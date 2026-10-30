@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useAgentChat, type ChatSession } from '../../store/agentChat'
 import { editedFiles } from '../../lib/agentReducer'
+import { focusSoon } from '../../lib/focusSoon'
 import { useEditor } from '../../store/editor'
 import { useWorkspace } from '../../store/workspace'
 import { FileLink, MessageText, PermissionCard, PlanView, ToolCallRow, UsageLine } from './ChatItems'
@@ -27,7 +28,7 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
     if (el && stick.current) el.scrollTop = el.scrollHeight
   }, [chat.items])
   useEffect(() => {
-    if (active) input.current?.focus()
+    if (active) return focusSoon(() => input.current?.focus())
   }, [active])
 
   const attachActiveFile = () => {

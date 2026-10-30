@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from 'react'
+import { Suspense, lazy, useLayoutEffect, useState } from 'react'
 import { useEditor, type Tab } from '../../store/editor'
 import { confirmAction } from '../../store/dialog'
 import { useTerminal } from '../../store/terminal'
@@ -49,6 +49,17 @@ export function EditorArea() {
   const terminals = useTerminal((s) => s.tabs)
   const sessions = useAgentChat((s) => s.sessions)
 
+  // WebKit (the macOS webview) keeps focus on an element that becomes hidden, so a
+  // hidden editor would keep receiving keystrokes typed "into the terminal". Drop
+  // focus from inactive tabs on every switch; the active tab focuses itself.
+  useLayoutEffect(() => {
+    const focused = document.activeElement
+    if (focused instanceof HTMLElement) {
+      const panel = focused.closest<HTMLElement>('.tab-panel')
+      if (panel && panel.dataset.tabId !== activeId) focused.blur()
+    }
+  }, [activeId])
+
   if (tabs.length === 0) return <Welcome />
 
   return (
@@ -85,7 +96,7 @@ export function EditorArea() {
         {tabs.map((tab) => {
           const active = tab.id === activeId
           return (
-            <div key={tab.id} className="tab-panel" hidden={!active}>
+            <div key={tab.id} className="tab-panel" data-tab-id={tab.id} hidden={!active}>
               <ErrorBoundary label={tab.title}>
                 <Suspense fallback={null}>
                   {tab.kind === 'file' && <FileView tab={tab} active={active} />}

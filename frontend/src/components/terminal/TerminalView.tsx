@@ -11,6 +11,7 @@ import { useEditor } from '../../store/editor'
 import { findPathLinks, resolvePath } from '../../lib/pathLinks'
 import { showToast } from '../../store/dialog'
 import { errorMessage } from '../../api/backend'
+import { focusSoon } from '../../lib/focusSoon'
 
 const THEME = {
   background: '#141518',
@@ -129,10 +130,11 @@ export function TerminalView({ tab, active }: Props) {
   }, [tab.id])
 
   useEffect(() => {
-    if (active) {
+    if (!active) return
+    return focusSoon(() => {
       fit.current?.fit()
       term.current?.focus()
-    }
+    })
   }, [active])
 
   return <div className="terminal-view" ref={host} />

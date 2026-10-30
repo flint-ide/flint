@@ -40,5 +40,4 @@ lint:
 install: build ## Copy to /Applications and add a `flint` command to ~/.local/bin
 	rm -rf /Applications/flint.app && cp -R build/bin/flint.app /Applications/
 	mkdir -p $(HOME)/.local/bin
-	printf '#!/bin/sh\nexec open -n -a flint --args "$$(cd "$${1:-.}" && pwd)"\n' > $(HOME)/.local/bin/flint
-	chmod +x $(HOME)/.local/bin/flint
+	install -m 755 scripts/flint $(HOME)/.local/bin/flint

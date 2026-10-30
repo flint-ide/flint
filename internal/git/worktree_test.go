@@ -235,3 +235,47 @@ func TestDefaultWorktreePath(t *testing.T) {
 		}
 	}
 }
+
+// An agent's worktree nested inside the main checkout (.claude/worktrees/…) is
+// its own work tree: opening it from a file's directory must find that tree and
+// its HEAD, not the outer repository's.
+func TestOpenFromNestedWorktreeUsesItsOwnHead(t *testing.T) {
+	r := newRepo(t)
+	writeFile(t, r.Root, "cmd/CHANGELOG.md", "v1\n")
+	commitAll(t, r.Root, "changelog")
+	nested := filepath.Join(r.Root, ".claude", "worktrees", "agent")
+	mustGit(t, r.Root, "worktree", "add", "-q", "-b", "agent/task", nested)
+	writeFile(t, nested, "cmd/CHANGELOG.md", "v2\n")
+	commitAll(t, nested, "agent change")
+	writeFile(t, nested, "cmd/CHANGELOG.md", "v3 uncommitted\nv2\n")
+
+	path := filepath.Join(nested, "cmd", "CHANGELOG.md")
+	wt := openRepo(t, filepath.Dir(path))
+	if resolved, _ := filepath.EvalSymlinks(wt.Root); resolved != mustEval(t, nested) {
+		t.Fatalf("root = %s, want %s", wt.Root, nested)
+	}
+	rel, err := wt.Rel(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rev, err := wt.FileAt(context.Background(), "HEAD", rel)
+	if err != nil || !rev.Exists || rev.Content != "v2\n" {
+		t.Fatalf("HEAD version = %+v, %v; want the worktree's v2", rev, err)
+	}
+	// The outer repository does not track the nested path at all.
+	if _, err := r.Rel(path); err == nil {
+		outer, _ := r.FileAt(context.Background(), "HEAD", ".claude/worktrees/agent/cmd/CHANGELOG.md")
+		if outer.Exists {
+			t.Fatal("outer HEAD unexpectedly tracks the nested worktree file")
+		}
+	}
+}
+
+func mustEval(t *testing.T, p string) string {
+	t.Helper()
+	out, err := filepath.EvalSymlinks(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}

@@ -23,6 +23,8 @@ export function Fetch(arg1:string):Promise<void>;
 
 export function FileAt(arg1:string,arg2:string,arg3:string):Promise<git.Revision>;
 
+export function HeadFile(arg1:string):Promise<git.Revision>;
+
 export function Info(arg1:string):Promise<main.RepoInfo>;
 
 export function LastCommitMessage(arg1:string):Promise<string>;

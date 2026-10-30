@@ -26,6 +26,30 @@ describe('createBus', () => {
     bus.emit('ping')
     assert.deepEqual(got, ['b', 'a', 'a'])
   })
+
+  it('does not call a handler subscribed during emit until the next emit', () => {
+    const bus = createBus<{ ping: [] }>()
+    const got: string[] = []
+    bus.on('ping', () => {
+      got.push('a')
+      if (got.length === 1) bus.on('ping', () => got.push('late'))
+    })
+    bus.emit('ping')
+    bus.emit('ping')
+    assert.deepEqual(got, ['a', 'a', 'late'])
+  })
+
+  it('subscribes the same handler once, like a Set', () => {
+    const bus = createBus<{ ping: [] }>()
+    let calls = 0
+    const fn = () => calls++
+    bus.on('ping', fn)
+    const off = bus.on('ping', fn)
+    bus.emit('ping')
+    off()
+    bus.emit('ping')
+    assert.equal(calls, 1)
+  })
 })
 
 describe('createStore', () => {
@@ -83,6 +107,30 @@ describe('createStore', () => {
     store.subscribe(() => calls++)
     store.setState((s) => s)
     assert.equal(calls, 0)
+  })
+
+  it('skips the event (and keeps the state object) when a partial changes nothing', () => {
+    const store = counter()
+    const before = store.getState()
+    let calls = 0
+    store.subscribe(() => calls++)
+    store.setState({})
+    store.setState(() => ({}))
+    store.setState({ n: 0, label: 'x' })
+    store.setState((s) => ({ inc: s.inc }))
+    assert.equal(calls, 0)
+    assert.equal(store.getState(), before)
+    store.setState({ n: 0, label: 'y' })
+    assert.equal(calls, 1)
+    assert.equal(store.getState().label, 'y')
+  })
+
+  it('still notifies a replace with an equal-looking but new state', () => {
+    const store = counter()
+    let calls = 0
+    store.subscribe(() => calls++)
+    store.setState({ ...store.getState() }, true)
+    assert.equal(calls, 1)
   })
 })
 

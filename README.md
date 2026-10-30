@@ -9,21 +9,26 @@ Szybkie, minimalistyczne IDE „AI-first” na macOS. Kod piszą agenci (claude,
 | Obszar | Jak działa |
 |---|---|
 | Karty | Pliki, terminale, czaty z agentem, konsole SQL i diffy w jednym obszarze kart z ikonami typów plików. Plik otwarty z terminala pojawia się obok, a `⌘[` wraca do terminala (historia jak w IntelliJ). `⌘J` przełącza terminal ↔ ostatni plik, `+` otwiera terminal / czat / konsolę SQL. |
-| Terminal | Prawdziwe PTY (`creack/pty`), login shell z Twoim `PATH`, renderowanie WebGL. Kilka zakładek. `⌘`+klik w `ścieżka:linia` z wyjścia agenta otwiera plik na danej linii. Shift+Enter wstawia nową linię w promptach claude/codex. |
+| Terminal | Prawdziwe PTY (`creack/pty`), login shell z Twoim `PATH`, renderowanie WebGL. Kilka zakładek. `⌘`+klik w `ścieżka:linia` z wyjścia agenta otwiera plik na danej linii. Shift+Enter wstawia nową linię w promptach claude/codex. Zaznaczone wyjście → `⌘L` albo prawy klik → *Send to agent* trafia do czatu z agentem jako blok kodu. |
 | Zmiany agenta na żywo | FSEvents (jedna rekurencyjna subskrypcja na cały projekt). Drzewo plików się odświeża, a otwarte pliki przeładowują się w miejscu z minimalnym diffem. Jeśli masz niezapisane zmiany, pojawi się ostrzeżenie. |
 | Wyszukiwanie | `ripgrep --json`, wyniki przychodzą strumieniowo w paczkach i są renderowane wirtualnie. Bez rg działa wolniejszy fallback w czystym Go. |
 | Go to file (`⌘P`) | Lista z `rg --files` (respektuje `.gitignore`) trzymana w Go; fuzzy matching też w Go, do WebView wraca tylko top 60 wyników. Brak indeksowania z góry. |
 | Bazy danych | PostgreSQL (`pgx`) i ClickHouse (natywny protokół). Hasła trzymane są w Keychainie macOS, nie w plikach. Przeglądarka schematu, autouzupełnianie SQL ze schematu, tryb read-only. |
-| Git (jak w IntelliJ) | Panel Commit (`⌘K`) z checkboxami, Amend, Commit and Push i Rollback. Diff obok siebie w karcie. Znaczniki zmienionych linii na marginesie, które pokazują też, co ruszył agent. Widżet gałęzi w pasku stanu: checkout, nowa gałąź, fetch, pull, push (`⇧⌘K`). Commit podczas merge'a obejmuje cały index. |
+| Git (jak w IntelliJ) | Panel Commit (`⌘K`) z checkboxami, Amend, Commit and Push i Rollback. Diff obok siebie w karcie. Znaczniki zmienionych linii na marginesie, które pokazują też, co ruszył agent. Widżet gałęzi w pasku stanu: checkout, nowa gałąź, fetch, pull, push (`⇧⌘K`). Commit podczas merge'a obejmuje cały index. **Annotate** (blame): kolumna z datą i autorem przy każdej linii (przycisk *Blame* w pasku stanu albo prawy klik na marginesie edytora), z podpowiedzią (pełny hash, autor, data, opis). Klik otwiera zmianę z tego commita, a linie niezacommitowane (także niezapisane) mają „Not committed”. **Show History** pliku (`git log --follow`, z rename'ami) w osobnej karcie: lista commitów, pod nią diff wybranego commita, *Compare with current*. **Stash** w panelu Commit: zapis z wiadomością (opcjonalnie z plikami nieśledzonymi), lista z Apply / Pop / Drop (z potwierdzeniem) i diffem każdego pliku. Działa też dla plików w zagnieżdżonych worktree. |
 | Worktree | Lista, tworzenie (`<repo>.worktrees/<gałąź>`), usuwanie, przełączanie, otwieranie w nowym oknie lub od razu z terminalem dla agenta. Checkout i commit zrobione w terminalu odświeżają UI, bo obserwowany jest też katalog git. |
-| LSP | `gopls`, `rust-analyzer`, `vtsls`/`typescript-language-server`, `basedpyright`/`pyright`. Serwer startuje w tle przy pierwszym pliku danego języka. Podpowiedzi, hover, ⌘+klik / ⌘B / F12 → definicja, ⌥F7 / ⇧F12 → Find Usages, błędy na żywo. Stan serwera i podpowiedź instalacji w pasku stanu. |
-| Czat z agentem | Natywne sterowniki **bez npm**: Claude Code (`claude -p` w trybie `stream-json` + `--permission-prompt-tool stdio`) i Codex (`codex app-server`), plus klient ACP dla agentów mówiących nim natywnie. Wspólny panel w doku po prawej (`+` → claude / codex): strumieniowana odpowiedź, wywołania narzędzi z mini-diffem, plan, lista zmienionych plików. Edycje i odczyty przechodzą bez pytania (polityka „auto: edits”), komendy pytają. `⌘L` dołącza zaznaczenie lub bieżący plik do rozmowy. |
+| LSP | `gopls`, `rust-analyzer`, `vtsls`/`typescript-language-server`, `basedpyright`/`pyright`. Serwer startuje w tle przy pierwszym pliku danego języka. Podpowiedzi, hover, ⌘+klik / ⌘B / F12 → definicja, ⌥F7 / ⇧F12 → Find Usages, błędy na żywo (`⇧⌘M` lista problemów, `F8` następny). Przy błędzie i ostrzeżeniu przycisk *Fix with agent* (oraz *Fix all N in file*, także `⌥⇧⌘L`): do czatu trafia ścieżka, linia:kolumna, waga, źródło (np. gopls), komunikat i okoliczne linie jako załącznik. Stan serwera i podpowiedź instalacji w pasku stanu. |
+| Czat z agentem | Natywne sterowniki **bez npm**: Claude Code (`claude -p` w trybie `stream-json` + `--permission-prompt-tool stdio`) i Codex (`codex app-server`), plus klient ACP dla agentów mówiących nim natywnie. Wspólny panel w doku po prawej (`+` → claude / codex): strumieniowana odpowiedź, wywołania narzędzi z mini-diffem, plan, lista zmienionych plików. Edycje i odczyty przechodzą bez pytania (polityka „auto: edits”), komendy pytają. `⌘L` dołącza zaznaczenie lub bieżący plik do rozmowy. „Wyślij do agenta” (problemy LSP, wyjście terminala) używa wspólnego `askAgent` (`frontend/src/lib/askAgent.ts`): aktywny lub ostatnio używany czat bieżącego projektu, a gdy go nie ma — nowy z preferowanym agentem. Treść trafia do szkicu, żeby można było coś dopisać; ⌥-klik wysyła od razu. W nagłówku czatu: zużycie (skumulowane tokeny wejścia/wyjścia, koszt w USD, o ile agent go raportuje — codex zwykle nie — oraz pasek wypełnienia kontekstu, np. „42% context”), ze szczegółami w podpowiedzi; suma dla projektu w pasku stanu. Zużycie jest częścią zapisanej sesji. |
 | Agent | ✦ *Generate message*: `claude -p` (albo `codex exec`) dostaje diff zaznaczonych plików i ostatnie wiadomości commitów, a wynik trafia do pola do poprawki. ✦ *Resolve with claude*: konflikty trafiają do interaktywnej sesji agenta w nowym terminalu; agent robi `git add`, ale nie commituje. Nic nie wymaga akceptowania diffów. |
+| Uruchamianie (jak w IntelliJ) | Konfiguracje w `.flint/run.json` (do commitowania, jak `.idea/runConfigurations` / `.vscode/launch.json`): `command` (program z argumentami albo linia powłoki), `go` (build pakietu lub pliku + uruchomienie binarki), `npm` (skrypt z `package.json`, menedżer wg lockfile'a), `make`. Katalog roboczy, zmienne środowiskowe i krok „before launch”. Bez konfiguracji Flint sam wykrywa pakiety `main` w Go, cele `Makefile` i skrypty `package.json` (zapisuje je dopiero po edycji). Selektor z ▶ Run / ↻ Rerun / ■ Stop w pasku tytułu, wyjście w karcie z xterm.js i klikalnymi `ścieżka:linia`. Proces działa w PTY we własnej grupie procesów, więc Stop (SIGINT, po 3 s SIGKILL) kończy też dzieci (`go run`, `npm run`). Pole `debug` w konfiguracji jest zarezerwowane pod debugger DAP (`dlv dap`). |
+| Testy | ▶ na marginesie przy `func TestXxx`, podtestach `t.Run("…")`, `describe` / `it` / `test` w `*.test.ts(x)` / `*.spec.*`; ▶ przy `package` (lub w 1. linii pliku JS) uruchamia cały plik, ⌥-klik cały pakiet. Wynik przy teście: ✓ / ✗ / ↷. Karta *Tests*: drzewo pakietów i testów ze statusem i czasem, wyjście błędu z klikalnymi lokalizacjami, „Rerun failed”, ponowne uruchomienie pojedynczego testu. Go: `go test -json` parsowany w Go. JS: `node --test --test-reporter=tap` (także przez skrypt `test` tego repo, `webbuild --test`); inne runnery (jest, vitest) uruchamiają się przez skrypt `test` i raportują tylko kod wyjścia. |
+| Debugger | Go przez Delve (`dlv dap`, klient DAP w Go: `internal/dap`). Przycisk z robakiem obok ▶ w pasku tytułu (`⌃D`) debuguje wybraną konfigurację `go`, a ⇧-klik w ▶ przy teście debuguje test. Breakpointy: klik na marginesie plików `.go` lub `⌘F8`; przesuwają się razem z edycją i są częścią zapisanej sesji. Po zatrzymaniu edytor pokazuje bieżącą linię, a karta *Debug* — ramki stosu, zmienne (rozwijane leniwie) i konsolę z wyjściem programu i ewaluacją wyrażeń. Krokowanie: `F9` wznów, `F8` przejdź, `F7` wejdź, `⇧F8` wyjdź, `⌘F2` zatrzymaj. Wymaga `dlv` (`go install github.com/go-delve/delve/cmd/dlv@latest`) i włączonego trybu deweloperskiego macOS (`sudo DevToolsSecurity -enable`). |
 | Brudnopisy | Trwałe konsole SQL i notatki (MD/TXT) z autozapisem. `⌘↵` uruchamia zapytanie spod kursora lub zaznaczenie. Wyniki trafiają do wirtualizowanej tabeli (do 200k wierszy) z eksportem do TSV/JSON. |
 
 ## Skróty
 
-`⌘[` / `⌘]` wstecz / dalej · `⌘P` plik · `⇧⌘F` szukaj · `⌘B`/`F12` definicja · `⌥F7` użycia · `⌘L` do agenta · `⌘K` commit · `⇧⌘K` push · `⌘J` terminal · `⇧⌘T` nowy terminal · `⌘N` nowa konsola SQL · `⌘↵` uruchom zapytanie · `⌘S` zapisz · `⌘W` zamknij kartę · `⌘B` panel boczny · `⌘O` otwórz folder · `⌘K` w terminalu czyści ekran
+`⇧⌘P` paleta akcji · `⌘[` / `⌘]` wstecz / dalej · `⌘P` plik · `⇧⌘F` szukaj · `⌘B`/`F12` definicja · `⌥F7` użycia · `⌘L` do agenta (zaznaczenie w edytorze lub terminalu) · `⌥⇧⌘L` napraw problemy pliku z agentem · `⇧⌘M` problemy · `⌘K` commit · `⇧⌘K` push · `⌘J` terminal · `⇧⌘T` nowy terminal · `⌘N` nowa konsola SQL · `⌘↵` uruchom zapytanie · `⌘S` zapisz · `⌘W` zamknij kartę · `⌘B` panel boczny · `⌘O` otwórz folder · `⌘K` w terminalu czyści ekran · `⌃R` uruchom wybraną konfigurację (ponownie, jeśli działa) · `⌃⇧R` uruchom test pod kursorem (poza plikiem testów: wybraną konfigurację) · `⌘F2` zatrzymaj · `⌃D` debuguj · `⌘F8` breakpoint · `F9` / `F8` / `F7` / `⇧F8` wznów / przejdź / wejdź / wyjdź (podczas debugowania)
+
+Paleta akcji (`⇧⌘P`, jak „Find Action” w IntelliJ) wyszukuje fuzzy wśród wszystkich komend aplikacji (nawigacja, git, terminal, agent, bazy, brudnopisy), pokazuje ich kategorię i skrót, a ostatnio użyte trzyma na górze. Komendy i globalne skróty pochodzą z jednego rejestru (`frontend/src/lib/commands.ts`); nowa funkcja dodaje swoje akcje przez `registerCommand`.
 
 ## Uruchomienie
 
@@ -79,7 +84,7 @@ flowchart LR
   end
 
   UI -- "wywołania metod (Wails bindings)" --> GO
-  GO -- "zdarzenia: term:data · agent:event · search:batch<br/>fs:changed · git:changed · lsp:diagnostics" --> UI
+  GO -- "zdarzenia: term:data · agent:event · run:event · debug:event · search:batch<br/>fs:changed · git:changed · lsp:diagnostics" --> UI
   srch & git & lsp --> bins
   ag --> agents
   term --> shell
@@ -89,12 +94,13 @@ flowchart LR
 **Komunikacja UI ↔ Go.**
 - **Wywołania:** frontend wywołuje metody `WorkspaceAPI`, `GitAPI`, `DatabaseAPI`, `LSPAPI`, `AgentChatAPI` itd. przez wygenerowane bindingi (`frontend/wailsjs`). Wails wykonuje każde wywołanie w osobnej gorutynie, dlatego zapisy i wpisywanie do terminala są kolejkowane po stronie UI.
 - **Zdarzenia:** strumienie płyną zdarzeniami (wyjście terminala, odpowiedzi agenta, wyniki wyszukiwania, zmiany plików i gita, diagnostyka LSP).
-- **Kolejność:** zdarzenia terminala i agenta mają numery sekwencyjne, a UI układa je z powrotem w kolejności, bo transport nie gwarantuje kolejności (np. dev server Wails).
+- **Kolejność:** zdarzenia terminala, agenta i uruchomień (wyjście, wyniki testów i kod wyjścia w jednym strumieniu `run:event`) mają numery sekwencyjne, a UI układa je z powrotem w kolejności, bo transport nie gwarantuje kolejności (np. dev server Wails).
 
 **Frontend bez łańcucha narzędzi npm.**
-- **Build:** `cmd/webbuild` (Go, `github.com/evanw/esbuild/pkg/api`) bundluje TSX i CSS do `frontend/dist` w ~0,1 s. `wails build` wywołuje go jako `frontend:build` z `--typecheck` (najpierw `tsc --noEmit`, bo esbuild tylko usuwa typy). `wails dev` uruchamia `webbuild --watch`: przebudowa po każdej zmianie i przeładowanie strony przez strumień SSE esbuild (`/esbuild`), bez HMR. Serwer dev działa na `localhost:5173` (`frontend:dev:serverUrl`).
+- **Build:** `cmd/webbuild` (Go, `github.com/evanw/esbuild/pkg/api`) bundluje TSX i CSS do `frontend/dist` w ~0,1 s, z podziałem na chunki: przy starcie ładuje się ok. 350 KB JS, a edytor (CodeMirror), terminal (xterm.js), języki, czat i panele dopiero przy pierwszym użyciu. `wails build` wywołuje go jako `frontend:build` z `--typecheck` (najpierw `tsc --noEmit`, bo esbuild tylko usuwa typy). `wails dev` uruchamia `webbuild --watch`: przebudowa po każdej zmianie i przeładowanie strony przez strumień SSE esbuild (`/esbuild`), bez HMR. Serwer dev działa na `localhost:5173` (`frontend:dev:serverUrl`).
 - **Testy:** `webbuild --test` kompiluje `src/**/*.test.ts(x)` do katalogu tymczasowego i uruchamia `node --test`. Testy używają `node:test` i `node:assert`. Typy sprawdza `tsc --noEmit`, a typy `node:test` są opisane lokalnie w `src/testing/node.d.ts` (bez `@types/node`).
 - **Stan:** `src/lib/store.ts` (`createStore`) to mały kontener na `useSyncExternalStore`. `setState` emituje zdarzenie `change` na event busie (`src/lib/bus.ts`). API jak wcześniej: `useX(selector)`, `useX.getState()`, `useX.setState()`, `useX.subscribe()`. Wynik selektora jest zapamiętywany i porównywany przez `Object.is`, więc selektor budujący nową tablicę nie zapętla renderów.
+- **Komendy:** rejestr `src/lib/commands.ts` (`registerCommand({ id, title, category, keys, when, run })`) zasila paletę `⇧⌘P` i jedyny globalny listener `keydown` (faza capture, przed CodeMirror i xterm). Skróty należące do edytora (np. `⌘B`, `⌘S`) paleta tylko wyświetla, a uruchamia je przez keymapę aktywnego edytora.
 - **Własny kod zamiast bibliotek:** wirtualizacja list o stałej wysokości wiersza (`src/lib/virtualList.ts`), dopasowanie terminala do kontenera (`terminalFit.ts`) oraz klikalne URL-e w terminalu, także zawinięte na kilka wierszy (`terminalLinks.ts`).
 - **Obliczenia w Go:** diffy liczy `internal/textdiff` (Myers w pamięci liniowej, limit czasu, potem zastępuje cały region; słowa zmienione wewnątrz linii jako offsety UTF-16). Przez `DiffAPI` dostają je: znaczniki na marginesie edytora (`Marks`), statystyki +/− i mini-diffy w czacie agenta (`Hunks`) oraz karta diffu (`Compare`). Kartę diffu rysują dwa zwykłe edytory CodeMirror z własnymi dekoracjami: tło zmienionych linii, zmienione słowa, odstępy wyrównujące obie strony i zwinięte niezmienione fragmenty. Lista plików dla ⌘P jest trzymana w `fuzzy.Index` po stronie Go (`WorkspaceAPI.IndexFiles` / `FindFiles`), więc WebView nigdy nie dostaje pełnej listy.
 
@@ -126,12 +132,15 @@ flowchart LR
 | Otwarte karty, terminale, rozmowy z agentem (sesja projektu) | `~/Library/Application Support/flint/sessions/<hash ścieżki>.json`, jeden plik na projekt | zapis po zmianach (debounce) i przy wyjściu, `0600`, maks. 4 MB |
 | Historia rozmów z agentem | sam CLI agenta: `~/.claude/projects/…`, `~/.codex/sessions/…` | Flint wznawia je po restarcie (`claude --resume`, codex `thread/resume`) |
 | „Always allow” dla komend Claude | `.claude/settings.local.json` w projekcie | zapisuje Claude Code, jak w terminalu |
+| Konfiguracje uruchomieniowe | `.flint/run.json` w projekcie | do commitowania; wersja formatu, walidacja w Go (nieznane pola i typy są błędem) |
+| Wybrana konfiguracja uruchomieniowa | sesja projektu (`sessions/<hash ścieżki>.json`) | uruchomione procesy nie są przywracane |
+| Binarki konfiguracji `go` | `$TMPDIR/flint-run/<hash>/` | nadpisywane przy każdym uruchomieniu |
 | Cache serwerów LSP | ich własne katalogi, np. `~/Library/Caches/gopls` | |
 
 Sesja projektu zawiera:
 - karty plików z pozycją kursora, brudnopisy i diffy;
 - terminale: ostatni katalog powłoki (podąża za `cd`) i ostatnie ~400 linii wyjścia. Po restarcie startuje nowa powłoka w tym katalogu, a stary output widać nad nią przyciemniony. Programy pełnoekranowe (np. TUI claude) nie są zapisywane;
-- rozmowy z agentem: transcript (ostatnie 200 wpisów, długie wyjścia narzędzi przycięte). Agent dostaje połączenie przy pierwszej nowej wiadomości. Gdy rozmowy nie da się wznowić, Flint zaczyna nową i to zaznacza.
+- rozmowy z agentem: transcript (ostatnie 200 wpisów, długie wyjścia narzędzi przycięte), zużycie tokenów i koszt). Agent dostaje połączenie przy pierwszej nowej wiadomości. Gdy rozmowy nie da się wznowić, Flint zaczyna nową i to zaznacza.
 
 Wyjście terminala może zawierać dane wrażliwe, dlatego plik ma uprawnienia `0600`. Usunięcie pliku z `sessions/` czyści sesję projektu.
 
@@ -149,8 +158,12 @@ internal/search             ripgrep + fallback, streaming wyników
 internal/db                 profile połączeń, Keychain, pgx/clickhouse, normalizacja typów
 internal/scratch            trwałe brudnopisy
 internal/terminal           PTY, koalescencja wyjścia, cwd powłoki (proc_pidinfo)
+internal/runconfig          .flint/run.json: schemat, walidacja, zapis, wykrywanie (Go main, make, npm)
+internal/runner             procesy konfiguracji i testów: kroki, PTY lub pipe'y, grupa procesów, Stop
+internal/testrun            plan uruchomienia testów, parsery go test -json i TAP, testy w pliku (gutter)
+internal/dap                klient Debug Adapter Protocol, sesje Delve (dlv dap)
 internal/restore            zapis sesji projektu (karty, terminale, czaty) między uruchomieniami
-internal/git                status, commit, rollback, gałęzie, worktree, log (CLI gita)
+internal/git                status, commit, rollback, gałęzie, worktree, log, blame, historia pliku, stash (CLI gita)
 internal/agent              claude / codex: tryb bez interakcji i polecenia interaktywne
 internal/shellenv           PATH z login shell (hooki gita, brew, nvm w aplikacji GUI)
 internal/watcher            FSEvents + debounce

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { createStore } from '../lib/store'
 import * as Git from '../../wailsjs/go/main/GitAPI'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
@@ -26,8 +27,13 @@ interface GitState {
   message: string
   amend: boolean
   busy: RemoteOp
-  /** Bumps whenever HEAD/index change so editors refetch their gutter baseline. */
+  /**
+   * Bumps when HEAD of the opened work tree moves (commit, checkout, reset), so editors
+   * refetch their gutter baseline, blame and history. Index writes leave it alone.
+   */
   headVersion: number
+  /** Bumps on every git:changed (index, refs, stashes, other worktrees' HEAD). */
+  refsVersion: number
 
   load: (folder: string | null) => Promise<void>
   refresh: () => Promise<void>
@@ -51,6 +57,7 @@ export const useGit = createStore<GitState>((set, get) => ({
   amend: false,
   busy: null,
   headVersion: 0,
+  refsVersion: 0,
 
   load: async (folder) => {
     if (!folder) {
@@ -176,10 +183,13 @@ function refreshStatus(): Promise<void> {
       try {
         const status = await Git.Status(root)
         if (useGit.getState().root !== root) return
-        const prevHead = useGit.getState().status?.head
+        const prev = useGit.getState().status
+        // Most refreshes (an agent's `git status`, a save) change nothing: keep the
+        // old object so the Commit panel and status bar don't render.
+        if (sameStatus(prev, status)) continue
         useGit.setState((s) => ({
           status,
-          headVersion: prevHead !== status.head ? s.headVersion + 1 : s.headVersion,
+          headVersion: prev?.head !== status.head ? s.headVersion + 1 : s.headVersion,
         }))
       } catch (err) {
         showToast(errorMessage(err), 'error')
@@ -190,6 +200,51 @@ function refreshStatus(): Promise<void> {
     inFlight = null
   })
   return inFlight
+}
+
+function sameStatus(a: GitStatus | null, b: GitStatus): boolean {
+  if (!a) return false
+  if (a.head !== b.head || a.branch !== b.branch || a.upstream !== b.upstream) return false
+  if (a.ahead !== b.ahead || a.behind !== b.behind || a.operation !== b.operation) return false
+  const fa = a.files ?? []
+  const fb = b.files ?? []
+  return (
+    fa.length === fb.length &&
+    fa.every((f, i) => {
+      const g = fb[i]
+      return f.path === g.path && f.origPath === g.origPath && f.kind === g.kind && f.index === g.index && f.worktree === g.worktree
+    })
+  )
+}
+
+/** headVersion for the opened work tree; refsVersion for another one (see useHeadVersion). */
+export function headVersionOf(s: Pick<GitState, 'root' | 'headVersion' | 'refsVersion'>, workTree: string): number {
+  return workTree === s.root ? s.headVersion : s.refsVersion
+}
+
+const dirname = (p: string) => p.slice(0, Math.max(p.lastIndexOf('/'), 1))
+
+/**
+ * Changes when HEAD of the work tree containing path may have moved. Only the opened
+ * work tree's HEAD is tracked (headVersion); a file in another one (an agent's nested
+ * worktree) follows every git:changed instead.
+ */
+export function useHeadVersion(path: string): number {
+  const root = useGit((s) => s.root)
+  const [workTree, setWorkTree] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    Git.Info(dirname(path)).then(
+      (info) => !cancelled && setWorkTree(info.isRepo ? info.root : null),
+      () => undefined, // keep the guess below
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [path, root])
+  // Until Info answers, a file under the opened folder is assumed to be in its work tree.
+  const tree = workTree ?? (root && path.startsWith(`${root}/`) ? root : '')
+  return useGit((s) => headVersionOf(s, tree))
 }
 
 let debounce: ReturnType<typeof setTimeout> | undefined
@@ -203,8 +258,10 @@ export function subscribeGitEvents(): void {
   if (subscribed) return
   subscribed = true
   // HEAD / index / refs changed (commit, checkout, rebase — ours or an agent's).
+  // HEAD itself is compared by the status refresh: index-only writes (an agent's
+  // `git add`) must not make every editor re-baseline, re-blame and reload history.
   EventsOn('git:changed', () => {
-    useGit.setState((s) => ({ headVersion: s.headVersion + 1 }))
+    useGit.setState((s) => ({ refsVersion: s.refsVersion + 1 }))
     scheduleRefresh(100)
   })
   // Working-tree edits change the status too.

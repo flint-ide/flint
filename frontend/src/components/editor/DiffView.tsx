@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { EditorState, type Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { Diff, Workspace, errorMessage, type Hunk } from '../../api/backend'
-import { Git, useGit } from '../../store/git'
+import { Git, headVersionOf, useGit } from '../../store/git'
 import { useEditor, type DiffTab } from '../../store/editor'
 import { onFileChanged } from '../../store/fsEvents'
 import { languageFor } from '../../lib/language'
@@ -18,7 +18,10 @@ interface Sides {
   note: string | null
 }
 
-/** Side-by-side diff of HEAD vs the working tree, refreshed live as agents edit. */
+/**
+ * Side-by-side diff of HEAD (or baseRev) vs the working tree, refreshed live as agents
+ * edit, or between two revisions when the tab has rev.
+ */
 export function DiffView({ tab }: { tab: DiffTab }) {
   const left = useRef<HTMLDivElement>(null)
   const right = useRef<HTMLDivElement>(null)
@@ -26,15 +29,20 @@ export function DiffView({ tab }: { tab: DiffTab }) {
   const [error, setError] = useState<string | null>(null)
   const [language, setLanguage] = useState<Extension>([])
   const [version, setVersion] = useState(0)
-  const headVersion = useGit((s) => s.headVersion)
+  // Fixed revisions never change: only a working-tree side follows saves, and only a
+  // HEAD base follows commits (a commit diff must not refetch on every git event).
+  const working = !tab.rev
+  const headBase = !tab.baseRev
+  const headVersion = useGit((s) => (headBase ? headVersionOf(s, tab.repoRoot) : 0))
   const openFile = useEditor((s) => s.openFile)
 
-  useEffect(() => onFileChanged(tab.path, () => setVersion((v) => v + 1)), [tab.path])
+  useEffect(() => (working ? onFileChanged(tab.path, () => setVersion((v) => v + 1)) : undefined), [tab.path, working])
   useEffect(() => void languageFor(tab.path).then(setLanguage), [tab.path])
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([Git.FileAt(tab.repoRoot, 'HEAD', tab.basePath), readWorking(tab.path)])
+    const right = tab.rev ? Git.FileAt(tab.repoRoot, tab.rev, tab.path) : readWorking(tab.path)
+    Promise.all([Git.FileAt(tab.repoRoot, tab.baseRev || 'HEAD', tab.basePath), right])
       .then(async ([baseFile, currentFile]) => {
         const note = baseFile.binary || currentFile.binary ? 'Binary file — contents not shown.' : null
         // One line-break convention, so Go and CodeMirror count the same lines.
@@ -49,7 +57,7 @@ export function DiffView({ tab }: { tab: DiffTab }) {
     return () => {
       cancelled = true
     }
-  }, [tab.repoRoot, tab.path, tab.basePath, version, headVersion])
+  }, [tab.repoRoot, tab.path, tab.basePath, tab.baseRev, tab.rev, version, headVersion])
 
   useEffect(() => {
     if (!left.current || !right.current || !sides || sides.note) return
@@ -80,9 +88,9 @@ export function DiffView({ tab }: { tab: DiffTab }) {
   return (
     <div className="diff-view">
       <div className="diff-header">
-        <span className="muted">HEAD</span>
+        <span className="muted">{tab.baseLabel ?? tab.baseRev ?? 'HEAD'}</span>
         <span className="truncate" title={tab.path}>{rel}</span>
-        <span className="muted">Working tree</span>
+        <span className="muted">{tab.label ?? (tab.rev ? tab.rev.slice(0, 7) : 'Working tree')}</span>
         <span className="spacer" />
         <button className="link" onClick={() => openFile(tab.path)}>Open file</button>
       </div>

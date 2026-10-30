@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { inside, parseSnapshot, trimChat } from './sessionSnapshot'
+import { chatsNeedSave, inside, parseSnapshot, trimChat, type AutosavedChat } from './sessionSnapshot'
 import type { ChatState } from './agentReducer'
 
 describe('inside', () => {
@@ -25,6 +25,19 @@ describe('parseSnapshot', () => {
     assert.equal(parseSnapshot('null'), null)
     assert.equal(parseSnapshot(JSON.stringify({ version: 99, active: 0, tabs: [] })), null)
     assert.equal(parseSnapshot(JSON.stringify({ version: 1, active: 0, tabs: {} })), null)
+  })
+
+  it('keeps the selected run configuration, ignoring bad values', () => {
+    assert.equal(parseSnapshot(JSON.stringify({ version: 1, active: 0, tabs: [], runConfig: 'server' }))?.runConfig, 'server')
+    assert.equal(parseSnapshot(JSON.stringify({ version: 1, active: 0, tabs: [], runConfig: 7 }))?.runConfig, undefined)
+  })
+
+  it('keeps history tabs and revision diffs', () => {
+    const tabs = [
+      { kind: 'history', path: '/p/a' },
+      { kind: 'diff', path: '/p/a', basePath: '/p/a', repoRoot: '/p', title: 'Δ a', baseRev: 'x^', rev: 'x' },
+    ]
+    assert.deepEqual(parseSnapshot(JSON.stringify({ version: 1, active: 0, tabs }))?.tabs, tabs)
   })
 
   it('defaults a bad active index to none', () => {
@@ -62,5 +75,40 @@ describe('trimChat', () => {
     assert.ok(tool.call.output!.length < 8_010)
     assert.deepEqual(tool.call.diffs!.map((d) => d.path), ['/p/small'])
     assert.equal(chat.items.length, 251) // input untouched
+  })
+})
+
+describe('trimChat cache', () => {
+  it('returns the same trimmed copy for the same chat', () => {
+    const chat: ChatState = { busy: false, plan: [], items: [{ type: 'assistant', text: 'hi' }] }
+    assert.equal(trimChat(chat), trimChat(chat))
+    assert.notEqual(trimChat({ ...chat }), trimChat(chat))
+  })
+})
+
+describe('chatsNeedSave', () => {
+  const session = (chat: Partial<ChatState> = {}, rest: Partial<AutosavedChat> = {}): AutosavedChat => ({
+    chat: { busy: true, plan: [], items: [{ type: 'assistant', text: 'a' }], ...chat },
+    draft: '',
+    ...rest,
+  })
+
+  it('ignores text streaming into the last item', () => {
+    const a = session()
+    const b = session({ items: [{ type: 'assistant', text: 'ab' }] })
+    assert.equal(chatsNeedSave({ s: a }, { s: b }), false)
+    assert.equal(chatsNeedSave({ s: a }, { s: a }), false)
+  })
+
+  it('saves for opened or closed chats and structural changes', () => {
+    const a = session()
+    assert.equal(chatsNeedSave({}, { s: a }), true)
+    assert.equal(chatsNeedSave({ s: a }, {}), true)
+    assert.equal(chatsNeedSave({ s: a }, { t: a }), true)
+    assert.equal(chatsNeedSave({ s: a }, { s: session({ busy: false }) }), true)
+    assert.equal(chatsNeedSave({ s: a }, { s: session({ items: [...a.chat.items, { type: 'error', text: 'x' }] }) }), true)
+    assert.equal(chatsNeedSave({ s: a }, { s: session({ totals: { inputTokens: 1, outputTokens: 0, costUsd: 0, contextTokens: 0, contextWindow: 0 } }) }), true)
+    assert.equal(chatsNeedSave({ s: a }, { s: session({}, { draft: 'hi' }) }), true)
+    assert.equal(chatsNeedSave({ s: a }, { s: session({}, { dormant: true }) }), true)
   })
 })

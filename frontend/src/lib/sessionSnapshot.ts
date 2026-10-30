@@ -1,4 +1,5 @@
 // Pure helpers for session snapshots (see store/session.ts).
+import { parseBreakpoints, type BreakpointMap } from './breakpoints'
 import type { ChatItem, ChatState, ToolCall } from './agentReducer'
 
 export const SNAPSHOT_VERSION = 1
@@ -19,7 +20,18 @@ export interface SavedChat {
 export type SavedTab =
   | { kind: 'file'; path: string; line?: number; col?: number }
   | { kind: 'scratch'; scratchId: string; scratchKind: 'sql' | 'markdown' | 'text'; title: string }
-  | { kind: 'diff'; path: string; basePath: string; repoRoot: string; title: string }
+  | {
+      kind: 'diff'
+      path: string
+      basePath: string
+      repoRoot: string
+      title: string
+      baseRev?: string
+      rev?: string
+      baseLabel?: string
+      label?: string
+    }
+  | { kind: 'history'; path: string }
   | { kind: 'terminal'; title: string; cwd: string; output: string }
   | { kind: 'chat'; title: string; chat: SavedChat }
 
@@ -28,6 +40,10 @@ export interface Snapshot {
   /** Index of the active tab in tabs (-1: none). */
   active: number
   tabs: SavedTab[]
+  /** Selected run configuration id (running processes are never saved). */
+  runConfig?: string
+  /** Debugger breakpoints: 1-based lines by absolute file path. */
+  breakpoints?: BreakpointMap
 }
 
 /** Whether path is root or lies under it. */
@@ -41,18 +57,62 @@ export function parseSnapshot(raw: string): Snapshot | null {
   try {
     const snap = JSON.parse(raw) as Snapshot
     if (snap?.version !== SNAPSHOT_VERSION || !Array.isArray(snap.tabs)) return null
-    return { version: snap.version, active: Number.isInteger(snap.active) ? snap.active : -1, tabs: snap.tabs.filter(isTab) }
+    return {
+      version: snap.version,
+      active: Number.isInteger(snap.active) ? snap.active : -1,
+      tabs: snap.tabs.filter(isTab),
+      ...(typeof snap.runConfig === 'string' && snap.runConfig ? { runConfig: snap.runConfig } : {}),
+      ...(snap.breakpoints ? { breakpoints: parseBreakpoints(snap.breakpoints) } : {}),
+    }
   } catch {
     return null
   }
 }
 
-const KINDS = new Set(['file', 'scratch', 'diff', 'terminal', 'chat'])
+const KINDS = new Set(['file', 'scratch', 'diff', 'history', 'terminal', 'chat'])
 const isTab = (t: unknown): t is SavedTab => typeof t === 'object' && t !== null && KINDS.has((t as SavedTab).kind)
+
+/** The parts of a chat session autosave looks at. */
+export interface AutosavedChat {
+  chat: ChatState
+  draft: string
+  dormant?: boolean
+}
+
+/**
+ * Whether a change to the chat sessions is worth an autosave: a chat opened or closed,
+ * a turn started or ended, an item added, the draft, dormancy or usage changed. Text
+ * streaming into the last item is not; the turn's end saves it.
+ */
+export function chatsNeedSave(prev: Record<string, AutosavedChat>, next: Record<string, AutosavedChat>): boolean {
+  if (prev === next) return false
+  const ids = Object.keys(prev)
+  if (ids.length !== Object.keys(next).length) return true
+  return ids.some((id) => {
+    const a = prev[id]
+    const b = next[id]
+    if (!b) return true
+    if (a === b) return false
+    return (
+      a.chat.busy !== b.chat.busy ||
+      a.chat.items.length !== b.chat.items.length ||
+      a.chat.totals !== b.chat.totals ||
+      a.draft !== b.draft ||
+      a.dormant !== b.dormant
+    )
+  })
+}
+
+// Chat states are immutable, so a trimmed copy stays valid as long as its chat lives.
+const trimmed = new WeakMap<ChatState, ChatState>()
 
 /** Keeps a transcript small: recent items only, long outputs cut, big diffs dropped. */
 export function trimChat(chat: ChatState): ChatState {
-  return { ...chat, busy: false, items: chat.items.slice(-CHAT_ITEMS).map(trimItem) }
+  const cached = trimmed.get(chat)
+  if (cached) return cached
+  const out = { ...chat, busy: false, items: chat.items.slice(-CHAT_ITEMS).map(trimItem) }
+  trimmed.set(chat, out)
+  return out
 }
 
 function trimItem(it: ChatItem): ChatItem {

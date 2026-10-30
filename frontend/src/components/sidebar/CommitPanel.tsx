@@ -5,6 +5,8 @@ import { confirmAction, showToast } from '../../store/dialog'
 import { resolveConflictsWithAgent, suggestCommitMessage, useAgent } from '../../store/agent'
 import { errorMessage } from '../../api/backend'
 import { Select } from '../ui/Select'
+import { openStashDialog } from '../../store/stash'
+import { StashSection } from './StashSection'
 
 const KIND_LETTER: Record<string, string> = {
   modified: 'M', added: 'A', deleted: 'D', renamed: 'R', copied: 'C',
@@ -19,8 +21,17 @@ interface Group {
 
 /** IntelliJ-style Commit tool window: tick changes, write a message, commit (and push). */
 export function CommitPanel({ focusToken }: { focusToken: number }) {
-  const { root, isRepo, status, message, amend, busy } = useGit()
-  const { setMessage, setAmend, toggleFile, setGroup, isIncluded, commit, rollback, remote, refresh } = useGit()
+  // Field by field: the store also carries counters bumped on every git event.
+  const root = useGit((s) => s.root)
+  const isRepo = useGit((s) => s.isRepo)
+  const status = useGit((s) => s.status)
+  const message = useGit((s) => s.message)
+  const amend = useGit((s) => s.amend)
+  const busy = useGit((s) => s.busy)
+  // isIncluded reads these; subscribing re-renders the panel when a file is ticked.
+  useGit((s) => s.excluded)
+  useGit((s) => s.includedUntracked)
+  const { setMessage, setAmend, toggleFile, setGroup, isIncluded, commit, rollback, remote, refresh } = useGit.getState()
   const openDiff = useEditor((s) => s.openDiff)
   const openFile = useEditor((s) => s.openFile)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
@@ -86,6 +97,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
         <button className="icon" title="Fetch" disabled={!!busy} onClick={() => void remote('fetch')}>⇣</button>
         <button className="icon" title="Update project (pull)" disabled={!!busy} onClick={() => void remote('pull')}>⤓</button>
         <button className="icon" title="Push (⇧⌘K)" disabled={!!busy} onClick={() => void remote('push')}>⤒</button>
+        <button className="icon" title="Stash changes…" disabled={!!busy} onClick={openStashDialog}>⊟</button>
       </div>
       <div className="git-branch-line muted">
         ⎇ {status?.branch || `detached ${status?.head.slice(0, 7) ?? ''}`}
@@ -160,6 +172,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
             </div>
           )
         })}
+        <StashSection />
       </div>
 
       <div className="commit-box">

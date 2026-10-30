@@ -37,7 +37,14 @@ type GitAPI struct {
 
 	mu    sync.Mutex
 	repos map[string]*git.Repo
+	// blames cancels a file's previous blame when a newer one starts (an agent
+	// editing an annotated file would otherwise stack up git processes).
+	blames map[string]*context.CancelFunc
 }
+
+// maxCachedRepos bounds the folder → repository cache (blame and history add
+// one entry per folder of the files they open).
+const maxCachedRepos = 256
 
 func (g *GitAPI) repo(ctx context.Context, dir string) (*git.Repo, error) {
 	g.mu.Lock()
@@ -51,7 +58,7 @@ func (g *GitAPI) repo(ctx context.Context, dir string) (*git.Repo, error) {
 		return nil, err
 	}
 	g.mu.Lock()
-	if g.repos == nil {
+	if g.repos == nil || len(g.repos) >= maxCachedRepos {
 		g.repos = map[string]*git.Repo{}
 	}
 	g.repos[dir] = r
@@ -219,6 +226,93 @@ func (g *GitAPI) Log(dir string, opts git.LogOptions) ([]git.Commit, error) {
 func (g *GitAPI) CommitFiles(dir, hash string) ([]git.FileChange, error) {
 	return with(g, dir, gitTimeout, func(ctx context.Context, r *git.Repo) ([]git.FileChange, error) {
 		return r.CommitFiles(ctx, hash)
+	})
+}
+
+// Blame annotates a file (absolute path) as shown in the editor: contents is the
+// buffer, so unsaved edits come back as uncommitted lines. Like HeadFile, the
+// repository is found from the file's directory (nested worktrees included).
+func (g *GitAPI) Blame(path, contents string) (git.Blame, error) {
+	return with(g, filepath.Dir(path), gitTimeout, func(ctx context.Context, r *git.Repo) (git.Blame, error) {
+		rel, err := r.Rel(path)
+		if err != nil {
+			return git.Blame{}, err
+		}
+		ctx, cancel := context.WithCancel(ctx)
+		mine := &cancel
+		g.mu.Lock()
+		if prev := g.blames[path]; prev != nil {
+			(*prev)()
+		}
+		if g.blames == nil {
+			g.blames = map[string]*context.CancelFunc{}
+		}
+		g.blames[path] = mine
+		g.mu.Unlock()
+		defer func() {
+			cancel()
+			g.mu.Lock()
+			if g.blames[path] == mine {
+				delete(g.blames, path)
+			}
+			g.mu.Unlock()
+		}()
+		return r.Blame(ctx, rel, &contents)
+	})
+}
+
+// FileHistory lists commits touching a file (absolute path), following renames.
+// The result carries the work-tree root the entries' paths are relative to.
+func (g *GitAPI) FileHistory(path string, limit int) (FileHistory, error) {
+	return with(g, filepath.Dir(path), gitTimeout, func(ctx context.Context, r *git.Repo) (FileHistory, error) {
+		rel, err := r.Rel(path)
+		if err != nil {
+			return FileHistory{}, err
+		}
+		commits, err := r.FileHistory(ctx, rel, limit)
+		return FileHistory{Root: r.Root, Commits: commits}, err
+	})
+}
+
+// FileHistory is a file's log together with the work tree it was read from.
+type FileHistory struct {
+	Root    string           `json:"root"`
+	Commits []git.FileCommit `json:"commits"`
+}
+
+// Stashes lists the repository's stashes, newest first.
+func (g *GitAPI) Stashes(dir string) ([]git.Stash, error) {
+	return with(g, dir, gitTimeout, func(ctx context.Context, r *git.Repo) ([]git.Stash, error) {
+		return r.Stashes(ctx)
+	})
+}
+
+// StashPush stashes local changes, optionally with untracked files.
+func (g *GitAPI) StashPush(dir, message string, includeUntracked bool) error {
+	return do(g, dir, gitTimeout, func(ctx context.Context, r *git.Repo) error {
+		return r.StashPush(ctx, message, includeUntracked)
+	})
+}
+
+// StashApply applies the stash with the given hash and keeps it.
+func (g *GitAPI) StashApply(dir, hash string) error {
+	return do(g, dir, gitTimeout, func(ctx context.Context, r *git.Repo) error { return r.StashApply(ctx, hash) })
+}
+
+// StashPop applies the stash with the given hash and drops it.
+func (g *GitAPI) StashPop(dir, hash string) error {
+	return do(g, dir, gitTimeout, func(ctx context.Context, r *git.Repo) error { return r.StashPop(ctx, hash) })
+}
+
+// StashDrop deletes the stash with the given hash.
+func (g *GitAPI) StashDrop(dir, hash string) error {
+	return do(g, dir, gitTimeout, func(ctx context.Context, r *git.Repo) error { return r.StashDrop(ctx, hash) })
+}
+
+// StashFiles lists the files a stash changed (untracked ones with Kind "untracked").
+func (g *GitAPI) StashFiles(dir, hash string) ([]git.FileChange, error) {
+	return with(g, dir, gitTimeout, func(ctx context.Context, r *git.Repo) ([]git.FileChange, error) {
+		return r.StashFiles(ctx, hash)
 	})
 }
 

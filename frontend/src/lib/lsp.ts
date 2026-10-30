@@ -2,10 +2,11 @@ import type { Extension, Text } from '@codemirror/state'
 import { EditorView, ViewPlugin, hoverTooltip, keymap, type ViewUpdate } from '@codemirror/view'
 import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
 import { EditorState } from '@codemirror/state'
-import { lintGutter, setDiagnostics, type Diagnostic as CMDiagnostic } from '@codemirror/lint'
+import { lintGutter, lintKeymap, setDiagnostics, type Diagnostic as CMDiagnostic } from '@codemirror/lint'
 import * as LSP from '../../wailsjs/go/main/LSPAPI'
 import type { lsp } from '../../wailsjs/go/models'
 import { onDiagnostics, currentDiagnostics } from '../store/lsp'
+import { agentActions, fixFileProblemsWithAgent } from './lspAgent'
 
 export type Location = lsp.Location
 
@@ -67,16 +68,18 @@ export function lspExtension(root: string, path: string, hooks: LspHooks): Exten
       }
       applyDiagnostics() {
         const doc = this.view.state.doc
-        const diags: CMDiagnostic[] = currentDiagnostics(path).map((d) => {
+        const list = currentDiagnostics(path)
+        const diags: CMDiagnostic[] = list.map((d) => {
           const from = fromLsp(doc, d.range.start)
           const to = Math.max(from, fromLsp(doc, d.range.end))
-          return {
+          const diag: CMDiagnostic = {
             from,
             to: to === from ? Math.min(from + 1, doc.length) : to,
             severity: d.severity === 1 ? 'error' : d.severity === 2 ? 'warning' : 'info',
             message: d.message,
             source: d.source || undefined,
           }
+          return diag.severity === 'info' ? diag : { ...diag, actions: agentActions(path, diag, list.length) }
         })
         // Dispatching inside an update is not allowed; defer to the next tick.
         queueMicrotask(() => this.view.dispatch(setDiagnostics(this.view.state, diags)))
@@ -170,6 +173,9 @@ export function lspExtension(root: string, path: string, hooks: LspHooks): Exten
     hover,
     lintGutter(),
     keymap.of([
+      ...lintKeymap, // ⇧⌘M problems panel, F8 next problem
+      // ⌥⇧⌘L: fix all problems in the file with the agent.
+      { key: 'Mod-Alt-Shift-l', run: (v) => fixFileProblemsWithAgent(v, path) },
       // IntelliJ: ⌘B / F12 go to declaration, ⌥F7 / ⇧F12 find usages.
       { key: 'Mod-b', run: (v) => (void goToDefinition(v, v.state.selection.main.head), true) },
       { key: 'F12', run: (v) => (void goToDefinition(v, v.state.selection.main.head), true) },

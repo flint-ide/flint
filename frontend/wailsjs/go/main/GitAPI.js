@@ -6,6 +6,10 @@ export function AddWorktree(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['GitAPI']['AddWorktree'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function Blame(arg1, arg2) {
+  return window['go']['main']['GitAPI']['Blame'](arg1, arg2);
+}
+
 export function Branches(arg1) {
   return window['go']['main']['GitAPI']['Branches'](arg1);
 }
@@ -42,6 +46,10 @@ export function FileAt(arg1, arg2, arg3) {
   return window['go']['main']['GitAPI']['FileAt'](arg1, arg2, arg3);
 }
 
+export function FileHistory(arg1, arg2) {
+  return window['go']['main']['GitAPI']['FileHistory'](arg1, arg2);
+}
+
 export function HeadFile(arg1) {
   return window['go']['main']['GitAPI']['HeadFile'](arg1);
 }
@@ -76,6 +84,30 @@ export function RemoveWorktree(arg1, arg2, arg3) {
 
 export function Rollback(arg1, arg2) {
   return window['go']['main']['GitAPI']['Rollback'](arg1, arg2);
+}
+
+export function StashApply(arg1, arg2) {
+  return window['go']['main']['GitAPI']['StashApply'](arg1, arg2);
+}
+
+export function StashDrop(arg1, arg2) {
+  return window['go']['main']['GitAPI']['StashDrop'](arg1, arg2);
+}
+
+export function StashFiles(arg1, arg2) {
+  return window['go']['main']['GitAPI']['StashFiles'](arg1, arg2);
+}
+
+export function StashPop(arg1, arg2) {
+  return window['go']['main']['GitAPI']['StashPop'](arg1, arg2);
+}
+
+export function StashPush(arg1, arg2, arg3) {
+  return window['go']['main']['GitAPI']['StashPush'](arg1, arg2, arg3);
+}
+
+export function Stashes(arg1) {
+  return window['go']['main']['GitAPI']['Stashes'](arg1);
 }
 
 export function Status(arg1) {

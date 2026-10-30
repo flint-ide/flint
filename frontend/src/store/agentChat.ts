@@ -7,13 +7,15 @@ import {
   addUserMessage,
   answerPermission,
   applyEvent,
+  applyEvents,
   emptyChat,
+  settleItems,
   type AgentEvent,
   type Attachment,
   type ChatState,
 } from '../lib/agentReducer'
 import { showToast } from './dialog'
-import { createReorderer } from '../lib/reorder'
+import { createReorderer, type Reorderer } from '../lib/reorder'
 import type { SavedChat } from '../lib/sessionSnapshot'
 import { useEditor } from './editor'
 
@@ -134,6 +136,7 @@ export const useAgentChat = createStore<AgentChatState>((set, get) => ({
   stop: async (id) => {
     useEditor.getState().closeTab(chatTabId(id))
     if (!get().sessions[id]?.dormant) await Chat.Stop(remoteId(id)).catch(() => undefined)
+    deliverAgent?.forget(remoteId(id))
     localIds.delete(remoteId(id))
     remoteIds.delete(id)
     set((s) => {
@@ -195,14 +198,13 @@ async function wake(s: ChatSession): Promise<void> {
 
 /** A restored transcript is idle: nothing runs and unanswered questions expired. */
 function settle(chat: ChatState): ChatState {
-  return {
-    ...chat,
-    busy: false,
-    items: chat.items.map((it) => (it.type === 'permission' && !it.settled ? { ...it, settled: true } : it)),
-  }
+  return { ...chat, busy: false, items: settleItems(chat.items) }
 }
 
 function update(id: string, fn: (s: ChatSession) => ChatSession): void {
+  // Local changes (the user's message, an answer, an error) go after the events
+  // received before them.
+  flushEvents()
   useAgentChat.setState((st) => {
     const cur = st.sessions[id]
     if (!cur) return {}
@@ -211,16 +213,52 @@ function update(id: string, fn: (s: ChatSession) => ChatSession): void {
   })
 }
 
+// Agents stream a few events per token. Applying each in its own setState re-renders
+// the chat and copies its transcript per token, so events wait in a per-session queue
+// (in arrival order) and are applied together once per frame. The timer covers a
+// hidden window, where animation frames stop.
+const FLUSH_FALLBACK_MS = 100
+const queued = new Map<string, AgentEvent[]>()
+let pendingFlush: { frame: number; timer: ReturnType<typeof setTimeout> } | null = null
+
+function enqueue(id: string, e: AgentEvent): void {
+  const q = queued.get(id)
+  if (q) q.push(e)
+  else queued.set(id, [e])
+  pendingFlush ??= { frame: requestAnimationFrame(flushEvents), timer: setTimeout(flushEvents, FLUSH_FALLBACK_MS) }
+}
+
+/** Applies every queued event in one store update. */
+function flushEvents(): void {
+  if (pendingFlush) {
+    cancelAnimationFrame(pendingFlush.frame)
+    clearTimeout(pendingFlush.timer)
+    pendingFlush = null
+  }
+  if (queued.size === 0) return
+  const batch = [...queued]
+  queued.clear()
+  useAgentChat.setState((st) => {
+    let sessions = st.sessions
+    for (const [id, events] of batch) {
+      const cur = sessions[id]
+      if (!cur) continue // closed meanwhile
+      const chat = applyEvents(cur.chat, events)
+      if (chat !== cur.chat) sessions = { ...sessions, [id]: { ...cur, chat } }
+    }
+    return sessions === st.sessions ? {} : { sessions }
+  })
+}
+
+/** Set once subscribed; stop() releases a closed chat's ordering state. */
+let deliverAgent: Reorderer<AgentEvent> | null = null
+
 let subscribed = false
 export function subscribeAgentChatEvents(): void {
   if (subscribed) return
   subscribed = true
-  const deliver = createReorderer<AgentEvent>((id, e) =>
-    update(localId(id), (cs) => {
-      const chat = applyEvent(cs.chat, e)
-      return chat === cs.chat ? cs : { ...cs, chat }
-    }),
-  )
+  const deliver = createReorderer<AgentEvent>((id, e) => enqueue(localId(id), e))
+  deliverAgent = deliver
   EventsOn('agent:event', (e: AgentEvent) => deliver(e.sessionId, e))
   void useAgentChat.getState().load()
 }

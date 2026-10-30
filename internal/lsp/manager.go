@@ -118,7 +118,7 @@ func (m *Manager) Change(path, text string) {
 	doc.version++
 	doc.text = text
 	if e := m.servers[doc.key]; e != nil && doc.opened && e.srv != nil {
-		e.srv.out.notify("textDocument/didChange", map[string]any{
+		e.srv.out.notifyLatest("change:"+path, "textDocument/didChange", map[string]any{
 			"textDocument":   map[string]any{"uri": PathToURI(path), "version": doc.version},
 			"contentChanges": []map[string]any{{"text": text}},
 		})
@@ -272,11 +272,13 @@ func (m *Manager) ensureServerLocked(k key) *entry {
 			}
 			// Crashed: restart (a bounded number of times) and re-open its documents.
 			if m.restarts[k] >= maxRestarts {
+				e.srv.kill()
 				failed := failedEntry(fmt.Errorf("%s language server keeps crashing%s — reopen the folder to retry", k.language, e.srv.stderrTail()))
 				m.servers[k] = failed
 				return failed
 			}
 			m.restarts[k]++
+			e.srv.kill() // helpers it spawned (tsserver…) would otherwise outlive it
 			for _, d := range m.docs {
 				if d.key == k {
 					d.opened = false

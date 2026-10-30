@@ -27,7 +27,7 @@ export function createStore<T extends object>(init: Init<T>): UseStore<T> {
     getState: () => state,
     setState: (partial, replace) => {
       const next = typeof partial === 'function' ? partial(state) : partial
-      if (Object.is(next, state)) return
+      if (Object.is(next, state) || (!replace && unchanged(state, next))) return
       const prev = state
       state = replace ? (next as T) : Object.assign({}, state, next)
       bus.emit('change', prev)
@@ -67,3 +67,11 @@ export function select<T, U>(prev: Memo<T, U> | null, state: T, selector: (state
 }
 
 const identity = <T,>(s: T): T => s
+
+/** Whether merging partial into state would change nothing (so listeners need no event). */
+function unchanged<T extends object>(state: T, partial: Partial<T>): boolean {
+  for (const key in partial) {
+    if (Object.prototype.hasOwnProperty.call(partial, key) && !Object.is(partial[key], state[key])) return false
+  }
+  return true
+}

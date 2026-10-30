@@ -247,8 +247,21 @@ export const FileIcon = memo(function FileIcon({ name, isDir, open }: Props) {
 })
 
 /** Icons for non-file tabs. */
-export function TabKindIcon({ kind, busy }: { kind: 'terminal' | 'chat' | 'diff' | 'sql' | 'markdown' | 'text'; busy?: boolean }) {
+export function TabKindIcon({ kind, busy }: { kind: 'terminal' | 'chat' | 'diff' | 'history' | 'sql' | 'markdown' | 'text' | 'run' | 'debug'; busy?: boolean }) {
   switch (kind) {
+    case 'debug':
+      return (
+        <Svg className={`file-icon${busy ? ' pulse' : ''}`}>
+          <ellipse cx="8" cy="9.2" rx="3.6" ry="4.3" fill="#3b2a1d" stroke="#f0a35e" />
+          <path d="M8 5v8.4M4.4 9.2H2.3M13.7 9.2h-2.1M5 6.4L3.2 4.9M11 6.4l1.8-1.5M5 12l-1.8 1.4M11 12l1.8 1.4M6.3 4.9a1.7 1.7 0 0 1 3.4 0" fill="none" stroke="#f0a35e" strokeWidth="1.1" strokeLinecap="round" />
+        </Svg>
+      )
+    case 'run':
+      return (
+        <Svg className={`file-icon${busy ? ' pulse' : ''}`}>
+          <path d="M4.5 2.8v10.4l8.6-5.2z" fill="#5fbf7f" stroke="#86efac" strokeWidth="0.9" strokeLinejoin="round" />
+        </Svg>
+      )
     case 'terminal':
       return (
         <Svg>
@@ -270,6 +283,13 @@ export function TabKindIcon({ kind, busy }: { kind: 'terminal' | 'chat' | 'diff'
           <rect x="0.5" y="7.5" width="9.5" height="7" rx="1.6" fill="#4a7fd4" />
           <path d="M3 10.9h3.4M4.7 9.2v3.4" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
           <path d="M7.2 12.6h1.6" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
+        </Svg>
+      )
+    case 'history':
+      return (
+        <Svg>
+          <circle cx="8" cy="8" r="6.2" fill="#2a3446" stroke="#82aaff" />
+          <path d="M8 4.6V8l2.4 1.6" fill="none" stroke="#c7d7ff" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       )
     case 'sql':

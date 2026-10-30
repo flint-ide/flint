@@ -12,10 +12,12 @@ import (
 
 	"flint/internal/agentsession"
 	"flint/internal/config"
+	"flint/internal/dap"
 	"flint/internal/db"
 	"flint/internal/fuzzy"
 	"flint/internal/lsp"
 	"flint/internal/restore"
+	"flint/internal/runner"
 	"flint/internal/scratch"
 	"flint/internal/terminal"
 	"flint/internal/watcher"
@@ -37,13 +39,17 @@ type App struct {
 	configDir string
 	argFolder string
 
-	db        *db.Manager
-	scratch   *scratch.Store
-	terminals *terminal.Manager
-	lsp       *lsp.Manager
-	agents    *agentsession.Manager
-	sessions  *restore.Store
-	files     fuzzy.Index // quick-open file list of the open folder
+	db          *db.Manager
+	scratch     *scratch.Store
+	terminals   *terminal.Manager
+	runs        *runner.Manager // run configurations and test runs
+	runEvents   *runEvents
+	debugs      *dap.Manager // debug sessions (dlv dap)
+	debugEvents *debugEvents
+	lsp         *lsp.Manager
+	agents      *agentsession.Manager
+	sessions    *restore.Store
+	files       fuzzy.Index // quick-open file list of the open folder
 
 	watchMu sync.Mutex
 	watch   *watcher.Watcher
@@ -81,6 +87,10 @@ func NewApp() (*App, error) {
 		sessions:  restore.New(filepath.Join(dir, "sessions")),
 	}
 	a.terminals = terminal.NewManager(newTerminalEvents(a))
+	a.runEvents = newRunEvents(a)
+	a.runs = runner.NewManager(a.runEvents)
+	a.debugEvents = newDebugEvents(a)
+	a.debugs = dap.NewManager(a.debugEvents)
 	a.lsp = lsp.NewManager()
 	if err := config.LoadJSON(a.statePath(), &a.state); err != nil {
 		return nil, err
@@ -97,6 +107,8 @@ func (a *App) shutdown(context.Context) {
 	var wg sync.WaitGroup
 	for _, stop := range []func(){
 		a.terminals.CloseAll,
+		a.runs.CloseAll,
+		a.debugs.CloseAll,
 		a.lsp.Shutdown,
 		func() { _ = a.agents.Close() },
 		a.db.CloseAll,

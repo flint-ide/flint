@@ -5,6 +5,8 @@ import {main} from '../models';
 
 export function AddWorktree(arg1:string,arg2:string,arg3:string,arg4:boolean,arg5:string):Promise<void>;
 
+export function Blame(arg1:string,arg2:string):Promise<git.Blame>;
+
 export function Branches(arg1:string):Promise<Array<git.Branch>>;
 
 export function Checkout(arg1:string,arg2:string,arg3:boolean):Promise<void>;
@@ -23,6 +25,8 @@ export function Fetch(arg1:string):Promise<void>;
 
 export function FileAt(arg1:string,arg2:string,arg3:string):Promise<git.Revision>;
 
+export function FileHistory(arg1:string,arg2:number):Promise<main.FileHistory>;
+
 export function HeadFile(arg1:string):Promise<git.Revision>;
 
 export function Info(arg1:string):Promise<main.RepoInfo>;
@@ -40,6 +44,18 @@ export function Push(arg1:string):Promise<void>;
 export function RemoveWorktree(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function Rollback(arg1:string,arg2:Array<string>):Promise<void>;
+
+export function StashApply(arg1:string,arg2:string):Promise<void>;
+
+export function StashDrop(arg1:string,arg2:string):Promise<void>;
+
+export function StashFiles(arg1:string,arg2:string):Promise<Array<git.FileChange>>;
+
+export function StashPop(arg1:string,arg2:string):Promise<void>;
+
+export function StashPush(arg1:string,arg2:string,arg3:boolean):Promise<void>;
+
+export function Stashes(arg1:string):Promise<Array<git.Stash>>;
 
 export function Status(arg1:string):Promise<git.Status>;
 

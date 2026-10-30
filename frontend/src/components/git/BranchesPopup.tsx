@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { errorMessage } from '../../api/backend'
 import { Git, useGit, type Branch, type Worktree } from '../../store/git'
-import { useWorkspace } from '../../store/workspace'
+import { useWorkspace, type BranchesMode } from '../../store/workspace'
 import { useTerminal } from '../../store/terminal'
 import { confirmAction, showToast } from '../../store/dialog'
 import { Modal } from '../layout/Modal'
 import { NewWorktreeForm } from './NewWorktreeForm'
 
 /** IntelliJ-like branches popup: filter, checkout, new branch, worktrees, remote ops. */
-export function BranchesPopup({ onClose }: { onClose: () => void }) {
+export function BranchesPopup({ onClose, initialMode = 'list' }: { onClose: () => void; initialMode?: BranchesMode }) {
   const root = useGit((s) => s.root)
   const status = useGit((s) => s.status)
   const remote = useGit((s) => s.remote)
@@ -17,7 +17,7 @@ export function BranchesPopup({ onClose }: { onClose: () => void }) {
   const [branches, setBranches] = useState<Branch[]>([])
   const [worktrees, setWorktrees] = useState<Worktree[]>([])
   const [filter, setFilter] = useState('')
-  const [mode, setMode] = useState<'list' | 'new-branch' | 'new-worktree'>('list')
+  const [mode, setMode] = useState<BranchesMode>(initialMode)
   const [newBranch, setNewBranch] = useState('')
 
   const reload = async () => {

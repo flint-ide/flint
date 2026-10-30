@@ -13,9 +13,19 @@ import (
 )
 
 // runTests bundles every src/**/*.test.ts(x) for Node into a temp directory and
-// runs them with the built-in test runner. Filters keep only test files whose
-// path contains one of them. Returns node's exit code.
-func runTests(root string, filters []string) (int, error) {
+// runs them with the built-in test runner. Arguments starting with "-" are
+// passed to node (e.g. --test-reporter=tap, --test-name-pattern=… from Flint's
+// test runner); the others are filters that keep only test files whose path
+// contains one of them. Returns node's exit code.
+func runTests(root string, args []string) (int, error) {
+	var filters, nodeFlags []string
+	for _, a := range args {
+		if strings.HasPrefix(a, "-") {
+			nodeFlags = append(nodeFlags, a)
+		} else {
+			filters = append(filters, a)
+		}
+	}
 	tests, err := findTests(filepath.Join(root, "src"), filters)
 	if err != nil {
 		return 1, err
@@ -28,6 +38,12 @@ func runTests(root string, filters []string) (int, error) {
 		return 1, err
 	}
 	defer os.RemoveAll(out)
+	// Source maps hold paths relative to the output; node resolves them from the
+	// real path, so a symlinked temp dir (/var → /private/var on macOS) would
+	// make stack traces point at files that don't exist.
+	if real, err := filepath.EvalSymlinks(out); err == nil {
+		out = real
+	}
 
 	result := api.Build(api.BuildOptions{
 		AbsWorkingDir: root,
@@ -52,12 +68,12 @@ func runTests(root string, filters []string) (int, error) {
 		return 1, fmt.Errorf("compiling tests failed with %d error(s)", len(result.Errors))
 	}
 
-	args := []string{"--enable-source-maps", "--test"}
+	nodeArgs := append([]string{"--enable-source-maps", "--test"}, nodeFlags...)
 	for _, t := range tests {
 		rel, _ := filepath.Rel(filepath.Join(root, "src"), t)
-		args = append(args, filepath.Join(out, strings.TrimSuffix(rel, filepath.Ext(rel))+".mjs"))
+		nodeArgs = append(nodeArgs, filepath.Join(out, strings.TrimSuffix(rel, filepath.Ext(rel))+".mjs"))
 	}
-	cmd := exec.Command("node", args...)
+	cmd := exec.Command("node", nodeArgs...)
 	cmd.Dir = root
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {

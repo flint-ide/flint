@@ -8,7 +8,9 @@ import { ConnectionForm } from './ConnectionForm'
 /** Connections list with a lazily loaded schema tree per connection. */
 export function DatabasePanel() {
   const connections = useDatabase((s) => s.connections)
-  const [editing, setEditing] = useState<Connection | null | 'new'>(null)
+  // In the store so the palette's "New Database Connection…" can open the form.
+  const editing = useDatabase((s) => s.editing)
+  const setEditing = useDatabase((s) => s.setEditing)
 
   return (
     <div className="panel">

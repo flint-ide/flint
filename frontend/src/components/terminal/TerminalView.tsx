@@ -3,7 +3,15 @@ import { Terminal as XTerm, type ILink } from '@xterm/xterm'
 import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
-import { TerminalBackend, attachSink, registerOutputReader, sendInput, type TerminalTab } from '../../store/terminal'
+import {
+  TerminalBackend,
+  attachSink,
+  claimStart,
+  registerOutputReader,
+  registerSelectionReader,
+  sendInput,
+  type TerminalTab,
+} from '../../store/terminal'
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
 import { findPathLinks, resolvePath } from '../../lib/pathLinks'
@@ -12,8 +20,11 @@ import { errorMessage } from '../../api/backend'
 import { focusSoon } from '../../lib/focusSoon'
 import { fitTerminal } from '../../lib/terminalFit'
 import { registerUrlLinks } from '../../lib/terminalLinks'
+import { sendTerminalSelectionToAgent } from '../../lib/agentContext'
+import type { DropdownItem } from '../ui/Dropdown'
+import { openContextMenu } from '../../store/contextMenu'
 
-const THEME = {
+export const THEME = {
   background: '#141518',
   foreground: '#d4d4d8',
   cursor: '#f59e0b',
@@ -24,8 +35,6 @@ const THEME = {
   brightBlack: '#6b7280', brightRed: '#fca5a5', brightGreen: '#bbf7d0', brightYellow: '#fde68a',
   brightBlue: '#bfdbfe', brightMagenta: '#e9d5ff', brightCyan: '#a5f3fc', brightWhite: '#fafafa',
 }
-
-const started = new Set<string>()
 
 interface Props {
   tab: TerminalTab
@@ -52,13 +61,6 @@ export function TerminalView({ tab, active }: Props) {
     })
     xterm.open(host.current)
     registerUrlLinks(xterm, BrowserOpenURL)
-    try {
-      const webgl = new WebglAddon()
-      webgl.onContextLoss(() => webgl.dispose())
-      xterm.loadAddon(webgl) // GPU rendering keeps agent output floods smooth
-    } catch {
-      // Falls back to the DOM renderer.
-    }
     fitTerminal(xterm)
     term.current = xterm
 
@@ -100,13 +102,13 @@ export function TerminalView({ tab, active }: Props) {
       xterm.write(`\x1b[2m${tab.restored.replace(/\n/g, '\r\n')}\r\n── restored ──\x1b[0m\r\n`)
     }
     const unregisterReader = registerOutputReader(tab.id, (maxLines) => readBuffer(xterm, maxLines))
+    const unregisterSelection = registerSelectionReader(tab.id, () => xterm.getSelection())
     const detach = attachSink(tab.id, (data) => xterm.write(data))
     const input = xterm.onData((data) => sendInput(tab.id, data))
     const resize = xterm.onResize(({ cols, rows }) => void TerminalBackend.Resize(tab.id, cols, rows))
 
     // The PTY outlives this view (remounts, StrictMode); it is closed with the tab.
-    if (!started.has(tab.id)) {
-      started.add(tab.id)
+    if (claimStart(tab.id)) {
       TerminalBackend.Start(tab.id, tab.cwd, xterm.cols, xterm.rows)
         .then(() => tab.initialInput && sendInput(tab.id, `${tab.initialInput}\r`))
         .catch((err) => showToast(`Terminal failed: ${errorMessage(err)}`, 'error'))
@@ -124,6 +126,7 @@ export function TerminalView({ tab, active }: Props) {
       input.dispose()
       resize.dispose()
       unregisterReader()
+      unregisterSelection()
       detach()
       xterm.dispose()
       term.current = null
@@ -131,6 +134,32 @@ export function TerminalView({ tab, active }: Props) {
     // One PTY per tab for the component's lifetime.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab.id])
+
+  // GPU rendering keeps agent output floods smooth, but each WebGL context holds a
+  // canvas and texture atlas: only the visible terminal gets one. Hidden ones use the
+  // DOM renderer, which redraws from the same buffer, so no output is lost.
+  useEffect(() => {
+    const xterm = term.current
+    if (!active || !xterm) return
+    let webgl: WebglAddon | null = null
+    const release = () => {
+      const addon = webgl
+      webgl = null
+      try {
+        addon?.dispose()
+      } catch {
+        // Already gone with its terminal.
+      }
+    }
+    try {
+      webgl = new WebglAddon()
+      webgl.onContextLoss(release)
+      xterm.loadAddon(webgl)
+    } catch {
+      release() // falls back to the DOM renderer
+    }
+    return release
+  }, [active, tab.id])
 
   useEffect(() => {
     if (!active) return
@@ -141,7 +170,35 @@ export function TerminalView({ tab, active }: Props) {
     })
   }, [active])
 
-  return <div className="terminal-view" ref={host} />
+  const menuItems = (): DropdownItem[] => {
+    const selected = !!term.current?.hasSelection()
+    return [
+      {
+        label: 'Send to agent',
+        hint: '⌥ sends now',
+        kbd: '⌘L',
+        disabled: !selected,
+        onSelect: (e) => void sendTerminalSelectionToAgent(tab.id, e.altKey),
+      },
+      {
+        label: 'Copy',
+        kbd: '⌘C',
+        disabled: !selected,
+        onSelect: () => void navigator.clipboard.writeText(term.current?.getSelection() ?? '').catch(() => undefined),
+      },
+    ]
+  }
+
+  return (
+    <div
+      className="terminal-view"
+      ref={host}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        openContextMenu(e.clientX, e.clientY, menuItems())
+      }}
+    />
+  )
 }
 
 /**

@@ -37,7 +37,7 @@ let seq = 0
 /** Editor tab id of a terminal (terminals live among the editor tabs). */
 export const terminalTabId = (termId: string) => `term:${termId}`
 
-export const useTerminal = createStore<TerminalState>((set) => ({
+export const useTerminal = createStore<TerminalState>((set, get) => ({
   tabs: [],
 
   create: (cwd, opts = {}) => {
@@ -52,12 +52,17 @@ export const useTerminal = createStore<TerminalState>((set) => ({
   },
 
   close: (id) => {
+    const exited = get().tabs.find((t) => t.id === id)?.exitCode != null
     void Terminal.Close(id)
-    closed.add(id)
+    markClosed(id)
+    // A live shell is forgotten when it reports its exit (term:exit below).
+    if (exited) forgetClosedLater(id)
+    started.delete(id)
     sinks.delete(id)
     backlog.delete(id)
     inputs.delete(id)
     readers.delete(id)
+    selections.delete(id)
     set((s) => ({ tabs: s.tabs.filter((t) => t.id !== id) }))
     useEditor.getState().closeTab(terminalTabId(id))
   },
@@ -95,12 +100,76 @@ export function recentOutput(id: string, maxLines: number): string {
   return readers.get(id)?.(maxLines) ?? ''
 }
 
+/** Selected text of each mounted terminal (⌘L / "Send to agent"). */
+const selections = new Map<string, () => string>()
+
+export function registerSelectionReader(id: string, read: () => string): () => void {
+  selections.set(id, read)
+  return () => {
+    if (selections.get(id) === read) selections.delete(id)
+  }
+}
+
+export function terminalSelection(id: string): string {
+  return selections.get(id)?.() ?? ''
+}
+
+/** Terminals whose PTY was started; the PTY outlives remounts of its view. */
+const started = new Set<string>()
+
+/** True the first time it is called for a terminal: that caller starts the PTY. */
+export function claimStart(id: string): boolean {
+  if (started.has(id)) return false
+  started.add(id)
+  return true
+}
+
 type Sink = (data: Uint8Array) => void
+
+interface Backlog {
+  chunks: Uint8Array[]
+  bytes: number
+}
 
 /** Output routing: xterm instances register a sink; output arriving earlier is buffered. */
 const sinks = new Map<string, Sink>()
-const backlog = new Map<string, Uint8Array[]>()
-const closed = new Set<string>() // output still in flight for closed tabs is dropped
+const backlog = new Map<string, Backlog>()
+/** Output buffered for a terminal no view shows yet; the oldest is dropped beyond this. */
+const MAX_BACKLOG_BYTES = 2 * 1024 * 1024
+
+/** Output still in flight for closed tabs is dropped. */
+const closed = new Set<string>()
+/** Bound for `closed` should a shell never report its exit (insertion order: oldest first). */
+const MAX_CLOSED = 256
+/** How long after a closed terminal's exit its last (reordered) output may still arrive. */
+const CLOSED_GRACE_MS = 1000
+
+function markClosed(id: string): void {
+  closed.add(id)
+  for (const old of closed) {
+    if (closed.size <= MAX_CLOSED) break
+    closed.delete(old)
+    deliver.forget(old)
+  }
+}
+
+/** Exit is sent on its own channel, so output reordered behind it may still come. */
+function forgetClosedLater(id: string): void {
+  setTimeout(() => {
+    closed.delete(id)
+    deliver.forget(id)
+  }, CLOSED_GRACE_MS)
+}
+
+function buffer(id: string, bytes: Uint8Array): void {
+  const pending = backlog.get(id) ?? { chunks: [], bytes: 0 }
+  backlog.set(id, pending)
+  pending.chunks.push(bytes)
+  pending.bytes += bytes.length
+  while (pending.bytes > MAX_BACKLOG_BYTES && pending.chunks.length > 1) {
+    pending.bytes -= pending.chunks.shift()!.length
+  }
+}
 
 interface InputQueue {
   pending: string
@@ -136,38 +205,35 @@ async function flushInput(id: string, q: InputQueue): Promise<void> {
 
 export function attachSink(id: string, sink: Sink): () => void {
   sinks.set(id, sink)
-  for (const chunk of backlog.get(id) ?? []) sink(chunk)
+  for (const chunk of backlog.get(id)?.chunks ?? []) sink(chunk)
   backlog.delete(id)
   return () => {
     if (sinks.get(id) === sink) sinks.delete(id)
   }
 }
 
-function decodeBase64(b64: string): Uint8Array {
+export function decodeBase64(b64: string): Uint8Array {
   const bin = atob(b64)
   const out = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
   return out
 }
 
+const deliver = createReorderer<{ id: string; seq?: number; data: string }>((_, msg) => {
+  if (closed.has(msg.id)) return
+  const bytes = decodeBase64(msg.data)
+  const sink = sinks.get(msg.id)
+  if (sink) sink(bytes)
+  else buffer(msg.id, bytes)
+})
+
 let subscribed = false
 export function subscribeTerminalEvents(): void {
   if (subscribed) return
   subscribed = true
-  const deliver = createReorderer<{ id: string; seq?: number; data: string }>((_, msg) => {
-    if (closed.has(msg.id)) return
-    const bytes = decodeBase64(msg.data)
-    const sink = sinks.get(msg.id)
-    if (sink) {
-      sink(bytes)
-      return
-    }
-    const pending = backlog.get(msg.id)
-    if (pending) pending.push(bytes)
-    else backlog.set(msg.id, [bytes])
-  })
   EventsOn('term:data', (msg: { id: string; seq?: number; data: string }) => deliver(msg.id, msg))
   EventsOn('term:exit', (msg: { id: string; code: number }) => {
+    if (closed.has(msg.id)) return forgetClosedLater(msg.id)
     useTerminal.setState((s) => ({
       tabs: s.tabs.map((t) => (t.id === msg.id ? { ...t, exitCode: msg.code } : t)),
     }))

@@ -40,6 +40,27 @@ export interface DiffTab {
   repoRoot: string
   title: string
   dirty: boolean // always false: diffs are read-only
+  /** Revision of the left side (default HEAD). */
+  baseRev?: string
+  /** Revision of the right side; unset means the working tree (live). */
+  rev?: string
+  /** Header labels for the two sides. */
+  baseLabel?: string
+  label?: string
+}
+
+/** A diff between two revisions of a file (or a revision and the working tree). */
+export type RevisionDiff = Required<Pick<DiffTab, 'repoRoot' | 'path' | 'basePath' | 'baseRev'>> &
+  Pick<DiffTab, 'rev' | 'baseLabel' | 'label'>
+
+/** Commits that touched a file (git log --follow). */
+export interface HistoryTab {
+  id: string
+  kind: 'history'
+  /** Absolute path of the file. */
+  path: string
+  title: string
+  dirty: boolean // always false
 }
 
 /** A shell; the PTY itself is managed by the terminal store. */
@@ -60,7 +81,24 @@ export interface ChatTab {
   dirty: boolean // always false
 }
 
-export type Tab = FileTab | ScratchTab | DiffTab | TerminalTab | ChatTab
+/** Output (and test results) of a run configuration or test run; see store/run.ts. */
+export interface RunTab {
+  id: string
+  kind: 'run'
+  runKey: string
+  title: string
+  dirty: boolean // always false
+}
+
+/** The debug session (store/debug.ts); there is at most one. */
+export interface DebugTab {
+  id: 'debug'
+  kind: 'debug'
+  title: string
+  dirty: boolean // always false
+}
+
+export type Tab = FileTab | ScratchTab | DiffTab | HistoryTab | TerminalTab | ChatTab | RunTab | DebugTab
 
 const HISTORY_LIMIT = 50
 
@@ -73,6 +111,9 @@ interface EditorState {
   /** background: add the tab without switching to it (session restore). */
   openTerminal: (termId: string, title: string, background?: boolean) => void
   openChat: (sessionId: string, title: string, background?: boolean) => void
+  /** Opens (or retitles and shows) a run tab; background: only retitle / add. */
+  openRun: (runKey: string, title: string, background?: boolean) => void
+  openDebug: (title: string) => void
   back: () => void
   forward: () => void
   openFile: (path: string, reveal?: Omit<Reveal, 'nonce'>) => void
@@ -80,6 +121,8 @@ interface EditorState {
   addTab: (tab: Tab) => void
   openScratch: (sc: ScratchPad) => void
   openDiff: (repoRoot: string, path: string, basePath?: string) => void
+  openRevisionDiff: (d: RevisionDiff) => void
+  openHistory: (path: string) => void
   renameScratchTab: (scratchId: string, title: string) => void
   closeTab: (id: string) => void
   closeScratch: (scratchId: string) => void
@@ -90,13 +133,16 @@ interface EditorState {
 export const fileTabId = (path: string) => `file:${path}`
 export const scratchTabId = (id: string) => `scratch:${id}`
 export const diffTabId = (path: string) => `diff:${path}`
+export const revisionDiffTabId = (d: Pick<DiffTab, 'path' | 'baseRev' | 'rev'>) =>
+  `diff:${d.baseRev ?? 'HEAD'}..${d.rev ?? ''}:${d.path}`
+export const historyTabId = (path: string) => `history:${path}`
 const baseName = (path: string) => path.split('/').pop() ?? path
 
 let revealSeq = 0
 
 /** Switches to id, remembering the previous tab for Back. */
 function activate(s: EditorState, id: string): Partial<EditorState> {
-  if (s.activeId === id) return { activeId: id }
+  if (s.activeId === id) return {} // no-op: subscribers are not notified
   const backStack = s.activeId ? [...s.backStack, s.activeId].slice(-HISTORY_LIMIT) : s.backStack
   return { activeId: id, backStack, forwardStack: [] }
 }
@@ -122,6 +168,26 @@ export const useEditor = createStore<EditorState>((set) => ({
       if (s.tabs.some((t) => t.id === id)) return activate(s, id)
       const tab: ChatTab = { id, kind: 'chat', sessionId, title, dirty: false }
       if (background) return { tabs: [...s.tabs, tab] }
+      return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
+    }),
+
+  openRun: (runKey, title, background) =>
+    set((s) => {
+      const id = `run:${runKey}`
+      if (s.tabs.some((t) => t.id === id)) {
+        const tabs = s.tabs.map((t) => (t.id === id && t.title !== title ? { ...t, title } : t))
+        return background ? { tabs } : { tabs, ...activate(s, id) }
+      }
+      const tab: RunTab = { id, kind: 'run', runKey, title, dirty: false }
+      if (background) return { tabs: [...s.tabs, tab] }
+      return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
+    }),
+
+  openDebug: (title) =>
+    set((s) => {
+      const id = 'debug'
+      if (s.tabs.some((t) => t.id === id)) return { tabs: s.tabs.map((t) => (t.id === id ? { ...t, title } : t)), ...activate(s, id) }
+      const tab: DebugTab = { id, kind: 'debug', title, dirty: false }
       return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
     }),
 
@@ -181,6 +247,23 @@ export const useEditor = createStore<EditorState>((set) => ({
       const id = diffTabId(path)
       if (s.tabs.some((t) => t.id === id)) return activate(s, id)
       const tab: DiffTab = { id, kind: 'diff', path, basePath, repoRoot, title: `Δ ${baseName(path)}`, dirty: false }
+      return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
+    }),
+
+  openRevisionDiff: (d) =>
+    set((s) => {
+      const id = revisionDiffTabId(d)
+      if (s.tabs.some((t) => t.id === id)) return activate(s, id)
+      const at = d.rev ? ` @ ${d.label ?? d.rev.slice(0, 7)}` : ` vs ${d.baseLabel ?? d.baseRev.slice(0, 7)}`
+      const tab: DiffTab = { id, kind: 'diff', ...d, title: `Δ ${baseName(d.path)}${at}`, dirty: false }
+      return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
+    }),
+
+  openHistory: (path) =>
+    set((s) => {
+      const id = historyTabId(path)
+      if (s.tabs.some((t) => t.id === id)) return activate(s, id)
+      const tab: HistoryTab = { id, kind: 'history', path, title: `History: ${baseName(path)}`, dirty: false }
       return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
     }),
 

@@ -82,7 +82,7 @@ func (s *session) handleStatusNotification(method string, params json.RawMessage
 	case notifTokenUsage:
 		var n tokenUsageNotification
 		if decode(params, &n) {
-			s.onTokenUsage(n.TokenUsage.Total)
+			s.onTokenUsage(n.TokenUsage.Total, n.TokenUsage.Last.InputTokens, n.TokenUsage.ModelContextWindow)
 		}
 	case notifError:
 		var n errorNotification
@@ -254,9 +254,10 @@ func (s *session) patchUpdated(itemID string, changes []fileUpdateChange) {
 	s.emit(agentsession.Event{Kind: agentsession.KindToolCallUpdate, ToolCall: &tc})
 }
 
-func (s *session) onTokenUsage(total tokenBreakdown) {
+func (s *session) onTokenUsage(total tokenBreakdown, ctxLast, ctxWin int) {
 	s.mu.Lock()
 	s.usage = total
+	s.ctxLast, s.ctxWin = ctxLast, ctxWin
 	if s.turn != nil {
 		s.turn.usageSeen = true
 	}

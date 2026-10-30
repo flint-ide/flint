@@ -35,6 +35,8 @@ type session struct {
 	items   map[string]*itemState
 	pending map[string]*pendingRequest
 	usage   tokenBreakdown // latest cumulative thread total
+	ctxLast int            // input tokens of the latest model call (context fill)
+	ctxWin  int            // model context window, 0 when not reported
 	exited  bool
 	exitErr error
 }
@@ -285,6 +287,9 @@ func (s *session) turnUsage(t *turn) *agentsession.Usage {
 	return &agentsession.Usage{
 		InputTokens:  s.usage.InputTokens - t.usageBase.InputTokens,
 		OutputTokens: s.usage.OutputTokens - t.usageBase.OutputTokens,
+
+		ContextTokens: s.ctxLast,
+		ContextWindow: s.ctxWin,
 	}
 }
 

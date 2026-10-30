@@ -107,7 +107,7 @@ export function Dropdown({ trigger, items, align = 'start', searchable, placehol
   )
 }
 
-interface MenuProps {
+export interface MenuProps {
   anchor: HTMLElement
   items: DropdownItem[]
   align: 'start' | 'end'
@@ -118,7 +118,8 @@ interface MenuProps {
   onClose: () => void
 }
 
-function Menu({ anchor, items, align, searchable, placeholder, minWidth, emptyText, onClose }: MenuProps) {
+/** The menu itself, positioned next to anchor (also used for context menus). */
+export function Menu({ anchor, items, align, searchable, placeholder, minWidth, emptyText, onClose }: MenuProps) {
   const menu = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
   const [cursor, setCursorState] = useState(-1)

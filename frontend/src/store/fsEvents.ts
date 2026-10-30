@@ -1,5 +1,5 @@
 import { EventsOn } from '../../wailsjs/runtime/runtime'
-import { Workspace } from '../api/backend'
+import { Workspace, type Entry } from '../api/backend'
 import { useWorkspace } from './workspace'
 
 type FileListener = () => void
@@ -31,6 +31,9 @@ export async function applyChanges(paths: string[]): Promise<void> {
     if (children[dirname(p)]) dirs.add(dirname(p))
     if (children[p]) dirs.add(p)
   }
+  // Mark the quick-open list stale (any path may be new); it refreshes lazily on next ⌘P.
+  // A no-op while already stale, so a burst of edits in unloaded dirs renders nothing.
+  if (dirs.size === 0) return useWorkspace.setState({ filesLoadedAt: 0 })
   const listed = await Promise.all(
     [...dirs].map((d) =>
       Workspace.ListDir(d).then(
@@ -39,13 +42,20 @@ export async function applyChanges(paths: string[]): Promise<void> {
       ),
     ),
   )
-  const next = { ...useWorkspace.getState().children }
+  // Content edits don't change a listing: only write the tree when one did.
+  const current = useWorkspace.getState().children
+  let next: typeof current | null = null
   for (const [dir, entries] of listed) {
+    if (entries ? sameEntries(current[dir], entries) : !(dir in current)) continue
+    next ??= { ...current }
     if (entries) next[dir] = entries
     else delete next[dir]
   }
-  // Mark the quick-open list stale; it refreshes lazily on next ⌘P.
-  useWorkspace.setState({ children: next, filesLoadedAt: 0 })
+  useWorkspace.setState(next ? { children: next, filesLoadedAt: 0 } : { filesLoadedAt: 0 })
+}
+
+function sameEntries(a: Entry[] | undefined, b: Entry[]): boolean {
+  return !!a && a.length === b.length && a.every((e, i) => e.name === b[i].name && e.path === b[i].path && e.isDir === b[i].isDir)
 }
 
 let subscribed = false

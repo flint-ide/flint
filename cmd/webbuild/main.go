@@ -4,6 +4,7 @@
 //	webbuild            production build into frontend/dist (--typecheck: tsc first)
 //	webbuild --watch    rebuild on change and reload the page (wails dev)
 //	webbuild --test     compile *.test.ts(x) and run them with `node --test`
+//	                    (--test -- [node flags] [file filters])
 package main
 
 import (

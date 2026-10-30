@@ -178,6 +178,9 @@ type tokenUsageNotification struct {
 	envelope
 	TokenUsage struct {
 		Total tokenBreakdown `json:"total"`
+		// Last is the most recent model call: its input is the context fill.
+		Last               tokenBreakdown `json:"last"`
+		ModelContextWindow int            `json:"modelContextWindow"`
 	} `json:"tokenUsage"`
 }
 

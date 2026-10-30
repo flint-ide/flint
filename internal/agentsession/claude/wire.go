@@ -125,10 +125,22 @@ type resultMsg struct {
 		CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
 		CacheReadInputTokens     int `json:"cache_read_input_tokens"`
 		OutputTokens             int `json:"output_tokens"`
+		// Iterations has one entry per model call of the turn; the last one's
+		// input is the context fill (the totals above sum all calls).
+		Iterations []struct {
+			InputTokens              int `json:"input_tokens"`
+			CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+			CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+		} `json:"iterations"`
 	} `json:"usage"`
-	ModelUsageSinceLastResult map[string]struct {
-		CostUSD float64 `json:"costUSD"`
-	} `json:"model_usage_since_last_result"`
+	ModelUsage                map[string]modelUsage `json:"modelUsage"`
+	ModelUsageSinceLastResult map[string]modelUsage `json:"model_usage_since_last_result"`
+}
+
+// modelUsage is one model's entry in a result's modelUsage maps.
+type modelUsage struct {
+	CostUSD       float64 `json:"costUSD"`
+	ContextWindow int     `json:"contextWindow"`
 }
 
 // errorText summarises why a failed result failed.

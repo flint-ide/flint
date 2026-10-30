@@ -48,6 +48,8 @@ func main() {
 			&DatabaseAPI{app: app},
 			&ScratchAPI{app: app},
 			&TerminalAPI{app: app},
+			&RunAPI{app: app},
+			&DebugAPI{app: app},
 			&AppAPI{app: app},
 			&SessionAPI{app: app},
 			gitAPI,

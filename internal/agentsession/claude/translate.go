@@ -273,8 +273,26 @@ func (tr *translator) usage(r *resultMsg) *agentsession.Usage {
 	if r.Usage != nil {
 		u.InputTokens = r.Usage.InputTokens + r.Usage.CacheCreationInputTokens + r.Usage.CacheReadInputTokens
 		u.OutputTokens = r.Usage.OutputTokens
+		u.ContextTokens = u.InputTokens
+		if n := len(r.Usage.Iterations); n > 0 {
+			it := r.Usage.Iterations[n-1]
+			u.ContextTokens = it.InputTokens + it.CacheCreationInputTokens + it.CacheReadInputTokens
+		}
 	}
+	u.ContextWindow = contextWindow(r)
 	return u
+}
+
+// contextWindow is the largest window among the models used (the main model
+// dominates; sub-agent models are usually smaller or equal).
+func contextWindow(r *resultMsg) int {
+	win := 0
+	for _, m := range []map[string]modelUsage{r.ModelUsage, r.ModelUsageSinceLastResult} {
+		for _, mu := range m {
+			win = max(win, mu.ContextWindow)
+		}
+	}
+	return win
 }
 
 func (s *session) onControlRequest(m *inbound) {

@@ -216,6 +216,9 @@ func TestTextTurnThenEditAndCommand(t *testing.T) {
 	if len(usage) != 1 || usage[0].Usage.InputTokens != 21885 || usage[0].Usage.OutputTokens != 5 {
 		t.Fatalf("turn 1 usage = %+v", usage)
 	}
+	if u := usage[0].Usage; u.ContextTokens != 21885 || u.ContextWindow != 258400 {
+		t.Fatalf("turn 1 context usage = %+v", u)
+	}
 	assertLastIsTurnEnd(t, h.rec.all(), agentsession.StopEndTurn)
 
 	atts := []agentsession.Attachment{
@@ -245,6 +248,9 @@ func TestTextTurnThenEditAndCommand(t *testing.T) {
 	usage = h.rec.ofKind(agentsession.KindUsage)
 	if len(usage) != 2 || usage[1].Usage.InputTokens != 91077-21885 || usage[1].Usage.OutputTokens != 258-5 {
 		t.Fatalf("turn 2 usage = %+v", usage[len(usage)-1].Usage)
+	}
+	if u := usage[1].Usage; u.ContextTokens != 23205 || u.ContextWindow != 258400 {
+		t.Fatalf("turn 2 context usage = %+v", u)
 	}
 	if got := h.rec.text(agentsession.KindMessageChunk); got != "pongdone" {
 		t.Fatalf("message text = %q", got)

@@ -74,7 +74,7 @@ export function CodeEditor({ initialDoc, language, keys = [], reveal, active, on
       selection: EditorSelection.range(from, to),
       effects: EditorView.scrollIntoView(from, { y: 'center' }),
     })
-    v.focus()
+    if (!reveal.quiet) v.focus()
   }, [reveal])
 
   return <div className="code-editor" ref={host} />

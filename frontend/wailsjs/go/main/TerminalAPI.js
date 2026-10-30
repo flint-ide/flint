@@ -6,6 +6,10 @@ export function Close(arg1) {
   return window['go']['main']['TerminalAPI']['Close'](arg1);
 }
 
+export function Cwd(arg1) {
+  return window['go']['main']['TerminalAPI']['Cwd'](arg1);
+}
+
 export function Resize(arg1, arg2, arg3) {
   return window['go']['main']['TerminalAPI']['Resize'](arg1, arg2, arg3);
 }

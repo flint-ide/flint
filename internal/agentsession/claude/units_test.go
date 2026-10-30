@@ -254,11 +254,16 @@ func TestResolveBinary(t *testing.T) {
 }
 
 func TestBuildArgsAndEnv(t *testing.T) {
-	args := buildArgs("sid", Options{PermissionMode: "acceptEdits", ExtraArgs: []string{"--setting-sources", "project"}})
+	args := buildArgs("sid", false, Options{PermissionMode: "acceptEdits", ExtraArgs: []string{"--setting-sources", "project"}})
 	joined := strings.Join(args, " ")
 	if !strings.Contains(joined, "--permission-mode acceptEdits") || strings.Contains(joined, "--model") ||
+		!strings.Contains(joined, "--session-id sid") || strings.Contains(joined, "--resume") ||
 		!strings.HasSuffix(joined, "--setting-sources project") {
 		t.Errorf("args = %q", joined)
+	}
+	resumed := strings.Join(buildArgs("sid", true, Options{}), " ")
+	if !strings.Contains(resumed, "--resume sid") || strings.Contains(resumed, "--session-id") {
+		t.Errorf("resume args = %q", resumed)
 	}
 	t.Setenv("CLAUDECODE", "1")
 	env := buildEnv([]string{"CLAUDE_CODE_ENABLE_TODO_TOOLS=0"}, "/w")
@@ -268,6 +273,9 @@ func TestBuildArgsAndEnv(t *testing.T) {
 	id, err := newSessionID()
 	if err != nil || !regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`).MatchString(id) {
 		t.Errorf("session id %q, %v", id, err)
+	}
+	if !isSessionID(id) || isSessionID("--model=x") || isSessionID("") {
+		t.Error("isSessionID accepts only UUIDs")
 	}
 }
 

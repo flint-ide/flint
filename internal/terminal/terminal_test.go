@@ -115,3 +115,31 @@ func TestWinsizeDefaults(t *testing.T) {
 		t.Errorf("winsize defaults = %dx%d", ws.Cols, ws.Rows)
 	}
 }
+
+func TestCwdFollowsCd(t *testing.T) {
+	rec := newRecorder()
+	m := NewManager(rec)
+	t.Cleanup(m.CloseAll)
+	start, next := t.TempDir(), t.TempDir()
+	if err := m.Start("t3", Options{Cwd: start, Shell: "/bin/sh"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Write("t3", []byte("cd '"+next+"' && echo moved\n")); err != nil {
+		t.Fatal(err)
+	}
+	trim := func(p string) string { return strings.TrimPrefix(p, "/private") }
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		cwd, err := m.Cwd("t3")
+		if err == nil && trim(cwd) == trim(next) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("cwd = %q, %v; want %s", cwd, err, next)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if _, err := m.Cwd("missing"); err == nil {
+		t.Error("Cwd of an unknown terminal should fail")
+	}
+}

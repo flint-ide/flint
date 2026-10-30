@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { Workspace, errorMessage, type Entry } from '../api/backend'
+import { restoreSession, saveSession } from './session'
 
 export type SidebarView = 'files' | 'search' | 'git' | 'database' | 'scratch'
 
@@ -56,8 +57,12 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
 
   openFolder: async (path) => {
     try {
+      const previous = get().root
       const root = await Workspace.OpenFolder(path)
+      if (previous && previous !== root) await saveSession(previous)
       const entries = await Workspace.ListDir(root)
+      // Restore before publishing root so the "first terminal" effect sees restored tabs.
+      if (previous !== root) await restoreSession(root)
       set({ root, children: { [root]: entries }, expanded: { [root]: true }, files: [], filesLoadedAt: 0 })
       void get().refreshFiles()
     } catch (err) {

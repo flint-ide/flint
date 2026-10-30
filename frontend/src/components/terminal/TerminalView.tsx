@@ -5,7 +5,7 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
-import { TerminalBackend, attachSink, sendInput, type TerminalTab } from '../../store/terminal'
+import { TerminalBackend, attachSink, registerOutputReader, sendInput, type TerminalTab } from '../../store/terminal'
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
 import { findPathLinks, resolvePath } from '../../lib/pathLinks'
@@ -98,6 +98,12 @@ export function TerminalView({ tab, active }: Props) {
       },
     })
 
+    // Output from before a restart, dimmed, above the fresh shell (again after a
+    // remount: a new xterm starts empty).
+    if (tab.restored) {
+      xterm.write(`\x1b[2m${tab.restored.replace(/\n/g, '\r\n')}\r\n── restored ──\x1b[0m\r\n`)
+    }
+    const unregisterReader = registerOutputReader(tab.id, (maxLines) => readBuffer(xterm, maxLines))
     const detach = attachSink(tab.id, (data) => xterm.write(data))
     const input = xterm.onData((data) => sendInput(tab.id, data))
     const resize = xterm.onResize(({ cols, rows }) => void TerminalBackend.Resize(tab.id, cols, rows))
@@ -121,6 +127,7 @@ export function TerminalView({ tab, active }: Props) {
       observer.disconnect()
       input.dispose()
       resize.dispose()
+      unregisterReader()
       detach()
       xterm.dispose()
       term.current = null
@@ -138,4 +145,23 @@ export function TerminalView({ tab, active }: Props) {
   }, [active])
 
   return <div className="terminal-view" ref={host} />
+}
+
+/**
+ * The last maxLines lines of the normal screen buffer as plain text (full-screen
+ * apps like claude draw on the alternate screen, which is not worth keeping).
+ * Soft-wrapped rows are joined back into one line.
+ */
+function readBuffer(xterm: XTerm, maxLines: number): string {
+  const buf = xterm.buffer.normal
+  const lines: string[] = []
+  for (let i = Math.max(0, buf.length - maxLines * 2); i < buf.length; i++) {
+    const line = buf.getLine(i)
+    if (!line) continue
+    const text = line.translateToString(true)
+    if (line.isWrapped && lines.length > 0) lines[lines.length - 1] += text
+    else lines.push(text)
+  }
+  while (lines.length > 0 && lines[lines.length - 1].trim() === '') lines.pop()
+  return lines.slice(-maxLines).join('\n')
 }

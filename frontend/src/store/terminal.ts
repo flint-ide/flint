@@ -11,11 +11,19 @@ export interface TerminalTab {
   exitCode: number | null
   /** Typed into the shell once it starts, e.g. a `claude '…'` command. */
   initialInput?: string
+  /** Output from before a restart, shown dimmed above the new shell. */
+  restored?: string
+  /** Project the terminal was opened for (its cwd may be elsewhere after a restore). */
+  project?: string
 }
 
 export interface CreateOptions {
   title?: string
   input?: string
+  restored?: string
+  /** Open the tab without switching to it (session restore). */
+  background?: boolean
+  project?: string
 }
 
 interface TerminalState {
@@ -35,9 +43,11 @@ export const useTerminal = create<TerminalState>((set) => ({
   create: (cwd, opts = {}) => {
     const id = crypto.randomUUID()
     const title = opts.title ?? `${cwd.split('/').pop() || '~'} ${++seq}`
-    const tab: TerminalTab = { id, title, cwd, exitCode: null, initialInput: opts.input }
+    const tab: TerminalTab = {
+      id, title, cwd, exitCode: null, initialInput: opts.input, restored: opts.restored, project: opts.project ?? cwd,
+    }
     set((s) => ({ tabs: [...s.tabs, tab] }))
-    useEditor.getState().openTerminal(id, title)
+    useEditor.getState().openTerminal(id, title, opts.background)
     return id
   },
 
@@ -47,6 +57,7 @@ export const useTerminal = create<TerminalState>((set) => ({
     sinks.delete(id)
     backlog.delete(id)
     inputs.delete(id)
+    readers.delete(id)
     set((s) => ({ tabs: s.tabs.filter((t) => t.id !== id) }))
     useEditor.getState().closeTab(terminalTabId(id))
   },
@@ -68,6 +79,20 @@ export function toggleTerminal(cwd: string): void {
   const target = recent ?? any
   if (target) editor.setActive(target)
   else useTerminal.getState().create(cwd)
+}
+
+/** Recent plain-text output of each mounted terminal, for session snapshots. */
+const readers = new Map<string, (maxLines: number) => string>()
+
+export function registerOutputReader(id: string, read: (maxLines: number) => string): () => void {
+  readers.set(id, read)
+  return () => {
+    if (readers.get(id) === read) readers.delete(id)
+  }
+}
+
+export function recentOutput(id: string, maxLines: number): string {
+  return readers.get(id)?.(maxLines) ?? ''
 }
 
 type Sink = (data: Uint8Array) => void

@@ -8,6 +8,7 @@ import { subscribeTerminalEvents, toggleTerminal, useTerminal } from './store/te
 import { subscribeSearchEvents } from './store/search'
 import { subscribeFsEvents } from './store/fsEvents'
 import { subscribeQuit } from './store/quit'
+import { subscribeSessionAutosave } from './store/session'
 import { subscribeGitEvents, useGit } from './store/git'
 import { subscribeLspEvents } from './store/lsp'
 import { subscribeAgentChatEvents } from './store/agentChat'
@@ -54,6 +55,7 @@ export default function App() {
     subscribeGitEvents()
     subscribeLspEvents()
     subscribeAgentChatEvents()
+    subscribeSessionAutosave()
     // Native File menu: Open Folder… / Open Recent ▸ <folder>.
     EventsOn('menu:open-recent', () => useWorkspace.getState().setRecentOpen(true))
     EventsOn('menu:open-folder', (path: string) => void useWorkspace.getState().openFolder(path))

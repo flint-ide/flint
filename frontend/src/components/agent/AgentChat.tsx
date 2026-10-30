@@ -99,6 +99,9 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
           }
           return null
         })}
+        {session.dormant && chat.items.length > 0 && (
+          <div className="restored-note muted">Restored after restart — {session.agent} picks the conversation up with your next message.</div>
+        )}
         {chat.busy && <div className="working muted">● working…</div>}
       </div>
       {edited.length > 0 && !chat.busy && (

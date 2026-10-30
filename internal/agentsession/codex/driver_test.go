@@ -560,3 +560,27 @@ func TestCloseWithoutLeaks(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 }
+
+func TestResumeOpensStoredThread(t *testing.T) {
+	h := newHarness(t, "resume.jsonl", nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	info, err := h.d.Resume(ctx, h.cwd, "thr-old", h.rec.sink)
+	if err != nil {
+		t.Fatalf("Resume: %v", err)
+	}
+	if info.ID != "thr-old" || info.Model != "gpt-5.6-luna" {
+		t.Fatalf("info = %+v", info)
+	}
+	log := h.clientLog(t)
+	if !strings.Contains(log, `"method":"thread/resume"`) || !strings.Contains(log, `"threadId":"thr-old"`) ||
+		!strings.Contains(log, `"approvalPolicy":"on-request"`) || !strings.Contains(log, `"excludeTurns":true`) || strings.Contains(log, "thread/start") {
+		t.Fatalf("client log:\n%s", log)
+	}
+	if _, err := h.d.Resume(ctx, h.cwd, "thr-old", h.rec.sink); err == nil {
+		t.Fatal("resuming an open thread should fail")
+	}
+	if _, err := h.d.Resume(ctx, h.cwd, "", h.rec.sink); err == nil {
+		t.Fatal("empty thread id should fail")
+	}
+}

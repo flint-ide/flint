@@ -14,6 +14,7 @@ import {
 } from '../lib/agentReducer'
 import { showToast } from './dialog'
 import { createReorderer } from '../lib/reorder'
+import type { SavedChat } from '../lib/sessionSnapshot'
 import { useEditor } from './editor'
 
 export interface ChatSession {
@@ -24,6 +25,8 @@ export interface ChatSession {
   chat: ChatState
   draft: string
   attachments: Attachment[]
+  /** Restored after a restart: the agent is reconnected on the next message. */
+  dormant?: boolean
 }
 
 interface AgentChatState {
@@ -43,10 +46,26 @@ interface AgentChatState {
   attach: (id: string, a: Attachment) => void
   detach: (id: string, index: number) => void
   setPolicy: (p: agentsession.Policy) => Promise<void>
+  /** Re-creates a chat from a snapshot without starting its agent. */
+  restore: (saved: SavedChat) => void
 }
 
 /** Dock tab id of a chat session (terminals and chats share the right dock). */
 export const chatTabId = (sessionId: string) => `chat:${sessionId}`
+
+// A resumed conversation keeps its id, but if the agent hands back a new one (or a
+// fresh session replaces one that could not be resumed) the chat keeps its local id:
+// calls go to remoteId(local), events are routed back through localId(remote).
+const remoteIds = new Map<string, string>()
+const localIds = new Map<string, string>()
+const remoteId = (id: string) => remoteIds.get(id) ?? id
+const localId = (id: string) => localIds.get(id) ?? id
+
+function link(local: string, remote: string): void {
+  if (local === remote) return
+  remoteIds.set(local, remote)
+  localIds.set(remote, local)
+}
 
 export const useAgentChat = create<AgentChatState>((set, get) => ({
   agents: [],
@@ -89,7 +108,8 @@ export const useAgentChat = create<AgentChatState>((set, get) => ({
     const attachments = s.attachments
     update(id, (cs) => ({ ...cs, draft: '', attachments: [], chat: addUserMessage(cs.chat, text, attachments) }))
     try {
-      await Chat.Prompt(id, text, attachments.map((a) => agentsession.Attachment.createFrom(a)))
+      if (s.dormant) await wake(s)
+      await Chat.Prompt(remoteId(id), text, attachments.map((a) => agentsession.Attachment.createFrom(a)))
     } catch (err) {
       update(id, (cs) => ({
         ...cs,
@@ -100,12 +120,12 @@ export const useAgentChat = create<AgentChatState>((set, get) => ({
     }
   },
 
-  cancel: (id) => void Chat.Cancel(id).catch((err) => showToast(errorMessage(err), 'error')),
+  cancel: (id) => void Chat.Cancel(remoteId(id)).catch((err) => showToast(errorMessage(err), 'error')),
 
   respond: async (id, requestId, optionId, optionName) => {
     update(id, (cs) => ({ ...cs, chat: answerPermission(cs.chat, requestId, optionName) }))
     try {
-      await Chat.Respond(id, requestId, optionId)
+      await Chat.Respond(remoteId(id), requestId, optionId)
     } catch (err) {
       showToast(errorMessage(err), 'error')
     }
@@ -113,7 +133,9 @@ export const useAgentChat = create<AgentChatState>((set, get) => ({
 
   stop: async (id) => {
     useEditor.getState().closeTab(chatTabId(id))
-    await Chat.Stop(id).catch(() => undefined)
+    if (!get().sessions[id]?.dormant) await Chat.Stop(remoteId(id)).catch(() => undefined)
+    localIds.delete(remoteId(id))
+    remoteIds.delete(id)
     set((s) => {
       const { [id]: _gone, ...sessions } = s.sessions
       return { sessions, order: s.order.filter((x) => x !== id) }
@@ -131,6 +153,13 @@ export const useAgentChat = create<AgentChatState>((set, get) => ({
 
   detach: (id, index) => update(id, (cs) => ({ ...cs, attachments: cs.attachments.filter((_, i) => i !== index) })),
 
+  restore: (saved) => {
+    if (get().sessions[saved.id]) return
+    const session: ChatSession = { ...saved, chat: settle(saved.chat), attachments: [], dormant: true }
+    set((s) => ({ sessions: { ...s.sessions, [saved.id]: session }, order: [...s.order, saved.id] }))
+    useEditor.getState().openChat(saved.id, saved.agent, true)
+  },
+
   setPolicy: async (p) => {
     set({ policy: p })
     try {
@@ -140,6 +169,38 @@ export const useAgentChat = create<AgentChatState>((set, get) => ({
     }
   },
 }))
+
+/**
+ * Reconnects a restored chat: resumes the agent's conversation, or starts a new
+ * one (and says so) when the agent cannot find it any more.
+ */
+async function wake(s: ChatSession): Promise<void> {
+  let info: agentsession.SessionInfo
+  try {
+    info = await Chat.Resume(s.agent, s.cwd, s.id)
+  } catch (err) {
+    info = await Chat.Start(s.agent, s.cwd)
+    update(s.id, (cs) => ({
+      ...cs,
+      chat: applyEvent(cs.chat, {
+        sessionId: s.id,
+        kind: 'error',
+        text: `Could not resume the earlier conversation (${errorMessage(err)}); continuing in a new one that does not see the messages above.`,
+      }),
+    }))
+  }
+  link(s.id, info.id)
+  update(s.id, (cs) => ({ ...cs, dormant: false, model: info.model || cs.model }))
+}
+
+/** A restored transcript is idle: nothing runs and unanswered questions expired. */
+function settle(chat: ChatState): ChatState {
+  return {
+    ...chat,
+    busy: false,
+    items: chat.items.map((it) => (it.type === 'permission' && !it.settled ? { ...it, settled: true } : it)),
+  }
+}
 
 function update(id: string, fn: (s: ChatSession) => ChatSession): void {
   useAgentChat.setState((st) => {
@@ -155,7 +216,7 @@ export function subscribeAgentChatEvents(): void {
   if (subscribed) return
   subscribed = true
   const deliver = createReorderer<AgentEvent>((id, e) =>
-    update(id, (cs) => {
+    update(localId(id), (cs) => {
       const chat = applyEvent(cs.chat, e)
       return chat === cs.chat ? cs : { ...cs, chat }
     }),

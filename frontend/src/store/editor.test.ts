@@ -44,4 +44,15 @@ describe('editor tabs history', () => {
     expect(st().tabs.filter((t) => t.kind === 'chat')).toHaveLength(1)
     expect(st().activeId).toBe('chat:s1')
   })
+
+  it('restored tabs are appended in order without changing the active tab', () => {
+    st().openFile('/p/a.go')
+    st().addTab({ id: 'file:/p/b.go', kind: 'file', path: '/p/b.go', title: 'b.go', dirty: false })
+    st().openTerminal('t1', 'zsh', true)
+    st().openChat('s1', 'claude', true)
+    st().addTab({ id: 'file:/p/a.go', kind: 'file', path: '/p/a.go', title: 'a.go', dirty: false })
+    expect(st().tabs.map((t) => t.id)).toEqual(['file:/p/a.go', 'file:/p/b.go', 'term:t1', 'chat:s1'])
+    expect(st().activeId).toBe('file:/p/a.go')
+    expect(st().backStack).toEqual([])
+  })
 })

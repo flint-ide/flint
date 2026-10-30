@@ -114,10 +114,17 @@ flowchart LR
 | Hasła do baz | Pęk kluczy macOS (Keychain), usługa `flint-db`, konto = id połączenia | usuwane razem z profilem |
 | Brudnopisy (konsole SQL, notatki) | `~/Library/Application Support/flint/scratch/` — `index.json` + `<id>.sql/.md/.txt` | autozapis |
 | Szerokość panelu bocznego | `localStorage` WebView | tylko ustawienia wyglądu |
-| Otwarte karty, terminale, rozmowy z agentem | tylko w pamięci | znikają po zamknięciu |
-| Historia rozmów z agentem | sam CLI agenta: `~/.claude/projects/…`, `~/.codex/sessions/…` | Flint jej nie kopiuje |
+| Otwarte karty, terminale, rozmowy z agentem (sesja projektu) | `~/Library/Application Support/flint/sessions/<hash ścieżki>.json`, jeden plik na projekt | zapis po zmianach (debounce) i przy wyjściu, `0600`, maks. 4 MB |
+| Historia rozmów z agentem | sam CLI agenta: `~/.claude/projects/…`, `~/.codex/sessions/…` | Flint wznawia je po restarcie (`claude --resume`, codex `thread/resume`) |
 | „Always allow” dla komend Claude | `.claude/settings.local.json` w projekcie | zapisuje Claude Code, jak w terminalu |
 | Cache serwerów LSP | ich własne katalogi, np. `~/Library/Caches/gopls` | |
+
+Sesja projektu zawiera:
+- karty plików z pozycją kursora, brudnopisy i diffy;
+- terminale: ostatni katalog powłoki (podąża za `cd`) i ostatnie ~400 linii wyjścia. Po restarcie startuje nowa powłoka w tym katalogu, a stary output widać nad nią przyciemniony. Programy pełnoekranowe (np. TUI claude) nie są zapisywane;
+- rozmowy z agentem: transcript (ostatnie 200 wpisów, długie wyjścia narzędzi przycięte). Agent dostaje połączenie przy pierwszej nowej wiadomości. Gdy rozmowy nie da się wznowić, Flint zaczyna nową i to zaznacza.
+
+Wyjście terminala może zawierać dane wrażliwe, dlatego plik ma uprawnienia `0600`. Usunięcie pliku z `sessions/` czyści sesję projektu.
 
 Katalog `~/Library/Application Support/flint` można zmienić zmienną `FLINT_CONFIG_DIR` (używają jej testy i tryb deweloperski). Pliki JSON są zapisywane atomowo: zapis do pliku tymczasowego, potem rename.
 
@@ -129,7 +136,8 @@ internal/workspace          drzewo, odczyt/zapis plików, lista plików
 internal/search             ripgrep + fallback, streaming wyników
 internal/db                 profile połączeń, Keychain, pgx/clickhouse, normalizacja typów
 internal/scratch            trwałe brudnopisy
-internal/terminal           PTY, koalescencja wyjścia
+internal/terminal           PTY, koalescencja wyjścia, cwd powłoki (proc_pidinfo)
+internal/restore            zapis sesji projektu (karty, terminale, czaty) między uruchomieniami
 internal/git                status, commit, rollback, gałęzie, worktree, log (CLI gita)
 internal/agent              claude / codex: tryb bez interakcji i polecenia interaktywne
 internal/shellenv           PATH z login shell (hooki gita, brew, nvm w aplikacji GUI)

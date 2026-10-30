@@ -41,6 +41,14 @@ func (c *AgentChatAPI) Start(agent, cwd string) (as.SessionInfo, error) {
 	return c.app.agents.Start(ctx, agent, cwd)
 }
 
+// Resume reopens a conversation from an earlier run (after a restart). The
+// returned ID may differ from sessionID if the agent forked it.
+func (c *AgentChatAPI) Resume(agent, cwd, sessionID string) (as.SessionInfo, error) {
+	ctx, cancel := context.WithTimeout(c.app.ctx, agentStartTimeout)
+	defer cancel()
+	return c.app.agents.Resume(ctx, agent, cwd, sessionID)
+}
+
 // Prompt sends a message; the reply streams as "agent:event" events.
 func (c *AgentChatAPI) Prompt(sessionID, text string, attachments []as.Attachment) error {
 	return c.app.agents.Prompt(sessionID, text, attachments)

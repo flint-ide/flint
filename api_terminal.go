@@ -78,6 +78,15 @@ func (t *TerminalAPI) Resize(id string, cols, rows int) error {
 	return t.app.terminals.Resize(id, cols, rows)
 }
 
+// Cwd returns the shell's current directory (follows `cd`), "" when unknown.
+func (t *TerminalAPI) Cwd(id string) string {
+	cwd, err := t.app.terminals.Cwd(id)
+	if err != nil {
+		return ""
+	}
+	return cwd
+}
+
 // Close terminates the terminal's shell.
 func (t *TerminalAPI) Close(id string) {
 	t.app.terminals.Close(id)

@@ -180,8 +180,29 @@ func (m *Manager) SetPolicy(p Policy) {
 	m.policy = p
 }
 
+// ErrNoResume is returned by Resume for agents that cannot reopen a conversation.
+var ErrNoResume = errors.New("this agent cannot resume earlier conversations")
+
 // Start opens a session with the named agent.
 func (m *Manager) Start(ctx context.Context, agent, cwd string) (SessionInfo, error) {
+	return m.open(agent, cwd, func(d Driver, sink Sink) (SessionInfo, error) {
+		return d.Start(ctx, cwd, sink)
+	})
+}
+
+// Resume reopens an earlier conversation of the named agent.
+func (m *Manager) Resume(ctx context.Context, agent, cwd, sessionID string) (SessionInfo, error) {
+	return m.open(agent, cwd, func(d Driver, sink Sink) (SessionInfo, error) {
+		r, ok := d.(Resumer)
+		if !ok {
+			return SessionInfo{}, ErrNoResume
+		}
+		return r.Resume(ctx, cwd, sessionID, sink)
+	})
+}
+
+// open starts or resumes a session through fn and registers it.
+func (m *Manager) open(agent, cwd string, fn func(Driver, Sink) (SessionInfo, error)) (SessionInfo, error) {
 	m.mu.Lock()
 	d := m.drivers[agent]
 	m.mu.Unlock()
@@ -190,7 +211,7 @@ func (m *Manager) Start(ctx context.Context, agent, cwd string) (SessionInfo, er
 	}
 	var sessionID string
 	var idMu sync.Mutex
-	info, err := d.Start(ctx, cwd, func(e Event) {
+	info, err := fn(d, func(e Event) {
 		idMu.Lock()
 		if e.SessionID == "" {
 			e.SessionID = sessionID

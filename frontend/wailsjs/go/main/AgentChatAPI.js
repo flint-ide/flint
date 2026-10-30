@@ -22,6 +22,10 @@ export function Respond(arg1, arg2, arg3) {
   return window['go']['main']['AgentChatAPI']['Respond'](arg1, arg2, arg3);
 }
 
+export function Resume(arg1, arg2, arg3) {
+  return window['go']['main']['AgentChatAPI']['Resume'](arg1, arg2, arg3);
+}
+
 export function SetPolicy(arg1) {
   return window['go']['main']['AgentChatAPI']['SetPolicy'](arg1);
 }

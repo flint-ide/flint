@@ -7,6 +7,8 @@ export interface Reveal {
   from: number // UTF-16 column offsets within the line
   to: number
   nonce: number // changes on every request so the same location can be revealed twice
+  /** Move the cursor without focusing the editor (session restore). */
+  quiet?: boolean
 }
 
 export interface FileTab {
@@ -68,11 +70,14 @@ interface EditorState {
   /** Previously active tabs (most recent last), for ⌘[ like IntelliJ's Back. */
   backStack: string[]
   forwardStack: string[]
-  openTerminal: (termId: string, title: string) => void
-  openChat: (sessionId: string, title: string) => void
+  /** background: add the tab without switching to it (session restore). */
+  openTerminal: (termId: string, title: string, background?: boolean) => void
+  openChat: (sessionId: string, title: string, background?: boolean) => void
   back: () => void
   forward: () => void
   openFile: (path: string, reveal?: Omit<Reveal, 'nonce'>) => void
+  /** Appends a tab without switching to it; no-op when it is already open. */
+  addTab: (tab: Tab) => void
   openScratch: (sc: ScratchPad) => void
   openDiff: (repoRoot: string, path: string, basePath?: string) => void
   renameScratchTab: (scratchId: string, title: string) => void
@@ -82,8 +87,9 @@ interface EditorState {
   setDirty: (id: string, dirty: boolean) => void
 }
 
-const fileTabId = (path: string) => `file:${path}`
-const scratchTabId = (id: string) => `scratch:${id}`
+export const fileTabId = (path: string) => `file:${path}`
+export const scratchTabId = (id: string) => `scratch:${id}`
+export const diffTabId = (path: string) => `diff:${path}`
 const baseName = (path: string) => path.split('/').pop() ?? path
 
 let revealSeq = 0
@@ -101,19 +107,21 @@ export const useEditor = create<EditorState>((set) => ({
   backStack: [],
   forwardStack: [],
 
-  openTerminal: (termId, title) =>
+  openTerminal: (termId, title, background) =>
     set((s) => {
       const id = `term:${termId}`
       if (s.tabs.some((t) => t.id === id)) return activate(s, id)
       const tab: TerminalTab = { id, kind: 'terminal', termId, title, dirty: false }
+      if (background) return { tabs: [...s.tabs, tab] }
       return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
     }),
 
-  openChat: (sessionId, title) =>
+  openChat: (sessionId, title, background) =>
     set((s) => {
       const id = `chat:${sessionId}`
       if (s.tabs.some((t) => t.id === id)) return activate(s, id)
       const tab: ChatTab = { id, kind: 'chat', sessionId, title, dirty: false }
+      if (background) return { tabs: [...s.tabs, tab] }
       return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
     }),
 
@@ -146,6 +154,13 @@ export const useEditor = create<EditorState>((set) => ({
       return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
     }),
 
+  addTab: (tab) =>
+    set((s) => {
+      if (s.tabs.some((t) => t.id === tab.id)) return {}
+      const withNonce = tab.kind === 'file' && tab.reveal ? { ...tab, reveal: { ...tab.reveal, nonce: ++revealSeq } } : tab
+      return { tabs: [...s.tabs, withNonce] }
+    }),
+
   openScratch: (sc) =>
     set((s) => {
       const id = scratchTabId(sc.id)
@@ -163,7 +178,7 @@ export const useEditor = create<EditorState>((set) => ({
 
   openDiff: (repoRoot, path, basePath = path) =>
     set((s) => {
-      const id = `diff:${path}`
+      const id = diffTabId(path)
       if (s.tabs.some((t) => t.id === id)) return activate(s, id)
       const tab: DiffTab = { id, kind: 'diff', path, basePath, repoRoot, title: `Δ ${baseName(path)}`, dirty: false }
       return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }

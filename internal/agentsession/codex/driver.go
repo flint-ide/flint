@@ -67,6 +67,24 @@ func New(opts Options) *Driver {
 // thread. ctx bounds the handshake only. Sink must not call Stop, Close or
 // Prompt synchronously (Respond and Cancel are fine).
 func (d *Driver) Start(ctx context.Context, cwd string, sink agentsession.Sink) (agentsession.SessionInfo, error) {
+	return d.start(ctx, cwd, "", sink)
+}
+
+// Resume spawns `codex app-server` and reopens the stored thread threadID.
+func (d *Driver) Resume(ctx context.Context, cwd, threadID string, sink agentsession.Sink) (agentsession.SessionInfo, error) {
+	if threadID == "" {
+		return agentsession.SessionInfo{}, errors.New("codex: empty thread id")
+	}
+	d.mu.Lock()
+	_, taken := d.sessions[threadID]
+	d.mu.Unlock()
+	if taken {
+		return agentsession.SessionInfo{}, fmt.Errorf("codex: thread %s is already open", threadID)
+	}
+	return d.start(ctx, cwd, threadID, sink)
+}
+
+func (d *Driver) start(ctx context.Context, cwd, resumeID string, sink agentsession.Sink) (agentsession.SessionInfo, error) {
 	if sink == nil {
 		return agentsession.SessionInfo{}, errors.New("codex: nil sink")
 	}
@@ -96,7 +114,7 @@ func (d *Driver) Start(ctx context.Context, cwd string, sink agentsession.Sink) 
 	s.proc = proc
 	s.mu.Unlock()
 
-	info, err := s.handshake(ctx, d.opts)
+	info, err := s.handshake(ctx, d.opts, resumeID)
 	if err == nil {
 		err = d.register(info.ID, s)
 	}

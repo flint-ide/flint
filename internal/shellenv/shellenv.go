@@ -1,0 +1,85 @@
+// Package shellenv imports PATH from the user's login shell. macOS GUI apps inherit a
+// minimal launchd environment, so without this git hooks (husky, pre-commit), rg and
+// tools installed via brew/nvm/asdf wouldn't be found.
+package shellenv
+
+import (
+	"context"
+	"os"
+	"os/exec"
+	"strings"
+	"sync"
+	"time"
+)
+
+const (
+	marker  = "__FLINT_PATH__="
+	timeout = 4 * time.Second
+)
+
+var (
+	once sync.Once
+	done = make(chan struct{})
+)
+
+// Load starts resolving the login-shell PATH in the background. Safe to call repeatedly.
+func Load() {
+	once.Do(func() {
+		go func() {
+			defer close(done)
+			if path := loginPath(); path != "" {
+				_ = os.Setenv("PATH", mergePaths(path, os.Getenv("PATH")))
+			}
+		}()
+	})
+}
+
+// Wait blocks until the PATH import finished (or timed out). Call before spawning tools.
+func Wait() {
+	Load()
+	<-done
+}
+
+func loginPath() string {
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/zsh"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	// -i loads .zshrc/.bashrc too, where nvm & co. usually extend PATH.
+	cmd := exec.CommandContext(ctx, shell, "-ilc", `printf '\n`+marker+`%s\n' "$PATH"`)
+	cmd.Stdin = nil
+	out, err := cmd.Output()
+	if err != nil && len(out) == 0 {
+		return ""
+	}
+	return ParseMarker(string(out))
+}
+
+// ParseMarker extracts the PATH printed after the marker, ignoring any noise that
+// shell startup files print before it.
+func ParseMarker(out string) string {
+	i := strings.LastIndex(out, marker)
+	if i < 0 {
+		return ""
+	}
+	line := out[i+len(marker):]
+	if nl := strings.IndexByte(line, '\n'); nl >= 0 {
+		line = line[:nl]
+	}
+	return strings.TrimSpace(line)
+}
+
+// mergePaths puts the login PATH first and keeps any extra entries of the current one.
+func mergePaths(login, current string) string {
+	seen := map[string]bool{}
+	var out []string
+	for _, p := range append(strings.Split(login, ":"), strings.Split(current, ":")...) {
+		if p != "" && !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
+	return strings.Join(out, ":")
+}

@@ -10,8 +10,10 @@ import (
 	"sync"
 	"time"
 
+	"flint/internal/agentsession"
 	"flint/internal/config"
 	"flint/internal/db"
+	"flint/internal/lsp"
 	"flint/internal/scratch"
 	"flint/internal/terminal"
 	"flint/internal/watcher"
@@ -23,6 +25,8 @@ const maxRecentFolders = 10
 type appState struct {
 	RecentFolders []string `json:"recentFolders"`
 	Agent         string   `json:"agent"` // preferred coding agent: "claude" or "codex"
+	// AgentPolicy is the approval policy for agent chat sessions (nil = default).
+	AgentPolicy *agentsession.Policy `json:"agentPolicy,omitempty"`
 }
 
 // App holds the services shared by all bound APIs.
@@ -34,6 +38,8 @@ type App struct {
 	db        *db.Manager
 	scratch   *scratch.Store
 	terminals *terminal.Manager
+	lsp       *lsp.Manager
+	agents    *agentsession.Manager
 
 	watchMu sync.Mutex
 	watch   *watcher.Watcher
@@ -69,19 +75,35 @@ func NewApp() (*App, error) {
 		db:        db.NewManager(store),
 		scratch:   scratches,
 	}
-	a.terminals = terminal.NewManager(terminalEvents{app: a})
+	a.terminals = terminal.NewManager(newTerminalEvents(a))
+	a.lsp = lsp.NewManager()
 	if err := config.LoadJSON(a.statePath(), &a.state); err != nil {
 		return nil, err
 	}
+	a.agents = newAgentManager(a)
 	return a, nil
 }
 
 func (a *App) startup(ctx context.Context) { a.ctx = ctx }
 
 func (a *App) shutdown(context.Context) {
-	a.terminals.CloseAll()
-	a.db.CloseAll()
-	a.setWatcher(nil)
+	// Language servers and agents each have grace periods; stop them in parallel
+	// so quitting stays fast.
+	var wg sync.WaitGroup
+	for _, stop := range []func(){
+		a.terminals.CloseAll,
+		a.lsp.Shutdown,
+		func() { _ = a.agents.Close() },
+		a.db.CloseAll,
+		func() { a.setWatcher(nil) },
+	} {
+		wg.Add(1)
+		go func(stop func()) {
+			defer wg.Done()
+			stop()
+		}(stop)
+	}
+	wg.Wait()
 }
 
 // setWatcher replaces the active project watcher (nil just stops the current one).

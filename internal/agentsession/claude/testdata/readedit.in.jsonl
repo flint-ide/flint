@@ -1,0 +1,4 @@
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Use the Read tool on notes.txt and reply with only its first line."}]},"parent_tool_use_id":null,"session_id":""}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Use the Edit tool to change \"hello\" to \"hi\" in main.go, then use the Write tool to create new.txt containing exactly: abc. Be brief."}]},"parent_tool_use_id":null,"session_id":""}
+{"type":"control_response","response":{"subtype":"success","request_id":"2c5686eb-274a-4027-ab94-8546ad48dba3","response":{"behavior":"allow","updatedInput":{"file_path":"/FIXTURE_CWD/main.go","old_string":"\"hello\"","new_string":"\"hi\"","replace_all":false}}}}
+{"type":"control_response","response":{"subtype":"success","request_id":"39786cae-4b82-4d10-a8b9-41e737f0b0cb","response":{"behavior":"allow","updatedInput":{"file_path":"/FIXTURE_CWD/new.txt","content":"abc"}}}}

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import * as Terminal from '../../wailsjs/go/main/TerminalAPI'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
+import { createReorderer } from '../lib/reorder'
 
 export interface TerminalTab {
   id: string
@@ -120,7 +121,7 @@ let subscribed = false
 export function subscribeTerminalEvents(): void {
   if (subscribed) return
   subscribed = true
-  EventsOn('term:data', (msg: { id: string; data: string }) => {
+  const deliver = createReorderer<{ id: string; seq?: number; data: string }>((_, msg) => {
     if (closed.has(msg.id)) return
     const bytes = decodeBase64(msg.data)
     const sink = sinks.get(msg.id)
@@ -132,6 +133,7 @@ export function subscribeTerminalEvents(): void {
     if (pending) pending.push(bytes)
     else backlog.set(msg.id, [bytes])
   })
+  EventsOn('term:data', (msg: { id: string; seq?: number; data: string }) => deliver(msg.id, msg))
   EventsOn('term:exit', (msg: { id: string; code: number }) => {
     useTerminal.setState((s) => ({
       tabs: s.tabs.map((t) => (t.id === msg.id ? { ...t, exitCode: msg.code } : t)),

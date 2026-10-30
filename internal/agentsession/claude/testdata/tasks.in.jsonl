@@ -1,0 +1,1 @@
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Use the TodoWrite tool (or, if absent, TaskCreate) to record a plan with exactly two items: 'Inspect main.go' (in_progress) and 'Write tests' (pending). Do nothing else, then reply ok."}]},"parent_tool_use_id":null,"session_id":""}

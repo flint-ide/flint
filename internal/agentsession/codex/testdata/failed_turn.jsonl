@@ -1,0 +1,11 @@
+{"dir":"out","msg":{"id":1,"method":"initialize"}}
+{"dir":"in","msg":{"id":1,"result":{"userAgent":"fake/0.153.4","codexHome":"/tmp/codex-home","platformFamily":"unix","platformOs":"macos"}}}
+{"dir":"out","msg":{"method":"initialized"}}
+{"dir":"out","msg":{"id":2,"method":"thread/start"}}
+{"dir":"in","msg":{"id":2,"result":{"thread":{"id":"thr-1"},"model":"gpt-5.6-luna","cwd":"$CWD"}}}
+{"dir":"out","msg":{"id":3,"method":"turn/start"}}
+{"dir":"in","msg":{"id":3,"result":{"turn":{"id":"turn-1","items":[],"status":"inProgress","error":null}}}}
+{"dir":"in","msg":{"method":"turn/started","params":{"threadId":"thr-1","turn":{"id":"turn-1","items":[],"status":"inProgress","error":null}}}}
+{"dir":"in","msg":{"method":"thread/tokenUsage/updated","params":{"threadId":"thr-1","turnId":"turn-1","tokenUsage":{"total":{"totalTokens":10,"inputTokens":10,"cachedInputTokens":0,"cacheWriteInputTokens":0,"outputTokens":0,"reasoningOutputTokens":0},"last":{"totalTokens":10,"inputTokens":10,"cachedInputTokens":0,"cacheWriteInputTokens":0,"outputTokens":0,"reasoningOutputTokens":0},"modelContextWindow":258400}}}}
+{"dir":"in","msg":{"method":"error","params":{"threadId":"thr-1","turnId":"turn-1","willRetry":false,"error":{"message":"Quota exceeded","codexErrorInfo":"usageLimitExceeded","additionalDetails":null}}}}
+{"dir":"in","msg":{"method":"turn/completed","params":{"threadId":"thr-1","turn":{"id":"turn-1","items":[],"status":"failed","error":{"message":"Quota exceeded","codexErrorInfo":"usageLimitExceeded","additionalDetails":null}}}}}

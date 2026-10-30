@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import fuzzysort from 'fuzzysort'
+import { highlight, prepare, search } from '../lib/fuzzy'
 import { useWorkspace } from '../store/workspace'
 import { useEditor } from '../store/editor'
 import { Modal } from './layout/Modal'
@@ -24,13 +24,10 @@ export function QuickOpen() {
     if (Date.now() - useWorkspace.getState().filesLoadedAt > STALE_MS) void refreshFiles()
   }, [refreshFiles])
 
-  const prepared = useMemo(() => files.map((f) => fuzzysort.prepare(f)), [files])
+  const prepared = useMemo(() => files.map(prepare), [files])
   const results = useMemo(() => {
-    if (!query) return files.slice(0, MAX_RESULTS).map((f) => ({ path: f, html: f }))
-    return fuzzysort.go(query, prepared, { limit: MAX_RESULTS, threshold: 0.2 }).map((r) => ({
-      path: r.target,
-      html: r.highlight('<b>', '</b>'),
-    }))
+    if (!query) return files.slice(0, MAX_RESULTS).map((f) => ({ path: f, html: highlight({ target: f, score: 0, indices: [] }) }))
+    return search(query, prepared, MAX_RESULTS).map((r) => ({ path: r.target, html: highlight(r) }))
   }, [query, files, prepared])
 
   useEffect(() => setCursor(0), [query])
@@ -80,20 +77,12 @@ export function QuickOpen() {
               onClick={() => choose(r.path)}
             >
               <span className="file-name">{r.path.slice(slash + 1)}</span>
-              {/* fuzzysort highlight output only wraps our own file paths in <b> tags */}
-              <span className="muted path-hint" dangerouslySetInnerHTML={{ __html: escapeExceptBold(r.html) }} />
+              {/* highlight() escapes the path and only adds <b> tags */}
+              <span className="muted path-hint" dangerouslySetInnerHTML={{ __html: r.html }} />
             </div>
           )
         })}
       </div>
     </Modal>
   )
-}
-
-/** Escapes HTML in a highlighted path while keeping the <b> markers fuzzysort inserted. */
-function escapeExceptBold(html: string): string {
-  return html
-    .split(/(<\/?b>)/)
-    .map((part) => (part === '<b>' || part === '</b>' ? part : part.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')))
-    .join('')
 }

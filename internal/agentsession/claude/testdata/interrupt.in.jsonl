@@ -1,0 +1,3 @@
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Write a 400-word story about a lighthouse keeper. No tools."}]},"parent_tool_use_id":null,"session_id":""}
+{"type":"control_request","request_id":"flint-1","request":{"subtype":"interrupt"}}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Reply with exactly: still here"}]},"parent_tool_use_id":null,"session_id":""}

@@ -9,10 +9,15 @@ import { subscribeSearchEvents } from './store/search'
 import { subscribeFsEvents } from './store/fsEvents'
 import { subscribeQuit } from './store/quit'
 import { subscribeGitEvents, useGit } from './store/git'
+import { subscribeLspEvents } from './store/lsp'
+import { subscribeAgentChatEvents } from './store/agentChat'
+import { attachSelectionToAgent } from './lib/agentContext'
+import { UsagesModal } from './components/lsp/UsagesModal'
 import { showToast } from './store/dialog'
 import { ActivityBar } from './components/layout/ActivityBar'
 import { Splitter } from './components/layout/Splitter'
 import { Overlays } from './components/layout/Overlays'
+import { ErrorBoundary } from './components/layout/ErrorBoundary'
 import { StatusBar } from './components/layout/StatusBar'
 import { EditorArea, requestCloseTab } from './components/editor/EditorArea'
 import { TerminalPanel } from './components/terminal/TerminalPanel'
@@ -46,6 +51,8 @@ export default function App() {
     subscribeFsEvents()
     subscribeQuit()
     subscribeGitEvents()
+    subscribeLspEvents()
+    subscribeAgentChatEvents()
     void useDatabase.getState().loadConnections()
     void useScratch.getState().load()
     void useWorkspace.getState().init()
@@ -78,6 +85,7 @@ export default function App() {
         {sidebarVisible && (
           <>
             <aside className="sidebar" style={{ width: sidebarWidth }}>
+              <ErrorBoundary label="Sidebar">
               {sidebar === 'files' && <FileTree />}
               {sidebar === 'search' && <SearchPanel focusToken={searchFocus} />}
               {sidebar === 'git' && (
@@ -91,6 +99,7 @@ export default function App() {
                 </Suspense>
               )}
               {sidebar === 'scratch' && <ScratchPanel />}
+              </ErrorBoundary>
             </aside>
             <Splitter direction="horizontal" onResize={onSidebarResize} />
           </>
@@ -112,6 +121,7 @@ export default function App() {
           <QuickOpen />
         </Suspense>
       )}
+      <UsagesModal />
       <Overlays />
     </div>
   )
@@ -127,7 +137,9 @@ function useGlobalShortcuts(focusSearch: () => void, focusCommit: () => void) {
       const handled = (() => {
         if (key === 'p' && !e.shiftKey) return ws.setQuickOpen(true), true
         if (key === 'f' && e.shiftKey) return ws.setSidebar('search'), focusSearch(), true
-        if (key === 'b' && !e.shiftKey) return ws.toggleSidebar(), true
+        if (key === 'b' && !e.shiftKey && !inEditor(e)) return ws.toggleSidebar(), true
+        // ⌘L: hand the editor selection (or current file) to the agent chat.
+        if (key === 'l' && !e.shiftKey) return void attachSelectionToAgent(), true
         // ⌘K / ⇧⌘K like IntelliJ; inside the terminal ⌘K keeps clearing the screen.
         if (key === 'k' && !inTerminal(e)) {
           if (e.shiftKey) return void useGit.getState().remote('push'), true
@@ -156,6 +168,11 @@ function useGlobalShortcuts(focusSearch: () => void, focusCommit: () => void) {
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [focusSearch, focusCommit])
+}
+
+// ⌘B in the editor means "go to declaration" (IntelliJ), not "toggle sidebar".
+function inEditor(e: KeyboardEvent): boolean {
+  return e.target instanceof HTMLElement && !!e.target.closest('.cm-editor')
 }
 
 function inTerminal(e: KeyboardEvent): boolean {

@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { useEditor, type Tab } from '../../store/editor'
 import { confirmAction } from '../../store/dialog'
 import { Welcome } from '../layout/Welcome'
+import { ErrorBoundary } from '../layout/ErrorBoundary'
 
 // CodeMirror and the SQL console load on first use, keeping startup to layout + terminal.
 const FileView = lazy(() => import('./FileView').then((m) => ({ default: m.FileView })))
@@ -55,11 +56,13 @@ export function EditorArea() {
         {/* All tabs stay mounted so undo history, scroll and results survive tab switches. */}
         {tabs.map((tab) => (
           <div key={tab.id} className="tab-panel" hidden={tab.id !== activeId}>
-            <Suspense fallback={null}>
-              {tab.kind === 'file' && <FileView tab={tab} active={tab.id === activeId} />}
-              {tab.kind === 'scratch' && <ScratchView tab={tab} active={tab.id === activeId} />}
-              {tab.kind === 'diff' && <DiffView tab={tab} />}
-            </Suspense>
+            <ErrorBoundary label={tab.title}>
+              <Suspense fallback={null}>
+                {tab.kind === 'file' && <FileView tab={tab} active={tab.id === activeId} />}
+                {tab.kind === 'scratch' && <ScratchView tab={tab} active={tab.id === activeId} />}
+                {tab.kind === 'diff' && <DiffView tab={tab} />}
+              </Suspense>
+            </ErrorBoundary>
           </div>
         ))}
       </div>

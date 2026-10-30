@@ -1,0 +1,176 @@
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { useAgentChat, type ChatSession } from '../../store/agentChat'
+import { editedFiles } from '../../lib/agentReducer'
+import { useEditor } from '../../store/editor'
+import { useWorkspace } from '../../store/workspace'
+import { FileLink, MessageText, PermissionCard, PlanView, ToolCallRow, UsageLine } from './ChatItems'
+
+/** Conversation with a coding agent: streamed replies, tool calls, plan and questions. */
+// memo: chunks for one session must not re-render the others (actions are stable).
+export const AgentChat = memo(function AgentChat({ session, active }: { session: ChatSession; active: boolean }) {
+  const send = useAgentChat((s) => s.send)
+  const cancel = useAgentChat((s) => s.cancel)
+  const respond = useAgentChat((s) => s.respond)
+  const setDraft = useAgentChat((s) => s.setDraft)
+  const detach = useAgentChat((s) => s.detach)
+  const attach = useAgentChat((s) => s.attach)
+  const root = useWorkspace((s) => s.root) ?? session.cwd
+  const [showThoughts, setShowThoughts] = useState(false)
+  const scroller = useRef<HTMLDivElement>(null)
+  const input = useRef<HTMLTextAreaElement>(null)
+  const stick = useRef(true)
+  const { chat } = session
+
+  // Follow the stream unless the user scrolled up to read.
+  useEffect(() => {
+    const el = scroller.current
+    if (el && stick.current) el.scrollTop = el.scrollHeight
+  }, [chat.items])
+  useEffect(() => {
+    if (active) input.current?.focus()
+  }, [active])
+
+  const attachActiveFile = () => {
+    const { tabs, activeId } = useEditor.getState()
+    const tab = tabs.find((t) => t.id === activeId)
+    if (tab?.kind === 'file') attach(session.id, { path: tab.path })
+  }
+
+  const edited = useMemo(() => editedFiles(chat), [chat])
+
+  return (
+    <div className="agent-chat">
+      <div className="chat-header">
+        <span className="agent-name">{session.agent}</span>
+        {session.model && <span className="muted">{session.model}</span>}
+        <span className="spacer" />
+        <label className="check muted" title="Show the agent's reasoning">
+          <input type="checkbox" checked={showThoughts} onChange={(e) => setShowThoughts(e.target.checked)} /> thinking
+        </label>
+        <PolicyToggle />
+      </div>
+      <PlanView plan={chat.plan} />
+      <div
+        className="chat-log"
+        ref={scroller}
+        onScroll={(e) => {
+          const el = e.currentTarget
+          stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+        }}
+      >
+        {chat.items.length === 0 && (
+          <div className="placeholder muted">
+            Ask {session.agent} anything about {root.split('/').pop()}. Edits are applied directly; review them in the Commit panel (⌘K).
+          </div>
+        )}
+        {chat.items.map((it, i) => {
+          switch (it.type) {
+            case 'user':
+              return (
+                <div key={i} className="msg user">
+                  <MessageText text={it.text} />
+                  {it.attachments.length > 0 && (
+                    <div className="msg-attachments">{it.attachments.map((a, j) => <span key={j} className="chip">{label(a, root)}</span>)}</div>
+                  )}
+                </div>
+              )
+            case 'assistant':
+              return <div key={i} className="msg assistant"><MessageText text={it.text} /></div>
+            case 'thought':
+              return showThoughts ? <div key={i} className="msg thought"><MessageText text={it.text} /></div> : null
+            case 'tool':
+              return <ToolCallRow key={it.call.id} call={it.call} root={root} />
+            case 'permission':
+              return (
+                <PermissionCard
+                  key={`p${it.request.id}`}
+                  request={it.request}
+                  answer={it.answer}
+                  settled={it.settled}
+                  onAnswer={(optionId, name) => void respond(session.id, it.request.id, optionId, name)}
+                />
+              )
+            case 'error':
+              return <div key={i} className="msg error selectable">{it.text}</div>
+            case 'end':
+              return <UsageLine key={i} usage={it.usage} stopReason={it.stopReason} />
+          }
+          return null
+        })}
+        {chat.busy && <div className="working muted">● working…</div>}
+      </div>
+      {edited.length > 0 && !chat.busy && (
+        <div className="chat-edited">
+          <span className="muted">Changed:</span>
+          {edited.slice(0, 6).map((p) => <FileLink key={p} path={p} root={root} />)}
+          {edited.length > 6 && <span className="muted">+{edited.length - 6}</span>}
+        </div>
+      )}
+      <div className="composer">
+        {session.attachments.length > 0 && (
+          <div className="composer-attachments">
+            {session.attachments.map((a, i) => (
+              <span key={i} className="chip">
+                {label(a, root)}
+                <button className="icon" onClick={() => detach(session.id, i)} aria-label="Remove attachment">✕</button>
+              </span>
+            ))}
+          </div>
+        )}
+        <textarea
+          ref={input}
+          value={session.draft}
+          placeholder={chat.busy ? `${session.agent} is working… (Esc to stop)` : `Message ${session.agent} (Enter to send, ⇧Enter newline)`}
+          spellCheck={false}
+          onChange={(e) => setDraft(session.id, e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault()
+              void send(session.id)
+            } else if (e.key === 'Escape' && chat.busy) {
+              e.preventDefault()
+              cancel(session.id)
+            }
+          }}
+        />
+        <div className="composer-actions">
+          <button className="link" onClick={attachActiveFile} title="Attach the file open in the editor (⌘L attaches the selection)">
+            ＋ current file
+          </button>
+          <span className="spacer" />
+          {chat.busy ? (
+            <button className="danger" onClick={() => cancel(session.id)}>■ Stop</button>
+          ) : (
+            <button className="primary" disabled={!session.draft.trim()} onClick={() => void send(session.id)}>Send</button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+})
+
+function label(a: { path: string; startLine?: number; endLine?: number }, root: string): string {
+  const rel = a.path.startsWith(root + '/') ? a.path.slice(root.length + 1) : a.path
+  return a.startLine ? `${rel}:${a.startLine}${a.endLine && a.endLine !== a.startLine ? `-${a.endLine}` : ''}` : rel
+}
+
+/** What the agent may do without asking (edits by default — review them via git). */
+function PolicyToggle() {
+  const policy = useAgentChat((s) => s.policy)
+  const setPolicy = useAgentChat((s) => s.setPolicy)
+  const [open, setOpen] = useState(false)
+  if (!policy) return null
+  const summary = policy.autoApproveAll ? 'auto: all' : policy.autoApproveEdits ? 'auto: edits' : 'ask: all'
+  return (
+    <span className="policy">
+      <button className="link" onClick={() => setOpen(!open)} title="What the agent may do without asking">{summary}</button>
+      {open && (
+        <div className="policy-menu" onMouseLeave={() => setOpen(false)}>
+          <label className="check"><input type="checkbox" checked={policy.autoApproveEdits} onChange={(e) => void setPolicy({ ...policy, autoApproveEdits: e.target.checked })} /> Edit files without asking</label>
+          <label className="check"><input type="checkbox" checked={policy.autoApproveReads} onChange={(e) => void setPolicy({ ...policy, autoApproveReads: e.target.checked })} /> Read / search without asking</label>
+          <label className="check"><input type="checkbox" checked={policy.autoApproveAll} onChange={(e) => void setPolicy({ ...policy, autoApproveAll: e.target.checked })} /> Allow everything (commands too)</label>
+        </div>
+      )}
+    </span>
+  )
+}

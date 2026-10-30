@@ -1,0 +1,85 @@
+{
+ "type": "control_response",
+ "response": {
+  "subtype": "success",
+  "request_id": "REQ",
+  "response": {
+   "commands": [
+    {
+     "name": "deep-research",
+     "description": "Deep research harness — fan-out web searches, fetch sources, adversarially verify claims, synthesize a cited report. (dynamic workflow)",
+     "argumentHint": "",
+     "builtin": true
+    },
+    {
+     "name": "design",
+     "description": "Make a new Design artifact from a brief",
+     "argumentHint": "[what to design]",
+     "builtin": true
+    }
+   ],
+   "agents": [],
+   "output_style": "default",
+   "models": [
+    {
+     "value": "default",
+     "resolvedModel": "claude-opus-5-5",
+     "displayName": "Default (recommended)",
+     "description": "Opus 5.5 · Best for everyday, complex tasks",
+     "supportsEffort": true,
+     "supportedEffortLevels": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+     ],
+     "supportsAdaptiveThinking": true,
+     "supportsFastMode": true,
+     "supportsAutoMode": true,
+     "supportsThinkingOff": false
+    },
+    {
+     "value": "sonnet",
+     "resolvedModel": "claude-sonnet-5-5",
+     "displayName": "Sonnet 5.5",
+     "description": "Efficient for routine tasks",
+     "supportsEffort": true,
+     "supportedEffortLevels": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+     ],
+     "supportsAdaptiveThinking": true,
+     "supportsAutoMode": true,
+     "supportsThinkingOff": false
+    },
+    {
+     "value": "haiku",
+     "resolvedModel": "claude-haiku-5-5",
+     "displayName": "Haiku 5.5",
+     "description": "Fastest for quick answers",
+     "supportsEffort": true,
+     "supportedEffortLevels": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+     ],
+     "supportsAdaptiveThinking": true,
+     "supportsAutoMode": true,
+     "supportsThinkingOff": false
+    }
+   ],
+   "pid": 12345,
+   "claude_code_version": "2.1.314",
+   "current_permission_mode": "default",
+   "session_state": "idle"
+  },
+  "pending_permission_requests": [],
+  "pending_user_dialog_requests": []
+ }
+}

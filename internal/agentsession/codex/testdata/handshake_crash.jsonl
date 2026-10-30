@@ -1,0 +1,2 @@
+{"dir":"out","msg":{"id":1,"method":"initialize"}}
+{"dir":"exit","code":1,"stderr":"Error: not logged in. Run codex login.\n"}

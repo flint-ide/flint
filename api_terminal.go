@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -18,6 +19,7 @@ const (
 // sequences survive until xterm.js reassembles them.
 type TermData struct {
 	ID   string `json:"id"`
+	Seq  uint64 `json:"seq"` // per terminal, from 1; lets the UI restore order
 	Data []byte `json:"data"`
 }
 
@@ -28,14 +30,29 @@ type TermExit struct {
 }
 
 // terminalEvents forwards terminal output to the frontend.
-type terminalEvents struct{ app *App }
+type terminalEvents struct {
+	app *App
 
-func (e terminalEvents) Output(id string, data []byte) {
-	runtime.EventsEmit(e.app.ctx, eventTermData, TermData{ID: id, Data: data})
+	mu  sync.Mutex
+	seq map[string]uint64
 }
 
-func (e terminalEvents) Exited(id string, code int) {
+func newTerminalEvents(app *App) *terminalEvents {
+	return &terminalEvents{app: app, seq: map[string]uint64{}}
+}
+
+func (e *terminalEvents) Output(id string, data []byte) {
+	e.mu.Lock()
+	defer e.mu.Unlock() // stamp and emit together so sequence order equals send order
+	e.seq[id]++
+	runtime.EventsEmit(e.app.ctx, eventTermData, TermData{ID: id, Seq: e.seq[id], Data: data})
+}
+
+func (e *terminalEvents) Exited(id string, code int) {
 	runtime.EventsEmit(e.app.ctx, eventTermExit, TermExit{ID: id, Code: code})
+	e.mu.Lock()
+	delete(e.seq, id)
+	e.mu.Unlock()
 }
 
 // TerminalAPI runs interactive shells (e.g. for claude / codex) inside Flint.

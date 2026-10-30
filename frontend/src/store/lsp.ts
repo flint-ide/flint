@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { createStore } from '../lib/store'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
 import type { lsp } from '../../wailsjs/go/models'
 
@@ -19,7 +19,7 @@ interface LspState {
   closeUsages: () => void
 }
 
-export const useLsp = create<LspState>((set) => ({
+export const useLsp = createStore<LspState>((set) => ({
   statuses: {},
   usages: null,
   showUsages: (symbol, locations) => set({ usages: { symbol, locations } }),

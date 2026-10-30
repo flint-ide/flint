@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { createStore } from '../lib/store'
 import * as Git from '../../wailsjs/go/main/GitAPI'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
 import type { git } from '../../wailsjs/go/models'
@@ -41,7 +41,7 @@ interface GitState {
   remote: (op: 'fetch' | 'pull' | 'push') => Promise<void>
 }
 
-export const useGit = create<GitState>((set, get) => ({
+export const useGit = createStore<GitState>((set, get) => ({
   root: null,
   isRepo: false,
   status: null,

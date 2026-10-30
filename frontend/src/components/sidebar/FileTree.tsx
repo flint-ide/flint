@@ -1,5 +1,5 @@
-import { useMemo, useRef } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { useMemo } from 'react'
+import { useVirtualList } from '../../lib/virtualList'
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
 import type { Entry } from '../../api/backend'
@@ -35,15 +35,9 @@ export function FileTree() {
   const reloadTree = useWorkspace((s) => s.reloadTree)
   const openFile = useEditor((s) => s.openFile)
   const activeId = useEditor((s) => s.activeId)
-  const scroller = useRef<HTMLDivElement>(null)
 
   const rows = useMemo(() => (root ? visibleRows(root, children, expanded) : []), [root, children, expanded])
-  const virtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => scroller.current,
-    estimateSize: () => ROW_HEIGHT,
-    overscan: 30,
-  })
+  const { scrollRef, totalSize, items } = useVirtualList({ count: rows.length, itemSize: ROW_HEIGHT, overscan: 30 })
 
   if (!root) return <div className="placeholder muted">No folder open.</div>
 
@@ -53,9 +47,9 @@ export function FileTree() {
         <span className="panel-title" title={root}>{root.split('/').pop()}</span>
         <button className="icon" title="Refresh" onClick={() => void reloadTree()}>↻</button>
       </div>
-      <div className="tree" ref={scroller}>
-        <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-          {virtualizer.getVirtualItems().map((vi) => {
+      <div className="tree" ref={scrollRef}>
+        <div style={{ height: totalSize, position: 'relative' }}>
+          {items.map((vi) => {
             const { entry, depth, expanded: isOpen } = rows[vi.index]
             const active = activeId === `file:${entry.path}`
             return (

@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { createStore } from '../lib/store'
 import { Database, errorMessage, type Connection, type Table } from '../api/backend'
 import { showToast } from './dialog'
 
@@ -17,7 +17,7 @@ interface DatabaseState {
   upsertConnection: (conn: Connection) => void
 }
 
-export const useDatabase = create<DatabaseState>((set, get) => ({
+export const useDatabase = createStore<DatabaseState>((set, get) => ({
   connections: [],
   schemas: {},
 

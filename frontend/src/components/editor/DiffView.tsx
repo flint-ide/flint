@@ -1,23 +1,27 @@
 import { useEffect, useRef, useState } from 'react'
-import { MergeView } from '@codemirror/merge'
 import { EditorState, type Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { Workspace, errorMessage } from '../../api/backend'
+import { Diff, Workspace, errorMessage, type Hunk } from '../../api/backend'
 import { Git, useGit } from '../../store/git'
 import { useEditor, type DiffTab } from '../../store/editor'
 import { onFileChanged } from '../../store/fsEvents'
 import { languageFor } from '../../lib/language'
 import { baseExtensions } from '../../lib/editorSetup'
+import { diffSide, expandFold, foldsFor } from '../../lib/diffDecorations'
+
+const COLLAPSE = { margin: 3, minSize: 6 }
 
 interface Sides {
   base: string
   current: string
+  hunks: Hunk[]
   note: string | null
 }
 
 /** Side-by-side diff of HEAD vs the working tree, refreshed live as agents edit. */
 export function DiffView({ tab }: { tab: DiffTab }) {
-  const host = useRef<HTMLDivElement>(null)
+  const left = useRef<HTMLDivElement>(null)
+  const right = useRef<HTMLDivElement>(null)
   const [sides, setSides] = useState<Sides | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [language, setLanguage] = useState<Extension>([])
@@ -31,10 +35,14 @@ export function DiffView({ tab }: { tab: DiffTab }) {
   useEffect(() => {
     let cancelled = false
     Promise.all([Git.FileAt(tab.repoRoot, 'HEAD', tab.basePath), readWorking(tab.path)])
-      .then(([base, current]) => {
+      .then(async ([baseFile, currentFile]) => {
+        const note = baseFile.binary || currentFile.binary ? 'Binary file — contents not shown.' : null
+        // One line-break convention, so Go and CodeMirror count the same lines.
+        const base = normalize(baseFile.content)
+        const current = normalize(currentFile.content)
+        const hunks = note ? [] : await Diff.Compare(base, current)
         if (cancelled) return
-        const note = base.binary || current.binary ? 'Binary file — contents not shown.' : null
-        setSides({ base: base.content, current: current.content, note })
+        setSides({ base, current, hunks: hunks ?? [], note })
         setError(null)
       })
       .catch((err) => !cancelled && setError(errorMessage(err)))
@@ -44,19 +52,30 @@ export function DiffView({ tab }: { tab: DiffTab }) {
   }, [tab.repoRoot, tab.path, tab.basePath, version, headVersion])
 
   useEffect(() => {
-    if (!host.current || !sides || sides.note) return
+    if (!left.current || !right.current || !sides || sides.note) return
+    const { base, current, hunks } = sides
+    const folds = foldsFor(hunks, base.split('\n').length, COLLAPSE)
+    const views: EditorView[] = []
+    // Unfolding must happen on both sides at once or they drift apart.
+    const expand = (index: number) => views.forEach((v) => v.dispatch({ effects: expandFold.of(index) }))
     const readOnly = [EditorState.readOnly.of(true), EditorView.editable.of(false)]
-    const view = new MergeView({
-      parent: host.current,
-      a: { doc: sides.base, extensions: [baseExtensions(), language, readOnly] },
-      b: { doc: sides.current, extensions: [baseExtensions(), language, readOnly] },
-      collapseUnchanged: { margin: 3, minSize: 6 },
-      gutter: true,
-    })
-    return () => view.destroy()
+    views.push(
+      new EditorView({
+        parent: left.current,
+        doc: base,
+        extensions: [baseExtensions(), language, readOnly, diffSide('a', hunks, folds, expand)],
+      }),
+      new EditorView({
+        parent: right.current,
+        doc: current,
+        extensions: [baseExtensions(), language, readOnly, diffSide('b', hunks, folds, expand)],
+      }),
+    )
+    return () => views.forEach((v) => v.destroy())
   }, [sides, language])
 
   const rel = tab.path.startsWith(tab.repoRoot) ? tab.path.slice(tab.repoRoot.length + 1) : tab.path
+  const showEditors = !!sides && !sides.note
 
   return (
     <div className="diff-view">
@@ -70,9 +89,19 @@ export function DiffView({ tab }: { tab: DiffTab }) {
       {error && <div className="placeholder error selectable">{error}</div>}
       {sides?.note && <div className="placeholder muted">{sides.note}</div>}
       {!sides && !error && <div className="placeholder">Loading…</div>}
-      <div className="diff-host" ref={host} />
+      {/* Both editors grow to full height inside one scroller, so they scroll together. */}
+      <div className="diff-host" hidden={!showEditors}>
+        <div className="diff-sides">
+          <div className="diff-side" ref={left} />
+          <div className="diff-side" ref={right} />
+        </div>
+      </div>
     </div>
   )
+}
+
+function normalize(text: string): string {
+  return text.replace(/\r\n?/g, '\n')
 }
 
 async function readWorking(path: string): Promise<{ content: string; binary: boolean }> {

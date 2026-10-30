@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { createStore } from '../lib/store'
 import { Workspace, errorMessage, type Entry } from '../api/backend'
 import { restoreSession, saveSession } from './session'
 
@@ -8,7 +8,8 @@ interface WorkspaceState {
   root: string | null
   /** True once the initial folder (CLI arg / last used) has been resolved. */
   ready: boolean
-  files: string[]
+  /** Files indexed for quick-open; the list itself stays in Go. */
+  fileCount: number
   filesLoadedAt: number
   children: Record<string, Entry[]>
   expanded: Record<string, boolean>
@@ -33,10 +34,10 @@ interface WorkspaceState {
 let listing: Promise<void> | null = null
 let relistRequested = false
 
-export const useWorkspace = create<WorkspaceState>((set, get) => ({
+export const useWorkspace = createStore<WorkspaceState>((set, get) => ({
   root: null,
   ready: false,
-  files: [],
+  fileCount: 0,
   filesLoadedAt: 0,
   children: {},
   expanded: {},
@@ -63,7 +64,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       const entries = await Workspace.ListDir(root)
       // Restore before publishing root so the "first terminal" effect sees restored tabs.
       if (previous !== root) await restoreSession(root)
-      set({ root, children: { [root]: entries }, expanded: { [root]: true }, files: [], filesLoadedAt: 0 })
+      set({ root, children: { [root]: entries }, expanded: { [root]: true }, fileCount: 0, filesLoadedAt: 0 })
       void get().refreshFiles()
     } catch (err) {
       set({ error: errorMessage(err) })
@@ -82,8 +83,8 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         const root = get().root
         if (!root) return
         try {
-          const files = await Workspace.ListFiles(root)
-          if (get().root === root) set({ files: files ?? [], filesLoadedAt: Date.now() })
+          const fileCount = await Workspace.IndexFiles(root)
+          if (get().root === root) set({ fileCount, filesLoadedAt: Date.now() })
         } catch (err) {
           set({ error: errorMessage(err) })
           return

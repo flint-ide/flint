@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { createStore } from '../lib/store'
 import * as Terminal from '../../wailsjs/go/main/TerminalAPI'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
 import { createReorderer } from '../lib/reorder'
@@ -37,7 +37,7 @@ let seq = 0
 /** Editor tab id of a terminal (terminals live among the editor tabs). */
 export const terminalTabId = (termId: string) => `term:${termId}`
 
-export const useTerminal = create<TerminalState>((set) => ({
+export const useTerminal = createStore<TerminalState>((set) => ({
   tabs: [],
 
   create: (cwd, opts = {}) => {

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, it } from 'node:test'
+import assert from 'node:assert/strict'
 import { minimalChange } from './textDiff'
 
 const apply = (a: string, c: ReturnType<typeof minimalChange>) =>
@@ -6,22 +7,24 @@ const apply = (a: string, c: ReturnType<typeof minimalChange>) =>
 
 describe('minimalChange', () => {
   it('returns null for identical text', () => {
-    expect(minimalChange('abc', 'abc')).toBeNull()
+    assert.equal(minimalChange('abc', 'abc'), null)
   })
 
-  it.each([
+  for (const [a, b] of [
     ['hello world', 'hello brave world'],
     ['line1\nline2\nline3', 'line1\nline3'],
     ['', 'new file'],
     ['old', ''],
     ['aaaa', 'aa'],
     ['func a() {}\n', 'func a() {\n\treturn\n}\n'],
-  ])('turns %j into %j with a minimal edit', (a, b) => {
-    const change = minimalChange(a, b)
-    expect(apply(a, change)).toBe(b)
-  })
+  ]) {
+    it(`turns ${JSON.stringify(a)} into ${JSON.stringify(b)} with a minimal edit`, () => {
+      const change = minimalChange(a, b)
+      assert.equal(apply(a, change), b)
+    })
+  }
 
   it('keeps the common prefix and suffix out of the change', () => {
-    expect(minimalChange('abcXdef', 'abcYYdef')).toEqual({ from: 3, to: 4, insert: 'YY' })
+    assert.deepEqual(minimalChange('abcXdef', 'abcYYdef'), { from: 3, to: 4, insert: 'YY' })
   })
 })

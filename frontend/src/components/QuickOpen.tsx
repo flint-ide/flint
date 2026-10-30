@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { highlight, prepare, search } from '../lib/fuzzy'
+import { useEffect, useRef, useState } from 'react'
+import { Workspace } from '../api/backend'
+import { highlight, type FileMatch } from '../lib/highlight'
 import { useWorkspace } from '../store/workspace'
 import { useEditor } from '../store/editor'
 import { Modal } from './layout/Modal'
@@ -8,28 +9,36 @@ import { FileIcon } from './icons/FileIcon'
 const MAX_RESULTS = 60
 const STALE_MS = 15_000
 
-/** ⌘P: fuzzy "go to file" over the cached project file list. */
+/** ⌘P: fuzzy "go to file". Matching runs in Go; only the top results come back. */
 export function QuickOpen() {
   const root = useWorkspace((s) => s.root)
-  const files = useWorkspace((s) => s.files)
+  const fileCount = useWorkspace((s) => s.fileCount)
+  const filesLoadedAt = useWorkspace((s) => s.filesLoadedAt)
   const refreshFiles = useWorkspace((s) => s.refreshFiles)
   const setQuickOpen = useWorkspace((s) => s.setQuickOpen)
   const openFile = useEditor((s) => s.openFile)
   const [query, setQuery] = useState('')
+  const [results, setResults] = useState<FileMatch[]>([])
   const [cursor, setCursor] = useState(0)
   const list = useRef<HTMLDivElement>(null)
 
-  // Use the cached list immediately and refresh once in the background if it's stale.
+  // Use the cached index immediately and refresh once in the background if it's stale.
   // Not re-run on file changes: agents may churn files while the picker is open.
   useEffect(() => {
     if (Date.now() - useWorkspace.getState().filesLoadedAt > STALE_MS) void refreshFiles()
   }, [refreshFiles])
 
-  const prepared = useMemo(() => files.map(prepare), [files])
-  const results = useMemo(() => {
-    if (!query) return files.slice(0, MAX_RESULTS).map((f) => ({ path: f, html: highlight({ target: f, score: 0, indices: [] }) }))
-    return search(query, prepared, MAX_RESULTS).map((r) => ({ path: r.target, html: highlight(r) }))
-  }, [query, files, prepared])
+  // Re-queried when the index is refreshed; stale answers are dropped by the flag.
+  useEffect(() => {
+    if (!root) return
+    let current = true
+    Workspace.FindFiles(root, query, MAX_RESULTS)
+      .then((r) => current && setResults(r.matches ?? []))
+      .catch(() => current && setResults([]))
+    return () => {
+      current = false
+    }
+  }, [root, query, filesLoadedAt])
 
   useEffect(() => setCursor(0), [query])
   useEffect(() => {
@@ -61,7 +70,7 @@ export function QuickOpen() {
       <input
         autoFocus
         className="quick-input"
-        placeholder={root ? `Go to file… (${files.length.toLocaleString()} files)` : 'Open a folder first'}
+        placeholder={root ? `Go to file… (${fileCount.toLocaleString()} files)` : 'Open a folder first'}
         value={query}
         spellCheck={false}
         onChange={(e) => setQuery(e.target.value)}
@@ -80,7 +89,7 @@ export function QuickOpen() {
               <FileIcon name={r.path.slice(slash + 1)} />
               <span className="file-name">{r.path.slice(slash + 1)}</span>
               {/* highlight() escapes the path and only adds <b> tags */}
-              <span className="muted path-hint" dangerouslySetInnerHTML={{ __html: r.html }} />
+              <span className="muted path-hint" dangerouslySetInnerHTML={{ __html: highlight(r) }} />
             </div>
           )
         })}

@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { createStore } from '../lib/store'
 import { Search, onSearchBatch, onSearchDone, type SearchMatch, type SearchSummary } from '../api/backend'
 import { search } from '../../wailsjs/go/models'
 
@@ -22,7 +22,7 @@ interface SearchState {
   cancel: () => void
 }
 
-export const useSearch = create<SearchState>((set, get) => ({
+export const useSearch = createStore<SearchState>((set, get) => ({
   params: { query: '', regex: false, caseSensitive: false, wholeWord: false, include: '', exclude: '' },
   runningId: null,
   matches: [],

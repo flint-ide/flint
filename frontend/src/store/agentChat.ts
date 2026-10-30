@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { createStore } from '../lib/store'
 import * as Chat from '../../wailsjs/go/main/AgentChatAPI'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
 import { agentsession } from '../../wailsjs/go/models'
@@ -48,7 +48,7 @@ interface AgentChatState {
 /** Dock tab id of a chat session (terminals and chats share the right dock). */
 export const chatTabId = (sessionId: string) => `chat:${sessionId}`
 
-export const useAgentChat = create<AgentChatState>((set, get) => ({
+export const useAgentChat = createStore<AgentChatState>((set, get) => ({
   agents: [],
   sessions: {},
   order: [],

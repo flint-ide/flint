@@ -1,16 +1,16 @@
-import { Chunk } from '@codemirror/merge'
-import { RangeSet, StateEffect, StateField, Text, type Extension } from '@codemirror/state'
+import { RangeSet, StateEffect, StateField, type Extension, type Text } from '@codemirror/state'
 import { EditorView, GutterMarker, ViewPlugin, gutter, type ViewUpdate } from '@codemirror/view'
+import { Diff, type LineMark } from '../api/backend'
 
 export type LineChange = 'added' | 'modified' | 'deleted'
 
 /** Sets the HEAD version the gutter compares against (null = no baseline, no markers). */
 export const setGitBaseline = StateEffect.define<string | null>()
 
-const baselineField = StateField.define<Text | null>({
+const baselineField = StateField.define<string | null>({
   create: () => null,
   update(value, tr) {
-    for (const e of tr.effects) if (e.is(setGitBaseline)) return e.value === null ? null : Text.of(e.value.split(/\r?\n/))
+    for (const e of tr.effects) if (e.is(setGitBaseline)) return e.value
     return value
   },
 })
@@ -42,23 +42,12 @@ const MARKERS: Record<LineChange, ChangeMarker> = {
   deleted: new ChangeMarker('deleted'),
 }
 
-/**
- * Classifies lines of `current` against `base`: 1-based line number → change kind.
- * A deletion is marked on the line following the removed block (or the last line).
- */
-export function lineChanges(base: Text, current: Text): Map<number, LineChange> {
-  const out = new Map<number, LineChange>()
-  for (const chunk of Chunk.build(base, current)) {
-    const fromLine = current.lineAt(Math.min(chunk.fromB, current.length)).number
-    if (chunk.fromB === chunk.toB) {
-      if (!out.has(fromLine)) out.set(fromLine, 'deleted')
-      continue
-    }
-    const toLine = current.lineAt(Math.min(chunk.endB, current.length)).number
-    const kind: LineChange = chunk.fromA === chunk.toA ? 'added' : 'modified'
-    for (let l = fromLine; l <= toLine; l++) out.set(l, kind)
-  }
-  return out
+/** Turns line marks (computed in Go, sorted by line) into gutter markers for `doc`. */
+export function markerSet(doc: Text, marks: LineMark[]): RangeSet<GutterMarker> {
+  const ranges = marks
+    .filter((m) => m.line >= 1 && m.line <= doc.lines && m.kind in MARKERS)
+    .map((m) => MARKERS[m.kind as LineChange].range(doc.line(m.line).from))
+  return RangeSet.of(ranges)
 }
 
 const DEBOUNCE_MS = 250
@@ -67,6 +56,7 @@ const DEBOUNCE_MS = 250
 const differ = ViewPlugin.fromClass(
   class {
     timer: ReturnType<typeof setTimeout> | undefined
+    destroyed = false
     constructor(readonly view: EditorView) {
       this.schedule(0)
     }
@@ -77,19 +67,27 @@ const differ = ViewPlugin.fromClass(
     }
     schedule(delay: number) {
       clearTimeout(this.timer)
-      this.timer = setTimeout(() => this.compute(), delay)
+      this.timer = setTimeout(() => void this.compute(), delay)
     }
-    compute() {
+    async compute() {
       const { state } = this.view
       const base = state.field(baselineField)
       let set = RangeSet.empty as RangeSet<GutterMarker>
-      if (base) {
-        const ranges = [...lineChanges(base, state.doc)].sort((a, b) => a[0] - b[0])
-        set = RangeSet.of(ranges.map(([line, kind]) => MARKERS[kind].range(state.doc.line(line).from)))
+      if (base !== null) {
+        let marks: LineMark[]
+        try {
+          marks = await Diff.Marks(base, state.doc.toString())
+        } catch {
+          return // gutter is best-effort
+        }
+        // A newer edit or baseline already scheduled another run.
+        if (this.destroyed || this.view.state.doc !== state.doc || this.view.state.field(baselineField) !== base) return
+        set = markerSet(state.doc, marks ?? [])
       }
       this.view.dispatch({ effects: setMarkers.of(set) })
     }
     destroy() {
+      this.destroyed = true
       clearTimeout(this.timer)
     }
   },

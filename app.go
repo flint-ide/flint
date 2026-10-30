@@ -13,6 +13,7 @@ import (
 	"flint/internal/agentsession"
 	"flint/internal/config"
 	"flint/internal/db"
+	"flint/internal/fuzzy"
 	"flint/internal/lsp"
 	"flint/internal/scratch"
 	"flint/internal/terminal"
@@ -40,6 +41,7 @@ type App struct {
 	terminals *terminal.Manager
 	lsp       *lsp.Manager
 	agents    *agentsession.Manager
+	files     fuzzy.Index // quick-open file list of the open folder
 
 	watchMu sync.Mutex
 	watch   *watcher.Watcher

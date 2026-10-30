@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { createStore } from '../lib/store'
 
 interface ConfirmRequest {
   message: string
@@ -11,7 +11,7 @@ interface DialogState {
   toast: { message: string; kind: 'info' | 'error' } | null
 }
 
-export const useDialog = create<DialogState>(() => ({ confirm: null, toast: null }))
+export const useDialog = createStore<DialogState>(() => ({ confirm: null, toast: null }))
 
 /** Shows an in-app confirmation (native window.confirm isn't available in the webview). */
 export function confirmAction(message: string, confirmLabel = 'OK'): Promise<boolean> {

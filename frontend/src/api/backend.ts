@@ -4,10 +4,11 @@ import * as Workspace from '../../wailsjs/go/main/WorkspaceAPI'
 import * as Search from '../../wailsjs/go/main/SearchAPI'
 import * as Database from '../../wailsjs/go/main/DatabaseAPI'
 import * as Scratch from '../../wailsjs/go/main/ScratchAPI'
+import * as Diff from '../../wailsjs/go/main/DiffAPI'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
-import { db, scratch, search, workspace } from '../../wailsjs/go/models'
+import { db, scratch, search, textdiff, workspace } from '../../wailsjs/go/models'
 
-export { Workspace, Search, Database, Scratch }
+export { Workspace, Search, Database, Scratch, Diff }
 
 export type Entry = workspace.Entry
 export type FileContent = workspace.FileContent
@@ -15,6 +16,8 @@ export type Connection = db.Connection
 export type QueryResult = db.QueryResult
 export type Table = db.Table
 export type ScratchPad = scratch.Scratch
+export type Hunk = textdiff.Hunk
+export type LineMark = textdiff.LineMark
 export type SearchOptions = search.Options
 export type Driver = 'postgres' | 'clickhouse'
 export type ScratchKind = 'sql' | 'markdown' | 'text'

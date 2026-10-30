@@ -11,6 +11,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"flint/internal/fuzzy"
 	"flint/internal/git"
 	"flint/internal/watcher"
 	"flint/internal/workspace"
@@ -84,11 +85,25 @@ func (w *WorkspaceAPI) ListDir(path string) ([]workspace.Entry, error) {
 	return workspace.ListDir(path)
 }
 
-// ListFiles returns all project files (relative paths) for quick-open.
-func (w *WorkspaceAPI) ListFiles(root string) ([]string, error) {
+// IndexFiles (re)lists the project files for quick-open and returns their count.
+// The list stays in Go: the webview only ever receives the top matches.
+func (w *WorkspaceAPI) IndexFiles(root string) (int, error) {
 	ctx, cancel := context.WithTimeout(w.app.ctx, 30*time.Second)
 	defer cancel()
-	return workspace.ListFiles(ctx, root)
+	// Concurrent requests (⌘P typed before the first listing ends) share one walk.
+	return w.app.files.Load(root, func() ([]string, error) { return workspace.ListFiles(ctx, root) })
+}
+
+// FindFiles ranks project files against a fuzzy query (⌘P), best `limit` first.
+func (w *WorkspaceAPI) FindFiles(root, query string, limit int) (fuzzy.Result, error) {
+	if res, ok := w.app.files.Search(root, query, limit); ok {
+		return res, nil
+	}
+	if _, err := w.IndexFiles(root); err != nil {
+		return fuzzy.Result{}, err
+	}
+	res, _ := w.app.files.Search(root, query, limit)
+	return res, nil
 }
 
 // ReadFile loads a file for the editor.

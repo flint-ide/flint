@@ -6,7 +6,7 @@ import { showToast } from '../../store/dialog'
 
 export function StatusBar() {
   const root = useWorkspace((s) => s.root)
-  const files = useWorkspace((s) => s.files.length)
+  const files = useWorkspace((s) => s.fileCount)
   const active = useEditor((s) => s.tabs.find((t) => t.id === s.activeId))
   const terminals = useTerminal((s) => s.tabs.length)
 

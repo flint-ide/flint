@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Run this exact shell command with the Bash tool: touch never.txt"}]},"parent_tool_use_id":null,"session_id":""}
+{"type":"control_request","request_id":"flint-1","request":{"subtype":"interrupt"}}

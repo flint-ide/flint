@@ -1,0 +1,447 @@
+package lsp
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"strings"
+	"sync"
+
+	"flint/internal/shellenv"
+)
+
+// Server states reported to the UI.
+const (
+	StateStarting    = "starting"
+	StateReady       = "ready"
+	StateUnavailable = "unavailable" // no server installed for the language
+	StateFailed      = "failed"
+)
+
+// Status describes a language server for the status bar.
+type Status struct {
+	Language string `json:"language"`
+	Root     string `json:"root"`
+	State    string `json:"state"`
+	Message  string `json:"message"`
+}
+
+type key struct{ root, language string }
+
+type entry struct {
+	ready chan struct{} // closed once srv or err is set
+	srv   *server
+	err   error
+}
+
+type document struct {
+	key        key
+	languageID string
+	version    int
+	text       string
+	opened     bool // didOpen sent to the current server process
+}
+
+// Manager starts servers lazily (on the first opened file of a language) and keeps
+// open documents in sync with them. Servers start in the background, so opening a
+// file never waits for indexing.
+type Manager struct {
+	OnDiagnostics func(path string, diags []Diagnostic)
+	OnStatus      func(Status)
+
+	lookPath func(string) (string, error)
+
+	mu       sync.Mutex
+	servers  map[key]*entry
+	docs     map[string]*document
+	restarts map[key]int // crash restarts per server, to stop a crash loop
+	closed   bool
+}
+
+// maxRestarts bounds automatic restarts of a crashing server.
+const maxRestarts = 3
+
+// NewManager creates a manager; callbacks may be nil.
+func NewManager() *Manager {
+	return &Manager{
+		lookPath: defaultLookPath, servers: map[key]*entry{}, docs: map[string]*document{}, restarts: map[key]int{},
+	}
+}
+
+// Supported reports whether Flint knows a language server for path.
+func Supported(path string) bool {
+	_, _, ok := languageFor(path)
+	return ok
+}
+
+// Open registers a document and starts its language server if needed.
+func (m *Manager) Open(root, path, text string) Status {
+	language, languageID, ok := languageFor(path)
+	if !ok {
+		return Status{State: StateUnavailable, Message: "no language server for this file type"}
+	}
+	k := key{root: root, language: language}
+	m.mu.Lock()
+	doc := &document{key: k, languageID: languageID, version: 1, text: text}
+	if old, exists := m.docs[path]; exists {
+		doc.version = old.version + 1
+		doc.opened = old.opened && old.key == k
+	}
+	m.docs[path] = doc
+	e := m.ensureServerLocked(k)
+	m.mu.Unlock()
+
+	select {
+	case <-e.ready:
+		if e.err != nil {
+			return m.statusFor(k, e)
+		}
+		m.mu.Lock()
+		m.openDocLocked(e.srv, path, doc)
+		m.mu.Unlock()
+		return Status{Language: language, Root: root, State: StateReady}
+	default:
+		return Status{Language: language, Root: root, State: StateStarting}
+	}
+}
+
+// Change replaces a document's text (full sync; simple and fast enough for source files).
+func (m *Manager) Change(path, text string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	doc := m.docs[path]
+	if doc == nil {
+		return
+	}
+	doc.version++
+	doc.text = text
+	if e := m.servers[doc.key]; e != nil && doc.opened && e.srv != nil {
+		e.srv.out.notify("textDocument/didChange", map[string]any{
+			"textDocument":   map[string]any{"uri": PathToURI(path), "version": doc.version},
+			"contentChanges": []map[string]any{{"text": text}},
+		})
+	}
+}
+
+// Saved tells the server the file was written (some servers lint on save).
+func (m *Manager) Saved(path string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	doc := m.docs[path]
+	if doc == nil || !doc.opened {
+		return
+	}
+	if e := m.servers[doc.key]; e != nil && e.srv != nil {
+		e.srv.out.notify("textDocument/didSave", map[string]any{"textDocument": map[string]any{"uri": PathToURI(path)}})
+	}
+}
+
+// Close forgets a document.
+func (m *Manager) Close(path string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	doc := m.docs[path]
+	delete(m.docs, path)
+	if doc == nil || !doc.opened {
+		return
+	}
+	if e := m.servers[doc.key]; e != nil && e.srv != nil {
+		e.srv.out.notify("textDocument/didClose", map[string]any{"textDocument": map[string]any{"uri": PathToURI(path)}})
+	}
+}
+
+// Completion returns completion items at pos.
+func (m *Manager) Completion(ctx context.Context, path string, pos Position) (CompletionList, error) {
+	var raw json.RawMessage
+	if err := m.request(ctx, path, "textDocument/completion", positionParams(path, pos), &raw); err != nil {
+		return CompletionList{Items: []CompletionItem{}}, err
+	}
+	return decodeCompletion(raw), nil
+}
+
+// Hover returns hover documentation (markdown) at pos.
+func (m *Manager) Hover(ctx context.Context, path string, pos Position) (string, error) {
+	var res struct {
+		Contents json.RawMessage `json:"contents"`
+	}
+	if err := m.request(ctx, path, "textDocument/hover", positionParams(path, pos), &res); err != nil {
+		return "", err
+	}
+	return markupText(res.Contents), nil
+}
+
+// Definition returns where the symbol at pos is defined.
+func (m *Manager) Definition(ctx context.Context, path string, pos Position) ([]Location, error) {
+	var raw json.RawMessage
+	if err := m.request(ctx, path, "textDocument/definition", positionParams(path, pos), &raw); err != nil {
+		return []Location{}, err
+	}
+	return m.withPreviews(decodeLocations(raw)), nil
+}
+
+// References returns usages of the symbol at pos (declaration excluded).
+func (m *Manager) References(ctx context.Context, path string, pos Position) ([]Location, error) {
+	params := positionParams(path, pos)
+	params["context"] = map[string]any{"includeDeclaration": false}
+	var raw json.RawMessage
+	if err := m.request(ctx, path, "textDocument/references", params, &raw); err != nil {
+		return []Location{}, err
+	}
+	return m.withPreviews(decodeLocations(raw)), nil
+}
+
+// Statuses lists every server Flint started or tried to start.
+func (m *Manager) Statuses() []Status {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]Status, 0, len(m.servers))
+	for k, e := range m.servers {
+		out = append(out, m.statusFor(k, e))
+	}
+	return out
+}
+
+// Shutdown stops all servers.
+func (m *Manager) Shutdown() {
+	m.mu.Lock()
+	m.closed = true // servers still starting are killed by start() when they finish
+	servers := m.servers
+	m.servers = map[key]*entry{}
+	m.mu.Unlock()
+	var wg sync.WaitGroup
+	for _, e := range servers {
+		select {
+		case <-e.ready:
+			if e.srv != nil {
+				wg.Add(1)
+				go func(s *server) { defer wg.Done(); s.shutdown() }(e.srv)
+			}
+		default:
+		}
+	}
+	wg.Wait()
+}
+
+// request waits for the document's server and performs a call.
+func (m *Manager) request(ctx context.Context, path, method string, params, out any) error {
+	m.mu.Lock()
+	doc := m.docs[path]
+	if doc == nil {
+		m.mu.Unlock()
+		return fmt.Errorf("%s is not open", path)
+	}
+	e := m.ensureServerLocked(doc.key)
+	m.mu.Unlock()
+
+	select {
+	case <-e.ready:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	if e.err != nil {
+		return e.err
+	}
+	m.mu.Lock()
+	if doc := m.docs[path]; doc != nil {
+		m.openDocLocked(e.srv, path, doc)
+	}
+	m.mu.Unlock()
+	// Edits queued before this request must reach the server first.
+	if err := e.srv.out.barrier(ctx); err != nil {
+		return err
+	}
+	err := e.srv.conn.Call(ctx, method, params, out)
+	if errors.Is(err, ErrClosed) {
+		return fmt.Errorf("%s language server stopped%s", e.srv.language, e.srv.stderrTail())
+	}
+	return err
+}
+
+// ensureServerLocked returns the entry for k, (re)starting a dead or missing server.
+func (m *Manager) ensureServerLocked(k key) *entry {
+	if m.closed {
+		return failedEntry(ErrClosed)
+	}
+	if e := m.servers[k]; e != nil {
+		select {
+		case <-e.ready:
+			if e.srv == nil || e.srv.alive() {
+				return e // ready, or failed permanently (not installed / init error)
+			}
+			// Crashed: restart (a bounded number of times) and re-open its documents.
+			if m.restarts[k] >= maxRestarts {
+				failed := failedEntry(fmt.Errorf("%s language server keeps crashing%s — reopen the folder to retry", k.language, e.srv.stderrTail()))
+				m.servers[k] = failed
+				return failed
+			}
+			m.restarts[k]++
+			for _, d := range m.docs {
+				if d.key == k {
+					d.opened = false
+				}
+			}
+		default:
+			return e // still starting
+		}
+	}
+	e := &entry{ready: make(chan struct{})}
+	m.servers[k] = e
+	m.emit(Status{Language: k.language, Root: k.root, State: StateStarting})
+	go m.start(k, e)
+	return e
+}
+
+func (m *Manager) start(k key, e *entry) {
+	spec, _ := specFor(k.language)
+	shellenv.Wait() // servers live on the login-shell PATH (~/go/bin, ~/.cargo/bin, ...)
+	argv, ok := spec.resolveCommand(m.lookPath)
+	var srv *server
+	var err error
+	if !ok {
+		err = fmt.Errorf("no %s language server installed — %s", k.language, spec.Install)
+	} else {
+		srv, err = startServer(context.Background(), k.language, k.root, argv, m.diagnostics)
+	}
+
+	m.mu.Lock()
+	if m.closed && srv != nil {
+		// Flint quit while the server was booting: don't leave it running.
+		m.mu.Unlock()
+		srv.kill()
+		srv, err = nil, ErrClosed
+		m.mu.Lock()
+	}
+	e.srv, e.err = srv, err
+	if srv != nil {
+		for path, d := range m.docs {
+			if d.key == k {
+				m.openDocLocked(srv, path, d)
+			}
+		}
+	}
+	close(e.ready)
+	status := m.statusFor(k, e)
+	m.mu.Unlock()
+	m.emit(status)
+}
+
+func failedEntry(err error) *entry {
+	e := &entry{ready: make(chan struct{}), err: err}
+	close(e.ready)
+	return e
+}
+
+func (m *Manager) openDocLocked(srv *server, path string, d *document) {
+	if d.opened {
+		return
+	}
+	d.opened = true
+	srv.out.notify("textDocument/didOpen", map[string]any{
+		"textDocument": map[string]any{
+			"uri": PathToURI(path), "languageId": d.languageID, "version": d.version, "text": d.text,
+		},
+	})
+}
+
+func (m *Manager) statusFor(k key, e *entry) Status {
+	st := Status{Language: k.language, Root: k.root}
+	select {
+	case <-e.ready:
+	default:
+		st.State = StateStarting
+		return st
+	}
+	switch {
+	case e.err != nil && strings.HasPrefix(e.err.Error(), "no "):
+		st.State, st.Message = StateUnavailable, e.err.Error()
+	case e.err != nil:
+		st.State, st.Message = StateFailed, e.err.Error()
+	case !e.srv.alive():
+		st.State, st.Message = StateFailed, "server exited"+e.srv.stderrTail()
+	default:
+		st.State = StateReady
+	}
+	return st
+}
+
+func (m *Manager) diagnostics(path string, diags []Diagnostic) {
+	if m.OnDiagnostics != nil {
+		m.OnDiagnostics(path, diags)
+	}
+}
+
+func (m *Manager) emit(s Status) {
+	if m.OnStatus != nil {
+		m.OnStatus(s)
+	}
+}
+
+// withPreviews fills each location's Preview with the text of its first line.
+func (m *Manager) withPreviews(locs []Location) []Location {
+	if locs == nil {
+		return []Location{}
+	}
+	cache := map[string][]string{}
+	for i := range locs {
+		lines, ok := cache[locs[i].Path]
+		if !ok {
+			lines = m.fileLines(locs[i].Path)
+			cache[locs[i].Path] = lines
+		}
+		if l := locs[i].Range.Start.Line; l >= 0 && l < len(lines) {
+			locs[i].Preview = strings.TrimSpace(lines[l])
+		}
+	}
+	return locs
+}
+
+func (m *Manager) fileLines(path string) []string {
+	m.mu.Lock()
+	doc := m.docs[path]
+	var text string
+	if doc != nil {
+		text = doc.text // unsaved buffer wins
+	}
+	m.mu.Unlock()
+	if doc == nil {
+		data, err := os.ReadFile(path)
+		if err != nil || len(data) > 10<<20 {
+			return nil
+		}
+		text = string(data)
+	}
+	return strings.Split(text, "\n")
+}
+
+func positionParams(path string, pos Position) map[string]any {
+	return map[string]any{
+		"textDocument": map[string]any{"uri": PathToURI(path)},
+		"position":     pos,
+	}
+}
+
+func decodeCompletion(raw json.RawMessage) CompletionList {
+	list := CompletionList{Items: []CompletionItem{}}
+	if len(raw) == 0 || string(raw) == "null" {
+		return list
+	}
+	var items []wireCompletionItem
+	if raw[0] == '{' {
+		var wl struct {
+			IsIncomplete bool                 `json:"isIncomplete"`
+			Items        []wireCompletionItem `json:"items"`
+		}
+		if json.Unmarshal(raw, &wl) != nil {
+			return list
+		}
+		list.Incomplete, items = wl.IsIncomplete, wl.Items
+	} else if json.Unmarshal(raw, &items) != nil {
+		return list
+	}
+	for _, it := range items {
+		list.Items = append(list.Items, it.toItem())
+	}
+	return list
+}

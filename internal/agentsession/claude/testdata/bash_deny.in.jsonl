@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Run this exact shell command with the Bash tool: touch denied.txt. If refused, reply: refused."}]},"parent_tool_use_id":null,"session_id":""}
+{"type":"control_response","response":{"subtype":"success","request_id":"85d1adad-20f4-4eb1-bee0-dfdde0b5c637","response":{"behavior":"deny","message":"User rejected this action"}}}

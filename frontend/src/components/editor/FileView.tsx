@@ -3,12 +3,17 @@ import { EditorState, type Extension } from '@codemirror/state'
 import type { EditorView, KeyBinding } from '@codemirror/view'
 import { Workspace, errorMessage, type FileContent } from '../../api/backend'
 import { languageFor } from '../../lib/language'
-import { registerSaver, useEditor, type FileTab } from '../../store/editor'
-import { showToast } from '../../store/dialog'
+import { registerSaver, registerView, useEditor, type FileTab } from '../../store/editor'
+import { confirmAction, showToast } from '../../store/dialog'
 import { onFileChanged } from '../../store/fsEvents'
 import { minimalChange } from '../../lib/textDiff'
 import { gitGutter, setGitBaseline } from '../../lib/gitGutter'
+import { indentationFor } from '../../lib/indent'
 import { Git, useGit } from '../../store/git'
+import { lspExtension, lspSupported, type LspHooks } from '../../lib/lsp'
+import { useLsp } from '../../store/lsp'
+import { useWorkspace } from '../../store/workspace'
+import * as LSP from '../../../wailsjs/go/main/LSPAPI'
 import { CodeEditor } from './CodeEditor'
 
 interface Props {
@@ -24,6 +29,8 @@ export function FileView({ tab, active }: Props) {
   const saved = useRef('') // disk content, with its original line endings
   const saving = useRef<Promise<void>>(Promise.resolve())
   const reloadPending = useRef(false)
+  const unregisterView = useRef<(() => void) | null>(null)
+  useEffect(() => () => unregisterView.current?.(), [])
   const setDirty = useEditor((s) => s.setDirty)
 
   useEffect(() => {
@@ -43,9 +50,29 @@ export function FileView({ tab, active }: Props) {
 
   // CRLF files keep CRLF: CodeMirror otherwise joins lines with \n on save.
   const crlf = !!file?.content.includes('\r\n')
+  // Language server features; the server boots in the background on first use.
+  const root = useWorkspace((s) => s.root)
+  const lsp = useMemo(() => {
+    if (!root || !lspSupported(tab.path)) return []
+    const hooks: LspHooks = {
+      goTo: (loc) =>
+        useEditor.getState().openFile(loc.path, {
+          line: loc.range.start.line + 1,
+          from: loc.range.start.character,
+          to: loc.range.end.line === loc.range.start.line ? loc.range.end.character : loc.range.start.character,
+        }),
+      showUsages: (locs, symbol) => useLsp.getState().showUsages(symbol, locs),
+      notify: (message) => showToast(message),
+    }
+    return lspExtension(root, tab.path, hooks)
+  }, [root, tab.path])
+
+  // Enter / Tab follow the file's own indentation (tabs for Go, detected otherwise).
+  const indentation = useMemo(() => (file ? indentationFor(file.content, tab.path) : []), [file, tab.path])
+
   const extensions = useMemo(
-    () => [language, gitGutter(), crlf ? EditorState.lineSeparator.of('\r\n') : []],
-    [crlf, language],
+    () => [language, indentation, gitGutter(), lsp, crlf ? EditorState.lineSeparator.of('\r\n') : []],
+    [crlf, language, indentation, lsp],
   )
 
   // Gutter baseline: the file at HEAD, refetched when HEAD moves (commit, checkout).
@@ -80,7 +107,10 @@ export function FileView({ tab, active }: Props) {
       if (!v) return
       const text = v.state.sliceDoc() // joined with the file's own line separator
       try {
+        // Never silently overwrite what an agent (or anything else) wrote meanwhile.
+        if (!(await confirmOverwriteIfChanged())) return
         await Workspace.WriteFile(tab.path, text)
+        if (lspSupported(tab.path)) void LSP.Saved(tab.path)
         saved.current = text
         if (v.state.sliceDoc() === text) setDirty(tab.id, false)
       } catch (err) {
@@ -91,6 +121,23 @@ export function FileView({ tab, active }: Props) {
   }, [tab.path, tab.id, setDirty])
 
   useEffect(() => registerSaver(tab.id, save), [tab.id, save])
+
+  /** True when it's fine to write: the disk still matches what we loaded, or the user said so. */
+  async function confirmOverwriteIfChanged(): Promise<boolean> {
+    let disk: FileContent
+    try {
+      disk = await Workspace.ReadFile(tab.path)
+    } catch {
+      return true // deleted meanwhile: saving recreates it
+    }
+    if (disk.binary || disk.tooLarge || disk.content === saved.current) return true
+    const ok = await confirmAction(
+      `${tab.title} was changed on disk (probably by the agent) after you started editing. Overwrite those changes with your version?`,
+      'Overwrite',
+    )
+    if (!ok) showToast('Not saved — your edits stay in the editor. Compare with the disk version in the Commit panel (⌘K).')
+    return ok
+  }
 
   // Agents edit files from the terminal: reload clean buffers in place, warn on conflicts.
   const reloadFromDisk = useCallback(async () => {
@@ -125,6 +172,8 @@ export function FileView({ tab, active }: Props) {
   const onReady = useCallback(
     (v: EditorView) => {
       view.current = v
+      unregisterView.current?.()
+      unregisterView.current = registerView(tab.id, v)
       setEditorReady(true)
       if (reloadPending.current) {
         reloadPending.current = false

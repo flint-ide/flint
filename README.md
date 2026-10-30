@@ -15,12 +15,14 @@ Szybkie, minimalistyczne IDE „AI-first” na macOS. Kod piszą agenci (claude,
 | Bazy danych | PostgreSQL (`pgx`) i ClickHouse (natywny protokół). Hasła trzymane są w Keychainie macOS, nie w plikach. Przeglądarka schematu, autouzupełnianie SQL ze schematu, tryb read-only. |
 | Git (jak w IntelliJ) | Panel Commit (`⌘K`) z checkboxami, Amend, Commit and Push i Rollback. Diff obok siebie w karcie. Znaczniki zmienionych linii na marginesie, które pokazują też, co ruszył agent. Widżet gałęzi w pasku stanu: checkout, nowa gałąź, fetch, pull, push (`⇧⌘K`). Commit podczas merge'a obejmuje cały index. |
 | Worktree | Lista, tworzenie (`<repo>.worktrees/<gałąź>`), usuwanie, przełączanie, otwieranie w nowym oknie lub od razu z terminalem dla agenta. Checkout i commit zrobione w terminalu odświeżają UI, bo obserwowany jest też katalog git. |
+| LSP | `gopls`, `rust-analyzer`, `vtsls`/`typescript-language-server`, `basedpyright`/`pyright`. Serwer startuje w tle przy pierwszym pliku danego języka. Podpowiedzi, hover, ⌘+klik / ⌘B / F12 → definicja, ⌥F7 / ⇧F12 → Find Usages, błędy na żywo. Stan serwera i podpowiedź instalacji w pasku stanu. |
+| Czat z agentem | Natywne sterowniki **bez npm**: Claude Code (`claude -p` w trybie `stream-json` + `--permission-prompt-tool stdio`) i Codex (`codex app-server`), plus klient ACP dla agentów mówiących nim natywnie. Wspólny panel w doku po prawej (`+` → claude / codex): strumieniowana odpowiedź, wywołania narzędzi z mini-diffem, plan, lista zmienionych plików. Edycje i odczyty przechodzą bez pytania (polityka „auto: edits”), komendy pytają. `⌘L` dołącza zaznaczenie lub bieżący plik do rozmowy. |
 | Agent | ✦ *Generate message*: `claude -p` (albo `codex exec`) dostaje diff zaznaczonych plików i ostatnie wiadomości commitów, a wynik trafia do pola do poprawki. ✦ *Resolve with claude*: konflikty trafiają do interaktywnej sesji agenta w nowym terminalu; agent robi `git add`, ale nie commituje. Nic nie wymaga akceptowania diffów. |
 | Brudnopisy | Trwałe konsole SQL i notatki (MD/TXT) z autozapisem. `⌘↵` uruchamia zapytanie spod kursora lub zaznaczenie. Wyniki trafiają do wirtualizowanej tabeli (do 200k wierszy) z eksportem do TSV/JSON. |
 
 ## Skróty
 
-`⌘P` plik · `⇧⌘F` szukaj · `⌘K` commit · `⇧⌘K` push · `⌘J` terminal · `⇧⌘T` nowy terminal · `⌘N` nowa konsola SQL · `⌘↵` uruchom zapytanie · `⌘S` zapisz · `⌘W` zamknij kartę · `⌘B` panel boczny · `⌘O` otwórz folder · `⌘K` w terminalu czyści ekran
+`⌘P` plik · `⇧⌘F` szukaj · `⌘B`/`F12` definicja · `⌥F7` użycia · `⌘L` do agenta · `⌘K` commit · `⇧⌘K` push · `⌘J` terminal · `⇧⌘T` nowy terminal · `⌘N` nowa konsola SQL · `⌘↵` uruchom zapytanie · `⌘S` zapisz · `⌘W` zamknij kartę · `⌘B` panel boczny · `⌘O` otwórz folder · `⌘K` w terminalu czyści ekran
 
 ## Uruchomienie
 
@@ -54,7 +56,17 @@ internal/git                status, commit, rollback, gałęzie, worktree, log (
 internal/agent              claude / codex: tryb bez interakcji i polecenia interaktywne
 internal/shellenv           PATH z login shell (hooki gita, brew, nvm w aplikacji GUI)
 internal/watcher            FSEvents + debounce
+internal/lsp                klient LSP (JSON-RPC, Content-Length), menedżer serwerów
+internal/acp                klient Agent Client Protocol (JSON-RPC rozdzielany \n)
+internal/agentsession       wspólny model zdarzeń agenta, polityka akceptacji, menedżer sesji
+  claude/ codex/ acpdriver/ natywne sterowniki agentów
 frontend/src                React: store (zustand), components, lib
 ```
 
 Konfiguracja trafia do `~/Library/Application Support/flint` (można ją nadpisać zmienną `FLINT_CONFIG_DIR`).
+
+## Bezpieczeństwo zależności
+
+- Flint w trakcie działania nie pobiera nic z npm (żadnego `npx`). Agenci i serwery LSP to Twoje zainstalowane binarki.
+- Frontend: `frontend/.npmrc` wyłącza skrypty instalacyjne (`ignore-scripts=true`) i wymusza dokładne wersje, a build używa `npm ci --ignore-scripts`.
+- Zależności runtime frontendu ograniczone do: React, CodeMirror (jeden autor), xterm.js, zustand, @tanstack/react-virtual. Fuzzy matching jest własny.

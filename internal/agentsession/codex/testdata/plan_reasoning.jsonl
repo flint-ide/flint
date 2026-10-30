@@ -1,0 +1,26 @@
+{"dir":"out","msg":{"id":1,"method":"initialize"}}
+{"dir":"in","msg":{"id":1,"result":{"userAgent":"fake/0.153.4","codexHome":"/tmp/codex-home","platformFamily":"unix","platformOs":"macos"}}}
+{"dir":"out","msg":{"method":"initialized"}}
+{"dir":"out","msg":{"id":2,"method":"thread/start"}}
+{"dir":"in","msg":{"id":2,"result":{"thread":{"id":"thr-1"},"model":"gpt-5.6-luna","cwd":"$CWD"}}}
+{"dir":"out","msg":{"id":3,"method":"turn/start"}}
+{"dir":"in","msg":{"id":3,"result":{"turn":{"id":"turn-1","items":[],"status":"inProgress","error":null}}}}
+{"dir":"in","msg":{"method":"turn/started","params":{"threadId":"thr-1","turn":{"id":"turn-1","items":[],"status":"inProgress","error":null}}}}
+{"dir":"in","msg":{"method":"item/started","params":{"threadId":"thr-1","turnId":"turn-1","item":{"type":"reasoning","id":"rs_1","summary":[],"content":[]}}}}
+{"dir":"in","msg":{"method":"item/reasoning/summaryPartAdded","params":{"threadId":"thr-1","turnId":"turn-1","itemId":"rs_1","summaryIndex":0}}}
+{"dir":"in","msg":{"method":"item/reasoning/summaryTextDelta","params":{"threadId":"thr-1","turnId":"turn-1","itemId":"rs_1","delta":"Planning","summaryIndex":0}}}
+{"dir":"in","msg":{"method":"item/reasoning/summaryPartAdded","params":{"threadId":"thr-1","turnId":"turn-1","itemId":"rs_1","summaryIndex":1}}}
+{"dir":"in","msg":{"method":"item/reasoning/summaryTextDelta","params":{"threadId":"thr-1","turnId":"turn-1","itemId":"rs_1","delta":"the steps","summaryIndex":1}}}
+{"dir":"in","msg":{"method":"item/completed","params":{"threadId":"thr-1","turnId":"turn-1","item":{"type":"reasoning","id":"rs_1","summary":["Planning","the steps"],"content":[]}}}}
+{"dir":"in","msg":{"method":"turn/plan/updated","params":{"threadId":"thr-1","turnId":"turn-1","explanation":null,"plan":[{"step":"Read code","status":"completed"},{"step":"Write fix","status":"inProgress"},{"step":"Run tests","status":"pending"}]}}}
+{"dir":"in","msg":{"method":"item/agentMessage/delta","params":{"threadId":"thr-subagent","turnId":"t-x","itemId":"m-x","delta":"IGNORED"}}}
+{"dir":"in","msg":{"method":"item/started","params":{"threadId":"thr-1","turnId":"turn-1","item":{"type":"mcpToolCall","id":"mcp-1","server":"docs","tool":"search","status":"inProgress","arguments":{"q":"go"},"result":null,"error":null}}}}
+{"dir":"in","msg":{"method":"item/completed","params":{"threadId":"thr-1","turnId":"turn-1","item":{"type":"mcpToolCall","id":"mcp-1","server":"docs","tool":"search","status":"completed","arguments":{"q":"go"},"result":{"content":[{"type":"text","text":"found 3"}],"structuredContent":null,"_meta":null},"error":null}}}}
+{"dir":"in","msg":{"method":"item/started","params":{"threadId":"thr-1","turnId":"turn-1","item":{"type":"webSearch","id":"ws-1","query":"golang release","action":null,"results":null}}}}
+{"dir":"in","msg":{"method":"item/completed","params":{"threadId":"thr-1","turnId":"turn-1","item":{"type":"webSearch","id":"ws-1","query":"golang release","action":null,"results":null}}}}
+{"dir":"in","msg":{"method":"error","params":{"threadId":"thr-1","turnId":"turn-1","willRetry":true,"error":{"message":"stream disconnected","codexErrorInfo":null,"additionalDetails":null}}}}
+{"dir":"in","msg":{"method":"item/started","params":{"threadId":"thr-1","turnId":"turn-1","item":{"type":"agentMessage","id":"msg-1","text":"","phase":"final_answer"}}}}
+{"dir":"in","msg":{"method":"item/completed","params":{"threadId":"thr-1","turnId":"turn-1","item":{"type":"agentMessage","id":"msg-1","text":"Plan ready.","phase":"final_answer"}}}}
+{"dir":"in","msg":{"method":"thread/tokenUsage/updated","params":{"threadId":"thr-1","turnId":"turn-1","tokenUsage":{"total":{"totalTokens":107,"inputTokens":100,"cachedInputTokens":0,"cacheWriteInputTokens":0,"outputTokens":7,"reasoningOutputTokens":0},"last":{"totalTokens":107,"inputTokens":100,"cachedInputTokens":0,"cacheWriteInputTokens":0,"outputTokens":7,"reasoningOutputTokens":0},"modelContextWindow":258400}}}}
+{"dir":"in","msg":{"method":"thread/tokenUsage/updated","params":{"threadId":"thr-1","turnId":"turn-1","tokenUsage":{"total":{"totalTokens":270,"inputTokens":250,"cachedInputTokens":0,"cacheWriteInputTokens":0,"outputTokens":20,"reasoningOutputTokens":0},"last":{"totalTokens":270,"inputTokens":250,"cachedInputTokens":0,"cacheWriteInputTokens":0,"outputTokens":20,"reasoningOutputTokens":0},"modelContextWindow":258400}}}}
+{"dir":"in","msg":{"method":"turn/completed","params":{"threadId":"thr-1","turn":{"id":"turn-1","items":[],"status":"completed","error":null}}}}

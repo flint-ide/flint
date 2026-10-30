@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { EditorView } from '@codemirror/view'
 import type { ScratchKind, ScratchPad } from '../api/backend'
 
 export interface Reveal {
@@ -146,4 +147,18 @@ export function registerSaver(tabId: string, save: () => Promise<void>): () => v
 
 export async function saveTab(tabId: string): Promise<void> {
   await savers.get(tabId)?.()
+}
+
+/** Live editor views by tab id, for features that need the real selection (⌘L). */
+const views = new Map<string, EditorView>()
+
+export function registerView(tabId: string, view: EditorView): () => void {
+  views.set(tabId, view)
+  return () => {
+    if (views.get(tabId) === view) views.delete(tabId)
+  }
+}
+
+export function viewFor(tabId: string): EditorView | undefined {
+  return views.get(tabId)
 }

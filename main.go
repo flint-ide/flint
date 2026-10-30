@@ -24,6 +24,8 @@ func main() {
 	}
 
 	gitAPI := &GitAPI{app: app}
+	lspAPI := &LSPAPI{app: app}
+	lspAPI.wire()
 	err = wails.Run(&options.App{
 		Title:     "flint",
 		Width:     1400,
@@ -48,6 +50,8 @@ func main() {
 			&AppAPI{app: app},
 			gitAPI,
 			&AgentAPI{app: app, git: gitAPI},
+			lspAPI,
+			&AgentChatAPI{app: app},
 		},
 		Mac: &mac.Options{
 			TitleBar: mac.TitleBarHiddenInset(),

@@ -1,0 +1,11 @@
+{"dir":"out","msg":{"id":1,"method":"initialize"}}
+{"dir":"in","msg":{"id":1,"result":{"userAgent":"fake/0.153.4","codexHome":"/tmp/codex-home","platformFamily":"unix","platformOs":"macos"}}}
+{"dir":"out","msg":{"method":"initialized"}}
+{"dir":"out","msg":{"id":2,"method":"thread/start"}}
+{"dir":"in","msg":{"id":2,"result":{"thread":{"id":"thr-1"},"model":"gpt-5.6-luna","cwd":"$CWD"}}}
+{"dir":"out","msg":{"id":3,"method":"turn/start"}}
+{"dir":"in","msg":{"id":3,"result":{"turn":{"id":"turn-1","items":[],"status":"inProgress","error":null}}}}
+{"dir":"in","msg":{"method":"turn/started","params":{"threadId":"thr-1","turn":{"id":"turn-1","items":[],"status":"inProgress","error":null}}}}
+{"dir":"in","msg":{"method":"item/started","params":{"threadId":"thr-1","turnId":"turn-1","item":{"type":"agentMessage","id":"msg-1","text":"","phase":"commentary"}}}}
+{"dir":"in","msg":{"method":"item/agentMessage/delta","params":{"threadId":"thr-1","turnId":"turn-1","itemId":"msg-1","delta":"partial"}}}
+{"dir":"exit","code":2,"stderr":"thread 'main' panicked at app-server: boom\n"}

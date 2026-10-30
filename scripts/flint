@@ -1,0 +1,21 @@
+#!/bin/sh
+# flint [folder] — opens a folder (default: the current one) in a new Flint window.
+set -eu
+
+case "${1:-}" in
+-h | --help)
+	echo "usage: flint [folder]"
+	exit 0
+	;;
+esac
+
+target=${1:-.}
+if [ ! -d "$target" ]; then
+	echo "flint: $target is not a folder" >&2
+	exit 1
+fi
+if [ ! -d /Applications/flint.app ] && [ ! -d "$HOME/Applications/flint.app" ]; then
+	echo "flint: Flint.app is not installed (run \`make install\` in the flint repo)" >&2
+	exit 1
+fi
+exec open -n -a flint --args "$(cd "$target" && pwd -P)"

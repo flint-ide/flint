@@ -37,6 +37,9 @@ func (w *WorkspaceAPI) InitialFolder() string {
 	return ""
 }
 
+// ForgetRecent removes a folder from the recent list.
+func (w *WorkspaceAPI) ForgetRecent(path string) error { return w.app.forgetRecentFolder(path) }
+
 // RecentFolders lists recently opened folders, newest first.
 func (w *WorkspaceAPI) RecentFolders() []string {
 	return w.app.recentFolders()

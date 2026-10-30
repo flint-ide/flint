@@ -8,6 +8,8 @@ import { useTerminal, toggleTerminal } from '../../store/terminal'
 import { useAgentChat } from '../../store/agentChat'
 import { useAgent } from '../../store/agent'
 import { FileIcon, TabKindIcon } from '../icons/FileIcon'
+import { Dropdown, type DropdownItem } from '../ui/Dropdown'
+import { Git } from '../../store/git'
 
 const BranchesPopup = lazy(() => import('../git/BranchesPopup').then((m) => ({ default: m.BranchesPopup })))
 
@@ -67,43 +69,51 @@ function useTitlebarMetrics(): { height: number; inset: number } {
 function ProjectWidget() {
   const root = useWorkspace((s) => s.root)
   const openFolder = useWorkspace((s) => s.openFolder)
-  const [open, setOpen] = useState(false)
   const [recent, setRecent] = useState<string[]>([])
   const name = root?.split('/').pop() ?? 'Open folder'
 
-  const toggle = () => {
-    if (!open) void Workspace.RecentFolders().then((r) => setRecent((r ?? []).filter((p) => p !== root)))
-    setOpen(!open)
-  }
   const pick = async () => {
-    setOpen(false)
     const path = await Workspace.PickFolder()
     if (path) await openFolder(path)
   }
 
+  const items = (): DropdownItem[] => [
+    { label: 'Open Folder…', kbd: '⌘O', icon: <FileIcon name="folder" isDir open />, onSelect: () => void pick() },
+    { label: 'Recent Projects…', onSelect: () => useWorkspace.getState().setRecentOpen(true) },
+    ...(recent.length ? [{ type: 'section', label: 'Recent' } as DropdownItem] : []),
+    ...recent.map(
+      (p): DropdownItem => ({
+        key: p,
+        label: p.split('/').pop() ?? p,
+        hint: p.replace(/^\/Users\/[^/]+/, '~'),
+        icon: <FileIcon name={p.split('/').pop() ?? p} isDir />,
+        // ⌘-click / ⌘Enter opens it in a new window.
+        onSelect: (e) => void (e.metaKey ? Git.OpenWindow(p) : openFolder(p)),
+        action: {
+          label: '✕',
+          title: 'Remove from recent',
+          onClick: () => {
+            void Workspace.ForgetRecent(p)
+            setRecent((r) => r.filter((x) => x !== p))
+          },
+        },
+      }),
+    ),
+  ]
+
   return (
-    <span className="tb-menu-wrap">
-      <button className="tb-widget project" onClick={toggle} title={root ?? 'Open a folder'}>
-        <FileIcon name={name} isDir />
-        <span className="tb-label">{name}</span>
-        <span className="tb-chevron">⌄</span>
-      </button>
-      {open && (
-        <div className="tb-menu" onMouseLeave={() => setOpen(false)}>
-          <button onClick={() => void pick()}>
-            Open Folder… <kbd>⌘O</kbd>
-          </button>
-          {recent.length > 0 && <div className="tb-menu-section">Recent</div>}
-          {recent.map((p) => (
-            <button key={p} onClick={() => (setOpen(false), void openFolder(p))} title={p}>
-              <FileIcon name={p.split('/').pop() ?? p} isDir />
-              <span>{p.split('/').pop()}</span>
-              <span className="muted tb-path">{p.replace(/^\/Users\/[^/]+/, '~')}</span>
-            </button>
-          ))}
-        </div>
+    <Dropdown
+      minWidth={320}
+      onOpen={() => void Workspace.RecentFolders().then((r) => setRecent((r ?? []).filter((p) => p !== root)))}
+      items={items}
+      trigger={(t) => (
+        <button {...t} className="tb-widget project" title={root ?? 'Open a folder'}>
+          <FileIcon name={name} isDir />
+          <span className="tb-label">{name}</span>
+          <span className="tb-chevron">⌄</span>
+        </button>
       )}
-    </span>
+    />
   )
 }
 

@@ -5,6 +5,7 @@ import { focusSoon } from '../../lib/focusSoon'
 import { useEditor } from '../../store/editor'
 import { useWorkspace } from '../../store/workspace'
 import { FileLink, MessageText, PermissionCard, PlanView, ToolCallRow, UsageLine } from './ChatItems'
+import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 
 /** Conversation with a coding agent: streamed replies, tool calls, plan and questions. */
 // memo: chunks for one session must not re-render the others (actions are stable).
@@ -159,19 +160,36 @@ function label(a: { path: string; startLine?: number; endLine?: number }, root: 
 function PolicyToggle() {
   const policy = useAgentChat((s) => s.policy)
   const setPolicy = useAgentChat((s) => s.setPolicy)
-  const [open, setOpen] = useState(false)
   if (!policy) return null
   const summary = policy.autoApproveAll ? 'auto: all' : policy.autoApproveEdits ? 'auto: edits' : 'ask: all'
+  const items: DropdownItem[] = [
+    { type: 'section', label: 'Without asking, the agent may…' },
+    {
+      label: 'Edit files in the project',
+      checked: policy.autoApproveEdits,
+      onSelect: () => void setPolicy({ ...policy, autoApproveEdits: !policy.autoApproveEdits }),
+    },
+    {
+      label: 'Read and search the project',
+      checked: policy.autoApproveReads,
+      onSelect: () => void setPolicy({ ...policy, autoApproveReads: !policy.autoApproveReads }),
+    },
+    { type: 'separator' },
+    {
+      label: 'Do everything (commands too)',
+      danger: true,
+      checked: policy.autoApproveAll,
+      onSelect: () => void setPolicy({ ...policy, autoApproveAll: !policy.autoApproveAll }),
+    },
+  ]
   return (
-    <span className="policy">
-      <button className="link" onClick={() => setOpen(!open)} title="What the agent may do without asking">{summary}</button>
-      {open && (
-        <div className="policy-menu" onMouseLeave={() => setOpen(false)}>
-          <label className="check"><input type="checkbox" checked={policy.autoApproveEdits} onChange={(e) => void setPolicy({ ...policy, autoApproveEdits: e.target.checked })} /> Edit files without asking</label>
-          <label className="check"><input type="checkbox" checked={policy.autoApproveReads} onChange={(e) => void setPolicy({ ...policy, autoApproveReads: e.target.checked })} /> Read / search without asking</label>
-          <label className="check"><input type="checkbox" checked={policy.autoApproveAll} onChange={(e) => void setPolicy({ ...policy, autoApproveAll: e.target.checked })} /> Allow everything (commands too)</label>
-        </div>
+    <Dropdown
+      align="end"
+      minWidth={260}
+      items={items}
+      trigger={(t) => (
+        <button {...t} className="link" title="What the agent may do without asking">{summary}</button>
       )}
-    </span>
+    />
   )
 }

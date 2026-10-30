@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
@@ -37,7 +36,7 @@ func main() {
 			Assets: assets,
 		},
 		// Without an Edit menu macOS webviews ignore Cmd+C / Cmd+V / Cmd+Z.
-		Menu:             menu.NewMenuFromItems(menu.AppMenu(), menu.EditMenu(), menu.WindowMenu()),
+		Menu:             app.buildMenu(),
 		BackgroundColour: &options.RGBA{R: 24, G: 25, B: 28, A: 1},
 		OnStartup:        app.startup,
 		OnDomReady:       func(context.Context) { styleNativeWindow() },

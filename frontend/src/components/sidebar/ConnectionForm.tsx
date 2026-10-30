@@ -3,6 +3,7 @@ import { Database, errorMessage, newConnection, type Connection, type Driver } f
 import { db } from '../../../wailsjs/go/models'
 import { useDatabase } from '../../store/database'
 import { Modal } from '../layout/Modal'
+import { Select } from '../ui/Select'
 
 interface Props {
   initial: Connection | null
@@ -55,10 +56,15 @@ export function ConnectionForm({ initial, onClose }: Props) {
       >
         <label>
           Driver
-          <select value={conn.driver} onChange={(e) => update({ driver: e.target.value as Driver, port: 0 })}>
-            <option value="postgres">PostgreSQL</option>
-            <option value="clickhouse">ClickHouse (native)</option>
-          </select>
+          <Select
+            block
+            value={conn.driver as Driver}
+            options={[
+              { value: 'postgres', label: 'PostgreSQL', icon: <span className="driver-badge postgres">PG</span> },
+              { value: 'clickhouse', label: 'ClickHouse', hint: 'native protocol', icon: <span className="driver-badge clickhouse">CH</span> },
+            ]}
+            onChange={(driver) => update({ driver, port: 0 })}
+          />
         </label>
         <label>
           Name

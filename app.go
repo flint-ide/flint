@@ -134,6 +134,7 @@ func (a *App) rememberFolder(path string) error {
 		return err
 	}
 	a.state = next
+	go a.refreshMenu() // outside stateMu: building the menu reads the list again
 	return nil
 }
 

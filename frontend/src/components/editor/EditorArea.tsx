@@ -1,4 +1,4 @@
-import { Suspense, lazy, useLayoutEffect, useState } from 'react'
+import { Suspense, lazy, useLayoutEffect } from 'react'
 import { useEditor, type Tab } from '../../store/editor'
 import { confirmAction } from '../../store/dialog'
 import { useTerminal } from '../../store/terminal'
@@ -9,6 +9,7 @@ import { Welcome } from '../layout/Welcome'
 import { ErrorBoundary } from '../layout/ErrorBoundary'
 import { FileIcon, TabKindIcon } from '../icons/FileIcon'
 import { TerminalView } from '../terminal/TerminalView'
+import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 
 // CodeMirror, the SQL console and the agent chat load on first use, keeping startup
 // to the layout plus the terminal.
@@ -132,29 +133,32 @@ function TabIcon({ tab, busy }: { tab: Tab; busy: boolean }) {
 
 /** "+" at the end of the tab bar: new terminal, agent chat or SQL console. */
 function NewTabMenu() {
-  const [open, setOpen] = useState(false)
   const root = useWorkspace((s) => s.root) ?? ''
   const agents = useAgentChat((s) => s.agents)
   const starting = useAgentChat((s) => s.starting)
-  const close = () => setOpen(false)
+  const items = (): DropdownItem[] => [
+    { label: 'Terminal', kbd: '⇧⌘T', icon: <TabKindIcon kind="terminal" />, onSelect: () => void useTerminal.getState().create(root) },
+    ...agents.map(
+      (a): DropdownItem => ({
+        label: `${a} chat`,
+        icon: <TabKindIcon kind="chat" />,
+        disabled: !!starting,
+        onSelect: () => void useAgentChat.getState().start(a, root),
+      }),
+    ),
+    { type: 'separator' },
+    { label: 'SQL console', kbd: '⌘N', icon: <TabKindIcon kind="sql" />, onSelect: () => void useScratch.getState().create('sql') },
+    { label: 'Markdown note', icon: <TabKindIcon kind="markdown" />, onSelect: () => void useScratch.getState().create('markdown') },
+  ]
   return (
     <span className="new-tab-wrap">
-      <button className="icon new-tab" title="New terminal (⇧⌘T), agent chat or SQL console" onClick={() => setOpen(!open)}>＋</button>
-      {open && (
-        <div className="new-tab-menu" onMouseLeave={close}>
-          <button onClick={() => (useTerminal.getState().create(root), close())}>
-            <TabKindIcon kind="terminal" /> Terminal <kbd>⇧⌘T</kbd>
-          </button>
-          {agents.map((a) => (
-            <button key={a} disabled={!!starting} onClick={() => (void useAgentChat.getState().start(a, root), close())}>
-              <TabKindIcon kind="chat" /> {a} chat
-            </button>
-          ))}
-          <button onClick={() => (void useScratch.getState().create('sql'), close())}>
-            <TabKindIcon kind="sql" /> SQL console <kbd>⌘N</kbd>
-          </button>
-        </div>
-      )}
+      <Dropdown
+        align="end"
+        items={items}
+        trigger={(t) => (
+          <button {...t} className="icon new-tab" title="New terminal (⇧⌘T), agent chat or SQL console">＋</button>
+        )}
+      />
       {starting && <span className="muted starting">starting {starting}…</span>}
     </span>
   )

@@ -5,6 +5,8 @@ import { useWorkspace } from '../../store/workspace'
 import { useTerminal } from '../../store/terminal'
 import { showToast } from '../../store/dialog'
 import { Modal } from '../layout/Modal'
+import { Select } from '../ui/Select'
+import { TabKindIcon } from '../icons/FileIcon'
 
 type After = 'terminal' | 'window' | 'switch'
 
@@ -84,22 +86,26 @@ export function NewWorktreeForm({ root, branches, onClose, onBack }: Props) {
             </label>
             <label className="grow">
               From
-              <select value={base} onChange={(e) => setBase(e.target.value)}>
-                {branches.filter((b) => !b.remote).map((b) => (
-                  <option key={b.name} value={b.name}>{b.name}</option>
-                ))}
-              </select>
+              <Select
+                block
+                searchable
+                value={base}
+                options={branches.filter((b) => !b.remote).map((b) => ({ value: b.name, label: b.name, hint: b.current ? 'current' : undefined }))}
+                onChange={setBase}
+              />
             </label>
           </div>
         ) : (
           <label>
             Branch
-            <select value={branch} onChange={(e) => setBranch(e.target.value)} required>
-              <option value="">— pick a branch —</option>
-              {free.map((b) => (
-                <option key={b.name} value={b.name}>{b.name}</option>
-              ))}
-            </select>
+            <Select
+              block
+              searchable
+              value={branch}
+              placeholder="Pick a branch"
+              options={free.map((b) => ({ value: b.name, label: b.name, hint: b.track || undefined }))}
+              onChange={setBranch}
+            />
           </label>
         )}
         <label>
@@ -116,11 +122,16 @@ export function NewWorktreeForm({ root, branches, onClose, onBack }: Props) {
         </label>
         <label>
           Then
-          <select value={after} onChange={(e) => setAfter(e.target.value as After)}>
-            <option value="terminal">Open a terminal there (for claude / codex)</option>
-            <option value="window">Open in a new window</option>
-            <option value="switch">Switch this window to it</option>
-          </select>
+          <Select<After>
+            block
+            value={after}
+            options={[
+              { value: 'terminal', label: 'Open a terminal there', hint: 'for claude / codex', icon: <TabKindIcon kind="terminal" /> },
+              { value: 'window', label: 'Open in a new window' },
+              { value: 'switch', label: 'Switch this window to it' },
+            ]}
+            onChange={setAfter}
+          />
         </label>
         {error && <div className="form-status error">{error}</div>}
         <div className="form-actions">

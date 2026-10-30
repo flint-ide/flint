@@ -6,3 +6,4 @@ frontend/dist/*
 coverage.out
 .claude/launch.json
 frontend/package.json.md5
+frontend/.vite/

@@ -4,6 +4,7 @@ import { useEditor } from '../../store/editor'
 import { confirmAction, showToast } from '../../store/dialog'
 import { resolveConflictsWithAgent, suggestCommitMessage, useAgent } from '../../store/agent'
 import { errorMessage } from '../../api/backend'
+import { Select } from '../ui/Select'
 
 const KIND_LETTER: Record<string, string> = {
   modified: 'M', added: 'A', deleted: 'D', renamed: 'R', copied: 'C',
@@ -164,11 +165,13 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
       <div className="commit-box">
         <div className="commit-box-tools">
           {agents.available.length > 1 ? (
-            <select value={agents.preferred} onChange={(e) => void agents.setPreferred(e.target.value)} title="Agent used for generating and resolving">
-              {agents.available.map((a) => (
-                <option key={a} value={a}>{a}</option>
-              ))}
-            </select>
+            <Select
+              size="sm"
+              value={agents.preferred}
+              options={agents.available.map((a) => ({ value: a, label: a }))}
+              onChange={(a) => void agents.setPreferred(a)}
+              title="Agent used for generating messages and resolving conflicts"
+            />
           ) : (
             <span className="muted">{agents.preferred || 'no agent installed'}</span>
           )}

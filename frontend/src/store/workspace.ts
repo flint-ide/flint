@@ -14,6 +14,7 @@ interface WorkspaceState {
   sidebar: SidebarView
   sidebarVisible: boolean
   quickOpen: boolean
+  recentOpen: boolean
   error: string | null
 
   init: () => Promise<void>
@@ -24,6 +25,7 @@ interface WorkspaceState {
   setSidebar: (view: SidebarView) => void
   toggleSidebar: () => void
   setQuickOpen: (open: boolean) => void
+  setRecentOpen: (open: boolean) => void
   clearError: () => void
 }
 
@@ -40,6 +42,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   sidebar: 'files',
   sidebarVisible: true,
   quickOpen: false,
+  recentOpen: false,
   error: null,
 
   init: async () => {
@@ -119,5 +122,6 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   setSidebar: (view) => set({ sidebar: view, sidebarVisible: true }),
   toggleSidebar: () => set((s) => ({ sidebarVisible: !s.sidebarVisible })),
   setQuickOpen: (open) => set({ quickOpen: open }),
+  setRecentOpen: (open) => set({ recentOpen: open }),
   clearError: () => set({ error: null }),
 }))

@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
-import { Workspace } from './api/backend'
+import { EventsOn } from '../wailsjs/runtime/runtime'
 import { useWorkspace } from './store/workspace'
 import { useEditor } from './store/editor'
 import { useDatabase } from './store/database'
@@ -30,12 +30,14 @@ const ACTIVITY_BAR = 44
 
 const DatabasePanel = lazy(() => import('./components/sidebar/DatabasePanel').then((m) => ({ default: m.DatabasePanel })))
 const CommitPanel = lazy(() => import('./components/sidebar/CommitPanel').then((m) => ({ default: m.CommitPanel })))
+const RecentProjects = lazy(() => import('./components/RecentProjects').then((m) => ({ default: m.RecentProjects })))
 const QuickOpen = lazy(() => import('./components/QuickOpen').then((m) => ({ default: m.QuickOpen })))
 
 export default function App() {
   const sidebar = useWorkspace((s) => s.sidebar)
   const sidebarVisible = useWorkspace((s) => s.sidebarVisible)
   const quickOpen = useWorkspace((s) => s.quickOpen)
+  const recentOpen = useWorkspace((s) => s.recentOpen)
   const root = useWorkspace((s) => s.root)
   const error = useWorkspace((s) => s.error)
   const ready = useWorkspace((s) => s.ready)
@@ -52,6 +54,9 @@ export default function App() {
     subscribeGitEvents()
     subscribeLspEvents()
     subscribeAgentChatEvents()
+    // Native File menu: Open Folder… / Open Recent ▸ <folder>.
+    EventsOn('menu:open-recent', () => useWorkspace.getState().setRecentOpen(true))
+    EventsOn('menu:open-folder', (path: string) => void useWorkspace.getState().openFolder(path))
     void useDatabase.getState().loadConnections()
     void useScratch.getState().load()
     void useWorkspace.getState().init()
@@ -118,6 +123,11 @@ export default function App() {
           <QuickOpen />
         </Suspense>
       )}
+      {recentOpen && (
+        <Suspense fallback={null}>
+          <RecentProjects />
+        </Suspense>
+      )}
       <UsagesModal />
       <Overlays />
     </div>
@@ -148,10 +158,8 @@ function useGlobalShortcuts(focusSearch: () => void, focusCommit: () => void) {
         if (key === ']' && !e.shiftKey) return useEditor.getState().forward(), true
         if (key === 't' && e.shiftKey) return useTerminal.getState().create(ws.root ?? ''), true
         if (key === 'n' && !e.shiftKey) return void useScratch.getState().create('sql'), true
-        if (key === 'o' && !e.shiftKey) {
-          void Workspace.PickFolder().then((p) => (p ? ws.openFolder(p) : undefined))
-          return true
-        }
+        // ⌘O shows Recent Projects (the native File menu sends the same event).
+        if (key === 'o' && !e.shiftKey) return ws.setRecentOpen(true), true
         if (key === 'w' && !e.shiftKey) {
           const { tabs, activeId } = useEditor.getState()
           const tab = tabs.find((t) => t.id === activeId)

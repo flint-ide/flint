@@ -7,6 +7,7 @@ import { useDatabase } from '../../store/database'
 import { useScratch } from '../../store/scratch'
 import { ResultsGrid } from '../results/ResultsGrid'
 import { Splitter } from '../layout/Splitter'
+import { Select } from '../ui/Select'
 
 const LIMITS = [100, 1000, 10_000, 100_000]
 
@@ -84,14 +85,20 @@ export function QueryPanel({ scratchId, connId, runner, editor, view }: PanelPro
   return (
     <div className="query-panel">
       <div className="query-toolbar">
-        <select value={connId} onChange={(e) => setConnection(scratchId, e.target.value)}>
-          <option value="">— connection —</option>
-          {connections.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name} ({c.driver})
-            </option>
-          ))}
-        </select>
+        <Select
+          size="sm"
+          value={connId}
+          allowEmpty="— no connection —"
+          placeholder="Connection"
+          title="Connection used by this console"
+          options={connections.map((c) => ({
+            value: c.id,
+            label: c.name,
+            hint: c.driver === 'clickhouse' ? 'ClickHouse' : 'PostgreSQL',
+            icon: <span className={`driver-badge ${c.driver}`}>{c.driver === 'clickhouse' ? 'CH' : 'PG'}</span>,
+          }))}
+          onChange={(id) => void setConnection(scratchId, id)}
+        />
         {state.running ? (
           <button className="danger" onClick={runner.cancel}>■ Cancel</button>
         ) : (
@@ -99,14 +106,14 @@ export function QueryPanel({ scratchId, connId, runner, editor, view }: PanelPro
             ▶ Run
           </button>
         )}
-        <label className="muted">
-          limit
-          <select value={runner.limit} onChange={(e) => runner.setLimit(Number(e.target.value))}>
-            {LIMITS.map((l) => (
-              <option key={l} value={l}>{l.toLocaleString()}</option>
-            ))}
-          </select>
-        </label>
+        <Select
+          size="sm"
+          label="limit"
+          value={runner.limit}
+          options={LIMITS.map((l) => ({ value: l, label: l.toLocaleString() }))}
+          onChange={runner.setLimit}
+          title="Maximum rows fetched"
+        />
         <span className="spacer" />
       </div>
       <div className="query-split">

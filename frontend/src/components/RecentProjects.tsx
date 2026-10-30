@@ -1,0 +1,115 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Workspace, errorMessage } from '../api/backend'
+import { Git } from '../store/git'
+import { useWorkspace } from '../store/workspace'
+import { showToast } from '../store/dialog'
+import { Modal } from './layout/Modal'
+import { FileIcon } from './icons/FileIcon'
+
+const tildify = (p: string) => p.replace(/^\/Users\/[^/]+/, '~')
+
+/**
+ * ⌘O: IntelliJ-style Recent Projects. Enter opens here, ⌘Enter in a new window,
+ * "Browse…" falls back to the native folder picker.
+ */
+export function RecentProjects() {
+  const root = useWorkspace((s) => s.root)
+  const openFolder = useWorkspace((s) => s.openFolder)
+  const close = () => useWorkspace.getState().setRecentOpen(false)
+  const [recent, setRecent] = useState<string[]>([])
+  const [query, setQuery] = useState('')
+  const [cursor, setCursor] = useState(0)
+  const list = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    void Workspace.RecentFolders().then((r) => setRecent(r ?? []))
+  }, [])
+
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const matches = recent.filter((p) => !q || p.toLowerCase().includes(q))
+    return [null, ...matches] // null = "Browse…"
+  }, [recent, query])
+
+  useEffect(() => setCursor(rows.length > 1 && query ? 1 : 0), [query, rows.length])
+  useEffect(() => {
+    list.current?.querySelector('.selected')?.scrollIntoView({ block: 'nearest' })
+  }, [cursor])
+
+  const browse = async () => {
+    close()
+    const path = await Workspace.PickFolder()
+    if (path) await openFolder(path)
+  }
+
+  const choose = async (path: string | null, newWindow: boolean) => {
+    if (path === null) return void browse()
+    close()
+    if (newWindow) {
+      await Git.OpenWindow(path).catch((err) => showToast(errorMessage(err), 'error'))
+      return
+    }
+    if (path !== root) await openFolder(path)
+  }
+
+  const forget = async (path: string) => {
+    await Workspace.ForgetRecent(path).catch(() => undefined)
+    setRecent((r) => r.filter((p) => p !== path))
+  }
+
+  return (
+    <Modal onClose={close} className="quick-open recent-projects">
+      <input
+        autoFocus
+        className="quick-input"
+        placeholder="Open recent project…  (⌘↵ new window)"
+        value={query}
+        spellCheck={false}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') setCursor((c) => Math.min(c + 1, rows.length - 1))
+          else if (e.key === 'ArrowUp') setCursor((c) => Math.max(c - 1, 0))
+          else if (e.key === 'Enter') void choose(rows[cursor], e.metaKey)
+          else return
+          e.preventDefault()
+        }}
+      />
+      <div className="quick-list" ref={list}>
+        {rows.map((path, i) =>
+          path === null ? (
+            <div key="browse" className={`quick-item${i === cursor ? ' selected' : ''}`} onMouseMove={() => setCursor(i)} onClick={() => void browse()}>
+              <FileIcon name="folder" isDir open />
+              <span className="file-name">Browse…</span>
+              <span className="muted path-hint">choose a folder</span>
+              <kbd>⌘O</kbd>
+            </div>
+          ) : (
+            <div
+              key={path}
+              className={`quick-item${i === cursor ? ' selected' : ''}${path === root ? ' current' : ''}`}
+              onMouseMove={() => setCursor(i)}
+              onClick={(e) => void choose(path, e.metaKey)}
+              title={path}
+            >
+              <FileIcon name={path.split('/').pop() ?? path} isDir />
+              <span className="file-name">{path.split('/').pop()}</span>
+              <span className="muted path-hint">{tildify(path)}</span>
+              {path === root && <span className="badge">open</span>}
+              <button
+                className="icon recent-forget"
+                title="Remove from list"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void forget(path)
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ),
+        )}
+        {rows.length === 1 && <div className="placeholder muted">{recent.length ? 'No matching projects' : 'No recent projects yet'}</div>}
+      </div>
+    </Modal>
+  )
+}

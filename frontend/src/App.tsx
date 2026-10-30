@@ -19,6 +19,7 @@ import { Splitter } from './components/layout/Splitter'
 import { Overlays } from './components/layout/Overlays'
 import { ErrorBoundary } from './components/layout/ErrorBoundary'
 import { StatusBar } from './components/layout/StatusBar'
+import { TitleBar } from './components/layout/TitleBar'
 import { EditorArea, requestCloseTab } from './components/editor/EditorArea'
 import { FileTree } from './components/sidebar/FileTree'
 import { SearchPanel } from './components/sidebar/SearchPanel'
@@ -81,10 +82,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="titlebar" style={{ '--wails-draggable': 'drag' } as React.CSSProperties}>
-        <span className="title">{root ? root.split('/').pop() : 'flint'}</span>
-        {root && <span className="muted title-path">{root}</span>}
-      </header>
+      <TitleBar />
       <div className="workbench" ref={workbench}>
         <ActivityBar onTerminal={() => toggleTerminal(root ?? '')} />
         {sidebarVisible && (

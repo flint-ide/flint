@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { createStore } from '../lib/store'
 import type { EditorView } from '@codemirror/view'
 import type { ScratchKind, ScratchPad } from '../api/backend'
 
@@ -95,7 +95,7 @@ function activate(s: EditorState, id: string): Partial<EditorState> {
   return { activeId: id, backStack, forwardStack: [] }
 }
 
-export const useEditor = create<EditorState>((set) => ({
+export const useEditor = createStore<EditorState>((set) => ({
   tabs: [],
   activeId: null,
   backStack: [],

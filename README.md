@@ -12,7 +12,7 @@ Szybkie, minimalistyczne IDE „AI-first” na macOS. Kod piszą agenci (claude,
 | Terminal | Prawdziwe PTY (`creack/pty`), login shell z Twoim `PATH`, renderowanie WebGL. Kilka zakładek. `⌘`+klik w `ścieżka:linia` z wyjścia agenta otwiera plik na danej linii. Shift+Enter wstawia nową linię w promptach claude/codex. |
 | Zmiany agenta na żywo | FSEvents (jedna rekurencyjna subskrypcja na cały projekt). Drzewo plików się odświeża, a otwarte pliki przeładowują się w miejscu z minimalnym diffem. Jeśli masz niezapisane zmiany, pojawi się ostrzeżenie. |
 | Wyszukiwanie | `ripgrep --json`, wyniki przychodzą strumieniowo w paczkach i są renderowane wirtualnie. Bez rg działa wolniejszy fallback w czystym Go. |
-| Go to file (`⌘P`) | Lista z `rg --files` (respektuje `.gitignore`) + fuzzy matching. Brak indeksowania z góry. |
+| Go to file (`⌘P`) | Lista z `rg --files` (respektuje `.gitignore`) trzymana w Go; fuzzy matching też w Go, do WebView wraca tylko top 60 wyników. Brak indeksowania z góry. |
 | Bazy danych | PostgreSQL (`pgx`) i ClickHouse (natywny protokół). Hasła trzymane są w Keychainie macOS, nie w plikach. Przeglądarka schematu, autouzupełnianie SQL ze schematu, tryb read-only. |
 | Git (jak w IntelliJ) | Panel Commit (`⌘K`) z checkboxami, Amend, Commit and Push i Rollback. Diff obok siebie w karcie. Znaczniki zmienionych linii na marginesie, które pokazują też, co ruszył agent. Widżet gałęzi w pasku stanu: checkout, nowa gałąź, fetch, pull, push (`⇧⌘K`). Commit podczas merge'a obejmuje cały index. |
 | Worktree | Lista, tworzenie (`<repo>.worktrees/<gałąź>`), usuwanie, przełączanie, otwieranie w nowym oknie lub od razu z terminalem dla agenta. Checkout i commit zrobione w terminalu odświeżają UI, bo obserwowany jest też katalog git. |
@@ -39,7 +39,7 @@ flint .         # otwiera bieżący katalog
 ## Testy
 
 ```bash
-make test                                  # Go (race) + frontend (tsc + vitest)
+make test                                  # Go (race) + frontend (tsc + node --test)
 make test-db-up && make test-integration   # Postgres + ClickHouse w Dockerze
 make test-db-down
 ```
@@ -54,12 +54,13 @@ flowchart LR
     direction TB
     tabs["Karty: CodeMirror 6 · xterm.js · czat agenta · konsola SQL · diff"]
     side["Panele: pliki · szukaj · Commit · bazy · brudnopisy"]
-    stores["zustand stores"]
+    stores["stores: createStore + event bus"]
   end
 
   subgraph GO["Proces Go · api_*.go → internal/*"]
     direction TB
-    ws["workspace · watcher (FSEvents)"]
+    ws["workspace · watcher (FSEvents) · fuzzy (⌘P)"]
+    diff["textdiff (Myers): gutter · diff · +/−"]
     srch["search (ripgrep)"]
     git["git (git CLI)"]
     lsp["lsp (JSON-RPC)"]
@@ -90,9 +91,16 @@ flowchart LR
 - **Zdarzenia:** strumienie płyną zdarzeniami (wyjście terminala, odpowiedzi agenta, wyniki wyszukiwania, zmiany plików i gita, diagnostyka LSP).
 - **Kolejność:** zdarzenia terminala i agenta mają numery sekwencyjne, a UI układa je z powrotem w kolejności, bo transport nie gwarantuje kolejności (np. dev server Wails).
 
+**Frontend bez łańcucha narzędzi npm.**
+- **Build:** `cmd/webbuild` (Go, `github.com/evanw/esbuild/pkg/api`) bundluje TSX i CSS do `frontend/dist` w ~0,1 s. `wails build` wywołuje go jako `frontend:build` z `--typecheck` (najpierw `tsc --noEmit`, bo esbuild tylko usuwa typy). `wails dev` uruchamia `webbuild --watch`: przebudowa po każdej zmianie i przeładowanie strony przez strumień SSE esbuild (`/esbuild`), bez HMR. Serwer dev działa na `localhost:5173` (`frontend:dev:serverUrl`).
+- **Testy:** `webbuild --test` kompiluje `src/**/*.test.ts(x)` do katalogu tymczasowego i uruchamia `node --test`. Testy używają `node:test` i `node:assert`. Typy sprawdza `tsc --noEmit`, a typy `node:test` są opisane lokalnie w `src/testing/node.d.ts` (bez `@types/node`).
+- **Stan:** `src/lib/store.ts` (`createStore`) to mały kontener na `useSyncExternalStore`. `setState` emituje zdarzenie `change` na event busie (`src/lib/bus.ts`). API jak wcześniej: `useX(selector)`, `useX.getState()`, `useX.setState()`, `useX.subscribe()`. Wynik selektora jest zapamiętywany i porównywany przez `Object.is`, więc selektor budujący nową tablicę nie zapętla renderów.
+- **Własny kod zamiast bibliotek:** wirtualizacja list o stałej wysokości wiersza (`src/lib/virtualList.ts`), dopasowanie terminala do kontenera (`terminalFit.ts`) oraz klikalne URL-e w terminalu, także zawinięte na kilka wierszy (`terminalLinks.ts`).
+- **Obliczenia w Go:** diffy liczy `internal/textdiff` (Myers w pamięci liniowej, limit czasu, potem zastępuje cały region; słowa zmienione wewnątrz linii jako offsety UTF-16). Przez `DiffAPI` dostają je: znaczniki na marginesie edytora (`Marks`), statystyki +/− i mini-diffy w czacie agenta (`Hunks`) oraz karta diffu (`Compare`). Kartę diffu rysują dwa zwykłe edytory CodeMirror z własnymi dekoracjami: tło zmienionych linii, zmienione słowa, odstępy wyrównujące obie strony i zwinięte niezmienione fragmenty. Lista plików dla ⌘P jest trzymana w `fuzzy.Index` po stronie Go (`WorkspaceAPI.IndexFiles` / `FindFiles`), więc WebView nigdy nie dostaje pełnej listy.
+
 **Zasady projektowe.**
 - **Szybkość ponad wszystko:**
-  - brak indeksowania z góry: wyszukiwanie przez `rg` na żywo, lista plików dla ⌘P z `rg --files`;
+  - brak indeksowania z góry: wyszukiwanie przez `rg` na żywo, lista plików dla ⌘P z `rg --files` (dopasowanie w Go, 200k ścieżek ≈ 25 ms);
   - serwery LSP i agenci startują leniwie, w tle;
   - CodeMirror i czat agenta ładują się dopiero przy pierwszym użyciu;
   - długie listy (drzewo, wyniki, tabele SQL) są wirtualizowane.
@@ -103,7 +111,8 @@ flowchart LR
   - komendy agenta i wyjścia poza projekt wymagają zgody.
 - **Bez npm w runtime:**
   - klienci LSP/ACP i sterowniki agentów są napisani w Go na bibliotece standardowej;
-  - zależności frontendu są przypięte i instalowane z `--ignore-scripts`.
+  - zależności frontendu są przypięte i instalowane z `--ignore-scripts`;
+  - bundler i runner testów to Go (`cmd/webbuild`), a nie pakiety npm.
 
 ### Gdzie Flint trzyma dane
 
@@ -125,7 +134,10 @@ Katalog `~/Library/Application Support/flint` można zmienić zmienną `FLINT_CO
 
 ```
 main.go, app.go, api_*.go   wiązania Wails (cienka warstwa)
+cmd/webbuild                bundler frontendu (esbuild Go API), --watch, --test
 internal/workspace          drzewo, odczyt/zapis plików, lista plików
+internal/fuzzy              fuzzy matching ⌘P i indeks plików otwartego folderu
+internal/textdiff           diffy linii i słów (Myers) dla gutter, karty diffu i czatu
 internal/search             ripgrep + fallback, streaming wyników
 internal/db                 profile połączeń, Keychain, pgx/clickhouse, normalizacja typów
 internal/scratch            trwałe brudnopisy
@@ -138,7 +150,7 @@ internal/lsp                klient LSP (JSON-RPC, Content-Length), menedżer ser
 internal/acp                klient Agent Client Protocol (JSON-RPC rozdzielany \n)
 internal/agentsession       wspólny model zdarzeń agenta, polityka akceptacji, menedżer sesji
   claude/ codex/ acpdriver/ natywne sterowniki agentów
-frontend/src                React: store (zustand), components, lib
+frontend/src                React: store (createStore + event bus), components, lib
 ```
 
 Szczegóły przechowywania danych: sekcja [Gdzie Flint trzyma dane](#gdzie-flint-trzyma-dane).
@@ -147,4 +159,4 @@ Szczegóły przechowywania danych: sekcja [Gdzie Flint trzyma dane](#gdzie-flint
 
 - Flint w trakcie działania nie pobiera nic z npm (żadnego `npx`). Agenci i serwery LSP to Twoje zainstalowane binarki.
 - Frontend: `frontend/.npmrc` wyłącza skrypty instalacyjne (`ignore-scripts=true`) i wymusza dokładne wersje, a build używa `npm ci --ignore-scripts`.
-- Zależności runtime frontendu ograniczone do: React, CodeMirror (jeden autor), xterm.js, zustand, @tanstack/react-virtual. Fuzzy matching jest własny.
+- Zależności frontendu ograniczone do: React, CodeMirror (jeden autor, bez `@codemirror/merge`), xterm.js (rdzeń + renderer WebGL) oraz TypeScript i typy Reacta do sprawdzania typów. Razem 43 pakiety w `node_modules` (wcześniej 145). Bundler (esbuild przez Go API) i runner testów (`node --test`) nie pochodzą z npm. Stan, wirtualizacja list, dopasowanie terminala, linki w terminalu, diffy i fuzzy matching są własne.

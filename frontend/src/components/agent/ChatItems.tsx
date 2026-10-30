@@ -1,7 +1,6 @@
 import { memo, useMemo, useState, type ReactNode } from 'react'
-import { Chunk } from '@codemirror/merge'
-import { Text } from '@codemirror/state'
 import type { Diff, PermissionRequest, PlanEntry, ToolCall, Usage } from '../../lib/agentReducer'
+import { countLines, previewLines, useHunks } from '../../lib/editDiff'
 import { useEditor } from '../../store/editor'
 
 const TOOL_ICONS: Record<string, string> = {
@@ -80,8 +79,10 @@ export const ToolCallRow = memo(function ToolCallRow({ call, root }: { call: Too
 })
 
 function DiffStat({ diffs }: { diffs: Diff[] }) {
-  // Myers diff over whole files is the expensive part; only recompute when diffs change.
-  const { add, del } = useMemo(() => countChanges(diffs), [diffs])
+  // Diffed in Go; the stat appears once the backend answers.
+  const hunks = useHunks(diffs)
+  if (!hunks) return null
+  const { add, del } = countLines(hunks)
   return (
     <span className="diff-stat">
       <span className="add">+{add}</span> <span className="del">−{del}</span>
@@ -89,36 +90,13 @@ function DiffStat({ diffs }: { diffs: Diff[] }) {
   )
 }
 
-function countChanges(diffs: Diff[]): { add: number; del: number } {
-  let add = 0
-  let del = 0
-  for (const d of diffs) {
-    const a = Text.of(d.oldText.split('\n'))
-    const b = Text.of(d.newText.split('\n'))
-    for (const c of Chunk.build(a, b)) {
-      if (c.toB > c.fromB) add += b.lineAt(c.endB).number - b.lineAt(c.fromB).number + 1
-      if (c.toA > c.fromA) del += a.lineAt(c.endA).number - a.lineAt(c.fromA).number + 1
-    }
-  }
-  return { add, del }
-}
-
 const MAX_DIFF_LINES = 80
 
 /** Changed lines only (red/green), like a compact unified diff. */
 export function DiffPreview({ diff, root }: { diff: Diff; root: string }) {
-  const lines = useMemo(() => {
-    const a = Text.of(diff.oldText.split('\n'))
-    const b = Text.of(diff.newText.split('\n'))
-    const out: { kind: 'add' | 'del' | 'sep'; text: string }[] = []
-    for (const c of Chunk.build(a, b)) {
-      if (out.length) out.push({ kind: 'sep', text: '⋯' })
-      if (c.toA > c.fromA) for (const l of a.sliceString(c.fromA, Math.min(c.toA, a.length)).split('\n')) out.push({ kind: 'del', text: l })
-      if (c.toB > c.fromB) for (const l of b.sliceString(c.fromB, Math.min(c.toB, b.length)).split('\n')) out.push({ kind: 'add', text: l })
-      if (out.length > MAX_DIFF_LINES) break
-    }
-    return out
-  }, [diff])
+  const diffs = useMemo(() => [diff], [diff]) // stable array: useHunks keys on identity
+  const hunks = useHunks(diffs)
+  const lines = useMemo(() => (hunks ? previewLines(diff, hunks[0], MAX_DIFF_LINES) : []), [diff, hunks])
   return (
     <div className="diff-preview">
       <FileLink path={diff.path} root={root} />

@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { createStore } from '../lib/store'
 import { Scratch, errorMessage, type ScratchKind, type ScratchPad } from '../api/backend'
 import { showToast } from './dialog'
 import { useEditor } from './editor'
@@ -15,7 +15,7 @@ interface ScratchState {
 /** Initial content for scratchpads created with a prefilled query (e.g. from the schema tree). */
 export const pendingContent = new Map<string, string>()
 
-export const useScratch = create<ScratchState>((set, get) => ({
+export const useScratch = createStore<ScratchState>((set, get) => ({
   items: [],
 
   load: async () => {

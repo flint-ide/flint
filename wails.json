@@ -3,9 +3,9 @@
   "name": "flint",
   "outputfilename": "flint",
   "frontend:install": "npm ci --ignore-scripts",
-  "frontend:build": "npm run build",
-  "frontend:dev:watcher": "npm run dev",
-  "frontend:dev:serverUrl": "auto",
+  "frontend:build": "go run ../cmd/webbuild --typecheck",
+  "frontend:dev:watcher": "go run ../cmd/webbuild --watch",
+  "frontend:dev:serverUrl": "http://localhost:5173",
   "author": {
     "name": "Aleksander",
     "email": "dudek.olek4@gmail.com"

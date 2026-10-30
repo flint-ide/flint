@@ -1238,29 +1238,51 @@ kbd {
   min-height: 0;
   overflow: auto;
 }
-.diff-host .cm-mergeView {
+.diff-sides {
+  display: flex;
+  align-items: stretch;
   min-height: 100%;
 }
-.diff-host .cm-editor {
-  height: auto;
+.diff-side {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
 }
-.cm-merge-a .cm-changedLine,
-.cm-deletedChunk {
-  background: rgba(248, 113, 113, 0.1) !important;
+.diff-side + .diff-side {
+  border-left: 1px solid var(--border);
 }
-.cm-merge-b .cm-changedLine,
-.cm-inlineChangedLine {
-  background: rgba(134, 239, 172, 0.08) !important;
+/* Editors take their full height: the shared .diff-host scrolls both sides. */
+.diff-side .cm-editor {
+  height: auto !important;
+  min-height: 100%;
 }
-.cm-merge-a .cm-changedText {
-  background: rgba(248, 113, 113, 0.3) !important;
+.diff-side .cm-scroller {
+  overflow-y: visible !important;
 }
-.cm-merge-b .cm-changedText {
-  background: rgba(134, 239, 172, 0.25) !important;
+.cm-diff-deleted {
+  background: rgba(248, 113, 113, 0.1);
 }
-.cm-collapsedLines {
-  background: var(--bg-raised) !important;
-  color: var(--fg-muted) !important;
+.cm-diff-inserted {
+  background: rgba(134, 239, 172, 0.08);
+}
+.cm-diff-deleted-text {
+  background: rgba(248, 113, 113, 0.3);
+}
+.cm-diff-inserted-text {
+  background: rgba(134, 239, 172, 0.25);
+}
+.cm-diff-spacer {
+  background: repeating-linear-gradient(-45deg, transparent 0 6px, var(--bg-raised) 6px 8px);
+}
+.cm-diff-fold {
+  padding: 2px 12px;
+  background: var(--bg-raised);
+  color: var(--fg-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.cm-diff-fold:hover {
+  color: var(--fg);
 }
 
 .cm-git-gutter {

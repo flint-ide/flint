@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { useMemo, useState } from 'react'
+import { useVirtualList } from '../../lib/virtualList'
 import type { QueryResult } from '../../api/backend'
 import { cellText, columnWidths, toTSV } from '../../lib/format'
 import { showToast } from '../../store/dialog'
@@ -15,18 +15,12 @@ interface Props {
 
 /** Virtualized result table: only visible rows are rendered, so 100k rows stay smooth. */
 export function ResultsGrid({ result, summary }: Props) {
-  const scroller = useRef<HTMLDivElement>(null)
   const [selected, setSelected] = useState<{ row: number; col: number } | null>(null)
   const widths = useMemo(() => columnWidths(result), [result])
   const totalWidth = INDEX_WIDTH + widths.reduce((a, b) => a + b, 0)
   const template = `${INDEX_WIDTH}px ${widths.map((w) => `${w}px`).join(' ')}`
 
-  const virtualizer = useVirtualizer({
-    count: result.rows.length,
-    getScrollElement: () => scroller.current,
-    estimateSize: () => ROW_HEIGHT,
-    overscan: 20,
-  })
+  const { scrollRef, totalSize, items } = useVirtualList({ count: result.rows.length, itemSize: ROW_HEIGHT, overscan: 20 })
 
   const copy = async (text: string, what: string) => {
     await navigator.clipboard.writeText(text)
@@ -49,8 +43,8 @@ export function ResultsGrid({ result, summary }: Props) {
           Copy JSON
         </button>
       </div>
-      <div className="grid-scroller" ref={scroller} tabIndex={0} onKeyDown={onKeyDown}>
-        <div style={{ width: totalWidth, height: virtualizer.getTotalSize() + ROW_HEIGHT, position: 'relative' }}>
+      <div className="grid-scroller" ref={scrollRef} tabIndex={0} onKeyDown={onKeyDown}>
+        <div style={{ width: totalWidth, height: totalSize + ROW_HEIGHT, position: 'relative' }}>
           <div className="grid-row grid-header" style={{ gridTemplateColumns: template, width: totalWidth }}>
             <div className="grid-cell index">#</div>
             {result.columns.map((c, i) => (
@@ -60,11 +54,11 @@ export function ResultsGrid({ result, summary }: Props) {
               </div>
             ))}
           </div>
-          {virtualizer.getVirtualItems().map((vr) => {
+          {items.map((vr) => {
             const row = result.rows[vr.index]
             return (
               <div
-                key={vr.key}
+                key={vr.index}
                 className="grid-row"
                 style={{
                   gridTemplateColumns: template,

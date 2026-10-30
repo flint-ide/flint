@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, it } from 'node:test'
+import assert from 'node:assert/strict'
+import { assertSubset } from '../testing/assertSubset'
 import { addUserMessage, answerPermission, applyEvent, editedFiles, emptyChat, type AgentEvent, type ChatState } from './agentReducer'
 
 const ev = (e: Partial<AgentEvent>): AgentEvent => ({ sessionId: 's', kind: '', ...e })
@@ -13,7 +15,7 @@ describe('agent reducer', () => {
       { kind: 'thought_chunk', text: 'hmm' },
       { kind: 'message_chunk', text: '!' },
     ])
-    expect(s.items).toEqual([
+    assert.deepEqual(s.items, [
       { type: 'assistant', text: 'Hello' },
       { type: 'thought', text: 'hmm' },
       { type: 'assistant', text: '!' },
@@ -25,8 +27,8 @@ describe('agent reducer', () => {
       { kind: 'tool_call', toolCall: { id: 't1', title: 'Run: go test', kind: 'execute', status: 'pending', input: 'go test' } },
       { kind: 'tool_call_update', toolCall: { id: 't1', status: 'completed', output: 'ok', title: '' } },
     ])
-    expect(s.items).toHaveLength(1)
-    expect(s.items[0]).toEqual({
+    assert.equal((s.items).length, 1)
+    assert.deepEqual(s.items[0], {
       type: 'tool',
       call: { id: 't1', title: 'Run: go test', kind: 'execute', status: 'completed', input: 'go test', output: 'ok' },
     })
@@ -34,7 +36,7 @@ describe('agent reducer', () => {
 
   it('tracks busy state, plan, usage and the turn end', () => {
     let s = addUserMessage(emptyChat, 'fix it', [{ path: '/p/a.go' }])
-    expect(s.busy).toBe(true)
+    assert.equal(s.busy, true)
     s = run(
       [
         { kind: 'plan', plan: [{ content: 'read', status: 'completed' }] },
@@ -43,21 +45,21 @@ describe('agent reducer', () => {
       ],
       s,
     )
-    expect(s.busy).toBe(false)
-    expect(s.plan).toHaveLength(1)
-    expect(s.items.at(-1)).toEqual({ type: 'end', stopReason: 'end_turn', usage: { inputTokens: 10, outputTokens: 5, costUsd: 0.01 } })
+    assert.equal(s.busy, false)
+    assert.equal((s.plan).length, 1)
+    assert.deepEqual(s.items.at(-1), { type: 'end', stopReason: 'end_turn', usage: { inputTokens: 10, outputTokens: 5, costUsd: 0.01 } })
   })
 
   it('handles permission requests: answer, settle, and cancel', () => {
     const permission = { id: 'p1', toolCall: { id: 't', kind: 'execute' }, options: [{ id: 'y', name: 'Allow', kind: 'allow_once' }] }
     let s = run([{ kind: 'permission_request', permission }])
     s = answerPermission(s, 'p1', 'Allow')
-    expect(s.items[0]).toMatchObject({ type: 'permission', answer: 'Allow', settled: true })
+    assertSubset(s.items[0], { type: 'permission', answer: 'Allow', settled: true })
 
     let c = run([{ kind: 'permission_request', permission: { ...permission, id: 'p2' } }, { kind: 'turn_end', stopReason: 'cancelled' }])
-    expect(c.items[0]).toMatchObject({ settled: true, answer: null })
+    assertSubset(c.items[0], { settled: true, answer: null })
     c = run([{ kind: 'permission_settled', requestId: 'zzz' }], c)
-    expect(c.items).toHaveLength(2)
+    assert.equal((c.items).length, 2)
   })
 
   it('lists edited files from diffs and edit calls, skipping failures', () => {
@@ -67,11 +69,11 @@ describe('agent reducer', () => {
       { kind: 'tool_call', toolCall: { id: '3', kind: 'edit', paths: ['/p/c.go'], status: 'failed' } },
       { kind: 'tool_call', toolCall: { id: '4', kind: 'read', paths: ['/p/d.go'] } },
     ])
-    expect(editedFiles(s)).toEqual(['/p/a.go', '/p/b.go'])
+    assert.deepEqual(editedFiles(s), ['/p/a.go', '/p/b.go'])
   })
 
   it('ignores unknown events without allocating', () => {
     const s = run([{ kind: 'message_chunk', text: 'x' }])
-    expect(applyEvent(s, ev({ kind: 'something_new' }))).toBe(s)
+    assert.equal(applyEvent(s, ev({ kind: 'something_new' })), s)
   })
 })

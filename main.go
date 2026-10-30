@@ -54,6 +54,7 @@ func main() {
 			&AgentAPI{app: app, git: gitAPI},
 			lspAPI,
 			&AgentChatAPI{app: app},
+			&DiffAPI{},
 		},
 		Mac: &mac.Options{
 			TitleBar: mac.TitleBarHiddenInset(),

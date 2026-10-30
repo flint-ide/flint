@@ -1,8 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Terminal as XTerm, type ILink } from '@xterm/xterm'
-import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
-import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
 import { TerminalBackend, attachSink, registerOutputReader, sendInput, type TerminalTab } from '../../store/terminal'
@@ -12,6 +10,8 @@ import { findPathLinks, resolvePath } from '../../lib/pathLinks'
 import { showToast } from '../../store/dialog'
 import { errorMessage } from '../../api/backend'
 import { focusSoon } from '../../lib/focusSoon'
+import { fitTerminal } from '../../lib/terminalFit'
+import { registerUrlLinks } from '../../lib/terminalLinks'
 
 const THEME = {
   background: '#141518',
@@ -36,7 +36,6 @@ interface Props {
 export function TerminalView({ tab, active }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const term = useRef<XTerm | null>(null)
-  const fit = useRef<FitAddon | null>(null)
 
   useEffect(() => {
     if (!host.current) return
@@ -51,10 +50,8 @@ export function TerminalView({ tab, active }: Props) {
       macOptionIsMeta: false, // Option composes Polish diacritics (ą, ę, ż…)
       macOptionClickForcesSelection: true,
     })
-    const fitAddon = new FitAddon()
-    xterm.loadAddon(fitAddon)
-    xterm.loadAddon(new WebLinksAddon((e, uri) => e.metaKey && BrowserOpenURL(uri)))
     xterm.open(host.current)
+    registerUrlLinks(xterm, BrowserOpenURL)
     try {
       const webgl = new WebglAddon()
       webgl.onContextLoss(() => webgl.dispose())
@@ -62,9 +59,8 @@ export function TerminalView({ tab, active }: Props) {
     } catch {
       // Falls back to the DOM renderer.
     }
-    fitAddon.fit()
+    fitTerminal(xterm)
     term.current = xterm
-    fit.current = fitAddon
 
     xterm.attachCustomKeyEventHandler((e) => {
       if (e.type !== 'keydown') return true
@@ -119,7 +115,7 @@ export function TerminalView({ tab, active }: Props) {
     }
 
     const observer = new ResizeObserver(() => {
-      if (host.current && host.current.offsetWidth > 0) fitAddon.fit()
+      if (host.current && host.current.offsetWidth > 0) fitTerminal(xterm)
     })
     observer.observe(host.current)
 
@@ -139,8 +135,9 @@ export function TerminalView({ tab, active }: Props) {
   useEffect(() => {
     if (!active) return
     return focusSoon(() => {
-      fit.current?.fit()
-      term.current?.focus()
+      if (!term.current) return
+      fitTerminal(term.current)
+      term.current.focus()
     })
   }, [active])
 

@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.50.0
 	github.com/creack/pty v1.1.24
+	github.com/evanw/esbuild v0.28.2
 	github.com/fsnotify/fsevents v0.2.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/wailsapp/wails/v2 v2.17.0

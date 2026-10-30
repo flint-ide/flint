@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { useVirtualList } from '../../lib/virtualList'
 import { useSearch } from '../../store/search'
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
@@ -36,7 +36,6 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [showFilters, setShowFilters] = useState(false)
   const input = useRef<HTMLInputElement>(null)
-  const scroller = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     input.current?.focus()
@@ -56,12 +55,7 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
   }, [root, params, run])
 
   const rows = useMemo(() => groupRows(matches, collapsed), [matches, collapsed])
-  const virtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => scroller.current,
-    estimateSize: () => ROW_HEIGHT,
-    overscan: 30,
-  })
+  const { scrollRef, totalSize, items } = useVirtualList({ count: rows.length, itemSize: ROW_HEIGHT, overscan: 30 })
 
   const toggleFile = (path: string) =>
     setCollapsed((prev) => {
@@ -113,9 +107,9 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
           ) : null}
         </div>
       </div>
-      <div className="tree" ref={scroller}>
-        <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-          {virtualizer.getVirtualItems().map((vi) => {
+      <div className="tree" ref={scrollRef}>
+        <div style={{ height: totalSize, position: 'relative' }}>
+          {items.map((vi) => {
             const row = rows[vi.index]
             const style = { transform: `translateY(${vi.start}px)` }
             if (row.kind === 'file') {

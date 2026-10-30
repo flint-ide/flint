@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { createStore } from '../lib/store'
 import * as Agent from '../../wailsjs/go/main/AgentAPI'
 import { errorMessage } from '../api/backend'
 import { showToast } from './dialog'
@@ -12,7 +12,7 @@ interface AgentState {
   setPreferred: (kind: string) => Promise<void>
 }
 
-export const useAgent = create<AgentState>((set) => ({
+export const useAgent = createStore<AgentState>((set) => ({
   available: [],
   preferred: '',
   loaded: false,

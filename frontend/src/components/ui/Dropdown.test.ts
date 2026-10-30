@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, it } from 'node:test'
+import assert from 'node:assert/strict'
 import { filterItems, type DropdownItem } from './Dropdown'
 
 const noop = () => undefined
@@ -14,17 +15,17 @@ const items: DropdownItem[] = [
 
 describe('filterItems', () => {
   it('returns everything for an empty query', () => {
-    expect(filterItems(items, '  ')).toBe(items)
+    assert.equal(filterItems(items, '  '), items)
   })
 
   it('keeps a section only above its matches and drops separators', () => {
     const labels = filterItems(items, 'poc').map((i) => ('label' in i ? i.label : i.type))
-    expect(labels).toEqual(['Recent', 'poc-mailos'])
+    assert.deepEqual(labels, ['Recent', 'poc-mailos'])
   })
 
   it('matches hints and keywords, case-insensitively', () => {
-    expect(filterItems(items, 'WORK').map((i) => ('label' in i ? i.label : ''))).toContain('poc-mailos')
-    expect(filterItems(items, 'mail')).toHaveLength(2)
-    expect(filterItems(items, 'zzz')).toEqual([])
+    assert.ok((filterItems(items, 'WORK').map((i) => ('label' in i ? i.label : ''))).includes('poc-mailos'))
+    assert.equal((filterItems(items, 'mail')).length, 2)
+    assert.deepEqual(filterItems(items, 'zzz'), [])
   })
 })

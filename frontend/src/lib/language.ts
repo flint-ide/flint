@@ -20,6 +20,8 @@ const byExtension: Record<string, Loader> = {
   css: () => import('@codemirror/lang-css').then((m) => m.css()),
   sql: () => import('@codemirror/lang-sql').then((m) => m.sql({ dialect: m.PostgreSQL })),
   sh: () => legacy(import('@codemirror/legacy-modes/mode/shell').then((m) => m.shell)),
+  mk: () => legacy(import('@codemirror/legacy-modes/mode/shell').then((m) => m.shell)),
+  mod: () => legacy(import('./gomod').then((m) => m.goMod)),
   bash: () => legacy(import('@codemirror/legacy-modes/mode/shell').then((m) => m.shell)),
   zsh: () => legacy(import('@codemirror/legacy-modes/mode/shell').then((m) => m.shell)),
   toml: () => legacy(import('@codemirror/legacy-modes/mode/toml').then((m) => m.toml)),
@@ -28,9 +30,23 @@ const byExtension: Record<string, Loader> = {
   ini: () => legacy(import('@codemirror/legacy-modes/mode/properties').then((m) => m.properties)),
 }
 
+const goMod: Loader = () => legacy(import('./gomod').then((m) => m.goMod))
+const shell: Loader = () => legacy(import('@codemirror/legacy-modes/mode/shell').then((m) => m.shell))
+
 const byName: Record<string, Loader> = {
   Dockerfile: () => legacy(import('@codemirror/legacy-modes/mode/dockerfile').then((m) => m.dockerFile)),
   '.env': () => legacy(import('@codemirror/legacy-modes/mode/properties').then((m) => m.properties)),
+  'go.mod': goMod,
+  'go.work': goMod,
+  'go.sum': goMod,
+  // Close enough: comments, strings, variables and recipe lines are shell-like.
+  Makefile: shell,
+  makefile: shell,
+  GNUmakefile: shell,
+  '.gitignore': shell,
+  '.dockerignore': shell,
+  '.npmrc': () => legacy(import('@codemirror/legacy-modes/mode/properties').then((m) => m.properties)),
+  '.editorconfig': () => legacy(import('@codemirror/legacy-modes/mode/properties').then((m) => m.properties)),
 }
 
 function legacy(parser: Promise<StreamParser<unknown>>): Promise<Extension> {
@@ -47,6 +63,6 @@ export function extensionOf(path: string): string {
 /** Loads the CodeMirror language support for a file path (empty extension if unknown). */
 export async function languageFor(path: string): Promise<Extension> {
   const base = path.split('/').pop() ?? ''
-  const loader = byName[base] ?? byExtension[extensionOf(path)]
+  const loader = byName[base] ?? (base.startsWith('Dockerfile') ? byName.Dockerfile : undefined) ?? (base.startsWith('.env') ? byName['.env'] : undefined) ?? byExtension[extensionOf(path)]
   return loader ? loader() : []
 }

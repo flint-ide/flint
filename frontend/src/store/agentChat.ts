@@ -14,7 +14,7 @@ import {
 } from '../lib/agentReducer'
 import { showToast } from './dialog'
 import { createReorderer } from '../lib/reorder'
-import { useTerminal } from './terminal'
+import { useEditor } from './editor'
 
 export interface ChatSession {
   id: string
@@ -72,7 +72,7 @@ export const useAgentChat = create<AgentChatState>((set, get) => ({
         id: info.id, agent: info.agent || agent, cwd: info.cwd, model: info.model, chat: emptyChat, draft: '', attachments: [],
       }
       set((s) => ({ sessions: { ...s.sessions, [info.id]: session }, order: [...s.order, info.id] }))
-      useTerminal.setState({ activeId: chatTabId(info.id), open: true })
+      useEditor.getState().openChat(info.id, session.agent)
       return info.id
     } catch (err) {
       showToast(`Could not start ${agent}: ${errorMessage(err)}`, 'error')
@@ -112,6 +112,7 @@ export const useAgentChat = create<AgentChatState>((set, get) => ({
   },
 
   stop: async (id) => {
+    useEditor.getState().closeTab(chatTabId(id))
     await Chat.Stop(id).catch(() => undefined)
     set((s) => {
       const { [id]: _gone, ...sessions } = s.sessions

@@ -3,6 +3,7 @@ import { highlight, prepare, search } from '../lib/fuzzy'
 import { useWorkspace } from '../store/workspace'
 import { useEditor } from '../store/editor'
 import { Modal } from './layout/Modal'
+import { FileIcon } from './icons/FileIcon'
 
 const MAX_RESULTS = 60
 const STALE_MS = 15_000
@@ -76,6 +77,7 @@ export function QuickOpen() {
               onMouseMove={() => setCursor(i)}
               onClick={() => choose(r.path)}
             >
+              <FileIcon name={r.path.slice(slash + 1)} />
               <span className="file-name">{r.path.slice(slash + 1)}</span>
               {/* highlight() escapes the path and only adds <b> tags */}
               <span className="muted path-hint" dangerouslySetInnerHTML={{ __html: r.html }} />

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Compartment, EditorSelection, EditorState, type Extension } from '@codemirror/state'
 import { EditorView, keymap, type KeyBinding } from '@codemirror/view'
 import { baseExtensions } from '../../lib/editorSetup'
+import { focusSoon } from '../../lib/focusSoon'
 import type { Reveal } from '../../store/editor'
 
 interface Props {
@@ -59,7 +60,7 @@ export function CodeEditor({ initialDoc, language, keys = [], reveal, active, on
   }, [keys])
 
   useEffect(() => {
-    if (active) view.current?.focus()
+    if (active) return focusSoon(() => view.current?.focus())
   }, [active])
 
   useEffect(() => {

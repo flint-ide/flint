@@ -11,6 +11,7 @@ import { useEditor } from '../../store/editor'
 import { findPathLinks, resolvePath } from '../../lib/pathLinks'
 import { showToast } from '../../store/dialog'
 import { errorMessage } from '../../api/backend'
+import { focusSoon } from '../../lib/focusSoon'
 
 const THEME = {
   background: '#141518',
@@ -29,11 +30,10 @@ const started = new Set<string>()
 interface Props {
   tab: TerminalTab
   active: boolean
-  visible: boolean
 }
 
 /** One xterm.js instance bound to a backend PTY. Stays mounted while its tab exists. */
-export function TerminalView({ tab, active, visible }: Props) {
+export function TerminalView({ tab, active }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const term = useRef<XTerm | null>(null)
   const fit = useRef<FitAddon | null>(null)
@@ -130,11 +130,12 @@ export function TerminalView({ tab, active, visible }: Props) {
   }, [tab.id])
 
   useEffect(() => {
-    if (active && visible) {
+    if (!active) return
+    return focusSoon(() => {
       fit.current?.fit()
       term.current?.focus()
-    }
-  }, [active, visible])
+    })
+  }, [active])
 
   return <div className="terminal-view" ref={host} />
 }

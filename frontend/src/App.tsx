@@ -4,7 +4,7 @@ import { useWorkspace } from './store/workspace'
 import { useEditor } from './store/editor'
 import { useDatabase } from './store/database'
 import { useScratch } from './store/scratch'
-import { useTerminal, subscribeTerminalEvents } from './store/terminal'
+import { subscribeTerminalEvents, toggleTerminal, useTerminal } from './store/terminal'
 import { subscribeSearchEvents } from './store/search'
 import { subscribeFsEvents } from './store/fsEvents'
 import { subscribeQuit } from './store/quit'
@@ -19,8 +19,8 @@ import { Splitter } from './components/layout/Splitter'
 import { Overlays } from './components/layout/Overlays'
 import { ErrorBoundary } from './components/layout/ErrorBoundary'
 import { StatusBar } from './components/layout/StatusBar'
+import { TitleBar } from './components/layout/TitleBar'
 import { EditorArea, requestCloseTab } from './components/editor/EditorArea'
-import { TerminalPanel } from './components/terminal/TerminalPanel'
 import { FileTree } from './components/sidebar/FileTree'
 import { SearchPanel } from './components/sidebar/SearchPanel'
 import { ScratchPanel } from './components/sidebar/ScratchPanel'
@@ -38,9 +38,8 @@ export default function App() {
   const quickOpen = useWorkspace((s) => s.quickOpen)
   const root = useWorkspace((s) => s.root)
   const error = useWorkspace((s) => s.error)
-  const terminalOpen = useTerminal((s) => s.open)
+  const ready = useWorkspace((s) => s.ready)
   const [sidebarWidth, setSidebarWidth] = usePersistentNumber('flint.sidebarWidth', 280)
-  const [editorRatio, setEditorRatio] = usePersistentNumber('flint.editorRatio', 0.5)
   const [searchFocus, setSearchFocus] = useState(0)
   const [commitFocus, setCommitFocus] = useState(0)
   const workbench = useRef<HTMLDivElement>(null)
@@ -64,6 +63,13 @@ export default function App() {
     useWorkspace.getState().clearError()
   }, [error])
 
+  // AI-first: a shell in the project is the first tab once the folder is known.
+  useEffect(() => {
+    if (ready && !useEditor.getState().tabs.some((t) => t.kind === 'terminal')) {
+      useTerminal.getState().create(root ?? '')
+    }
+  }, [ready, root])
+
   useGlobalShortcuts(
     () => setSearchFocus((n) => n + 1),
     () => setCommitFocus((n) => n + 1),
@@ -76,12 +82,9 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="titlebar" style={{ '--wails-draggable': 'drag' } as React.CSSProperties}>
-        <span className="title">{root ? root.split('/').pop() : 'flint'}</span>
-        {root && <span className="muted title-path">{root}</span>}
-      </header>
+      <TitleBar />
       <div className="workbench" ref={workbench}>
-        <ActivityBar onTerminal={() => useTerminal.getState().toggle()} terminalOpen={terminalOpen} />
+        <ActivityBar onTerminal={() => toggleTerminal(root ?? '')} />
         {sidebarVisible && (
           <>
             <aside className="sidebar" style={{ width: sidebarWidth }}>
@@ -104,15 +107,9 @@ export default function App() {
             <Splitter direction="horizontal" onResize={onSidebarResize} />
           </>
         )}
+        {/* Files, terminals and agent chats share one tab area. */}
         <main className="main">
-          <div className="main-editor" style={{ flex: terminalOpen ? `${editorRatio} 1 0` : '1 1 0' }}>
-            <EditorArea />
-          </div>
-          {/* Kept mounted while hidden so shells (and running agents) survive toggling. */}
-          <Splitter direction="horizontal" onResize={(r) => setEditorRatio(Math.min(0.85, Math.max(0.15, r)))} hidden={!terminalOpen} />
-          <div className="main-terminal" style={{ flex: `${1 - editorRatio} 1 0` }} hidden={!terminalOpen}>
-            <TerminalPanel />
-          </div>
+          <EditorArea />
         </main>
       </div>
       <StatusBar />
@@ -145,7 +142,10 @@ function useGlobalShortcuts(focusSearch: () => void, focusCommit: () => void) {
           if (e.shiftKey) return void useGit.getState().remote('push'), true
           return ws.setSidebar('git'), focusCommit(), true
         }
-        if (key === 'j' && !e.shiftKey) return useTerminal.getState().toggle(), true
+        if (key === 'j' && !e.shiftKey) return toggleTerminal(ws.root ?? ''), true
+        // ⌘[ / ⌘] like IntelliJ's Back / Forward (e.g. file opened from the terminal → back).
+        if (key === '[' && !e.shiftKey) return useEditor.getState().back(), true
+        if (key === ']' && !e.shiftKey) return useEditor.getState().forward(), true
         if (key === 't' && e.shiftKey) return useTerminal.getState().create(ws.root ?? ''), true
         if (key === 'n' && !e.shiftKey) return void useScratch.getState().create('sql'), true
         if (key === 'o' && !e.shiftKey) {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"log"
 
@@ -39,6 +40,7 @@ func main() {
 		Menu:             menu.NewMenuFromItems(menu.AppMenu(), menu.EditMenu(), menu.WindowMenu()),
 		BackgroundColour: &options.RGBA{R: 24, G: 25, B: 28, A: 1},
 		OnStartup:        app.startup,
+		OnDomReady:       func(context.Context) { styleNativeWindow() },
 		OnShutdown:       app.shutdown,
 		OnBeforeClose:    app.beforeClose,
 		Bind: []any{

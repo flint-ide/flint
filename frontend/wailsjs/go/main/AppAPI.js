@@ -9,3 +9,7 @@ export function CancelQuit() {
 export function Quit() {
   return window['go']['main']['AppAPI']['Quit']();
 }
+
+export function Titlebar() {
+  return window['go']['main']['AppAPI']['Titlebar']();
+}

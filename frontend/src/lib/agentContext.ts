@@ -1,6 +1,5 @@
 import { useEditor, viewFor } from '../store/editor'
 import { useWorkspace } from '../store/workspace'
-import { useTerminal } from '../store/terminal'
 import { chatTabId, useAgentChat } from '../store/agentChat'
 import { useAgent } from '../store/agent'
 import { showToast } from '../store/dialog'
@@ -19,8 +18,10 @@ export async function attachSelectionToAgent(): Promise<void> {
   const sel = currentSelection(tab.id)
 
   const chat = useAgentChat.getState()
-  const term = useTerminal.getState()
-  let id = term.activeId?.startsWith('chat:') ? term.activeId.slice(5) : chat.order[chat.order.length - 1]
+  // The chat used most recently (⌘L from a file returns you to it).
+  const editor = useEditor.getState()
+  const recentChat = [...editor.backStack].reverse().find((t) => t.startsWith('chat:'))
+  let id = recentChat?.slice(5) ?? chat.order[chat.order.length - 1]
   if (!id || !chat.sessions[id]) {
     const agent = useAgent.getState().preferred || chat.agents[0]
     if (!agent) {
@@ -31,7 +32,7 @@ export async function attachSelectionToAgent(): Promise<void> {
     if (!id) return
   }
   useAgentChat.getState().attach(id, sel ? { path: tab.path, ...sel } : { path: tab.path })
-  useTerminal.setState({ activeId: chatTabId(id), open: true })
+  useEditor.getState().setActive(chatTabId(id))
 }
 
 /** The main selection of the active editor tab, with 1-based line numbers. */

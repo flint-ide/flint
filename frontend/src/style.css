@@ -173,20 +173,162 @@ kbd {
 }
 
 .titlebar {
-  height: 34px;
+  height: var(--titlebar-height, 40px);
   flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-left: 84px; /* macOS traffic lights */
-  border-bottom: 1px solid var(--border);
+  gap: 4px;
+  padding: 0 8px 0 var(--traffic-inset, 80px);
   background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border);
+  --wails-draggable: drag;
+  user-select: none;
+  -webkit-user-select: none;
 }
-.titlebar .title {
+.titlebar button,
+.titlebar .tb-menu {
+  --wails-draggable: no-drag;
+}
+.titlebar-drag {
+  flex: 1;
+  align-self: stretch;
+}
+.tb-widget {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  color: var(--fg);
+  font-size: 13px;
+}
+.tb-widget:hover,
+.tb-icon:hover {
+  background: var(--bg-hover);
+}
+.tb-widget.project .tb-label {
   font-weight: 600;
 }
-.title-path {
+.tb-widget.branch {
+  color: var(--fg-muted);
+}
+.tb-widget.branch .tb-label {
+  color: var(--fg);
+}
+.tb-label {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tb-chevron {
+  color: var(--fg-faint);
   font-size: 11px;
+  margin-top: -4px;
+}
+.tb-widget .ahead,
+.tb-widget .behind,
+.tb-widget .warn {
+  font-size: 11px;
+}
+.tb-menu-wrap {
+  position: relative;
+}
+.tb-menu {
+  position: absolute;
+  top: 32px;
+  left: 0;
+  z-index: 30;
+  min-width: 280px;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.tb-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  padding: 6px 10px;
+  border-radius: 5px;
+  text-align: left;
+  white-space: nowrap;
+}
+.tb-menu button:hover {
+  background: var(--bg-hover);
+}
+.tb-menu kbd {
+  margin-left: auto;
+}
+.tb-menu-section {
+  padding: 8px 10px 2px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-faint);
+}
+.tb-path {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: auto;
+  padding-left: 12px;
+}
+.tb-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.tb-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  width: 220px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg-faint);
+  font-size: 12px;
+  margin-right: 6px;
+}
+.tb-search:hover {
+  border-color: var(--fg-faint);
+  color: var(--fg-muted);
+}
+.tb-search kbd {
+  margin-left: auto;
+  font-size: 10px;
+}
+.tb-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  padding: 0;
+}
+@media (max-width: 860px) {
+  .tb-search span,
+  .tb-search kbd {
+    display: none;
+  }
+  .tb-search {
+    width: auto;
+  }
 }
 
 .workbench {
@@ -232,11 +374,6 @@ kbd {
 
 .main {
   flex: 1;
-  min-width: 0;
-  display: flex;
-}
-.main-editor,
-.main-terminal {
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -1618,4 +1755,56 @@ kbd {
   align-items: center;
   gap: 8px;
   font-size: 12px;
+}
+
+/* ---------- unified tabs & icons ---------- */
+
+.tab-strip {
+  height: 34px;
+  flex: none;
+  display: flex;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.tab-strip .tab-bar {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-bottom: none;
+}
+.tab-strip .new-tab-wrap {
+  flex: none;
+  padding: 0 4px;
+}
+.new-tab-menu {
+  top: 32px;
+  left: auto;
+  right: 0;
+}
+.new-tab-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.new-tab-menu kbd {
+  margin-left: auto;
+  font-size: 10px;
+}
+.file-icon {
+  flex: none;
+  display: block;
+}
+.file-icon.pulse {
+  animation: pulse 1s ease-in-out infinite;
+}
+.tree-row .file-icon {
+  margin-right: 2px;
+}
+.tab .file-icon {
+  margin-left: -2px;
+}
+.quick-item .file-icon {
+  align-self: center;
+}
+.terminal-view {
+  background: #141518;
 }

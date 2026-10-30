@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import * as Terminal from '../../wailsjs/go/main/TerminalAPI'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
 import { createReorderer } from '../lib/reorder'
+import { useEditor } from './editor'
 
 export interface TerminalTab {
   id: string
@@ -19,27 +20,24 @@ export interface CreateOptions {
 
 interface TerminalState {
   tabs: TerminalTab[]
-  activeId: string | null
-  open: boolean
   create: (cwd: string, opts?: CreateOptions) => string
   close: (id: string) => void
-  setActive: (id: string) => void
-  toggle: () => void
-  setOpen: (open: boolean) => void
 }
 
 let seq = 0
 
-export const useTerminal = create<TerminalState>((set, get) => ({
+/** Editor tab id of a terminal (terminals live among the editor tabs). */
+export const terminalTabId = (termId: string) => `term:${termId}`
+
+export const useTerminal = create<TerminalState>((set) => ({
   tabs: [],
-  activeId: null,
-  open: true,
 
   create: (cwd, opts = {}) => {
     const id = crypto.randomUUID()
     const title = opts.title ?? `${cwd.split('/').pop() || '~'} ${++seq}`
     const tab: TerminalTab = { id, title, cwd, exitCode: null, initialInput: opts.input }
-    set((s) => ({ tabs: [...s.tabs, tab], activeId: id, open: true }))
+    set((s) => ({ tabs: [...s.tabs, tab] }))
+    useEditor.getState().openTerminal(id, title)
     return id
   },
 
@@ -49,18 +47,28 @@ export const useTerminal = create<TerminalState>((set, get) => ({
     sinks.delete(id)
     backlog.delete(id)
     inputs.delete(id)
-    set((s) => {
-      const idx = s.tabs.findIndex((t) => t.id === id)
-      const tabs = s.tabs.filter((t) => t.id !== id)
-      const activeId = s.activeId === id ? (tabs[Math.max(0, idx - 1)]?.id ?? null) : s.activeId
-      return { tabs, activeId }
-    })
+    set((s) => ({ tabs: s.tabs.filter((t) => t.id !== id) }))
+    useEditor.getState().closeTab(terminalTabId(id))
   },
-
-  setActive: (id) => set({ activeId: id }),
-  toggle: () => set({ open: !get().open }),
-  setOpen: (open) => set({ open }),
 }))
+
+/**
+ * ⌘J: jump to the most recently used terminal, or back to where you were when a
+ * terminal is already active. Creates one when there is none.
+ */
+export function toggleTerminal(cwd: string): void {
+  const editor = useEditor.getState()
+  const active = editor.tabs.find((t) => t.id === editor.activeId)
+  if (active?.kind === 'terminal') {
+    editor.back()
+    return
+  }
+  const recent = [...editor.backStack].reverse().find((id) => id.startsWith('term:') && editor.tabs.some((t) => t.id === id))
+  const any = editor.tabs.find((t) => t.kind === 'terminal')?.id
+  const target = recent ?? any
+  if (target) editor.setActive(target)
+  else useTerminal.getState().create(cwd)
+}
 
 type Sink = (data: Uint8Array) => void
 

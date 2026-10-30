@@ -600,6 +600,26 @@ export namespace main {
 	        this.commonDir = source["commonDir"];
 	    }
 	}
+	export class TitlebarMetrics {
+	    height: number;
+	    buttonsLeft: number;
+	    buttonsTop: number;
+	    buttonWidth: number;
+	    buttonHeight: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TitlebarMetrics(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.height = source["height"];
+	        this.buttonsLeft = source["buttonsLeft"];
+	        this.buttonsTop = source["buttonsTop"];
+	        this.buttonWidth = source["buttonWidth"];
+	        this.buttonHeight = source["buttonHeight"];
+	    }
+	}
 
 }
 

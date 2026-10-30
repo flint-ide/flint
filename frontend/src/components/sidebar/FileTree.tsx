@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
 import type { Entry } from '../../api/backend'
+import { FileIcon } from '../icons/FileIcon'
 
 const ROW_HEIGHT = 22
 
@@ -66,6 +67,7 @@ export function FileTree() {
                 title={entry.path}
               >
                 <span className="twisty">{entry.isDir ? (isOpen ? '▾' : '▸') : ''}</span>
+                <FileIcon name={entry.name} isDir={entry.isDir} open={isOpen} />
                 <span className={entry.isDir ? 'dir-name' : 'file-name'}>{entry.name}</span>
               </div>
             )

@@ -35,6 +35,10 @@ type AppAPI struct {
 	app *App
 }
 
+// Titlebar reports where the native window buttons are, so the title bar can be
+// laid out around them (0s on platforms without them).
+func (q *AppAPI) Titlebar() TitlebarMetrics { return titlebarMetrics() }
+
 // Quit closes the app after the frontend saved what it had to.
 func (q *AppAPI) Quit() {
 	q.app.closeMu.Lock()

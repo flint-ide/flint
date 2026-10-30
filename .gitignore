@@ -1,0 +1,8 @@
+build/bin
+node_modules
+frontend/dist/*
+!frontend/dist/gitkeep
+.DS_Store
+coverage.out
+.claude/launch.json
+frontend/package.json.md5

@@ -6,6 +6,10 @@ export function CancelQuery(arg1) {
   return window['go']['main']['DatabaseAPI']['CancelQuery'](arg1);
 }
 
+export function Databases(arg1) {
+  return window['go']['main']['DatabaseAPI']['Databases'](arg1);
+}
+
 export function DeleteConnection(arg1) {
   return window['go']['main']['DatabaseAPI']['DeleteConnection'](arg1);
 }
@@ -14,16 +18,16 @@ export function ListConnections() {
   return window['go']['main']['DatabaseAPI']['ListConnections']();
 }
 
-export function RunQuery(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['DatabaseAPI']['RunQuery'](arg1, arg2, arg3, arg4);
+export function RunQuery(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['DatabaseAPI']['RunQuery'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SaveConnection(arg1, arg2, arg3) {
   return window['go']['main']['DatabaseAPI']['SaveConnection'](arg1, arg2, arg3);
 }
 
-export function Schema(arg1, arg2) {
-  return window['go']['main']['DatabaseAPI']['Schema'](arg1, arg2);
+export function Schema(arg1, arg2, arg3) {
+  return window['go']['main']['DatabaseAPI']['Schema'](arg1, arg2, arg3);
 }
 
 export function TestConnection(arg1, arg2, arg3) {

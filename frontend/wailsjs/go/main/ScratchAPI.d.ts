@@ -4,7 +4,7 @@ import {scratch} from '../models';
 
 export function Content(arg1:string):Promise<string>;
 
-export function Create(arg1:string,arg2:string,arg3:string):Promise<scratch.Scratch>;
+export function Create(arg1:string,arg2:string,arg3:string,arg4:string):Promise<scratch.Scratch>;
 
 export function Delete(arg1:string):Promise<void>;
 
@@ -14,4 +14,4 @@ export function Rename(arg1:string,arg2:string):Promise<void>;
 
 export function Save(arg1:string,arg2:string):Promise<void>;
 
-export function SetConnection(arg1:string,arg2:string):Promise<void>;
+export function SetConnection(arg1:string,arg2:string,arg3:string):Promise<void>;

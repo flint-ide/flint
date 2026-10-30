@@ -14,8 +14,8 @@ func (s *ScratchAPI) List() []scratch.Scratch {
 
 // Create adds an empty scratchpad of the given kind ("sql", "markdown", "text").
 // The kind is a plain string because Wails doesn't generate TS types for named strings.
-func (s *ScratchAPI) Create(name, kind, connID string) (scratch.Scratch, error) {
-	return s.app.scratch.Create(name, scratch.Kind(kind), connID)
+func (s *ScratchAPI) Create(name, kind, connID, database string) (scratch.Scratch, error) {
+	return s.app.scratch.Create(name, scratch.Kind(kind), connID, database)
 }
 
 // Content loads a scratchpad's text.
@@ -33,9 +33,9 @@ func (s *ScratchAPI) Rename(id, name string) error {
 	return s.app.scratch.Rename(id, name)
 }
 
-// SetConnection binds an SQL scratchpad to a connection profile.
-func (s *ScratchAPI) SetConnection(id, connID string) error {
-	return s.app.scratch.SetConnection(id, connID)
+// SetConnection binds an SQL scratchpad to a connection profile and one of its databases.
+func (s *ScratchAPI) SetConnection(id, connID, database string) error {
+	return s.app.scratch.SetConnection(id, connID, database)
 }
 
 // Delete removes a scratchpad.

@@ -20,9 +20,10 @@ type chSession struct {
 
 func openClickHouse(_ context.Context, c Connection, password string) (*chSession, error) {
 	opts := &clickhouse.Options{
-		Addr: []string{net.JoinHostPort(c.Host, strconv.Itoa(c.Port))},
+		Protocol: clickhouseProtocol(c.Protocol),
+		Addr:     []string{net.JoinHostPort(c.Host, strconv.Itoa(c.Port))},
 		Auth: clickhouse.Auth{
-			Database: c.Database,
+			Database: c.DefaultDatabase(), // "" = the user's default_database
 			Username: c.User,
 			Password: password,
 		},
@@ -34,6 +35,11 @@ func openClickHouse(_ context.Context, c Connection, password string) (*chSessio
 			Products: []struct{ Name, Version string }{{Name: "flint", Version: "0.1"}},
 		},
 	}
+	if c.Protocol == ProtocolHTTP {
+		// Over HTTP a cancelled context only closes the request; without this setting the
+		// server keeps running the query after Cancel or the row limit.
+		opts.Settings = clickhouse.Settings{"cancel_http_readonly_queries_on_client_close": 1}
+	}
 	if c.TLS {
 		opts.TLS = &tls.Config{ServerName: c.Host, MinVersion: tls.VersionTLS12}
 	}
@@ -42,6 +48,13 @@ func openClickHouse(_ context.Context, c Connection, password string) (*chSessio
 		return nil, fmt.Errorf("clickhouse config: %w", err)
 	}
 	return &chSession{conn: conn}, nil
+}
+
+func clickhouseProtocol(p string) clickhouse.Protocol {
+	if p == ProtocolHTTP {
+		return clickhouse.HTTP
+	}
+	return clickhouse.Native
 }
 
 func (s *chSession) Ping(ctx context.Context) error { return s.conn.Ping(ctx) }
@@ -100,12 +113,14 @@ func (s *chSession) Query(ctx context.Context, sql string, limit int) (*QueryRes
 	return res, nil
 }
 
+// chSchemaSQL introspects the session's database only; other databases are listed by
+// Databases and opened as sessions of their own, like Postgres databases.
 const chSchemaSQL = `
 SELECT c.database, c.table, t.engine, c.name, c.type
 FROM system.columns AS c
 INNER JOIN system.tables AS t ON t.database = c.database AND t.name = c.table
-WHERE c.database NOT IN ('system', 'INFORMATION_SCHEMA', 'information_schema')
-ORDER BY c.database, c.table, c.position`
+WHERE c.database = currentDatabase()
+ORDER BY c.table, c.position`
 
 func (s *chSession) Schema(ctx context.Context) ([]Table, error) {
 	rows, err := s.conn.Query(ctx, chSchemaSQL)
@@ -128,6 +143,31 @@ func (s *chSession) Schema(ctx context.Context) ([]Table, error) {
 		return nil, fmt.Errorf("clickhouse schema: %w", err)
 	}
 	return groupTables(collected), nil
+}
+
+// chDatabasesSQL is SHOW DATABASES; system.databases already hides what the user can't see.
+const chDatabasesSQL = `SELECT name, name = currentDatabase() FROM system.databases ORDER BY name`
+
+func (s *chSession) Databases(ctx context.Context) ([]DatabaseInfo, error) {
+	rows, err := s.conn.Query(ctx, chDatabasesSQL)
+	if err != nil {
+		return nil, fmt.Errorf("clickhouse databases: %w", err)
+	}
+	defer rows.Close()
+
+	dbs := []DatabaseInfo{}
+	for rows.Next() {
+		var name string
+		var isDefault bool
+		if err := rows.Scan(&name, &isDefault); err != nil {
+			return nil, fmt.Errorf("clickhouse databases: %w", err)
+		}
+		dbs = append(dbs, DatabaseInfo{Name: name, CanConnect: true, Default: isDefault})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("clickhouse databases: %w", err)
+	}
+	return dbs, nil
 }
 
 func clickhouseKind(engine string) string {

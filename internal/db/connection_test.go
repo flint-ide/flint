@@ -20,14 +20,34 @@ func TestConnectionNormalized(t *testing.T) {
 			want: Connection{Driver: Postgres, Host: "db.local", Database: "app", User: "bob", Port: 5432, Name: "app@db.local"},
 		},
 		{
+			name: "postgres without database falls back to host for the name",
+			in:   Connection{Driver: Postgres, Host: "db.local", User: "bob"},
+			want: Connection{Driver: Postgres, Host: "db.local", User: "bob", Port: 5432, Name: "db.local"},
+		},
+		{
 			name: "clickhouse plain port",
 			in:   Connection{Driver: ClickHouse, Host: "ch", Name: "  Prod CH "},
-			want: Connection{Driver: ClickHouse, Host: "ch", Port: 9000, Name: "Prod CH"},
+			want: Connection{Driver: ClickHouse, Host: "ch", Port: 9000, Name: "Prod CH", Protocol: ProtocolNative},
 		},
 		{
 			name: "clickhouse tls port",
 			in:   Connection{Driver: ClickHouse, Host: "ch", TLS: true, Name: "x"},
-			want: Connection{Driver: ClickHouse, Host: "ch", TLS: true, Port: 9440, Name: "x"},
+			want: Connection{Driver: ClickHouse, Host: "ch", TLS: true, Port: 9440, Name: "x", Protocol: ProtocolNative},
+		},
+		{
+			name: "clickhouse http port",
+			in:   Connection{Driver: ClickHouse, Host: "ch", Protocol: ProtocolHTTP, Name: "x"},
+			want: Connection{Driver: ClickHouse, Host: "ch", Port: 8123, Name: "x", Protocol: ProtocolHTTP},
+		},
+		{
+			name: "clickhouse https port",
+			in:   Connection{Driver: ClickHouse, Host: "ch", Protocol: ProtocolHTTP, TLS: true, Name: "x"},
+			want: Connection{Driver: ClickHouse, Host: "ch", Port: 8443, TLS: true, Name: "x", Protocol: ProtocolHTTP},
+		},
+		{
+			name: "protocol dropped for postgres",
+			in:   Connection{Driver: Postgres, Host: "h", Protocol: ProtocolHTTP, Name: "x"},
+			want: Connection{Driver: Postgres, Host: "h", Port: 5432, Name: "x"},
 		},
 		{
 			name: "explicit port kept",
@@ -65,6 +85,9 @@ func TestConnectionValidate(t *testing.T) {
 		{"port negative", func(c Connection) Connection { c.Port = -1; return c }, "invalid port"},
 		{"port too big", func(c Connection) Connection { c.Port = 65536; return c }, "invalid port 65536"},
 		{"no user", func(c Connection) Connection { c.User = ""; return c }, "user is required"},
+		{"no database is fine", func(c Connection) Connection { c.Database = ""; return c }, ""},
+		{"clickhouse http", func(c Connection) Connection { c.Driver, c.Protocol = ClickHouse, ProtocolHTTP; return c }, ""},
+		{"clickhouse bad protocol", func(c Connection) Connection { c.Driver, c.Protocol = ClickHouse, "grpc"; return c }, `unsupported clickhouse protocol "grpc"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -79,6 +102,40 @@ func TestConnectionValidate(t *testing.T) {
 				t.Errorf("Validate() = %v, want containing %q", err, tt.wantSub)
 			}
 		})
+	}
+}
+
+func TestConnectionDefaultDatabase(t *testing.T) {
+	tests := []struct {
+		name string
+		conn Connection
+		want string
+	}{
+		{"postgres profile database", Connection{Driver: Postgres, Database: "app"}, "app"},
+		{"postgres without database uses maintenance db", Connection{Driver: Postgres}, "postgres"},
+		{"clickhouse without database leaves it to the server", Connection{Driver: ClickHouse}, ""},
+		{"clickhouse profile database", Connection{Driver: ClickHouse, Database: "logs"}, "logs"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.conn.DefaultDatabase(); got != tt.want {
+				t.Errorf("DefaultDatabase() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConnectionWithDatabase(t *testing.T) {
+	base := Connection{ID: "c1", Driver: Postgres, Host: "h", User: "u", Database: "app", ReadOnly: true}
+	other := base.WithDatabase("billing")
+	if other.Database != "billing" || other.ID != "c1" || other.Host != "h" || other.User != "u" || !other.ReadOnly {
+		t.Errorf("WithDatabase(billing) = %+v", other)
+	}
+	if base.Database != "app" {
+		t.Errorf("WithDatabase mutated the receiver: %+v", base)
+	}
+	if got := base.WithDatabase(""); got != base {
+		t.Errorf("WithDatabase(\"\") = %+v, want the profile unchanged", got)
 	}
 }
 
@@ -100,6 +157,12 @@ func TestPostgresDSN(t *testing.T) {
 			conn:     Connection{Driver: Postgres, Host: "::1", Port: 6543, Database: "my db", User: "bob", TLS: true},
 			password: "",
 			wantSSL:  "require",
+		},
+		{
+			name:     "no database connects to postgres",
+			conn:     Connection{Driver: Postgres, Host: "h", Port: 5432, User: "bob"},
+			password: "pw",
+			wantSSL:  "prefer",
 		},
 	}
 	for _, tt := range tests {
@@ -125,8 +188,8 @@ func TestPostgresDSN(t *testing.T) {
 			if cfg.Password != tt.password {
 				t.Errorf("password = %q, want %q", cfg.Password, tt.password)
 			}
-			if cfg.User != tt.conn.User || cfg.Database != tt.conn.Database {
-				t.Errorf("user/db = %q/%q, want %q/%q", cfg.User, cfg.Database, tt.conn.User, tt.conn.Database)
+			if cfg.User != tt.conn.User || cfg.Database != tt.conn.DefaultDatabase() {
+				t.Errorf("user/db = %q/%q, want %q/%q", cfg.User, cfg.Database, tt.conn.User, tt.conn.DefaultDatabase())
 			}
 			if cfg.Host != tt.conn.Host || int(cfg.Port) != tt.conn.Port {
 				t.Errorf("host:port = %s:%d, want %s:%d", cfg.Host, cfg.Port, tt.conn.Host, tt.conn.Port)

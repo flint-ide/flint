@@ -238,6 +238,7 @@ export namespace db {
 	    port: number;
 	    database: string;
 	    user: string;
+	    protocol: string;
 	    tls: boolean;
 	    readOnly: boolean;
 	
@@ -254,8 +255,25 @@ export namespace db {
 	        this.port = source["port"];
 	        this.database = source["database"];
 	        this.user = source["user"];
+	        this.protocol = source["protocol"];
 	        this.tls = source["tls"];
 	        this.readOnly = source["readOnly"];
+	    }
+	}
+	export class DatabaseInfo {
+	    name: string;
+	    canConnect: boolean;
+	    default: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new DatabaseInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.canConnect = source["canConnect"];
+	        this.default = source["default"];
 	    }
 	}
 	export class QueryResult {
@@ -1137,6 +1155,7 @@ export namespace scratch {
 	    name: string;
 	    kind: string;
 	    connId: string;
+	    database: string;
 	    updatedAt: number;
 	
 	    static createFrom(source: any = {}) {
@@ -1149,6 +1168,7 @@ export namespace scratch {
 	        this.name = source["name"];
 	        this.kind = source["kind"];
 	        this.connId = source["connId"];
+	        this.database = source["database"];
 	        this.updatedAt = source["updatedAt"];
 	    }
 	}

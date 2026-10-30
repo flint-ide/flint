@@ -4,14 +4,16 @@ import {db} from '../models';
 
 export function CancelQuery(arg1:string):Promise<void>;
 
+export function Databases(arg1:string):Promise<Array<db.DatabaseInfo>>;
+
 export function DeleteConnection(arg1:string):Promise<void>;
 
 export function ListConnections():Promise<Array<db.Connection>>;
 
-export function RunQuery(arg1:string,arg2:string,arg3:string,arg4:number):Promise<db.QueryResult>;
+export function RunQuery(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number):Promise<db.QueryResult>;
 
 export function SaveConnection(arg1:db.Connection,arg2:string,arg3:boolean):Promise<db.Connection>;
 
-export function Schema(arg1:string,arg2:boolean):Promise<Array<db.Table>>;
+export function Schema(arg1:string,arg2:string,arg3:boolean):Promise<Array<db.Table>>;
 
 export function TestConnection(arg1:db.Connection,arg2:string,arg3:boolean):Promise<void>;

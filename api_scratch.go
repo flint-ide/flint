@@ -1,0 +1,44 @@
+package main
+
+import "flint/internal/scratch"
+
+// ScratchAPI exposes persistent scratchpads (SQL consoles, notes).
+type ScratchAPI struct {
+	app *App
+}
+
+// List returns all scratchpads, most recently edited first.
+func (s *ScratchAPI) List() []scratch.Scratch {
+	return s.app.scratch.List()
+}
+
+// Create adds an empty scratchpad of the given kind ("sql", "markdown", "text").
+// The kind is a plain string because Wails doesn't generate TS types for named strings.
+func (s *ScratchAPI) Create(name, kind, connID string) (scratch.Scratch, error) {
+	return s.app.scratch.Create(name, scratch.Kind(kind), connID)
+}
+
+// Content loads a scratchpad's text.
+func (s *ScratchAPI) Content(id string) (string, error) {
+	return s.app.scratch.Content(id)
+}
+
+// Save stores a scratchpad's text.
+func (s *ScratchAPI) Save(id, content string) error {
+	return s.app.scratch.SaveContent(id, content)
+}
+
+// Rename changes a scratchpad's name.
+func (s *ScratchAPI) Rename(id, name string) error {
+	return s.app.scratch.Rename(id, name)
+}
+
+// SetConnection binds an SQL scratchpad to a connection profile.
+func (s *ScratchAPI) SetConnection(id, connID string) error {
+	return s.app.scratch.SetConnection(id, connID)
+}
+
+// Delete removes a scratchpad.
+func (s *ScratchAPI) Delete(id string) error {
+	return s.app.scratch.Delete(id)
+}

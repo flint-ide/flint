@@ -110,6 +110,18 @@ func (g *GitAPI) FileAt(dir, rev, path string) (git.Revision, error) {
 	})
 }
 
+// HeadFile returns path as committed in HEAD of the work tree that contains it.
+// That may be a nested one, e.g. an agent's worktree under .claude/worktrees, so
+// the repository is found from the file's own directory, not the open folder.
+// Files outside any repository come back with Exists false.
+func (g *GitAPI) HeadFile(path string) (git.Revision, error) {
+	rev, err := g.FileAt(filepath.Dir(path), "HEAD", path)
+	if errors.Is(err, git.ErrNotRepository) {
+		return git.Revision{}, nil
+	}
+	return rev, err
+}
+
 // Commit commits the given repo-relative paths and returns the new short hash.
 func (g *GitAPI) Commit(dir, message string, paths []string, amend bool) (string, error) {
 	return with(g, dir, gitRemoteTimeout, func(ctx context.Context, r *git.Repo) (string, error) {

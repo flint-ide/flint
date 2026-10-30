@@ -75,19 +75,16 @@ export function FileView({ tab, active }: Props) {
     [crlf, language, indentation, lsp],
   )
 
-  // Gutter baseline: the file at HEAD, refetched when HEAD moves (commit, checkout).
-  const gitRoot = useGit((s) => (s.isRepo ? s.root : null))
+  // Gutter baseline: the file at HEAD of the work tree that contains it (which may be
+  // an agent's worktree nested in the project), refetched when HEAD moves.
+  const isRepo = useGit((s) => s.isRepo)
   const headVersion = useGit((s) => s.headVersion)
   const [editorReady, setEditorReady] = useState(false)
   useEffect(() => {
     const v = view.current
     if (!v || !editorReady) return
-    if (!gitRoot || !tab.path.startsWith(gitRoot + '/')) {
-      v.dispatch({ effects: setGitBaseline.of(null) })
-      return
-    }
     let cancelled = false
-    Git.FileAt(gitRoot, 'HEAD', tab.path)
+    Git.HeadFile(tab.path)
       .then((rev) => {
         if (cancelled || view.current !== v) return
         // Files not in HEAD (new/untracked) get no markers, like IntelliJ.
@@ -97,7 +94,7 @@ export function FileView({ tab, active }: Props) {
     return () => {
       cancelled = true
     }
-  }, [gitRoot, headVersion, tab.path, editorReady])
+  }, [isRepo, headVersion, tab.path, editorReady])
 
   // Saves are chained: Wails runs each call on its own goroutine, so two in-flight
   // writes could otherwise land out of order.

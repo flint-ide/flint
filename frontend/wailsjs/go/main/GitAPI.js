@@ -42,6 +42,10 @@ export function FileAt(arg1, arg2, arg3) {
   return window['go']['main']['GitAPI']['FileAt'](arg1, arg2, arg3);
 }
 
+export function HeadFile(arg1) {
+  return window['go']['main']['GitAPI']['HeadFile'](arg1);
+}
+
 export function Info(arg1) {
   return window['go']['main']['GitAPI']['Info'](arg1);
 }

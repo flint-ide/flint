@@ -32,6 +32,13 @@ describe('parseSnapshot', () => {
     assert.equal(parseSnapshot(JSON.stringify({ version: 1, active: 0, tabs: [], runConfig: 7 }))?.runConfig, undefined)
   })
 
+  it('keeps the selected run configuration of each workspace folder, ignoring bad entries', () => {
+    const runConfigs = { '/w/api': 'server', '/w/web': 'detected:npm:dev', rel: 'x', '/w/docs': '', '/w/x': 3 }
+    const snap = parseSnapshot(JSON.stringify({ version: 1, active: 0, tabs: [], runConfigs }))
+    assert.deepEqual(snap?.runConfigs, { '/w/api': 'server', '/w/web': 'detected:npm:dev' })
+    assert.equal('runConfigs' in (parseSnapshot(JSON.stringify({ version: 1, active: 0, tabs: [], runConfigs: ['/w'] })) ?? {}), false)
+  })
+
   it('keeps history tabs and revision diffs', () => {
     const tabs = [
       { kind: 'history', path: '/p/a' },
@@ -42,6 +49,13 @@ describe('parseSnapshot', () => {
 
   it('defaults a bad active index to none', () => {
     assert.equal(parseSnapshot(JSON.stringify({ version: 1, active: 'x', tabs: [] }))?.active, -1)
+  })
+
+  it('keeps attached folders, dropping anything that is not an absolute path', () => {
+    const snap = parseSnapshot(JSON.stringify({ version: 1, active: -1, tabs: [], roots: ['/w/web', 3, 'rel', '/w/docs'] }))
+    assert.deepEqual(snap?.roots, ['/w/web', '/w/docs'])
+    // A one-folder session (written before workspaces existed) has no roots at all.
+    assert.equal('roots' in (parseSnapshot(JSON.stringify({ version: 1, active: -1, tabs: [] })) ?? {}), false)
   })
 })
 

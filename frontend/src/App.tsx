@@ -14,6 +14,7 @@ import { subscribeLspEvents } from './store/lsp'
 import { subscribeAgentChatEvents } from './store/agentChat'
 import { subscribeRunEvents, useRun } from './store/run'
 import { subscribeDebugEvents } from './store/debug'
+import { activeRoot } from './store/activeRoot'
 import { UsagesModal } from './components/lsp/UsagesModal'
 import { showToast } from './store/dialog'
 import { errorMessage } from './api/backend'
@@ -69,6 +70,7 @@ export default function App() {
     // Native File menu: Open Folder… / Open Recent ▸ <folder>.
     EventsOn('menu:open-recent', () => useWorkspace.getState().setRecentOpen(true))
     EventsOn('menu:open-folder', (path: string) => void useWorkspace.getState().openFolder(path))
+    EventsOn('menu:add-project', () => void useWorkspace.getState().pickRoot())
     void useDatabase.getState().loadConnections()
     void useScratch.getState().load()
     void useWorkspace.getState().init()
@@ -101,7 +103,7 @@ export default function App() {
     <div className="app">
       <TitleBar />
       <div className="workbench" ref={workbench}>
-        <ActivityBar onTerminal={() => toggleTerminal(root ?? '')} />
+        <ActivityBar onTerminal={() => toggleTerminal(activeRoot())} />
         {sidebarVisible && (
           <>
             <aside className="sidebar" style={{ width: sidebarWidth }}>

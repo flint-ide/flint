@@ -47,12 +47,20 @@ class TestMarker extends GutterMarker {
     el.title =
       this.mark.kind === 'file'
         ? `Run tests in file (⌥-click: whole package${this.go ? ', ⇧-click: debug' : ''})`
-        : `Run ${this.mark.name}${this.status ? ` — last run: ${this.status}` : ''}${this.go ? ' (⇧-click: debug)' : ''}`
+        : `Run ${this.mark.name}${this.status ? ` — last run: ${this.status}` : ''}${this.go ? ' (⇧-click: debug, right click: more)' : ''}`
     return el
   }
 }
 
 const DEBOUNCE_MS = 300
+
+function markAt(view: EditorView, pos: number): TestMark | null {
+  let found: TestMark | null = null
+  view.state.field(markersField).between(pos, pos, (_from, _to, marker) => {
+    found = (marker as TestMarker).mark
+  })
+  return found
+}
 
 /** Gutter with run markers for test files; [] for other files. */
 export function testGutter(path: string, hooks: TestGutterHooks): Extension {
@@ -119,14 +127,19 @@ export function testGutter(path: string, hooks: TestGutterHooks): Extension {
       markers: (view) => view.state.field(markersField),
       domEventHandlers: {
         mousedown(view, line, event) {
-          let found: TestMark | null = null
-          view.state.field(markersField).between(line.from, line.from, (_from, _to, marker) => {
-            found = (marker as TestMarker).mark
-          })
-          if (!found) return false
+          const found = markAt(view, line.from)
           const e = event as MouseEvent
+          if (!found || e.button !== 0 || e.ctrlKey) return false // ⌃-click is a right click on macOS
           if (e.shiftKey && hooks.debug && testLang(path) === 'go') hooks.debug(path, found)
           else hooks.run(path, found, e.altKey)
+          return true
+        },
+        contextmenu(view, line, event) {
+          const found = markAt(view, line.from)
+          if (!found || !hooks.menu) return false
+          const e = event as MouseEvent
+          e.preventDefault() // the editor's own gutter menu (blame) skips handled events
+          hooks.menu(path, found, e.clientX, e.clientY)
           return true
         },
       },

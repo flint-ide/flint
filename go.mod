@@ -7,8 +7,10 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/evanw/esbuild v0.28.2
 	github.com/fsnotify/fsevents v0.2.0
+	github.com/google/pprof v0.0.0-20260709232956-b9395ee17fa0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/wailsapp/wails/v2 v2.17.0
+	github.com/yuin/goldmark v1.7.13
 	github.com/zalando/go-keyring v0.2.8
 )
 

@@ -209,11 +209,20 @@ func (r *RunAPI) StartTests(id string, req testrun.Request) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if err := r.app.startTestPlan(id, plan); err != nil {
+		return "", err
+	}
+	return plan.Title, nil
+}
+
+// startTestPlan runs a planned test run under id, parsing its output into
+// RunEvent.Tests (also used by profiled test runs, see ProfileAPI).
+func (a *App) startTestPlan(id string, plan testrun.Plan) error {
 	sink := &testSink{parser: plan.NewParser()}
-	r.app.runEvents.mu.Lock()
-	r.app.runEvents.tests[id] = sink
-	r.app.runEvents.mu.Unlock()
-	err = r.app.runs.Start(id, runner.Spec{
+	a.runEvents.mu.Lock()
+	a.runEvents.tests[id] = sink
+	a.runEvents.mu.Unlock()
+	err := a.runs.Start(id, runner.Spec{
 		Steps: plan.Steps, Cwd: plan.Cwd, Env: plan.Env,
 		Filter: func(line []byte) []byte {
 			shown, nodes := sink.parser.Line(line)
@@ -225,12 +234,11 @@ func (r *RunAPI) StartTests(id string, req testrun.Request) (string, error) {
 		},
 	})
 	if err != nil {
-		r.app.runEvents.mu.Lock()
-		delete(r.app.runEvents.tests, id)
-		r.app.runEvents.mu.Unlock()
-		return "", err
+		a.runEvents.mu.Lock()
+		delete(a.runEvents.tests, id)
+		a.runEvents.mu.Unlock()
 	}
-	return plan.Title, nil
+	return err
 }
 
 // Stop interrupts a run and returns once it ended.

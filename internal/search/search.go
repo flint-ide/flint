@@ -4,6 +4,8 @@ package search
 import (
 	"context"
 	"errors"
+	"fmt"
+	"path/filepath"
 	"time"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -28,6 +30,9 @@ type Options struct {
 	Include       string `json:"include"` // comma-separated globs, e.g. "*.go,*.sql"
 	Exclude       string `json:"exclude"`
 	MaxResults    int    `json:"maxResults"`
+	// ReplaceOn: matches carry what Replace turns them into (see Replacer).
+	ReplaceOn bool   `json:"replaceOn"`
+	Replace   string `json:"replace"`
 }
 
 // Range is a match span in UTF-16 code units, matching JS string / CodeMirror offsets.
@@ -38,10 +43,13 @@ type Range struct {
 
 // Match is one matching line.
 type Match struct {
-	Path   string  `json:"path"` // relative to Options.Root, slash-separated
+	Root   string  `json:"root"` // the searched folder (Options.Root)
+	Path   string  `json:"path"` // relative to Root, slash-separated
 	Line   int     `json:"line"` // 1-based
 	Text   string  `json:"text"`
 	Ranges []Range `json:"ranges"`
+	// Replacements, when replacing, is what each range becomes.
+	Replacements []string `json:"replacements,omitempty"`
 }
 
 // Summary is reported once the search finishes.
@@ -64,8 +72,24 @@ func Run(ctx context.Context, opts Options, onBatch func([]Match)) (Summary, err
 	if opts.MaxResults <= 0 {
 		opts.MaxResults = defaultMaxResults
 	}
+	var rep *Replacer
+	if opts.ReplaceOn {
+		r, err := NewReplacer(opts, opts.Replace)
+		if err != nil {
+			return Summary{}, err
+		}
+		rep = r
+	}
 	start := time.Now()
-	b := newBatcher(onBatch)
+	b := newBatcher(func(matches []Match) {
+		for i := range matches {
+			matches[i].Root = opts.Root
+			if rep != nil {
+				rep.annotate(&matches[i])
+			}
+		}
+		onBatch(matches)
+	})
 
 	var (
 		sum Summary
@@ -81,6 +105,38 @@ func Run(ctx context.Context, opts Options, onBatch func([]Match)) (Summary, err
 	b.flush()
 	sum.ElapsedMs = time.Since(start).Milliseconds()
 	return sum, err
+}
+
+// RunRoots searches several project folders one after another, sharing the
+// result limit. Every match carries the root it was found in.
+func RunRoots(ctx context.Context, roots []string, opts Options, onBatch func([]Match)) (Summary, error) {
+	if opts.Query == "" {
+		return Summary{}, ErrEmptyQuery
+	}
+	if opts.MaxResults <= 0 {
+		opts.MaxResults = defaultMaxResults
+	}
+	start := time.Now()
+	var total Summary
+	for _, root := range roots {
+		if ctx.Err() != nil || total.Matches >= opts.MaxResults {
+			break
+		}
+		o := opts
+		o.Root = root
+		o.MaxResults = opts.MaxResults - total.Matches
+		sum, err := Run(ctx, o, onBatch)
+		total.Matches += sum.Matches
+		total.Files += sum.Files
+		total.Truncated = total.Truncated || sum.Truncated
+		total.Engine = sum.Engine
+		if err != nil {
+			total.ElapsedMs = time.Since(start).Milliseconds()
+			return total, fmt.Errorf("%s: %w", filepath.Base(root), err)
+		}
+	}
+	total.ElapsedMs = time.Since(start).Milliseconds()
+	return total, nil
 }
 
 // batcher groups matches so the UI receives a few events instead of thousands.

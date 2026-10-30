@@ -150,3 +150,35 @@ func TestQuote(t *testing.T) {
 		}
 	}
 }
+
+func TestProfileURL(t *testing.T) {
+	ok := `{"configurations":[{"name":"api","type":"go","package":".","profileURL":" http://localhost:6060/debug/pprof/profile?seconds=5 "}]}`
+	configs, err := Parse([]byte(ok))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := configs[0].ProfileURL; got != "http://localhost:6060/debug/pprof/profile?seconds=5" {
+		t.Fatalf("profileURL not trimmed: %q", got)
+	}
+	if caps := CapabilitiesOf(configs[0]); !caps.Profile || !caps.Debug {
+		t.Fatalf("capabilities %+v", caps)
+	}
+	if CapabilitiesOf(Config{Type: TypeGo}).Profile {
+		t.Fatal("profiling offered without profileURL")
+	}
+
+	for _, u := range []string{"http://127.0.0.1:6060/debug/pprof/heap", "https://[::1]:8443/debug/pprof/profile", "http://localhost/x"} {
+		if err := ValidateProfileURL(u); err != nil {
+			t.Errorf("%s: %v", u, err)
+		}
+	}
+	for _, u := range []string{"http://example.com/debug/pprof/profile", "file:///etc/passwd", "localhost:6060", "http://user:pw@localhost/x", "http://10.0.0.1/x", "://"} {
+		if err := ValidateProfileURL(u); err == nil {
+			t.Errorf("%s accepted", u)
+		}
+	}
+	bad := `{"configurations":[{"name":"a","type":"go","package":".","profileURL":"http://example.com/debug/pprof/profile"}]}`
+	if _, err := Parse([]byte(bad)); err == nil {
+		t.Fatal("remote profileURL accepted")
+	}
+}

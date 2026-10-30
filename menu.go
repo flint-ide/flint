@@ -17,6 +17,7 @@ import (
 const (
 	eventMenuOpenRecent = "menu:open-recent" // show the Recent Projects popup
 	eventMenuOpenFolder = "menu:open-folder" // open the given folder
+	eventMenuAddProject = "menu:add-project" // pick a folder to attach to the workspace
 )
 
 // buildMenu creates the native macOS menu bar. File ▸ Open Recent mirrors the
@@ -28,6 +29,9 @@ func (a *App) buildMenu() *menu.Menu {
 	file := m.AddSubmenu("File")
 	file.AddText("Open Folder…", keys.CmdOrCtrl("o"), func(*menu.CallbackData) {
 		runtime.EventsEmit(a.ctx, eventMenuOpenRecent)
+	})
+	file.AddText("Add Project to Workspace…", keys.Combo("o", keys.CmdOrCtrlKey, keys.ShiftKey), func(*menu.CallbackData) {
+		runtime.EventsEmit(a.ctx, eventMenuAddProject)
 	})
 	recentMenu := file.AddSubmenu("Open Recent")
 	recent := a.recentFolders()

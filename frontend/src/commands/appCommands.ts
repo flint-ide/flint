@@ -8,9 +8,14 @@ import { requestCloseTab } from '../components/editor/EditorArea'
 import { useWorkspace, type SidebarView } from '../store/workspace'
 import { saveTab, useEditor, viewFor, type Tab } from '../store/editor'
 import { toggleTerminal, useTerminal } from '../store/terminal'
+import { activeRoot } from '../store/activeRoot'
+import { removeFromWorkspace } from '../store/fileOps'
+import { rootLabels } from '../lib/workspaceRoots'
 import { useGit } from '../store/git'
 import { useScratch } from '../store/scratch'
+import { useSearch } from '../store/search'
 import { useDatabase } from '../store/database'
+import { activeSqlConsole } from '../store/sqlConsole'
 import { useAgentChat } from '../store/agentChat'
 import { showToast } from '../store/dialog'
 
@@ -26,7 +31,6 @@ const IN_EDITOR = '.cm-editor'
 const IN_TERMINAL = '.terminal-view'
 
 const ws = () => useWorkspace.getState()
-const root = () => ws().root ?? ''
 const activeTab = (): Tab | undefined => {
   const { tabs, activeId } = useEditor.getState()
   return tabs.find((t) => t.id === activeId)
@@ -43,10 +47,12 @@ export function registerAppCommands(hooks: AppCommandHooks): () => void {
   const offStatic = registerCommands(appCommands(hooks))
   const offAgents = registerAgentChatCommands()
   const offFeatures = registerFeatureCommands()
+  const offRoots = registerWorkspaceRootCommands()
   return () => {
     offStatic()
     offAgents()
     offFeatures()
+    offRoots()
   }
 }
 
@@ -66,6 +72,19 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
         ws().setSidebar('search')
         focusSearch()
       },
+    },
+    {
+      id: 'nav.replaceInFiles', title: 'Replace in Files…', category: 'Navigate', keys: 'Mod+Shift+R', keywords: 'search substitute rename text',
+      run: () => {
+        useSearch.getState().setParams({ replaceOn: true })
+        ws().setSidebar('search')
+        focusSearch()
+      },
+    },
+    {
+      id: 'nav.undoReplace', title: 'Undo Last Replace in Files', category: 'Navigate', keywords: 'revert',
+      when: () => !!useSearch.getState().lastReplace?.undoable,
+      run: () => useSearch.getState().undoReplace(ws().roots),
     },
     { id: 'nav.back', title: 'Back', category: 'Navigate', keys: 'Mod+[', keywords: 'previous history', run: () => useEditor.getState().back() },
     { id: 'nav.forward', title: 'Forward', category: 'Navigate', keys: 'Mod+]', keywords: 'next history', run: () => useEditor.getState().forward() },
@@ -117,8 +136,9 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
     { id: 'git.newWorktree', title: 'New Worktree…', category: 'Git', keywords: 'agent folder', when: hasBranchWidget, run: () => ws().setBranchesPopup('new-worktree') },
 
     // Terminal
-    { id: 'terminal.toggle', title: 'Toggle Terminal', category: 'Terminal', keys: 'Mod+J', run: () => toggleTerminal(root()) },
-    { id: 'terminal.new', title: 'New Terminal', category: 'Terminal', keys: 'Mod+Shift+T', keywords: 'shell', run: () => void useTerminal.getState().create(root()) },
+    // In the active tab's workspace folder (the primary one when it has none).
+    { id: 'terminal.toggle', title: 'Toggle Terminal', category: 'Terminal', keys: 'Mod+J', run: () => toggleTerminal(activeRoot()) },
+    { id: 'terminal.new', title: 'New Terminal', category: 'Terminal', keys: 'Mod+Shift+T', keywords: 'shell', run: () => void useTerminal.getState().create(activeRoot()) },
 
     // View
     { id: 'view.toggleSidebar', title: 'Toggle Sidebar', category: 'View', keys: 'Mod+B', keysIgnoredIn: IN_EDITOR, keywords: 'panel hide show', run: () => ws().toggleSidebar() },
@@ -135,6 +155,10 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
         if (path) await ws().openFolder(path)
       },
     },
+    {
+      id: 'project.addToWorkspace', title: 'Add Project to Workspace…', category: 'Project', keys: 'Mod+Shift+O',
+      keywords: 'attach folder multi root', when: () => !!ws().root, run: () => ws().pickRoot(),
+    },
     { id: 'project.reloadTree', title: 'Reload File Tree', category: 'Project', keywords: 'refresh', when: () => !!ws().root, run: () => ws().reloadTree() },
 
     // Database & scratchpads
@@ -146,6 +170,22 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
         return tab?.kind === 'scratch' && tab.scratchKind === 'sql' && hasEditor()
       },
       run: () => pressInEditor('Mod+Enter'),
+    },
+    {
+      id: 'sql.explain', title: 'Explain Plan', category: 'Database', keys: 'Mod+Shift+E', keywords: 'query plan explain',
+      when: () => !!activeSqlConsole(),
+      run: () => activeSqlConsole()?.explain(false),
+    },
+    {
+      id: 'sql.explainAnalyze', title: 'Explain Analyze', category: 'Database', keys: 'Mod+Shift+A',
+      keywords: 'query plan explain execute timing buffers pipeline',
+      when: () => !!activeSqlConsole(),
+      run: () => activeSqlConsole()?.explain(true),
+    },
+    {
+      id: 'sql.history', title: 'Query History…', category: 'Database', keys: 'Mod+Shift+H', keywords: 'recent statements log rerun',
+      when: () => !!activeSqlConsole(),
+      run: () => activeSqlConsole()?.showHistory(),
     },
     {
       id: 'db.newConnection', title: 'New Database Connection…', category: 'Database', keywords: 'postgres clickhouse add',
@@ -205,12 +245,40 @@ function registerAgentChatCommands(): () => void {
         category: 'Agent',
         keywords: 'conversation',
         when: () => !useAgentChat.getState().starting,
-        run: () => useAgentChat.getState().start(agent, root()),
+        run: () => useAgentChat.getState().start(agent, activeRoot()),
       })),
     )
   }
   sync()
   const unsubscribe = useAgentChat.subscribe(sync)
+  return () => {
+    unsubscribe()
+    off()
+  }
+}
+
+/** "Remove <project> from Workspace" per attached folder; follows the workspace. */
+function registerWorkspaceRootCommands(): () => void {
+  let roots: string[] | null = null
+  let off: () => void = () => undefined
+  const sync = () => {
+    const next = useWorkspace.getState().roots
+    if (next === roots) return
+    roots = next
+    off()
+    const labels = rootLabels(next)
+    off = registerCommands(
+      next.slice(1).map((r, i) => ({
+        id: `project.remove.${r}`,
+        title: `Remove ${labels[i + 1]} from Workspace`,
+        category: 'Project',
+        keywords: 'detach close folder multi root',
+        run: () => removeFromWorkspace(r),
+      })),
+    )
+  }
+  sync()
+  const unsubscribe = useWorkspace.subscribe(sync)
   return () => {
     unsubscribe()
     off()

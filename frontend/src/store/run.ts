@@ -15,6 +15,7 @@ import { useEditor, viewFor } from './editor'
 import { onFileChanged } from './fsEvents'
 import { decodeBase64 } from './terminal'
 import { useWorkspace } from './workspace'
+import { followedRoot, rootFor } from './activeRoot'
 import { askAgent } from '../lib/askAgent'
 import { failedTestsPrompt } from '../lib/agentPrompt'
 
@@ -23,6 +24,8 @@ import { failedTestsPrompt } from '../lib/agentPrompt'
 // gutter, a command palette or a "fix failed tests with the agent" button can
 // all drive the same thing. Running processes are never part of session
 // restore; only the selected configuration is remembered (store/session.ts).
+// With several workspace folders the configurations shown are those of the active
+// tab's folder (like the Commit panel); each folder keeps its own selection.
 
 export type RunConfig = runconfig.Config
 export type RunType = 'command' | 'go' | 'npm' | 'make'
@@ -44,6 +47,8 @@ export interface RunSession {
   kind: 'config' | 'tests'
   title: string
   config?: RunConfig
+  /** Workspace folder a configuration runs in. */
+  root?: string
   request?: TestRequest
   /** Directories relative paths in the console are tried against. */
   bases: string[]
@@ -51,6 +56,18 @@ export interface RunSession {
   exit: RunExit | null
   tests: TestTree
   startedAt: number
+  /** Rerun of a custom test launch (profiling); plain runs rerun `request`. */
+  again?: () => Promise<void>
+}
+
+/** A test run started some other way than RunAPI.StartTests (profiling, see store/profile.ts). */
+export interface TestLaunch {
+  /** Starts the process under runId; returns the run's title. */
+  start: (runId: string) => Promise<string>
+  /** Called once the process ended; null when it was replaced, closed or failed to start first. */
+  onExit: (exit: RunExit | null) => void
+  /** Starts the same launch again (Rerun). */
+  again: () => Promise<void>
 }
 
 /** A failed test, as handed to an agent ("Fix with agent"). */
@@ -63,13 +80,15 @@ export interface FailedTest {
 }
 
 interface RunState {
+  /** Workspace folder whose configurations are loaded (follows the active tab's folder). */
   root: string | null
   saved: RunConfig[]
   detected: RunConfig[]
   capabilities: Record<string, runconfig.Capabilities>
   /** Why .flint/run.json could not be used. */
   loadError: string
-  selectedId: string | null
+  /** Selected configuration id per workspace folder. */
+  selected: Record<string, string>
   sessions: Record<string, RunSession>
   /** Session that Stop / Rerun act on when none is given. */
   lastKey: string | null
@@ -79,7 +98,8 @@ interface RunState {
 
 export const TESTS_KEY = 'tests'
 export const runTabId = (key: string) => `run:${key}`
-const configKey = (id: string) => `cfg:${id}`
+/** Session key of a configuration; ids are only unique within one folder. */
+export const configKey = (root: string, id: string) => `cfg:${id}@${root}`
 
 export const useRun = createStore<RunState>(() => ({
   root: null,
@@ -87,7 +107,7 @@ export const useRun = createStore<RunState>(() => ({
   detected: [],
   capabilities: {},
   loadError: '',
-  selectedId: null,
+  selected: {},
   sessions: {},
   lastKey: null,
   editing: null,
@@ -101,31 +121,50 @@ export function allConfigs(s: RunState = useRun.getState()): RunConfig[] {
 
 export const isDetected = (c: RunConfig) => c.id.startsWith('detected:')
 
-/** The selected configuration, falling back to the first one. */
+/** The selected configuration of the shown folder, falling back to the first one. */
 export function selectedRunConfig(s: RunState = useRun.getState()): RunConfig | null {
   const all = allConfigs(s)
-  return all.find((c) => c.id === s.selectedId) ?? all[0] ?? null
+  const id = s.root ? s.selected[s.root] : undefined
+  return all.find((c) => c.id === id) ?? all[0] ?? null
 }
 
-export function selectRunConfig(id: string | null): void {
-  useRun.setState({ selectedId: id })
+/** Selects id in root (default: the shown folder); null forgets the selection. */
+export function selectRunConfig(id: string | null, root: string | null = useRun.getState().root): void {
+  if (!root) return
+  useRun.setState((s) => {
+    if ((s.selected[root] ?? null) === id) return {}
+    const { [root]: _, ...rest } = s.selected
+    return { selected: id ? { ...rest, [root]: id } : rest }
+  })
 }
 
-export async function loadRunConfigs(root: string | null = useWorkspace.getState().root): Promise<void> {
+/** Selections restored from a session (folder → configuration id), on top of the current ones. */
+export function restoreRunSelections(selected: Record<string, string>): void {
+  useRun.setState((s) => ({ selected: { ...s.selected, ...selected } }))
+}
+
+type Loaded = Pick<RunState, 'saved' | 'detected' | 'capabilities' | 'loadError'>
+const EMPTY: Loaded = { saved: [], detected: [], capabilities: {}, loadError: '' }
+/** Last configurations per folder, so switching folders shows them before the reload. */
+const loadedByRoot = new Map<string, Loaded>()
+/** The folder configurations follow (see subscribeRunEvents). */
+let following: string | null = null
+
+export async function loadRunConfigs(root: string | null = following): Promise<void> {
   if (!root) {
-    useRun.setState({ root: null, saved: [], detected: [], capabilities: {}, loadError: '' })
+    useRun.setState({ root: null, ...EMPTY })
     return
   }
   try {
     const res = await RunAPI.Configs(root)
-    if (useWorkspace.getState().root !== root) return
-    useRun.setState({
-      root,
+    const loaded: Loaded = {
       saved: res.saved ?? [],
       detected: res.detected ?? [],
       capabilities: res.capabilities ?? {},
       loadError: res.error,
-    })
+    }
+    loadedByRoot.set(root, loaded)
+    if (following === root) useRun.setState({ root, ...loaded })
   } catch (err) {
     showToast(`Run configurations: ${errorMessage(err)}`, 'error')
   }
@@ -155,16 +194,18 @@ export async function saveRunConfig(config: RunConfig, replaces: string | null):
   const index = replaces !== null ? Math.max(0, list.indexOf(config)) : list.length - 1
   const result = (await RunAPI.SaveConfigs(root, list)) ?? []
   const stored = result[index] ?? result[result.length - 1]
-  useRun.setState({ saved: result, selectedId: stored?.id ?? null })
+  if (useRun.getState().root === root) useRun.setState({ saved: result })
+  selectRunConfig(stored?.id ?? null, root)
   void loadRunConfigs(root) // capabilities and detection
   return stored
 }
 
 export async function deleteRunConfig(id: string): Promise<void> {
-  const { root, saved, selectedId } = useRun.getState()
+  const { root, saved, selected } = useRun.getState()
   if (!root) return
   const result = (await RunAPI.SaveConfigs(root, saved.filter((c) => c.id !== id))) ?? []
-  useRun.setState({ saved: result, selectedId: selectedId === id ? null : selectedId })
+  if (useRun.getState().root === root) useRun.setState({ saved: result })
+  if (selected[root] === id) selectRunConfig(null, root)
 }
 
 // ---------- running ----------
@@ -176,13 +217,13 @@ export async function runSelected(): Promise<void> {
   await runConfiguration(config)
 }
 
-export async function runConfiguration(config: RunConfig): Promise<void> {
-  const root = useWorkspace.getState().root
+/** Runs config of root (default: the folder whose configurations are shown). */
+export async function runConfiguration(config: RunConfig, root: string | null = useRun.getState().root): Promise<void> {
   if (!root) return
-  useRun.setState({ selectedId: config.id })
+  selectRunConfig(config.id, root)
   await startSession(
-    configKey(config.id),
-    { kind: 'config', title: config.name, config, bases: [resolvePath(root, config.cwd || '.')] },
+    configKey(root, config.id),
+    { kind: 'config', title: config.name, config, root, bases: [resolvePath(root, config.cwd || '.')] },
     async (runId, cols, rows) => {
       await RunAPI.Start(runId, root, runconfig.Config.createFrom(config), cols, rows)
       return config.name
@@ -190,13 +231,14 @@ export async function runConfiguration(config: RunConfig): Promise<void> {
   )
 }
 
-/** Runs tests in the Tests tab (replacing the previous test run). */
-export async function runTests(req: TestRequest): Promise<void> {
-  const root = useWorkspace.getState().root ?? ''
+/** Runs tests in the Tests tab (replacing the previous test run); launch: a custom start (profiling). */
+export async function runTests(req: TestRequest, launch?: TestLaunch): Promise<void> {
+  const root = rootFor(req.file ?? req.dirs[0])
   await startSession(
     TESTS_KEY,
-    { kind: 'tests', title: 'Tests', request: req, bases: [...req.dirs, root].filter(Boolean) },
-    (runId) => RunAPI.StartTests(runId, testrun.Request.createFrom(req)),
+    { kind: 'tests', title: 'Tests', request: req, bases: [...req.dirs, root].filter(Boolean), again: launch?.again },
+    launch?.start ?? ((runId) => RunAPI.StartTests(runId, testrun.Request.createFrom(req))),
+    launch?.onExit,
   )
 }
 
@@ -250,9 +292,10 @@ export function failedTests(): FailedTest[] {
 export async function fixFailedTestsWithAgent(send = false): Promise<void> {
   const failed = failedTests()
   if (failed.length === 0) return showToast('No failed tests')
-  const root = useWorkspace.getState().root ?? ''
+  const req = useRun.getState().sessions[TESTS_KEY]?.request
+  const root = rootFor(req?.file ?? req?.dirs[0])
   const attachments = failed.flatMap((t) => (t.location ? [{ path: t.location.path, startLine: t.location.line, endLine: t.location.line }] : []))
-  await askAgent({ prompt: failedTestsPrompt(failed, root), attachments, send })
+  await askAgent({ prompt: failedTestsPrompt(failed, root), attachments, send, root })
 }
 
 /** ⌃⇧R: the test at the cursor in a test file, else the selected configuration. */
@@ -278,10 +321,12 @@ export async function stopRun(key: string | null = currentKey()): Promise<void> 
 export async function rerun(key: string | null = currentKey()): Promise<void> {
   const session = key ? useRun.getState().sessions[key] : undefined
   if (!session) return runSelected()
+  if (session.again) return session.again()
   if (session.kind === 'tests' && session.request) return runTests(session.request)
   if (session.config) {
-    const latest = allConfigs().find((c) => c.id === session.config!.id) ?? session.config
-    return runConfiguration(latest)
+    const shown = session.root === useRun.getState().root
+    const latest = (shown && allConfigs().find((c) => c.id === session.config!.id)) || session.config
+    return runConfiguration(latest, session.root)
   }
 }
 
@@ -310,9 +355,18 @@ export function currentKey(): string | null {
 
 /** Process ids → the session (key) they belong to. */
 const runKeys = new Map<string, string>()
+/** Process ids → what to do once they ended (TestLaunch.onExit). */
+const exitHooks = new Map<string, (exit: RunExit | null) => void>()
+
+function settleExit(runId: string, exit: RunExit | null): void {
+  const hook = exitHooks.get(runId)
+  exitHooks.delete(runId)
+  hook?.(exit)
+}
 
 /** Forgets a process (tab closed or rerun): its late events are dropped. */
 function dropRun(runId: string): void {
+  settleExit(runId, null)
   runKeys.delete(runId)
   pendingNodes.delete(runId)
   inputs.delete(runId)
@@ -321,14 +375,16 @@ function dropRun(runId: string): void {
 
 async function startSession(
   key: string,
-  base: Pick<RunSession, 'kind' | 'title' | 'config' | 'request' | 'bases'>,
+  base: Pick<RunSession, 'kind' | 'title' | 'config' | 'root' | 'request' | 'bases' | 'again'>,
   start: (runId: string, cols: number, rows: number) => Promise<string>,
+  onExit?: (exit: RunExit | null) => void,
 ): Promise<void> {
   const prev = useRun.getState().sessions[key]
   if (prev?.running) await RunAPI.Stop(prev.runId).catch(() => undefined)
   if (prev) dropRun(prev.runId)
   const runId = crypto.randomUUID()
   runKeys.set(runId, key)
+  if (onExit) exitHooks.set(runId, onExit)
   resetConsole(key)
   const session: RunSession = { key, runId, running: true, exit: null, tests: emptyTree, startedAt: Date.now(), ...base }
   useRun.setState((s) => ({ sessions: { ...s.sessions, [key]: session }, lastKey: key }))
@@ -343,6 +399,7 @@ async function startSession(
     const message = errorMessage(err)
     writeConsole(key, new TextEncoder().encode(`\x1b[31m${message}\x1b[0m\r\n`))
     updateSession(key, runId, () => ({ running: false, exit: { code: -1, stopped: false, elapsedMs: 0, error: message } }))
+    settleExit(runId, null)
     showToast(message, 'error')
   }
 }
@@ -432,7 +489,7 @@ async function flushInput(runId: string, q: InputQueue): Promise<void> {
 /** Opens a path printed by a run, trying the session's directories for relative ones. */
 export async function openRunLink(key: string, path: string, line?: number, column?: number, dir?: string): Promise<void> {
   const session = useRun.getState().sessions[key]
-  const root = useWorkspace.getState().root ?? ''
+  const root = session?.root ?? rootFor(session?.bases[0])
   const dirs = new Set([dir ?? '', ...(session?.bases ?? []), ...Object.values(session?.tests.nodes ?? {}).flatMap((n) => (n.dir ? [n.dir] : [])), root])
   const candidates = path.startsWith('/') ? [path] : [...dirs].filter(Boolean).map((d) => resolvePath(d, path))
   for (const candidate of candidates) {
@@ -525,6 +582,7 @@ function applyRunEvent(runId: string, ev: RunEventMsg): void {
   // The exit is the process's last event: settle its results first, then forget it.
   flushNodes(runId)
   if (key) updateSession(key, runId, () => ({ running: false, exit: ev.exit! }))
+  settleExit(runId, ev.exit)
   inputs.delete(runId)
   deliver.forget(runId)
 }
@@ -537,15 +595,26 @@ export function subscribeRunEvents(): void {
   subscribed = true
   EventsOn('run:event', (ev: RunEventMsg) => deliver(ev.id, ev))
 
-  // Configurations follow the open project and edits of .flint/run.json.
+  // Configurations follow the active tab's workspace folder and edits of its .flint/run.json.
   let unwatch: (() => void) | null = null
-  const follow = (root: string | null) => {
+  const follow = () => {
+    const root = followedRoot(following)
+    if (root === following) return
+    following = root
     unwatch?.()
     unwatch = root ? onFileChanged(`${root}/.flint/run.json`, () => void loadRunConfigs(root)) : null
+    // Show what is known about the folder at once; the reload refreshes it.
+    useRun.setState({ root, ...((root && loadedByRoot.get(root)) || EMPTY) })
     void loadRunConfigs(root)
   }
   useWorkspace.subscribe((s, prev) => {
-    if (s.root !== prev.root) follow(s.root)
+    if (s.roots !== prev.roots) {
+      for (const r of loadedByRoot.keys()) if (!s.roots.includes(r)) loadedByRoot.delete(r)
+      follow()
+    }
   })
-  follow(useWorkspace.getState().root)
+  useEditor.subscribe((s, prev) => {
+    if (s.activeId !== prev.activeId) follow()
+  })
+  follow()
 }

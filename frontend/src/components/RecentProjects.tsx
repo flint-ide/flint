@@ -8,12 +8,17 @@ import { FileIcon } from './icons/FileIcon'
 
 const tildify = (p: string) => p.replace(/^\/Users\/[^/]+/, '~')
 
+/** Row of the "Add Project to Workspace…" action (paths are absolute, so it can't clash). */
+const ADD = '\0add'
+
 /**
  * ⌘O: IntelliJ-style Recent Projects. Enter opens here, ⌘Enter in a new window,
- * "Browse…" falls back to the native folder picker.
+ * ⌥Enter attaches the project to this workspace; "Browse…" falls back to the
+ * native folder picker.
  */
 export function RecentProjects() {
   const root = useWorkspace((s) => s.root)
+  const roots = useWorkspace((s) => s.roots)
   const openFolder = useWorkspace((s) => s.openFolder)
   const close = () => useWorkspace.getState().setRecentOpen(false)
   const [recent, setRecent] = useState<string[]>([])
@@ -28,10 +33,11 @@ export function RecentProjects() {
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
     const matches = recent.filter((p) => !q || p.toLowerCase().includes(q))
-    return [null, ...matches] // null = "Browse…"
-  }, [recent, query])
+    // null = "Browse…"; ADD = "Add Project to Workspace…" (only with a folder open).
+    return [null, ...(root ? [ADD] : []), ...matches]
+  }, [recent, query, root])
 
-  useEffect(() => setCursor(rows.length > 1 && query ? 1 : 0), [query, rows.length])
+  useEffect(() => setCursor(query ? Math.max(0, rows.findIndex((r) => r !== null && r !== ADD)) : 0), [query, rows])
   useEffect(() => {
     list.current?.querySelector('.selected')?.scrollIntoView({ block: 'nearest' })
   }, [cursor])
@@ -42,10 +48,18 @@ export function RecentProjects() {
     if (path) await openFolder(path)
   }
 
-  const choose = async (path: string | null, newWindow: boolean) => {
-    if (path === null) return void browse()
+  const addProject = async (path?: string) => {
     close()
-    if (newWindow) {
+    const target = path ?? (await Workspace.PickFolder())
+    if (target) await useWorkspace.getState().addRoot(target)
+  }
+
+  const choose = async (path: string | null, mods: { metaKey: boolean; altKey: boolean }) => {
+    if (path === null) return void browse()
+    if (path === ADD) return void addProject()
+    if (mods.altKey && root && !roots.includes(path)) return void addProject(path)
+    close()
+    if (mods.metaKey) {
       await Git.OpenWindow(path).catch((err) => showToast(errorMessage(err), 'error'))
       return
     }
@@ -62,21 +76,28 @@ export function RecentProjects() {
       <input
         autoFocus
         className="quick-input"
-        placeholder="Open recent project…  (⌘↵ new window)"
+        placeholder={root ? 'Open recent project…  (⌘↵ new window · ⌥↵ add to workspace)' : 'Open recent project…  (⌘↵ new window)'}
         value={query}
         spellCheck={false}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown') setCursor((c) => Math.min(c + 1, rows.length - 1))
           else if (e.key === 'ArrowUp') setCursor((c) => Math.max(c - 1, 0))
-          else if (e.key === 'Enter') void choose(rows[cursor], e.metaKey)
+          else if (e.key === 'Enter') void choose(rows[cursor], e)
           else return
           e.preventDefault()
         }}
       />
       <div className="quick-list" ref={list}>
         {rows.map((path, i) =>
-          path === null ? (
+          path === ADD ? (
+            <div key="add" className={`quick-item${i === cursor ? ' selected' : ''}`} onMouseMove={() => setCursor(i)} onClick={() => void addProject()}>
+              <FileIcon name="folder" isDir />
+              <span className="file-name">Add Project to Workspace…</span>
+              <span className="muted path-hint">open it next to {root?.split('/').pop()}</span>
+              <kbd>⇧⌘O</kbd>
+            </div>
+          ) : path === null ? (
             <div key="browse" className={`quick-item${i === cursor ? ' selected' : ''}`} onMouseMove={() => setCursor(i)} onClick={() => void browse()}>
               <FileIcon name="folder" isDir open />
               <span className="file-name">Browse…</span>
@@ -86,15 +107,28 @@ export function RecentProjects() {
           ) : (
             <div
               key={path}
-              className={`quick-item${i === cursor ? ' selected' : ''}${path === root ? ' current' : ''}`}
+              className={`quick-item${i === cursor ? ' selected' : ''}${roots.includes(path) ? ' current' : ''}`}
               onMouseMove={() => setCursor(i)}
-              onClick={(e) => void choose(path, e.metaKey)}
+              onClick={(e) => void choose(path, e)}
               title={path}
             >
               <FileIcon name={path.split('/').pop() ?? path} isDir />
               <span className="file-name">{path.split('/').pop()}</span>
               <span className="muted path-hint">{tildify(path)}</span>
               {path === root && <span className="badge">open</span>}
+              {path !== root && roots.includes(path) && <span className="badge">in workspace</span>}
+              {root && !roots.includes(path) && (
+                <button
+                  className="icon recent-forget"
+                  title="Add to workspace (⌥↵)"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void addProject(path)
+                  }}
+                >
+                  ＋
+                </button>
+              )}
               <button
                 className="icon recent-forget"
                 title="Remove from list"

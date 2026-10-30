@@ -6,10 +6,10 @@ import { Menu, type DropdownItem } from './Dropdown'
 export function ContextMenu() {
   const menu = useContextMenu((s) => s.menu)
   if (!menu) return null
-  return <AnchoredMenu key={menu.seq} x={menu.x} y={menu.y} items={menu.items} />
+  return <AnchoredMenu key={menu.seq} x={menu.x} y={menu.y} items={menu.items} minWidth={menu.minWidth} />
 }
 
-function AnchoredMenu({ x, y, items }: { x: number; y: number; items: DropdownItem[] }) {
+function AnchoredMenu({ x, y, items, minWidth }: { x: number; y: number; items: DropdownItem[]; minWidth: number }) {
   // A zero-size element at the pointer stands in for the trigger a dropdown has.
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   return (
@@ -18,11 +18,12 @@ function AnchoredMenu({ x, y, items }: { x: number; y: number; items: DropdownIt
       {anchor && (
         <Menu
           anchor={anchor}
+          atPoint
           items={items}
           align="start"
           searchable={false}
           placeholder=""
-          minWidth={200}
+          minWidth={minWidth}
           emptyText="Nothing here"
           onClose={closeContextMenu}
         />

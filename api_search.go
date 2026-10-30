@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -34,12 +35,47 @@ type SearchAPI struct {
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
+
+	undo search.UndoSlot // the last replace, for "Undo replace"
 }
 
-// Start cancels any running search and starts a new one. The caller picks the id so it
-// can match events that may arrive before this call returns.
-// Results arrive as "search:batch" events followed by one "search:done".
-func (s *SearchAPI) Start(id string, opts search.Options) {
+// Replace replaces the matches of opts on the selected lines (see
+// search.Replacer.Apply) and keeps the previous contents for UndoReplace.
+func (s *SearchAPI) Replace(opts search.Options, targets []search.ReplaceTarget) (search.ReplaceResult, error) {
+	r, err := search.NewReplacer(opts, opts.Replace)
+	if err != nil {
+		return search.ReplaceResult{}, err
+	}
+	res, undo := r.Apply(targets)
+	s.undo.Set(undo)
+	return res, nil
+}
+
+// UndoReplace restores the files the last Replace changed, except ones edited
+// since; it returns how many were restored and the paths skipped.
+func (s *SearchAPI) UndoReplace() (UndoResult, error) {
+	u := s.undo.Take()
+	if u == nil {
+		return UndoResult{}, errors.New("nothing to undo")
+	}
+	n, skipped := u.Restore()
+	if skipped == nil {
+		skipped = []string{}
+	}
+	return UndoResult{Restored: n, Skipped: skipped}, nil
+}
+
+// UndoResult reports an UndoReplace.
+type UndoResult struct {
+	Restored int      `json:"restored"`
+	Skipped  []string `json:"skipped"`
+}
+
+// Start cancels any running search and starts a new one over the given workspace
+// folders. The caller picks the id so it can match events that may arrive before
+// this call returns. Results arrive as "search:batch" events followed by one
+// "search:done"; every match names its folder.
+func (s *SearchAPI) Start(id string, roots []string, opts search.Options) {
 	ctx, cancel := context.WithCancel(s.app.ctx)
 
 	s.mu.Lock()
@@ -51,7 +87,7 @@ func (s *SearchAPI) Start(id string, opts search.Options) {
 
 	go func() {
 		defer cancel()
-		sum, err := search.Run(ctx, opts, func(matches []search.Match) {
+		sum, err := search.RunRoots(ctx, roots, opts, func(matches []search.Match) {
 			if ctx.Err() == nil {
 				runtime.EventsEmit(s.app.ctx, eventSearchBatch, SearchBatch{ID: id, Matches: matches})
 			}

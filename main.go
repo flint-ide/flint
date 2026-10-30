@@ -50,6 +50,7 @@ func main() {
 			&TerminalAPI{app: app},
 			&RunAPI{app: app},
 			&DebugAPI{app: app},
+			&ProfileAPI{app: app},
 			&AppAPI{app: app},
 			&SessionAPI{app: app},
 			gitAPI,
@@ -57,6 +58,8 @@ func main() {
 			lspAPI,
 			&AgentChatAPI{app: app},
 			&DiffAPI{},
+			&HTTPAPI{app: app},
+			&PreviewAPI{app: app},
 		},
 		Mac: &mac.Options{
 			TitleBar: mac.TitleBarHiddenInset(),

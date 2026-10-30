@@ -16,6 +16,11 @@ import (
 type Match struct {
 	Path    string `json:"path"`
 	Indices []int  `json:"indices"`
+	// Root is the project folder the path belongs to (set by Index.Search). With
+	// several roots Path starts with the root's label and Offset code points of it
+	// ("label/") come before the path relative to Root.
+	Root   string `json:"root,omitempty"`
+	Offset int    `json:"offset,omitempty"`
 }
 
 // Target is a path prepared for repeated matching.
@@ -33,15 +38,34 @@ func Prepare(path string) Target {
 // Search returns the best `limit` matches, highest score first. An empty query
 // returns the first `limit` targets in order.
 func Search(query string, targets []Target, limit int) []Match {
+	m, _ := search(query, targets, limit)
+	return m
+}
+
+// SearchIndices is Search returning the positions in targets of the best matches,
+// for callers ranking their own records (e.g. query history) rather than paths.
+func SearchIndices(query string, targets []Target, limit int) []int {
+	_, idx := search(query, targets, limit)
+	if idx == nil {
+		return []int{}
+	}
+	return idx
+}
+
+// search is Search that also returns the index in targets of each match.
+func search(query string, targets []Target, limit int) ([]Match, []int) {
 	if limit <= 0 {
-		return []Match{}
+		return []Match{}, nil
 	}
 	if query == "" {
-		out := make([]Match, 0, min(limit, len(targets)))
-		for _, t := range targets[:min(limit, len(targets))] {
+		n := min(limit, len(targets))
+		out := make([]Match, 0, n)
+		idx := make([]int, 0, n)
+		for i, t := range targets[:n] {
 			out = append(out, Match{Path: t.Path, Indices: []int{}})
+			idx = append(idx, i)
 		}
-		return out
+		return out, idx
 	}
 	q := newQuery(query)
 	top := &ranking{}
@@ -60,14 +84,16 @@ func Search(query string, targets []Target, limit int) []Match {
 		}
 	}
 	out := make([]Match, top.Len())
+	idx := make([]int, top.Len())
 	for i := len(out) - 1; i >= 0; i-- {
 		c := heap.Pop(top).(candidate)
 		t := &targets[c.index]
 		indices := []int{}
 		q.score(t, &indices)
 		out[i] = Match{Path: t.Path, Indices: indices}
+		idx[i] = c.index
 	}
-	return out
+	return out, idx
 }
 
 type query struct {

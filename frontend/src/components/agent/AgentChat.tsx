@@ -5,6 +5,7 @@ import { totalsOf } from '../../lib/usage'
 import { focusSoon } from '../../lib/focusSoon'
 import { useEditor } from '../../store/editor'
 import { useWorkspace } from '../../store/workspace'
+import { rootOf } from '../../lib/workspaceRoots'
 import { FileLink, MessageText, PermissionCard, PlanView, ToolCallRow, UsageLine, ChatUsage } from './ChatItems'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 
@@ -17,7 +18,8 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
   const setDraft = useAgentChat((s) => s.setDraft)
   const detach = useAgentChat((s) => s.detach)
   const attach = useAgentChat((s) => s.attach)
-  const root = useWorkspace((s) => s.root) ?? session.cwd
+  // Paths are shown relative to the chat's own workspace folder.
+  const root = useWorkspace((s) => rootOf(s.roots, session.cwd)) ?? session.cwd
   const [showThoughts, setShowThoughts] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLTextAreaElement>(null)

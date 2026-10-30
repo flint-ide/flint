@@ -51,6 +51,7 @@ export function RunConfigDialog({ editing }: Props) {
       script: type === 'npm' ? config.script : undefined,
       target: type === 'make' ? config.target || undefined : undefined,
       debug: config.debug,
+      profileURL: config.profileURL?.trim() || undefined,
     })
   }
 
@@ -158,6 +159,14 @@ export function RunConfigDialog({ editing }: Props) {
         <label>
           Environment
           <textarea className="run-env" rows={3} value={env} placeholder={'KEY=value\nDEBUG=1'} spellCheck={false} onChange={(e) => setEnv(e.target.value)} />
+        </label>
+        <label>
+          Profile URL
+          <input
+            value={config.profileURL ?? ''}
+            placeholder="http://localhost:6060/debug/pprof/profile?seconds=10   (optional, net/http/pprof)"
+            onChange={(e) => update({ profileURL: e.target.value })}
+          />
         </label>
         {debuggable && type === 'go' && <div className="muted run-hint">Debugging (dlv dap) will hook into this configuration.</div>}
 

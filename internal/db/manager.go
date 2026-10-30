@@ -49,7 +49,16 @@ type Manager struct {
 	// generation bumps on Invalidate so a dial that started with the old profile
 	// isn't cached after the profile changed.
 	generation map[string]uint64
+
+	// history records executed statements; nil disables it (tests).
+	history *History
 }
+
+// SetHistory turns on recording of executed statements.
+func (m *Manager) SetHistory(h *History) { m.history = h }
+
+// History returns the query history (nil when disabled).
+func (m *Manager) History() *History { return m.history }
 
 // NewManager creates a manager backed by the given profile store.
 func NewManager(store *Store) *Manager {
@@ -72,11 +81,26 @@ func (m *Manager) Store() *Store { return m.store }
 
 // Query runs sql on one database of the connection ("" = the profile's default).
 // queryID identifies the run so Cancel can abort it.
+// The statement is recorded in the query history, failed or not.
 func (m *Manager) Query(ctx context.Context, connID, database, queryID, sql string, limit int) (*QueryResult, error) {
 	conn, ok := m.store.Get(connID)
 	if !ok {
 		return nil, fmt.Errorf("unknown connection %q", connID)
 	}
+	start := time.Now()
+	res, err := m.query(ctx, conn, database, queryID, sql, limit)
+	var rows int64
+	if res != nil {
+		rows = res.Affected
+		if len(res.Columns) > 0 {
+			rows = int64(len(res.Rows))
+		}
+	}
+	m.record(conn, database, HistoryQuery, sql, start, rows, err)
+	return res, err
+}
+
+func (m *Manager) query(ctx context.Context, conn Connection, database, queryID, sql string, limit int) (*QueryResult, error) {
 	// Postgres enforces read-only server-side; ClickHouse needs a client-side guard.
 	if conn.ReadOnly && conn.Driver == ClickHouse && !isReadStatement(sql) {
 		return nil, ErrReadOnly
@@ -94,27 +118,38 @@ func (m *Manager) Query(ctx context.Context, connID, database, queryID, sql stri
 		m.evictIdle(func(k sessionKey, _ time.Duration) bool { return k.connID == conn.ID && k != key }, true)
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	if queryID != "" {
-		m.mu.Lock()
-		m.running[queryID] = cancel
-		m.mu.Unlock()
-		defer func() {
-			m.mu.Lock()
-			delete(m.running, queryID)
-			m.mu.Unlock()
-		}()
-	}
-
+	ctx, done := m.track(ctx, queryID)
+	defer done()
 	res, err := sess.Query(ctx, sql, limit)
 	if err != nil {
-		if errors.Is(ctx.Err(), context.Canceled) {
-			return nil, errors.New("query cancelled")
-		}
-		return nil, err
+		return nil, cancelled(ctx, err)
 	}
 	return res, nil
+}
+
+// track makes a run cancellable by queryID ("" = not cancellable); done must be called.
+func (m *Manager) track(ctx context.Context, queryID string) (context.Context, func()) {
+	ctx, cancel := context.WithCancel(ctx)
+	if queryID == "" {
+		return ctx, cancel
+	}
+	m.mu.Lock()
+	m.running[queryID] = cancel
+	m.mu.Unlock()
+	return ctx, func() {
+		m.mu.Lock()
+		delete(m.running, queryID)
+		m.mu.Unlock()
+		cancel()
+	}
+}
+
+// cancelled replaces the driver's error of a cancelled run with a plain one.
+func cancelled(ctx context.Context, err error) error {
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return errors.New("query cancelled")
+	}
+	return err
 }
 
 // Cancel aborts a running query. Unknown ids are ignored (the query may have finished).

@@ -25,6 +25,7 @@ declare module 'node:assert/strict' {
     deepEqual<T>(actual: unknown, expected: T, message?: string): asserts actual is T
     notDeepEqual(actual: unknown, expected: unknown, message?: string): void
     throws(fn: () => unknown, expected?: RegExp | (new (...args: never[]) => Error), message?: string): void
+    match(value: string, regexp: RegExp, message?: string): void
   }
   const assert: Assert
   export default assert

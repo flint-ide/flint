@@ -16,6 +16,11 @@ export type Connection = db.Connection
 export type QueryResult = db.QueryResult
 export type Table = db.Table
 export type DatabaseInfo = db.DatabaseInfo
+export type HistoryEntry = db.HistoryEntry
+export type ExplainResult = db.ExplainResult
+export type PlanNode = db.PlanNode
+export type EditTarget = db.EditTarget
+export type EditResult = db.EditResult
 export type ScratchPad = scratch.Scratch
 export type Hunk = textdiff.Hunk
 export type LineMark = textdiff.LineMark
@@ -26,10 +31,14 @@ export type ClickHouseProtocol = 'native' | 'http'
 
 // Event payloads aren't part of any bound method signature, so Wails doesn't generate them.
 export interface SearchMatch {
+  /** Workspace folder the match was found in; path is relative to it. */
+  root: string
   path: string
   line: number
   text: string
   ranges: { start: number; end: number }[]
+  /** When replacing: what each range becomes. */
+  replacements?: string[]
 }
 
 export interface SearchSummary {
@@ -72,6 +81,16 @@ export function newConnection(driver: Driver = 'postgres'): Connection {
     tls: false,
     readOnly: false,
   })
+}
+
+/** A batch of staged row edits in the shape of Go's db.EditBatch. */
+export function editBatch(batch: { tableOid: number; edits: { op: string; key: Record<string, string | null>; values: Record<string, string | null> }[] }): db.EditBatch {
+  return db.EditBatch.createFrom(batch)
+}
+
+/** Filter for DatabaseAPI.QueryHistory ("" database = the profile's default). */
+export function historyFilter(f: { database: string; allDatabases: boolean; filter: string; limit: number }): db.HistoryFilter {
+  return db.HistoryFilter.createFrom(f)
 }
 
 /** Wails rejects bound-method promises with a plain string; normalize to a message. */

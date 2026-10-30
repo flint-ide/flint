@@ -11,6 +11,8 @@ import { FileIcon, TabKindIcon } from '../icons/FileIcon'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 import { Git } from '../../store/git'
 import { RunWidget } from '../run/RunWidget'
+import { activeRoot } from '../../store/activeRoot'
+import { rootLabels } from '../../lib/workspaceRoots'
 
 const BranchesPopup = lazy(() => import('../git/BranchesPopup').then((m) => ({ default: m.BranchesPopup })))
 
@@ -78,9 +80,11 @@ function useTitlebarMetrics(): { height: number; inset: number } {
 
 function ProjectWidget() {
   const root = useWorkspace((s) => s.root)
+  const roots = useWorkspace((s) => s.roots)
   const openFolder = useWorkspace((s) => s.openFolder)
   const [recent, setRecent] = useState<string[]>([])
   const name = root?.split('/').pop() ?? 'Open folder'
+  const labels = rootLabels(roots)
 
   const pick = async () => {
     const path = await Workspace.PickFolder()
@@ -89,16 +93,30 @@ function ProjectWidget() {
 
   const items = (): DropdownItem[] => [
     { label: 'Open Folder…', kbd: '⌘O', icon: <FileIcon name="folder" isDir open />, onSelect: () => void pick() },
+    { label: 'Add Project to Workspace…', kbd: '⇧⌘O', disabled: !root, onSelect: () => void useWorkspace.getState().pickRoot() },
     { label: 'Recent Projects…', onSelect: () => useWorkspace.getState().setRecentOpen(true) },
-    ...(recent.length ? [{ type: 'section', label: 'Recent' } as DropdownItem] : []),
+    ...(roots.length > 1 ? [{ type: 'section', label: 'Workspace' } as DropdownItem] : []),
+    ...(roots.length > 1
+      ? roots.map(
+          (r, i): DropdownItem => ({
+            key: `ws:${r}`,
+            label: labels[i],
+            hint: i === 0 ? 'main project' : r.replace(/^\/Users\/[^/]+/, '~'),
+            icon: <FileIcon name={labels[i]} isDir />,
+            onSelect: () => void Workspace.RevealInFinder(r),
+            action: i === 0 ? undefined : { label: '✕', title: 'Remove from workspace', onClick: () => void useWorkspace.getState().removeRoot(r) },
+          }),
+        )
+      : []),
+    ...(recent.length ? [{ type: 'section', label: 'Recent · ⌥ adds to workspace' } as DropdownItem] : []),
     ...recent.map(
       (p): DropdownItem => ({
         key: p,
         label: p.split('/').pop() ?? p,
         hint: p.replace(/^\/Users\/[^/]+/, '~'),
         icon: <FileIcon name={p.split('/').pop() ?? p} isDir />,
-        // ⌘-click / ⌘Enter opens it in a new window.
-        onSelect: (e) => void (e.metaKey ? Git.OpenWindow(p) : openFolder(p)),
+        // ⌘-click / ⌘Enter opens it in a new window, ⌥ attaches it to this workspace.
+        onSelect: (e) => void (e.metaKey ? Git.OpenWindow(p) : e.altKey && root ? useWorkspace.getState().addRoot(p) : openFolder(p)),
         action: {
           label: '✕',
           title: 'Remove from recent',
@@ -114,12 +132,13 @@ function ProjectWidget() {
   return (
     <Dropdown
       minWidth={320}
-      onOpen={() => void Workspace.RecentFolders().then((r) => setRecent((r ?? []).filter((p) => p !== root)))}
+      onOpen={() => void Workspace.RecentFolders().then((r) => setRecent((r ?? []).filter((p) => !roots.includes(p))))}
       items={items}
       trigger={(t) => (
-        <button {...t} className="tb-widget project" title={root ?? 'Open a folder'}>
+        <button {...t} className="tb-widget project" title={roots.length ? roots.join('\n') : 'Open a folder'}>
           <FileIcon name={name} isDir />
           <span className="tb-label">{name}</span>
+          {roots.length > 1 && <span className="tb-extra">+{roots.length - 1}</span>}
           <span className="tb-chevron">⌄</span>
         </button>
       )}
@@ -162,7 +181,6 @@ function BranchWidget() {
 }
 
 function QuickActions() {
-  const root = useWorkspace((s) => s.root) ?? ''
   const setQuickOpen = useWorkspace((s) => s.setQuickOpen)
   const preferred = useAgent((s) => s.preferred)
   const agents = useAgentChat((s) => s.agents)
@@ -179,7 +197,7 @@ function QuickActions() {
         <span>Go to file</span>
         <kbd>⌘P</kbd>
       </button>
-      <button className="tb-icon" title="Terminal (⌘J) · new terminal ⇧⌘T" onClick={() => toggleTerminal(root)} onAuxClick={() => useTerminal.getState().create(root)}>
+      <button className="tb-icon" title="Terminal (⌘J) · new terminal ⇧⌘T" onClick={() => toggleTerminal(activeRoot())} onAuxClick={() => useTerminal.getState().create(activeRoot())}>
         <TabKindIcon kind="terminal" />
       </button>
       {agent && (
@@ -187,7 +205,7 @@ function QuickActions() {
           className="tb-icon"
           title={`New ${agent} chat`}
           disabled={!!starting}
-          onClick={() => void useAgentChat.getState().start(agent, root)}
+          onClick={() => void useAgentChat.getState().start(agent, activeRoot())}
         >
           <TabKindIcon kind="chat" busy={!!starting} />
         </button>

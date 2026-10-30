@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useGit, type FileChange } from '../../store/git'
+import { confirmRollback, useGit, type FileChange } from '../../store/git'
 import { useEditor } from '../../store/editor'
-import { confirmAction, showToast } from '../../store/dialog'
+import { useWorkspace } from '../../store/workspace'
+import { rootLabels } from '../../lib/workspaceRoots'
+import { showToast } from '../../store/dialog'
 import { resolveConflictsWithAgent, suggestCommitMessage, useAgent } from '../../store/agent'
 import { errorMessage } from '../../api/backend'
 import { Select } from '../ui/Select'
@@ -31,7 +33,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
   // isIncluded reads these; subscribing re-renders the panel when a file is ticked.
   useGit((s) => s.excluded)
   useGit((s) => s.includedUntracked)
-  const { setMessage, setAmend, toggleFile, setGroup, isIncluded, commit, rollback, remote, refresh } = useGit.getState()
+  const { setMessage, setAmend, toggleFile, setGroup, isIncluded, commit, remote, refresh } = useGit.getState()
   const openDiff = useEditor((s) => s.openDiff)
   const openFile = useEditor((s) => s.openFile)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
@@ -52,7 +54,16 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
     ].filter((g) => g.files.length > 0)
   }, [status])
 
-  if (!root || !isRepo) return <div className="placeholder muted">Not a git repository.</div>
+  if (!root || !isRepo) {
+    return (
+      <div className="panel commit-panel">
+        <div className="panel-header">
+          <RepoSwitcher fallback="Commit" />
+        </div>
+        <div className="placeholder muted">Not a git repository.</div>
+      </div>
+    )
+  }
 
   // Recomputed each render so ticking a file updates the count (isIncluded reads the store).
   const selected = (status?.files ?? []).filter((f) => f.kind !== 'conflicted' && isIncluded(f))
@@ -82,17 +93,10 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
     }
   }
 
-  const confirmRollback = async (files: FileChange[]) => {
-    const deletes = files.filter((f) => f.kind === 'untracked' || f.kind === 'added').length
-    const what = files.length === 1 ? files[0].path : `${files.length} files`
-    const extra = deletes ? ` ${deletes} new file(s) will be deleted.` : ''
-    if (await confirmAction(`Rollback changes in ${what}?${extra}`, 'Rollback')) await rollback(files)
-  }
-
   return (
     <div className="panel commit-panel">
       <div className="panel-header">
-        <span className="panel-title">Commit</span>
+        <RepoSwitcher fallback="Commit" />
         <button className="icon" title="Refresh" onClick={() => void refresh()}>↻</button>
         <button className="icon" title="Fetch" disabled={!!busy} onClick={() => void remote('fetch')}>⇣</button>
         <button className="icon" title="Update project (pull)" disabled={!!busy} onClick={() => void remote('pull')}>⤓</button>
@@ -243,4 +247,31 @@ function dirOf(path: string): string {
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+/**
+ * With several workspace folders: which one's repository the panel shows (it follows
+ * the active tab's folder), with the number of changes in each.
+ */
+function RepoSwitcher({ fallback }: { fallback: string }) {
+  const roots = useWorkspace((s) => s.roots)
+  const folder = useGit((s) => s.folder)
+  const counts = useGit((s) => s.counts)
+  if (roots.length < 2 || !folder) return <span className="panel-title">{fallback}</span>
+  const labels = rootLabels(roots)
+  return (
+    <span className="panel-title repo-switcher">
+      <Select
+        size="sm"
+        title="Repository shown in the Commit panel (follows the active file)"
+        value={folder}
+        options={roots.map((r, i) => ({
+          value: r,
+          label: labels[i],
+          hint: r in counts ? `${counts[r]} change${counts[r] === 1 ? '' : 's'}` : 'not a repository',
+        }))}
+        onChange={(r) => void useGit.getState().load(r)}
+      />
+    </span>
+  )
 }

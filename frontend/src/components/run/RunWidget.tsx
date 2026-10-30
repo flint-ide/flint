@@ -1,12 +1,15 @@
 import { useEditor } from '../../store/editor'
+import { useWorkspace } from '../../store/workspace'
+import { labelOf } from '../../lib/workspaceRoots'
 import {
-  TESTS_KEY, currentKey, editRunConfig, loadRunConfigs, newRunConfig, rerunFailedTests, runSelected, runTestsInFile,
+  TESTS_KEY, configKey, currentKey, editRunConfig, loadRunConfigs, newRunConfig, rerunFailedTests, runSelected, runTestsInFile,
   runTestsInPackage, selectRunConfig, selectedRunConfig, stopRun, useRun, type RunConfig,
 } from '../../store/run'
 import { failedNodes } from '../../lib/runTree'
 import { testLang } from '../../lib/testFiles'
 import { TabKindIcon } from '../icons/FileIcon'
 import { debugSelected, debugTestsInFile, useDebug } from '../../store/debug'
+import { cancelProfiling, profileSelected, profileTestsInFile, profileTestsInPackage, useProfile } from '../../store/profile'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 
 /** Title bar run toolbar like IntelliJ: configuration selector, ▶ Run / ↻ Rerun, ■ Stop. */
@@ -15,10 +18,14 @@ export function RunWidget() {
   const detected = useRun((s) => s.detected)
   const loadError = useRun((s) => s.loadError)
   const selected = useRun(selectedRunConfig)
-  const running = useRun((s) => (selected ? !!s.sessions[`cfg:${selected.id}`]?.running : false))
+  // With several workspace folders the widget shows the active tab's folder's configurations.
+  const runRoot = useRun((s) => s.root)
+  const project = useWorkspace((s) => (s.roots.length > 1 && runRoot ? labelOf(s.roots, runRoot) : null))
+  const selectedKey = useRun((s) => (selected && s.root ? configKey(s.root, selected.id) : null))
+  const running = useRun((s) => (selectedKey ? !!s.sessions[selectedKey]?.running : false))
   // Stop targets the selected configuration's process, else the run in front.
   const stopKey = useRun((s) => {
-    if (selected && s.sessions[`cfg:${selected.id}`]?.running) return `cfg:${selected.id}`
+    if (selectedKey && s.sessions[selectedKey]?.running) return selectedKey
     const key = currentKey()
     return key && s.sessions[key]?.running ? key : null
   })
@@ -28,6 +35,8 @@ export function RunWidget() {
   })
   const debuggable = useRun((s) => !!selected && !!s.capabilities[selected.id]?.debug)
   const debugging = useDebug((s) => s.session?.status === 'running' || s.session?.status === 'paused')
+  const profilable = useRun((s) => !!selected && !!s.capabilities[selected.id]?.profile)
+  const profiling = useProfile((s) => (selectedKey ? !!s.collecting[selectedKey] : false))
   const testFile = useEditor((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeId)
     return tab?.kind === 'file' && testLang(tab.path) ? tab.path : null
@@ -43,11 +52,24 @@ export function RunWidget() {
   })
 
   const items = (): DropdownItem[] => [
+    ...(project ? [{ type: 'section', label: `Configurations of ${project}` } as DropdownItem] : []),
     ...(loadError ? [{ type: 'section', label: `⚠ .flint/run.json: ${loadError}` } as DropdownItem] : []),
     ...saved.map(configItem),
     ...(detected.length ? [{ type: 'section', label: 'Detected' } as DropdownItem, ...detected.map(configItem)] : []),
     { type: 'separator' },
     { label: 'Edit Configuration…', disabled: !selected, onSelect: () => editRunConfig() },
+    ...(selected
+      ? [
+          profiling
+            ? { label: `Cancel Profiling '${selected.name}'`, onSelect: () => cancelProfiling(selectedKey ?? undefined) }
+            : {
+                label: `Profile '${selected.name}'`,
+                // Go programs don't profile themselves: Flint records from their net/http/pprof endpoint.
+                hint: profilable ? 'CPU via profileURL' : 'needs a Profile URL (net/http/pprof)',
+                onSelect: () => void profileSelected(),
+              },
+        ]
+      : []),
     { label: 'Add Configuration…', onSelect: () => newRunConfig() },
     ...(testFile
       ? [
@@ -55,7 +77,11 @@ export function RunWidget() {
           { label: `Run Tests in ${testFile.split('/').pop()}`, kbd: '⌃⇧R', onSelect: () => void runTestsInFile(testFile) },
           { label: testLang(testFile) === 'go' ? 'Run Package Tests' : 'Run All Tests', onSelect: () => void runTestsInPackage(testFile) },
           ...(testLang(testFile) === 'go'
-            ? [{ label: `Debug Tests in ${testFile.split('/').pop()}`, onSelect: () => void debugTestsInFile(testFile) }]
+            ? [
+                { label: `Debug Tests in ${testFile.split('/').pop()}`, onSelect: () => void debugTestsInFile(testFile) },
+                { label: `Profile Tests in ${testFile.split('/').pop()}`, hint: 'CPU + memory', onSelect: () => void profileTestsInFile(testFile) },
+                { label: 'Profile Package Tests', onSelect: () => void profileTestsInPackage(testFile) },
+              ]
             : []),
         ]
       : []),
@@ -72,9 +98,10 @@ export function RunWidget() {
         onOpen={() => void loadRunConfigs()}
         items={items}
         trigger={(t) => (
-          <button {...t} className="tb-widget run-config" title="Run configurations">
+          <button {...t} className="tb-widget run-config" title={project ? `Run configurations of ${project}` : 'Run configurations'}>
             <TabKindIcon kind="run" busy={running} />
             <span className="tb-label">{selected?.name ?? 'Add Configuration…'}</span>
+            {project && <span className="tb-extra">{project}</span>}
             <span className="tb-chevron">⌄</span>
           </button>
         )}

@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -72,6 +74,12 @@ type Config struct {
 
 	// Debug tunes debugging (Go via `dlv dap`, see DebugAPI); optional.
 	Debug *Debug `json:"debug,omitempty"`
+
+	// ProfileURL is the program's net/http/pprof endpoint Flint's Profile
+	// action records from, e.g. http://localhost:6060/debug/pprof/profile
+	// (?seconds=N, default 10). Go programs don't profile themselves, so
+	// without it a configuration can't be profiled (tests can). Loopback only.
+	ProfileURL string `json:"profileURL,omitempty"`
 }
 
 // Debug describes how a debugger would launch the configuration.
@@ -94,11 +102,13 @@ type Capabilities struct {
 	Run bool `json:"run"`
 	// Debug: a DAP adapter exists for the type (Delve for Go).
 	Debug bool `json:"debug"`
+	// Profile: the program serves a pprof endpoint (ProfileURL).
+	Profile bool `json:"profile"`
 }
 
 // CapabilitiesOf reports what can be done with c.
 func CapabilitiesOf(c Config) Capabilities {
-	return Capabilities{Run: true, Debug: c.Type == TypeGo}
+	return Capabilities{Run: true, Debug: c.Type == TypeGo, Profile: c.ProfileURL != ""}
 }
 
 // Path returns the run configuration file of a project.
@@ -189,6 +199,7 @@ func normalize(c Config) Config {
 	n.Package = strings.TrimSpace(c.Package)
 	n.Script = strings.TrimSpace(c.Script)
 	n.Target = strings.TrimSpace(c.Target)
+	n.ProfileURL = strings.TrimSpace(c.ProfileURL)
 	if len(c.Env) == 0 {
 		n.Env = nil
 	}
@@ -261,6 +272,11 @@ func Validate(c Config) error {
 	if c.Debug != nil && c.Debug.Adapter != "" && c.Debug.Adapter != "dlv" {
 		return fmt.Errorf("unknown debug adapter %q (supported: dlv)", c.Debug.Adapter)
 	}
+	if c.ProfileURL != "" {
+		if err := ValidateProfileURL(c.ProfileURL); err != nil {
+			return err
+		}
+	}
 	switch c.Type {
 	case TypeCommand:
 		if c.Command == "" {
@@ -285,6 +301,26 @@ func Validate(c Config) error {
 		return errors.New("type is required")
 	default:
 		return fmt.Errorf("unknown type %q (command, go, npm, make)", c.Type)
+	}
+	return nil
+}
+
+// ValidateProfileURL accepts http(s) URLs on the local machine only: the file
+// is committed, so a cloned project must not make Flint fetch from elsewhere.
+func ValidateProfileURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid profileURL %q: %w", raw, err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("profileURL %q must be an http:// or https:// URL", raw)
+	}
+	if u.User != nil {
+		return fmt.Errorf("profileURL %q must not contain credentials", raw)
+	}
+	host := u.Hostname()
+	if ip := net.ParseIP(host); host != "localhost" && (ip == nil || !ip.IsLoopback()) {
+		return fmt.Errorf("profileURL %q must point at localhost (e.g. http://localhost:6060/debug/pprof/profile)", raw)
 	}
 	return nil
 }

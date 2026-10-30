@@ -3,7 +3,13 @@
 import {fuzzy} from '../models';
 import {workspace} from '../models';
 
-export function FindFiles(arg1:string,arg2:string,arg3:number):Promise<fuzzy.Result>;
+export function AddRoot(arg1:string):Promise<string>;
+
+export function CreateFile(arg1:string,arg2:string):Promise<string>;
+
+export function CreateFolder(arg1:string,arg2:string):Promise<string>;
+
+export function FindFiles(arg1:Array<string>,arg2:string,arg3:number):Promise<fuzzy.Result>;
 
 export function ForgetRecent(arg1:string):Promise<void>;
 
@@ -20,5 +26,13 @@ export function PickFolder():Promise<string>;
 export function ReadFile(arg1:string):Promise<workspace.FileContent>;
 
 export function RecentFolders():Promise<Array<string>>;
+
+export function RemoveRoot(arg1:string):Promise<void>;
+
+export function RenamePath(arg1:string,arg2:string):Promise<string>;
+
+export function RevealInFinder(arg1:string):Promise<void>;
+
+export function TrashPaths(arg1:Array<string>):Promise<Array<string>>;
 
 export function WriteFile(arg1:string,arg2:string):Promise<void>;

@@ -23,8 +23,8 @@ const dirname = (p: string) => p.slice(0, Math.max(p.lastIndexOf('/'), 1))
 export async function applyChanges(paths: string[]): Promise<void> {
   for (const p of paths) fileListeners.get(p)?.forEach((fn) => fn())
 
-  const { children, root } = useWorkspace.getState()
-  if (!root) return
+  const { children, roots } = useWorkspace.getState()
+  if (roots.length === 0) return
   // A change to `a/b/c.go` may add/remove an entry in `a/b`; a changed dir path may be new.
   const dirs = new Set<string>()
   for (const p of paths) {

@@ -1,5 +1,5 @@
 import { useEditor } from '../store/editor'
-import { useWorkspace } from '../store/workspace'
+import { activeRoot, rootFor } from '../store/activeRoot'
 import { chatTabId, useAgentChat } from '../store/agentChat'
 import { useAgent } from '../store/agent'
 import { showToast } from '../store/dialog'
@@ -16,16 +16,21 @@ export interface AskAgentOptions {
    * add words. A busy agent keeps it in the draft.
    */
   send?: boolean
+  /**
+   * Workspace folder the request is about; its chats are preferred. Defaults to the
+   * folder of the first attachment, else the active tab's folder.
+   */
+  root?: string
 }
 
 /**
  * Hands a problem to the agent chat: the active (or most recently used) chat of the
- * current project, or a new one with the preferred agent. Fills the draft and
+ * project it is about, or a new one there with the preferred agent. Fills the draft and
  * attachments, then focuses the chat. Returns the chat session id, or null when
  * no chat could be opened.
  */
-export async function askAgent({ prompt, attachments = [], send = false }: AskAgentOptions): Promise<string | null> {
-  const id = await targetChat()
+export async function askAgent({ prompt, attachments = [], send = false, root }: AskAgentOptions): Promise<string | null> {
+  const id = await targetChat(root ?? (attachments.length ? rootFor(attachments[0].path) : activeRoot()))
   if (!id) return null
   const store = useAgentChat.getState()
   const session = store.sessions[id]
@@ -40,10 +45,9 @@ export async function askAgent({ prompt, attachments = [], send = false }: AskAg
 }
 
 /** The chat askAgent writes to, started with the preferred agent when none fits. */
-async function targetChat(): Promise<string | null> {
+async function targetChat(root: string): Promise<string | null> {
   const chat = useAgentChat.getState()
   const { activeId, backStack } = useEditor.getState()
-  const root = useWorkspace.getState().root ?? ''
   const cwds = Object.fromEntries(Object.values(chat.sessions).map((s) => [s.id, s.cwd]))
   const found = pickChat({ activeId, backStack, order: chat.order, cwds, root })
   if (found) return found

@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useLsp } from '../../store/lsp'
 import { useEditor } from '../../store/editor'
 import { useWorkspace } from '../../store/workspace'
+import { displayPath } from '../../lib/workspaceRoots'
 import { Modal } from '../layout/Modal'
 
 /** IntelliJ-style "Find Usages" popup: ↑/↓ to move, Enter to jump. */
 export function UsagesModal() {
   const usages = useLsp((s) => s.usages)
   const close = useLsp((s) => s.closeUsages)
-  const root = useWorkspace((s) => s.root)
+  const roots = useWorkspace((s) => s.roots)
   const openFile = useEditor((s) => s.openFile)
   const [cursor, setCursor] = useState(0)
   const list = useRef<HTMLDivElement>(null)
@@ -20,7 +21,7 @@ export function UsagesModal() {
 
   if (!usages) return null
   const { locations, symbol } = usages
-  const rel = (p: string) => (root && p.startsWith(root + '/') ? p.slice(root.length + 1) : p)
+  const rel = (p: string) => displayPath(roots, p)
 
   const choose = (i: number) => {
     const loc = locations[i]

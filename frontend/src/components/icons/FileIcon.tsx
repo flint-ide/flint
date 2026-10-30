@@ -56,6 +56,8 @@ const BY_EXT: Record<string, Badge> = {
   tf: { label: 'TF', bg: '#7444c4' },
   hcl: { label: 'HCL', bg: '#7444c4' },
   graphql: { label: 'GQL', bg: '#d6339c' },
+  http: { label: 'API', bg: '#2a8a7a' },
+  rest: { label: 'API', bg: '#2a8a7a' },
   vue: { label: 'VUE', bg: '#3a9b6f' },
   svelte: { label: 'SV', bg: '#e8552f' },
   dart: { label: 'DT', bg: '#2a8ac2' },
@@ -247,8 +249,24 @@ export const FileIcon = memo(function FileIcon({ name, isDir, open }: Props) {
 })
 
 /** Icons for non-file tabs. */
-export function TabKindIcon({ kind, busy }: { kind: 'terminal' | 'chat' | 'diff' | 'history' | 'sql' | 'markdown' | 'text' | 'run' | 'debug'; busy?: boolean }) {
+export function TabKindIcon({ kind, busy }: { kind: 'terminal' | 'chat' | 'diff' | 'history' | 'sql' | 'markdown' | 'text' | 'run' | 'debug' | 'profile' | 'http'; busy?: boolean }) {
   switch (kind) {
+    case 'profile':
+      return (
+        <Svg className={`file-icon${busy ? ' pulse' : ''}`}>
+          <rect x="1.5" y="2.5" width="13" height="3" rx="0.8" fill="#9a4a1c" />
+          <rect x="1.5" y="6.5" width="9" height="3" rx="0.8" fill="#c2671c" />
+          <rect x="11" y="6.5" width="3.5" height="3" rx="0.8" fill="#58657d" />
+          <rect x="1.5" y="10.5" width="5.5" height="3" rx="0.8" fill="#f59e0b" />
+        </Svg>
+      )
+    case 'http':
+      return (
+        <Svg className={`file-icon${busy ? ' pulse' : ''}`}>
+          <rect x="1.5" y="2.5" width="13" height="11" rx="2.2" fill="#1d2a2a" stroke="#4fb8a8" />
+          <path d="M4 6.2h7.2M9.4 4.6l1.8 1.6-1.8 1.6M12 9.8H4.8M6.6 8.2L4.8 9.8l1.8 1.6" fill="none" stroke="#7fe0cf" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      )
     case 'debug':
       return (
         <Svg className={`file-icon${busy ? ' pulse' : ''}`}>

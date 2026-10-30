@@ -50,7 +50,8 @@ export function useBlame(view: RefObject<EditorView | null>, path: string, ready
     const v = view.current
     if (!v || !ready) return
     const onContextMenu = (e: MouseEvent) => {
-      if (!(e.target instanceof Element) || !e.target.closest('.cm-gutters')) return
+      // A gutter that handled the click itself (test markers) prevented the default.
+      if (e.defaultPrevented || !(e.target instanceof Element) || !e.target.closest('.cm-gutters')) return
       e.preventDefault()
       const line = v.lineBlockAtHeight(e.clientY - v.documentTop)
       const commit = blameAt(v.state, line.from)

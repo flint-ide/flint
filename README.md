@@ -44,6 +44,83 @@ make test-db-up && make test-integration   # Postgres + ClickHouse w Dockerze
 make test-db-down
 ```
 
+## Architektura
+
+Flint to jeden proces Go z systemowym WebView (Wails v2, na macOS WKWebView). Cała logika — pliki, git, bazy, terminale, agenci, LSP — działa w Go. Frontend (React + TypeScript) tylko wyświetla i wysyła polecenia.
+
+```mermaid
+flowchart LR
+  subgraph UI["WebView · React + TypeScript"]
+    direction TB
+    tabs["Karty: CodeMirror 6 · xterm.js · czat agenta · konsola SQL · diff"]
+    side["Panele: pliki · szukaj · Commit · bazy · brudnopisy"]
+    stores["zustand stores"]
+  end
+
+  subgraph GO["Proces Go · api_*.go → internal/*"]
+    direction TB
+    ws["workspace · watcher (FSEvents)"]
+    srch["search (ripgrep)"]
+    git["git (git CLI)"]
+    lsp["lsp (JSON-RPC)"]
+    ag["agentsession: claude · codex · acp"]
+    term["terminal (PTY)"]
+    db["db: pgx · clickhouse-go"]
+    cfg["config · scratch · Keychain"]
+  end
+
+  subgraph EXT["Procesy i usługi zewnętrzne"]
+    direction TB
+    bins["rg · git · gopls / rust-analyzer / …"]
+    agents["claude -p stream-json · codex app-server"]
+    shell["login shell (zsh)"]
+    dbs[("PostgreSQL · ClickHouse")]
+  end
+
+  UI -- "wywołania metod (Wails bindings)" --> GO
+  GO -- "zdarzenia: term:data · agent:event · search:batch<br/>fs:changed · git:changed · lsp:diagnostics" --> UI
+  srch & git & lsp --> bins
+  ag --> agents
+  term --> shell
+  db --> dbs
+```
+
+**Komunikacja UI ↔ Go.**
+- **Wywołania:** frontend wywołuje metody `WorkspaceAPI`, `GitAPI`, `DatabaseAPI`, `LSPAPI`, `AgentChatAPI` itd. przez wygenerowane bindingi (`frontend/wailsjs`). Wails wykonuje każde wywołanie w osobnej gorutynie, dlatego zapisy i wpisywanie do terminala są kolejkowane po stronie UI.
+- **Zdarzenia:** strumienie płyną zdarzeniami (wyjście terminala, odpowiedzi agenta, wyniki wyszukiwania, zmiany plików i gita, diagnostyka LSP).
+- **Kolejność:** zdarzenia terminala i agenta mają numery sekwencyjne, a UI układa je z powrotem w kolejności, bo transport nie gwarantuje kolejności (np. dev server Wails).
+
+**Zasady projektowe.**
+- **Szybkość ponad wszystko:**
+  - brak indeksowania z góry: wyszukiwanie przez `rg` na żywo, lista plików dla ⌘P z `rg --files`;
+  - serwery LSP i agenci startują leniwie, w tle;
+  - CodeMirror i czat agenta ładują się dopiero przy pierwszym użyciu;
+  - długie listy (drzewo, wyniki, tabele SQL) są wirtualizowane.
+- **Natywne narzędzia zamiast reimplementacji:** git, ripgrep, serwery LSP i agenci to Twoje zainstalowane binarki, uruchamiane z `PATH` login shella (`internal/shellenv`), więc działają hooki, konfiguracja i uwierzytelnianie dokładnie jak w terminalu.
+- **AI-first bez blokowania:**
+  - agenci edytują pliki bez okien „Akceptuj/Odrzuć” (w obrębie projektu);
+  - Flint pokazuje zmiany przez watcher, znaczniki gita na marginesie i panel Commit;
+  - komendy agenta i wyjścia poza projekt wymagają zgody.
+- **Bez npm w runtime:**
+  - klienci LSP/ACP i sterowniki agentów są napisani w Go na bibliotece standardowej;
+  - zależności frontendu są przypięte i instalowane z `--ignore-scripts`.
+
+### Gdzie Flint trzyma dane
+
+| Co | Gdzie | Uwagi |
+|---|---|---|
+| Ostatnie foldery, preferowany agent, polityka zgód agenta | `~/Library/Application Support/flint/state.json` | |
+| Profile połączeń z bazami (host, port, użytkownik, baza, TLS, read-only) | `~/Library/Application Support/flint/connections.json` | **bez haseł**, plik z uprawnieniami `0600` |
+| Hasła do baz | Pęk kluczy macOS (Keychain), usługa `flint-db`, konto = id połączenia | usuwane razem z profilem |
+| Brudnopisy (konsole SQL, notatki) | `~/Library/Application Support/flint/scratch/` — `index.json` + `<id>.sql/.md/.txt` | autozapis |
+| Szerokość panelu bocznego | `localStorage` WebView | tylko ustawienia wyglądu |
+| Otwarte karty, terminale, rozmowy z agentem | tylko w pamięci | znikają po zamknięciu |
+| Historia rozmów z agentem | sam CLI agenta: `~/.claude/projects/…`, `~/.codex/sessions/…` | Flint jej nie kopiuje |
+| „Always allow” dla komend Claude | `.claude/settings.local.json` w projekcie | zapisuje Claude Code, jak w terminalu |
+| Cache serwerów LSP | ich własne katalogi, np. `~/Library/Caches/gopls` | |
+
+Katalog `~/Library/Application Support/flint` można zmienić zmienną `FLINT_CONFIG_DIR` (używają jej testy i tryb deweloperski). Pliki JSON są zapisywane atomowo: zapis do pliku tymczasowego, potem rename.
+
 ## Struktura
 
 ```
@@ -64,7 +141,7 @@ internal/agentsession       wspólny model zdarzeń agenta, polityka akceptacji,
 frontend/src                React: store (zustand), components, lib
 ```
 
-Konfiguracja trafia do `~/Library/Application Support/flint` (można ją nadpisać zmienną `FLINT_CONFIG_DIR`).
+Szczegóły przechowywania danych: sekcja [Gdzie Flint trzyma dane](#gdzie-flint-trzyma-dane).
 
 ## Bezpieczeństwo zależności
 

@@ -29,11 +29,10 @@ const started = new Set<string>()
 interface Props {
   tab: TerminalTab
   active: boolean
-  visible: boolean
 }
 
 /** One xterm.js instance bound to a backend PTY. Stays mounted while its tab exists. */
-export function TerminalView({ tab, active, visible }: Props) {
+export function TerminalView({ tab, active }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const term = useRef<XTerm | null>(null)
   const fit = useRef<FitAddon | null>(null)
@@ -130,11 +129,11 @@ export function TerminalView({ tab, active, visible }: Props) {
   }, [tab.id])
 
   useEffect(() => {
-    if (active && visible) {
+    if (active) {
       fit.current?.fit()
       term.current?.focus()
     }
-  }, [active, visible])
+  }, [active])
 
   return <div className="terminal-view" ref={host} />
 }

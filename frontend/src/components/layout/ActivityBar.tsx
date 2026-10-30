@@ -1,4 +1,5 @@
 import { useWorkspace, type SidebarView } from '../../store/workspace'
+import { useEditor } from '../../store/editor'
 
 const VIEWS: { id: SidebarView; icon: string; title: string }[] = [
   { id: 'files', icon: '▤', title: 'Files' },
@@ -8,7 +9,8 @@ const VIEWS: { id: SidebarView; icon: string; title: string }[] = [
   { id: 'scratch', icon: '✎', title: 'Scratchpads' },
 ]
 
-export function ActivityBar({ onTerminal, terminalOpen }: { onTerminal: () => void; terminalOpen: boolean }) {
+export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {
+  const terminalActive = useEditor((s) => s.activeId?.startsWith('term:') ?? false)
   const sidebar = useWorkspace((s) => s.sidebar)
   const visible = useWorkspace((s) => s.sidebarVisible)
   const setSidebar = useWorkspace((s) => s.setSidebar)
@@ -27,7 +29,7 @@ export function ActivityBar({ onTerminal, terminalOpen }: { onTerminal: () => vo
         </button>
       ))}
       <span className="spacer" />
-      <button className={`activity${terminalOpen ? ' active' : ''}`} title="Terminal (⌘J)" onClick={onTerminal}>
+      <button className={`activity${terminalActive ? ' active' : ''}`} title="Terminal (⌘J)" onClick={onTerminal}>
         ❯_
       </button>
     </nav>

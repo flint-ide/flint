@@ -4,6 +4,7 @@ import { useSearch } from '../../store/search'
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
 import type { SearchMatch } from '../../api/backend'
+import { FileIcon } from '../icons/FileIcon'
 
 const ROW_HEIGHT = 22
 const DEBOUNCE_MS = 250
@@ -121,6 +122,7 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
               return (
                 <div key={`f:${row.path}`} className="tree-row search-file" style={style} onClick={() => toggleFile(row.path)} title={row.path}>
                   <span className="twisty">{collapsed.has(row.path) ? '▸' : '▾'}</span>
+                  <FileIcon name={row.path.split('/').pop() ?? row.path} />
                   <span className="file-name">{row.path.split('/').pop()}</span>
                   <span className="muted path-hint">{row.path.includes('/') ? row.path.slice(0, row.path.lastIndexOf('/')) : ''}</span>
                   <span className="badge">{row.count}</span>

@@ -168,7 +168,7 @@ func (f *fakeServer) match(want, got wireMsg) error {
 		if len(want.ID) > 0 {
 			f.ids[string(want.ID)] = got.ID
 		}
-		if got.Method == methodThreadStart {
+		if got.Method == methodThreadStart || got.Method == methodThreadResume {
 			var p struct {
 				Cwd string `json:"cwd"`
 			}

@@ -100,6 +100,16 @@ func (m *Manager) Resize(id string, cols, rows int) error {
 	return pty.Setsize(s.pty, winsize(cols, rows))
 }
 
+// Cwd returns the shell's current directory (it follows `cd`), so a restarted
+// Flint can reopen the terminal where the user left it.
+func (m *Manager) Cwd(id string) (string, error) {
+	s, err := m.get(id)
+	if err != nil {
+		return "", err
+	}
+	return processCwd(s.cmd.Process.Pid)
+}
+
 // Close hangs up the shell and its children.
 func (m *Manager) Close(id string) {
 	m.mu.Lock()

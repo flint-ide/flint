@@ -260,3 +260,47 @@ func TestEventsAreNumberedPerSession(t *testing.T) {
 		t.Errorf("seq = %v, want [1 1 2]", got)
 	}
 }
+
+// resumableFake is a fakeDriver that can also reopen a session.
+type resumableFake struct {
+	*fakeDriver
+	resumed []string
+}
+
+func (r *resumableFake) Resume(_ context.Context, cwd, id string, sink Sink) (SessionInfo, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if id == "gone" {
+		return SessionInfo{}, errors.New("no such conversation")
+	}
+	r.resumed = append(r.resumed, id)
+	r.sinks[id] = sink
+	return SessionInfo{ID: id, Cwd: cwd}, nil
+}
+
+func TestResumeRegistersTheSession(t *testing.T) {
+	rec := &recorder{}
+	m := NewManager(rec.emit)
+	f := &resumableFake{fakeDriver: newFake("")}
+	close(f.release)
+	m.Register("fake", f)
+	m.Register("plain", newFake(""))
+
+	info, err := m.Resume(context.Background(), "fake", "/w", "old-1")
+	if err != nil || info.ID != "old-1" || info.Agent != "fake" {
+		t.Fatalf("Resume = %+v, %v", info, err)
+	}
+	if err := m.Prompt("old-1", "again", nil); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool { return contains(rec.kinds(), KindTurnEnd) })
+	if _, err := m.Resume(context.Background(), "fake", "/w", "gone"); err == nil {
+		t.Error("resuming a missing conversation should fail")
+	}
+	if _, err := m.Resume(context.Background(), "plain", "/w", "x"); !errors.Is(err, ErrNoResume) {
+		t.Errorf("driver without Resume: %v", err)
+	}
+	if _, err := m.Resume(context.Background(), "nope", "/w", "x"); err == nil {
+		t.Error("unknown agent should fail")
+	}
+}

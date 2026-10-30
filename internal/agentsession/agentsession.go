@@ -164,3 +164,11 @@ type Driver interface {
 	// Close stops every session.
 	Close() error
 }
+
+// Resumer is implemented by drivers that can reopen a conversation from an
+// earlier run (so a restarted Flint continues where it left off).
+type Resumer interface {
+	// Resume reopens session sessionID in cwd. The returned ID may differ when
+	// the agent forks the conversation.
+	Resume(ctx context.Context, cwd, sessionID string, sink Sink) (SessionInfo, error)
+}

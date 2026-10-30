@@ -12,6 +12,8 @@ export function Prompt(arg1:string,arg2:string,arg3:Array<agentsession.Attachmen
 
 export function Respond(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function Resume(arg1:string,arg2:string,arg3:string):Promise<agentsession.SessionInfo>;
+
 export function SetPolicy(arg1:agentsession.Policy):Promise<void>;
 
 export function Start(arg1:string,arg2:string):Promise<agentsession.SessionInfo>;

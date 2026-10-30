@@ -2,6 +2,7 @@ import * as AppAPI from '../../wailsjs/go/main/AppAPI'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
 import { saveTab, useEditor } from './editor'
 import { confirmAction } from './dialog'
+import { saveSession } from './session'
 
 /** ⌘Q / window close: flush scratchpads, ask about unsaved files, then quit. */
 async function handleBeforeClose(): Promise<void> {
@@ -17,6 +18,7 @@ async function handleBeforeClose(): Promise<void> {
       return
     }
   }
+  await saveSession()
   await AppAPI.Quit()
 }
 

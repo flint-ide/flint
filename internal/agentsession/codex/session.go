@@ -91,8 +91,9 @@ func (s *session) barrier(ch chan struct{}) {
 	}
 }
 
-// handshake runs initialize / initialized / thread/start.
-func (s *session) handshake(ctx context.Context, opts Options) (agentsession.SessionInfo, error) {
+// handshake runs initialize / initialized and then thread/start, or
+// thread/resume when resumeID names a stored thread.
+func (s *session) handshake(ctx context.Context, opts Options, resumeID string) (agentsession.SessionInfo, error) {
 	c := s.conn()
 	init := initializeParams{
 		ClientInfo:   clientInfo{Name: orDefault(opts.ClientName, "flint"), Title: "Flint", Version: orDefault(opts.ClientVersion, "0.0.0")},
@@ -104,18 +105,20 @@ func (s *session) handshake(ctx context.Context, opts Options) (agentsession.Ses
 	if err := c.notify(methodInitialized, nil); err != nil {
 		return agentsession.SessionInfo{}, err
 	}
-	params := threadStartParams{
-		Cwd:            s.cwd,
-		Model:          opts.Model,
-		ApprovalPolicy: orDefault(opts.ApprovalPolicy, DefaultApprovalPolicy),
-		Sandbox:        orDefault(opts.Sandbox, DefaultSandbox),
+	approval := orDefault(opts.ApprovalPolicy, DefaultApprovalPolicy)
+	sandbox := orDefault(opts.Sandbox, DefaultSandbox)
+	method := methodThreadStart
+	var params any = threadStartParams{Cwd: s.cwd, Model: opts.Model, ApprovalPolicy: approval, Sandbox: sandbox}
+	if resumeID != "" {
+		method = methodThreadResume
+		params = threadResumeParams{ThreadID: resumeID, Cwd: s.cwd, Model: opts.Model, ApprovalPolicy: approval, Sandbox: sandbox, ExcludeTurns: true}
 	}
 	var res threadStartResponse
-	if err := c.call(ctx, methodThreadStart, params, &res); err != nil {
+	if err := c.call(ctx, method, params, &res); err != nil {
 		return agentsession.SessionInfo{}, err
 	}
 	if res.Thread.ID == "" {
-		return agentsession.SessionInfo{}, errors.New("codex: thread/start returned no thread id")
+		return agentsession.SessionInfo{}, fmt.Errorf("codex: %s returned no thread id", method)
 	}
 	id := res.Thread.ID
 	s.sid.Store(&id)

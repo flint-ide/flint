@@ -7,6 +7,7 @@ const (
 	methodInitialize    = "initialize"
 	methodInitialized   = "initialized"
 	methodThreadStart   = "thread/start"
+	methodThreadResume  = "thread/resume"
 	methodTurnStart     = "turn/start"
 	methodTurnInterrupt = "turn/interrupt"
 
@@ -80,6 +81,19 @@ type threadStartParams struct {
 	Sandbox        string `json:"sandbox,omitempty"`
 }
 
+// threadResumeParams reopens a stored thread; the policy fields mirror
+// thread/start because a resumed thread does not keep them.
+type threadResumeParams struct {
+	ThreadID       string `json:"threadId"`
+	Cwd            string `json:"cwd"`
+	Model          string `json:"model,omitempty"`
+	ApprovalPolicy string `json:"approvalPolicy,omitempty"`
+	Sandbox        string `json:"sandbox,omitempty"`
+	// ExcludeTurns skips sending the stored history back: Flint keeps its own transcript.
+	ExcludeTurns bool `json:"excludeTurns,omitempty"`
+}
+
+// threadStartResponse is also the thread/resume response.
 type threadStartResponse struct {
 	Thread struct {
 		ID string `json:"id"`

@@ -3,6 +3,8 @@
 
 export function Close(arg1:string):Promise<void>;
 
+export function Cwd(arg1:string):Promise<string>;
+
 export function Resize(arg1:string,arg2:number,arg3:number):Promise<void>;
 
 export function Start(arg1:string,arg2:string,arg3:number,arg4:number):Promise<void>;

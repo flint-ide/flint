@@ -49,6 +49,7 @@ func main() {
 			&ScratchAPI{app: app},
 			&TerminalAPI{app: app},
 			&AppAPI{app: app},
+			&SessionAPI{app: app},
 			gitAPI,
 			&AgentAPI{app: app, git: gitAPI},
 			lspAPI,

@@ -14,6 +14,7 @@ import (
 	"flint/internal/config"
 	"flint/internal/db"
 	"flint/internal/lsp"
+	"flint/internal/restore"
 	"flint/internal/scratch"
 	"flint/internal/terminal"
 	"flint/internal/watcher"
@@ -40,6 +41,7 @@ type App struct {
 	terminals *terminal.Manager
 	lsp       *lsp.Manager
 	agents    *agentsession.Manager
+	sessions  *restore.Store
 
 	watchMu sync.Mutex
 	watch   *watcher.Watcher
@@ -74,6 +76,7 @@ func NewApp() (*App, error) {
 		argFolder: folderFromArgs(os.Args[1:]),
 		db:        db.NewManager(store),
 		scratch:   scratches,
+		sessions:  restore.New(filepath.Join(dir, "sessions")),
 	}
 	a.terminals = terminal.NewManager(newTerminalEvents(a))
 	a.lsp = lsp.NewManager()

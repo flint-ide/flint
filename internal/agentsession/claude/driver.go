@@ -5,7 +5,10 @@
 //
 //	claude -p --input-format stream-json --output-format stream-json --verbose
 //	       --include-partial-messages --permission-prompt-tool stdio
-//	       --session-id <uuid> --permission-mode <mode> [--model <m>] [extra...]
+//	       --permission-mode <mode> --session-id <uuid> [--model <m>] [extra...]
+//
+// Resume replaces --session-id with --resume <uuid> to continue a saved
+// conversation.
 //
 // Each Prompt writes one stream-json user message to stdin; the turn ends
 // with a "result" line. Permission prompts arrive as control_request
@@ -21,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -94,6 +98,22 @@ func New(opts Options) *Driver {
 // Start spawns a claude process for a new conversation in cwd and performs
 // the initialize handshake. ctx bounds the handshake only.
 func (d *Driver) Start(ctx context.Context, cwd string, sink agentsession.Sink) (agentsession.SessionInfo, error) {
+	id, err := newSessionID()
+	if err != nil {
+		return agentsession.SessionInfo{}, err
+	}
+	return d.start(ctx, cwd, id, false, sink)
+}
+
+// Resume reopens an earlier conversation (claude --resume) under the same id.
+func (d *Driver) Resume(ctx context.Context, cwd, sessionID string, sink agentsession.Sink) (agentsession.SessionInfo, error) {
+	if !isSessionID(sessionID) {
+		return agentsession.SessionInfo{}, fmt.Errorf("claude: invalid session id %q", sessionID)
+	}
+	return d.start(ctx, cwd, sessionID, true, sink)
+}
+
+func (d *Driver) start(ctx context.Context, cwd, id string, resume bool, sink agentsession.Sink) (agentsession.SessionInfo, error) {
 	if sink == nil {
 		return agentsession.SessionInfo{}, errors.New("claude: nil sink")
 	}
@@ -110,11 +130,13 @@ func (d *Driver) Start(ctx context.Context, cwd string, sink agentsession.Sink) 
 	if err != nil {
 		return agentsession.SessionInfo{}, err
 	}
-	id, err := newSessionID()
-	if err != nil {
-		return agentsession.SessionInfo{}, err
+	d.mu.Lock()
+	_, taken := d.sessions[id]
+	d.mu.Unlock()
+	if taken {
+		return agentsession.SessionInfo{}, fmt.Errorf("claude: session %s is already open", id)
 	}
-	s, err := spawn(path, buildArgs(id, d.opts), cwd, buildEnv(d.opts.Env, cwd), id, sink)
+	s, err := spawn(path, buildArgs(id, resume, d.opts), cwd, buildEnv(d.opts.Env, cwd), id, sink)
 	if err != nil {
 		return agentsession.SessionInfo{}, err
 	}
@@ -287,8 +309,9 @@ func (s *session) shutdownAsFailure() {
 	}
 }
 
-// buildArgs assembles the CLI command line.
-func buildArgs(sessionID string, opts Options) []string {
+// buildArgs assembles the CLI command line. resume continues the saved
+// conversation sessionID instead of starting a new one under that id.
+func buildArgs(sessionID string, resume bool, opts Options) []string {
 	mode := opts.PermissionMode
 	if mode == "" {
 		mode = defaultPermissionMode
@@ -300,8 +323,12 @@ func buildArgs(sessionID string, opts Options) []string {
 		"--verbose", // required by stream-json output
 		"--include-partial-messages",
 		"--permission-prompt-tool", "stdio",
-		"--session-id", sessionID,
 		"--permission-mode", mode,
+	}
+	if resume {
+		args = append(args, "--resume", sessionID)
+	} else {
+		args = append(args, "--session-id", sessionID)
 	}
 	if opts.Model != "" {
 		args = append(args, "--model", opts.Model)
@@ -382,6 +409,12 @@ func resolveModel(initResp json.RawMessage, want string) string {
 	}
 	return want
 }
+
+var sessionIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+// isSessionID reports whether id is a lowercase UUID, the only form Flint
+// hands to --resume (it comes back from the saved session file).
+func isSessionID(id string) bool { return sessionIDPattern.MatchString(id) }
 
 // newSessionID returns a random RFC 4122 version 4 UUID (--session-id
 // requires one).

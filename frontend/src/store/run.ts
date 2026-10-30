@@ -56,6 +56,18 @@ export interface RunSession {
   exit: RunExit | null
   tests: TestTree
   startedAt: number
+  /** Rerun of a custom test launch (profiling); plain runs rerun `request`. */
+  again?: () => Promise<void>
+}
+
+/** A test run started some other way than RunAPI.StartTests (profiling, see store/profile.ts). */
+export interface TestLaunch {
+  /** Starts the process under runId; returns the run's title. */
+  start: (runId: string) => Promise<string>
+  /** Called once the process ended; null when it was replaced, closed or failed to start first. */
+  onExit: (exit: RunExit | null) => void
+  /** Starts the same launch again (Rerun). */
+  again: () => Promise<void>
 }
 
 /** A failed test, as handed to an agent ("Fix with agent"). */
@@ -219,13 +231,14 @@ export async function runConfiguration(config: RunConfig, root: string | null = 
   )
 }
 
-/** Runs tests in the Tests tab (replacing the previous test run). */
-export async function runTests(req: TestRequest): Promise<void> {
+/** Runs tests in the Tests tab (replacing the previous test run); launch: a custom start (profiling). */
+export async function runTests(req: TestRequest, launch?: TestLaunch): Promise<void> {
   const root = rootFor(req.file ?? req.dirs[0])
   await startSession(
     TESTS_KEY,
-    { kind: 'tests', title: 'Tests', request: req, bases: [...req.dirs, root].filter(Boolean) },
-    (runId) => RunAPI.StartTests(runId, testrun.Request.createFrom(req)),
+    { kind: 'tests', title: 'Tests', request: req, bases: [...req.dirs, root].filter(Boolean), again: launch?.again },
+    launch?.start ?? ((runId) => RunAPI.StartTests(runId, testrun.Request.createFrom(req))),
+    launch?.onExit,
   )
 }
 
@@ -308,6 +321,7 @@ export async function stopRun(key: string | null = currentKey()): Promise<void> 
 export async function rerun(key: string | null = currentKey()): Promise<void> {
   const session = key ? useRun.getState().sessions[key] : undefined
   if (!session) return runSelected()
+  if (session.again) return session.again()
   if (session.kind === 'tests' && session.request) return runTests(session.request)
   if (session.config) {
     const shown = session.root === useRun.getState().root
@@ -341,9 +355,18 @@ export function currentKey(): string | null {
 
 /** Process ids → the session (key) they belong to. */
 const runKeys = new Map<string, string>()
+/** Process ids → what to do once they ended (TestLaunch.onExit). */
+const exitHooks = new Map<string, (exit: RunExit | null) => void>()
+
+function settleExit(runId: string, exit: RunExit | null): void {
+  const hook = exitHooks.get(runId)
+  exitHooks.delete(runId)
+  hook?.(exit)
+}
 
 /** Forgets a process (tab closed or rerun): its late events are dropped. */
 function dropRun(runId: string): void {
+  settleExit(runId, null)
   runKeys.delete(runId)
   pendingNodes.delete(runId)
   inputs.delete(runId)
@@ -352,14 +375,16 @@ function dropRun(runId: string): void {
 
 async function startSession(
   key: string,
-  base: Pick<RunSession, 'kind' | 'title' | 'config' | 'root' | 'request' | 'bases'>,
+  base: Pick<RunSession, 'kind' | 'title' | 'config' | 'root' | 'request' | 'bases' | 'again'>,
   start: (runId: string, cols: number, rows: number) => Promise<string>,
+  onExit?: (exit: RunExit | null) => void,
 ): Promise<void> {
   const prev = useRun.getState().sessions[key]
   if (prev?.running) await RunAPI.Stop(prev.runId).catch(() => undefined)
   if (prev) dropRun(prev.runId)
   const runId = crypto.randomUUID()
   runKeys.set(runId, key)
+  if (onExit) exitHooks.set(runId, onExit)
   resetConsole(key)
   const session: RunSession = { key, runId, running: true, exit: null, tests: emptyTree, startedAt: Date.now(), ...base }
   useRun.setState((s) => ({ sessions: { ...s.sessions, [key]: session }, lastKey: key }))
@@ -374,6 +399,7 @@ async function startSession(
     const message = errorMessage(err)
     writeConsole(key, new TextEncoder().encode(`\x1b[31m${message}\x1b[0m\r\n`))
     updateSession(key, runId, () => ({ running: false, exit: { code: -1, stopped: false, elapsedMs: 0, error: message } }))
+    settleExit(runId, null)
     showToast(message, 'error')
   }
 }
@@ -556,6 +582,7 @@ function applyRunEvent(runId: string, ev: RunEventMsg): void {
   // The exit is the process's last event: settle its results first, then forget it.
   flushNodes(runId)
   if (key) updateSession(key, runId, () => ({ running: false, exit: ev.exit! }))
+  settleExit(runId, ev.exit)
   inputs.delete(runId)
   deliver.forget(runId)
 }

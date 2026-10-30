@@ -18,6 +18,8 @@ export interface TestGutterHooks {
   onResults: (listener: () => void) => () => void
   /** ⇧-click: debug the mark instead (when the language has a debugger). */
   debug?: (path: string, mark: TestMark) => void
+  /** Right click: a menu of what can be done with the mark (run, debug, profile). */
+  menu?: (path: string, mark: TestMark, x: number, y: number) => void
 }
 
 /** Mirrors testrun.Lang: which test runner a file belongs to. */

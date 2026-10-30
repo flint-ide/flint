@@ -9,6 +9,7 @@ import { useTerminal } from '../../store/terminal'
 import { useWorkspace } from '../../store/workspace'
 import { showFileHistory } from '../../store/gitHistory'
 import { runTestsInFile } from '../../store/run'
+import { profileTestsInFile } from '../../store/profile'
 import { debugTestsInFile } from '../../store/debug'
 import { testLang } from '../../lib/testFiles'
 
@@ -64,7 +65,12 @@ export function fileTreeMenu(roots: string[], targets: TreeEntry[], actions: Men
   const lang = single && !single.isDir ? testLang(single.path) : null
   if (lang) {
     items.push({ type: 'separator' }, { label: 'Run Tests', hint: single!.name, onSelect: () => void runTestsInFile(single!.path) })
-    if (lang === 'go') items.push({ label: 'Debug Tests', hint: single!.name, onSelect: () => void debugTestsInFile(single!.path) })
+    if (lang === 'go') {
+      items.push(
+        { label: 'Debug Tests', hint: single!.name, onSelect: () => void debugTestsInFile(single!.path) },
+        { label: 'Profile Tests', hint: single!.name, onSelect: () => void profileTestsInFile(single!.path) },
+      )
+    }
   }
   const history = single && !single.isDir && inRepo(root)
   if (history || changes.length > 0) items.push({ type: 'separator' })

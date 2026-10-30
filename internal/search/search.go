@@ -30,6 +30,9 @@ type Options struct {
 	Include       string `json:"include"` // comma-separated globs, e.g. "*.go,*.sql"
 	Exclude       string `json:"exclude"`
 	MaxResults    int    `json:"maxResults"`
+	// ReplaceOn: matches carry what Replace turns them into (see Replacer).
+	ReplaceOn bool   `json:"replaceOn"`
+	Replace   string `json:"replace"`
 }
 
 // Range is a match span in UTF-16 code units, matching JS string / CodeMirror offsets.
@@ -45,6 +48,8 @@ type Match struct {
 	Line   int     `json:"line"` // 1-based
 	Text   string  `json:"text"`
 	Ranges []Range `json:"ranges"`
+	// Replacements, when replacing, is what each range becomes.
+	Replacements []string `json:"replacements,omitempty"`
 }
 
 // Summary is reported once the search finishes.
@@ -67,10 +72,21 @@ func Run(ctx context.Context, opts Options, onBatch func([]Match)) (Summary, err
 	if opts.MaxResults <= 0 {
 		opts.MaxResults = defaultMaxResults
 	}
+	var rep *Replacer
+	if opts.ReplaceOn {
+		r, err := NewReplacer(opts, opts.Replace)
+		if err != nil {
+			return Summary{}, err
+		}
+		rep = r
+	}
 	start := time.Now()
 	b := newBatcher(func(matches []Match) {
 		for i := range matches {
 			matches[i].Root = opts.Root
+			if rep != nil {
+				rep.annotate(&matches[i])
+			}
 		}
 		onBatch(matches)
 	})

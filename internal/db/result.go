@@ -25,6 +25,14 @@ type QueryResult struct {
 	Affected  int64    `json:"affected"`  // rows affected by DML, when the driver reports it
 	Command   string   `json:"command"`   // e.g. "SELECT 3", "INSERT 0 1"
 	ElapsedMs int64    `json:"elapsedMs"`
+
+	// TableOID is the one table every table-backed column was read from (Postgres only,
+	// 0 otherwise); Attnums maps each result column to its attribute number there (0 =
+	// expression or repeated column). The grid offers editing for such results.
+	TableOID uint32 `json:"tableOid,omitempty"`
+	Attnums  []int  `json:"attnums,omitempty"`
+	// EditBlocked says why a Postgres result can't be edited (several tables, …).
+	EditBlocked string `json:"editBlocked,omitempty"`
 }
 
 // Table is a schema-introspection entry used for autocomplete and the schema tree.

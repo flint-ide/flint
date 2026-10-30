@@ -1,11 +1,15 @@
 import { Suspense, lazy, memo, useLayoutEffect } from 'react'
-import { useEditor, type Tab } from '../../store/editor'
+import { useEditor, type FileTab, type Tab } from '../../store/editor'
+import { usePreview } from '../../store/preview'
+import { isImage } from '../../lib/previewFiles'
 import { confirmAction } from '../../store/dialog'
 import { useTerminal } from '../../store/terminal'
 import { useAgentChat } from '../../store/agentChat'
 import { useScratch } from '../../store/scratch'
 import { closeRunSession, useRun } from '../../store/run'
 import { isDebugging, stopDebug, useDebug } from '../../store/debug'
+import { closeProfile } from '../../store/profile'
+import { useHttpClient } from '../../store/httpClient'
 import { useWorkspace } from '../../store/workspace'
 import { activeRoot } from '../../store/activeRoot'
 import { labelOf, rootLabels } from '../../lib/workspaceRoots'
@@ -17,12 +21,15 @@ import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 // CodeMirror, the SQL console and the agent chat load on first use, keeping startup
 // to the layout plus the terminal.
 const FileView = lazy(() => import('./FileView').then((m) => ({ default: m.FileView })))
+const ImageView = lazy(() => import('../preview/ImageView').then((m) => ({ default: m.ImageView })))
 const ScratchView = lazy(() => import('./ScratchView').then((m) => ({ default: m.ScratchView })))
 const DiffView = lazy(() => import('./DiffView').then((m) => ({ default: m.DiffView })))
 const HistoryView = lazy(() => import('./HistoryView').then((m) => ({ default: m.HistoryView })))
 const AgentChat = lazy(() => import('../agent/AgentChat').then((m) => ({ default: m.AgentChat })))
 const RunView = lazy(() => import('../run/RunView').then((m) => ({ default: m.RunView })))
 const DebugView = lazy(() => import('../debug/DebugView').then((m) => ({ default: m.DebugView })))
+const ProfileView = lazy(() => import('../profile/ProfileView').then((m) => ({ default: m.ProfileView })))
+const HttpResponseView = lazy(() => import('../http/HttpResponseView').then((m) => ({ default: m.HttpResponseView })))
 // xterm.js is the biggest dependency; output that arrives first waits in store/terminal.
 const TerminalView = lazy(() => import('../terminal/TerminalView').then((m) => ({ default: m.TerminalView })))
 
@@ -57,6 +64,9 @@ export async function requestCloseTab(tab: Tab): Promise<void> {
         return
       }
       void closeRunSession(tab.runKey) // also removes the editor tab
+      return
+    case 'profile':
+      closeProfile(tab.profileId) // also removes the editor tab and the temporary files
       return
   }
   useEditor.getState().closeTab(tab.id)
@@ -128,7 +138,7 @@ const TabPanel = memo(function TabPanel({ tab, active }: { tab: Tab; active: boo
     <div className="tab-panel" data-tab-id={tab.id} hidden={!active}>
       <ErrorBoundary label={tab.title}>
         <Suspense fallback={null}>
-          {tab.kind === 'file' && <FileView tab={tab} active={active} />}
+          {tab.kind === 'file' && <FileOrImage tab={tab} active={active} />}
           {tab.kind === 'scratch' && <ScratchView tab={tab} active={active} />}
           {tab.kind === 'diff' && <DiffView tab={tab} />}
           {tab.kind === 'history' && <HistoryView tab={tab} active={active} />}
@@ -136,11 +146,20 @@ const TabPanel = memo(function TabPanel({ tab, active }: { tab: Tab; active: boo
           {tab.kind === 'chat' && <ChatTabView sessionId={tab.sessionId} active={active} />}
           {tab.kind === 'run' && <RunView runKey={tab.runKey} active={active} />}
           {tab.kind === 'debug' && <DebugView />}
+          {tab.kind === 'profile' && <ProfileView profileId={tab.profileId} />}
+          {tab.kind === 'http' && <HttpResponseView tab={tab} active={active} />}
         </Suspense>
       </ErrorBoundary>
     </div>
   )
 })
+
+/** Images open in the image view (an SVG can switch to its source); everything else in the editor. */
+function FileOrImage({ tab, active }: { tab: FileTab; active: boolean }) {
+  const source = usePreview((s) => !!s.svgSource[tab.path])
+  if (isImage(tab.path) && !source) return <ImageView path={tab.path} active={active} />
+  return <FileView tab={tab} active={active} />
+}
 
 function TerminalTabView({ termId, active }: { termId: string; active: boolean }) {
   const tab = useTerminal((s) => s.tabs.find((t) => t.id === termId))
@@ -164,6 +183,8 @@ function TabIcon({ tab, debugActive }: { tab: Tab; debugActive: boolean }) {
       return <RunTabIcon runKey={tab.runKey} />
     case 'debug':
       return <TabKindIcon kind="debug" busy={debugActive} />
+    case 'http':
+      return <HttpTabIcon path={tab.path} />
     default:
       return <TabKindIcon kind={tab.kind} busy={false} />
   }
@@ -177,6 +198,11 @@ function ChatTabIcon({ sessionId }: { sessionId: string }) {
 function RunTabIcon({ runKey }: { runKey: string }) {
   const running = useRun((s) => !!s.sessions[runKey]?.running)
   return <TabKindIcon kind="run" busy={running} />
+}
+
+function HttpTabIcon({ path }: { path: string }) {
+  const sending = useHttpClient((s) => !!s.files[path]?.pending)
+  return <TabKindIcon kind="http" busy={sending} />
 }
 
 /** "+" at the end of the tab bar: new terminal, agent chat or SQL console. */

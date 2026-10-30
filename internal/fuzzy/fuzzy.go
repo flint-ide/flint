@@ -42,6 +42,16 @@ func Search(query string, targets []Target, limit int) []Match {
 	return m
 }
 
+// SearchIndices is Search returning the positions in targets of the best matches,
+// for callers ranking their own records (e.g. query history) rather than paths.
+func SearchIndices(query string, targets []Target, limit int) []int {
+	_, idx := search(query, targets, limit)
+	if idx == nil {
+		return []int{}
+	}
+	return idx
+}
+
 // search is Search that also returns the index in targets of each match.
 func search(query string, targets []Target, limit int) ([]Match, []int) {
 	if limit <= 0 {

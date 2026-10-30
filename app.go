@@ -15,6 +15,7 @@ import (
 	"flint/internal/dap"
 	"flint/internal/db"
 	"flint/internal/fuzzy"
+	"flint/internal/httpfile"
 	"flint/internal/lsp"
 	"flint/internal/restore"
 	"flint/internal/runner"
@@ -46,10 +47,12 @@ type App struct {
 	runEvents   *runEvents
 	debugs      *dap.Manager // debug sessions (dlv dap)
 	debugEvents *debugEvents
+	profiles    *profiles // temporary profiles and recordings in progress
 	lsp         *lsp.Manager
 	agents      *agentsession.Manager
 	sessions    *restore.Store
-	files       fuzzy.Index // quick-open file list of the open folder
+	files       fuzzy.Index      // quick-open file list of the open folder
+	http        *httpfile.Client // requests of .http files, sent only on demand
 
 	projMu   sync.Mutex
 	roots    []string                    // open project folders, the primary one first
@@ -86,13 +89,16 @@ func NewApp() (*App, error) {
 		db:        db.NewManager(store),
 		scratch:   scratches,
 		sessions:  restore.New(filepath.Join(dir, "sessions")),
+		http:      httpfile.NewClient(),
 	}
+	a.db.SetHistory(db.OpenHistory(filepath.Join(dir, "history"), db.DefaultHistoryLimit))
 	a.terminals = terminal.NewManager(newTerminalEvents(a))
 	a.runEvents = newRunEvents(a)
 	a.runs = runner.NewManager(a.runEvents)
 	a.debugEvents = newDebugEvents(a)
 	a.debugs = dap.NewManager(a.debugEvents)
 	a.lsp = lsp.NewManager()
+	a.profiles = newProfiles()
 	if err := config.LoadJSON(a.statePath(), &a.state); err != nil {
 		return nil, err
 	}
@@ -110,9 +116,11 @@ func (a *App) shutdown(context.Context) {
 		a.terminals.CloseAll,
 		a.runs.CloseAll,
 		a.debugs.CloseAll,
+		a.http.CancelAll,
 		a.lsp.Shutdown,
 		func() { _ = a.agents.Close() },
 		a.db.CloseAll,
+		a.profiles.closeAll,
 		a.closeProject,
 	} {
 		wg.Add(1)

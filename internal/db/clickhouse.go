@@ -113,6 +113,41 @@ func (s *chSession) Query(ctx context.Context, sql string, limit int) (*QueryRes
 	return res, nil
 }
 
+// Explain returns EXPLAIN PLAN (or, with pipeline, EXPLAIN PIPELINE) of sql as indented
+// lines. Neither executes the query.
+func (s *chSession) Explain(ctx context.Context, sql string, pipeline bool) (*ExplainResult, error) {
+	target, err := explainTarget(sql)
+	if err != nil {
+		return nil, err
+	}
+	stmt := clickhouseExplainSQL(target, pipeline)
+	start := time.Now()
+	rows, err := s.conn.Query(ctx, stmt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var lines []string
+	for rows.Next() {
+		var line string
+		if err := rows.Scan(&line); err != nil {
+			return nil, err
+		}
+		lines = append(lines, line)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return &ExplainResult{
+		Driver:    ClickHouse,
+		Analyze:   pipeline,
+		Statement: stmt,
+		Raw:       strings.Join(lines, "\n"),
+		Lines:     ParseTextPlan(lines),
+		ElapsedMs: time.Since(start).Milliseconds(),
+	}, nil
+}
+
 // chSchemaSQL introspects the session's database only; other databases are listed by
 // Databases and opened as sessions of their own, like Postgres databases.
 const chSchemaSQL = `

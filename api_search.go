@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -34,6 +35,40 @@ type SearchAPI struct {
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
+
+	undo search.UndoSlot // the last replace, for "Undo replace"
+}
+
+// Replace replaces the matches of opts on the selected lines (see
+// search.Replacer.Apply) and keeps the previous contents for UndoReplace.
+func (s *SearchAPI) Replace(opts search.Options, targets []search.ReplaceTarget) (search.ReplaceResult, error) {
+	r, err := search.NewReplacer(opts, opts.Replace)
+	if err != nil {
+		return search.ReplaceResult{}, err
+	}
+	res, undo := r.Apply(targets)
+	s.undo.Set(undo)
+	return res, nil
+}
+
+// UndoReplace restores the files the last Replace changed, except ones edited
+// since; it returns how many were restored and the paths skipped.
+func (s *SearchAPI) UndoReplace() (UndoResult, error) {
+	u := s.undo.Take()
+	if u == nil {
+		return UndoResult{}, errors.New("nothing to undo")
+	}
+	n, skipped := u.Restore()
+	if skipped == nil {
+		skipped = []string{}
+	}
+	return UndoResult{Restored: n, Skipped: skipped}, nil
+}
+
+// UndoResult reports an UndoReplace.
+type UndoResult struct {
+	Restored int      `json:"restored"`
+	Skipped  []string `json:"skipped"`
 }
 
 // Start cancels any running search and starts a new one over the given workspace

@@ -73,7 +73,15 @@ func (s *pgSession) Query(ctx context.Context, sql string, limit int) (*QueryRes
 
 	res := &QueryResult{Rows: [][]any{}, Columns: []Column{}}
 	typeMap := rows.Conn().TypeMap()
-	for _, fd := range rows.FieldDescriptions() {
+	fields := rows.FieldDescriptions()
+	oids, attnums := make([]uint32, len(fields)), make([]uint16, len(fields))
+	for i, fd := range fields {
+		oids[i], attnums[i] = fd.TableOID, fd.TableAttributeNumber
+	}
+	if len(fields) > 0 {
+		res.TableOID, res.Attnums, res.EditBlocked = resultSource(oids, attnums)
+	}
+	for _, fd := range fields {
 		typeName := "oid:" + strconv.FormatUint(uint64(fd.DataTypeOID), 10)
 		if t, ok := typeMap.TypeForOID(fd.DataTypeOID); ok {
 			typeName = t.Name

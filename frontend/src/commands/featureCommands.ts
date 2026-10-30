@@ -1,11 +1,23 @@
-// Commands of the run/test, debugger, git history and "fix with agent" features. Kept apart
+// Commands of the run/test, debugger, git history, HTTP client and "fix with agent" features. Kept apart
 // from appCommands so each feature's actions read as one list.
 import { registerCommands, type Command } from '../lib/commands'
+import { isMarkdown } from '../lib/previewFiles'
+import { markdownMode, setMarkdownMode } from '../store/preview'
 import { testLang } from '../lib/testFiles'
 import { useEditor, viewFor } from '../store/editor'
 import { useGit } from '../store/git'
 import { activeFilePath, showFileHistory, toggleBlame, useGitHistory } from '../store/gitHistory'
 import { openStashDialog } from '../store/stash'
+import { showToast } from '../store/dialog'
+import {
+  activeHttpFile,
+  clearCookies,
+  copyRequestAsCurl,
+  newHttpFile,
+  pickEnvironment,
+  setFollowRedirects,
+  useHttpClient,
+} from '../store/httpClient'
 import {
   canDebug,
   debugSelected,
@@ -19,6 +31,16 @@ import {
   useDebug,
 } from '../store/debug'
 import {
+  cancelProfiling,
+  isProfiling,
+  openProfileFile,
+  profilable,
+  profileSelected,
+  profileTestsInFile,
+  profileTestsInPackage,
+} from '../store/profile'
+import {
+  configKey,
   editRunConfig,
   failedTests,
   fixFailedTestsWithAgent,
@@ -48,7 +70,84 @@ const hasFailures = () => failedTests().length > 0
 
 export function registerFeatureCommands(): () => void {
   // Debug last: while debugging, its keys (⌘F2, F8) win over Run's and the editor's.
-  return registerCommands([...runCommands(), ...gitCommands(), ...agentCommands(), ...debugCommands()])
+  return registerCommands([...previewCommands(), ...runCommands(), ...profileCommands(), ...gitCommands(), ...agentCommands(), ...httpCommands(), ...debugCommands()])
+}
+
+function httpCommands(): Command[] {
+  const httpEditor = () => {
+    const path = activeHttpFile()
+    const { activeId } = useEditor.getState()
+    const view = activeId ? viewFor(activeId) : undefined
+    return path && view ? { path, view } : null
+  }
+  // The .http file of the active tab: the file itself or its response tab.
+  const httpPath = () => {
+    const { tabs, activeId } = useEditor.getState()
+    const tab = tabs.find((t) => t.id === activeId)
+    return tab?.kind === 'http' ? tab.path : activeHttpFile()
+  }
+  return [
+    {
+      id: 'http.send', title: 'Send Request', category: 'HTTP Client', hintKeys: 'Mod+Enter', keywords: 'rest api run execute http',
+      when: () => !!httpEditor(),
+      run: async () => {
+        const target = httpEditor()
+        if (!target) return
+        // Loaded with the .http editor, so already there.
+        const { sendAtCursor } = await import('../lib/httpEditor')
+        sendAtCursor(target.view, target.path)
+      },
+    },
+    { id: 'http.newFile', title: 'New HTTP Request File', category: 'HTTP Client', keywords: 'rest api client scratch .http', run: () => newHttpFile() },
+    {
+      id: 'http.selectEnv', title: 'Select HTTP Environment', category: 'HTTP Client', keywords: 'env variables dev prod http-client.env.json',
+      when: () => !!httpPath(),
+      run: () => {
+        const path = httpPath()
+        if (!path) return
+        // Under the environment button of the visible editor, else near the top of the window.
+        const anchor = document.querySelector('.tab-panel:not([hidden]) .http-bar .select')?.getBoundingClientRect()
+        return pickEnvironment(path, anchor?.left ?? window.innerWidth / 2 - 100, anchor ? anchor.bottom + 2 : 80)
+      },
+    },
+    {
+      id: 'http.copyCurl', title: 'Copy Request as curl', category: 'HTTP Client', keywords: 'http shell command',
+      when: () => !!httpEditor(),
+      run: () => {
+        const target = httpEditor()
+        if (!target) return
+        const { state } = target.view
+        return copyRequestAsCurl(target.path, state.doc.toString(), state.doc.lineAt(state.selection.main.head).number)
+      },
+    },
+    {
+      id: 'http.followRedirects', title: 'Toggle HTTP Follow Redirects', category: 'HTTP Client', keywords: '3xx location',
+      when: () => !!httpPath(),
+      run: () => {
+        const follow = !useHttpClient.getState().followRedirects
+        setFollowRedirects(follow)
+        showToast(follow ? 'HTTP client follows redirects' : 'HTTP client stops at redirects')
+      },
+    },
+    { id: 'http.clearCookies', title: 'Clear HTTP Cookies', category: 'HTTP Client', keywords: 'cookie jar session', when: () => !!httpPath(), run: () => clearCookies(httpPath()!) },
+  ]
+}
+
+function previewCommands(): Command[] {
+  const mdFile = () => {
+    const path = filePath()
+    return path && isMarkdown(path) ? path : null
+  }
+  return [
+    {
+      id: 'preview.toggleMarkdown', title: 'Toggle Markdown Preview', category: 'View', keys: 'Mod+Shift+V', keywords: 'md render',
+      when: () => !!mdFile(), run: () => setMarkdownMode(mdFile()!, markdownMode(mdFile()!) === 'preview' ? 'editor' : 'preview'),
+    },
+    {
+      id: 'preview.markdownSide', title: 'Open Markdown Preview to the Side', category: 'View', keywords: 'md render split',
+      when: () => !!mdFile(), run: () => setMarkdownMode(mdFile()!, 'split'),
+    },
+  ]
 }
 
 function runCommands(): Command[] {
@@ -72,6 +171,32 @@ function runCommands(): Command[] {
       id: 'test.fixWithAgent', title: 'Fix Failed Tests with Agent', category: 'Agent', keywords: 'claude codex tests',
       when: hasFailures, run: () => fixFailedTestsWithAgent(),
     },
+  ]
+}
+
+function profileCommands(): Command[] {
+  const goTestFile = () => profilable(filePath())
+  const selectedKey = () => {
+    const { root } = useRun.getState()
+    const config = selectedRunConfig()
+    return root && config ? configKey(root, config.id) : null
+  }
+  return [
+    {
+      id: 'profile.testsInFile', title: 'Profile Tests in File', category: 'Profile', keywords: 'pprof cpu memory flame graph',
+      when: goTestFile, run: () => profileTestsInFile(filePath()!),
+    },
+    {
+      id: 'profile.package', title: 'Profile Package Tests', category: 'Profile', keywords: 'pprof cpu memory flame graph',
+      when: goTestFile, run: () => profileTestsInPackage(filePath()!),
+    },
+    {
+      // Go programs don't profile themselves: needs profileURL (net/http/pprof) in the configuration.
+      id: 'profile.selected', title: 'Profile', category: 'Profile', keywords: 'pprof cpu flame graph configuration profileURL',
+      when: () => !!selectedRunConfig() && !isProfiling(selectedKey() ?? undefined), run: () => profileSelected(),
+    },
+    { id: 'profile.cancel', title: 'Cancel Profiling', category: 'Profile', keywords: 'pprof stop', when: () => isProfiling(), run: () => cancelProfiling() },
+    { id: 'profile.open', title: 'Open Profile File…', category: 'Profile', keywords: 'pprof flame graph .pprof', run: () => openProfileFile() },
   ]
 }
 

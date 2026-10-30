@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorState, type Extension } from '@codemirror/state'
 import type { EditorView, KeyBinding } from '@codemirror/view'
 import { Workspace, errorMessage, type FileContent } from '../../api/backend'
@@ -12,6 +12,7 @@ import { testGutter } from '../../lib/testGutter'
 import { testGutterHooks } from '../../store/run'
 import { breakpointGutter } from '../../lib/breakpointGutter'
 import { breakpointHooks, debugTestMark } from '../../store/debug'
+import { testMarkMenu } from '../../store/testMenu'
 import { blameGutter } from '../../lib/blameGutter'
 import { indentationFor } from '../../lib/indent'
 import { Git, useGit, useHeadVersion } from '../../store/git'
@@ -19,9 +20,15 @@ import { lspExtension, lspSupported, type LspHooks } from '../../lib/lsp'
 import { useLsp } from '../../store/lsp'
 import { useWorkspace } from '../../store/workspace'
 import { rootOf } from '../../lib/workspaceRoots'
+import { isHttpFile } from '../../lib/httpFiles'
 import * as LSP from '../../../wailsjs/go/main/LSPAPI'
 import { CodeEditor } from './CodeEditor'
 import { useBlame } from './useBlame'
+import { isMarkdown } from '../../lib/previewFiles'
+import { markdownMode, setMarkdownMode, usePreview, type MarkdownMode } from '../../store/preview'
+
+const MarkdownPreview = lazy(() => import('../preview/MarkdownPreview').then((m) => ({ default: m.MarkdownPreview })))
+const PREVIEW_DELAY_MS = 150
 
 interface Props {
   tab: FileTab
@@ -39,6 +46,21 @@ export function FileView({ tab, active }: Props) {
   const unregisterView = useRef<(() => void) | null>(null)
   useEffect(() => () => unregisterView.current?.(), [])
   const setDirty = useEditor((s) => s.setDirty)
+
+  // Markdown: source, rendering or both side by side; the text reaches the preview
+  // (debounced) only while it is shown.
+  const md = isMarkdown(tab.path)
+  const mdMode = usePreview((s) => (md ? markdownMode(tab.path, s) : 'editor'))
+  const mdModeRef = useRef<MarkdownMode>(mdMode)
+  mdModeRef.current = mdMode
+  const [mdSource, setMdSource] = useState<string | null>(null)
+  const [topLine, setTopLine] = useState<number | undefined>(undefined)
+  const mdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(mdTimer.current), [])
+  const pullSource = useCallback(() => {
+    const v = view.current
+    if (v) setMdSource(v.state.doc.toString())
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -78,11 +100,12 @@ export function FileView({ tab, active }: Props) {
   // Enter / Tab follow the file's own indentation (tabs for Go, detected otherwise).
   const indentation = useMemo(() => (file ? indentationFor(file.content, tab.path) : []), [file, tab.path])
 
-  const tests = useMemo(() => testGutter(tab.path, { ...testGutterHooks, debug: debugTestMark }), [tab.path])
+  const tests = useMemo(() => testGutter(tab.path, { ...testGutterHooks, debug: debugTestMark, menu: testMarkMenu }), [tab.path])
   const breakpoints = useMemo(() => (tab.path.endsWith('.go') ? breakpointGutter(tab.path, breakpointHooks) : []), [tab.path])
+  const http = useHttpEditor(tab.path)
   const extensions = useMemo(
-    () => [language, indentation, breakpoints, gitGutter(), blameGutter(), tests, lsp, crlf ? EditorState.lineSeparator.of('\r\n') : []],
-    [crlf, language, indentation, breakpoints, tests, lsp],
+    () => [language, indentation, breakpoints, gitGutter(), blameGutter(), tests, http, lsp, crlf ? EditorState.lineSeparator.of('\r\n') : []],
+    [crlf, language, indentation, breakpoints, tests, http, lsp],
   )
 
   // Gutter baseline: the file at HEAD of the work tree that contains it (which may be
@@ -197,20 +220,45 @@ export function FileView({ tab, active }: Props) {
   )
 
   const onDocChange = useCallback(() => {
+    if (mdModeRef.current !== 'editor') {
+      clearTimeout(mdTimer.current)
+      mdTimer.current = setTimeout(pullSource, PREVIEW_DELAY_MS)
+    }
     const state = view.current?.state
     if (!state) return
     // Cheap length check first so typing in large files stays fast.
     const length = state.doc.length + (state.doc.lines - 1) * (state.lineBreak.length - 1)
     const clean = length === saved.current.length && state.sliceDoc() === saved.current
     setDirty(tab.id, !clean)
-  }, [tab.id, setDirty])
+  }, [tab.id, setDirty, pullSource])
+
+  useEffect(() => {
+    if (mdMode !== 'editor' && editorReady) pullSource()
+  }, [mdMode, editorReady, pullSource])
+
+  // Split mode: follow the editor's first visible line (once per frame).
+  useEffect(() => {
+    const v = view.current
+    if (mdMode !== 'split' || !editorReady || !v) return
+    let frame = 0
+    const onScroll = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => setTopLine(v.state.doc.lineAt(v.lineBlockAtHeight(v.scrollDOM.scrollTop).from).number))
+    }
+    onScroll()
+    v.scrollDOM.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      cancelAnimationFrame(frame)
+      v.scrollDOM.removeEventListener('scroll', onScroll)
+    }
+  }, [mdMode, editorReady])
 
   if (error) return <div className="placeholder error">{error}</div>
   if (!file) return <div className="placeholder">Loading…</div>
   if (file.binary) return <div className="placeholder">Binary or non-UTF-8 file ({formatSize(file.size)}) — not shown.</div>
   if (file.tooLarge) return <div className="placeholder">File too large to edit ({formatSize(file.size)}).</div>
 
-  return (
+  const editor = (
     <CodeEditor
       initialDoc={file.content}
       language={extensions}
@@ -221,6 +269,43 @@ export function FileView({ tab, active }: Props) {
       onReady={onReady}
     />
   )
+  if (!md) return editor
+  return (
+    <div className="md-layout">
+      <div className="md-modes" role="tablist">
+        {(['editor', 'split', 'preview'] as const).map((m) => (
+          <button key={m} className={`md-mode${m === mdMode ? ' on' : ''}`} onClick={() => setMarkdownMode(tab.path, m)}>
+            {m === 'editor' ? 'Editor' : m === 'split' ? 'Split' : 'Preview'}
+          </button>
+        ))}
+      </div>
+      <div className="md-body">
+        {/* The editor stays mounted in Preview mode so undo history and cursor survive. */}
+        <div className="md-editor" hidden={mdMode === 'preview'}>
+          {editor}
+        </div>
+        {mdMode !== 'editor' && mdSource !== null && (
+          <Suspense fallback={null}>
+            <MarkdownPreview path={tab.path} source={mdSource} topLine={mdMode === 'split' ? topLine : undefined} />
+          </Suspense>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** HTTP client support (▶ / ⌘↵ / environment bar) for .http files, loaded on first use. */
+function useHttpEditor(path: string): Extension {
+  const [extension, setExtension] = useState<Extension>([])
+  useEffect(() => {
+    if (!isHttpFile(path)) return
+    let cancelled = false
+    void import('../../lib/httpEditor').then((m) => !cancelled && setExtension(m.httpEditor(path)))
+    return () => {
+      cancelled = true
+    }
+  }, [path])
+  return extension
 }
 
 function formatSize(bytes: number): string {

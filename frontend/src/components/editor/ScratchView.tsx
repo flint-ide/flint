@@ -131,5 +131,5 @@ export function ScratchView({ tab, active }: Props) {
   )
 
   if (!isSQL) return editor
-  return <QueryPanel scratchId={tab.scratchId} connId={connId} database={database} runner={runner} editor={editor} view={view} />
+  return <QueryPanel tabId={tab.id} scratchId={tab.scratchId} connId={connId} database={database} runner={runner} editor={editor} view={view} />
 }

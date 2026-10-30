@@ -28,6 +28,9 @@ const byExtension: Record<string, Loader> = {
   proto: () => legacy(import('@codemirror/legacy-modes/mode/protobuf').then((m) => m.protobuf)),
   env: () => legacy(import('@codemirror/legacy-modes/mode/properties').then((m) => m.properties)),
   ini: () => legacy(import('@codemirror/legacy-modes/mode/properties').then((m) => m.properties)),
+  xml: () => legacy(import('@codemirror/legacy-modes/mode/xml').then((m) => m.xml)),
+  http: () => legacy(import('./httpLanguage').then((m) => m.httpRequests)),
+  rest: () => legacy(import('./httpLanguage').then((m) => m.httpRequests)),
 }
 
 const goMod: Loader = () => legacy(import('./gomod').then((m) => m.goMod))

@@ -99,7 +99,26 @@ export interface DebugTab {
   dirty: boolean // always false
 }
 
-export type Tab = FileTab | ScratchTab | DiffTab | HistoryTab | TerminalTab | ChatTab | RunTab | DebugTab
+/** A recorded profile shown as a flame graph; its data lives in store/profile.ts. */
+export interface ProfileTab {
+  id: string
+  kind: 'profile'
+  profileId: string
+  title: string
+  dirty: boolean // always false
+}
+
+/** Responses to requests of a .http file (store/httpClient.ts), one tab per file. */
+export interface HttpTab {
+  id: string
+  kind: 'http'
+  /** Absolute path of the .http file. */
+  path: string
+  title: string
+  dirty: boolean // always false
+}
+
+export type Tab = FileTab | ScratchTab | DiffTab | HistoryTab | TerminalTab | ChatTab | RunTab | DebugTab | ProfileTab | HttpTab
 
 const HISTORY_LIMIT = 50
 
@@ -115,6 +134,7 @@ interface EditorState {
   /** Opens (or retitles and shows) a run tab; background: only retitle / add. */
   openRun: (runKey: string, title: string, background?: boolean) => void
   openDebug: (title: string) => void
+  openProfile: (profileId: string, title: string) => void
   back: () => void
   forward: () => void
   openFile: (path: string, reveal?: Omit<Reveal, 'nonce'>) => void
@@ -124,12 +144,14 @@ interface EditorState {
   openDiff: (repoRoot: string, path: string, basePath?: string) => void
   openRevisionDiff: (d: RevisionDiff) => void
   openHistory: (path: string) => void
+  /** Opens the response tab of a .http file, right after the file's own tab. */
+  openHttpResponse: (path: string) => void
   renameScratchTab: (scratchId: string, title: string) => void
   closeTab: (id: string) => void
   closeScratch: (scratchId: string) => void
   /** Follows a rename on disk: file, diff and history tabs at or under `from` move to `to`. */
   renamePath: (from: string, to: string) => void
-  /** Closes file, diff and history tabs at or under the given (deleted) paths. */
+  /** Closes file, diff, history and response tabs at or under the given (deleted) paths. */
   closePaths: (paths: string[]) => void
   setActive: (id: string) => void
   setDirty: (id: string, dirty: boolean) => void
@@ -141,6 +163,8 @@ export const diffTabId = (path: string) => `diff:${path}`
 export const revisionDiffTabId = (d: Pick<DiffTab, 'path' | 'baseRev' | 'rev'>) =>
   `diff:${d.baseRev ?? 'HEAD'}..${d.rev ?? ''}:${d.path}`
 export const historyTabId = (path: string) => `history:${path}`
+export const profileTabId = (profileId: string) => `profile:${profileId}`
+export const httpTabId = (path: string) => `http:${path}`
 const baseName = (path: string) => path.split('/').pop() ?? path
 
 let revealSeq = 0
@@ -193,6 +217,14 @@ export const useEditor = createStore<EditorState>((set) => ({
       const id = 'debug'
       if (s.tabs.some((t) => t.id === id)) return { tabs: s.tabs.map((t) => (t.id === id ? { ...t, title } : t)), ...activate(s, id) }
       const tab: DebugTab = { id, kind: 'debug', title, dirty: false }
+      return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
+    }),
+
+  openProfile: (profileId, title) =>
+    set((s) => {
+      const id = profileTabId(profileId)
+      if (s.tabs.some((t) => t.id === id)) return activate(s, id)
+      const tab: ProfileTab = { id, kind: 'profile', profileId, title, dirty: false }
       return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
     }),
 
@@ -272,6 +304,15 @@ export const useEditor = createStore<EditorState>((set) => ({
       return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
     }),
 
+  openHttpResponse: (path) =>
+    set((s) => {
+      const id = httpTabId(path)
+      if (s.tabs.some((t) => t.id === id)) return activate(s, id)
+      const tab: HttpTab = { id, kind: 'http', path, title: `Response: ${baseName(path)}`, dirty: false }
+      const after = s.tabs.some((t) => t.id === fileTabId(path)) ? fileTabId(path) : s.activeId
+      return { tabs: insertAfterActive(s.tabs, after, tab), ...activate(s, id) }
+    }),
+
   renameScratchTab: (scratchId, title) =>
     set((s) => ({
       tabs: s.tabs.map((t) => (t.kind === 'scratch' && t.scratchId === scratchId ? { ...t, title } : t)),
@@ -302,7 +343,9 @@ export const useEditor = createStore<EditorState>((set) => ({
 
   closePaths: (paths) =>
     set((s) => {
-      const gone = s.tabs.filter((t) => (t.kind === 'file' || t.kind === 'diff' || t.kind === 'history') && paths.some((p) => isWithin(p, t.path)))
+      const gone = s.tabs.filter(
+        (t) => (t.kind === 'file' || t.kind === 'diff' || t.kind === 'history' || t.kind === 'http') && paths.some((p) => isWithin(p, t.path)),
+      )
       return gone.reduce<Partial<EditorState>>((acc, t) => ({ ...acc, ...removeTab({ ...s, ...acc } as EditorState, t.id) }), {})
     }),
 

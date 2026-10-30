@@ -13,7 +13,9 @@ import { removeFromWorkspace } from '../store/fileOps'
 import { rootLabels } from '../lib/workspaceRoots'
 import { useGit } from '../store/git'
 import { useScratch } from '../store/scratch'
+import { useSearch } from '../store/search'
 import { useDatabase } from '../store/database'
+import { activeSqlConsole } from '../store/sqlConsole'
 import { useAgentChat } from '../store/agentChat'
 import { showToast } from '../store/dialog'
 
@@ -70,6 +72,19 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
         ws().setSidebar('search')
         focusSearch()
       },
+    },
+    {
+      id: 'nav.replaceInFiles', title: 'Replace in Files…', category: 'Navigate', keys: 'Mod+Shift+R', keywords: 'search substitute rename text',
+      run: () => {
+        useSearch.getState().setParams({ replaceOn: true })
+        ws().setSidebar('search')
+        focusSearch()
+      },
+    },
+    {
+      id: 'nav.undoReplace', title: 'Undo Last Replace in Files', category: 'Navigate', keywords: 'revert',
+      when: () => !!useSearch.getState().lastReplace?.undoable,
+      run: () => useSearch.getState().undoReplace(ws().roots),
     },
     { id: 'nav.back', title: 'Back', category: 'Navigate', keys: 'Mod+[', keywords: 'previous history', run: () => useEditor.getState().back() },
     { id: 'nav.forward', title: 'Forward', category: 'Navigate', keys: 'Mod+]', keywords: 'next history', run: () => useEditor.getState().forward() },
@@ -155,6 +170,22 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
         return tab?.kind === 'scratch' && tab.scratchKind === 'sql' && hasEditor()
       },
       run: () => pressInEditor('Mod+Enter'),
+    },
+    {
+      id: 'sql.explain', title: 'Explain Plan', category: 'Database', keys: 'Mod+Shift+E', keywords: 'query plan explain',
+      when: () => !!activeSqlConsole(),
+      run: () => activeSqlConsole()?.explain(false),
+    },
+    {
+      id: 'sql.explainAnalyze', title: 'Explain Analyze', category: 'Database', keys: 'Mod+Shift+A',
+      keywords: 'query plan explain execute timing buffers pipeline',
+      when: () => !!activeSqlConsole(),
+      run: () => activeSqlConsole()?.explain(true),
+    },
+    {
+      id: 'sql.history', title: 'Query History…', category: 'Database', keys: 'Mod+Shift+H', keywords: 'recent statements log rerun',
+      when: () => !!activeSqlConsole(),
+      run: () => activeSqlConsole()?.showHistory(),
     },
     {
       id: 'db.newConnection', title: 'New Database Connection…', category: 'Database', keywords: 'postgres clickhouse add',

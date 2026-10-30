@@ -33,10 +33,51 @@ func (d *DatabaseAPI) SaveConnection(c db.Connection, password string, updatePas
 	return saved, nil
 }
 
-// DeleteConnection removes a profile and its stored password.
+// DeleteConnection removes a profile, its stored password and its query history.
 func (d *DatabaseAPI) DeleteConnection(id string) error {
 	d.app.db.Invalidate(id)
-	return d.app.db.Store().Delete(id)
+	if err := d.app.db.Store().Delete(id); err != nil {
+		return err
+	}
+	return d.app.db.ClearHistory(id)
+}
+
+// QueryHistory lists the connection's executed statements, newest (or best match) first.
+func (d *DatabaseAPI) QueryHistory(connID string, q db.HistoryFilter) ([]db.HistoryEntry, error) {
+	return d.app.db.QueryHistory(connID, q)
+}
+
+// ClearQueryHistory forgets every recorded statement of the connection.
+func (d *DatabaseAPI) ClearQueryHistory(connID string) error {
+	return d.app.db.ClearHistory(connID)
+}
+
+// Explain returns the plan of sql. analyze runs EXPLAIN ANALYZE (Postgres, in a rolled-back
+// transaction) or EXPLAIN PIPELINE (ClickHouse). A Postgres statement that may write needs
+// allowWrites; without it the result only asks for confirmation.
+func (d *DatabaseAPI) Explain(connID, database, queryID, sql string, analyze, allowWrites bool) (*db.ExplainResult, error) {
+	return d.app.db.Explain(d.app.ctx, connID, database, queryID, sql, analyze, allowWrites)
+}
+
+// EditTarget describes the table behind an editable result (columns, primary key).
+func (d *DatabaseAPI) EditTarget(connID, database string, tableOID uint32) (*db.EditTarget, error) {
+	ctx, cancel := context.WithTimeout(d.app.ctx, testTimeout)
+	defer cancel()
+	return d.app.db.EditTarget(ctx, connID, database, tableOID)
+}
+
+// PreviewEdits returns the SQL a batch of staged row changes would run.
+func (d *DatabaseAPI) PreviewEdits(connID, database string, batch db.EditBatch) (string, error) {
+	ctx, cancel := context.WithTimeout(d.app.ctx, testTimeout)
+	defer cancel()
+	return d.app.db.PreviewEdits(ctx, connID, database, batch)
+}
+
+// ApplyEdits applies staged row changes in one transaction.
+func (d *DatabaseAPI) ApplyEdits(connID, database string, batch db.EditBatch) (*db.EditResult, error) {
+	ctx, cancel := context.WithTimeout(d.app.ctx, schemaTimeout)
+	defer cancel()
+	return d.app.db.ApplyEdits(ctx, connID, database, batch)
 }
 
 // TestConnection pings a (possibly unsaved) profile.

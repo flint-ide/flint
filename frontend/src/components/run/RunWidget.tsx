@@ -9,6 +9,7 @@ import { failedNodes } from '../../lib/runTree'
 import { testLang } from '../../lib/testFiles'
 import { TabKindIcon } from '../icons/FileIcon'
 import { debugSelected, debugTestsInFile, useDebug } from '../../store/debug'
+import { cancelProfiling, profileSelected, profileTestsInFile, profileTestsInPackage, useProfile } from '../../store/profile'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 
 /** Title bar run toolbar like IntelliJ: configuration selector, ▶ Run / ↻ Rerun, ■ Stop. */
@@ -34,6 +35,8 @@ export function RunWidget() {
   })
   const debuggable = useRun((s) => !!selected && !!s.capabilities[selected.id]?.debug)
   const debugging = useDebug((s) => s.session?.status === 'running' || s.session?.status === 'paused')
+  const profilable = useRun((s) => !!selected && !!s.capabilities[selected.id]?.profile)
+  const profiling = useProfile((s) => (selectedKey ? !!s.collecting[selectedKey] : false))
   const testFile = useEditor((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeId)
     return tab?.kind === 'file' && testLang(tab.path) ? tab.path : null
@@ -55,6 +58,18 @@ export function RunWidget() {
     ...(detected.length ? [{ type: 'section', label: 'Detected' } as DropdownItem, ...detected.map(configItem)] : []),
     { type: 'separator' },
     { label: 'Edit Configuration…', disabled: !selected, onSelect: () => editRunConfig() },
+    ...(selected
+      ? [
+          profiling
+            ? { label: `Cancel Profiling '${selected.name}'`, onSelect: () => cancelProfiling(selectedKey ?? undefined) }
+            : {
+                label: `Profile '${selected.name}'`,
+                // Go programs don't profile themselves: Flint records from their net/http/pprof endpoint.
+                hint: profilable ? 'CPU via profileURL' : 'needs a Profile URL (net/http/pprof)',
+                onSelect: () => void profileSelected(),
+              },
+        ]
+      : []),
     { label: 'Add Configuration…', onSelect: () => newRunConfig() },
     ...(testFile
       ? [
@@ -62,7 +77,11 @@ export function RunWidget() {
           { label: `Run Tests in ${testFile.split('/').pop()}`, kbd: '⌃⇧R', onSelect: () => void runTestsInFile(testFile) },
           { label: testLang(testFile) === 'go' ? 'Run Package Tests' : 'Run All Tests', onSelect: () => void runTestsInPackage(testFile) },
           ...(testLang(testFile) === 'go'
-            ? [{ label: `Debug Tests in ${testFile.split('/').pop()}`, onSelect: () => void debugTestsInFile(testFile) }]
+            ? [
+                { label: `Debug Tests in ${testFile.split('/').pop()}`, onSelect: () => void debugTestsInFile(testFile) },
+                { label: `Profile Tests in ${testFile.split('/').pop()}`, hint: 'CPU + memory', onSelect: () => void profileTestsInFile(testFile) },
+                { label: 'Profile Package Tests', onSelect: () => void profileTestsInPackage(testFile) },
+              ]
             : []),
         ]
       : []),

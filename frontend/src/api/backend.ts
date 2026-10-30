@@ -26,6 +26,8 @@ export type ClickHouseProtocol = 'native' | 'http'
 
 // Event payloads aren't part of any bound method signature, so Wails doesn't generate them.
 export interface SearchMatch {
+  /** Workspace folder the match was found in; path is relative to it. */
+  root: string
   path: string
   line: number
   text: string

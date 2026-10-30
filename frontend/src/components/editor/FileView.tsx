@@ -18,6 +18,7 @@ import { Git, useGit, useHeadVersion } from '../../store/git'
 import { lspExtension, lspSupported, type LspHooks } from '../../lib/lsp'
 import { useLsp } from '../../store/lsp'
 import { useWorkspace } from '../../store/workspace'
+import { rootOf } from '../../lib/workspaceRoots'
 import * as LSP from '../../../wailsjs/go/main/LSPAPI'
 import { CodeEditor } from './CodeEditor'
 import { useBlame } from './useBlame'
@@ -57,7 +58,8 @@ export function FileView({ tab, active }: Props) {
   // CRLF files keep CRLF: CodeMirror otherwise joins lines with \n on save.
   const crlf = !!file?.content.includes('\r\n')
   // Language server features; the server boots in the background on first use.
-  const root = useWorkspace((s) => s.root)
+  // Each workspace folder gets its own language server (gopls per module root etc.).
+  const root = useWorkspace((s) => rootOf(s.roots, tab.path) ?? s.root)
   const lsp = useMemo(() => {
     if (!root || !lspSupported(tab.path)) return []
     const hooks: LspHooks = {

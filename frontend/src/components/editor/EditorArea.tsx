@@ -7,6 +7,8 @@ import { useScratch } from '../../store/scratch'
 import { closeRunSession, useRun } from '../../store/run'
 import { isDebugging, stopDebug, useDebug } from '../../store/debug'
 import { useWorkspace } from '../../store/workspace'
+import { activeRoot } from '../../store/activeRoot'
+import { labelOf, rootLabels } from '../../lib/workspaceRoots'
 import { Welcome } from '../layout/Welcome'
 import { ErrorBoundary } from '../layout/ErrorBoundary'
 import { FileIcon, TabKindIcon } from '../icons/FileIcon'
@@ -179,19 +181,35 @@ function RunTabIcon({ runKey }: { runKey: string }) {
 
 /** "+" at the end of the tab bar: new terminal, agent chat or SQL console. */
 function NewTabMenu() {
-  const root = useWorkspace((s) => s.root) ?? ''
+  const roots = useWorkspace((s) => s.roots)
   const agents = useAgentChat((s) => s.agents)
   const starting = useAgentChat((s) => s.starting)
-  const items = (): DropdownItem[] => [
-    { label: 'Terminal', kbd: '⇧⌘T', icon: <TabKindIcon kind="terminal" />, onSelect: () => void useTerminal.getState().create(root) },
+  // One folder: terminal and chats open there. Several: the active tab's folder, plus a section per folder.
+  const forRoot = (root: string): DropdownItem[] => [
+    { label: 'Terminal', key: `t:${root}`, icon: <TabKindIcon kind="terminal" />, onSelect: () => void useTerminal.getState().create(root) },
     ...agents.map(
       (a): DropdownItem => ({
+        key: `c:${a}:${root}`,
         label: `${a} chat`,
         icon: <TabKindIcon kind="chat" />,
         disabled: !!starting,
         onSelect: () => void useAgentChat.getState().start(a, root),
       }),
     ),
+  ]
+  const items = (): DropdownItem[] => {
+    const here = activeRoot()
+    const head = forRoot(here).map((it, i) => (i === 0 && 'onSelect' in it ? { ...it, kbd: '⇧⌘T' } : it))
+    if (roots.length < 2) return [...head, ...tail]
+    const labels = rootLabels(roots)
+    return [
+      { type: 'section', label: `In ${labelOf(roots, here)}` },
+      ...head,
+      ...roots.flatMap((r, i): DropdownItem[] => (r === here ? [] : [{ type: 'section', label: `In ${labels[i]}` }, ...forRoot(r)])),
+      ...tail,
+    ]
+  }
+  const tail: DropdownItem[] = [
     { type: 'separator' },
     { label: 'SQL console', kbd: '⌘N', icon: <TabKindIcon kind="sql" />, onSelect: () => void useScratch.getState().create('sql') },
     { label: 'Markdown note', icon: <TabKindIcon kind="markdown" />, onSelect: () => void useScratch.getState().create('markdown') },

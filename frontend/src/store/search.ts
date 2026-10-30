@@ -9,6 +9,8 @@ export interface SearchQuery {
   wholeWord: boolean
   include: string
   exclude: string
+  /** Workspace folder the search is limited to ("" = all of them), set by Find in Folder. */
+  scope: string
 }
 
 interface SearchState {
@@ -18,12 +20,13 @@ interface SearchState {
   summary: SearchSummary | null
   error: string | null
   setParams: (p: Partial<SearchQuery>) => void
-  run: (root: string) => Promise<void>
+  /** Searches roots (or just the scope folder when it is one of them). */
+  run: (roots: string[]) => Promise<void>
   cancel: () => void
 }
 
 export const useSearch = createStore<SearchState>((set, get) => ({
-  params: { query: '', regex: false, caseSensitive: false, wholeWord: false, include: '', exclude: '' },
+  params: { query: '', regex: false, caseSensitive: false, wholeWord: false, include: '', exclude: '', scope: '' },
   runningId: null,
   matches: [],
   summary: null,
@@ -31,8 +34,10 @@ export const useSearch = createStore<SearchState>((set, get) => ({
 
   setParams: (p) => set((s) => ({ params: { ...s.params, ...p } })),
 
-  run: async (root) => {
+  run: async (roots) => {
     const { params } = get()
+    const { scope, ...options } = params
+    const targets = scope && roots.includes(scope) ? [scope] : roots
     if (!params.query) {
       void Search.Cancel()
       set({ runningId: null, matches: [], summary: null, error: null })
@@ -40,7 +45,7 @@ export const useSearch = createStore<SearchState>((set, get) => ({
     }
     const id = crypto.randomUUID()
     set({ runningId: id, matches: [], summary: null, error: null })
-    await Search.Start(id, search.Options.createFrom({ ...params, root, maxResults: 5000 }))
+    await Search.Start(id, targets, search.Options.createFrom({ ...options, root: '', maxResults: 5000 }))
   },
 
   cancel: () => void Search.Cancel(),

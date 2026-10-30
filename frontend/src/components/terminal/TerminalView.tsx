@@ -88,7 +88,8 @@ export function TerminalView({ tab, active }: Props) {
           decorations: { underline: true, pointerCursor: true },
           activate: (e) => {
             if (!e.metaKey) return
-            const root = useWorkspace.getState().root ?? tab.cwd
+            // Relative paths in agent output are relative to the terminal's project.
+            const root = tab.project || useWorkspace.getState().root || tab.cwd
             useEditor.getState().openFile(resolvePath(root, l.path), l.line ? { line: l.line, from: 0, to: 0 } : undefined)
           },
         }))

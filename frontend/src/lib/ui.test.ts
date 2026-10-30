@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { highlight } from './highlight'
+import { highlight, matchPath } from './highlight'
 import { visibleRange } from './virtualList'
 import { findUrls, layoutLine, type Cell } from './terminalLinks'
 import { geometryFor } from './terminalFit'
@@ -12,6 +12,14 @@ describe('highlight', () => {
 
   it('counts indices in code points', () => {
     assert.equal(highlight({ path: '😀ab', indices: [1] }), '😀<b>a</b>b')
+  })
+})
+
+describe('matchPath', () => {
+  it('strips the project label of multi-root matches', () => {
+    assert.equal(matchPath({ path: 'web/src/a.ts', indices: [], root: '/w/web', offset: 4 }, '/w/api'), '/w/web/src/a.ts')
+    assert.equal(matchPath({ path: 'zażółć/a.ts', indices: [], root: '/w/zażółć', offset: 7 }, '/w/api'), '/w/zażółć/a.ts')
+    assert.equal(matchPath({ path: 'main.go', indices: [] }, '/w/api'), '/w/api/main.go')
   })
 })
 

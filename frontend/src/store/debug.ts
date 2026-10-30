@@ -8,7 +8,6 @@ import { toggleLine, withLines, type BreakpointMap } from '../lib/breakpoints'
 import type { BreakpointHooks } from '../lib/breakpointGutter'
 import { showToast } from './dialog'
 import { fileTabId, useEditor, viewFor } from './editor'
-import { useWorkspace } from './workspace'
 import { selectedRunConfig, useRun, type RunConfig } from './run'
 import * as RunAPI from '../../wailsjs/go/main/RunAPI'
 import type { TestMark } from '../lib/testFiles'
@@ -158,8 +157,8 @@ export function canDebug(config: RunConfig | null = selectedRunConfig()): boolea
   return !!config && !!useRun.getState().capabilities[config.id]?.debug
 }
 
-export function debugConfiguration(config: RunConfig): Promise<void> {
-  const root = useWorkspace.getState().root
+/** Debugs config of root (default: the folder whose configurations are shown). */
+export function debugConfiguration(config: RunConfig, root: string | null = useRun.getState().root): Promise<void> {
   if (!root) return Promise.resolve()
   if (!canDebug(config)) {
     showToast(`${config.name} can't be debugged (only Go configurations)`)

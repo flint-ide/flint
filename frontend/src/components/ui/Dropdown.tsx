@@ -10,9 +10,9 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 
-// The one popover menu used across Flint (title bar, "+" menu, selects, settings).
-// Rendered in a portal with fixed positioning so it never gets clipped by
-// scrolling tab strips or panels.
+// The one popover menu used across Flint (title bar, "+" menu, selects, settings,
+// right-click context menus via store/contextMenu). Rendered in a portal with fixed
+// positioning so it never gets clipped by scrolling tab strips or panels.
 
 export type DropdownItem =
   | {
@@ -109,6 +109,8 @@ export function Dropdown({ trigger, items, align = 'start', searchable, placehol
 
 export interface MenuProps {
   anchor: HTMLElement
+  /** Opened at a point (context menu): placed below-right of it, flipped to stay on screen. */
+  atPoint?: boolean
   items: DropdownItem[]
   align: 'start' | 'end'
   searchable?: boolean
@@ -119,7 +121,7 @@ export interface MenuProps {
 }
 
 /** The menu itself, positioned next to anchor (also used for context menus). */
-export function Menu({ anchor, items, align, searchable, placeholder, minWidth, emptyText, onClose }: MenuProps) {
+export function Menu({ anchor, atPoint, items, align, searchable, placeholder, minWidth, emptyText, onClose }: MenuProps) {
   const menu = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
   const [cursor, setCursorState] = useState(-1)
@@ -144,6 +146,10 @@ export function Menu({ anchor, items, align, searchable, placeholder, minWidth, 
 
   useLayoutEffect(() => {
     const r = anchor.getBoundingClientRect()
+    if (atPoint) {
+      setPos({ top: r.top + 2, left: Math.max(8, Math.min(r.left, window.innerWidth - minWidth - 8)), maxHeight: window.innerHeight - 16, width: minWidth })
+      return
+    }
     const width = Math.max(minWidth, r.width)
     const below = window.innerHeight - r.bottom - 8
     const above = r.top - 8
@@ -155,7 +161,17 @@ export function Menu({ anchor, items, align, searchable, placeholder, minWidth, 
       maxHeight: Math.min(openUp ? above : below, 420),
       width,
     })
-  }, [anchor, align, minWidth])
+  }, [anchor, atPoint, align, minWidth])
+
+  // A context menu that would run off the bottom or right edge opens up / to the left instead.
+  useLayoutEffect(() => {
+    const el = menu.current
+    if (!atPoint || !pos || !el) return
+    const r = el.getBoundingClientRect()
+    const top = r.bottom > window.innerHeight - 8 ? Math.max(8, pos.top - 4 - r.height) : pos.top
+    const left = r.right > window.innerWidth - 8 ? Math.max(8, window.innerWidth - 8 - r.width) : pos.left
+    if (top !== pos.top || left !== pos.left) setPos({ ...pos, top, left })
+  }, [atPoint, pos])
 
   // Close on outside click, scroll elsewhere, window blur or resize.
   useEffect(() => {

@@ -311,3 +311,35 @@ func matchedText(m *matcher, input string) []string {
 	}
 	return out
 }
+
+func TestRunRoots(t *testing.T) {
+	a, b := newSearchTree(t), newSearchTree(t)
+	var all []Match
+	sum, err := RunRoots(context.Background(), []string{a, b}, Options{Query: "todo", Exclude: "node_modules/**"},
+		func(ms []Match) { all = append(all, ms...) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	perRoot := map[string]int{}
+	for _, m := range all {
+		perRoot[m.Root]++
+	}
+	if perRoot[a] == 0 || perRoot[a] != perRoot[b] || sum.Matches != len(all) {
+		t.Fatalf("matches per root %v, summary %+v", perRoot, sum)
+	}
+
+	// The limit is shared: the second root gets what the first one left.
+	all = nil
+	sum, err = RunRoots(context.Background(), []string{a, b}, Options{Query: "todo", Exclude: "node_modules/**", MaxResults: perRoot[a] + 1},
+		func(ms []Match) { all = append(all, ms...) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != perRoot[a]+1 || !sum.Truncated {
+		t.Fatalf("limited search returned %d matches, summary %+v", len(all), sum)
+	}
+
+	if _, err := RunRoots(context.Background(), []string{a}, Options{}, func([]Match) {}); !errors.Is(err, ErrEmptyQuery) {
+		t.Fatalf("empty query: %v", err)
+	}
+}

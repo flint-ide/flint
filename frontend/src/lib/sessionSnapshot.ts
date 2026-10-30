@@ -32,7 +32,7 @@ export type SavedTab =
       label?: string
     }
   | { kind: 'history'; path: string }
-  | { kind: 'terminal'; title: string; cwd: string; output: string }
+  | { kind: 'terminal'; title: string; cwd: string; output: string; project?: string }
   | { kind: 'chat'; title: string; chat: SavedChat }
 
 export interface Snapshot {
@@ -40,9 +40,13 @@ export interface Snapshot {
   /** Index of the active tab in tabs (-1: none). */
   active: number
   tabs: SavedTab[]
-  /** Selected run configuration id (running processes are never saved). */
+  /** Folders attached to the project (multi-root workspace); absent for one folder. */
+  roots?: string[]
+  /** Selected run configuration id per workspace folder (running processes are never saved). */
+  runConfigs?: Record<string, string>
+  /** Selected run configuration of the project, as saved before workspaces (read only). */
   runConfig?: string
-  /** Debugger breakpoints: 1-based lines by absolute file path. */
+  /** Debugger breakpoints of every workspace folder: 1-based lines by absolute file path. */
   breakpoints?: BreakpointMap
 }
 
@@ -57,16 +61,28 @@ export function parseSnapshot(raw: string): Snapshot | null {
   try {
     const snap = JSON.parse(raw) as Snapshot
     if (snap?.version !== SNAPSHOT_VERSION || !Array.isArray(snap.tabs)) return null
+    const roots = Array.isArray(snap.roots) ? snap.roots.filter((r): r is string => typeof r === 'string' && r.startsWith('/')) : []
+    const runConfigs = parseRunConfigs(snap.runConfigs)
     return {
       version: snap.version,
       active: Number.isInteger(snap.active) ? snap.active : -1,
       tabs: snap.tabs.filter(isTab),
+      ...(roots.length ? { roots } : {}),
+      ...(Object.keys(runConfigs).length ? { runConfigs } : {}),
       ...(typeof snap.runConfig === 'string' && snap.runConfig ? { runConfig: snap.runConfig } : {}),
       ...(snap.breakpoints ? { breakpoints: parseBreakpoints(snap.breakpoints) } : {}),
     }
   } catch {
     return null
   }
+}
+
+/** Folder → configuration id; entries that aren't an absolute path and an id are dropped. */
+function parseRunConfigs(raw: unknown): Record<string, string> {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {}
+  return Object.fromEntries(
+    Object.entries(raw).filter((e): e is [string, string] => e[0].startsWith('/') && typeof e[1] === 'string' && e[1] !== ''),
+  )
 }
 
 const KINDS = new Set(['file', 'scratch', 'diff', 'history', 'terminal', 'chat'])

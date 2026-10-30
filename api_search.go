@@ -36,10 +36,11 @@ type SearchAPI struct {
 	cancel context.CancelFunc
 }
 
-// Start cancels any running search and starts a new one. The caller picks the id so it
-// can match events that may arrive before this call returns.
-// Results arrive as "search:batch" events followed by one "search:done".
-func (s *SearchAPI) Start(id string, opts search.Options) {
+// Start cancels any running search and starts a new one over the given workspace
+// folders. The caller picks the id so it can match events that may arrive before
+// this call returns. Results arrive as "search:batch" events followed by one
+// "search:done"; every match names its folder.
+func (s *SearchAPI) Start(id string, roots []string, opts search.Options) {
 	ctx, cancel := context.WithCancel(s.app.ctx)
 
 	s.mu.Lock()
@@ -51,7 +52,7 @@ func (s *SearchAPI) Start(id string, opts search.Options) {
 
 	go func() {
 		defer cancel()
-		sum, err := search.Run(ctx, opts, func(matches []search.Match) {
+		sum, err := search.RunRoots(ctx, roots, opts, func(matches []search.Match) {
 			if ctx.Err() == nil {
 				runtime.EventsEmit(s.app.ctx, eventSearchBatch, SearchBatch{ID: id, Matches: matches})
 			}

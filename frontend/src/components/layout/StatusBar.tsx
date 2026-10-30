@@ -1,8 +1,10 @@
 import { useEditor } from '../../store/editor'
 import { useAgentChat } from '../../store/agentChat'
 import { inside } from '../../lib/sessionSnapshot'
+import type { UsageTotals } from '../../lib/agentReducer'
 import { formatCost, formatTokens, hasUsage, sumTotals, usageTooltip } from '../../lib/usage'
 import { useWorkspace } from '../../store/workspace'
+import { displayPath, rootLabels, rootOf } from '../../lib/workspaceRoots'
 import { useTerminal } from '../../store/terminal'
 import { useLsp } from '../../store/lsp'
 import { showToast } from '../../store/dialog'
@@ -11,12 +13,12 @@ import { showFileHistory, toggleBlame, useGitHistory } from '../../store/gitHist
 
 export function StatusBar() {
   const root = useWorkspace((s) => s.root)
+  const roots = useWorkspace((s) => s.roots)
   const files = useWorkspace((s) => s.fileCount)
   const active = useEditor((s) => s.tabs.find((t) => t.id === s.activeId))
   const terminals = useTerminal((s) => s.tabs.length)
 
-  const location =
-    active?.kind === 'file' && root && active.path.startsWith(root) ? active.path.slice(root.length + 1) : active?.title
+  const location = active?.kind === 'file' && rootOf(roots, active.path) ? displayPath(roots, active.path) : active?.title
 
   return (
     <footer className="status-bar">
@@ -25,7 +27,7 @@ export function StatusBar() {
       {active?.kind === 'file' && <GitFileActions path={active.path} />}
       {root && <span>{files.toLocaleString()} files</span>}
       <span>{terminals} {terminals === 1 ? 'terminal' : 'terminals'}</span>
-      <AgentUsageWidget root={root} />
+      <AgentUsageWidget roots={roots} />
       <LspWidget path={active?.kind === 'file' ? active.path : null} />
     </footer>
   )
@@ -52,19 +54,33 @@ function GitFileActions({ path }: { path: string }) {
   )
 }
 
-/** Tokens and cost of this project's agent chats (hidden until something was used). */
-function AgentUsageWidget({ root }: { root: string | null }) {
+/**
+ * Tokens and cost of the agent chats in the open project and its attached folders
+ * (hidden until something was used); the tooltip splits it per folder when there are several.
+ */
+function AgentUsageWidget({ roots }: { roots: string[] }) {
   // Selects a string, so streaming agent events (which replace sessions) don't
   // re-render the status bar; it changes only when a turn reports usage.
   const summary = useAgentChat((s) => {
-    const total = sumTotals(Object.values(s.sessions).filter((c) => root && inside(c.cwd, root)).map((c) => c.chat))
+    const chats = Object.values(s.sessions)
+    const usedIn = (root: string) => chats.filter((c) => inside(c.cwd, root)).map((c) => c.chat)
+    const total = sumTotals(roots.flatMap(usedIn))
     if (!hasUsage(total)) return ''
-    const cost = total.costUsd > 0 ? ` · ${formatCost(total.costUsd)}` : ''
-    return `${formatTokens(total.inputTokens + total.outputTokens)} tokens${cost}\n${usageTooltip(total)}`
+    const perRoot = roots.length > 1 ? rootLabels(roots).flatMap((label, i) => {
+      const t = sumTotals(usedIn(roots[i]))
+      return hasUsage(t) ? [`${label}: ${usageLabel(t)}`] : []
+    }) : []
+    return [usageLabel(total), usageTooltip(total), ...perRoot].join('\n')
   })
   if (!summary) return null
   const [label, ...details] = summary.split('\n')
-  return <span title={`Agent chats in this project\n${details.join('\n')}`}>{label}</span>
+  const scope = roots.length > 1 ? 'Agent chats in this workspace' : 'Agent chats in this project'
+  return <span title={`${scope}\n${details.join('\n')}`}>{label}</span>
+}
+
+function usageLabel(t: UsageTotals): string {
+  const cost = t.costUsd > 0 ? ` · ${formatCost(t.costUsd)}` : ''
+  return `${formatTokens(t.inputTokens + t.outputTokens)} tokens${cost}`
 }
 
 const LANG_BY_EXT: Record<string, string> = {

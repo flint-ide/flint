@@ -360,6 +360,8 @@ export namespace fuzzy {
 	export class Match {
 	    path: string;
 	    indices: number[];
+	    root?: string;
+	    offset?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Match(source);
@@ -369,6 +371,8 @@ export namespace fuzzy {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
 	        this.indices = source["indices"];
+	        this.root = source["root"];
+	        this.offset = source["offset"];
 	    }
 	}
 	export class Result {

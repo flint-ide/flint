@@ -4,4 +4,4 @@ import {search} from '../models';
 
 export function Cancel():Promise<void>;
 
-export function Start(arg1:string,arg2:search.Options):Promise<void>;
+export function Start(arg1:string,arg2:Array<string>,arg3:search.Options):Promise<void>;

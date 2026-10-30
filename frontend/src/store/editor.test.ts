@@ -102,3 +102,50 @@ describe('revision diffs and history tabs', () => {
     assert.equal(st(), before)
   })
 })
+
+describe('editor tabs follow the file tree', () => {
+  it('moves file and diff tabs under a renamed folder, keeping history', () => {
+    st().openFile('/p/src/a.go')
+    st().openDiff('/p', '/p/src/b.go')
+    st().openFile('/p/srcx/c.go')
+    st().openFile('/p/src/a.go')
+    st().renamePath('/p/src', '/p/lib')
+    assert.deepEqual(st().tabs.map((t) => t.id), ['file:/p/lib/a.go', 'diff:/p/lib/b.go', 'file:/p/srcx/c.go'])
+    const diff = st().tabs[1]
+    assert.ok(diff.kind === 'diff' && diff.basePath === '/p/lib/b.go' && diff.title === 'Δ b.go')
+    assert.equal(st().activeId, 'file:/p/lib/a.go')
+    assert.deepEqual(st().backStack, ['file:/p/lib/a.go', 'diff:/p/lib/b.go', 'file:/p/srcx/c.go'])
+  })
+
+  it('moves history tabs and the working-tree side of a comparison, not committed revisions', () => {
+    st().openHistory('/p/a.go')
+    st().openRevisionDiff({ repoRoot: '/p', path: '/p/a.go', basePath: '/p/a.go', baseRev: 'abc1234', baseLabel: 'abc1234' })
+    st().openRevisionDiff({ repoRoot: '/p', path: '/p/a.go', basePath: '/p/a.go', baseRev: 'abc1234^', rev: 'abc1234' })
+    st().renamePath('/p/a.go', '/p/b.go')
+    assert.deepEqual(st().tabs.map((t) => [t.id, t.title]), [
+      ['history:/p/b.go', 'History: b.go'],
+      ['diff:abc1234..:/p/b.go', 'Δ b.go vs abc1234'],
+      ['diff:abc1234^..abc1234:/p/a.go', 'Δ a.go @ abc1234'],
+    ])
+    const compare = st().tabs[1]
+    assert.ok(compare.kind === 'diff' && compare.basePath === '/p/a.go')
+  })
+
+  it('renames a single file tab and its title', () => {
+    st().openFile('/p/a.go')
+    st().renamePath('/p/a.go', '/p/main.go')
+    assert.deepEqual(st().tabs.map((t) => [t.id, t.title]), [['file:/p/main.go', 'main.go']])
+    assert.equal(st().activeId, 'file:/p/main.go')
+  })
+
+  it('closes tabs of deleted paths and returns to the previous tab', () => {
+    st().openTerminal('t1', 'zsh')
+    st().openFile('/p/keep.go')
+    st().openFile('/p/src/a.go')
+    st().openFile('/p/src/b.go')
+    st().openHistory('/p/src/b.go')
+    st().closePaths(['/p/src'])
+    assert.deepEqual(st().tabs.map((t) => t.id), ['term:t1', 'file:/p/keep.go'])
+    assert.equal(st().activeId, 'file:/p/keep.go')
+  })
+})

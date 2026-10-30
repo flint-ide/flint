@@ -8,6 +8,9 @@ import { requestCloseTab } from '../components/editor/EditorArea'
 import { useWorkspace, type SidebarView } from '../store/workspace'
 import { saveTab, useEditor, viewFor, type Tab } from '../store/editor'
 import { toggleTerminal, useTerminal } from '../store/terminal'
+import { activeRoot } from '../store/activeRoot'
+import { removeFromWorkspace } from '../store/fileOps'
+import { rootLabels } from '../lib/workspaceRoots'
 import { useGit } from '../store/git'
 import { useScratch } from '../store/scratch'
 import { useDatabase } from '../store/database'
@@ -26,7 +29,6 @@ const IN_EDITOR = '.cm-editor'
 const IN_TERMINAL = '.terminal-view'
 
 const ws = () => useWorkspace.getState()
-const root = () => ws().root ?? ''
 const activeTab = (): Tab | undefined => {
   const { tabs, activeId } = useEditor.getState()
   return tabs.find((t) => t.id === activeId)
@@ -43,10 +45,12 @@ export function registerAppCommands(hooks: AppCommandHooks): () => void {
   const offStatic = registerCommands(appCommands(hooks))
   const offAgents = registerAgentChatCommands()
   const offFeatures = registerFeatureCommands()
+  const offRoots = registerWorkspaceRootCommands()
   return () => {
     offStatic()
     offAgents()
     offFeatures()
+    offRoots()
   }
 }
 
@@ -117,8 +121,9 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
     { id: 'git.newWorktree', title: 'New Worktree…', category: 'Git', keywords: 'agent folder', when: hasBranchWidget, run: () => ws().setBranchesPopup('new-worktree') },
 
     // Terminal
-    { id: 'terminal.toggle', title: 'Toggle Terminal', category: 'Terminal', keys: 'Mod+J', run: () => toggleTerminal(root()) },
-    { id: 'terminal.new', title: 'New Terminal', category: 'Terminal', keys: 'Mod+Shift+T', keywords: 'shell', run: () => void useTerminal.getState().create(root()) },
+    // In the active tab's workspace folder (the primary one when it has none).
+    { id: 'terminal.toggle', title: 'Toggle Terminal', category: 'Terminal', keys: 'Mod+J', run: () => toggleTerminal(activeRoot()) },
+    { id: 'terminal.new', title: 'New Terminal', category: 'Terminal', keys: 'Mod+Shift+T', keywords: 'shell', run: () => void useTerminal.getState().create(activeRoot()) },
 
     // View
     { id: 'view.toggleSidebar', title: 'Toggle Sidebar', category: 'View', keys: 'Mod+B', keysIgnoredIn: IN_EDITOR, keywords: 'panel hide show', run: () => ws().toggleSidebar() },
@@ -134,6 +139,10 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
         const path = await Workspace.PickFolder()
         if (path) await ws().openFolder(path)
       },
+    },
+    {
+      id: 'project.addToWorkspace', title: 'Add Project to Workspace…', category: 'Project', keys: 'Mod+Shift+O',
+      keywords: 'attach folder multi root', when: () => !!ws().root, run: () => ws().pickRoot(),
     },
     { id: 'project.reloadTree', title: 'Reload File Tree', category: 'Project', keywords: 'refresh', when: () => !!ws().root, run: () => ws().reloadTree() },
 
@@ -205,12 +214,40 @@ function registerAgentChatCommands(): () => void {
         category: 'Agent',
         keywords: 'conversation',
         when: () => !useAgentChat.getState().starting,
-        run: () => useAgentChat.getState().start(agent, root()),
+        run: () => useAgentChat.getState().start(agent, activeRoot()),
       })),
     )
   }
   sync()
   const unsubscribe = useAgentChat.subscribe(sync)
+  return () => {
+    unsubscribe()
+    off()
+  }
+}
+
+/** "Remove <project> from Workspace" per attached folder; follows the workspace. */
+function registerWorkspaceRootCommands(): () => void {
+  let roots: string[] | null = null
+  let off: () => void = () => undefined
+  const sync = () => {
+    const next = useWorkspace.getState().roots
+    if (next === roots) return
+    roots = next
+    off()
+    const labels = rootLabels(next)
+    off = registerCommands(
+      next.slice(1).map((r, i) => ({
+        id: `project.remove.${r}`,
+        title: `Remove ${labels[i + 1]} from Workspace`,
+        category: 'Project',
+        keywords: 'detach close folder multi root',
+        run: () => removeFromWorkspace(r),
+      })),
+    )
+  }
+  sync()
+  const unsubscribe = useWorkspace.subscribe(sync)
   return () => {
     unsubscribe()
     off()

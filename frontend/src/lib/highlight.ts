@@ -4,6 +4,16 @@ export interface FileMatch {
   path: string
   /** Matched characters as code-point indices (Array.from(path)). */
   indices: number[]
+  /** Workspace folder of the file (set by the backend). */
+  root?: string
+  /** Code points of path before the part relative to root ("label/" with several roots). */
+  offset?: number
+}
+
+/** Absolute path of a quick-open match. */
+export function matchPath(m: FileMatch, fallbackRoot: string): string {
+  const rel = m.offset ? Array.from(m.path).slice(m.offset).join('') : m.path
+  return `${m.root || fallbackRoot}/${rel}`
 }
 
 /** Wraps matched characters in <b>…</b>, escaping everything else. */

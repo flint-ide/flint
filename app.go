@@ -51,8 +51,9 @@ type App struct {
 	sessions    *restore.Store
 	files       fuzzy.Index // quick-open file list of the open folder
 
-	watchMu sync.Mutex
-	watch   *watcher.Watcher
+	projMu   sync.Mutex
+	roots    []string                    // open project folders, the primary one first
+	watchers map[string]*watcher.Watcher // one per root
 
 	stateMu sync.Mutex
 	state   appState
@@ -112,7 +113,7 @@ func (a *App) shutdown(context.Context) {
 		a.lsp.Shutdown,
 		func() { _ = a.agents.Close() },
 		a.db.CloseAll,
-		func() { a.setWatcher(nil) },
+		a.closeProject,
 	} {
 		wg.Add(1)
 		go func(stop func()) {
@@ -121,17 +122,6 @@ func (a *App) shutdown(context.Context) {
 		}(stop)
 	}
 	wg.Wait()
-}
-
-// setWatcher replaces the active project watcher (nil just stops the current one).
-func (a *App) setWatcher(w *watcher.Watcher) {
-	a.watchMu.Lock()
-	prev := a.watch
-	a.watch = w
-	a.watchMu.Unlock()
-	if prev != nil {
-		prev.Close()
-	}
 }
 
 func (a *App) statePath() string { return filepath.Join(a.configDir, "state.json") }

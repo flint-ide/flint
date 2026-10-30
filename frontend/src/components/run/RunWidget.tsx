@@ -1,6 +1,8 @@
 import { useEditor } from '../../store/editor'
+import { useWorkspace } from '../../store/workspace'
+import { labelOf } from '../../lib/workspaceRoots'
 import {
-  TESTS_KEY, currentKey, editRunConfig, loadRunConfigs, newRunConfig, rerunFailedTests, runSelected, runTestsInFile,
+  TESTS_KEY, configKey, currentKey, editRunConfig, loadRunConfigs, newRunConfig, rerunFailedTests, runSelected, runTestsInFile,
   runTestsInPackage, selectRunConfig, selectedRunConfig, stopRun, useRun, type RunConfig,
 } from '../../store/run'
 import { failedNodes } from '../../lib/runTree'
@@ -15,10 +17,14 @@ export function RunWidget() {
   const detected = useRun((s) => s.detected)
   const loadError = useRun((s) => s.loadError)
   const selected = useRun(selectedRunConfig)
-  const running = useRun((s) => (selected ? !!s.sessions[`cfg:${selected.id}`]?.running : false))
+  // With several workspace folders the widget shows the active tab's folder's configurations.
+  const runRoot = useRun((s) => s.root)
+  const project = useWorkspace((s) => (s.roots.length > 1 && runRoot ? labelOf(s.roots, runRoot) : null))
+  const selectedKey = useRun((s) => (selected && s.root ? configKey(s.root, selected.id) : null))
+  const running = useRun((s) => (selectedKey ? !!s.sessions[selectedKey]?.running : false))
   // Stop targets the selected configuration's process, else the run in front.
   const stopKey = useRun((s) => {
-    if (selected && s.sessions[`cfg:${selected.id}`]?.running) return `cfg:${selected.id}`
+    if (selectedKey && s.sessions[selectedKey]?.running) return selectedKey
     const key = currentKey()
     return key && s.sessions[key]?.running ? key : null
   })
@@ -43,6 +49,7 @@ export function RunWidget() {
   })
 
   const items = (): DropdownItem[] => [
+    ...(project ? [{ type: 'section', label: `Configurations of ${project}` } as DropdownItem] : []),
     ...(loadError ? [{ type: 'section', label: `⚠ .flint/run.json: ${loadError}` } as DropdownItem] : []),
     ...saved.map(configItem),
     ...(detected.length ? [{ type: 'section', label: 'Detected' } as DropdownItem, ...detected.map(configItem)] : []),
@@ -72,9 +79,10 @@ export function RunWidget() {
         onOpen={() => void loadRunConfigs()}
         items={items}
         trigger={(t) => (
-          <button {...t} className="tb-widget run-config" title="Run configurations">
+          <button {...t} className="tb-widget run-config" title={project ? `Run configurations of ${project}` : 'Run configurations'}>
             <TabKindIcon kind="run" busy={running} />
             <span className="tb-label">{selected?.name ?? 'Add Configuration…'}</span>
+            {project && <span className="tb-extra">{project}</span>}
             <span className="tb-chevron">⌄</span>
           </button>
         )}

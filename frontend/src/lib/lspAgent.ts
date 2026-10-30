@@ -1,6 +1,6 @@
 import type { EditorView } from '@codemirror/view'
 import { forEachDiagnostic, type Action, type Diagnostic } from '@codemirror/lint'
-import { useWorkspace } from '../store/workspace'
+import { rootFor } from '../store/activeRoot'
 import { showToast } from '../store/dialog'
 import { askAgent } from './askAgent'
 import { fileProblemsPrompt, problemAttachments, problemPrompt, type Problem } from './agentPrompt'
@@ -22,7 +22,7 @@ export function agentActions(path: string, diagnostic: Diagnostic, count: number
 /** One diagnostic (from..to is its current range in the view) with the lines around it. */
 export function fixProblemWithAgent(view: EditorView, path: string, d: Diagnostic, from: number, to: number, send: boolean): void {
   const problem = toProblem(view, d, from, to)
-  const root = useWorkspace.getState().root ?? ''
+  const root = rootFor(path)
   void askAgent({ prompt: problemPrompt(path, root, problem), attachments: problemAttachments(path, view.state.doc, [problem]), send })
 }
 
@@ -34,7 +34,7 @@ export function fixFileProblemsWithAgent(view: EditorView, path: string, send = 
     showToast('No problems in this file')
     return true
   }
-  const root = useWorkspace.getState().root ?? ''
+  const root = rootFor(path)
   void askAgent({ prompt: fileProblemsPrompt(path, root, problems), attachments: problemAttachments(path, view.state.doc, problems), send })
   return true
 }

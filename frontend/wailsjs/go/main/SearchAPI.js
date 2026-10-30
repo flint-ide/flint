@@ -6,6 +6,6 @@ export function Cancel() {
   return window['go']['main']['SearchAPI']['Cancel']();
 }
 
-export function Start(arg1, arg2) {
-  return window['go']['main']['SearchAPI']['Start'](arg1, arg2);
+export function Start(arg1, arg2, arg3) {
+  return window['go']['main']['SearchAPI']['Start'](arg1, arg2, arg3);
 }

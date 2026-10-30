@@ -109,18 +109,63 @@ func TestTopNKeepsBest(t *testing.T) {
 	}
 }
 
+func one(root string) []Root { return []Root{{Path: root, Label: root}} }
+
 func TestIndex(t *testing.T) {
 	var x Index
-	if _, ok := x.Search("/p", "a", 5); ok {
+	if _, ok := x.Search(one("/p"), "a", 5); ok {
 		t.Fatal("unindexed root reported ok")
 	}
 	x.Set("/p", []string{"a.go", "b.go"})
-	r, ok := x.Search("/p", "a", 5)
+	r, ok := x.Search(one("/p"), "a", 5)
 	if !ok || r.Total != 2 || len(r.Matches) != 1 {
 		t.Fatalf("got %+v %v", r, ok)
 	}
-	if _, ok := x.Search("/other", "a", 5); ok {
+	if m := r.Matches[0]; m.Path != "a.go" || m.Root != "/p" || m.Offset != 0 {
+		t.Fatalf("single-root match %+v", m)
+	}
+	if _, ok := x.Search(one("/other"), "a", 5); ok {
 		t.Fatal("other root reported ok")
+	}
+}
+
+func TestIndexSearchesSeveralRoots(t *testing.T) {
+	var x Index
+	x.Set("/w/api", []string{"main.go", "handler.go"})
+	x.Set("/w/web", []string{"src/main.ts"})
+	roots := []Root{{Path: "/w/api", Label: "api"}, {Path: "/w/web", Label: "web"}}
+	if _, ok := x.Search(append(roots, Root{Path: "/w/x", Label: "x"}), "", 5); ok {
+		t.Fatal("search with an unindexed root reported ok")
+	}
+
+	r, ok := x.Search(roots, "main", 10)
+	if !ok || r.Total != 3 || len(r.Matches) != 2 {
+		t.Fatalf("got %+v %v", r, ok)
+	}
+	byRoot := map[string]Match{}
+	for _, m := range r.Matches {
+		byRoot[m.Root] = m
+	}
+	api, web := byRoot["/w/api"], byRoot["/w/web"]
+	if api.Path != "api/main.go" || api.Offset != 4 || web.Path != "web/src/main.ts" || web.Offset != 4 {
+		t.Fatalf("matches %+v", r.Matches)
+	}
+
+	// The project name can be typed to narrow the list.
+	r, _ = x.Search(roots, "web/main", 10)
+	if len(r.Matches) != 1 || r.Matches[0].Root != "/w/web" {
+		t.Fatalf("web/main = %+v", r.Matches)
+	}
+
+	// A changed listing is picked up by the next multi-root search.
+	x.Set("/w/web", []string{"src/main.ts", "src/app.ts"})
+	if r, _ = x.Search(roots, "", 10); r.Total != 4 {
+		t.Fatalf("after Set total = %d", r.Total)
+	}
+
+	x.Retain([]string{"/w/api"})
+	if _, ok := x.Search(roots, "", 10); ok {
+		t.Fatal("removed root still indexed")
 	}
 }
 
@@ -157,7 +202,7 @@ func TestLoadSharesConcurrentListings(t *testing.T) {
 	if calls.Load() != 1 {
 		t.Fatalf("listed %d times, want 1", calls.Load())
 	}
-	if r, ok := x.Search("/p", "", 10); !ok || r.Total != 2 {
+	if r, ok := x.Search(one("/p"), "", 10); !ok || r.Total != 2 {
 		t.Fatalf("Search = %+v, %v", r, ok)
 	}
 }
@@ -182,13 +227,18 @@ func TestLoadDropsListingOfAbandonedRoot(t *testing.T) {
 		}
 		runtime.Gosched()
 	}
+	// /old leaves the workspace while it is still being listed.
+	x.Retain([]string{"/new"})
 	if _, err := x.Load("/new", func() ([]string, error) { return []string{"new.go"}, nil }); err != nil {
 		t.Fatal(err)
 	}
 	close(slow)
 	<-done
-	if _, ok := x.Search("/new", "", 10); !ok {
-		t.Fatal("slow listing of /old replaced the index of /new")
+	if _, ok := x.Search(one("/new"), "", 10); !ok {
+		t.Fatal("/new is not indexed")
+	}
+	if _, ok := x.Search(one("/old"), "", 10); ok {
+		t.Fatal("listing of a removed root was kept")
 	}
 }
 

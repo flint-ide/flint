@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Workspace } from '../api/backend'
-import { highlight, type FileMatch } from '../lib/highlight'
+import { highlight, matchPath, type FileMatch } from '../lib/highlight'
 import { useWorkspace } from '../store/workspace'
 import { useEditor } from '../store/editor'
 import { Modal } from './layout/Modal'
@@ -12,6 +12,7 @@ const STALE_MS = 15_000
 /** ⌘P: fuzzy "go to file". Matching runs in Go; only the top results come back. */
 export function QuickOpen() {
   const root = useWorkspace((s) => s.root)
+  const roots = useWorkspace((s) => s.roots)
   const fileCount = useWorkspace((s) => s.fileCount)
   const filesLoadedAt = useWorkspace((s) => s.filesLoadedAt)
   const refreshFiles = useWorkspace((s) => s.refreshFiles)
@@ -30,15 +31,15 @@ export function QuickOpen() {
 
   // Re-queried when the index is refreshed; stale answers are dropped by the flag.
   useEffect(() => {
-    if (!root) return
+    if (roots.length === 0) return
     let current = true
-    Workspace.FindFiles(root, query, MAX_RESULTS)
+    Workspace.FindFiles(roots, query, MAX_RESULTS)
       .then((r) => current && setResults(r.matches ?? []))
       .catch(() => current && setResults([]))
     return () => {
       current = false
     }
-  }, [root, query, filesLoadedAt])
+  }, [roots, query, filesLoadedAt])
 
   useEffect(() => setCursor(0), [query])
   useEffect(() => {
@@ -46,9 +47,9 @@ export function QuickOpen() {
   }, [cursor])
 
   const close = () => setQuickOpen(false)
-  const choose = (path: string | undefined) => {
-    if (!path || !root) return
-    openFile(`${root}/${path}`)
+  const choose = (m: FileMatch | undefined) => {
+    if (!m || !root) return
+    openFile(matchPath(m, root))
     close()
   }
 
@@ -61,7 +62,7 @@ export function QuickOpen() {
       setCursor((c) => Math.max(c - 1, 0))
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      choose(results[cursor]?.path)
+      choose(results[cursor])
     }
   }
 
@@ -81,10 +82,10 @@ export function QuickOpen() {
           const slash = r.path.lastIndexOf('/')
           return (
             <div
-              key={r.path}
+              key={`${r.root}:${r.path}`}
               className={`quick-item${i === cursor ? ' selected' : ''}`}
               onMouseMove={() => setCursor(i)}
-              onClick={() => choose(r.path)}
+              onClick={() => choose(r)}
             >
               <FileIcon name={r.path.slice(slash + 1)} />
               <span className="file-name">{r.path.slice(slash + 1)}</span>

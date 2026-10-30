@@ -24,6 +24,11 @@ export async function attachSelectionToAgent(): Promise<void> {
   await askAgent({ prompt: '', attachments: [sel ? { path: tab.path, ...sel } : { path: tab.path }] })
 }
 
+/** Attaches files or folders (file tree ▸ Add to Agent Chat); the agent reads them itself. */
+export async function attachPathsToAgent(paths: string[]): Promise<void> {
+  await askAgent({ prompt: '', attachments: paths.map((path) => ({ path })) })
+}
+
 /** Sends the text selected in a terminal to the agent chat as a fenced block. */
 export async function sendTerminalSelectionToAgent(termId: string, send = false): Promise<void> {
   const text = terminalSelection(termId)

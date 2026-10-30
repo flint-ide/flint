@@ -4,8 +4,11 @@ import * as Git from '../../wailsjs/go/main/GitAPI'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
 import type { git } from '../../wailsjs/go/models'
 import { errorMessage } from '../api/backend'
-import { showToast } from './dialog'
+import { confirmAction, showToast } from './dialog'
 import { useWorkspace } from './workspace'
+import { isWithin } from '../lib/fileTree'
+import { followedRoot } from './activeRoot'
+import { useEditor } from './editor'
 
 export type FileChange = git.FileChange
 export type GitStatus = git.Status
@@ -17,6 +20,8 @@ export { Git }
 type RemoteOp = 'fetch' | 'pull' | 'push' | 'commit' | null
 
 interface GitState {
+  /** Workspace folder whose repository is shown (follows the active tab's folder). */
+  folder: string | null
   root: string | null // work-tree root (may differ from the opened folder)
   isRepo: boolean
   status: GitStatus | null
@@ -34,6 +39,8 @@ interface GitState {
   headVersion: number
   /** Bumps on every git:changed (index, refs, stashes, other worktrees' HEAD). */
   refsVersion: number
+  /** Changed-file count per workspace folder (multi-root switcher); absent = not a repo. */
+  counts: Record<string, number>
 
   load: (folder: string | null) => Promise<void>
   refresh: () => Promise<void>
@@ -48,6 +55,8 @@ interface GitState {
 }
 
 export const useGit = createStore<GitState>((set, get) => ({
+  folder: null,
+  counts: {},
   root: null,
   isRepo: false,
   status: null,
@@ -60,12 +69,14 @@ export const useGit = createStore<GitState>((set, get) => ({
   refsVersion: 0,
 
   load: async (folder) => {
+    set({ folder })
     if (!folder) {
       set({ root: null, isRepo: false, status: null })
       return
     }
     try {
       const info = await Git.Info(folder)
+      if (get().folder !== folder) return // switched again meanwhile
       set({ root: info.isRepo ? info.root : null, isRepo: info.isRepo, status: null, excluded: {}, includedUntracked: {} })
       if (info.isRepo) await get().refresh()
     } catch (err) {
@@ -165,6 +176,22 @@ export const useGit = createStore<GitState>((set, get) => ({
   },
 }))
 
+/** Asks before discarding changes (new files are deleted), then rolls back. */
+export async function confirmRollback(files: FileChange[]): Promise<void> {
+  if (files.length === 0) return
+  const deletes = files.filter((f) => f.kind === 'untracked' || f.kind === 'added').length
+  const what = files.length === 1 ? files[0].path : `${files.length} files`
+  const extra = deletes ? ` ${deletes} new file(s) will be deleted.` : ''
+  if (await confirmAction(`Rollback changes in ${what}?${extra}`, 'Rollback')) await useGit.getState().rollback(files)
+}
+
+/** Changed files at or under any of the absolute paths (file tree ▸ Rollback). */
+export function changesUnder(paths: string[]): FileChange[] {
+  const { root, status } = useGit.getState()
+  if (!root || !status) return []
+  return status.files.filter((f) => paths.some((p) => isWithin(p, `${root}/${f.path}`)))
+}
+
 // Single-flight status refresh with one trailing re-run, so bursts of agent edits cost
 // at most two `git status` calls.
 let inFlight: Promise<void> | null = null
@@ -247,10 +274,38 @@ export function useHeadVersion(path: string): number {
   return useGit((s) => headVersionOf(s, tree))
 }
 
+/** Counts changes of every workspace folder for the Commit panel's switcher (several folders only). */
+async function refreshCounts(): Promise<void> {
+  const roots = useWorkspace.getState().roots
+  if (roots.length < 2) {
+    if (Object.keys(useGit.getState().counts).length) useGit.setState({ counts: {} })
+    return
+  }
+  const results = await Promise.all(roots.map((r) => Git.Status(r).then((st) => (st.files ?? []).length, () => -1)))
+  const counts: Record<string, number> = {}
+  roots.forEach((r, i) => {
+    if (results[i] >= 0) counts[r] = results[i]
+  })
+  // Most refreshes change no count: keep the old object so the switcher doesn't render.
+  const prev = useGit.getState().counts
+  const keys = Object.keys(counts)
+  if (keys.length === Object.keys(prev).length && keys.every((k) => prev[k] === counts[k])) return
+  useGit.setState({ counts })
+}
+
 let debounce: ReturnType<typeof setTimeout> | undefined
 function scheduleRefresh(delay = 250): void {
   clearTimeout(debounce)
-  debounce = setTimeout(() => void refreshStatus(), delay)
+  debounce = setTimeout(() => {
+    void refreshStatus()
+    void refreshCounts()
+  }, delay)
+}
+
+/** Shows the repository of the active tab's workspace folder (like IntelliJ's branch widget). */
+function followActiveFolder(): void {
+  const target = followedRoot(useGit.getState().folder)
+  if (target !== useGit.getState().folder) void useGit.getState().load(target)
 }
 
 let subscribed = false
@@ -267,13 +322,15 @@ export function subscribeGitEvents(): void {
   // Working-tree edits change the status too.
   EventsOn('fs:changed', () => scheduleRefresh())
   window.addEventListener('focus', () => scheduleRefresh(0))
-  // Follow the opened folder.
-  let lastRoot: string | null = null
-  useWorkspace.subscribe((s) => {
-    if (s.root !== lastRoot) {
-      lastRoot = s.root
-      void useGit.getState().load(s.root)
+  // Follow the workspace's folders and the active tab's folder among them.
+  useWorkspace.subscribe((s, prev) => {
+    if (s.roots !== prev.roots || s.root !== prev.root) {
+      followActiveFolder()
+      void refreshCounts()
     }
   })
-  void useGit.getState().load(useWorkspace.getState().root)
+  useEditor.subscribe((s, prev) => {
+    if (s.activeId !== prev.activeId) followActiveFolder()
+  })
+  followActiveFolder()
 }

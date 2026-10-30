@@ -427,6 +427,63 @@ kbd {
 .tree-row.active {
   background: var(--bg-active);
 }
+.tree:focus {
+  outline: none;
+}
+.tree-row.selected {
+  background: var(--bg-active);
+}
+.tree:focus .tree-row.selected {
+  background: var(--selection);
+}
+.tree-row.root-row {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.tree-row.root-row .dir-name {
+  color: var(--fg-muted);
+}
+.search-scope {
+  display: flex;
+}
+.tb-extra {
+  color: var(--fg-muted);
+  font-size: 11px;
+}
+.repo-switcher {
+  display: flex;
+  min-width: 0;
+  text-transform: none;
+}
+.tree-row.editing {
+  z-index: 1;
+  cursor: default;
+}
+.tree-edit {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+.tree-edit .inline-input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+.tree-edit-error {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--danger);
+  border-radius: 4px;
+  background: var(--bg-raised);
+  color: var(--danger);
+  font-size: 11px;
+  white-space: normal;
+}
 .twisty {
   width: 12px;
   flex: none;

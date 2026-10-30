@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -56,6 +57,69 @@ func (w *WorkspaceAPI) PickFolder() (string, error) {
 
 // OpenFolder validates and records a folder as the current project.
 func (w *WorkspaceAPI) OpenFolder(path string) (string, error) {
+	abs, err := requireDir(path)
+	if err != nil {
+		return "", err
+	}
+	if err := w.app.rememberFolder(abs); err != nil {
+		return "", err
+	}
+	watch, err := w.watchFolder(abs)
+	if err != nil {
+		// Not fatal: the tree still works, it just won't live-refresh.
+		runtime.LogWarningf(w.app.ctx, "file watcher disabled: %v", err)
+	}
+	w.app.openProject(abs, watch)
+	w.updateTitle()
+	return abs, nil
+}
+
+// AddRoot attaches another project folder to the workspace and returns its path.
+func (w *WorkspaceAPI) AddRoot(path string) (string, error) {
+	abs, err := requireDir(path)
+	if err != nil {
+		return "", err
+	}
+	if err := workspace.CheckNewRoot(w.app.projectRoots(), abs); err != nil {
+		return "", err
+	}
+	watch, err := w.watchFolder(abs)
+	if err != nil {
+		runtime.LogWarningf(w.app.ctx, "file watcher disabled for %s: %v", abs, err)
+	}
+	if err := w.app.addRoot(abs, watch); err != nil {
+		if watch != nil {
+			watch.Close()
+		}
+		return "", err
+	}
+	w.updateTitle()
+	return abs, nil
+}
+
+// RemoveRoot detaches a folder added with AddRoot (files stay on disk).
+func (w *WorkspaceAPI) RemoveRoot(path string) error {
+	if err := w.app.removeRoot(path); err != nil {
+		return err
+	}
+	w.updateTitle()
+	return nil
+}
+
+// updateTitle shows the primary folder, plus how many are attached: "api + 2 — flint".
+func (w *WorkspaceAPI) updateTitle() {
+	roots := w.app.projectRoots()
+	if len(roots) == 0 {
+		return
+	}
+	title := filepath.Base(roots[0])
+	if len(roots) > 1 {
+		title += fmt.Sprintf(" + %d", len(roots)-1)
+	}
+	runtime.WindowSetTitle(w.app.ctx, title+" — flint")
+}
+
+func requireDir(path string) (string, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return "", fmt.Errorf("resolve %s: %w", path, err)
@@ -67,16 +131,6 @@ func (w *WorkspaceAPI) OpenFolder(path string) (string, error) {
 	if !info.IsDir() {
 		return "", fmt.Errorf("%s is not a directory", abs)
 	}
-	if err := w.app.rememberFolder(abs); err != nil {
-		return "", err
-	}
-	watch, err := w.watchFolder(abs)
-	if err != nil {
-		// Not fatal: the tree still works, it just won't live-refresh.
-		runtime.LogWarningf(w.app.ctx, "file watcher disabled: %v", err)
-	}
-	w.app.setWatcher(watch)
-	runtime.WindowSetTitle(w.app.ctx, filepath.Base(abs)+" — flint")
 	return abs, nil
 }
 
@@ -94,15 +148,23 @@ func (w *WorkspaceAPI) IndexFiles(root string) (int, error) {
 	return w.app.files.Load(root, func() ([]string, error) { return workspace.ListFiles(ctx, root) })
 }
 
-// FindFiles ranks project files against a fuzzy query (⌘P), best `limit` first.
-func (w *WorkspaceAPI) FindFiles(root, query string, limit int) (fuzzy.Result, error) {
-	if res, ok := w.app.files.Search(root, query, limit); ok {
+// FindFiles ranks the files of the given workspace folders against a fuzzy query
+// (⌘P), best `limit` first. With several folders paths start with the folder's label.
+func (w *WorkspaceAPI) FindFiles(roots []string, query string, limit int) (fuzzy.Result, error) {
+	labels := workspace.Labels(roots)
+	targets := make([]fuzzy.Root, len(roots))
+	for i, r := range roots {
+		targets[i] = fuzzy.Root{Path: r, Label: labels[i]}
+	}
+	if res, ok := w.app.files.Search(targets, query, limit); ok {
 		return res, nil
 	}
-	if _, err := w.IndexFiles(root); err != nil {
-		return fuzzy.Result{}, err
+	for _, r := range roots {
+		if _, err := w.IndexFiles(r); err != nil {
+			return fuzzy.Result{}, err
+		}
 	}
-	res, _ := w.app.files.Search(root, query, limit)
+	res, _ := w.app.files.Search(targets, query, limit)
 	return res, nil
 }
 
@@ -114,6 +176,71 @@ func (w *WorkspaceAPI) ReadFile(path string) (workspace.FileContent, error) {
 // WriteFile saves editor content to disk.
 func (w *WorkspaceAPI) WriteFile(path, content string) error {
 	return workspace.WriteFile(path, content)
+}
+
+// CreateFile creates an empty file name in dir (inside the open folder) and returns its path.
+func (w *WorkspaceAPI) CreateFile(dir, name string) (string, error) {
+	root, err := w.app.rootOf(dir)
+	if err != nil {
+		return "", err
+	}
+	return workspace.CreateFile(root, dir, name)
+}
+
+// CreateFolder creates a folder name in dir (inside the open folder) and returns its path.
+func (w *WorkspaceAPI) CreateFolder(dir, name string) (string, error) {
+	root, err := w.app.rootOf(dir)
+	if err != nil {
+		return "", err
+	}
+	return workspace.CreateDir(root, dir, name)
+}
+
+// RenamePath renames a file or folder in place and returns its new path.
+func (w *WorkspaceAPI) RenamePath(path, newName string) (string, error) {
+	root, err := w.app.rootOf(path)
+	if err != nil {
+		return "", err
+	}
+	return workspace.Rename(root, path, newName)
+}
+
+// TrashPaths moves files and folders to the macOS Trash and returns the paths moved
+// (nested selections collapse into their folder).
+func (w *WorkspaceAPI) TrashPaths(paths []string) ([]string, error) {
+	// Check every path before anything moves; then trash folder by folder.
+	byRoot := map[string][]string{}
+	var order []string
+	for _, p := range paths {
+		root, err := w.app.rootOf(p)
+		if err != nil {
+			return nil, err
+		}
+		if _, seen := byRoot[root]; !seen {
+			order = append(order, root)
+		}
+		byRoot[root] = append(byRoot[root], p)
+	}
+	moved := []string{}
+	for _, root := range order {
+		done, err := workspace.Trash(root, byRoot[root], workspace.MoveToTrash)
+		moved = append(moved, done...)
+		if err != nil {
+			return moved, err
+		}
+	}
+	return moved, nil
+}
+
+// RevealInFinder selects path in a Finder window.
+func (w *WorkspaceAPI) RevealInFinder(path string) error {
+	if _, err := w.app.rootOf(path); err != nil {
+		return err
+	}
+	if out, err := exec.Command("open", "-R", path).CombinedOutput(); err != nil {
+		return fmt.Errorf("reveal %s: %s", filepath.Base(path), strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 // watchFolder watches the project and, when it is a git work tree, its git dirs, so
@@ -138,7 +265,7 @@ func (w *WorkspaceAPI) watchFolder(root string) (*watcher.Watcher, error) {
 			runtime.EventsEmit(w.app.ctx, eventFSChanged, files)
 		}
 		if gitChanged {
-			runtime.EventsEmit(w.app.ctx, eventGitChanged)
+			runtime.EventsEmit(w.app.ctx, eventGitChanged, root)
 		}
 	})
 }

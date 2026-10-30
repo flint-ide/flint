@@ -1,14 +1,15 @@
-import { Suspense, lazy, useLayoutEffect } from 'react'
+import { Suspense, lazy, memo, useLayoutEffect } from 'react'
 import { useEditor, type Tab } from '../../store/editor'
 import { confirmAction } from '../../store/dialog'
 import { useTerminal } from '../../store/terminal'
 import { useAgentChat } from '../../store/agentChat'
 import { useScratch } from '../../store/scratch'
+import { closeRunSession, useRun } from '../../store/run'
+import { isDebugging, stopDebug, useDebug } from '../../store/debug'
 import { useWorkspace } from '../../store/workspace'
 import { Welcome } from '../layout/Welcome'
 import { ErrorBoundary } from '../layout/ErrorBoundary'
 import { FileIcon, TabKindIcon } from '../icons/FileIcon'
-import { TerminalView } from '../terminal/TerminalView'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 
 // CodeMirror, the SQL console and the agent chat load on first use, keeping startup
@@ -16,7 +17,12 @@ import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 const FileView = lazy(() => import('./FileView').then((m) => ({ default: m.FileView })))
 const ScratchView = lazy(() => import('./ScratchView').then((m) => ({ default: m.ScratchView })))
 const DiffView = lazy(() => import('./DiffView').then((m) => ({ default: m.DiffView })))
+const HistoryView = lazy(() => import('./HistoryView').then((m) => ({ default: m.HistoryView })))
 const AgentChat = lazy(() => import('../agent/AgentChat').then((m) => ({ default: m.AgentChat })))
+const RunView = lazy(() => import('../run/RunView').then((m) => ({ default: m.RunView })))
+const DebugView = lazy(() => import('../debug/DebugView').then((m) => ({ default: m.DebugView })))
+// xterm.js is the biggest dependency; output that arrives first waits in store/terminal.
+const TerminalView = lazy(() => import('../terminal/TerminalView').then((m) => ({ default: m.TerminalView })))
 
 /** Closes a tab, asking first when work could be lost. */
 export async function requestCloseTab(tab: Tab): Promise<void> {
@@ -39,6 +45,17 @@ export async function requestCloseTab(tab: Tab): Promise<void> {
       }
       void useAgentChat.getState().stop(tab.sessionId) // also removes the editor tab
       return
+    case 'debug':
+      if (isDebugging() && !(await confirmAction('The debugged program is still running. Stop it and close the tab?', 'Stop'))) return
+      void stopDebug()
+      useEditor.getState().closeTab(tab.id)
+      return
+    case 'run':
+      if (useRun.getState().sessions[tab.runKey]?.running && !(await confirmAction(`${tab.title} is still running. Stop it and close the tab?`, 'Stop'))) {
+        return
+      }
+      void closeRunSession(tab.runKey) // also removes the editor tab
+      return
   }
   useEditor.getState().closeTab(tab.id)
 }
@@ -48,7 +65,9 @@ export function EditorArea() {
   const activeId = useEditor((s) => s.activeId)
   const setActive = useEditor((s) => s.setActive)
   const terminals = useTerminal((s) => s.tabs)
-  const sessions = useAgentChat((s) => s.sessions)
+  // Busy flags and chat transcripts are selected per tab below: streamed agent tokens
+  // and run output must not re-render the whole editor area.
+  const debugActive = useDebug((s) => s.session?.status === 'running' || s.session?.status === 'starting')
 
   // WebKit (the macOS webview) keeps focus on an element that becomes hidden, so a
   // hidden editor would keep receiving keystrokes typed "into the terminal". Drop
@@ -77,7 +96,7 @@ export function EditorArea() {
             onClick={() => setActive(tab.id)}
             onMouseDown={(e) => e.button === 1 && void requestCloseTab(tab)}
           >
-            <TabIcon tab={tab} busy={tab.kind === 'chat' && !!sessions[tab.sessionId]?.chat.busy} />
+            <TabIcon tab={tab} debugActive={debugActive} />
             <span className="tab-title">{tab.title}</span>
             <button
               className={`tab-close${tab.dirty ? ' dirty' : ''}`}
@@ -94,41 +113,68 @@ export function EditorArea() {
       </div>
       <div className="tab-panels">
         {/* All tabs stay mounted so shells, agents, undo history and scroll survive tab switches. */}
-        {tabs.map((tab) => {
-          const active = tab.id === activeId
-          return (
-            <div key={tab.id} className="tab-panel" data-tab-id={tab.id} hidden={!active}>
-              <ErrorBoundary label={tab.title}>
-                <Suspense fallback={null}>
-                  {tab.kind === 'file' && <FileView tab={tab} active={active} />}
-                  {tab.kind === 'scratch' && <ScratchView tab={tab} active={active} />}
-                  {tab.kind === 'diff' && <DiffView tab={tab} />}
-                  {tab.kind === 'terminal' && <TerminalTabView termId={tab.termId} active={active} />}
-                  {tab.kind === 'chat' && sessions[tab.sessionId] && <AgentChat session={sessions[tab.sessionId]} active={active} />}
-                </Suspense>
-              </ErrorBoundary>
-            </div>
-          )
-        })}
+        {tabs.map((tab) => <TabPanel key={tab.id} tab={tab} active={tab.id === activeId} />)}
       </div>
     </div>
   )
 }
+
+// memo: a tab's body re-renders only when its tab or visibility changes (or the
+// store slice it selects itself), not when the tab bar does.
+const TabPanel = memo(function TabPanel({ tab, active }: { tab: Tab; active: boolean }) {
+  return (
+    <div className="tab-panel" data-tab-id={tab.id} hidden={!active}>
+      <ErrorBoundary label={tab.title}>
+        <Suspense fallback={null}>
+          {tab.kind === 'file' && <FileView tab={tab} active={active} />}
+          {tab.kind === 'scratch' && <ScratchView tab={tab} active={active} />}
+          {tab.kind === 'diff' && <DiffView tab={tab} />}
+          {tab.kind === 'history' && <HistoryView tab={tab} active={active} />}
+          {tab.kind === 'terminal' && <TerminalTabView termId={tab.termId} active={active} />}
+          {tab.kind === 'chat' && <ChatTabView sessionId={tab.sessionId} active={active} />}
+          {tab.kind === 'run' && <RunView runKey={tab.runKey} active={active} />}
+          {tab.kind === 'debug' && <DebugView />}
+        </Suspense>
+      </ErrorBoundary>
+    </div>
+  )
+})
 
 function TerminalTabView({ termId, active }: { termId: string; active: boolean }) {
   const tab = useTerminal((s) => s.tabs.find((t) => t.id === termId))
   return tab ? <TerminalView tab={tab} active={active} /> : null
 }
 
-function TabIcon({ tab, busy }: { tab: Tab; busy: boolean }) {
+function ChatTabView({ sessionId, active }: { sessionId: string; active: boolean }) {
+  const session = useAgentChat((s) => s.sessions[sessionId])
+  return session ? <AgentChat session={session} active={active} /> : null
+}
+
+function TabIcon({ tab, debugActive }: { tab: Tab; debugActive: boolean }) {
   switch (tab.kind) {
     case 'file':
       return <FileIcon name={tab.title} />
     case 'scratch':
       return <TabKindIcon kind={tab.scratchKind} />
+    case 'chat':
+      return <ChatTabIcon sessionId={tab.sessionId} />
+    case 'run':
+      return <RunTabIcon runKey={tab.runKey} />
+    case 'debug':
+      return <TabKindIcon kind="debug" busy={debugActive} />
     default:
-      return <TabKindIcon kind={tab.kind} busy={busy} />
+      return <TabKindIcon kind={tab.kind} busy={false} />
   }
+}
+
+function ChatTabIcon({ sessionId }: { sessionId: string }) {
+  const busy = useAgentChat((s) => !!s.sessions[sessionId]?.chat.busy)
+  return <TabKindIcon kind="chat" busy={busy} />
+}
+
+function RunTabIcon({ runKey }: { runKey: string }) {
+  const running = useRun((s) => !!s.sessions[runKey]?.running)
+  return <TabKindIcon kind="run" busy={running} />
 }
 
 /** "+" at the end of the tab bar: new terminal, agent chat or SQL console. */

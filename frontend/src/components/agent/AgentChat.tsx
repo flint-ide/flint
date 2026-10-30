@@ -1,10 +1,11 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useAgentChat, type ChatSession } from '../../store/agentChat'
 import { editedFiles } from '../../lib/agentReducer'
+import { totalsOf } from '../../lib/usage'
 import { focusSoon } from '../../lib/focusSoon'
 import { useEditor } from '../../store/editor'
 import { useWorkspace } from '../../store/workspace'
-import { FileLink, MessageText, PermissionCard, PlanView, ToolCallRow, UsageLine } from './ChatItems'
+import { FileLink, MessageText, PermissionCard, PlanView, ToolCallRow, UsageLine, ChatUsage } from './ChatItems'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 
 /** Conversation with a coding agent: streamed replies, tool calls, plan and questions. */
@@ -21,13 +22,20 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
   const scroller = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLTextAreaElement>(null)
   const stick = useRef(true)
+  const frame = useRef(0)
   const { chat } = session
 
-  // Follow the stream unless the user scrolled up to read.
+  // Follow the stream unless the user scrolled up to read. Scrolling (which reads the
+  // layout) happens at most once per frame however often the transcript changes.
   useEffect(() => {
-    const el = scroller.current
-    if (el && stick.current) el.scrollTop = el.scrollHeight
+    if (!stick.current || frame.current) return
+    frame.current = requestAnimationFrame(() => {
+      frame.current = 0
+      const el = scroller.current
+      if (el && stick.current) el.scrollTop = el.scrollHeight
+    })
   }, [chat.items])
+  useEffect(() => () => cancelAnimationFrame(frame.current), [])
   useEffect(() => {
     if (active) return focusSoon(() => input.current?.focus())
   }, [active])
@@ -38,13 +46,16 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
     if (tab?.kind === 'file') attach(session.id, { path: tab.path })
   }
 
-  const edited = useMemo(() => editedFiles(chat), [chat])
+  // Shown only between turns: no need to rescan the transcript for every streamed token.
+  const idleChat = chat.busy ? null : chat
+  const edited = useMemo(() => (idleChat ? editedFiles(idleChat) : NONE), [idleChat])
 
   return (
-    <div className="agent-chat">
+    <div className={`agent-chat${chat.busy ? ' busy' : ''}`}>
       <div className="chat-header">
         <span className="agent-name">{session.agent}</span>
         {session.model && <span className="muted">{session.model}</span>}
+        <ChatUsage totals={totalsOf(chat)} />
         <span className="spacer" />
         <label className="check muted" title="Show the agent's reasoning">
           <input type="checkbox" checked={showThoughts} onChange={(e) => setShowThoughts(e.target.checked)} /> thinking
@@ -153,6 +164,8 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
     </div>
   )
 })
+
+const NONE: string[] = []
 
 function label(a: { path: string; startLine?: number; endLine?: number }, root: string): string {
   const rel = a.path.startsWith(root + '/') ? a.path.slice(root.length + 1) : a.path

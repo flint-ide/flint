@@ -4,7 +4,7 @@ import type { EditorView, KeyBinding } from '@codemirror/view'
 import { Scratch, errorMessage, type Driver } from '../../api/backend'
 import { languageFor } from '../../lib/language'
 import { sqlLanguage } from '../../lib/sqlDialects'
-import { registerSaver, useEditor, type ScratchTab } from '../../store/editor'
+import { registerSaver, registerView, useEditor, type ScratchTab } from '../../store/editor'
 import { pendingContent, useScratch } from '../../store/scratch'
 import { useDatabase } from '../../store/database'
 import { showToast } from '../../store/dialog'
@@ -23,6 +23,9 @@ export function ScratchView({ tab, active }: Props) {
   const [initial, setInitial] = useState<string | null>(null)
   const [plainLanguage, setPlainLanguage] = useState<Extension>([])
   const view = useRef<EditorView | null>(null)
+  // Registered so palette commands (Run Query, Find…) can reach this editor.
+  const unregisterView = useRef<(() => void) | null>(null)
+  useEffect(() => () => unregisterView.current?.(), [])
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const dirty = useRef(false)
   const setDirty = useEditor((s) => s.setDirty)
@@ -114,7 +117,11 @@ export function ScratchView({ tab, active }: Props) {
       keys={keys}
       active={active}
       onDocChange={onDocChange}
-      onReady={(v) => (view.current = v)}
+      onReady={(v) => {
+        view.current = v
+        unregisterView.current?.()
+        unregisterView.current = registerView(tab.id, v)
+      }}
     />
   )
 

@@ -1,22 +1,26 @@
 import { memo, useMemo, useState, type ReactNode } from 'react'
-import type { Diff, PermissionRequest, PlanEntry, ToolCall, Usage } from '../../lib/agentReducer'
+import type { Diff, PermissionRequest, PlanEntry, ToolCall, Usage, UsageTotals } from '../../lib/agentReducer'
+import { contextPercent, formatCost, formatTokens, hasUsage, usageTooltip } from '../../lib/usage'
 import { countLines, previewLines, useHunks } from '../../lib/editDiff'
 import { useEditor } from '../../store/editor'
 
 const TOOL_ICONS: Record<string, string> = {
   read: '◫', search: '⌕', edit: '✎', delete: '✕', move: '⇄', execute: '❯', fetch: '⇣', think: '…', other: '•',
 }
-const STATUS_ICONS: Record<string, string> = { pending: '◌', in_progress: '◌', completed: '✓', failed: '✗' }
+// `cancelled`: left running by a turn that was stopped or failed (see settleItems).
+const STATUS_ICONS: Record<string, string> = { pending: '◌', in_progress: '◌', completed: '✓', failed: '✗', cancelled: '–' }
 
 /** Minimal, safe markdown: fenced code, inline code, bold, headings, lists. No HTML. */
 // memo everywhere below: streaming appends to one item; the rest must not re-render.
+// While a reply streams only its tail changes: parts and lines are memoized by their
+// text, so a new token re-parses the last line instead of the whole message.
 export const MessageText = memo(function MessageText({ text }: { text: string }) {
   const parts = useMemo(() => text.split(/```[^\n]*\n?/), [text])
   return (
     <div className="msg-text selectable">
       {parts.map((part, i) =>
         i % 2 === 1 ? (
-          <pre key={i} className="msg-code">{part.replace(/\n$/, '')}</pre>
+          <CodeBlock key={i} text={part} />
         ) : (
           <Paragraphs key={i} text={part} />
         ),
@@ -25,21 +29,30 @@ export const MessageText = memo(function MessageText({ text }: { text: string })
   )
 })
 
-function Paragraphs({ text }: { text: string }) {
+const CodeBlock = memo(function CodeBlock({ text }: { text: string }) {
+  return <pre className="msg-code">{text.replace(/\n$/, '')}</pre>
+})
+
+const Paragraphs = memo(function Paragraphs({ text }: { text: string }) {
   const lines = text.split('\n')
   return (
     <>
-      {lines.map((line, i) => {
-        if (!line.trim()) return i > 0 && i < lines.length - 1 ? <div key={i} className="msg-gap" /> : null
-        const heading = /^(#{1,4})\s+(.*)$/.exec(line)
-        if (heading) return <div key={i} className="msg-heading">{inline(heading[2])}</div>
-        const bullet = /^\s*([-*]|\d+\.)\s+(.*)$/.exec(line)
-        if (bullet) return <div key={i} className="msg-bullet"><span>{/\d/.test(bullet[1]) ? bullet[1] : '•'}</span>{inline(bullet[2])}</div>
-        return <div key={i}>{inline(line)}</div>
-      })}
+      {lines.map((line, i) => (
+        <Line key={i} line={line} edge={i === 0 || i === lines.length - 1} />
+      ))}
     </>
   )
-}
+})
+
+/** One line of prose; blank lines become gaps, except at the edges of a part. */
+const Line = memo(function Line({ line, edge }: { line: string; edge: boolean }) {
+  if (!line.trim()) return edge ? null : <div className="msg-gap" />
+  const heading = /^(#{1,4})\s+(.*)$/.exec(line)
+  if (heading) return <div className="msg-heading">{inline(heading[2])}</div>
+  const bullet = /^\s*([-*]|\d+\.)\s+(.*)$/.exec(line)
+  if (bullet) return <div className="msg-bullet"><span>{/\d/.test(bullet[1]) ? bullet[1] : '•'}</span>{inline(bullet[2])}</div>
+  return <div>{inline(line)}</div>
+})
 
 function inline(s: string): ReactNode[] {
   return s.split(/(`[^`]+`|\*\*[^*]+\*\*)/).map((tok, i) => {
@@ -175,6 +188,25 @@ export function PlanView({ plan }: { plan: PlanEntry[] }) {
     </div>
   )
 }
+
+/** Compact running usage of a chat: context fill bar, tokens and cost; details in the tooltip. */
+export const ChatUsage = memo(function ChatUsage({ totals }: { totals: UsageTotals }) {
+  if (!hasUsage(totals)) return null
+  const pct = contextPercent(totals)
+  const level = pct !== null && pct >= 90 ? 'full' : pct !== null && pct >= 70 ? 'warn' : ''
+  return (
+    <span className="chat-usage" title={usageTooltip(totals)}>
+      {pct !== null && (
+        <>
+          <span className={`context-bar ${level}`}><span style={{ width: `${pct}%` }} /></span>
+          <span>{pct}% context</span>
+        </>
+      )}
+      <span>{formatTokens(totals.inputTokens)} in / {formatTokens(totals.outputTokens)} out</span>
+      {totals.costUsd > 0 && <span>{formatCost(totals.costUsd)}</span>}
+    </span>
+  )
+})
 
 export function UsageLine({ usage, stopReason }: { usage?: Usage; stopReason: string }) {
   const parts: string[] = []

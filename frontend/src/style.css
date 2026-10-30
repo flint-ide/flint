@@ -1304,6 +1304,126 @@ kbd {
   background: #82aaff;
 }
 
+/* Annotate (git blame): IntelliJ-style column left of the line numbers. */
+/* Spacing sits on the entries, so the column takes no room while blame is off. */
+.cm-blame-entry {
+  margin: 0 10px 0 8px;
+  display: inline-block;
+  width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.cm-blame-entry:hover {
+  color: var(--accent);
+}
+.cm-blame-entry.uncommitted {
+  color: var(--fg-faint);
+  font-style: italic;
+}
+
+/* File history tab: commits on top, the selected commit's diff below. */
+.history-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-editor);
+}
+.history-list {
+  flex: 0 0 36%;
+  min-height: 80px;
+  overflow: auto;
+  border-bottom: 1px solid var(--border);
+  outline: none;
+  padding: 2px 0;
+}
+.history-row {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.history-row:hover {
+  background: var(--bg-hover);
+}
+.history-row.selected {
+  background: var(--bg-active);
+}
+.history-list:focus .history-row.selected {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.history-hash {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-faint);
+}
+.history-subject {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.history-refs {
+  color: var(--accent);
+  font-size: 11px;
+}
+.history-author {
+  flex: none;
+  width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.history-date {
+  flex: none;
+  width: 110px;
+  text-align: right;
+}
+.history-diff {
+  flex: 1;
+  min-height: 0;
+}
+
+.stash-row .row-actions {
+  gap: 6px;
+  align-items: center;
+}
+.stash-row .row-actions .link {
+  font-size: 11px;
+}
+
+.status-action {
+  background: none;
+  border: none;
+  padding: 0 6px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  border-radius: 4px;
+  height: 18px;
+}
+.status-action:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.status-action.on {
+  color: var(--accent);
+}
+
+.context-anchor {
+  position: fixed;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
 /* ---------- lsp ---------- */
 
 .cm-lsp-hover {
@@ -1329,6 +1449,19 @@ kbd {
 .cm-diagnostic {
   font: 12px/1.45 var(--font-mono);
   white-space: pre-wrap;
+}
+.cm-diagnostic .cm-diagnosticAction {
+  font: 11px var(--font-ui);
+  padding: 1px 6px;
+  margin-left: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-editor);
+  color: var(--fg);
+  cursor: pointer;
+}
+.cm-diagnostic .cm-diagnosticAction:hover {
+  border-color: var(--accent);
 }
 .status-lsp {
   background: none;
@@ -1520,7 +1653,14 @@ kbd {
 .tool-status.pending,
 .tool-status.in_progress {
   color: var(--accent);
+}
+/* Only while the turn runs: a call the agent never closed must not pulse forever. */
+.agent-chat.busy .tool-status.pending,
+.agent-chat.busy .tool-status.in_progress {
   animation: pulse 1s ease-in-out infinite;
+}
+.tool-status.cancelled {
+  color: var(--fg-muted);
 }
 .tool-paths {
   display: flex;
@@ -1893,4 +2033,431 @@ kbd {
 .select-chevron {
   flex: none;
   color: var(--fg-faint);
+}
+
+/* ---------- run configurations & tests ---------- */
+
+.tb-run {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 8px;
+}
+.tb-widget.run-config .tb-label {
+  max-width: 180px;
+}
+.tb-icon.run-stop:not(:disabled) {
+  color: var(--danger);
+}
+.tb-icon:disabled {
+  opacity: 0.35;
+}
+
+.run-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #141518;
+}
+.run-toolbar {
+  height: 30px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 12px;
+}
+.run-toolbar button.icon {
+  display: flex;
+  align-items: center;
+  height: 24px;
+}
+.run-toolbar .run-stop:not(:disabled) {
+  color: var(--danger);
+}
+.run-toolbar .run-fix {
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+.run-check {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  color: var(--fg-muted);
+}
+.run-status {
+  color: var(--fg-muted);
+  margin-left: 10px;
+}
+.run-status.ok {
+  color: var(--ok);
+}
+.run-status.failed {
+  color: var(--danger);
+}
+.run-status.running {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.test-counts {
+  display: flex;
+  gap: 8px;
+}
+.test-counts .passed {
+  color: var(--ok);
+}
+.test-counts .failed {
+  color: var(--danger);
+}
+.test-counts .skipped {
+  color: #fcd34d;
+}
+.run-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.run-console {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 6px 0 0 8px;
+}
+.run-console .xterm {
+  height: 100%;
+}
+
+.test-panel {
+  flex: none;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-sidebar);
+}
+.test-tree {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0;
+}
+.test-tree .placeholder {
+  padding: 12px;
+}
+.test-row {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 4px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.test-row:hover {
+  background: var(--bg-hover);
+}
+.test-row.selected {
+  background: var(--bg-active);
+}
+.test-twisty {
+  width: 12px;
+  flex: none;
+  color: var(--fg-faint);
+  font-size: 10px;
+  text-align: center;
+}
+.test-icon {
+  width: 14px;
+  flex: none;
+  text-align: center;
+}
+.test-icon.passed {
+  color: var(--ok);
+}
+.test-icon.failed,
+.test-icon.cancelled {
+  color: var(--danger);
+}
+.test-icon.skipped {
+  color: #fcd34d;
+}
+.test-icon.running {
+  color: var(--fg-muted);
+  animation: pulse 1s ease-in-out infinite;
+}
+.test-name {
+  flex: 1;
+  min-width: 0;
+}
+.test-time {
+  color: var(--fg-faint);
+  font-size: 11px;
+}
+.test-row .test-run {
+  visibility: hidden;
+  color: #5fbf7f;
+  padding: 0 4px;
+  font-size: 10px;
+}
+.test-row:hover .test-run {
+  visibility: visible;
+}
+.test-details {
+  flex: none;
+  max-height: 45%;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+  padding: 6px 10px;
+  background: var(--bg-editor);
+}
+.test-details pre {
+  margin: 4px 0 0;
+  font: 12px/1.45 var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.path-link {
+  color: var(--syn-function);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.cm-test-gutter .cm-gutterElement {
+  padding: 0 2px !important;
+}
+.cm-test-run {
+  display: inline-block;
+  width: 12px;
+  font-size: 10px;
+  line-height: inherit;
+  text-align: center;
+  cursor: pointer;
+  color: #5fbf7f;
+}
+.cm-test-run:hover {
+  filter: brightness(1.3);
+}
+.cm-test-run.failed,
+.cm-test-run.cancelled {
+  color: var(--danger);
+}
+.cm-test-run.skipped {
+  color: #fcd34d;
+}
+.cm-test-run.running {
+  color: var(--fg-muted);
+}
+
+.modal.run-config-dialog {
+  width: min(620px, 94vw);
+}
+.form-row .run-type {
+  width: 170px;
+}
+.form .run-env {
+  font: 12px/1.4 var(--font-mono);
+  background: var(--bg-editor);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px 8px;
+  resize: vertical;
+  outline: none;
+}
+.run-hint {
+  font-size: 11px;
+}
+
+/* ⇧⌘P command palette (reuses the quick-open list) */
+.command-palette .quick-item {
+  align-items: center;
+}
+.command-palette .file-name b {
+  color: var(--accent);
+  font-weight: 600;
+}
+.command-palette .path-hint {
+  text-align: right;
+}
+.command-palette kbd {
+  margin-left: auto;
+  min-width: 36px;
+  text-align: center;
+  font-size: 10px;
+}
+.command-palette .quick-item.after-recent {
+  border-top: 1px solid var(--border);
+}
+
+.chat-usage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  cursor: default;
+}
+.context-bar {
+  width: 36px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.context-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+}
+.context-bar.warn > span {
+  background: var(--accent);
+}
+.context-bar.full > span {
+  background: #f87171;
+}
+
+/* ---------- debugger ---------- */
+
+.debug-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-editor);
+}
+.debug-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--border);
+}
+.run-toolbar .debug-step {
+  min-width: 24px;
+  justify-content: center;
+  color: #6cb6ff;
+  font-size: 13px;
+}
+.run-toolbar .debug-step:disabled {
+  color: var(--fg-faint);
+}
+.run-status.paused {
+  color: #6cb6ff;
+}
+.debug-side {
+  flex: none;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-sidebar);
+  overflow: auto;
+}
+.debug-section {
+  padding: 4px 0;
+}
+.debug-section.placeholder {
+  padding: 12px;
+}
+.debug-frames {
+  max-height: 45%;
+  overflow: auto;
+  border-bottom: 1px solid var(--border);
+}
+.debug-vars {
+  flex: 1;
+  overflow: auto;
+}
+.debug-heading {
+  padding: 2px 10px 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-faint);
+}
+.debug-row {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  white-space: nowrap;
+  cursor: pointer;
+  font: 12px var(--font-mono);
+}
+.debug-row:hover {
+  background: var(--bg-hover);
+}
+.debug-row.selected {
+  background: var(--bg-active);
+}
+.debug-row.muted {
+  color: var(--fg-faint);
+}
+.debug-hint {
+  margin-left: auto;
+  color: var(--fg-faint);
+}
+.debug-var {
+  gap: 0;
+}
+.debug-scope {
+  color: var(--fg-muted);
+  font-family: var(--font-ui, inherit);
+}
+.debug-name {
+  color: var(--syn-property, #9cdcfe);
+}
+.debug-value {
+  color: var(--fg);
+  min-width: 0;
+}
+.debug-console {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.debug-console pre {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 6px 10px;
+  overflow: auto;
+  font: 12px/1.45 var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.debug-eval {
+  flex: none;
+  height: 28px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  padding: 0 10px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 12px var(--font-mono);
+  outline: none;
+}
+
+.cm-breakpoint-gutter .cm-gutterElement {
+  width: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.cm-breakpoint {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #e5534b;
+}
+.cm-line.cm-debug-line {
+  background: rgba(108, 182, 255, 0.24) !important; /* over the active-line highlight */
+  box-shadow: inset 2px 0 0 #6cb6ff;
 }

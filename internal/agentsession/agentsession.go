@@ -125,6 +125,10 @@ type Usage struct {
 	InputTokens  int     `json:"inputTokens"`
 	OutputTokens int     `json:"outputTokens"`
 	CostUSD      float64 `json:"costUsd"`
+	// ContextTokens is the context fill after the turn (the last model call's
+	// input incl. cache) and ContextWindow the model's limit; zero when unknown.
+	ContextTokens int `json:"contextTokens,omitempty"`
+	ContextWindow int `json:"contextWindow,omitempty"`
 }
 
 // Attachment is extra context sent with a prompt (a file or a selection).

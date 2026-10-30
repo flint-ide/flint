@@ -1,10 +1,13 @@
 import * as SessionAPI from '../../wailsjs/go/main/SessionAPI'
 import { Scratch, errorMessage } from '../api/backend'
 import { showToast } from './dialog'
-import { SNAPSHOT_VERSION, inside, parseSnapshot, trimChat, type SavedTab, type Snapshot } from '../lib/sessionSnapshot'
-import { diffTabId, fileTabId, scratchTabId, useEditor, viewFor, type Tab } from './editor'
+import { SNAPSHOT_VERSION, chatsNeedSave, inside, parseSnapshot, trimChat, type SavedTab, type Snapshot } from '../lib/sessionSnapshot'
+import { diffTabId, fileTabId, historyTabId, revisionDiffTabId, scratchTabId, useEditor, viewFor, type Tab } from './editor'
 import { recentOutput, terminalTabId, TerminalBackend, useTerminal } from './terminal'
 import { chatTabId, useAgentChat } from './agentChat'
+import { selectRunConfig, useRun } from './run'
+import { setAllBreakpoints, useDebug } from './debug'
+import { breakpointsUnder } from '../lib/breakpoints'
 
 // What was open in a project (tabs, terminals, agent chats) is saved per project
 // so a restart comes back as it was left. Terminals reopen as new shells in their
@@ -19,7 +22,13 @@ async function capture(root: string): Promise<Snapshot> {
   const { tabs, activeId } = useEditor.getState()
   const saved: (SavedTab | null)[] = await Promise.all(tabs.map((t) => captureTab(t, root)))
   const kept = tabs.flatMap((t, i) => (saved[i] ? [{ id: t.id, tab: saved[i]! }] : []))
-  return { version: SNAPSHOT_VERSION, active: kept.findIndex((k) => k.id === activeId), tabs: kept.map((k) => k.tab) }
+  return {
+    version: SNAPSHOT_VERSION,
+    active: kept.findIndex((k) => k.id === activeId),
+    tabs: kept.map((k) => k.tab),
+    runConfig: useRun.getState().selectedId ?? undefined,
+    breakpoints: breakpointsUnder(useDebug.getState().breakpoints, root),
+  }
 }
 
 async function captureTab(t: Tab, root: string): Promise<SavedTab | null> {
@@ -34,8 +43,13 @@ async function captureTab(t: Tab, root: string): Promise<SavedTab | null> {
     }
     case 'scratch':
       return { kind: 'scratch', scratchId: t.scratchId, scratchKind: t.scratchKind, title: t.title }
-    case 'diff':
-      return inside(t.path, root) ? { kind: 'diff', path: t.path, basePath: t.basePath, repoRoot: t.repoRoot, title: t.title } : null
+    case 'diff': {
+      if (!inside(t.path, root)) return null
+      const { path, basePath, repoRoot, title, baseRev, rev, baseLabel, label } = t
+      return { kind: 'diff', path, basePath, repoRoot, title, baseRev, rev, baseLabel, label }
+    }
+    case 'history':
+      return inside(t.path, root) ? { kind: 'history', path: t.path } : null
     case 'terminal': {
       const term = useTerminal.getState().tabs.find((x) => x.id === t.termId)
       if (!term || (term.project !== root && !inside(term.cwd, root))) return null
@@ -51,11 +65,19 @@ async function captureTab(t: Tab, root: string): Promise<SavedTab | null> {
         chat: { id: s.id, agent: s.agent, cwd: s.cwd, model: s.model, draft: s.draft, chat: trimChat(s.chat) },
       }
     }
+    case 'run':
+    case 'debug':
+      return null // processes are not restored; only the selected configuration is
   }
 }
 
 /** Re-opens what capture saved, after the tabs already open. */
 async function apply(root: string, snap: Snapshot): Promise<void> {
+  if (snap.runConfig) selectRunConfig(snap.runConfig)
+  if (snap.breakpoints) {
+    const others = Object.entries(useDebug.getState().breakpoints).filter(([path]) => !inside(path, root))
+    setAllBreakpoints({ ...Object.fromEntries(others), ...snap.breakpoints })
+  }
   const editor = useEditor.getState()
   const scratchIds = snap.tabs.some((t) => t.kind === 'scratch')
     ? new Set(((await Scratch.List().catch(() => [])) ?? []).map((s) => s.id))
@@ -87,9 +109,16 @@ async function apply(root: string, snap: Snapshot): Promise<void> {
         editor.addTab({ id: scratchTabId(t.scratchId), kind: 'scratch', scratchId: t.scratchId, scratchKind: t.scratchKind, title: t.title, dirty: false })
         ids.push(scratchTabId(t.scratchId))
         break
-      case 'diff':
-        editor.addTab({ id: diffTabId(t.path), kind: 'diff', path: t.path, basePath: t.basePath, repoRoot: t.repoRoot, title: t.title, dirty: false })
-        ids.push(diffTabId(t.path))
+      case 'diff': {
+        const { path, basePath, repoRoot, title, baseRev, rev, baseLabel, label } = t
+        const id = baseRev || rev ? revisionDiffTabId(t) : diffTabId(path)
+        editor.addTab({ id, kind: 'diff', path, basePath, repoRoot, title, baseRev, rev, baseLabel, label, dirty: false })
+        ids.push(id)
+        break
+      }
+      case 'history':
+        editor.addTab({ id: historyTabId(t.path), kind: 'history', path: t.path, title: `History: ${t.path.split('/').pop() ?? t.path}`, dirty: false })
+        ids.push(historyTabId(t.path))
         break
       case 'terminal': {
         const cwd = dirs.get(t.cwd) ? t.cwd : root
@@ -113,6 +142,7 @@ let firstPending = 0
 let currentRoot: string | null = null
 let restored: Promise<void> | null = null
 let saveFailed = false // report a broken save once, not on every autosave
+const lastSaved = new Map<string, string>() // JSON last written per root
 
 /** Saves root's session now (pending autosaves are folded in). */
 export async function saveSession(root = currentRoot): Promise<void> {
@@ -121,7 +151,10 @@ export async function saveSession(root = currentRoot): Promise<void> {
   firstPending = 0
   if (!root || restoring) return
   try {
-    await SessionAPI.Save(root, JSON.stringify(await capture(root)))
+    const json = JSON.stringify(await capture(root))
+    if (lastSaved.get(root) === json) return
+    await SessionAPI.Save(root, json)
+    lastSaved.set(root, json)
     saveFailed = false
   } catch (err) {
     if (!saveFailed) showToast(`Could not save open tabs: ${errorMessage(err)}`, 'error')
@@ -171,7 +204,13 @@ export function subscribeSessionAutosave(): void {
     if (s.tabs !== prev.tabs) scheduleSave()
   })
   useAgentChat.subscribe((s, prev) => {
-    if (s.sessions !== prev.sessions) scheduleSave()
+    if (chatsNeedSave(prev.sessions, s.sessions)) scheduleSave()
+  })
+  useDebug.subscribe((s, prev) => {
+    if (s.breakpoints !== prev.breakpoints) scheduleSave()
+  })
+  useRun.subscribe((s, prev) => {
+    if (s.selectedId !== prev.selectedId) scheduleSave()
   })
   // Cursor moves and terminal output don't touch the stores; catch them when the
   // window loses focus.

@@ -199,6 +199,9 @@ func TestTextTurn(t *testing.T) {
 	if len(usage) != 1 || usage[0].Usage.OutputTokens != 7 || usage[0].Usage.InputTokens != 2+32922 || usage[0].Usage.CostUSD <= 0 {
 		t.Fatalf("usage = %+v", usage)
 	}
+	if u := usage[0].Usage; u.ContextTokens != 2+32922 || u.ContextWindow != 1000000 {
+		t.Fatalf("context usage = %+v", u)
+	}
 	if model, _ := h.d.Model(h.info.ID); model != "claude-haiku-5-5" {
 		t.Fatalf("Model = %q", model)
 	}

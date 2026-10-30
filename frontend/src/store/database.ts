@@ -11,6 +11,9 @@ interface SchemaEntry {
 interface DatabaseState {
   connections: Connection[]
   schemas: Record<string, SchemaEntry>
+  /** Connection being edited in the form ('new' = adding one); null when closed. */
+  editing: Connection | 'new' | null
+  setEditing: (editing: Connection | 'new' | null) => void
   loadConnections: () => Promise<void>
   loadSchema: (connId: string, refresh?: boolean) => Promise<void>
   removeConnection: (connId: string) => Promise<void>
@@ -20,6 +23,9 @@ interface DatabaseState {
 export const useDatabase = createStore<DatabaseState>((set, get) => ({
   connections: [],
   schemas: {},
+  editing: null,
+
+  setEditing: (editing) => set({ editing }),
 
   loadConnections: async () => {
     try {

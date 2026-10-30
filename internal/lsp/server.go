@@ -34,6 +34,7 @@ func startServer(ctx context.Context, language, root string, argv []string, onDi
 	cmd.Dir = root
 	cmd.Env = os.Environ()
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // kill helper processes with it
+	cmd.WaitDelay = time.Second                           // a helper holding stderr must not keep Wait (and the pipes) open
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err

@@ -1,7 +1,8 @@
 import { useDialog } from '../../store/dialog'
 import { Modal } from './Modal'
+import { ContextMenu } from '../ui/ContextMenu'
 
-/** Global confirm dialog and toast notification. */
+/** Global confirm dialog, context menu and toast notification. */
 export function Overlays() {
   const confirm = useDialog((s) => s.confirm)
   const toast = useDialog((s) => s.toast)
@@ -20,6 +21,7 @@ export function Overlays() {
           </div>
         </Modal>
       )}
+      <ContextMenu />
       {toast && <div className={`toast ${toast.kind}`}>{toast.message}</div>}
     </>
   )

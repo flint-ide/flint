@@ -22,6 +22,9 @@ type outMsg struct {
 	method string
 	params any
 	done   chan struct{} // barrier when non-nil
+	// key marks a message a newer one with the same key replaces (full-text
+	// didChange of one document), so a stalled server doesn't pile up copies.
+	key string
 }
 
 func newOutbox(c *conn) *outbox {
@@ -43,6 +46,12 @@ func (o *outbox) notify(method string, params any) {
 	o.push(outMsg{method: method, params: params})
 }
 
+// notifyLatest queues a notification that replaces a not yet written one with
+// the same key, unless a barrier sits between them (a request expects it sent).
+func (o *outbox) notifyLatest(key, method string, params any) {
+	o.push(outMsg{method: method, params: params, key: key})
+}
+
 // barrier waits until everything queued before it has been written.
 func (o *outbox) barrier(ctx context.Context) error {
 	done := make(chan struct{})
@@ -59,6 +68,18 @@ func (o *outbox) barrier(ctx context.Context) error {
 
 func (o *outbox) push(m outMsg) {
 	o.mu.Lock()
+	if o.closed {
+		o.mu.Unlock()
+		return // the server is gone; barriers return ErrClosed via conn.done
+	}
+	if m.key != "" {
+		for i := len(o.queue) - 1; i >= 0 && o.queue[i].done == nil; i-- {
+			if o.queue[i].key == m.key {
+				o.queue = append(o.queue[:i], o.queue[i+1:]...)
+				break
+			}
+		}
+	}
 	o.queue = append(o.queue, m)
 	o.mu.Unlock()
 	o.cond.Signal()

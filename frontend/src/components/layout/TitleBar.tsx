@@ -10,6 +10,7 @@ import { useAgent } from '../../store/agent'
 import { FileIcon, TabKindIcon } from '../icons/FileIcon'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 import { Git } from '../../store/git'
+import { RunWidget } from '../run/RunWidget'
 
 const BranchesPopup = lazy(() => import('../git/BranchesPopup').then((m) => ({ default: m.BranchesPopup })))
 
@@ -35,10 +36,13 @@ export function TitleBar() {
       <ProjectWidget />
       {root && <BranchWidget />}
       <span className="titlebar-drag" onDoubleClick={() => WindowToggleMaximise()} />
+      {root && <RunWidget />}
       <QuickActions />
     </header>
   )
 }
+
+const FULLSCREEN_CHECK_MS = 100
 
 /** Height and left inset from AppKit; no inset in full screen (buttons hidden). */
 function useTitlebarMetrics(): { height: number; inset: number } {
@@ -54,10 +58,16 @@ function useTitlebarMetrics(): { height: number; inset: number } {
         setBase({ height: Math.round(m.height), inset })
       })
       .catch(() => undefined)
-    const check = () => void WindowIsFullscreen().then(setFullscreen).catch(() => undefined)
+    // A live resize fires every frame: ask AppKit once the window settles, not per event.
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const check = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => void WindowIsFullscreen().then(setFullscreen).catch(() => undefined), FULLSCREEN_CHECK_MS)
+    }
     window.addEventListener('resize', check)
     const off = EventsOn('wails:window-fullscreen', check)
     return () => {
+      clearTimeout(timer)
       window.removeEventListener('resize', check)
       off()
     }
@@ -121,12 +131,14 @@ function BranchWidget() {
   const isRepo = useGit((s) => s.isRepo)
   const status = useGit((s) => s.status)
   const busy = useGit((s) => s.busy)
-  const [open, setOpen] = useState(false)
+  // In the workspace store so palette commands (New Branch…, New Worktree…) can open it.
+  const popup = useWorkspace((s) => s.branchesPopup)
+  const setPopup = useWorkspace((s) => s.setBranchesPopup)
   if (!isRepo || !status) return null
   const name = status.branch || `detached ${status.head.slice(0, 7)}`
   return (
     <>
-      <button className="tb-widget branch" onClick={() => setOpen(true)} title="Branches & worktrees">
+      <button className="tb-widget branch" onClick={() => setPopup('list')} title="Branches & worktrees">
         <svg className="file-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden>
           <circle cx="5" cy="3.8" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.2" />
           <circle cx="5" cy="12.2" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.2" />
@@ -140,9 +152,9 @@ function BranchWidget() {
         {busy && <span className="muted">{busy}…</span>}
         <span className="tb-chevron">⌄</span>
       </button>
-      {open && (
+      {popup && (
         <Suspense fallback={null}>
-          <BranchesPopup onClose={() => setOpen(false)} />
+          <BranchesPopup key={popup} initialMode={popup} onClose={() => setPopup(null)} />
         </Suspense>
       )}
     </>

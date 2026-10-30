@@ -65,7 +65,7 @@ func (m *Manager) Start(id string, opts Options) error {
 	}
 	cmd := exec.Command(shell, args...)
 	cmd.Dir = opts.Cwd
-	cmd.Env = shellEnv()
+	cmd.Env = Environ()
 
 	ptmx, err := pty.StartWithSize(cmd, winsize(opts.Cols, opts.Rows))
 	if err != nil {
@@ -161,22 +161,7 @@ func (m *Manager) pump(id string, s *session) {
 		}
 	}()
 
-	for chunk := range chunks {
-		pending := chunk
-	drain:
-		for len(pending) < maxEmit {
-			select {
-			case more, ok := <-chunks:
-				if !ok {
-					break drain
-				}
-				pending = append(pending, more...)
-			default:
-				break drain
-			}
-		}
-		m.events.Output(id, pending)
-	}
+	Coalesce(chunks, func(data []byte) { m.events.Output(id, data) })
 
 	code := 0
 	if err := s.cmd.Wait(); err != nil {
@@ -195,6 +180,28 @@ func (m *Manager) pump(id string, s *session) {
 	}
 	m.mu.Unlock()
 	m.events.Exited(id, code)
+}
+
+// Coalesce forwards chunks to emit until the channel closes, merging chunks that
+// are already waiting (up to maxEmit bytes) into one call: floods become a few
+// large events while interactive echo stays instant.
+func Coalesce(chunks <-chan []byte, emit func([]byte)) {
+	for chunk := range chunks {
+		pending := chunk
+	drain:
+		for len(pending) < maxEmit {
+			select {
+			case more, ok := <-chunks:
+				if !ok {
+					break drain
+				}
+				pending = append(pending, more...)
+			default:
+				break drain
+			}
+		}
+		emit(pending)
+	}
 }
 
 // hangUp sends SIGHUP to the shell's process group (pty.Start makes it a session leader),
@@ -227,7 +234,9 @@ func loginShell() (string, []string) {
 	return shell, []string{"-l"}
 }
 
-func shellEnv() []string {
+// Environ is the process environment plus what terminal programs expect (TERM,
+// colors, a UTF-8 locale).
+func Environ() []string {
 	env := os.Environ()
 	return append(env,
 		"TERM=xterm-256color",

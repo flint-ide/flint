@@ -11,25 +11,26 @@ export interface Bus<E extends Record<string, unknown[]>> {
 }
 
 export function createBus<E extends Record<string, unknown[]>>(): Bus<E> {
-  const handlers = new Map<keyof E, Set<Handler<never>>>()
+  // Copy-on-write lists: on/off replace the array, so emit iterates a stable snapshot
+  // (handlers may unsubscribe or subscribe others meanwhile) without copying per event.
+  const handlers = new Map<keyof E, readonly Handler<never>[]>()
   const bus: Bus<E> = {
     on(event, fn) {
-      const set = handlers.get(event) ?? new Set()
-      set.add(fn as Handler<never>)
-      handlers.set(event, set)
+      const list = handlers.get(event) ?? []
+      if (!list.includes(fn as Handler<never>)) handlers.set(event, [...list, fn as Handler<never>])
       return () => bus.off(event, fn)
     },
     off(event, fn) {
-      const set = handlers.get(event)
-      if (!set) return
-      set.delete(fn as Handler<never>)
-      if (set.size === 0) handlers.delete(event)
+      const list = handlers.get(event)
+      if (!list) return
+      const rest = list.filter((h) => h !== fn)
+      if (rest.length === 0) handlers.delete(event)
+      else if (rest.length !== list.length) handlers.set(event, rest)
     },
     emit(event, ...args) {
-      const set = handlers.get(event)
-      if (!set) return
-      // Snapshot: handlers may unsubscribe (or subscribe others) while we iterate.
-      for (const fn of [...set]) (fn as Handler<E[typeof event]>)(...args)
+      const list = handlers.get(event)
+      if (!list) return
+      for (const fn of list) (fn as Handler<E[typeof event]>)(...args)
     },
   }
   return bus

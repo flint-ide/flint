@@ -3,6 +3,8 @@ import { Workspace, errorMessage, type Entry } from '../api/backend'
 import { restoreSession, saveSession } from './session'
 
 export type SidebarView = 'files' | 'search' | 'git' | 'database' | 'scratch'
+/** What the branches popup opens on (title bar widget or the palette). */
+export type BranchesMode = 'list' | 'new-branch' | 'new-worktree'
 
 interface WorkspaceState {
   root: string | null
@@ -17,6 +19,8 @@ interface WorkspaceState {
   sidebarVisible: boolean
   quickOpen: boolean
   recentOpen: boolean
+  paletteOpen: boolean
+  branchesPopup: BranchesMode | null
   error: string | null
 
   init: () => Promise<void>
@@ -28,6 +32,8 @@ interface WorkspaceState {
   toggleSidebar: () => void
   setQuickOpen: (open: boolean) => void
   setRecentOpen: (open: boolean) => void
+  setPaletteOpen: (open: boolean) => void
+  setBranchesPopup: (mode: BranchesMode | null) => void
   clearError: () => void
 }
 
@@ -45,6 +51,8 @@ export const useWorkspace = createStore<WorkspaceState>((set, get) => ({
   sidebarVisible: true,
   quickOpen: false,
   recentOpen: false,
+  paletteOpen: false,
+  branchesPopup: null,
   error: null,
 
   init: async () => {
@@ -129,5 +137,7 @@ export const useWorkspace = createStore<WorkspaceState>((set, get) => ({
   toggleSidebar: () => set((s) => ({ sidebarVisible: !s.sidebarVisible })),
   setQuickOpen: (open) => set({ quickOpen: open }),
   setRecentOpen: (open) => set({ recentOpen: open }),
+  setPaletteOpen: (open) => set({ paletteOpen: open }),
+  setBranchesPopup: (mode) => set({ branchesPopup: mode }),
   clearError: () => set({ error: null }),
 }))

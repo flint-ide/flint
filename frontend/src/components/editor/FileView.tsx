@@ -8,13 +8,19 @@ import { confirmAction, showToast } from '../../store/dialog'
 import { onFileChanged } from '../../store/fsEvents'
 import { minimalChange } from '../../lib/textDiff'
 import { gitGutter, setGitBaseline } from '../../lib/gitGutter'
+import { testGutter } from '../../lib/testGutter'
+import { testGutterHooks } from '../../store/run'
+import { breakpointGutter } from '../../lib/breakpointGutter'
+import { breakpointHooks, debugTestMark } from '../../store/debug'
+import { blameGutter } from '../../lib/blameGutter'
 import { indentationFor } from '../../lib/indent'
-import { Git, useGit } from '../../store/git'
+import { Git, useGit, useHeadVersion } from '../../store/git'
 import { lspExtension, lspSupported, type LspHooks } from '../../lib/lsp'
 import { useLsp } from '../../store/lsp'
 import { useWorkspace } from '../../store/workspace'
 import * as LSP from '../../../wailsjs/go/main/LSPAPI'
 import { CodeEditor } from './CodeEditor'
+import { useBlame } from './useBlame'
 
 interface Props {
   tab: FileTab
@@ -70,15 +76,17 @@ export function FileView({ tab, active }: Props) {
   // Enter / Tab follow the file's own indentation (tabs for Go, detected otherwise).
   const indentation = useMemo(() => (file ? indentationFor(file.content, tab.path) : []), [file, tab.path])
 
+  const tests = useMemo(() => testGutter(tab.path, { ...testGutterHooks, debug: debugTestMark }), [tab.path])
+  const breakpoints = useMemo(() => (tab.path.endsWith('.go') ? breakpointGutter(tab.path, breakpointHooks) : []), [tab.path])
   const extensions = useMemo(
-    () => [language, indentation, gitGutter(), lsp, crlf ? EditorState.lineSeparator.of('\r\n') : []],
-    [crlf, language, indentation, lsp],
+    () => [language, indentation, breakpoints, gitGutter(), blameGutter(), tests, lsp, crlf ? EditorState.lineSeparator.of('\r\n') : []],
+    [crlf, language, indentation, breakpoints, tests, lsp],
   )
 
   // Gutter baseline: the file at HEAD of the work tree that contains it (which may be
   // an agent's worktree nested in the project), refetched when HEAD moves.
   const isRepo = useGit((s) => s.isRepo)
-  const headVersion = useGit((s) => s.headVersion)
+  const headVersion = useHeadVersion(tab.path)
   const [editorReady, setEditorReady] = useState(false)
   useEffect(() => {
     const v = view.current
@@ -95,6 +103,7 @@ export function FileView({ tab, active }: Props) {
       cancelled = true
     }
   }, [isRepo, headVersion, tab.path, editorReady])
+  useBlame(view, tab.path, editorReady, headVersion)
 
   // Saves are chained: Wails runs each call on its own goroutine, so two in-flight
   // writes could otherwise land out of order.

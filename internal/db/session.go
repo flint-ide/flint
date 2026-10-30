@@ -7,10 +7,23 @@ import (
 	"unicode"
 )
 
+// DatabaseInfo is one database of a server, as listed in the Databases tree node.
+type DatabaseInfo struct {
+	Name string `json:"name"`
+	// CanConnect is false when the user lacks the CONNECT privilege (or the database
+	// refuses connections); such databases are listed but can't be opened.
+	CanConnect bool `json:"canConnect"`
+	// Default marks the database the connection opens by default (the one listing it).
+	Default bool `json:"default"`
+}
+
 // session is an open connection pool to one database.
 type session interface {
 	Query(ctx context.Context, sql string, limit int) (*QueryResult, error)
+	// Schema introspects the tables of the session's database.
 	Schema(ctx context.Context) ([]Table, error)
+	// Databases lists every database on the server.
+	Databases(ctx context.Context) ([]DatabaseInfo, error)
 	Ping(ctx context.Context) error
 	Close()
 }

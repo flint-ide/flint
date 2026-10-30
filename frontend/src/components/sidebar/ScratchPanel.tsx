@@ -66,7 +66,7 @@ function ScratchRow({ sc }: { sc: ScratchPad }) {
       ) : (
         <span className="scratch-name">{sc.name}</span>
       )}
-      {connName && <span className="muted path-hint">{connName}</span>}
+      {connName && <span className="muted path-hint">{sc.database ? `${connName} · ${sc.database}` : connName}</span>}
       <span className="row-actions" onClick={(e) => e.stopPropagation()}>
         <button
           className="icon"

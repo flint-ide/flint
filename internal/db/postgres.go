@@ -29,7 +29,7 @@ func postgresDSN(c Connection, password string) string {
 		Scheme:   "postgres",
 		User:     url.UserPassword(c.User, password),
 		Host:     net.JoinHostPort(c.Host, strconv.Itoa(c.Port)),
-		Path:     "/" + c.Database,
+		Path:     "/" + c.DefaultDatabase(),
 		RawQuery: q.Encode(),
 	}
 	return u.String()
@@ -139,4 +139,28 @@ func (s *pgSession) Schema(ctx context.Context) ([]Table, error) {
 		return nil, fmt.Errorf("postgres schema: %w", err)
 	}
 	return groupTables(collected), nil
+}
+
+// pgDatabasesSQL lists the cluster's databases like pgAdmin does: templates hidden, and
+// databases the user may not CONNECT to (or that refuse connections) marked as such.
+const pgDatabasesSQL = `
+SELECT datname, datallowconn AND has_database_privilege(oid, 'CONNECT'), datname = current_database()
+FROM pg_database
+WHERE NOT datistemplate
+ORDER BY datname`
+
+func (s *pgSession) Databases(ctx context.Context) ([]DatabaseInfo, error) {
+	rows, err := s.pool.Query(ctx, pgDatabasesSQL)
+	if err != nil {
+		return nil, fmt.Errorf("postgres databases: %w", err)
+	}
+	dbs, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (DatabaseInfo, error) {
+		var d DatabaseInfo
+		err := r.Scan(&d.Name, &d.CanConnect, &d.Default)
+		return d, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("postgres databases: %w", err)
+	}
+	return dbs, nil
 }

@@ -15,12 +15,14 @@ export type FileContent = workspace.FileContent
 export type Connection = db.Connection
 export type QueryResult = db.QueryResult
 export type Table = db.Table
+export type DatabaseInfo = db.DatabaseInfo
 export type ScratchPad = scratch.Scratch
 export type Hunk = textdiff.Hunk
 export type LineMark = textdiff.LineMark
 export type SearchOptions = search.Options
 export type Driver = 'postgres' | 'clickhouse'
 export type ScratchKind = 'sql' | 'markdown' | 'text'
+export type ClickHouseProtocol = 'native' | 'http'
 
 // Event payloads aren't part of any bound method signature, so Wails doesn't generate them.
 export interface SearchMatch {
@@ -66,6 +68,7 @@ export function newConnection(driver: Driver = 'postgres'): Connection {
     port: 0,
     database: '',
     user: '',
+    protocol: driver === 'clickhouse' ? 'native' : '',
     tls: false,
     readOnly: false,
   })

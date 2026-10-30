@@ -31,10 +31,12 @@ var extensions = map[Kind]string{SQL: ".sql", Markdown: ".md", Text: ".txt"}
 
 // Scratch is a scratchpad's metadata; the content lives in its own file.
 type Scratch struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Kind      Kind   `json:"kind"`
-	ConnID    string `json:"connId"` // selected connection for SQL scratchpads
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Kind   Kind   `json:"kind"`
+	ConnID string `json:"connId"` // selected connection for SQL scratchpads
+	// Database is the selected database on that connection's server ("" = the profile's default).
+	Database  string `json:"database"`
 	UpdatedAt int64  `json:"updatedAt"`
 }
 
@@ -66,8 +68,8 @@ func (s *Store) List() []Scratch {
 	return out
 }
 
-// Create adds an empty scratchpad.
-func (s *Store) Create(name string, kind Kind, connID string) (Scratch, error) {
+// Create adds an empty scratchpad, optionally bound to a connection and one of its databases.
+func (s *Store) Create(name string, kind Kind, connID, database string) (Scratch, error) {
 	if _, ok := extensions[kind]; !ok {
 		return Scratch{}, fmt.Errorf("unknown scratch kind %q", kind)
 	}
@@ -75,7 +77,10 @@ func (s *Store) Create(name string, kind Kind, connID string) (Scratch, error) {
 	if name == "" {
 		name = fmt.Sprintf("scratch %s", time.Now().Format("2006-01-02 15:04"))
 	}
-	item := Scratch{ID: newID(), Name: name, Kind: kind, ConnID: connID, UpdatedAt: time.Now().UnixMilli()}
+	item := Scratch{
+		ID: newID(), Name: name, Kind: kind, ConnID: connID,
+		Database: strings.TrimSpace(database), UpdatedAt: time.Now().UnixMilli(),
+	}
 	if err := config.WriteFileAtomic(s.contentPath(item), nil, 0o600); err != nil {
 		return Scratch{}, err
 	}
@@ -133,10 +138,12 @@ func (s *Store) Rename(id, name string) error {
 	})
 }
 
-// SetConnection binds an SQL scratchpad to a connection.
-func (s *Store) SetConnection(id, connID string) error {
+// SetConnection binds an SQL scratchpad to a connection and a database on its server
+// ("" = the profile's default).
+func (s *Store) SetConnection(id, connID, database string) error {
 	return s.update(id, func(sc Scratch) Scratch {
 		sc.ConnID = connID
+		sc.Database = strings.TrimSpace(database)
 		return sc
 	})
 }

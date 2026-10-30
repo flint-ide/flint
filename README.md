@@ -13,7 +13,7 @@ Szybkie, minimalistyczne IDE „AI-first” na macOS. Kod piszą agenci (claude,
 | Zmiany agenta na żywo | FSEvents (jedna rekurencyjna subskrypcja na cały projekt). Drzewo plików się odświeża, a otwarte pliki przeładowują się w miejscu z minimalnym diffem. Jeśli masz niezapisane zmiany, pojawi się ostrzeżenie. |
 | Wyszukiwanie | `ripgrep --json`, wyniki przychodzą strumieniowo w paczkach i są renderowane wirtualnie. Bez rg działa wolniejszy fallback w czystym Go. |
 | Go to file (`⌘P`) | Lista z `rg --files` (respektuje `.gitignore`) trzymana w Go; fuzzy matching też w Go, do WebView wraca tylko top 60 wyników. Brak indeksowania z góry. |
-| Bazy danych | PostgreSQL (`pgx`) i ClickHouse (natywny protokół). Hasła trzymane są w Keychainie macOS, nie w plikach. Przeglądarka schematu, autouzupełnianie SQL ze schematu, tryb read-only. |
+| Bazy danych | PostgreSQL (`pgx`) i ClickHouse (natywne TCP albo HTTP, do wyboru w profilu). Hasła trzymane są w Keychainie macOS, nie w plikach. Pod połączeniem węzeł „Databases (N)” ze wszystkimi bazami serwera, jak w pgAdmin: Postgres bez szablonów, bazy bez uprawnienia `CONNECT` z czerwonym krzyżykiem; ClickHouse jak `SHOW DATABASES`. Rozwinięcie bazy otwiera do niej osobną pulę (ten sam host, użytkownik i hasło) i pokazuje jej schematy i tabele. Pule niedomyślnych baz Flint zamyka po minucie bezczynności, a przed instrukcją modyfikującą (np. `DROP DATABASE`) od razu, żeby własne połączenia nie blokowały serwera. Konsola SQL ma select bazy obok połączenia, a wybór zapamiętuje brudnopis. Baza w profilu jest tylko domyślna i nieobowiązkowa: bez niej Flint łączy się do `postgres` (ClickHouse: `default`). Autouzupełnianie SQL ze schematu wybranej bazy, tryb read-only. |
 | Git (jak w IntelliJ) | Panel Commit (`⌘K`) z checkboxami, Amend, Commit and Push i Rollback. Diff obok siebie w karcie. Znaczniki zmienionych linii na marginesie, które pokazują też, co ruszył agent. Widżet gałęzi w pasku stanu: checkout, nowa gałąź, fetch, pull, push (`⇧⌘K`). Commit podczas merge'a obejmuje cały index. **Annotate** (blame): kolumna z datą i autorem przy każdej linii (przycisk *Blame* w pasku stanu albo prawy klik na marginesie edytora), z podpowiedzią (pełny hash, autor, data, opis). Klik otwiera zmianę z tego commita, a linie niezacommitowane (także niezapisane) mają „Not committed”. **Show History** pliku (`git log --follow`, z rename'ami) w osobnej karcie: lista commitów, pod nią diff wybranego commita, *Compare with current*. **Stash** w panelu Commit: zapis z wiadomością (opcjonalnie z plikami nieśledzonymi), lista z Apply / Pop / Drop (z potwierdzeniem) i diffem każdego pliku. Działa też dla plików w zagnieżdżonych worktree. |
 | Worktree | Lista, tworzenie (`<repo>.worktrees/<gałąź>`), usuwanie, przełączanie, otwieranie w nowym oknie lub od razu z terminalem dla agenta. Checkout i commit zrobione w terminalu odświeżają UI, bo obserwowany jest też katalog git. |
 | LSP | `gopls`, `rust-analyzer`, `vtsls`/`typescript-language-server`, `basedpyright`/`pyright`. Serwer startuje w tle przy pierwszym pliku danego języka. Podpowiedzi, hover, ⌘+klik / ⌘B / F12 → definicja, ⌥F7 / ⇧F12 → Find Usages, błędy na żywo (`⇧⌘M` lista problemów, `F8` następny). Przy błędzie i ostrzeżeniu przycisk *Fix with agent* (oraz *Fix all N in file*, także `⌥⇧⌘L`): do czatu trafia ścieżka, linia:kolumna, waga, źródło (np. gopls), komunikat i okoliczne linie jako załącznik. Stan serwera i podpowiedź instalacji w pasku stanu. |
@@ -45,7 +45,7 @@ flint .         # otwiera bieżący katalog
 
 ```bash
 make test                                  # Go (race) + frontend (tsc + node --test)
-make test-db-up && make test-integration   # Postgres + ClickHouse w Dockerze
+make test-db-up && make test-integration   # Postgres + ClickHouse (TCP i HTTP) w Dockerze
 make test-db-down
 ```
 
@@ -125,9 +125,9 @@ flowchart LR
 | Co | Gdzie | Uwagi |
 |---|---|---|
 | Ostatnie foldery, preferowany agent, polityka zgód agenta | `~/Library/Application Support/flint/state.json` | |
-| Profile połączeń z bazami (host, port, użytkownik, baza, TLS, read-only) | `~/Library/Application Support/flint/connections.json` | **bez haseł**, plik z uprawnieniami `0600` |
+| Profile połączeń z bazami (host, port, użytkownik, domyślna baza — opcjonalna, protokół ClickHouse `native`/`http`, TLS, read-only) | `~/Library/Application Support/flint/connections.json` | **bez haseł**, plik z uprawnieniami `0600` |
 | Hasła do baz | Pęk kluczy macOS (Keychain), usługa `flint-db`, konto = id połączenia | usuwane razem z profilem |
-| Brudnopisy (konsole SQL, notatki) | `~/Library/Application Support/flint/scratch/` — `index.json` + `<id>.sql/.md/.txt` | autozapis |
+| Brudnopisy (konsole SQL, notatki) | `~/Library/Application Support/flint/scratch/` — `index.json` (m.in. wybrane połączenie `connId` i baza `database`, pusta = domyślna z profilu) + `<id>.sql/.md/.txt` | autozapis |
 | Szerokość panelu bocznego | `localStorage` WebView | tylko ustawienia wyglądu |
 | Otwarte karty, terminale, rozmowy z agentem (sesja projektu) | `~/Library/Application Support/flint/sessions/<hash ścieżki>.json`, jeden plik na projekt | zapis po zmianach (debounce) i przy wyjściu, `0600`, maks. 4 MB |
 | Historia rozmów z agentem | sam CLI agenta: `~/.claude/projects/…`, `~/.codex/sessions/…` | Flint wznawia je po restarcie (`claude --resume`, codex `thread/resume`) |

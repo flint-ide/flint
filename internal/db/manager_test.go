@@ -18,6 +18,7 @@ type fakeSession struct {
 	schemaCalls int
 	closed      bool
 	tables      []Table
+	databases   []DatabaseInfo
 	queryErr    error
 	block       bool
 	started     chan struct{}
@@ -46,6 +47,12 @@ func (f *fakeSession) Schema(context.Context) ([]Table, error) {
 	return f.tables, nil
 }
 
+func (f *fakeSession) Databases(context.Context) ([]DatabaseInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.databases, nil
+}
+
 func (f *fakeSession) Ping(context.Context) error { return nil }
 
 func (f *fakeSession) Close() {
@@ -70,7 +77,7 @@ func newTestManager(t *testing.T, conn Connection) (*Manager, Connection, *fakeS
 	}
 	m := NewManager(s)
 	fake := &fakeSession{}
-	m.sessions[saved.ID] = fake
+	m.sessions[keyFor(saved, "")] = fake
 	return m, saved, fake
 }
 
@@ -80,10 +87,10 @@ func TestManagerQueryUnknownConnection(t *testing.T) {
 	if m.Store() != s {
 		t.Error("Store() mismatch")
 	}
-	if _, err := m.Query(context.Background(), "nope", "", "SELECT 1", 0); err == nil || !strings.Contains(err.Error(), "unknown connection") {
+	if _, err := m.Query(context.Background(), "nope", "", "", "SELECT 1", 0); err == nil || !strings.Contains(err.Error(), "unknown connection") {
 		t.Errorf("error = %v", err)
 	}
-	if _, err := m.Schema(context.Background(), "nope", false); err == nil {
+	if _, err := m.Schema(context.Background(), "nope", "", false); err == nil {
 		t.Error("Schema(unknown) error = nil")
 	}
 }
@@ -97,7 +104,7 @@ func TestManagerReadOnlyClickHouse(t *testing.T) {
 	}
 	m := NewManager(s) // no fake session: a dial would hang/fail, so rejection must come first
 	for _, sql := range []string{"INSERT INTO t VALUES (1)", "-- x\ndrop table t", "ALTER TABLE t DELETE WHERE 1"} {
-		if _, err := m.Query(context.Background(), conn.ID, "", sql, 0); !errors.Is(err, ErrReadOnly) {
+		if _, err := m.Query(context.Background(), conn.ID, "", "", sql, 0); !errors.Is(err, ErrReadOnly) {
 			t.Errorf("Query(%q) error = %v, want ErrReadOnly", sql, err)
 		}
 	}
@@ -119,7 +126,7 @@ func TestManagerQueryPassesThrough(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m, conn, fake := newTestManager(t, tt.conn)
-			res, err := m.Query(context.Background(), conn.ID, "q", tt.sql, 0)
+			res, err := m.Query(context.Background(), conn.ID, "", "q", tt.sql, 0)
 			if err != nil {
 				t.Fatalf("Query() error = %v", err)
 			}
@@ -136,7 +143,7 @@ func TestManagerQueryPassesThrough(t *testing.T) {
 func TestManagerQueryError(t *testing.T) {
 	m, conn, fake := newTestManager(t, pgConn())
 	fake.queryErr = errors.New("syntax error")
-	if _, err := m.Query(context.Background(), conn.ID, "", "SELEC", 5); !errors.Is(err, fake.queryErr) {
+	if _, err := m.Query(context.Background(), conn.ID, "", "", "SELEC", 5); !errors.Is(err, fake.queryErr) {
 		t.Errorf("error = %v, want syntax error", err)
 	}
 	if fake.lastLimit != 5 {
@@ -152,7 +159,7 @@ func TestManagerCancel(t *testing.T) {
 
 	errc := make(chan error, 1)
 	go func() {
-		_, err := m.Query(context.Background(), conn.ID, "q1", "SELECT pg_sleep(100)", 0)
+		_, err := m.Query(context.Background(), conn.ID, "", "q1", "SELECT pg_sleep(100)", 0)
 		errc <- err
 	}()
 	select {
@@ -188,7 +195,7 @@ func TestManagerSchemaCachingAndInvalidate(t *testing.T) {
 	m, conn, fake := newTestManager(t, pgConn())
 	ctx := context.Background()
 
-	tables, err := m.Schema(ctx, conn.ID, false)
+	tables, err := m.Schema(ctx, conn.ID, "", false)
 	if err != nil {
 		t.Fatalf("Schema() error = %v", err)
 	}
@@ -196,10 +203,10 @@ func TestManagerSchemaCachingAndInvalidate(t *testing.T) {
 		t.Errorf("nil schema should become empty slice, got %#v", tables)
 	}
 	fake.tables = []Table{{Schema: "public", Name: "t"}}
-	if tables, _ = m.Schema(ctx, conn.ID, false); len(tables) != 0 || fake.schemaCalls != 1 {
+	if tables, _ = m.Schema(ctx, conn.ID, "", false); len(tables) != 0 || fake.schemaCalls != 1 {
 		t.Errorf("cached call hit session: calls=%d tables=%v", fake.schemaCalls, tables)
 	}
-	if tables, _ = m.Schema(ctx, conn.ID, true); len(tables) != 1 || fake.schemaCalls != 2 {
+	if tables, _ = m.Schema(ctx, conn.ID, "", true); len(tables) != 1 || fake.schemaCalls != 2 {
 		t.Errorf("refresh: calls=%d tables=%v", fake.schemaCalls, tables)
 	}
 
@@ -212,7 +219,7 @@ func TestManagerSchemaCachingAndInvalidate(t *testing.T) {
 	if !fake.isClosed() {
 		t.Error("Invalidate did not close the session")
 	}
-	if _, ok := m.schemas[conn.ID]; ok {
+	if _, ok := m.schemas[keyFor(conn, "")]; ok {
 		t.Error("Invalidate kept cached schema")
 	}
 	m.Invalidate("unknown") // no-op
@@ -221,7 +228,7 @@ func TestManagerSchemaCachingAndInvalidate(t *testing.T) {
 func TestManagerCloseAll(t *testing.T) {
 	m, _, a := newTestManager(t, pgConn())
 	b := &fakeSession{}
-	m.sessions["other"] = b
+	m.sessions[sessionKey{connID: "other", database: "x"}] = b
 	m.CloseAll()
 	if !a.isClosed() || !b.isClosed() || len(m.sessions) != 0 {
 		t.Errorf("CloseAll: a=%v b=%v remaining=%d", a.isClosed(), b.isClosed(), len(m.sessions))
@@ -233,7 +240,7 @@ func TestManagerSessionPasswordError(t *testing.T) {
 	conn, _ := s.Save(pgConn(), nil)
 	sec.getErr = errors.New("keychain locked")
 	m := NewManager(s)
-	if _, err := m.Query(context.Background(), conn.ID, "", "SELECT 1", 0); !errors.Is(err, sec.getErr) {
+	if _, err := m.Query(context.Background(), conn.ID, "", "", "SELECT 1", 0); !errors.Is(err, sec.getErr) {
 		t.Errorf("error = %v, want keychain locked", err)
 	}
 }

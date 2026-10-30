@@ -4,6 +4,7 @@ export GOPROXY ?= https://proxy.golang.org,direct
 
 PG_PORT ?= 55432
 CH_PORT ?= 59000
+CH_HTTP_PORT ?= 58123
 
 .PHONY: dev build test test-go test-web test-integration test-db-up test-db-down install lint
 
@@ -24,13 +25,13 @@ test-web:
 test-db-up: ## Throwaway Postgres + ClickHouse for integration tests
 	docker run -d --rm --name flint-test-pg -e POSTGRES_PASSWORD=flint-test -p $(PG_PORT):5432 postgres:16-alpine
 	docker run -d --rm --name flint-test-ch -e CLICKHOUSE_USER=flint -e CLICKHOUSE_PASSWORD=flint-test \
-		-p $(CH_PORT):9000 clickhouse/clickhouse-server:24.8-alpine
+		-p $(CH_PORT):9000 -p $(CH_HTTP_PORT):8123 clickhouse/clickhouse-server:24.8-alpine
 
 test-db-down:
 	docker rm -f flint-test-pg flint-test-ch
 
 test-integration: ## Requires `make test-db-up`
-	FLINT_TEST_PG=localhost:$(PG_PORT) FLINT_TEST_CH=localhost:$(CH_PORT) \
+	FLINT_TEST_PG=localhost:$(PG_PORT) FLINT_TEST_CH=localhost:$(CH_PORT) FLINT_TEST_CH_HTTP=localhost:$(CH_HTTP_PORT) \
 		go test -tags integration -count=1 ./internal/db/
 
 lint:

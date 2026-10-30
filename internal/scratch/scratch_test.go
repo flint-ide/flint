@@ -31,7 +31,7 @@ func TestCreateKinds(t *testing.T) {
 		t.Run(string(tt.kind), func(t *testing.T) {
 			s, dir := openStore(t)
 			before := time.Now().UnixMilli()
-			sc, err := s.Create("  My pad  ", tt.kind, "conn-1")
+			sc, err := s.Create("  My pad  ", tt.kind, "conn-1", "")
 			if err != nil {
 				t.Fatalf("Create() error = %v", err)
 			}
@@ -55,7 +55,7 @@ func TestCreateKinds(t *testing.T) {
 
 func TestCreateUnknownKind(t *testing.T) {
 	s, _ := openStore(t)
-	if _, err := s.Create("x", "python", ""); err == nil || !strings.Contains(err.Error(), "unknown scratch kind") {
+	if _, err := s.Create("x", "python", "", ""); err == nil || !strings.Contains(err.Error(), "unknown scratch kind") {
 		t.Errorf("error = %v", err)
 	}
 	if len(s.List()) != 0 {
@@ -66,7 +66,7 @@ func TestCreateUnknownKind(t *testing.T) {
 func TestCreateDefaultName(t *testing.T) {
 	s, _ := openStore(t)
 	for _, name := range []string{"", "   \t"} {
-		sc, err := s.Create(name, Text, "")
+		sc, err := s.Create(name, Text, "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -81,7 +81,7 @@ func TestCreateDefaultName(t *testing.T) {
 
 func TestContentRoundtrip(t *testing.T) {
 	s, _ := openStore(t)
-	sc, _ := s.Create("q", SQL, "")
+	sc, _ := s.Create("q", SQL, "", "")
 
 	got, err := s.Content(sc.ID)
 	if err != nil || got != "" {
@@ -103,7 +103,7 @@ func TestContentRoundtrip(t *testing.T) {
 
 func TestContentMissingFileIsEmpty(t *testing.T) {
 	s, dir := openStore(t)
-	sc, _ := s.Create("q", Markdown, "")
+	sc, _ := s.Create("q", Markdown, "", "")
 	if err := os.Remove(filepath.Join(dir, "scratch", sc.ID+".md")); err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestUnknownID(t *testing.T) {
 	_, checks["Content"] = s.Content("nope")
 	checks["SaveContent"] = s.SaveContent("nope", "x")
 	checks["Rename"] = s.Rename("nope", "x")
-	checks["SetConnection"] = s.SetConnection("nope", "c")
+	checks["SetConnection"] = s.SetConnection("nope", "c", "")
 	for op, err := range checks {
 		if err == nil || !strings.Contains(err.Error(), "unknown scratch") {
 			t.Errorf("%s(unknown) error = %v", op, err)
@@ -131,11 +131,11 @@ func TestUnknownID(t *testing.T) {
 
 func TestListNewestFirst(t *testing.T) {
 	s, _ := openStore(t)
-	a, _ := s.Create("a", Text, "")
+	a, _ := s.Create("a", Text, "", "")
 	time.Sleep(2 * time.Millisecond)
-	b, _ := s.Create("b", Text, "")
+	b, _ := s.Create("b", Text, "", "")
 	time.Sleep(2 * time.Millisecond)
-	c, _ := s.Create("c", Text, "")
+	c, _ := s.Create("c", Text, "", "")
 
 	assertOrder(t, s.List(), c.ID, b.ID, a.ID)
 
@@ -160,7 +160,7 @@ func assertOrder(t *testing.T, list []Scratch, ids ...string) {
 
 func TestRename(t *testing.T) {
 	s, _ := openStore(t)
-	sc, _ := s.Create("old", Text, "")
+	sc, _ := s.Create("old", Text, "", "")
 	for _, name := range []string{"", "  "} {
 		if err := s.Rename(sc.ID, name); err == nil || !strings.Contains(err.Error(), "must not be empty") {
 			t.Errorf("Rename(%q) error = %v", name, err)
@@ -175,26 +175,44 @@ func TestRename(t *testing.T) {
 }
 
 func TestSetConnection(t *testing.T) {
-	s, _ := openStore(t)
-	sc, _ := s.Create("q", SQL, "")
-	if err := s.SetConnection(sc.ID, "pg-prod"); err != nil {
+	s, dir := openStore(t)
+	sc, _ := s.Create("q", SQL, "", "")
+	if err := s.SetConnection(sc.ID, "pg-prod", "billing"); err != nil {
 		t.Fatalf("SetConnection() error = %v", err)
 	}
-	if got := s.List()[0].ConnID; got != "pg-prod" {
-		t.Errorf("ConnID = %q", got)
+	if got := s.List()[0]; got.ConnID != "pg-prod" || got.Database != "billing" {
+		t.Errorf("ConnID/Database = %q/%q", got.ConnID, got.Database)
 	}
-	if err := s.SetConnection(sc.ID, ""); err != nil {
+	reopened, err := Open(dir)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if got := s.List()[0].ConnID; got != "" {
-		t.Errorf("ConnID = %q, want cleared", got)
+	if got := reopened.List()[0]; got.ConnID != "pg-prod" || got.Database != "billing" {
+		t.Errorf("after reload ConnID/Database = %q/%q, want the choice remembered", got.ConnID, got.Database)
+	}
+	if err := s.SetConnection(sc.ID, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.List()[0]; got.ConnID != "" || got.Database != "" {
+		t.Errorf("ConnID/Database = %q/%q, want cleared", got.ConnID, got.Database)
+	}
+}
+
+func TestCreateWithDatabase(t *testing.T) {
+	s, _ := openStore(t)
+	sc, err := s.Create("q", SQL, "pg-prod", " billing ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sc.ConnID != "pg-prod" || sc.Database != "billing" {
+		t.Errorf("created = %+v", sc)
 	}
 }
 
 func TestDelete(t *testing.T) {
 	s, dir := openStore(t)
-	keep, _ := s.Create("keep", Text, "")
-	gone, _ := s.Create("gone", SQL, "")
+	keep, _ := s.Create("keep", Text, "", "")
+	gone, _ := s.Create("gone", SQL, "", "")
 	path := filepath.Join(dir, "scratch", gone.ID+".sql")
 
 	if err := s.Delete(gone.ID); err != nil {
@@ -221,9 +239,9 @@ func TestDelete(t *testing.T) {
 
 func TestReloadFromDisk(t *testing.T) {
 	s, dir := openStore(t)
-	a, _ := s.Create("a", SQL, "c1")
+	a, _ := s.Create("a", SQL, "c1", "")
 	time.Sleep(2 * time.Millisecond)
-	b, _ := s.Create("b", Markdown, "")
+	b, _ := s.Create("b", Markdown, "", "")
 	if err := s.SaveContent(a.ID, "SELECT 1"); err != nil {
 		t.Fatal(err)
 	}

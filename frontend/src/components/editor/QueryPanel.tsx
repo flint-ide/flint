@@ -3,11 +3,13 @@ import type { EditorView } from '@codemirror/view'
 import { Database, errorMessage, type QueryResult } from '../../api/backend'
 import { statementAt } from '../../lib/sqlStatement'
 import { formatDuration } from '../../lib/format'
+import { databaseChoices, defaultDatabaseName } from '../../lib/databases'
 import { useDatabase } from '../../store/database'
 import { useScratch } from '../../store/scratch'
 import { ResultsGrid } from '../results/ResultsGrid'
 import { Splitter } from '../layout/Splitter'
 import { Select } from '../ui/Select'
+import { DatabaseIcon } from '../icons/DatabaseIcon'
 
 const LIMITS = [100, 1000, 10_000, 100_000]
 
@@ -27,17 +29,20 @@ export interface QueryRunner {
   cancel: () => void
 }
 
-/** Runs the statement under the cursor (or the selection) against a connection. */
-export function useQueryRunner(connId: string): QueryRunner {
+/**
+ * Runs the statement under the cursor (or the selection) against one database of a
+ * connection ("" = the profile's default).
+ */
+export function useQueryRunner(connId: string, database: string): QueryRunner {
   const [state, setState] = useState<RunState>({ running: false, sql: '', result: null, error: null, startedAt: 0 })
   const [limit, setLimit] = useState(1000)
   const queryId = useRef('')
   // Refs keep runAtCursor stable so the editor keymap isn't rebuilt on every run.
-  const latest = useRef({ connId, limit })
-  latest.current = { connId, limit }
+  const latest = useRef({ connId, database, limit })
+  latest.current = { connId, database, limit }
 
   const runAtCursor = useCallback((view: EditorView) => {
-    const { connId: conn, limit: max } = latest.current
+    const { connId: conn, database: db, limit: max } = latest.current
     const sel = view.state.selection.main
     const text = view.state.doc.toString()
     const sql = sel.empty ? statementAt(text, sel.head)?.sql : text.slice(sel.from, sel.to).trim()
@@ -50,7 +55,7 @@ export function useQueryRunner(connId: string): QueryRunner {
     const id = crypto.randomUUID()
     queryId.current = id
     setState({ running: true, sql, result: null, error: null, startedAt: Date.now() })
-    Database.RunQuery(conn, id, sql, max)
+    Database.RunQuery(conn, db, id, sql, max)
       .then((result) => queryId.current === id && setState((s) => ({ ...s, running: false, result })))
       .catch((err) => queryId.current === id && setState((s) => ({ ...s, running: false, error: errorMessage(err) })))
       .finally(() => {
@@ -71,16 +76,28 @@ export function useQueryRunner(connId: string): QueryRunner {
 interface PanelProps {
   scratchId: string
   connId: string
+  /** The scratchpad's remembered database ("" = the profile's default). */
+  database: string
   runner: QueryRunner
   editor: ReactNode
   view: RefObject<EditorView | null>
 }
 
-export function QueryPanel({ scratchId, connId, runner, editor, view }: PanelProps) {
+export function QueryPanel({ scratchId, connId, database, runner, editor, view }: PanelProps) {
   const connections = useDatabase((s) => s.connections)
+  const conn = connections.find((c) => c.id === connId)
+  const databases = useDatabase((s) => s.databases[connId])
+  const loadDatabases = useDatabase((s) => s.loadDatabases)
   const setConnection = useScratch((s) => s.setConnection)
   const [split, setSplit] = useState(0.55)
   const { state } = runner
+
+  useEffect(() => {
+    if (conn) void loadDatabases(conn.id)
+  }, [conn, loadDatabases])
+
+  const fallback = conn ? defaultDatabaseName(databases?.list, conn) : ''
+  const current = database || fallback
 
   return (
     <div className="query-panel">
@@ -99,6 +116,23 @@ export function QueryPanel({ scratchId, connId, runner, editor, view }: PanelPro
           }))}
           onChange={(id) => void setConnection(scratchId, id)}
         />
+        {conn && (
+          <Select
+            size="sm"
+            searchable
+            value={current}
+            title={databases?.error ? `Database used by this console (list unavailable: ${databases.error})` : 'Database used by this console'}
+            options={databaseChoices(databases?.list, current).map((d) => ({
+              value: d.name,
+              label: d.name,
+              icon: <DatabaseIcon locked={!d.canConnect} />,
+              hint: !d.canConnect ? 'no access' : d.name === fallback ? 'default' : undefined,
+              disabled: !d.canConnect,
+            }))}
+            // Picking the default stores "" so the console keeps following the profile's default.
+            onChange={(name) => void setConnection(scratchId, connId, name === fallback ? '' : name)}
+          />
+        )}
         {state.running ? (
           <button className="danger" onClick={runner.cancel}>■ Cancel</button>
         ) : (

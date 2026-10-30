@@ -6,8 +6,8 @@ export function Content(arg1) {
   return window['go']['main']['ScratchAPI']['Content'](arg1);
 }
 
-export function Create(arg1, arg2, arg3) {
-  return window['go']['main']['ScratchAPI']['Create'](arg1, arg2, arg3);
+export function Create(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['ScratchAPI']['Create'](arg1, arg2, arg3, arg4);
 }
 
 export function Delete(arg1) {
@@ -26,6 +26,6 @@ export function Save(arg1, arg2) {
   return window['go']['main']['ScratchAPI']['Save'](arg1, arg2);
 }
 
-export function SetConnection(arg1, arg2) {
-  return window['go']['main']['ScratchAPI']['SetConnection'](arg1, arg2);
+export function SetConnection(arg1, arg2, arg3) {
+  return window['go']['main']['ScratchAPI']['SetConnection'](arg1, arg2, arg3);
 }

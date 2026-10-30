@@ -7,6 +7,7 @@ import { sqlLanguage } from '../../lib/sqlDialects'
 import { registerSaver, registerView, useEditor, type ScratchTab } from '../../store/editor'
 import { pendingContent, useScratch } from '../../store/scratch'
 import { useDatabase } from '../../store/database'
+import { defaultDatabaseName, resolveDatabase, schemaKey } from '../../lib/databases'
 import { showToast } from '../../store/dialog'
 import { CodeEditor } from './CodeEditor'
 import { QueryPanel, useQueryRunner } from './QueryPanel'
@@ -18,7 +19,7 @@ interface Props {
   active: boolean
 }
 
-/** A persistent scratchpad. SQL scratchpads get a connection picker and a results panel. */
+/** A persistent scratchpad. SQL scratchpads get connection and database pickers and a results panel. */
 export function ScratchView({ tab, active }: Props) {
   const [initial, setInitial] = useState<string | null>(null)
   const [plainLanguage, setPlainLanguage] = useState<Extension>([])
@@ -33,10 +34,14 @@ export function ScratchView({ tab, active }: Props) {
 
   const scratch = useScratch((s) => s.items.find((i) => i.id === tab.scratchId))
   const connId = scratch?.connId ?? ''
+  const database = scratch?.database ?? ''
   const conn = useDatabase((s) => s.connections.find((c) => c.id === connId))
-  const schema = useDatabase((s) => s.schemas[connId])
+  const resolved = conn ? resolveDatabase(conn, database) : ''
+  const databases = useDatabase((s) => s.databases[connId])
+  const databaseName = database || (conn ? defaultDatabaseName(databases?.list, conn) : '')
+  const schema = useDatabase((s) => s.schemas[schemaKey(connId, resolved)])
   const loadSchema = useDatabase((s) => s.loadSchema)
-  const runner = useQueryRunner(connId)
+  const runner = useQueryRunner(connId, database)
   const runAtCursor = runner.runAtCursor
 
   useEffect(() => {
@@ -57,12 +62,12 @@ export function ScratchView({ tab, active }: Props) {
   }, [tab.scratchId, tab.scratchKind, isSQL])
 
   useEffect(() => {
-    if (isSQL && connId) void loadSchema(connId)
-  }, [isSQL, connId, loadSchema])
+    if (isSQL && conn) void loadSchema(conn.id, resolved)
+  }, [isSQL, conn, resolved, loadSchema])
 
   const language = useMemo(
-    () => (isSQL ? sqlLanguage(conn?.driver as Driver | undefined, conn?.database ?? '', schema?.tables ?? []) : plainLanguage),
-    [isSQL, conn, schema?.tables, plainLanguage],
+    () => (isSQL ? sqlLanguage(conn?.driver as Driver | undefined, databaseName, schema?.tables ?? []) : plainLanguage),
+    [isSQL, conn, databaseName, schema?.tables, plainLanguage],
   )
 
   // Chained so overlapping autosaves can't land out of order (Wails calls run concurrently).
@@ -126,5 +131,5 @@ export function ScratchView({ tab, active }: Props) {
   )
 
   if (!isSQL) return editor
-  return <QueryPanel scratchId={tab.scratchId} connId={connId} runner={runner} editor={editor} view={view} />
+  return <QueryPanel scratchId={tab.scratchId} connId={connId} database={database} runner={runner} editor={editor} view={view} />
 }

@@ -46,7 +46,7 @@ func query(t *testing.T, m *Manager, id, sql string, limit int) *QueryResult {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	res, err := m.Query(ctx, id, "", sql, limit)
+	res, err := m.Query(ctx, id, "", "", sql, limit)
 	if err != nil {
 		t.Fatalf("%s: %v", sql, err)
 	}
@@ -95,7 +95,7 @@ func TestPostgresIntegration(t *testing.T) {
 		if res.Affected != 2 {
 			t.Errorf("affected = %d (%s)", res.Affected, res.Command)
 		}
-		tables, err := m.Schema(context.Background(), conn.ID, true)
+		tables, err := m.Schema(context.Background(), conn.ID, "", true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -113,7 +113,7 @@ func TestPostgresIntegration(t *testing.T) {
 	t.Run("cancel", func(t *testing.T) {
 		done := make(chan error, 1)
 		go func() {
-			_, err := m.Query(context.Background(), conn.ID, "slow", "SELECT pg_sleep(30)", 10)
+			_, err := m.Query(context.Background(), conn.ID, "", "slow", "SELECT pg_sleep(30)", 10)
 			done <- err
 		}()
 		time.Sleep(300 * time.Millisecond)
@@ -136,7 +136,7 @@ func TestPostgresIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = m.Query(context.Background(), saved.ID, "", "CREATE TABLE flint_ro (id int)", 10)
+		_, err = m.Query(context.Background(), saved.ID, "", "", "CREATE TABLE flint_ro (id int)", 10)
 		if err == nil || !strings.Contains(err.Error(), "read-only") {
 			t.Errorf("err = %v, want read-only transaction error", err)
 		}
@@ -179,7 +179,7 @@ func TestClickHouseIntegration(t *testing.T) {
 		query(t, m, conn.ID, "CREATE TABLE IF NOT EXISTS flint_it (id UInt32, name String) ENGINE = Memory", 10)
 		t.Cleanup(func() { query(t, m, conn.ID, "DROP TABLE IF EXISTS flint_it", 10) })
 		query(t, m, conn.ID, "INSERT INTO flint_it VALUES (1, 'a')", 10)
-		tables, err := m.Schema(context.Background(), conn.ID, true)
+		tables, err := m.Schema(context.Background(), conn.ID, "", true)
 		if err != nil {
 			t.Fatal(err)
 		}

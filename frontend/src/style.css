@@ -477,6 +477,12 @@ kbd {
 .indent-3 {
   padding-left: 54px !important;
 }
+.indent-4 {
+  padding-left: 70px !important;
+}
+.indent-5 {
+  padding-left: 86px !important;
+}
 .row-actions {
   margin-left: auto;
   display: none;
@@ -594,6 +600,24 @@ kbd {
 }
 .table-name.view {
   font-style: italic;
+}
+.db-icon {
+  flex: none;
+  margin-right: 4px;
+  color: #c9a227;
+}
+.db-icon.locked {
+  color: var(--fg-faint);
+}
+.db-row.locked {
+  color: var(--fg-faint);
+  cursor: default;
+}
+.default-db {
+  font-weight: 600;
+}
+.query-toolbar .db-icon {
+  margin-right: 0;
 }
 .column-row {
   font-size: 12px;

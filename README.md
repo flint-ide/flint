@@ -123,6 +123,8 @@ Report security vulnerabilities privately, as described in [SECURITY.md](SECURIT
 
 ## Documentation
 
+**User guide:** https://odudek.github.io/flint/ — getting started, use cases, how-to recipes, feature guides and reference (built from `site/` with `make docs`).
+
 - [docs/PRINCIPLES.md](docs/PRINCIPLES.md): the five architectural principles every change is held to
 - [docs/FEATURES.md](docs/FEATURES.md): full feature reference and keyboard shortcuts
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): process model, Go/UI communication, security model, where data is stored, project layout

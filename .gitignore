@@ -9,3 +9,5 @@ frontend/package.json.md5
 frontend/.vite/
 .task/
 /flint
+
+_site/

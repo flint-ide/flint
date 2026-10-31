@@ -45,6 +45,7 @@ func CallerIdentity(ctx context.Context, profile string) (Identity, error) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, bin, "sts", "get-caller-identity", "--profile", profile, "--output", "json")
 	cmd.Env = append(cmd.Environ(), "AWS_PAGER=", "AWS_CLI_AUTO_PROMPT=off")
+	stopTree(cmd)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()

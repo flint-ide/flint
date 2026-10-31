@@ -115,7 +115,7 @@ Persistent SQL consoles and notes (MD/TXT) with autosave. `⌘↵` runs the quer
 
 ### Commit messages and conflicts
 
-- ✦ *Generate message*: `claude -p` (or `codex exec`) receives the diff of the selected files and recent commit messages; the result lands in the message field for you to edit. A custom agent gets the same prompt in a one-shot ACP session in the repository: it may read files inside it, but every permission request is declined and writes through Flint are refused; the text after its last tool call is the message.
+- ✦ *Generate message*: `claude -p` (or `codex exec`) receives the diff of the selected files and recent commit messages; the result lands in the message field for you to edit. A custom agent gets the same prompt in a one-shot ACP session in the repository: Flint serves reads inside it, declines every permission request and refuses writes sent through it; what the agent does with its own tools and its own configuration (for example a setting that lets it edit without asking) is outside Flint's control. The text after its last tool call is the message.
 - ✦ *Resolve with claude*: merge conflicts are handed to an interactive agent session in a new terminal. The agent runs `git add` but does not commit. A custom agent has no interactive terminal mode, so when it is the default the first installed native agent (Claude Code, then Codex) does this, and the button names it; with no native agent installed the button is hidden.
 - Nothing requires accepting diffs.
 

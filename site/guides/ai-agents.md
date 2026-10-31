@@ -31,8 +31,8 @@ What a custom agent can and can't do:
 
 - It starts only in a [trusted folder](restricted-mode.md); in Restricted Mode Flint shows an error asking you to trust the folder.
 - Its questions use the same approval policy as Claude Code and Codex (see below).
-- Flint lets it read and write files only inside the chat's project, never inside `.git`, and offers it no terminal of its own. The agent still runs its own tools with your user's rights, as it does in a terminal.
-- **Generate message** runs it once in the repository: it may read files, but Flint declines every permission request and refuses writes.
+- Flint lets it read and write files only inside the chat's project and never inside a `.git` folder (at any depth). Writes into agent or editor configuration (`.claude`, `.codex`, `.vscode`, `.idea`) ask you first in the chat. Flint offers it no terminal of its own. The agent still runs its own tools with your user's rights, as it does in a terminal.
+- **Generate message** runs it once in the repository: Flint lets it read files there, declines every permission request and refuses writes sent through Flint. Its own tools and configuration are outside Flint's control: if the agent's settings let it edit files or run commands without asking, it can still do so, as in a terminal.
 - Conflict resolution runs an agent interactively in a terminal, which ACP agents don't have, so Claude Code or Codex does it (the button names which one). Without either installed, the button is hidden.
 - A chat with a custom agent can't continue the old conversation after a restart; Flint starts a new one and tells you.
 

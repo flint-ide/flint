@@ -15,10 +15,14 @@ import (
 
 // Headless runs one prompt in a fresh session in cwd and returns the agent's
 // answer: the text after its last tool call (what it said before is
-// commentary such as "let me look at the diff"). A one-shot run may look at
-// the project but never change it: every permission request is declined,
-// writes through Flint are refused and reads stay inside cwd. The agent
-// process is stopped before Headless returns, also when ctx ends.
+// commentary such as "let me look at the diff"). Flint serves the run
+// read-only: it declines every permission request, refuses every write sent
+// through it and serves reads only inside cwd. That covers what goes through
+// Flint, not what the agent does on its own: its built-in tools, its own
+// configuration (a setting that lets it edit or run commands without
+// asking) and the MCP servers it starts are outside Flint's control, one
+// reason custom agents need a trusted folder. The agent process is stopped
+// before Headless returns, also when ctx ends.
 func Headless(ctx context.Context, opts Options, cwd, prompt string) (string, error) {
 	if err := opts.CheckTrust(cwd); err != nil {
 		return "", err

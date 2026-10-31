@@ -54,11 +54,21 @@ export function Hover(path: string, line: number, character: number): $Cancellab
 }
 
 /**
+ * Languages lists the languages with language servers and their known servers,
+ * for Settings.
+ */
+export function Languages(): $CancellablePromise<lsp$0.LanguageInfo[]> {
+    return $Call.ByID(1292416102).then(($result: any) => {
+        return $$createType4($result);
+    });
+}
+
+/**
  * Open starts tracking a document; the server boots in the background.
  */
 export function Open(root: string, path: string, text: string): $CancellablePromise<lsp$0.Status> {
     return $Call.ByID(1752305043, root, path, text).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType5($result);
     });
 }
 
@@ -83,7 +93,7 @@ export function Saved(path: string): $CancellablePromise<void> {
  */
 export function Statuses(): $CancellablePromise<lsp$0.Status[]> {
     return $Call.ByID(211971877).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType6($result);
     });
 }
 
@@ -98,5 +108,7 @@ export function Supported(path: string): $CancellablePromise<boolean> {
 const $$createType0 = lsp$0.CompletionList.createFrom;
 const $$createType1 = lsp$0.Location.createFrom;
 const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = lsp$0.Status.createFrom;
+const $$createType3 = lsp$0.LanguageInfo.createFrom;
 const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = lsp$0.Status.createFrom;
+const $$createType6 = $Create.Array($$createType5);

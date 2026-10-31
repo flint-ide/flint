@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/wailsapp/wails/v3/pkg/application"
-	"slices"
 
 	"flint/internal/settings"
 )
@@ -26,11 +25,12 @@ func (s *SettingsAPI) Get() settings.Settings { return s.app.currentSettings() }
 func (s *SettingsAPI) Defaults() settings.Settings { return settings.Default() }
 
 // Save validates and stores the settings, returning what was written. The native
-// window follows a theme change right away.
+// window follows a theme change right away and changed language servers restart;
+// agent settings are read when a session starts.
 func (s *SettingsAPI) Save(next settings.Settings) (settings.Settings, error) {
 	a := s.app
 	a.settingsMu.Lock()
-	prevTheme := a.settings.Theme
+	prev := a.settings
 	saved, err := settings.Save(settings.Path(a.configDir), next)
 	if err == nil {
 		a.settings = saved
@@ -39,7 +39,10 @@ func (s *SettingsAPI) Save(next settings.Settings) (settings.Settings, error) {
 	if err != nil {
 		return settings.Settings{}, err
 	}
-	if saved.Theme != prevTheme && a.ctx != nil {
+	for _, language := range settings.ChangedLanguageServers(prev, saved) {
+		a.lsp.Reconfigure(language)
+	}
+	if saved.Theme != prev.Theme && a.ctx != nil {
 		dark := setNativeAppearance(saved.Theme)
 		bg := lightBackground
 		if dark {
@@ -50,17 +53,30 @@ func (s *SettingsAPI) Save(next settings.Settings) (settings.Settings, error) {
 	return saved, nil
 }
 
-// currentSettings returns a copy safe to hand out (the keymap is cloned).
+// CheckAgent reports why an agent's settings would not be saved ("" when they
+// would), so Settings can show the error next to the field.
+func (s *SettingsAPI) CheckAgent(name string, a settings.AgentSettings) string {
+	return errorText(settings.CheckAgent(name, a))
+}
+
+// CheckLanguageServer reports why a language server's settings would not be
+// saved ("" when they would).
+func (s *SettingsAPI) CheckLanguageServer(language string, l settings.LanguageServerSettings) string {
+	return errorText(settings.CheckLanguageServer(language, l))
+}
+
+func errorText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+// currentSettings returns a copy safe to hand out (maps and lists are cloned).
 func (a *App) currentSettings() settings.Settings {
 	a.settingsMu.Lock()
 	defer a.settingsMu.Unlock()
-	out := a.settings
-	out.Keymap = make(map[string]string, len(a.settings.Keymap))
-	for id, keys := range a.settings.Keymap {
-		out.Keymap[id] = keys
-	}
-	out.TodoExclude = slices.Clone(a.settings.TodoExclude)
-	return out
+	return a.settings.Clone()
 }
 
 // startupAppearance picks the native appearance and window background for the

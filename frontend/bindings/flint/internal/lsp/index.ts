@@ -4,6 +4,7 @@
 export {
     CompletionItem,
     CompletionList,
+    LanguageInfo,
     Location,
     Position,
     Range,

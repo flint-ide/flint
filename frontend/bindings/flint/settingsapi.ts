@@ -15,6 +15,22 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as settings$0 from "./internal/settings/models.js";
 
 /**
+ * CheckAgent reports why an agent's settings would not be saved ("" when they
+ * would), so Settings can show the error next to the field.
+ */
+export function CheckAgent(name: string, a: settings$0.AgentSettings): $CancellablePromise<string> {
+    return $Call.ByID(4264446072, name, a);
+}
+
+/**
+ * CheckLanguageServer reports why a language server's settings would not be
+ * saved ("" when they would).
+ */
+export function CheckLanguageServer(language: string, l: settings$0.LanguageServerSettings): $CancellablePromise<string> {
+    return $Call.ByID(1561984010, language, l);
+}
+
+/**
  * Defaults returns the built-in settings, for "reset to default".
  */
 export function Defaults(): $CancellablePromise<settings$0.Settings> {
@@ -34,7 +50,8 @@ export function Get(): $CancellablePromise<settings$0.Settings> {
 
 /**
  * Save validates and stores the settings, returning what was written. The native
- * window follows a theme change right away.
+ * window follows a theme change right away and changed language servers restart;
+ * agent settings are read when a session starts.
  */
 export function Save(next: settings$0.Settings): $CancellablePromise<settings$0.Settings> {
     return $Call.ByID(2801417772, next).then(($result: any) => {

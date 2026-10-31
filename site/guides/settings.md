@@ -8,7 +8,7 @@ Flint's settings open in a tab. Every change applies immediately, without a rest
 - **flint ▸ Settings…** in the menu bar
 - "Settings…" in the command palette
 
-The tab has six sections: Appearance, Editor, Terminal, Agents, TODO List and Keymap.
+The tab has nine sections: Appearance, Editor, Terminal, Agents, Language Servers, Refresh, TODO List, Keymap and Updates.
 
 ## Appearance
 
@@ -30,7 +30,33 @@ Font family, size (default 13) and line height (default 1.2) for terminals and r
 ## Agents
 
 - **Default agent**: the agent used for new chats, generated commit messages and conflict resolution. Agents that aren't installed are marked. When none is chosen, Flint uses the first installed agent.
+- **Claude Code** and **Codex**, each with:
+  - **Path**: the executable. Empty looks the agent up on your login shell's `PATH`; otherwise a command name or an absolute path.
+  - **Model**: empty uses the CLI's default; for Claude Code an alias such as `sonnet` or `opus`, or a full model name.
+  - **Extra arguments**: one per line, for example `--add-dir` and `/Users/me/notes` on two lines. They come before Flint's own flags, and arguments that would change a flag Flint sets (output format, permission prompt, setting sources, sandbox, approvals, model) are refused with the reason shown under the field. They are ignored in [Restricted Mode](restricted-mode.md).
+  - **Reset to Defaults** appears once something is set.
+
+  Agent settings apply to chats, commit messages and conflict resolution started afterwards; running chats keep theirs.
 - **Tell me when work finishes in the background**: shows a macOS notification and a count on the Dock icon when a run, a test run or an agent turn finishes while Flint isn't the active app. On by default.
+
+## Language Servers
+
+For Go, TypeScript / JavaScript, Python and Rust:
+
+- **Enabled**: turn the language's server off or on.
+- **Server**: empty tries the known servers in the order shown. Pick one by name (the field suggests them), give an absolute path to one, or name another server. A server Flint doesn't know starts only in trusted folders.
+- **Extra arguments**: one per line, added after the server's own arguments. Ignored in Restricted Mode.
+
+A change restarts that language's servers for the open files. Rust and Python servers run the project's code and start only in trusted folders, whatever you choose here.
+
+## Refresh
+
+How often panels that poll re-read their data while they are shown:
+
+- **Kubernetes panel**: 2 to 600 seconds (default 5).
+- **AWS panel**: 5 to 3600 seconds (default 30).
+
+Git status, Docker and pull requests update on their own, without polling.
 
 ## TODO List
 
@@ -47,6 +73,13 @@ A searchable list of all commands. Search by name or by shortcut (for example `�
 - Keys of the macOS menu (`⌘Q`, `⌘C`, `⌘V`, `⌘O`, `⌘,`) stay with the menu.
 
 The command palette uses your shortcuts too.
+
+## Updates
+
+- **Check for new releases**: once a day Flint asks GitHub which release is the latest and shows a notice in the status bar when there is a newer one, with **Download** (opens the release page in your browser), **Skip This Version** and **✕**. On by default. When it is off, Flint makes no request on its own.
+- **Check Now**: checks right away, even when the daily check is off, and tells you if you are up to date. **Help ▸ Check for Updates…** does the same.
+
+Flint never downloads or installs updates itself. See [Update check](../reference/privacy-and-security.md#update-check) for exactly what is sent.
 
 ## Trusted folders
 

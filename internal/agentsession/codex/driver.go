@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"flint/internal/agent"
 	"flint/internal/agentsession"
 	"flint/internal/shellenv"
 )
@@ -39,6 +40,27 @@ type Options struct {
 	Sandbox string
 	// ClientName and ClientVersion are sent as clientInfo.
 	ClientName, ClientVersion string
+	// ExtraArgs are the user's extra arguments. They go before Flint's own
+	// (`app-server` and its overrides), may not name the approval, sandbox or
+	// model flags (agent.CheckArgs) and are left out in untrusted folders.
+	ExtraArgs []string
+	// Untrusted reports a folder the user hasn't trusted (Restricted Mode).
+	// Nil trusts every folder.
+	Untrusted func(cwd string) bool
+	// Settings, when set, is read on every Start and Resume and replaces
+	// Binary, Model and ExtraArgs, so settings changes apply to new sessions.
+	Settings func() agent.Config
+}
+
+// current returns the options for a new session.
+func (o Options) current() Options {
+	if o.Settings == nil {
+		return o
+	}
+	c := o.Settings()
+	out := o
+	out.Binary, out.Model, out.ExtraArgs = c.Path, c.Model, c.Args
+	return out
 }
 
 // TurnError reports a turn that Codex ended with status "failed".
@@ -99,13 +121,18 @@ func (d *Driver) start(ctx context.Context, cwd, resumeID string, sink agentsess
 		return agentsession.SessionInfo{}, err
 	}
 	shellenv.Wait()
-	env := buildEnv(d.opts.Env)
-	path, err := resolveCommand(orDefault(d.opts.Binary, "codex"), env)
+	opts := d.opts.current()
+	env := buildEnv(opts.Env)
+	path, err := resolveCommand(orDefault(opts.Binary, "codex"), env)
 	if err != nil {
 		return agentsession.SessionInfo{}, err
 	}
+	args, err := buildArgs(opts, opts.Untrusted != nil && opts.Untrusted(cwd))
+	if err != nil {
+		return agentsession.SessionInfo{}, fmt.Errorf("codex: %w", err)
+	}
 	s := newSession(cwd, sink)
-	proc, err := startProcess(spawnSpec{path: path, args: d.args(), dir: cwd, env: env}, s.handleRequest, s.handleNotification, s.onExit)
+	proc, err := startProcess(spawnSpec{path: path, args: args, dir: cwd, env: env}, s.handleRequest, s.handleNotification, s.onExit)
 	if err != nil {
 		s.events.close()
 		return agentsession.SessionInfo{}, err
@@ -114,7 +141,7 @@ func (d *Driver) start(ctx context.Context, cwd, resumeID string, sink agentsess
 	s.proc = proc
 	s.mu.Unlock()
 
-	info, err := s.handshake(ctx, d.opts, resumeID)
+	info, err := s.handshake(ctx, opts, resumeID)
 	if err == nil {
 		err = d.register(info.ID, s)
 	}
@@ -125,12 +152,15 @@ func (d *Driver) start(ctx context.Context, cwd, resumeID string, sink agentsess
 	return info, nil
 }
 
-func (d *Driver) args() []string {
+// buildArgs is the app-server command line. The user's extra arguments come
+// first (top-level options such as -c or --enable); the approval policy and
+// sandbox travel in thread/start, which overrides any configuration.
+func buildArgs(opts Options, untrusted bool) ([]string, error) {
 	args := []string{"app-server"}
-	for _, kv := range d.opts.Config {
+	for _, kv := range opts.Config {
 		args = append(args, "-c", kv)
 	}
-	return args
+	return agent.ComposeArgs(agent.Codex, opts.ExtraArgs, args, untrusted)
 }
 
 func (d *Driver) register(id string, s *session) error {

@@ -11,10 +11,10 @@ import (
 	"runtime/debug"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"flint/internal/redact"
+	"flint/internal/tools"
 )
 
 // IssuesURL is where bug reports go.
@@ -23,17 +23,10 @@ const IssuesURL = "https://github.com/ODudek/flint/issues/new"
 // Limits: a GitHub new-issue link stays well under browser URL limits; the
 // full report is also copied to the clipboard.
 const (
-	logTailLines = 150
-	maxURLBody   = 6000
-	toolTimeout  = 3 * time.Second
+	logTailLines  = 150
+	maxURLBody    = 6000
+	swVersTimeout = 3 * time.Second
 )
-
-// tools whose versions explain most environment-specific bugs.
-var tools = [][]string{
-	{"git", "--version"}, {"rg", "--version"}, {"gh", "--version"}, {"docker", "--version"},
-	{"kubectl", "version", "--client=true"}, {"aws", "--version"}, {"dlv", "version"},
-	{"gopls", "version"}, {"node", "--version"}, {"claude", "--version"}, {"codex", "--version"},
-}
 
 // Info is what the app knows about itself.
 type Info struct {
@@ -41,6 +34,8 @@ type Info struct {
 	Theme   string
 	Agent   string
 	Roots   int // open project folders (their paths stay private)
+	// Tools are the binaries configured in Settings, by tool id (see tools.Check).
+	Tools map[string]string
 }
 
 // Report is a Markdown bug-report body: versions, environment and the end of
@@ -53,8 +48,10 @@ func Report(ctx context.Context, info Info) string {
 	fmt.Fprintf(&b, "- Go: %s, Wails: %s\n", runtime.Version(), moduleVersion("github.com/wailsapp/wails/v3"))
 	fmt.Fprintf(&b, "- Theme: %s, default agent: %s, open folders: %d\n", info.Theme, firstNonEmpty(info.Agent, "auto"), info.Roots)
 	b.WriteString("\n### Tools\n\n")
-	for _, line := range toolVersions(ctx) {
-		b.WriteString("- " + line + "\n")
+	// The same table as the tool check: their versions explain most
+	// environment-specific bugs.
+	for _, s := range tools.Check(ctx, info.Tools) {
+		b.WriteString("- " + tools.ReportLine(s) + "\n")
 	}
 	b.WriteString("\n### Log (last lines)\n\n```\n")
 	b.WriteString(LogTail(logTailLines))
@@ -96,45 +93,13 @@ func LogTail(n int) string {
 }
 
 func macOSVersion(ctx context.Context) string {
-	ctx, cancel := context.WithTimeout(ctx, toolTimeout)
+	ctx, cancel := context.WithTimeout(ctx, swVersTimeout)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "sw_vers", "-productVersion").Output()
 	if err != nil {
 		return runtime.GOOS
 	}
 	return strings.TrimSpace(string(out))
-}
-
-// toolVersions asks every tool at once; missing ones say so.
-func toolVersions(ctx context.Context) []string {
-	out := make([]string, len(tools))
-	var wg sync.WaitGroup
-	for i, argv := range tools {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			out[i] = argv[0] + ": " + toolVersion(ctx, argv)
-		}()
-	}
-	wg.Wait()
-	return out
-}
-
-func toolVersion(ctx context.Context, argv []string) string {
-	bin, err := exec.LookPath(argv[0])
-	if err != nil {
-		return "not installed"
-	}
-	ctx, cancel := context.WithTimeout(ctx, toolTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, bin, argv[1:]...)
-	cmd.Stdin = nil
-	out, _ := cmd.CombinedOutput()
-	line, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n")
-	if line == "" {
-		return "installed (version unknown)"
-	}
-	return truncate(line, 120)
 }
 
 func moduleVersion(path string) string {
@@ -177,11 +142,4 @@ func firstNonEmpty(s ...string) string {
 		}
 	}
 	return ""
-}
-
-func truncate(s string, n int) string {
-	if r := []rune(s); len(r) > n {
-		return string(r[:n-1]) + "…"
-	}
-	return s
 }

@@ -2,6 +2,8 @@
 
 Flint is a fast, AI-first IDE for macOS. Coding agents such as Claude Code and Codex write the code, in a built-in chat or in a terminal. Flint gives you the context and the control around them: you navigate and search the project, review what the agent changed, run and debug, and work with your databases, APIs and clusters, all in one window.
 
+![A tour of Flint: go to a file, search the project, review a change in the Commit panel, and hand a failing Kubernetes deploy to the agent](images/tour.gif)
+
 Flint is a single native process that uses the macOS system WebView (WKWebView) instead of Electron. It starts quickly and stays light on CPU and memory, and it uses the tools you already have installed (git, ripgrep, gh, kubectl, aws, your agent CLIs) with the same `PATH` and logins as your terminal.
 
 ## Start here
@@ -63,7 +65,7 @@ See [Kubernetes](guides/kubernetes.md), [AWS](guides/aws.md) and [Docker](guides
 
 ## Privacy
 
-Flint has no telemetry and sends nothing automatically. See [Privacy and security](reference/privacy-and-security.md).
+Flint has no telemetry. The only request it makes on its own is a daily check for a newer release, which you can turn off. See [Privacy and security](reference/privacy-and-security.md).
 
 ## Getting help
 

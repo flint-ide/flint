@@ -317,13 +317,16 @@ Unhealthy apps are sorted first and expanded.
 
 ### Settings
 
-`⌘,` (flint menu ▸ Settings…, or "Settings…" in the palette) opens a settings tab with Appearance, Editor, Terminal, Agents and Keymap sections. Every change applies immediately, without a restart, and saves itself.
+`⌘,` (flint menu ▸ Settings…, or "Settings…" in the palette) opens a settings tab with Appearance, Editor, Terminal, Agents, Language Servers, Refresh, TODO List, Keymap and Updates sections. Every change applies immediately, without a restart, and saves itself (agent settings apply to sessions started afterwards).
 
 - **Theme**: Dark, Light or System (follows the macOS appearance, `prefers-color-scheme`). Colors are CSS variables in `style.css` (`:root` and `[data-theme="light"]`); terminals have their own palette (`lib/terminalTheme.ts`); Go switches the title bar and window buttons (`NSApp.appearance`). The theme from the last run is applied before the first render (a copy in `localStorage`, and the window appearance set in Go before the window is created), so a light theme never flashes dark.
 - **Editor**: font family, size and line height for all CodeMirror editors (files, diffs, scratchpads); optional save on window focus loss.
 - **Terminal**: font, size and line height for terminals and run consoles (xterm refits immediately and the PTY gets the new size).
-- **Agents**: the default agent for new chats, commit messages and conflict resolution. Background notifications can be turned off here.
+- **Agents**: the default agent for new chats, commit messages and conflict resolution. Per agent (Claude Code, Codex): the executable (empty = looked up on the login PATH; otherwise a command name or an absolute path, never one relative to the project), the model (empty = the CLI's default) and extra command-line arguments, one per line. Extra arguments go before Flint's own flags, so Flint's flags are parsed last and win; arguments that name a flag Flint sets (the stream protocol, the permission prompt and mode, `--setting-sources`, `--settings`, `--resume`, `--model`; for Codex the sandbox, approval policy, `--yolo`, `--listen` and `-c approval_policy/sandbox*/projects*`) and `--` are refused, as are newlines, more than 32 arguments or arguments over 512 characters. In Restricted Mode the extra arguments are left out entirely, since a flag such as `--mcp-config` or `--add-dir` with a relative path would load the project's files. Changes apply to new chats, commit messages and conflict resolution; running chats keep their settings. Background notifications can be turned off here.
+- **Language Servers**: per language (Go, TypeScript/JavaScript, Python, Rust): on/off, which server (a known server's name such as `pylsp`, an absolute path to one, or another server; empty tries the known servers in order) and extra arguments, added after the server's own (`--stdio`). A change restarts that language's servers for the open files. Restricted Mode still applies: servers that run the project's code and servers Flint doesn't know start only in trusted folders, and extra arguments are ignored there. typescript-language-server, also under another name or path, is always pinned to its own TypeScript, and `--tsserver-path` is refused.
+- **Refresh**: how often the Kubernetes panel (default 5 s, 2–600 s) and the AWS panel (default 30 s, 5–3600 s) re-read their data while shown; values out of range are clamped. Git status, Docker and pull requests don't poll.
 - **Keymap**: a searchable list of all commands (by name or by shortcut, for example `⌘K`). Click a shortcut and press a new combination to change it; conflicts with other commands are shown, `↺` restores the default and `✕` removes it. Shortcuts handled by CodeMirror (`⌘F`, `⌘S`, `⌘↵`, and so on) are display-only. Overrides go into a layer of the command registry (`lib/commands.ts`), so the palette and the dispatcher use the effective shortcuts.
+- **Updates**: the daily release check (see [Update check](#update-check)) can be turned off; **Check Now** checks right away.
 - **Trusted folders**: see [Restricted Mode](#restricted-mode-workspace-trust).
 
 ### macOS integration (Wails v3)
@@ -337,18 +340,31 @@ Unhealthy apps are sorted first and expanded.
 
 - Flint writes its own log to `~/Library/Logs/Flint/flint.log`. It is rotated at 5 MB (one old file is kept), secrets and the home path are redacted, and the file mode is `0600`.
 - Frontend errors (uncaught exceptions, rejected promises, render errors) and Go panics are logged.
-- **Help ▸ Report an Issue…** opens a prefilled GitHub issue in your browser and copies the full report to the clipboard. The report contains the versions of Flint, macOS, Go and Wails, the versions of installed tools (git, rg, gh, docker, kubectl, aws, dlv, gopls, node, claude, codex), and the last 150 log lines, all redacted. You review the issue before submitting it.
+- **Tool check** (**Help ▸ Check Tools…**, "Check Tools…" in the command palette, or the link on the Welcome screen) lists the external tools Flint drives, grouped (essentials, AI agents, languages and debugging, containers and cloud): a status dot, the version found or "Not installed", the feature each one enables, a link to its documentation page, and for missing tools an install command with a **Copy** button (Homebrew where there is a formula, `go install` for gopls and Delve, `rustup` for rust-analyzer). Language servers with alternatives count as installed when any one is found (vtsls or typescript-language-server; basedpyright, pyright or pylsp), and the row says which. A tool that is on `PATH` but whose version command fails (for example a rustup proxy without the rust-analyzer component) shows as "Not working" with its error. Only Git is required. **Recheck** runs the check again.
+  - It opens by itself once, on the first launch (remembered in `state.json` as `toolCheckShown`).
+  - The check waits for the login-shell `PATH`, then runs only fixed version commands (`--version` or equivalent), in parallel with a 5-second timeout, in the home folder and never in a project folder, so a repository's `.tool-versions`, `rust-toolchain.toml` or `.nvmrc` can't choose what runs. The Pyright language servers have no version flag and are not run at all. Nothing is installed by Flint.
+  - One table in `internal/tools` feeds both the tool check and the bug report; language-server binaries come from the LSP server specs.
+- **Help ▸ Report an Issue…** opens a prefilled GitHub issue in your browser and copies the full report to the clipboard. The report contains the versions of Flint, macOS, Go and Wails, the versions of the tools in the tool check, and the last 150 log lines, all redacted. You review the issue before submitting it.
 - **Help ▸ Copy Diagnostics** copies the same redacted report to the clipboard.
 - **Help ▸ Show Logs in Finder** reveals the log file in Finder.
-- Nothing is sent automatically. There is no telemetry.
+- There is no telemetry. The only request Flint makes on its own is the update check below.
+
+### Update check
+
+- Flint asks GitHub's API for the latest release (`GET https://api.github.com/repos/ODudek/flint/releases/latest`): one anonymous request with `User-Agent: Flint/<version>`, no token, cookies or identifiers, a 10 s timeout and a 1 MB response limit (`internal/update`).
+- Automatically: 5 s after launch and then once a day while Flint runs, at most once every 24 hours (the last check, its answer and a skipped version are kept in `state.json`, so a restart reuses the answer instead of asking again). Never in development builds (`dev`, `dev-<sha>`), and never when `checkForUpdates` is off (Settings ▸ Updates). A failed check is only logged.
+- The running version (`vX.Y.Z` from `-ldflags`) is compared with the release tag by Flint's own SemVer compare; a pre-release sorts below its release.
+- A newer release shows a notice in the status bar: **Download** opens the release page in the browser (only a `https://github.com/ODudek/flint/…` link from the API; anything else falls back to the releases page), **Skip This Version** stays quiet until a later release, **✕** hides it until the next launch.
+- **Help ▸ Check for Updates…** (also in the palette and Settings ▸ Updates ▸ Check Now) checks immediately, ignoring the daily limit and the setting, and says "You're up to date (vX.Y.Z)" when there is nothing new.
+- Flint never downloads or installs anything: there is no auto-update framework.
 
 ## Restricted Mode (workspace trust)
 
 A folder opened for the first time is untrusted until you click **Trust Folder** in the banner (or run "Trust Folder" from the command palette). A downloaded archive or a fresh clone can carry configuration that runs programs, so in Restricted Mode Flint:
 
 - does not auto-start a terminal (shell prompts run `git status` and version-manager hooks that read the folder);
-- does not start language servers that execute project code: rust-analyzer (build scripts, proc macros, `.cargo/config` tools) and the Python servers (they run the virtualenv interpreter the project points at). They start as soon as you trust the folder;
-- runs agents (chat, commit messages) without the project's agent settings and hooks (Claude Code gets `--setting-sources user`, because `-p` mode skips its own trust prompt);
+- does not start language servers that execute project code: rust-analyzer (build scripts, proc macros, `.cargo/config` tools), the Python servers (they run the virtualenv interpreter the project points at) and any server set in Settings that Flint doesn't know. They start as soon as you trust the folder; extra language-server arguments from Settings are ignored until then;
+- runs agents (chat, commit messages, conflict resolution) without the project's agent settings and hooks (Claude Code gets `--setting-sources user`, because `-p` mode skips its own trust prompt) and without the extra agent arguments from Settings;
 - runs Git without hooks, even on commit and push (`core.hooksPath=/dev/null`).
 
 Regardless of trust:

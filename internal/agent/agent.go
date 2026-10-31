@@ -24,12 +24,13 @@ const (
 
 var known = []Kind{Claude, Codex}
 
-// Available lists agent CLIs found on the login-shell PATH, in preference order.
-func Available() []Kind {
+// Available lists agent CLIs found on the login-shell PATH (or at their
+// configured path), in preference order.
+func Available(configs map[Kind]Config) []Kind {
 	shellenv.Wait()
 	out := []Kind{}
 	for _, k := range known {
-		if _, err := exec.LookPath(string(k)); err == nil {
+		if _, err := exec.LookPath(configs[k].Binary(k)); err == nil {
 			out = append(out, k)
 		}
 	}
@@ -50,23 +51,16 @@ func Valid(k Kind) bool {
 // input is extra context (e.g. a diff) that is piped or appended to the prompt.
 // In an untrusted folder Claude loads only the user's settings: the project's
 // hooks and permission rules would otherwise run (-p skips the trust prompt).
-func Headless(ctx context.Context, k Kind, dir, prompt, input string, untrusted bool) (string, error) {
+// cfg's extra arguments go before Flint's own (see ComposeArgs).
+func Headless(ctx context.Context, k Kind, cfg Config, dir, prompt, input string, untrusted bool) (string, error) {
 	shellenv.Wait()
-	var cmd *exec.Cmd
-	switch k {
-	case Claude:
-		// `claude -p` prints only the final response; stdin becomes context.
-		args := []string{"-p", prompt}
-		if untrusted {
-			args = append(args, "--setting-sources", "user")
-		}
-		cmd = exec.CommandContext(ctx, "claude", args...)
+	args, err := headlessArgs(k, cfg, prompt, input, untrusted)
+	if err != nil {
+		return "", err
+	}
+	cmd := exec.CommandContext(ctx, cfg.Binary(k), args...)
+	if k == Claude {
 		cmd.Stdin = strings.NewReader(input)
-	case Codex:
-		// `codex exec` runs non-interactively and prints the last message on stdout.
-		cmd = exec.CommandContext(ctx, "codex", "exec", prompt+"\n\n"+input)
-	default:
-		return "", fmt.Errorf("unsupported agent %q", k)
 	}
 	cmd.Dir = dir
 	var stdout, stderr bytes.Buffer
@@ -84,13 +78,77 @@ func Headless(ctx context.Context, k Kind, dir, prompt, input string, untrusted 
 	return strings.TrimSpace(stdout.String()), nil
 }
 
+// headlessArgs is the command line of a headless run.
+func headlessArgs(k Kind, cfg Config, prompt, input string, untrusted bool) ([]string, error) {
+	var flint []string
+	switch k {
+	case Claude:
+		// `claude -p` prints only the final response; stdin becomes context.
+		flint = []string{"-p", prompt}
+		if cfg.Model != "" {
+			flint = append(flint, "--model", cfg.Model)
+		}
+		if untrusted {
+			flint = append(flint, "--setting-sources", "user")
+		}
+	case Codex:
+		// `codex exec` runs non-interactively and prints the last message on stdout.
+		// The prompt carries the repository's diff, so the run may only read,
+		// whatever the user's Codex configuration says.
+		flint = []string{"exec", "--sandbox", "read-only"}
+		if cfg.Model != "" {
+			flint = append(flint, "--model", cfg.Model)
+		}
+		flint = append(flint, prompt+"\n\n"+input)
+	default:
+		return nil, fmt.Errorf("unsupported agent %q", k)
+	}
+	if err := checkConfig(cfg); err != nil {
+		return nil, fmt.Errorf("%s: %w", k, err)
+	}
+	return ComposeArgs(k, cfg.Args, flint, untrusted)
+}
+
 // InteractiveCommand is the shell command that starts an interactive session of k
-// with prompt as the first message, ready to be typed into a terminal.
-func InteractiveCommand(k Kind, prompt string) (string, error) {
+// with prompt as the first message, ready to be typed into a terminal. The
+// prompt comes before the extra arguments, so an option taking several values
+// (--add-dir a b) cannot swallow it; in Restricted Mode they are left out, as
+// for every agent run.
+func InteractiveCommand(k Kind, cfg Config, prompt string, untrusted bool) (string, error) {
 	if !Valid(k) {
 		return "", fmt.Errorf("unsupported agent %q", k)
 	}
-	return string(k) + " " + ShellQuote(prompt), nil
+	if err := checkConfig(cfg); err != nil {
+		return "", fmt.Errorf("%s: %w", k, err)
+	}
+	var args []string
+	if cfg.Model != "" {
+		args = append(args, "--model", cfg.Model)
+	}
+	args = append(args, prompt)
+	if !untrusted {
+		if err := CheckArgs(k, cfg.Args); err != nil {
+			return "", fmt.Errorf("%s extra arguments: %w", k, err)
+		}
+		args = append(args, cfg.Args...)
+	}
+	parts := []string{string(k)}
+	if cfg.Path != "" {
+		parts[0] = ShellQuote(cfg.Path)
+	}
+	for _, a := range args {
+		parts = append(parts, ShellQuote(a))
+	}
+	return strings.Join(parts, " "), nil
+}
+
+// checkConfig validates the path and the model; the arguments are checked
+// where they are composed.
+func checkConfig(cfg Config) error {
+	if err := CheckPath(cfg.Path); err != nil {
+		return err
+	}
+	return CheckModel(cfg.Model)
 }
 
 // ShellQuote quotes s for POSIX shells (single quotes, embedded ones escaped).

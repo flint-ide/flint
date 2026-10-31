@@ -62,6 +62,17 @@ func specFor(language string) (serverSpec, bool) {
 	return serverSpec{}, false
 }
 
+// ServerBinaries lists the binaries tried for a language's server, in the
+// order they are tried, so the tool check reports the one that would start.
+func ServerBinaries(language string) []string {
+	s, _ := specFor(language)
+	out := make([]string, 0, len(s.Candidates))
+	for _, c := range s.Candidates {
+		out = append(out, c[0])
+	}
+	return out
+}
+
 // resolveCommand picks the first installed candidate; lookPath is injectable for tests.
 func (s serverSpec) resolveCommand(lookPath func(string) (string, error)) ([]string, bool) {
 	for _, c := range s.Candidates {

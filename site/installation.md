@@ -52,28 +52,35 @@ If Flint is already running, it takes the folder over and comes to the front ins
 
 ## Recommended tools
 
-Flint launches the tools already installed on your Mac, with your login shell's `PATH`, so sign-ins and configuration work the same as in your terminal. None of them is required to start Flint; each one unlocks the features that need it.
+Flint launches the tools already installed on your Mac, with your login shell's `PATH`, so sign-ins and configuration work the same as in your terminal. Flint starts without any of them, but Git is the one you will almost certainly want; each of the others unlocks the features that need it.
+
+### Check which tools you have
+
+On the first launch Flint opens the **Tools** window. It lists every tool below with the version it found, or "Not installed", the feature it enables, and for a missing tool an install command with a **Copy** button. Paste the command into Terminal, then click **Recheck**. Open the window again at any time with **Help ▸ Check Tools…**, "Check Tools…" in the command palette (`⇧⌘P`), or **Check installed tools…** on the Welcome screen.
+
+The check only runs each tool's version command, outside your projects, and installs nothing. A tool marked "Not working" is on your `PATH` but its version command failed; the window shows the error (for example, a `rust-analyzer` that rustup knows about but hasn't installed).
 
 | Tool | What it unlocks |
 |---|---|
 | `ripgrep` (`brew install ripgrep`) | Fast project search, the TODO list and `⌘P`. Without it, a slower built-in search is used. |
-| `git` | The Commit panel, diffs, blame, history, branches, stash and worktrees. |
-| `gh` (GitHub CLI) | Pull request review. Sign in with `gh auth login`. |
-| `claude` and/or `codex` | Agent chat, generated commit messages and conflict resolution. |
+| `git` (`xcode-select --install`) | The Commit panel, diffs, blame, history, branches, stash and worktrees. |
+| `gh` (GitHub CLI, `brew install gh`) | Pull request review. Sign in with `gh auth login`. |
+| `claude` (`brew install --cask claude-code`) and/or `codex` (`brew install --cask codex`) | Agent chat, generated commit messages and conflict resolution. |
 | `gopls` | Go language features (`go install golang.org/x/tools/gopls@latest`). |
 | `rust-analyzer` | Rust language features (`rustup component add rust-analyzer`). |
 | `vtsls` or `typescript-language-server` | TypeScript and JavaScript language features (`npm i -g @vtsls/language-server`, or `npm i -g typescript-language-server typescript`). |
 | `basedpyright` or `pyright` | Python language features (`pipx install basedpyright`, or `npm i -g pyright`). |
 | `dlv` (Delve) | The Go debugger (`go install github.com/go-delve/delve/cmd/dlv@latest`). |
-| `kubectl` | The Kubernetes panel. |
-| `docker` | The Docker / Compose panel (Docker Desktop, Colima or OrbStack). |
-| `aws`, and `saml2aws` if you use it | The AWS profiles panel and credential refresh. |
+| `kubectl` (`brew install kubectl`) | The Kubernetes panel. |
+| `docker` | The Docker / Compose panel (Docker Desktop, Colima or OrbStack; `brew install --cask docker-desktop` installs Docker Desktop). |
+| `aws` (`brew install awscli`), and `saml2aws` if you use it | The AWS profiles panel and credential refresh. |
+| `node` (`brew install node`) | Only needed for the language servers installed with `npm`. |
 
 > **Note:** The Go debugger also needs macOS developer mode: run `sudo DevToolsSecurity -enable` once.
 
 ## Updating
 
-Flint doesn't update itself. To update, download the latest release, quit Flint and replace the app in Applications. Your settings, sessions and connections are kept, because they live outside the app (see [Files and data](reference/files-and-data.md)).
+Flint doesn't update itself. Once a day it checks whether a newer release exists and, if so, shows a notice in the status bar; **Help ▸ Check for Updates…** checks right away (see [Update check](reference/privacy-and-security.md#update-check)). To update, download the latest release, quit Flint and replace the app in Applications. Your settings, sessions and connections are kept, because they live outside the app (see [Files and data](reference/files-and-data.md)).
 
 ## Uninstalling
 

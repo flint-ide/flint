@@ -81,11 +81,11 @@ export function KubeApps({ overview }: { overview: KubeOverview }) {
     <>
       {apps.map((a) => {
         const open = isOpen(a)
-        // A pod's own problem is shown under the pod; the summary keeps the rest.
+        // A pod's own problem (and its warning events) is shown under the pod; the summary keeps the rest.
         const shownPods = a.workloads.flatMap((ref) => byName.pods.get(ref.slice(ref.indexOf('/') + 1)) ?? []).filter((p) => p.problem)
         const listed = a.problems
           .map((text, i) => ({ text, critical: i < a.critical }))
-          .filter((p) => !shownPods.some((pod) => p.text.startsWith(`${pod.name}: `)))
+          .filter((p) => !shownPods.some((pod) => p.text.startsWith(`${pod.name}: `) || p.text.startsWith(`Pod ${pod.name}: `)))
         const problems = moreProblems.has(a.key) ? listed : listed.slice(0, MAX_PROBLEMS)
         const k = a.kustomization
         return (

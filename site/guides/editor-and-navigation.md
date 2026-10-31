@@ -2,6 +2,8 @@
 
 This guide explains how the tab area, the file tree, search and the language servers work, and how to keep several projects in one window.
 
+![The editor with a Go file; the green bar in the gutter marks lines added since the last commit](../images/editor.png)
+
 ## Tabs
 
 Files, terminals, agent chats, SQL consoles and diffs share one tab area. Each tab has an icon for its file type or kind.

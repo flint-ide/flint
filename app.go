@@ -17,6 +17,7 @@ import (
 	"flint/internal/config"
 	"flint/internal/dap"
 	"flint/internal/db"
+	"flint/internal/diag"
 	"flint/internal/fuzzy"
 	"flint/internal/git"
 	"flint/internal/httpfile"
@@ -26,6 +27,7 @@ import (
 	"flint/internal/scratch"
 	"flint/internal/settings"
 	"flint/internal/terminal"
+	"flint/internal/update"
 	"flint/internal/watcher"
 )
 
@@ -41,6 +43,11 @@ type appState struct {
 	AgentPolicy *agentsession.Policy `json:"agentPolicy,omitempty"`
 	// TrustedFolders the user trusts to run their code (see trust.go).
 	TrustedFolders []string `json:"trustedFolders,omitempty"`
+	// ToolCheckShown: the tool check has opened on its own once (first launch).
+	ToolCheckShown bool `json:"toolCheckShown,omitempty"`
+	// Update remembers the release check (api_update.go): when GitHub was last
+	// asked, its answer, and the release the user skipped.
+	Update update.State `json:"update,omitzero"`
 }
 
 // App holds the services shared by all bound APIs.
@@ -76,6 +83,10 @@ type App struct {
 	settingsMu sync.Mutex
 	settings   settings.Settings // settings.json, loaded once at startup
 
+	updates       *update.Client // GitHub's latest-release endpoint
+	updateMu      sync.Mutex
+	pendingUpdate *update.Result // a newer release the UI should offer; nil = none
+
 	closeMu      sync.Mutex
 	quitting     bool
 	closeAskedAt time.Time
@@ -105,6 +116,7 @@ func NewApp() (*App, error) {
 		scratch:   scratches,
 		sessions:  restore.New(filepath.Join(dir, "sessions")),
 		http:      httpfile.NewClient(),
+		updates:   update.New(diag.Version(version)),
 	}
 	a.db.SetHistory(db.OpenHistory(filepath.Join(dir, "history"), db.DefaultHistoryLimit))
 	a.terminals = terminal.NewManager(newTerminalEvents(a))
@@ -115,6 +127,7 @@ func NewApp() (*App, error) {
 	a.debugs = dap.NewManager(a.debugEvents)
 	a.lsp = lsp.NewManager()
 	a.lsp.Trusted = a.isTrusted
+	a.lsp.Config = func(language string) lsp.ServerConfig { return a.currentSettings().ServerConfig(language) }
 	git.Untrusted = func(dir string) bool { return !a.isTrusted(dir) }
 	a.profiles = newProfiles()
 	if err := config.LoadJSON(a.statePath(), &a.state); err != nil {
@@ -132,6 +145,7 @@ func NewApp() (*App, error) {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	go a.watchForUpdates(ctx)
 }
 
 func (a *App) shutdown() {
@@ -178,6 +192,24 @@ func (a *App) rememberFolder(path string) error {
 	a.state = next
 	go a.refreshMenu() // outside stateMu: building the menu reads the list again
 	return nil
+}
+
+// claimToolCheck is true only the first time it is asked, ever: the tool check
+// opens on its own once. A failed save still counts for this run, so a broken
+// config directory shows it once per launch rather than never.
+func (a *App) claimToolCheck() bool {
+	a.stateMu.Lock()
+	defer a.stateMu.Unlock()
+	if a.state.ToolCheckShown {
+		return false
+	}
+	next := a.state
+	next.ToolCheckShown = true
+	if err := config.SaveJSON(a.statePath(), next); err != nil {
+		a.logf("save state: %v", err)
+	}
+	a.state = next
+	return true
 }
 
 func (a *App) recentFolders() []string {

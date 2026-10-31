@@ -1,6 +1,7 @@
 // Package settings holds the user's preferences (settings.json in the config
-// directory): theme, editor and terminal fonts, the default agent and keyboard
-// shortcut overrides. Loading is forgiving (a hand-edited file never stops Flint
+// directory): theme, editor and terminal fonts, the default agent, agent CLIs,
+// language servers, refresh intervals, keyboard shortcut overrides and whether
+// to look for new releases. Loading is forgiving (a hand-edited file never stops Flint
 // from starting: bad values fall back to defaults, unknown keys are ignored);
 // saving is strict. Nothing secret belongs here: credentials live in the Keychain.
 package settings
@@ -72,12 +73,22 @@ type Settings struct {
 	// NotifyInBackground shows a notification and a Dock badge when a run, a
 	// test run or an agent finishes while Flint is in the background.
 	NotifyInBackground bool `json:"notifyInBackground"`
+	// CheckForUpdates asks GitHub once a day whether a newer Flint release
+	// exists (internal/update). Off means Flint never asks on its own; the
+	// "Check for Updates…" command still works.
+	CheckForUpdates bool `json:"checkForUpdates"`
 	// Keymap overrides command shortcuts: command id → "Mod+Shift+X", or "" to
 	// remove the shortcut. Commands not listed keep their default keys.
 	Keymap map[string]string `json:"keymap"`
 	// TodoExclude are extra folders or globs the TODO list skips ("docs/legacy",
 	// "*.min.js"), on top of the dependency folders it recognises itself.
 	TodoExclude []string `json:"todoExclude"`
+	// Agents configures the agent CLIs by name ("claude", "codex").
+	Agents map[string]AgentSettings `json:"agents"`
+	// LanguageServers configures language servers by language ("go", …).
+	LanguageServers map[string]LanguageServerSettings `json:"languageServers"`
+	// Refresh sets how often polling panels re-read their data.
+	Refresh Refresh `json:"refresh"`
 }
 
 // Default returns the settings Flint uses when nothing is configured.
@@ -96,8 +107,12 @@ func Default() Settings {
 			LineHeight: 1.2,
 		},
 		NotifyInBackground: true,
+		CheckForUpdates:    true,
 		Keymap:             map[string]string{},
 		TodoExclude:        []string{},
+		Agents:             map[string]AgentSettings{},
+		LanguageServers:    map[string]LanguageServerSettings{},
+		Refresh:            defaultRefresh(),
 	}
 }
 
@@ -156,6 +171,9 @@ func Normalize(s Settings) Settings {
 		}
 	}
 	out.TodoExclude = CleanExcludes(s.TodoExclude)
+	out.Agents = normalizeAgents(s.Agents)
+	out.LanguageServers = normalizeLanguageServers(s.LanguageServers)
+	out.Refresh = normalizeRefresh(s.Refresh)
 	return out
 }
 
@@ -219,7 +237,13 @@ func Validate(s Settings) error {
 			return err
 		}
 	}
-	return nil
+	if err := validateAgents(s.Agents); err != nil {
+		return err
+	}
+	if err := validateLanguageServers(s.LanguageServers); err != nil {
+		return err
+	}
+	return validateRefresh(s.Refresh)
 }
 
 // validExclude accepts one gitignore-style glob. Search options join excludes
@@ -301,13 +325,10 @@ func Save(path string, s Settings) (Settings, error) {
 	if err := Validate(s); err != nil {
 		return Settings{}, err
 	}
-	out := s
+	out := s.Clone()
 	out.Version = Version
 	out.Editor.FontFamily, _ = cleanFontFamily(s.Editor.FontFamily)
 	out.Terminal.FontFamily, _ = cleanFontFamily(s.Terminal.FontFamily)
-	if out.Keymap == nil {
-		out.Keymap = map[string]string{}
-	}
 	if err := config.SaveJSON(path, out); err != nil {
 		return Settings{}, err
 	}

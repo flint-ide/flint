@@ -28,7 +28,8 @@ var needsTrust = map[string]string{
 // typescript-language-server that can't be pinned to its own TypeScript is
 // refused (it would load the project's node_modules/typescript instead).
 func initializationOptions(bin string) (map[string]any, error) {
-	if filepath.Base(bin) != "typescript-language-server" {
+	// A server set in Settings may be a link or wrapper under another name.
+	if filepath.Base(bin) != "typescript-language-server" && tslsPackage(bin) == "" {
 		return nil, nil
 	}
 	if ts := tsserverNextTo(bin); ts != "" {
@@ -37,21 +38,25 @@ func initializationOptions(bin string) (map[string]any, error) {
 	return nil, errors.New("typescript-language-server: no TypeScript installed next to it, and the project's own is never used — run: npm i -g typescript-language-server typescript (or install vtsls)")
 }
 
-// tsserverNextTo finds tsserver.js of the TypeScript installed with the
-// language server: in its own node_modules or alongside it (npm -g, Homebrew).
-func tsserverNextTo(bin string) string {
+// tslsPackage returns the typescript-language-server package directory bin
+// links into (.../node_modules/typescript-language-server/lib/cli.mjs), or "".
+func tslsPackage(bin string) string {
 	real, err := filepath.EvalSymlinks(bin)
 	if err != nil {
 		return ""
 	}
-	// .../node_modules/typescript-language-server/lib/cli.mjs → the package dir.
-	pkg := ""
 	for dir := filepath.Dir(real); dir != filepath.Dir(dir); dir = filepath.Dir(dir) {
 		if filepath.Base(dir) == "typescript-language-server" && filepath.Base(filepath.Dir(dir)) == "node_modules" {
-			pkg = dir
-			break
+			return dir
 		}
 	}
+	return ""
+}
+
+// tsserverNextTo finds tsserver.js of the TypeScript installed with the
+// language server: in its own node_modules or alongside it (npm -g, Homebrew).
+func tsserverNextTo(bin string) string {
+	pkg := tslsPackage(bin)
 	if pkg == "" {
 		return ""
 	}

@@ -58,6 +58,7 @@ func TestLoadReplacesInvalidValues(t *testing.T) {
 		"editor": {"fontFamily": "x; } body { display:none", "fontSize": 99, "lineHeight": 0.2},
 		"terminal": {"fontSize": "big", "lineHeight": 1.4},
 		"defaultAgent": "gpt",
+		"checkForUpdates": "no",
 		"keymap": {"a.ok": "Mod+K", "a.removed": "", "a.bad": "Mod+", "": "Mod+J", "a.spaces": "Mod+Shift+ X"}
 	}`)
 	got, err := Load(path)
@@ -76,6 +77,9 @@ func TestLoadReplacesInvalidValues(t *testing.T) {
 	}
 	if got.DefaultAgent != "" {
 		t.Errorf("DefaultAgent = %q, want empty", got.DefaultAgent)
+	}
+	if !got.CheckForUpdates {
+		t.Error("CheckForUpdates = false, want the default (true) for a non-boolean")
 	}
 	want := map[string]string{"a.ok": "Mod+K", "a.removed": ""}
 	if !reflect.DeepEqual(got.Keymap, want) {
@@ -146,6 +150,7 @@ func TestSaveRoundtrip(t *testing.T) {
 	in.Terminal.FontSize = 15
 	in.DefaultAgent = "claude"
 	in.AutoSave = true
+	in.CheckForUpdates = false
 	in.Keymap = map[string]string{"git.push": "", "app.settings": "Mod+,"}
 	saved, err := Save(path, in)
 	if err != nil {

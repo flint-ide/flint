@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Workspace } from '../../api/backend'
 import { useWorkspace } from '../../store/workspace'
+import { openToolCheck } from '../../store/toolCheck'
 
 const SHORTCUTS: [string, string][] = [
   ['⌘P', 'Go to file'],
@@ -53,6 +54,7 @@ export function Welcome() {
           </div>
         ))}
       </dl>
+      <button className="link welcome-tools" onClick={openToolCheck}>Check installed tools…</button>
     </div>
   )
 }

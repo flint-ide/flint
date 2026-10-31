@@ -1,20 +1,26 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { useSettings } from '../../store/settings'
-import { useAgent } from '../../store/agent'
 import { DEFAULT_SETTINGS, FONT_SIZE, LINE_HEIGHT, parseExcludes, type FontSettings, type ThemeMode } from '../../lib/settings'
 import * as TodoAPI from '../../../bindings/flint/todoapi'
-import { Select } from '../ui/Select'
 import { KeymapSection } from './KeymapSection'
+import { checkForUpdates, useUpdate } from '../../store/update'
+import { AgentsSection } from './AgentsSection'
+import { LanguageServersSection } from './LanguageServersSection'
+import { RefreshSection } from './RefreshSection'
+import { NumberField, Row, TextField } from './fields'
 
-type Section = 'appearance' | 'editor' | 'terminal' | 'agents' | 'todo' | 'keymap'
+type Section = 'appearance' | 'editor' | 'terminal' | 'agents' | 'lsp' | 'refresh' | 'todo' | 'keymap' | 'updates'
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'editor', label: 'Editor' },
   { id: 'terminal', label: 'Terminal' },
   { id: 'agents', label: 'Agents' },
+  { id: 'lsp', label: 'Language Servers' },
+  { id: 'refresh', label: 'Refresh' },
   { id: 'todo', label: 'TODO List' },
   { id: 'keymap', label: 'Keymap' },
+  { id: 'updates', label: 'Updates' },
 ]
 
 // Offered in the font pickers; any installed font can be typed instead.
@@ -37,8 +43,11 @@ export function SettingsView({ active }: { active: boolean }) {
         {section === 'editor' && <EditorSection />}
         {section === 'terminal' && <TerminalSection />}
         {section === 'agents' && <AgentsSection />}
+        {section === 'lsp' && <LanguageServersSection />}
+        {section === 'refresh' && <RefreshSection />}
         {section === 'todo' && <TodoSection />}
         {section === 'keymap' && <KeymapSection active={active} />}
+        {section === 'updates' && <UpdatesSection />}
       </div>
     </div>
   )
@@ -98,37 +107,24 @@ function TerminalSection() {
   )
 }
 
-function AgentsSection() {
-  const available = useAgent((s) => s.available)
-  const loaded = useAgent((s) => s.loaded)
-  const defaultAgent = useSettings((s) => s.settings.defaultAgent)
-  const notify = useSettings((s) => s.settings.notifyInBackground)
+function UpdatesSection() {
+  const enabled = useSettings((s) => s.settings.checkForUpdates)
+  const checking = useUpdate((s) => s.checking)
   const update = useSettings((s) => s.update)
-  useEffect(() => {
-    if (!loaded) void useAgent.getState().load()
-  }, [loaded])
-  const first = available[0]
-  // A default that is no longer installed still shows, so it can be changed back.
-  const names = defaultAgent && !available.includes(defaultAgent) ? [...available, defaultAgent] : available
   return (
     <section>
-      <h2>Agents</h2>
-      <Row label="Default agent" hint="Starts new agent chats, writes commit messages and resolves conflicts.">
-        {loaded && available.length === 0 ? (
-          <span className="muted">No agent installed (claude or codex)</span>
-        ) : (
-          <Select
-            value={defaultAgent}
-            allowEmpty={first ? `First installed (${first})` : 'First installed'}
-            options={names.map((a) => ({ value: a, label: a, hint: available.includes(a) ? undefined : 'not installed' }))}
-            onChange={(a) => useAgent.getState().setPreferred(a)}
-          />
-        )}
+      <h2>Updates</h2>
+      <Row label="Check for new releases" hint="Once a day Flint asks GitHub which release is the latest and shows a notice in the status bar when there is a newer one.">
+        <input type="checkbox" checked={enabled} onChange={(e) => update({ checkForUpdates: e.target.checked })} />
       </Row>
-      <h3>Notifications</h3>
-      <Row label="Tell me when work finishes in the background" hint="A macOS notification and a count on the Dock icon when a run, tests or an agent finish while Flint isn't the active app.">
-        <input type="checkbox" checked={notify} onChange={(e) => update({ notifyInBackground: e.target.checked })} />
-      </Row>
+      <div className="settings-actions">
+        <button disabled={checking} onClick={() => void checkForUpdates()}>{checking ? 'Checking…' : 'Check Now'}</button>
+      </div>
+      <p className="muted settings-note">
+        The check is one anonymous request to api.github.com for the latest release of ODudek/flint, with Flint's version in the User-Agent and no
+        account, token, cookie or identifier. Flint never downloads or installs anything itself: Download opens the release page in your browser.
+        With the check off, GitHub is asked only when you choose Check Now or Help ▸ Check for Updates….
+      </p>
     </section>
   )
 }
@@ -198,74 +194,5 @@ function FontRows({ font, defaults, onChange }: { font: FontSettings; defaults: 
         <button disabled={isDefault} onClick={() => onChange(defaults)}>Reset to Defaults</button>
       </div>
     </>
-  )
-}
-
-function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  return (
-    <div className="settings-row">
-      <div className="settings-label">
-        <span>{label}</span>
-        {hint && <span className="muted">{hint}</span>}
-      </div>
-      <div className="settings-control">{children}</div>
-    </div>
-  )
-}
-
-/** A number input that saves valid values as you type and resets to the saved one on blur. */
-function NumberField(props: { value: number; min: number; max: number; step: number; suffix?: string; onCommit: (v: number) => void }) {
-  const { value, min, max, step, suffix, onCommit } = props
-  const [draft, setDraft] = useState(String(value))
-  useEffect(() => setDraft(String(value)), [value])
-  const parse = (s: string) => {
-    const n = Number(s)
-    return s.trim() !== '' && Number.isFinite(n) && n >= min && n <= max ? n : null
-  }
-  const invalid = parse(draft) === null
-  return (
-    <span className="number-field">
-      <input
-        type="number"
-        className={invalid ? 'invalid' : ''}
-        value={draft}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(e) => {
-          setDraft(e.target.value)
-          const n = parse(e.target.value)
-          if (n !== null && n !== value) onCommit(n)
-        }}
-        onBlur={() => setDraft(String(value))}
-      />
-      {suffix && <span className="muted">{suffix}</span>}
-      {invalid && <span className="error">{min}–{max}</span>}
-    </span>
-  )
-}
-
-/** A text input that saves on Enter or blur when valid. */
-function TextField(props: { value: string; list?: string; valid: (v: string) => boolean; onCommit: (v: string) => void }) {
-  const { value, list, valid, onCommit } = props
-  const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
-  const commit = () => {
-    if (draft !== value && valid(draft)) onCommit(draft)
-    else setDraft(value)
-  }
-  return (
-    <input
-      className={`settings-text${valid(draft) ? '' : ' invalid'}`}
-      value={draft}
-      list={list}
-      spellCheck={false}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') commit()
-        if (e.key === 'Escape') setDraft(value)
-      }}
-    />
   )
 }

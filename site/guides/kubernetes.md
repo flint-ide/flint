@@ -4,6 +4,8 @@ The Kubernetes panel shows what is running in a cluster, grouped the way you dep
 
 Open it with the `☸` icon on the activity bar or "Kubernetes" in the command palette.
 
+![The Kubernetes panel with an app whose pods crash, next to the agent chat that Diagnose with AI filled in](../images/kubernetes.png)
+
 ## Context and namespace
 
 Pick a context from your kubeconfig and a namespace at the top of the panel. EKS context names are shortened to "cluster (account)". Flint remembers your choice between runs.

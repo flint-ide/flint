@@ -121,6 +121,15 @@ flowchart LR
 
 The registry in `src/lib/commands.ts` (`registerCommand({ id, title, category, keys, when, run })`) feeds the `⇧⌘P` palette and the only global `keydown` listener (capture phase, ahead of CodeMirror and xterm). Shortcuts owned by the editor (for example `⌘B`, `⌘S`) are only displayed by the palette, which runs them through the active editor's keymap.
 
+### Sidebar panels
+
+`src/panels/index.ts` lists the sidebar panels; the activity bar, the sidebar, the `SidebarView` type and one palette command per panel are derived from that list (`src/panels/registry.ts`). To add a panel:
+
+1. Write the component (for example `components/sidebar/GcpPanel.tsx`). It receives `focusToken`, which `focusPanel(id)` bumps when a command asks the panel to focus its input.
+2. Add one entry to `PANELS`: `{ id: 'gcp', title: 'Google Cloud', icon: '◇', order: 95, component: GcpPanel }`. Wrap the component in `React.lazy` unless it is small, so its code is fetched on first open rather than at startup.
+
+That entry also registers "Show Google Cloud" (`view.gcp`) in the palette. Optional fields: `command` (another id, title, keywords or a default shortcut, or `false` for no command), `shortcutCommand` (a command whose shortcut the tooltip shows, read on hover so it follows rebinding) and `when` (hides the button and the command). Panel ids are not persisted today; an unknown id still falls back to the Files panel. Keep the command id of an existing panel when you edit it, since keymap overrides are stored by command id.
+
 ### Own code instead of libraries
 
 Virtualization of fixed-row-height lists (`src/lib/virtualList.ts`), fitting the terminal to its container (`terminalFit.ts`), and clickable URLs in the terminal, including ones wrapped across several rows (`terminalLinks.ts`).
@@ -179,6 +188,10 @@ Flint drives many CLIs (git, gh, docker, kubectl, aws, saml2aws, claude, codex).
 - Kubernetes terminals use an override kubeconfig that holds only `current-context` and the namespace; credentials are not copied.
 - Settings, connections, query history, sessions and the log file are written with mode `0600`.
 
+### Network requests Flint makes on its own
+
+Every other connection is the result of a user action or of a CLI the user runs. The one exception is the update check (`internal/update`, `api_update.go`): an anonymous `GET https://api.github.com/repos/ODudek/flint/releases/latest` (no token, no cookie jar, `User-Agent: Flint/<version>`, 10 s timeout, 1 MB body limit, redirects only within the same host), a few seconds after launch and then at most once per 24 hours, only in release builds and only while the `checkForUpdates` setting is on. The response is treated as untrusted: the tag must be a SemVer version, the title is stripped of control characters and capped, and the release link is opened only if it is an `https://github.com/ODudek/flint/` URL (otherwise the releases page). The browser is opened from Go (`UpdateAPI.OpenRelease`), so the UI cannot pass it a URL. Flint never downloads or installs a release.
+
 ### Redaction
 
 `internal/redact` removes credentials (private keys, AWS key IDs, GitHub and Slack tokens, API keys, JWTs, bearer/basic auth, credentials in URLs, `password=`-style assignments) and replaces the home directory with `~`. It is applied to the log file, to bug reports and diagnostics, and to context sent to AI agents (for example Diagnose with AI). Query history masks passwords in `CREATE/ALTER ROLE … PASSWORD` and ClickHouse `IDENTIFIED … BY`. Flint does not log HTTP client headers or variable values.
@@ -191,8 +204,8 @@ Flint drives many CLIs (git, gh, docker, kubectl, aws, saml2aws, claude, codex).
 
 | What | Where | Notes |
 |---|---|---|
-| Recent folders, agent permission policy, trusted folders | `~/Library/Application Support/flint/state.json` | the preferred agent stored here before `settings.json` existed is read from it until you pick a default in Settings |
-| Settings: theme, editor and terminal fonts, default agent, autosave, shortcut overrides (`keymap`: command id → shortcut, `""` = none) | `~/Library/Application Support/flint/settings.json` | has a schema version; missing keys get defaults, unknown keys are ignored, invalid values are replaced with defaults on load (writes validate strictly); `0600`; **no secrets**. A copy for the first render lives in `localStorage` (`flint.settings`) |
+| Recent folders, agent permission policy, trusted folders, whether the first-run tool check was shown, update check (last check time, the latest release found, the skipped version) | `~/Library/Application Support/flint/state.json` | the preferred agent stored here before `settings.json` existed is read from it until you pick a default in Settings |
+| Settings: theme, editor and terminal fonts, default agent, autosave, shortcut overrides (`keymap`: command id → shortcut, `""` = none), agent CLIs (`agents`), language servers (`languageServers`), panel refresh intervals (`refresh`) | `~/Library/Application Support/flint/settings.json` | has a schema version; missing keys get defaults, unknown keys are ignored, invalid values are replaced with defaults on load (writes validate strictly); `0600`; **no secrets**. A copy for the first render lives in `localStorage` (`flint.settings`) |
 | Database connection profiles (host, port, user, optional default database, ClickHouse protocol `native`/`http`, TLS, read-only) | `~/Library/Application Support/flint/connections.json` | **no passwords**, mode `0600` |
 | Database passwords | macOS Keychain, service `flint-db`, account = connection id | deleted together with the profile |
 | Scratchpads (SQL consoles, notes) | `~/Library/Application Support/flint/scratch/`: `index.json` (including the selected connection `connId` and database `database`; empty = the profile default) plus `<id>.sql/.md/.txt` | autosaved |
@@ -259,6 +272,8 @@ internal/docker             docker CLI: Compose projects, containers, events
 internal/awsprof            AWS CLI profiles, credential status, login and refresh
 internal/kube               kubectl: contexts, namespaces, resources, apps, rollout state, diagnosis
 internal/diag               Flint's log file, bug report and diagnostics
+internal/tools              external tools Flint drives: one table (feature, install command, docs) and the installed-version check
+internal/update             new-release check: GitHub's latest-release API (net/http), SemVer compare, link allow-list
 internal/redact             removes credentials and the home path from logs, reports and agent context
 internal/agent              claude / codex: headless runs and interactive commands
 internal/shellenv           PATH from the login shell (git hooks, brew, nvm inside a GUI app)
@@ -269,7 +284,7 @@ internal/agentsession       shared agent event model, approval policy, session m
   claude/ codex/ acpdriver/ native agent drivers
 frontend/bindings           generated TypeScript bindings of the Go services (do not edit)
 frontend/src/wails          compatibility layer over the bindings and the Wails runtime
-frontend/src                React: store (createStore + event bus), components, lib, commands
+frontend/src                React: store (createStore + event bus), components, lib, commands, panels (sidebar registry)
 ```
 
 For data storage details see [Where Flint stores data](#where-flint-stores-data).

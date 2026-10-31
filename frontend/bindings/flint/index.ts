@@ -25,6 +25,7 @@ import * as SessionAPI from "./sessionapi.js";
 import * as SettingsAPI from "./settingsapi.js";
 import * as TerminalAPI from "./terminalapi.js";
 import * as TodoAPI from "./todoapi.js";
+import * as UpdateAPI from "./updateapi.js";
 import * as WorkspaceAPI from "./workspaceapi.js";
 export {
     AWSAPI,
@@ -51,6 +52,7 @@ export {
     SettingsAPI,
     TerminalAPI,
     TodoAPI,
+    UpdateAPI,
     WorkspaceAPI
 };
 

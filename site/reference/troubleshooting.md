@@ -19,6 +19,15 @@ You only need to do this once per version. See [Installation](../installation.md
 - `Flint.app is not installed`: the command looks for Flint in `/Applications` and `~/Applications`. Move the app to one of them.
 - `… is not a folder`: the command opens folders only. Open single files from inside Flint.
 
+## A panel is empty or a feature is missing
+
+Most panels drive a command-line tool: Pull Requests needs `gh`, Kubernetes needs `kubectl`, Docker needs `docker`, AWS Profiles needs `aws`, agent chat needs `claude` or `codex`. Choose **Help ▸ Check Tools…** (or "Check Tools…" in the command palette) to see which tools Flint found, their versions, and an install command for each missing one.
+
+- **Not installed** although it is: Flint uses your login shell's `PATH`. Check that the tool runs in a new Terminal window; if you just added its folder to `PATH` (for example `~/go/bin`), restart Flint.
+- **Not working**: the tool is on your `PATH` but its version command failed. The window shows the error. A common case is `rust-analyzer` provided by rustup without the component installed: run `rustup component add rust-analyzer`.
+
+See [Recommended tools](../installation.md#recommended-tools).
+
 ## A language server doesn't start
 
 Check the status bar; it shows each server's state and, when a server is missing, the command to install it.

@@ -5,21 +5,25 @@ import { openContextMenu } from '../../store/contextMenu'
 import { showToast } from '../../store/dialog'
 import { kindLabel, profileStatus, shellCommand, type AwsProfile } from '../../lib/aws'
 import type { DropdownItem } from '../ui/Dropdown'
-
-/** While shown, the list is re-read this often (new logins) and expiry counts down. */
-const REFRESH_MS = 30_000
+import { useSettings } from '../../store/settings'
+import { refreshMs } from '../../lib/toolSettings'
 
 /** AWS CLI profiles with the state of their credentials; terminals and logins per profile. */
 export function AwsPanel() {
   const { profiles, loaded, loading, error, query, identities, refreshes } = useAws()
   const [now, setNow] = useState(Date.now)
+  // While shown, the list is re-read this often (new logins) and expiry counts down (Settings ▸ Refresh).
+  const intervalMs = useSettings((s) => refreshMs(s.settings.refresh, 'awsSeconds'))
 
   useEffect(() => {
     void refreshAws()
+  }, [])
+
+  useEffect(() => {
     const tick = setInterval(() => {
       setNow(Date.now())
       void refreshAws()
-    }, REFRESH_MS)
+    }, intervalMs)
     // Back from the browser after `aws sso login`.
     const onFocus = () => {
       setNow(Date.now())
@@ -30,7 +34,7 @@ export function AwsPanel() {
       clearInterval(tick)
       window.removeEventListener('focus', onFocus)
     }
-  }, [])
+  }, [intervalMs])
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()

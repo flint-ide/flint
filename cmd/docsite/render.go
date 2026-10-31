@@ -122,6 +122,23 @@ func brokenLinks(p Page, pages map[string]Page) []string {
 	return bad
 }
 
+var imageSource = regexp.MustCompile(`<img src="([^"]+)"`)
+
+// missingImages lists the page's local images that aren't in site/.
+func missingImages(p Page, images map[string]string) []string {
+	var bad []string
+	for _, m := range imageSource.FindAllStringSubmatch(p.HTML, -1) {
+		src := html.UnescapeString(m[1])
+		if strings.Contains(src, ":") || strings.HasPrefix(src, "//") {
+			continue // remote
+		}
+		if _, ok := images[path.Clean(path.Join(path.Dir(p.Path), src))]; !ok {
+			bad = append(bad, src)
+		}
+	}
+	return bad
+}
+
 func hasAnchor(p Page, id string) bool {
 	return strings.Contains(p.HTML, ` id="`+id+`"`)
 }

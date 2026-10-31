@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"flint/internal/diag"
+	"flint/internal/tools"
 )
 
 // version is set at release builds (-ldflags "-X main.version=v1.2.3").
@@ -22,10 +23,12 @@ const (
 
 // DiagnosticsAPI is how people report problems: the log, a redacted report,
 // and a prefilled GitHub issue. Nothing leaves the machine unless the user
-// submits the issue themselves.
+// submits the issue themselves. It also runs the tool check (which external
+// tools are installed).
 type DiagnosticsAPI struct {
 	app *App
 
+	toolsMu     sync.Mutex
 	mu          sync.Mutex
 	windowStart time.Time
 	logged      int
@@ -36,6 +39,7 @@ func (d *DiagnosticsAPI) Report() string {
 	s := d.app.currentSettings()
 	return diag.Report(d.app.ctx, diag.Info{
 		Version: diag.Version(version), Theme: s.Theme, Agent: s.DefaultAgent, Roots: len(d.app.projectRoots()),
+		Tools: d.app.configuredTools(),
 	})
 }
 
@@ -50,6 +54,38 @@ func (d *DiagnosticsAPI) OpenIssue(title string) error {
 	d.app.copyText(report)
 	return d.app.openURL(diag.IssueLink(title, report))
 }
+
+// Tools reports which external tools Flint drives are installed, with their
+// versions. Only fixed version commands run, never in a project folder.
+// Calls run one at a time, so a UI that keeps asking can't start a dozen
+// version commands per call in parallel.
+func (d *DiagnosticsAPI) Tools() []tools.Status {
+	d.toolsMu.Lock()
+	defer d.toolsMu.Unlock()
+	return tools.Check(d.app.ctx, d.app.configuredTools())
+}
+
+// configuredTools are the agent and language-server binaries set in Settings,
+// by tool id, so the tool check finds them where Flint will run them.
+func (a *App) configuredTools() map[string]string {
+	s := a.currentSettings()
+	out := map[string]string{}
+	for _, name := range []string{"claude", "codex"} {
+		if p := s.Agents[name].Path; p != "" {
+			out[name] = p
+		}
+	}
+	for lang, id := range map[string]string{"go": "gopls", "typescript": "typescript-ls", "python": "python-ls", "rust": "rust-analyzer"} {
+		if ls := s.LanguageServers[lang]; ls.Command != "" && !ls.Disabled {
+			out[id] = ls.Command
+		}
+	}
+	return out
+}
+
+// ToolCheckOnFirstRun is true once, on the first launch, so the tool check
+// opens by itself only then.
+func (d *DiagnosticsAPI) ToolCheckOnFirstRun() bool { return d.app.claimToolCheck() }
 
 // LogPath is the log file, for the UI.
 func (d *DiagnosticsAPI) LogPath() string { return diag.LogPath() }

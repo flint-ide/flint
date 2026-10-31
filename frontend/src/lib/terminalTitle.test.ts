@@ -21,6 +21,10 @@ describe('terminal titles', () => {
     assert.equal(terminalTitle({ command: '', cwd: '/p/api', programTitle: 'me@mac: ~/p/api' }), 'api')
   })
 
+  it('starts with what the terminal works as', () => {
+    assert.equal(terminalTitle({ command: 'terraform plan', cwd: '/p', tag: 'aws:prod' }), 'aws:prod · terraform plan')
+  })
+
   it('cuts long titles', () => {
     assert.equal(terminalTitle({ command: 'x'.repeat(50), cwd: '/p' }), `${'x'.repeat(39)}…`)
   })

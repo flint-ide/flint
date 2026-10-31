@@ -38,6 +38,7 @@ import { usePersistentNumber } from './lib/usePersistentNumber'
 
 const ACTIVITY_BAR = 44
 
+const AwsPanel = lazy(() => import('./components/sidebar/AwsPanel').then((m) => ({ default: m.AwsPanel })))
 const DockerPanel = lazy(() => import('./components/sidebar/DockerPanel').then((m) => ({ default: m.DockerPanel })))
 const TodoPanel = lazy(() => import('./components/sidebar/TodoPanel').then((m) => ({ default: m.TodoPanel })))
 const DatabasePanel = lazy(() => import('./components/sidebar/DatabasePanel').then((m) => ({ default: m.DatabasePanel })))
@@ -140,6 +141,11 @@ export default function App() {
               {sidebar === 'docker' && (
                 <Suspense fallback={null}>
                   <DockerPanel />
+                </Suspense>
+              )}
+              {sidebar === 'aws' && (
+                <Suspense fallback={null}>
+                  <AwsPanel />
                 </Suspense>
               )}
               {sidebar === 'todo' && (

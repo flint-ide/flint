@@ -11,13 +11,16 @@ export interface TitleSource {
   cwd: string
   /** Title set by the running program, e.g. Claude Code's "✳ Fix the login form". */
   programTitle?: string
+  /** What the terminal works as, shown first ("aws:prod"). */
+  tag?: string
 }
 
 /**
  * The tab name: a program's own title while it runs, else its command line;
  * at the prompt, the folder the shell is in.
  */
-export function terminalTitle({ command, cwd, programTitle }: TitleSource): string {
+export function terminalTitle({ command, cwd, programTitle, tag }: TitleSource): string {
   const name = command ? programTitle?.trim() || command : cwd.split('/').filter(Boolean).pop() || '~'
-  return name.length > MAX_TITLE ? `${name.slice(0, MAX_TITLE - 1)}…` : name
+  const cut = name.length > MAX_TITLE ? `${name.slice(0, MAX_TITLE - 1)}…` : name
+  return tag ? `${tag} · ${cut}` : cut
 }

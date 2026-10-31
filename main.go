@@ -63,6 +63,7 @@ func main() {
 			application.NewService(&SettingsAPI{app: flint}),
 			application.NewService(&GitHubAPI{app: flint, git: gitAPI, gh: github.New()}),
 			application.NewService(newAlertsAPI(flint)),
+			application.NewService(newAWSAPI(flint)),
 		},
 	})
 	flint.wails = app

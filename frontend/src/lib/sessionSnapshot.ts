@@ -32,7 +32,7 @@ export type SavedTab =
       label?: string
     }
   | { kind: 'history'; path: string }
-  | { kind: 'terminal'; title: string; cwd: string; output: string; project?: string; pinned?: boolean }
+  | { kind: 'terminal'; title: string; cwd: string; output: string; project?: string; pinned?: boolean; env?: Record<string, string>; tag?: string }
   | { kind: 'chat'; title: string; chat: SavedChat }
 
 export interface Snapshot {

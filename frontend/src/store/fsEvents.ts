@@ -1,4 +1,4 @@
-import { EventsOn } from '../../wailsjs/runtime/runtime'
+import { EventsOn } from '../wails/runtime'
 import { Workspace, type Entry } from '../api/backend'
 import { useWorkspace } from './workspace'
 

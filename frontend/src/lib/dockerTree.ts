@@ -1,5 +1,5 @@
 // The Docker panel's tree and the shell commands it types into terminals; pure.
-import type { docker } from '../../wailsjs/go/models'
+import type { docker } from '../wails/models'
 
 export type Container = docker.Container
 export type ComposeProject = docker.ComposeProject

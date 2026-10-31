@@ -108,13 +108,13 @@ export function useQueryRunner(connId: string, database: string): QueryRunner {
       const id = begin(sql, 'explain', analyze)
       if (!id) return
       const go = async () => {
-        let res = await Database.Explain(conn, db, id, sql, analyze, false)
+        let res = (await Database.Explain(conn, db, id, sql, analyze, false))!
         if (res.needsConfirm) {
           if (queryId.current !== id) return
           const ok = await confirmAction(`${res.confirmReason} Run EXPLAIN ANALYZE of “${abbreviate(sql)}”?`, 'Explain Analyze')
           if (!ok) return settle(id, { notice: 'EXPLAIN ANALYZE not run.' })
           if (queryId.current !== id) return
-          res = await Database.Explain(conn, db, id, sql, analyze, true)
+          res = (await Database.Explain(conn, db, id, sql, analyze, true))!
         }
         settle(id, { explain: res })
       }

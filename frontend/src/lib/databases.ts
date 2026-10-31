@@ -1,10 +1,13 @@
 import type { Connection, DatabaseInfo } from '../api/backend'
 
+/** The parts of a connection that pick its default database. */
+type ConnectionRef = { driver: string; database: string }
+
 /**
  * Display name of a connection's default database until the server says otherwise: the
  * profile's, else "postgres" (what Go opens) or "default" (ClickHouse leaves it to the server).
  */
-export function defaultDatabase(conn: Pick<Connection, 'driver' | 'database'>): string {
+export function defaultDatabase(conn: ConnectionRef): string {
   if (conn.database) return conn.database
   return conn.driver === 'clickhouse' ? 'default' : 'postgres'
 }
@@ -19,7 +22,7 @@ export function resolveDatabase(conn: Pick<Connection, 'database'>, database: st
 }
 
 /** Name of the default database: flagged by the server's list, else the display fallback. */
-export function defaultDatabaseName(list: DatabaseInfo[] | undefined, conn: Pick<Connection, 'driver' | 'database'>): string {
+export function defaultDatabaseName(list: DatabaseInfo[] | undefined, conn: ConnectionRef): string {
   return list?.find((d) => d.default)?.name ?? defaultDatabase(conn)
 }
 

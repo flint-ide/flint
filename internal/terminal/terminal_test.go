@@ -15,7 +15,9 @@ type recorder struct {
 	titles chan Info
 }
 
-func newRecorder() *recorder { return &recorder{exited: make(chan int, 1), titles: make(chan Info, 32)} }
+func newRecorder() *recorder {
+	return &recorder{exited: make(chan int, 1), titles: make(chan Info, 32)}
+}
 
 func (r *recorder) Output(_ string, data []byte) {
 	r.mu.Lock()

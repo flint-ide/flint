@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Database, errorMessage, newConnection, type ClickHouseProtocol, type Connection, type Driver } from '../../api/backend'
-import { db } from '../../../wailsjs/go/models'
+import { db } from '../../wails/models'
 import { useDatabase } from '../../store/database'
 import { Modal } from '../layout/Modal'
 import { Select } from '../ui/Select'
@@ -65,7 +65,7 @@ export function ConnectionForm({ initial, onClose }: Props) {
               { value: 'postgres', label: 'PostgreSQL', icon: <span className="driver-badge postgres">PG</span> },
               { value: 'clickhouse', label: 'ClickHouse', icon: <span className="driver-badge clickhouse">CH</span> },
             ]}
-            onChange={(driver) => update({ driver, port: 0, protocol: driver === 'clickhouse' ? 'native' : '' })}
+            onChange={(driver) => update({ driver: driver as Connection['driver'], port: 0, protocol: driver === 'clickhouse' ? 'native' : '' })}
           />
         </label>
         {isClickHouse && (

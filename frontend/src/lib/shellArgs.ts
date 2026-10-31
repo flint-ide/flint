@@ -48,7 +48,7 @@ export function parseEnv(text: string): Record<string, string> {
   return env
 }
 
-export function formatEnv(env: Record<string, string> | undefined): string {
+export function formatEnv(env: Record<string, string | undefined> | undefined): string {
   return Object.entries(env ?? {})
     .map(([k, v]) => `${k}=${v}`)
     .join('\n')

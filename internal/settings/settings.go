@@ -69,6 +69,9 @@ type Settings struct {
 	DefaultAgent string `json:"defaultAgent"`
 	// AutoSave saves modified files when the window loses focus.
 	AutoSave bool `json:"autoSave"`
+	// NotifyInBackground shows a notification and a Dock badge when a run, a
+	// test run or an agent finishes while Flint is in the background.
+	NotifyInBackground bool `json:"notifyInBackground"`
 	// Keymap overrides command shortcuts: command id → "Mod+Shift+X", or "" to
 	// remove the shortcut. Commands not listed keep their default keys.
 	Keymap map[string]string `json:"keymap"`
@@ -92,8 +95,9 @@ func Default() Settings {
 			FontSize:   13,
 			LineHeight: 1.2,
 		},
-		Keymap:      map[string]string{},
-		TodoExclude: []string{},
+		NotifyInBackground: true,
+		Keymap:             map[string]string{},
+		TodoExclude:        []string{},
 	}
 }
 

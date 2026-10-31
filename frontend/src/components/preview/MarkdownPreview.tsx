@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import * as PreviewAPI from '../../../wailsjs/go/main/PreviewAPI'
-import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
+import * as PreviewAPI from '../../../bindings/flint/previewapi'
+import { BrowserOpenURL } from '../../wails/runtime'
 import { errorMessage } from '../../api/backend'
 import { useEditor } from '../../store/editor'
 import { useWorkspace } from '../../store/workspace'

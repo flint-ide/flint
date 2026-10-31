@@ -1,6 +1,6 @@
 import { createStore } from '../lib/store'
 import { joinRoot } from '../lib/blame'
-import type { git } from '../../wailsjs/go/models'
+import type { git } from '../wails/models'
 import { errorMessage } from '../api/backend'
 import { Git, useGit, type FileChange } from './git'
 import { confirmAction, showToast } from './dialog'

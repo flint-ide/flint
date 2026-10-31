@@ -13,8 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"flint/internal/dap"
 	"flint/internal/runconfig"
 	"flint/internal/shellenv"
@@ -62,7 +60,7 @@ type pendingOutput struct {
 
 func newDebugEvents(app *App) *debugEvents {
 	return &debugEvents{
-		send:    func(ev DebugEvent) { runtime.EventsEmit(app.ctx, eventDebug, ev) },
+		send:    func(ev DebugEvent) { app.emit(eventDebug, ev) },
 		seq:     map[string]uint64{},
 		pending: map[string]*pendingOutput{},
 	}

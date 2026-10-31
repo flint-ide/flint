@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { dap } from '../../../wailsjs/go/models'
+import { dap } from '../../wails/models'
 import {
   debugStep, evaluate, restartDebug, selectFrame, stopDebug, toggleVariable, useDebug, type DebugSession,
 } from '../../store/debug'

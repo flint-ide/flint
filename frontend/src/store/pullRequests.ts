@@ -11,7 +11,7 @@ import {
   type PullRequest,
   type PullRequestDetails,
 } from '../api/backend'
-import { BrowserOpenURL } from '../../wailsjs/runtime/runtime'
+import { BrowserOpenURL } from '../wails/runtime'
 import { confirmAction, showToast } from './dialog'
 import { useEditor } from './editor'
 

@@ -1,6 +1,6 @@
 import { createStore } from '../lib/store'
-import * as Terminal from '../../wailsjs/go/main/TerminalAPI'
-import { EventsOn } from '../../wailsjs/runtime/runtime'
+import * as Terminal from '../../bindings/flint/terminalapi'
+import { EventsOn } from '../wails/runtime'
 import { createReorderer } from '../lib/reorder'
 import { useEditor } from './editor'
 import { terminalTitle } from '../lib/terminalTitle'

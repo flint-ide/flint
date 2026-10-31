@@ -1,6 +1,6 @@
 import { createStore } from '../lib/store'
-import * as ProfileAPI from '../../wailsjs/go/main/ProfileAPI'
-import { runconfig, testrun, type profiling } from '../../wailsjs/go/models'
+import * as ProfileAPI from '../../bindings/flint/profileapi'
+import { runconfig, testrun, type profiling } from '../wails/models'
 import { errorMessage } from '../api/backend'
 import { testLang } from '../lib/testFiles'
 import type { TestRequest } from '../lib/runTree'

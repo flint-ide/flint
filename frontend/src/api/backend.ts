@@ -1,13 +1,13 @@
 // Single entry point to the Go backend: re-exports generated bindings under readable names
 // and adds types for event payloads the generator can't see.
-import * as Workspace from '../../wailsjs/go/main/WorkspaceAPI'
-import * as Search from '../../wailsjs/go/main/SearchAPI'
-import * as Database from '../../wailsjs/go/main/DatabaseAPI'
-import * as Scratch from '../../wailsjs/go/main/ScratchAPI'
-import * as Diff from '../../wailsjs/go/main/DiffAPI'
-import * as GitHub from '../../wailsjs/go/main/GitHubAPI'
-import { EventsOn } from '../../wailsjs/runtime/runtime'
-import { db, github, scratch, search, textdiff, workspace } from '../../wailsjs/go/models'
+import * as Workspace from '../../bindings/flint/workspaceapi'
+import * as Search from '../../bindings/flint/searchapi'
+import * as Database from '../../bindings/flint/databaseapi'
+import * as Scratch from '../../bindings/flint/scratchapi'
+import * as Diff from '../../bindings/flint/diffapi'
+import * as GitHub from '../../bindings/flint/githubapi'
+import { EventsOn } from '../wails/runtime'
+import { db, github, scratch, search, textdiff, workspace } from '../wails/models'
 
 export { Workspace, Search, Database, Scratch, Diff, GitHub }
 

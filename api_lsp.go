@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"flint/internal/lsp"
 )
 
@@ -28,10 +26,10 @@ type LSPAPI struct {
 
 func (l *LSPAPI) wire() {
 	l.app.lsp.OnDiagnostics = func(path string, diags []lsp.Diagnostic) {
-		runtime.EventsEmit(l.app.ctx, eventLSPDiagnostics, LSPDiagnostics{Path: path, Diagnostics: diags})
+		l.app.emit(eventLSPDiagnostics, LSPDiagnostics{Path: path, Diagnostics: diags})
 	}
 	l.app.lsp.OnStatus = func(s lsp.Status) {
-		runtime.EventsEmit(l.app.ctx, eventLSPStatus, s)
+		l.app.emit(eventLSPStatus, s)
 	}
 }
 

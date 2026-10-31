@@ -3,7 +3,7 @@
 // (RunAPI.TestMarks) off the typing path; after a run the marker shows the result.
 import { RangeSet, StateEffect, StateField, type Extension } from '@codemirror/state'
 import { EditorView, GutterMarker, ViewPlugin, gutter, type ViewUpdate } from '@codemirror/view'
-import * as RunAPI from '../../wailsjs/go/main/RunAPI'
+import * as RunAPI from '../../bindings/flint/runapi'
 import type { TestStatus } from './runTree'
 import { testLang, type TestGutterHooks, type TestMark } from './testFiles'
 

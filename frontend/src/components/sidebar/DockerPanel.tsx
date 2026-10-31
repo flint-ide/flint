@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import * as DockerAPI from '../../../wailsjs/go/main/DockerAPI'
-import { BrowserOpenURL, EventsOn } from '../../../wailsjs/runtime/runtime'
+import * as DockerAPI from '../../../bindings/flint/dockerapi'
+import { BrowserOpenURL, EventsOn } from '../../wails/runtime'
 import { composeAction, containerAction, openLogs, openShell, refreshDocker, useDocker } from '../../store/docker'
 import { openContextMenu } from '../../store/contextMenu'
 import { useEditor } from '../../store/editor'

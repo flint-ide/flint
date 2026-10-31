@@ -1,4 +1,4 @@
-WAILS   ?= $(shell go env GOPATH)/bin/wails
+WAILS   ?= $(shell go env GOPATH)/bin/wails3
 # The corporate Go proxy is only reachable on VPN; fall back to the public one.
 export GOPROXY ?= https://proxy.golang.org,direct
 
@@ -6,13 +6,16 @@ PG_PORT ?= 55432
 CH_PORT ?= 59000
 CH_HTTP_PORT ?= 58123
 
-.PHONY: dev build test test-go test-web test-integration test-db-up test-db-down install lint
+.PHONY: dev build server test test-go test-web test-integration test-db-up test-db-down install lint
 
-dev: ## Run with hot reload (opens the app + http://localhost:34115)
-	$(WAILS) dev -appargs "$(CURDIR)"
+dev: ## Run with live reload (Go rebuilds on change, the page reloads)
+	$(WAILS) task dev
 
 build: ## Build build/bin/flint.app
-	$(WAILS) build -clean
+	$(WAILS) task package
+
+server: ## Flint as an HTTP server for a browser, no window (http://localhost:8080)
+	$(WAILS) task server -- "$(CURDIR)"
 
 test: test-go test-web ## Unit tests (Go + frontend)
 

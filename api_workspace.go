@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"flint/internal/fuzzy"
 	"flint/internal/git"
 	"flint/internal/watcher"
@@ -49,10 +47,7 @@ func (w *WorkspaceAPI) RecentFolders() []string {
 
 // PickFolder shows the native folder picker. Returns "" when the user cancels.
 func (w *WorkspaceAPI) PickFolder() (string, error) {
-	return runtime.OpenDirectoryDialog(w.app.ctx, runtime.OpenDialogOptions{
-		Title:                "Open folder",
-		CanCreateDirectories: true,
-	})
+	return w.app.pickFolder("Open folder")
 }
 
 // OpenFolder validates and records a folder as the current project.
@@ -67,7 +62,7 @@ func (w *WorkspaceAPI) OpenFolder(path string) (string, error) {
 	watch, err := w.watchFolder(abs)
 	if err != nil {
 		// Not fatal: the tree still works, it just won't live-refresh.
-		runtime.LogWarningf(w.app.ctx, "file watcher disabled: %v", err)
+		w.app.logf("file watcher disabled: %v", err)
 	}
 	w.app.openProject(abs, watch)
 	w.updateTitle()
@@ -85,7 +80,7 @@ func (w *WorkspaceAPI) AddRoot(path string) (string, error) {
 	}
 	watch, err := w.watchFolder(abs)
 	if err != nil {
-		runtime.LogWarningf(w.app.ctx, "file watcher disabled for %s: %v", abs, err)
+		w.app.logf("file watcher disabled for %s: %v", abs, err)
 	}
 	if err := w.app.addRoot(abs, watch); err != nil {
 		if watch != nil {
@@ -116,7 +111,7 @@ func (w *WorkspaceAPI) updateTitle() {
 	if len(roots) > 1 {
 		title += fmt.Sprintf(" + %d", len(roots)-1)
 	}
-	runtime.WindowSetTitle(w.app.ctx, title+" — flint")
+	w.app.setWindowTitle(title + " — flint")
 }
 
 func requireDir(path string) (string, error) {
@@ -262,10 +257,10 @@ func (w *WorkspaceAPI) watchFolder(root string) (*watcher.Watcher, error) {
 	return watcher.Watch(roots, func(paths []string) {
 		files, gitChanged := watcher.Classify(paths, gitDirs)
 		if len(files) > 0 {
-			runtime.EventsEmit(w.app.ctx, eventFSChanged, files)
+			w.app.emit(eventFSChanged, files)
 		}
 		if gitChanged {
-			runtime.EventsEmit(w.app.ctx, eventGitChanged, root)
+			w.app.emit(eventGitChanged, root)
 		}
 	})
 }

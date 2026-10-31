@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build darwin && !server
 
 package main
 
@@ -6,20 +6,6 @@ package main
 #cgo CFLAGS: -x objective-c -fobjc-arc
 #cgo LDFLAGS: -framework Cocoa
 #import <Cocoa/Cocoa.h>
-
-// flintStyleWindows switches the (Wails-created) toolbar to the compact unified
-// style used by Xcode and Safari, so the native traffic lights sit in a 38pt bar
-// that matches Flint's own title bar instead of a tall 52pt one.
-static void flintStyleWindows(void) {
-	dispatch_async(dispatch_get_main_queue(), ^{
-		for (NSWindow *w in [NSApp windows]) {
-			if (@available(macOS 11.0, *)) {
-				w.toolbarStyle = NSWindowToolbarStyleUnifiedCompact;
-				w.titlebarSeparatorStyle = NSTitlebarSeparatorStyleNone;
-			}
-		}
-	});
-}
 
 // flintSetAppearance switches the native window chrome (title bar, traffic
 // lights, menus) to dark (1), light (2) or the system appearance (0) and reports
@@ -44,35 +30,6 @@ static int flintSystemPrefersDark(void) {
 	return style != nil && [style caseInsensitiveCompare:@"Dark"] == NSOrderedSame;
 }
 
-// The app menu's "Settings…" item, added next to the items Wails creates.
-extern void flintMenuOpenSettings(void);
-
-@interface FlintMenuTarget : NSObject
-- (void)openSettings:(id)sender;
-@end
-
-@implementation FlintMenuTarget
-- (void)openSettings:(id)sender { flintMenuOpenSettings(); }
-@end
-
-static const NSInteger flintSettingsTag = 0xF11E7;
-
-static void flintAddSettingsItem(void) {
-	dispatch_async(dispatch_get_main_queue(), ^{
-		static FlintMenuTarget *target;
-		NSMenu *appMenu = [[[NSApp mainMenu] itemAtIndex:0] submenu];
-		if (!appMenu || [appMenu itemWithTag:flintSettingsTag]) return;
-		if (!target) target = [FlintMenuTarget new];
-		NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:@"Settings…" action:@selector(openSettings:) keyEquivalent:@","];
-		item.target = target;
-		item.tag = flintSettingsTag;
-		// After "About flint" and its separator, as in other Mac apps.
-		NSInteger at = appMenu.numberOfItems >= 2 && [[appMenu itemAtIndex:1] isSeparatorItem] ? 2 : 0;
-		[appMenu insertItem:item atIndex:at];
-		[appMenu insertItem:[NSMenuItem separatorItem] atIndex:at + 1];
-	});
-}
-
 // flintTitlebarMetrics reports the title bar height and the close button's frame
 // (in points, origin top-left) so the web title bar can line up with them.
 static void flintTitlebarMetrics(double *height, double *x, double *y, double *w, double *h) {
@@ -95,9 +52,6 @@ static void flintTitlebarMetrics(double *height, double *x, double *y, double *w
 */
 import "C"
 
-// styleNativeWindow applies the compact toolbar style; call once the window exists.
-func styleNativeWindow() { C.flintStyleWindows() }
-
 // setNativeAppearance makes the window chrome follow theme ("dark", "light" or
 // "system") and reports whether it is now dark. Not for the main thread.
 func setNativeAppearance(theme string) bool {
@@ -113,10 +67,6 @@ func setNativeAppearance(theme string) bool {
 
 // systemPrefersDark reports whether macOS uses the dark appearance.
 func systemPrefersDark() bool { return C.flintSystemPrefersDark() != 0 }
-
-// addSettingsMenuItem puts "Settings… ⌘," into the app menu; call after the
-// menu is (re)installed. Adding it twice is a no-op.
-func addSettingsMenuItem() { C.flintAddSettingsItem() }
 
 // TitlebarMetrics describes where macOS draws the window buttons.
 type TitlebarMetrics struct {

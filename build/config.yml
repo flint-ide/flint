@@ -1,0 +1,37 @@
+# `wails3 dev` (see Taskfile.yml): rebuild and restart Flint when Go changes;
+# cmd/webbuild --watch rebuilds the frontend and reloads the page itself.
+version: '3'
+
+info:
+  companyName: Aleksander Dudek
+  productName: Flint
+  productIdentifier: com.wails.flint
+  description: A fast scratchpad IDE for code, SQL and data.
+  copyright: © 2026 Aleksander Dudek
+  version: 1.0.0
+
+dev_mode:
+  root_path: .
+  log_level: warn
+  debounce: 1000
+  ignore:
+    dir:
+      - .git
+      - .claude
+      - node_modules
+      - frontend
+      - build
+    file:
+      - .DS_Store
+      - "*_test.go"
+    watched_extension:
+      - "*.go"
+    git_ignore: true
+  executes:
+    - cmd: wails3 task dev:build
+      type: blocking
+    - cmd: wails3 task dev:frontend
+      type: background
+    - cmd: wails3 task dev:run
+      type: primary
+      exit_policy: shutdown

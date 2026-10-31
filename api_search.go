@@ -5,8 +5,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"flint/internal/search"
 )
 
@@ -89,14 +87,14 @@ func (s *SearchAPI) Start(id string, roots []string, opts search.Options) {
 		defer cancel()
 		sum, err := search.RunRoots(ctx, roots, opts, func(matches []search.Match) {
 			if ctx.Err() == nil {
-				runtime.EventsEmit(s.app.ctx, eventSearchBatch, SearchBatch{ID: id, Matches: matches})
+				s.app.emit(eventSearchBatch, SearchBatch{ID: id, Matches: matches})
 			}
 		})
 		done := SearchDone{ID: id, Summary: sum}
 		if err != nil && ctx.Err() == nil {
 			done.Error = err.Error()
 		}
-		runtime.EventsEmit(s.app.ctx, eventSearchDone, done)
+		s.app.emit(eventSearchDone, done)
 	}()
 }
 

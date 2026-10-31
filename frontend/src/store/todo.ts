@@ -1,5 +1,5 @@
 import { createStore } from '../lib/store'
-import * as TodoAPI from '../../wailsjs/go/main/TodoAPI'
+import * as TodoAPI from '../../bindings/flint/todoapi'
 import { errorMessage } from '../api/backend'
 import { useSettings } from './settings'
 import type { TodoItem } from '../lib/todos'

@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useState, type CSSProperties } from 'react'
-import * as AppAPI from '../../../wailsjs/go/main/AppAPI'
-import { EventsOn, WindowIsFullscreen, WindowToggleMaximise } from '../../../wailsjs/runtime/runtime'
+import * as AppAPI from '../../../bindings/flint/appapi'
+import { EventsOn, WindowIsFullscreen, WindowToggleMaximise } from '../../wails/runtime'
 import { Workspace } from '../../api/backend'
 import { useWorkspace } from '../../store/workspace'
 import { useGit } from '../../store/git'

@@ -1,10 +1,7 @@
 package main
 
 import (
-	"context"
 	"time"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const (
@@ -16,7 +13,7 @@ const (
 
 // beforeClose lets the frontend flush scratchpads and confirm unsaved files first.
 // Returning true keeps the window open until the frontend calls Quit.
-func (a *App) beforeClose(ctx context.Context) bool {
+func (a *App) beforeClose() bool {
 	a.closeMu.Lock()
 	defer a.closeMu.Unlock()
 	if a.quitting {
@@ -26,7 +23,7 @@ func (a *App) beforeClose(ctx context.Context) bool {
 		return false
 	}
 	a.closeAskedAt = time.Now()
-	runtime.EventsEmit(ctx, eventBeforeClose)
+	a.emit(eventBeforeClose)
 	return true
 }
 
@@ -44,7 +41,7 @@ func (q *AppAPI) Quit() {
 	q.app.closeMu.Lock()
 	q.app.quitting = true
 	q.app.closeMu.Unlock()
-	runtime.Quit(q.app.ctx)
+	q.app.quit()
 }
 
 // CancelQuit records that the user chose to keep working.

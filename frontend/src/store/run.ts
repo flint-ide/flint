@@ -1,11 +1,11 @@
 import { createStore } from '../lib/store'
-import * as RunAPI from '../../wailsjs/go/main/RunAPI'
-import { EventsOn } from '../../wailsjs/runtime/runtime'
-import { runconfig, testrun } from '../../wailsjs/go/models'
+import * as RunAPI from '../../bindings/flint/runapi'
+import { EventsOn } from '../wails/runtime'
+import { runconfig, testrun } from '../wails/models'
 import { Workspace, errorMessage } from '../api/backend'
 import { createReorderer } from '../lib/reorder'
 import {
-  applyNodes, emptyTree, failedNodes, nodeRequest, rerunFailedRequest, statusOf,
+  applyNodes, countTests, emptyTree, failedNodes, nodeRequest, rerunFailedRequest, statusOf,
   type TestNode, type TestRequest, type TestTree,
 } from '../lib/runTree'
 import { testLang, type TestGutterHooks, type TestMark } from '../lib/testFiles'
@@ -18,6 +18,8 @@ import { useWorkspace } from './workspace'
 import { followedRoot, rootFor } from './activeRoot'
 import { askAgent } from '../lib/askAgent'
 import { failedTestsPrompt } from '../lib/agentPrompt'
+import { runSummary } from '../lib/alerts'
+import { alertDone } from './alerts'
 
 // Run configurations (.flint/run.json + detected ones) and test runs. Every
 // action is a plain exported function so the toolbar, shortcuts, the editor
@@ -160,7 +162,7 @@ export async function loadRunConfigs(root: string | null = following): Promise<v
     const loaded: Loaded = {
       saved: res.saved ?? [],
       detected: res.detected ?? [],
-      capabilities: res.capabilities ?? {},
+      capabilities: (res.capabilities ?? {}) as Loaded['capabilities'],
       loadError: res.error,
     }
     loadedByRoot.set(root, loaded)
@@ -582,6 +584,9 @@ function applyRunEvent(runId: string, ev: RunEventMsg): void {
   // The exit is the process's last event: settle its results first, then forget it.
   flushNodes(runId)
   if (key) updateSession(key, runId, () => ({ running: false, exit: ev.exit! }))
+  const session = key ? useRun.getState().sessions[key] : undefined
+  const summary = session && runSummary({ kind: session.kind, exit: ev.exit, tests: countTests(session.tests) })
+  if (session && summary) alertDone(session.title, summary, runTabId(session.key))
   settleExit(runId, ev.exit)
   inputs.delete(runId)
   deliver.forget(runId)

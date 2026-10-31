@@ -1,4 +1,4 @@
-import * as SessionAPI from '../../wailsjs/go/main/SessionAPI'
+import * as SessionAPI from '../../bindings/flint/sessionapi'
 import { Scratch, errorMessage } from '../api/backend'
 import { showToast } from './dialog'
 import { SNAPSHOT_VERSION, chatsNeedSave, inside, parseSnapshot, trimChat, type SavedTab, type Snapshot } from '../lib/sessionSnapshot'

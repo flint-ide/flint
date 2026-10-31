@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { EditorState, Text } from '@codemirror/state'
+import type { LineMark } from '../api/backend'
 import type { Hunk } from '../api/backend'
 import { diffSide, foldsFor } from './diffDecorations'
 import { countLines, previewLines } from './editDiff'
@@ -64,8 +65,8 @@ describe('markerSet', () => {
   it('places markers on line starts and drops lines past the end', () => {
     const doc = Text.of(['one', 'two', 'three'])
     const set = markerSet(doc, [
-      { line: 2, kind: 'modified' },
-      { line: 9, kind: 'added' },
+      { line: 2, kind: 'modified' as LineMark['kind'] },
+      { line: 9, kind: 'added' as LineMark['kind'] },
     ])
     const found: number[] = []
     set.between(0, doc.length, (from) => void found.push(from))

@@ -4,7 +4,7 @@ import { replaceTargets } from '../lib/replaceTargets'
 import { showToast } from './dialog'
 import { useEditor } from './editor'
 import { Search, onSearchBatch, onSearchDone, type SearchMatch, type SearchSummary } from '../api/backend'
-import { search } from '../../wailsjs/go/models'
+import { search } from '../wails/models'
 
 export interface SearchQuery {
   query: string

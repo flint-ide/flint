@@ -1,5 +1,5 @@
 // Grouping and filtering of the TODO list, pure so it is testable.
-import type { todo } from '../../wailsjs/go/models'
+import type { todo } from '../wails/models'
 
 export type TodoItem = todo.Item
 

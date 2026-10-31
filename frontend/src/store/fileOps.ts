@@ -1,6 +1,6 @@
 // File operations started from the file tree. Go does the work (and checks the paths
 // stay inside the project); this keeps tabs, the tree and the search scope in step.
-import { ClipboardSetText } from '../../wailsjs/runtime/runtime'
+import { ClipboardSetText } from '../wails/runtime'
 import { Workspace, errorMessage } from '../api/backend'
 import { basename, folderGlob, isWithin, relativePath, remapKeys, topLevel } from '../lib/fileTree'
 import { rootOf } from '../lib/workspaceRoots'

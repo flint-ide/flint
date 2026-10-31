@@ -4,7 +4,7 @@ import { revisionDiffTabId, type DiffTab, type HistoryTab } from '../../store/ed
 import { compareWithCurrent, openCommitDiff, type FileRevision } from '../../store/gitHistory'
 import { errorMessage } from '../../api/backend'
 import { formatDateTime, joinRoot } from '../../lib/blame'
-import type { git } from '../../../wailsjs/go/models'
+import type { git } from '../../wails/models'
 import { DiffView } from './DiffView'
 
 const LIMIT = 500

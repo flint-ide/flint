@@ -188,6 +188,10 @@ Flint drives many CLIs (git, gh, docker, kubectl, aws, saml2aws, claude, codex).
 - Kubernetes terminals use an override kubeconfig that holds only `current-context` and the namespace; credentials are not copied.
 - Settings, connections, query history, sessions and the log file are written with mode `0600`.
 
+### Network requests Flint makes on its own
+
+Every other connection is the result of a user action or of a CLI the user runs. The one exception is the update check (`internal/update`, `api_update.go`): an anonymous `GET https://api.github.com/repos/ODudek/flint/releases/latest` (no token, no cookie jar, `User-Agent: Flint/<version>`, 10 s timeout, 1 MB body limit, redirects only within the same host), a few seconds after launch and then at most once per 24 hours, only in release builds and only while the `checkForUpdates` setting is on. The response is treated as untrusted: the tag must be a SemVer version, the title is stripped of control characters and capped, and the release link is opened only if it is an `https://github.com/ODudek/flint/` URL (otherwise the releases page). The browser is opened from Go (`UpdateAPI.OpenRelease`), so the UI cannot pass it a URL. Flint never downloads or installs a release.
+
 ### Redaction
 
 `internal/redact` removes credentials (private keys, AWS key IDs, GitHub and Slack tokens, API keys, JWTs, bearer/basic auth, credentials in URLs, `password=`-style assignments) and replaces the home directory with `~`. It is applied to the log file, to bug reports and diagnostics, and to context sent to AI agents (for example Diagnose with AI). Query history masks passwords in `CREATE/ALTER ROLE … PASSWORD` and ClickHouse `IDENTIFIED … BY`. Flint does not log HTTP client headers or variable values.
@@ -200,7 +204,7 @@ Flint drives many CLIs (git, gh, docker, kubectl, aws, saml2aws, claude, codex).
 
 | What | Where | Notes |
 |---|---|---|
-| Recent folders, agent permission policy, trusted folders, whether the first-run tool check was shown | `~/Library/Application Support/flint/state.json` | the preferred agent stored here before `settings.json` existed is read from it until you pick a default in Settings |
+| Recent folders, agent permission policy, trusted folders, whether the first-run tool check was shown, update check (last check time, the latest release found, the skipped version) | `~/Library/Application Support/flint/state.json` | the preferred agent stored here before `settings.json` existed is read from it until you pick a default in Settings |
 | Settings: theme, editor and terminal fonts, default agent, autosave, shortcut overrides (`keymap`: command id → shortcut, `""` = none) | `~/Library/Application Support/flint/settings.json` | has a schema version; missing keys get defaults, unknown keys are ignored, invalid values are replaced with defaults on load (writes validate strictly); `0600`; **no secrets**. A copy for the first render lives in `localStorage` (`flint.settings`) |
 | Database connection profiles (host, port, user, optional default database, ClickHouse protocol `native`/`http`, TLS, read-only) | `~/Library/Application Support/flint/connections.json` | **no passwords**, mode `0600` |
 | Database passwords | macOS Keychain, service `flint-db`, account = connection id | deleted together with the profile |
@@ -269,6 +273,7 @@ internal/awsprof            AWS CLI profiles, credential status, login and refre
 internal/kube               kubectl: contexts, namespaces, resources, apps, rollout state, diagnosis
 internal/diag               Flint's log file, bug report and diagnostics
 internal/tools              external tools Flint drives: one table (feature, install command, docs) and the installed-version check
+internal/update             new-release check: GitHub's latest-release API (net/http), SemVer compare, link allow-list
 internal/redact             removes credentials and the home path from logs, reports and agent context
 internal/agent              claude / codex: headless runs and interactive commands
 internal/shellenv           PATH from the login shell (git hooks, brew, nvm inside a GUI app)

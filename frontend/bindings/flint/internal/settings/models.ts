@@ -75,6 +75,13 @@ export class Settings {
     "notifyInBackground": boolean;
 
     /**
+     * CheckForUpdates asks GitHub once a day whether a newer Flint release
+     * exists (internal/update). Off means Flint never asks on its own; the
+     * "Check for Updates…" command still works.
+     */
+    "checkForUpdates": boolean;
+
+    /**
      * Keymap overrides command shortcuts: command id → "Mod+Shift+X", or "" to
      * remove the shortcut. Commands not listed keep their default keys.
      */
@@ -109,6 +116,9 @@ export class Settings {
         if (!("notifyInBackground" in $$source)) {
             this["notifyInBackground"] = false;
         }
+        if (!("checkForUpdates" in $$source)) {
+            this["checkForUpdates"] = false;
+        }
         if (!("keymap" in $$source)) {
             this["keymap"] = {};
         }
@@ -125,8 +135,8 @@ export class Settings {
     static createFrom($$source: any = {}): Settings {
         const $$createField2_0 = $$createType0;
         const $$createField3_0 = $$createType0;
-        const $$createField7_0 = $$createType1;
-        const $$createField8_0 = $$createType2;
+        const $$createField8_0 = $$createType1;
+        const $$createField9_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -135,10 +145,10 @@ export class Settings {
             $$parsedSource["terminal"] = $$createField3_0($$parsedSource["terminal"]);
         }
         if ("keymap" in $$parsedSource) {
-            $$parsedSource["keymap"] = $$createField7_0($$parsedSource["keymap"]);
+            $$parsedSource["keymap"] = $$createField8_0($$parsedSource["keymap"]);
         }
         if ("todoExclude" in $$parsedSource) {
-            $$parsedSource["todoExclude"] = $$createField8_0($$parsedSource["todoExclude"]);
+            $$parsedSource["todoExclude"] = $$createField9_0($$parsedSource["todoExclude"]);
         }
         return new Settings($$parsedSource as Partial<Settings>);
     }

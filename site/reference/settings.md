@@ -38,6 +38,7 @@ The file is readable only by your user. It never contains secrets: database pass
   "defaultAgent": "claude",
   "autoSave": true,
   "notifyInBackground": true,
+  "checkForUpdates": true,
   "keymap": {
     "terminal.new": "Mod+Alt+T",
     "git.push": ""
@@ -57,6 +58,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `defaultAgent` | string | `""` | Agent for new chats, commit messages and conflict resolution: `"claude"` or `"codex"`. Empty means the first installed agent. |
 | `autoSave` | boolean | `false` | Save modified files when the Flint window loses focus. |
 | `notifyInBackground` | boolean | `true` | Show a macOS notification and a Dock badge when a run, a test run or an agent finishes while Flint is in the background. |
+| `checkForUpdates` | boolean | `true` | Once a day, ask GitHub whether a newer Flint release exists and show a notice in the status bar. When `false`, Flint makes no request on its own; **Help ▸ Check for Updates…** still works. See [Update check](privacy-and-security.md#update-check). |
 | `keymap` | object | `{}` | Shortcut overrides: command id → shortcut. See [keymap](#keymap). |
 | `todoExclude` | array of strings | `[]` | Extra folders or globs the TODO list skips. See [todoExclude](#todoexclude). |
 
@@ -108,7 +110,7 @@ Up to 100 patterns are kept; duplicates are removed.
 
 Some preferences are not in `settings.json`:
 
-- Recent folders, the agent approval policy and trusted folders are in `state.json`.
+- Recent folders, the agent approval policy, trusted folders and the update check's last result (including a skipped version) are in `state.json`.
 - The sidebar width is kept by the app's web view.
 - The selected HTTP environment is remembered only until Flint quits.
 

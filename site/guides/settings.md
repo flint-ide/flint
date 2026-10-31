@@ -8,7 +8,7 @@ Flint's settings open in a tab. Every change applies immediately, without a rest
 - **flint ▸ Settings…** in the menu bar
 - "Settings…" in the command palette
 
-The tab has six sections: Appearance, Editor, Terminal, Agents, TODO List and Keymap.
+The tab has seven sections: Appearance, Editor, Terminal, Agents, TODO List, Keymap and Updates.
 
 ## Appearance
 
@@ -47,6 +47,13 @@ A searchable list of all commands. Search by name or by shortcut (for example `�
 - Keys of the macOS menu (`⌘Q`, `⌘C`, `⌘V`, `⌘O`, `⌘,`) stay with the menu.
 
 The command palette uses your shortcuts too.
+
+## Updates
+
+- **Check for new releases**: once a day Flint asks GitHub which release is the latest and shows a notice in the status bar when there is a newer one, with **Download** (opens the release page in your browser), **Skip This Version** and **✕**. On by default. When it is off, Flint makes no request on its own.
+- **Check Now**: checks right away, even when the daily check is off, and tells you if you are up to date. **Help ▸ Check for Updates…** does the same.
+
+Flint never downloads or installs updates itself. See [Update check](../reference/privacy-and-security.md#update-check) for exactly what is sent.
 
 ## Trusted folders
 

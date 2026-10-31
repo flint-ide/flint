@@ -80,7 +80,7 @@ The check only runs each tool's version command, outside your projects, and inst
 
 ## Updating
 
-Flint doesn't update itself. To update, download the latest release, quit Flint and replace the app in Applications. Your settings, sessions and connections are kept, because they live outside the app (see [Files and data](reference/files-and-data.md)).
+Flint doesn't update itself. Once a day it checks whether a newer release exists and, if so, shows a notice in the status bar; **Help ▸ Check for Updates…** checks right away (see [Update check](reference/privacy-and-security.md#update-check)). To update, download the latest release, quit Flint and replace the app in Applications. Your settings, sessions and connections are kept, because they live outside the app (see [Files and data](reference/files-and-data.md)).
 
 ## Uninstalling
 

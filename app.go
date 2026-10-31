@@ -17,6 +17,7 @@ import (
 	"flint/internal/config"
 	"flint/internal/dap"
 	"flint/internal/db"
+	"flint/internal/diag"
 	"flint/internal/fuzzy"
 	"flint/internal/git"
 	"flint/internal/httpfile"
@@ -26,6 +27,7 @@ import (
 	"flint/internal/scratch"
 	"flint/internal/settings"
 	"flint/internal/terminal"
+	"flint/internal/update"
 	"flint/internal/watcher"
 )
 
@@ -43,6 +45,9 @@ type appState struct {
 	TrustedFolders []string `json:"trustedFolders,omitempty"`
 	// ToolCheckShown: the tool check has opened on its own once (first launch).
 	ToolCheckShown bool `json:"toolCheckShown,omitempty"`
+	// Update remembers the release check (api_update.go): when GitHub was last
+	// asked, its answer, and the release the user skipped.
+	Update update.State `json:"update,omitzero"`
 }
 
 // App holds the services shared by all bound APIs.
@@ -78,6 +83,10 @@ type App struct {
 	settingsMu sync.Mutex
 	settings   settings.Settings // settings.json, loaded once at startup
 
+	updates       *update.Client // GitHub's latest-release endpoint
+	updateMu      sync.Mutex
+	pendingUpdate *update.Result // a newer release the UI should offer; nil = none
+
 	closeMu      sync.Mutex
 	quitting     bool
 	closeAskedAt time.Time
@@ -107,6 +116,7 @@ func NewApp() (*App, error) {
 		scratch:   scratches,
 		sessions:  restore.New(filepath.Join(dir, "sessions")),
 		http:      httpfile.NewClient(),
+		updates:   update.New(diag.Version(version)),
 	}
 	a.db.SetHistory(db.OpenHistory(filepath.Join(dir, "history"), db.DefaultHistoryLimit))
 	a.terminals = terminal.NewManager(newTerminalEvents(a))
@@ -134,6 +144,7 @@ func NewApp() (*App, error) {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	go a.watchForUpdates(ctx)
 }
 
 func (a *App) shutdown() {

@@ -317,13 +317,14 @@ Unhealthy apps are sorted first and expanded.
 
 ### Settings
 
-`⌘,` (flint menu ▸ Settings…, or "Settings…" in the palette) opens a settings tab with Appearance, Editor, Terminal, Agents and Keymap sections. Every change applies immediately, without a restart, and saves itself.
+`⌘,` (flint menu ▸ Settings…, or "Settings…" in the palette) opens a settings tab with Appearance, Editor, Terminal, Agents, TODO List, Keymap and Updates sections. Every change applies immediately, without a restart, and saves itself.
 
 - **Theme**: Dark, Light or System (follows the macOS appearance, `prefers-color-scheme`). Colors are CSS variables in `style.css` (`:root` and `[data-theme="light"]`); terminals have their own palette (`lib/terminalTheme.ts`); Go switches the title bar and window buttons (`NSApp.appearance`). The theme from the last run is applied before the first render (a copy in `localStorage`, and the window appearance set in Go before the window is created), so a light theme never flashes dark.
 - **Editor**: font family, size and line height for all CodeMirror editors (files, diffs, scratchpads); optional save on window focus loss.
 - **Terminal**: font, size and line height for terminals and run consoles (xterm refits immediately and the PTY gets the new size).
 - **Agents**: the default agent for new chats, commit messages and conflict resolution. Background notifications can be turned off here.
 - **Keymap**: a searchable list of all commands (by name or by shortcut, for example `⌘K`). Click a shortcut and press a new combination to change it; conflicts with other commands are shown, `↺` restores the default and `✕` removes it. Shortcuts handled by CodeMirror (`⌘F`, `⌘S`, `⌘↵`, and so on) are display-only. Overrides go into a layer of the command registry (`lib/commands.ts`), so the palette and the dispatcher use the effective shortcuts.
+- **Updates**: the daily release check (see [Update check](#update-check)) can be turned off; **Check Now** checks right away.
 - **Trusted folders**: see [Restricted Mode](#restricted-mode-workspace-trust).
 
 ### macOS integration (Wails v3)
@@ -344,7 +345,16 @@ Unhealthy apps are sorted first and expanded.
 - **Help ▸ Report an Issue…** opens a prefilled GitHub issue in your browser and copies the full report to the clipboard. The report contains the versions of Flint, macOS, Go and Wails, the versions of the tools in the tool check, and the last 150 log lines, all redacted. You review the issue before submitting it.
 - **Help ▸ Copy Diagnostics** copies the same redacted report to the clipboard.
 - **Help ▸ Show Logs in Finder** reveals the log file in Finder.
-- Nothing is sent automatically. There is no telemetry.
+- There is no telemetry. The only request Flint makes on its own is the update check below.
+
+### Update check
+
+- Flint asks GitHub's API for the latest release (`GET https://api.github.com/repos/ODudek/flint/releases/latest`): one anonymous request with `User-Agent: Flint/<version>`, no token, cookies or identifiers, a 10 s timeout and a 1 MB response limit (`internal/update`).
+- Automatically: 5 s after launch and then once a day while Flint runs, at most once every 24 hours (the last check, its answer and a skipped version are kept in `state.json`, so a restart reuses the answer instead of asking again). Never in development builds (`dev`, `dev-<sha>`), and never when `checkForUpdates` is off (Settings ▸ Updates). A failed check is only logged.
+- The running version (`vX.Y.Z` from `-ldflags`) is compared with the release tag by Flint's own SemVer compare; a pre-release sorts below its release.
+- A newer release shows a notice in the status bar: **Download** opens the release page in the browser (only a `https://github.com/ODudek/flint/…` link from the API; anything else falls back to the releases page), **Skip This Version** stays quiet until a later release, **✕** hides it until the next launch.
+- **Help ▸ Check for Updates…** (also in the palette and Settings ▸ Updates ▸ Check Now) checks immediately, ignoring the daily limit and the setting, and says "You're up to date (vX.Y.Z)" when there is nothing new.
+- Flint never downloads or installs anything: there is no auto-update framework.
 
 ## Restricted Mode (workspace trust)
 

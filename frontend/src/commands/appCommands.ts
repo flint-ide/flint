@@ -23,6 +23,7 @@ import { showToast } from '../store/dialog'
 import { trustFolder, untrustFolder } from '../store/trust'
 import { copyDiagnostics, reportIssue, showLogs } from '../store/diagnostics'
 import { openToolCheck } from '../store/toolCheck'
+import { checkForUpdates } from '../store/update'
 
 // Where a global shortcut belongs to the focused widget instead: ⌘B in an editor is
 // "go to declaration" (IntelliJ), ⌘K in a terminal clears the screen.
@@ -81,6 +82,7 @@ function appCommands(): Command[] {
       keywords: 'install setup missing path version git ripgrep gh claude codex kubectl docker aws delve language server',
       run: openToolCheck,
     },
+    { id: 'help.checkForUpdates', title: 'Check for Updates…', category: 'Help', keywords: 'update upgrade release version new download', run: () => void checkForUpdates() },
 
     // Navigate
     { id: 'nav.goToFile', title: 'Go to File…', category: 'Navigate', keys: 'Mod+P', keywords: 'open quick', run: () => ws().setQuickOpen(true) },

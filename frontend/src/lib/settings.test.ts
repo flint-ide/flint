@@ -46,6 +46,8 @@ describe('coerceSettings', () => {
     assert.equal(s.editor.fontFamily, DEFAULT_SETTINGS.editor.fontFamily)
     assert.deepEqual(s.terminal, DEFAULT_SETTINGS.terminal)
     assert.deepEqual(s.keymap, {})
+    assert.equal(s.checkForUpdates, true)
+    assert.equal(coerceSettings({ checkForUpdates: false }).checkForUpdates, false)
   })
 
   it('replaces invalid values', () => {
@@ -53,11 +55,13 @@ describe('coerceSettings', () => {
       theme: 'neon',
       editor: { fontFamily: 'x; } body {', fontSize: 200, lineHeight: '2' },
       autoSave: 'yes',
+      checkForUpdates: 0,
       keymap: { 'git.push': 'Mod+K', 'git.pull': 3 },
     })
     assert.equal(s.theme, 'dark')
     assert.deepEqual(s.editor, DEFAULT_SETTINGS.editor)
     assert.equal(s.autoSave, false)
+    assert.equal(s.checkForUpdates, true)
     assert.deepEqual(s.keymap, { 'git.push': 'Mod+K' })
   })
 

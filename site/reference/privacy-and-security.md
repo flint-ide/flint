@@ -4,11 +4,11 @@ Flint runs on your Mac and talks to the outside world only through tools you hav
 
 ## No telemetry
 
-Flint has no telemetry, analytics or crash reporting service. It sends nothing automatically, and it has no account or server of its own.
+Flint has no telemetry, analytics or crash reporting service, and it has no account or server of its own. The only request it makes on its own is the [update check](#update-check), which you can turn off.
 
 ## What leaves your machine, and when
 
-Data leaves your Mac only when you do something that needs it:
+Apart from the update check, data leaves your Mac only when you do something that needs it:
 
 | Action | What is sent | Where |
 |---|---|---|
@@ -18,8 +18,19 @@ Data leaves your Mac only when you do something that needs it:
 | HTTP client | The request you send | The server in the request |
 | Databases, Kubernetes, AWS, Docker | The commands and queries you run | Your servers and cloud accounts, through your own credentials |
 | Markdown preview | Requests for remote images, only after you click **Load remote images** | The image hosts |
+| Update check (on its own once a day, or Help ▸ Check for Updates…) | One anonymous request for the latest release, described below | GitHub's API (`api.github.com`) |
 
 Agents decide what they read and send to their provider. The [approval policy](../guides/ai-agents.md#what-the-agent-may-do-without-asking) controls what they may do without asking.
+
+## Update check
+
+Flint looks for a newer release so it can tell you about it. It never downloads or installs anything itself.
+
+- **What is requested**: `GET https://api.github.com/repos/ODudek/flint/releases/latest`, GitHub's public endpoint for the latest published release (drafts and pre-releases are left out).
+- **What is sent**: only the request itself, with the headers `Accept: application/vnd.github+json`, `X-GitHub-Api-Version` and `User-Agent: Flint/<version>` (for example `Flint/v1.3.0`). No account, token, cookie, machine identifier or information about your projects. Like any web request, it shows your IP address to GitHub.
+- **When**: a few seconds after Flint starts and then once a day while it runs, at most once every 24 hours. The time of the last check, the release it found and a version you skipped are kept in `state.json`. Development builds (version `dev`) never check on their own.
+- **What you see**: when a newer release exists, a notice in the status bar with **Download**, which opens the release page on `github.com/ODudek/flint` in your browser, **Skip This Version** and **✕** (hide until the next launch). If the check fails, for example when you are offline, Flint only writes a line to its log.
+- **Turning it off**: untick **Settings ▸ Updates ▸ Check for new releases**, or set `"checkForUpdates": false` in [`settings.json`](settings.md). Flint then makes no request on its own; **Help ▸ Check for Updates…** (also in the command palette) still checks when you ask.
 
 ## Secrets
 

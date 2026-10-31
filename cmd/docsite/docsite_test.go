@@ -64,16 +64,17 @@ func writeSite(t *testing.T, files map[string]string) string {
 
 func TestBuild(t *testing.T) {
 	src := writeSite(t, map[string]string{
-		"_nav.md":       "## Start\n- [Home](index.md)\n## Guides\n- [Git](guides/git.md)\n",
-		"index.md":      "# Flint\n\nRead the [Git guide](guides/git.md#blame).\n",
-		"guides/git.md": "# Git\n\n## Blame\n\nBack [home](../index.md).\n",
+		"_nav.md":          "## Start\n- [Home](index.md)\n## Guides\n- [Git](guides/git.md)\n",
+		"index.md":         "# Flint\n\nRead the [Git guide](guides/git.md#blame).\n",
+		"guides/git.md":    "# Git\n\n## Blame\n\n![Blame](../images/blame.png)\n\nBack [home](../index.md).\n",
+		"images/blame.png": "png",
 	})
 	out := filepath.Join(t.TempDir(), "site")
 	n, err := build(src, out)
 	if err != nil || n != 2 {
 		t.Fatalf("build: %d pages, %v", n, err)
 	}
-	for _, f := range []string{"index.html", "guides/git.html", "404.html", "search.json", ".nojekyll", "assets/style.css", "assets/search.js", "assets/theme.js"} {
+	for _, f := range []string{"index.html", "guides/git.html", "404.html", "search.json", ".nojekyll", "images/blame.png", "assets/style.css", "assets/search.js", "assets/theme.js"} {
 		if _, err := os.Stat(filepath.Join(out, f)); err != nil {
 			t.Errorf("missing %s", f)
 		}
@@ -100,14 +101,14 @@ func TestBuild(t *testing.T) {
 func TestBuildFailsOnBrokenLinksAndMissingPages(t *testing.T) {
 	src := writeSite(t, map[string]string{
 		"_nav.md":   "## Start\n- [Home](index.md)\n- [Gone](gone.md)\n",
-		"index.md":  "# Flint\n\n[missing](nope.md) and [bad anchor](#nowhere) and [image](logo.png)\n",
+		"index.md":  "# Flint\n\n[missing](nope.md) and [bad anchor](#nowhere) and [image](logo.png)\n\n![shot](images/none.png)\n",
 		"orphan.md": "# Orphan\n",
 	})
 	_, err := build(src, filepath.Join(t.TempDir(), "site"))
 	if err == nil {
 		t.Fatal("broken site built")
 	}
-	for _, want := range []string{"missing gone.md", "orphan.md is not in _nav.md", "broken link nope.html", "#nowhere (no such heading)", "logo.png (not a page)"} {
+	for _, want := range []string{"missing gone.md", "orphan.md is not in _nav.md", "broken link nope.html", "#nowhere (no such heading)", "logo.png (not a page)", "missing image images/none.png"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error lacks %q:\n%v", want, err)
 		}

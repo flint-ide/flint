@@ -88,12 +88,20 @@ func build(srcDir, outDir string) (int, error) {
 		return 0, err
 	}
 	pages := map[string]Page{}
+	images := map[string]string{} // site-relative path → source file
 	err = filepath.WalkDir(srcDir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".md") || d.Name() == "_nav.md" {
+		if err != nil || d.IsDir() {
 			return err
 		}
 		rel, _ := filepath.Rel(srcDir, p)
 		rel = filepath.ToSlash(rel)
+		if imageTypes[strings.ToLower(path.Ext(rel))] {
+			images[rel] = p
+			return nil
+		}
+		if !strings.HasSuffix(p, ".md") || d.Name() == "_nav.md" {
+			return nil
+		}
 		data, err := os.ReadFile(p)
 		if err != nil {
 			return err
@@ -108,7 +116,7 @@ func build(srcDir, outDir string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if err := check(nav, pages); err != nil {
+	if err := check(nav, pages, images); err != nil {
 		return 0, err
 	}
 	tmpl, err := template.ParseFS(theme, "theme/page.html")
@@ -160,6 +168,9 @@ func build(srcDir, outDir string) (int, error) {
 	if err := copyTheme(outDir); err != nil {
 		return 0, err
 	}
+	if err := copyImages(images, outDir); err != nil {
+		return 0, err
+	}
 	notFound := view{Page: Page{Title: "Page not found"}, Root: "/flint/",
 		Body: template.HTML(`<p>This page doesn't exist. Try the search above or go to the <a href="/flint/index.html">home page</a>.</p>`)}
 	for _, s := range nav {
@@ -177,7 +188,7 @@ func build(srcDir, outDir string) (int, error) {
 }
 
 // check: every nav entry exists, every page is in the nav, every link resolves.
-func check(nav []Section, pages map[string]Page) error {
+func check(nav []Section, pages map[string]Page, images map[string]string) error {
 	var problems []string
 	listed := map[string]bool{}
 	for _, item := range order(nav) {
@@ -195,6 +206,9 @@ func check(nav []Section, pages map[string]Page) error {
 		}
 		for _, bad := range brokenLinks(p, pages) {
 			problems = append(problems, rel+": broken link "+bad)
+		}
+		for _, bad := range missingImages(p, images) {
+			problems = append(problems, rel+": missing image "+bad)
 		}
 	}
 	if len(problems) > 0 {
@@ -239,6 +253,27 @@ func writeJSON(file string, v any) error {
 }
 
 // copyTheme copies the stylesheet and scripts to assets/.
+// imageTypes are the files under site/ copied to the site as they are.
+var imageTypes = map[string]bool{".png": true, ".gif": true, ".jpg": true, ".jpeg": true, ".svg": true, ".webp": true}
+
+// copyImages copies the screenshots and other images next to the pages.
+func copyImages(images map[string]string, outDir string) error {
+	for rel, src := range images {
+		data, err := os.ReadFile(src)
+		if err != nil {
+			return err
+		}
+		dst := filepath.Join(outDir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(dst, data, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func copyTheme(outDir string) error {
 	return fs.WalkDir(theme, "theme", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || path.Ext(p) == ".html" {

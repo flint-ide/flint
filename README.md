@@ -7,7 +7,7 @@ Flint is a fast, minimal, AI-first IDE for macOS. Coding agents (Claude Code, Co
 
 **Stack:** Go + [Wails v3](https://v3.wails.io) (system WebView, no Electron) · React 19 + TypeScript · CodeMirror 6 · xterm.js (WebGL)
 
-<!-- Screenshot: add docs/images/flint.png and reference it here, e.g. ![Flint](docs/images/flint.png) -->
+![A tour of Flint: go to a file, search the project, review a change in the Commit panel, and hand a failing Kubernetes deploy to the agent](site/images/tour.gif)
 
 ## Features
 

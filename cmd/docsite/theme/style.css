@@ -314,6 +314,14 @@ article pre code {
   background: none;
   font-size: 13px;
 }
+article img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
 article table {
   width: 100%;
   margin: 0 0 18px;

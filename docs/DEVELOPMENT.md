@@ -149,6 +149,8 @@ Flint writes its log to `~/Library/Logs/Flint/flint.log` (Help ▸ Show Logs in 
 
 The user guide lives in `site/` as Markdown: one file per page, the sidebar in `site/_nav.md` (`## Section` and `- [Title](page.md)` lines). `cmd/docsite` renders it with goldmark (no other dependencies) and fails on pages missing from the nav and on broken links or anchors.
 
+Screenshots and the README's tour GIF live in `site/images/` (copied to the site as they are; a missing image fails the build). Take them from a clean checkout in server mode (`WAILS_SERVER_PORT=… go run -tags server .`) with a throwaway `FLINT_CONFIG_DIR`, a `KUBECONFIG` that points only at a local cluster and empty AWS config files, so no real account, cluster or path ends up in a picture.
+
 ```bash
 make docs                                   # build into _site/ and preview at http://localhost:8090
 go run ./cmd/docsite -src site -out _site   # build only

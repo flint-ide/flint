@@ -19,6 +19,8 @@ A commit made during a merge includes the whole index. When there are merge conf
 
 With several projects in the window, the panel shows the repository of the active tab's project. A switcher lets you pick another one and shows the number of changes in each.
 
+![The Commit panel with two changed files and the side-by-side diff of one of them](../images/commit.png)
+
 ## Gutter markers
 
 The editor gutter marks added, changed and deleted lines. This is also the quickest way to see what an agent just touched.

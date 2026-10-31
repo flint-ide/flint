@@ -114,6 +114,10 @@ func TestValidate(t *testing.T) {
 		{"bare key", func(s *Settings) { s.Keymap = map[string]string{"debug.step": "F8"} }, ""},
 		{"unknown modifier", func(s *Settings) { s.Keymap = map[string]string{"x.y": "Hyper+K"} }, "invalid shortcut"},
 		{"empty id", func(s *Settings) { s.Keymap = map[string]string{"": "Mod+K"} }, "command id"},
+		{"todo excludes", func(s *Settings) { s.TodoExclude = []string{"docs/legacy", "*.min.js", "/gen/"} }, ""},
+		{"negated exclude", func(s *Settings) { s.TodoExclude = []string{"!src"} }, "exclude pattern"},
+		{"comma in exclude", func(s *Settings) { s.TodoExclude = []string{"a,b"} }, "exclude pattern"},
+		{"blank exclude", func(s *Settings) { s.TodoExclude = []string{" "} }, "exclude pattern"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -199,6 +203,15 @@ func TestSaveWritesEmptyKeymapObject(t *testing.T) {
 	}
 	if string(raw["keymap"]) != "{}" {
 		t.Errorf("keymap = %s, want {}", raw["keymap"])
+	}
+}
+
+func TestNormalizeCleansTodoExcludes(t *testing.T) {
+	s := Default()
+	s.TodoExclude = []string{" docs ", "docs", "", "!x", "a,b", "gen/"}
+	got := Normalize(s).TodoExclude
+	if want := []string{"docs", "gen/"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("TodoExclude = %q, want %q", got, want)
 	}
 }
 

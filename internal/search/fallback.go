@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -93,14 +94,14 @@ func runFallback(ctx context.Context, opts Options, b *batcher) (Summary, error)
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+		rel, _ := filepath.Rel(opts.Root, path)
+		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
-			if path != opts.Root && workspace.SkipDir(d.Name()) {
+			if path != opts.Root && (workspace.SkipDir(d.Name()) || dirExcluded(rel, excludes)) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		rel, _ := filepath.Rel(opts.Root, path)
-		rel = filepath.ToSlash(rel)
 		if !globsAllow(rel, includes, excludes) {
 			return nil
 		}
@@ -167,10 +168,27 @@ func globsAllow(rel string, includes, excludes []string) bool {
 	return false
 }
 
-func globMatch(glob, rel string) bool {
-	if ok, _ := filepath.Match(glob, filepath.Base(rel)); ok {
-		return true
+// dirExcluded applies exclude globs to a folder the way rg does: "vendor" and
+// "vendor/" match a folder of that name anywhere, "/gen" and "a/gen" match the
+// path from the root.
+func dirExcluded(rel string, excludes []string) bool {
+	for _, g := range excludes {
+		if globMatch(strings.TrimSuffix(g, "/"), rel) {
+			return true
+		}
 	}
-	ok, _ := filepath.Match(glob, rel)
+	return false
+}
+
+func globMatch(glob, rel string) bool {
+	if anchored, ok := strings.CutPrefix(glob, "/"); ok {
+		ok, _ := filepath.Match(anchored, rel)
+		return ok
+	}
+	if strings.Contains(glob, "/") {
+		ok, _ := filepath.Match(glob, rel)
+		return ok
+	}
+	ok, _ := filepath.Match(glob, filepath.Base(rel))
 	return ok
 }

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/creack/pty"
 )
@@ -20,6 +21,8 @@ const maxEmit = 64 * 1024
 type Events interface {
 	Output(id string, data []byte)
 	Exited(id string, code int)
+	// Title reports a change of what the terminal runs or where its shell is.
+	Title(id string, info Info)
 }
 
 // Options configure a new terminal session.
@@ -35,6 +38,12 @@ type Options struct {
 type session struct {
 	cmd *exec.Cmd
 	pty *os.File
+
+	titleMu    sync.Mutex
+	titleTimer *time.Timer
+	info       Info // last reported
+	fgGroup    int  // foreground process group of info.Command, 0 at the prompt
+	done       bool
 }
 
 // Manager owns all running terminal sessions.
@@ -161,7 +170,11 @@ func (m *Manager) pump(id string, s *session) {
 		}
 	}()
 
-	Coalesce(chunks, func(data []byte) { m.events.Output(id, data) })
+	Coalesce(chunks, func(data []byte) {
+		m.events.Output(id, data)
+		m.noteActivity(id, s)
+	})
+	s.stopTitle()
 
 	code := 0
 	if err := s.cmd.Wait(); err != nil {

@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { EventsOn } from '../../../wailsjs/runtime/runtime'
 import { useEditor } from '../../store/editor'
 import { useWorkspace } from '../../store/workspace'
+import { useSettings } from '../../store/settings'
 import { scanTodos, setTodoQuery, toggleTodoTag, useTodo } from '../../store/todo'
-import { countTags, groupTodos } from '../../lib/todos'
+import { affectsTodos, countTags, groupTodos } from '../../lib/todos'
 import { displayPath } from '../../lib/workspaceRoots'
 import { FileIcon } from '../icons/FileIcon'
 
@@ -11,15 +12,15 @@ const TAGS = ['TODO', 'FIXME', 'HACK', 'XXX', 'BUG']
 /** Edits come in bursts (an agent writing files); a rescan walks the whole
  * workspace, so it waits until they settle. */
 const RESCAN_DELAY_MS = 3000
-/** Changes here never hold notes worth listing. */
-const IGNORED = /\/(\.git|node_modules)\//
 
 const basename = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 
 /** TODO / FIXME / HACK / XXX / BUG markers of the workspace, by file; click to jump. */
 export function TodoPanel() {
   const roots = useWorkspace((s) => s.roots)
-  const { items, truncated, scanning, error, tags, query } = useTodo()
+  const { items, truncated, skipped, scanning, error, tags, query } = useTodo()
+  // Joined so a reloaded but equal list doesn't rescan.
+  const exclude = useSettings((s) => s.settings.todoExclude.join('\n'))
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
   const files = useMemo(() => groupTodos(items, tags, query), [items, tags, query])
   const counts = useMemo(() => countTags(items), [items])
@@ -29,7 +30,8 @@ export function TodoPanel() {
     void scanTodos()
     let timer: ReturnType<typeof setTimeout> | undefined
     const off = EventsOn('fs:changed', (paths: string[]) => {
-      if (paths.every((p) => IGNORED.test(p))) return
+      const { skipped } = useTodo.getState()
+      if (!paths.some((p) => affectsTodos(p, skipped))) return
       clearTimeout(timer)
       timer = setTimeout(() => void scanTodos(), RESCAN_DELAY_MS)
     })
@@ -37,7 +39,7 @@ export function TodoPanel() {
       clearTimeout(timer)
       off()
     }
-  }, [roots])
+  }, [roots, exclude])
 
   const shown = files.reduce((n, f) => n + f.items.length, 0)
   const toggleFile = (key: string) =>
@@ -71,6 +73,14 @@ export function TodoPanel() {
             'Scanning…'
           ) : (
             `${shown} in ${files.length} files${truncated ? ' (truncated)' : ''}`
+          )}
+          {skipped.length > 0 && (
+            <span
+              className="todo-skipped"
+              title={`Dependency folders left out (more in Settings → TODO List):\n${skipped.map((d) => displayPath(roots, d)).join('\n')}`}
+            >
+              {' · '}{skipped.length} dependency {skipped.length === 1 ? 'folder' : 'folders'} skipped
+            </span>
           )}
         </div>
       </div>

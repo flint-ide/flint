@@ -1,6 +1,8 @@
 package main
 
 import (
+	"slices"
+
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -60,6 +62,7 @@ func (a *App) currentSettings() settings.Settings {
 	for id, keys := range a.settings.Keymap {
 		out.Keymap[id] = keys
 	}
+	out.TodoExclude = slices.Clone(a.settings.TodoExclude)
 	return out
 }
 

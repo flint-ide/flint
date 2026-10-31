@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { countTags, groupTodos, type TodoItem } from './todos'
+import { affectsTodos, countTags, groupTodos, type TodoItem } from './todos'
 
 const item = (path: string, line: number, tag: string, text = ''): TodoItem => ({ root: '/p', path, line, column: 1, tag, text }) as TodoItem
 
@@ -18,5 +18,16 @@ describe('todos', () => {
 
   it('counts tags', () => {
     assert.deepEqual(countTags(items), { TODO: 2, FIXME: 1 })
+  })
+})
+
+describe('rescan on file changes', () => {
+  it('ignores .git, dependency folders and the folders the scan skipped', () => {
+    const skipped = ['/p/.env', '/p/rust/target']
+    assert.equal(affectsTodos('/p/src/a.ts', skipped), true)
+    assert.equal(affectsTodos('/p/.git/index', skipped), false)
+    assert.equal(affectsTodos('/p/web/node_modules/x/i.js', skipped), false)
+    assert.equal(affectsTodos('/p/.env/lib/site.py', skipped), false)
+    assert.equal(affectsTodos('/p/.envrc', skipped), true)
   })
 })

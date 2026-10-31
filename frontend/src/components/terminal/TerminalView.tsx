@@ -10,6 +10,7 @@ import {
   registerOutputReader,
   registerSelectionReader,
   sendInput,
+  setProgramTitle,
   type TerminalTab,
 } from '../../store/terminal'
 import { useWorkspace } from '../../store/workspace'
@@ -93,6 +94,7 @@ export function TerminalView({ tab, active }: Props) {
     const detach = attachSink(tab.id, (data) => xterm.write(data))
     const input = xterm.onData((data) => sendInput(tab.id, data))
     const resize = xterm.onResize(({ cols, rows }) => void TerminalBackend.Resize(tab.id, cols, rows))
+    const retitle = xterm.onTitleChange((title) => setProgramTitle(tab.id, title))
 
     // The PTY outlives this view (remounts, StrictMode); it is closed with the tab.
     if (claimStart(tab.id)) {
@@ -112,6 +114,7 @@ export function TerminalView({ tab, active }: Props) {
       observer.disconnect()
       input.dispose()
       resize.dispose()
+      retitle.dispose()
       unregisterReader()
       unregisterSelection()
       detach()

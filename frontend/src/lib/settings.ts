@@ -22,6 +22,8 @@ export interface AppSettings {
   autoSave: boolean
   /** Shortcut overrides: command id → keys ('' = none). */
   keymap: Record<string, string>
+  /** Extra folders / globs the TODO list skips, gitignore-style. */
+  todoExclude: string[]
 }
 
 /** Mirrors settings.Default() in Go (used until the backend answers). */
@@ -33,11 +35,30 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   defaultAgent: '',
   autoSave: false,
   keymap: Object.freeze({}) as Record<string, string>,
+  todoExclude: Object.freeze([]) as unknown as string[],
 }) as AppSettings
 
 /** Same limits as Go's settings.Validate, for the inputs. */
 export const FONT_SIZE = { min: 8, max: 32 }
 export const LINE_HEIGHT = { min: 1, max: 2.5 }
+export const MAX_EXCLUDES = 100
+
+/** Mirrors Go's validExclude: rg reads a leading "!" as "include" and excludes travel comma-separated. */
+export const validExclude = (p: string) => p !== '' && p.length <= 200 && !p.startsWith('!') && !/[,\x00-\x1f]/.test(p)
+
+/** One pattern per line → the patterns to save (trimmed, unique) and the lines that are not valid. */
+export function parseExcludes(text: string): { patterns: string[]; invalid: string[] } {
+  const patterns: string[] = []
+  const invalid: string[] = []
+  for (const line of text.split('\n')) {
+    const p = line.trim()
+    if (!p || patterns.includes(p)) continue
+    if (validExclude(p)) patterns.push(p)
+    else invalid.push(p)
+  }
+  if (patterns.length > MAX_EXCLUDES) invalid.push(...patterns.splice(MAX_EXCLUDES))
+  return { patterns, invalid }
+}
 
 /** The palette to use: System follows macOS (prefers-color-scheme). */
 export function resolveTheme(mode: ThemeMode, systemDark: boolean): ResolvedTheme {
@@ -85,5 +106,6 @@ export function coerceSettings(v: unknown): AppSettings {
     defaultAgent: typeof v.defaultAgent === 'string' ? v.defaultAgent : d.defaultAgent,
     autoSave: typeof v.autoSave === 'boolean' ? v.autoSave : d.autoSave,
     keymap,
+    todoExclude: Array.isArray(v.todoExclude) ? v.todoExclude.filter((p): p is string => typeof p === 'string' && validExclude(p)) : [],
   }
 }

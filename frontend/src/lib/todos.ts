@@ -31,3 +31,11 @@ export function countTags(items: readonly TodoItem[]): Record<string, number> {
   for (const it of items) counts[it.tag] = (counts[it.tag] ?? 0) + 1
   return counts
 }
+
+/** Changes here never hold notes worth listing. */
+const IGNORED = /\/(\.git|node_modules|\.venv|venv|__pycache__|vendor)\//
+
+/** Whether a file change can alter the list: not in .git or a dependency folder the scan skipped. */
+export function affectsTodos(path: string, skipped: readonly string[]): boolean {
+  return !IGNORED.test(path) && !skipped.some((dir) => path.startsWith(`${dir}/`))
+}

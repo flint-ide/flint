@@ -83,6 +83,8 @@ func TestGlobsAllow(t *testing.T) {
 		{"exclude full path", "vendor/x.go", "", "vendor/*", false},
 		{"exclude wins over include", "x.go", "*.go", "x.go", false},
 		{"exclude miss", "a/b.go", "", "*.md", true},
+		{"anchored exclude", "x.go", "", "/x.go", false},
+		{"anchored exclude only at root", "a/x.go", "", "/x.go", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -146,6 +148,10 @@ func TestRunFallback(t *testing.T) {
 			[]string{"main.go:2", "pkg/util.go:3"}},
 		{"exclude", Options{Query: "todo", Exclude: "*.md, pkg/*"},
 			[]string{"main.go:2"}},
+		{"folder excludes as rg reads them", Options{Query: "todo", Exclude: "docs/,/pkg"},
+			[]string{"main.go:2"}},
+		{"anchored folder exclude stays at the root", Options{Query: "todo", Exclude: "/dep/"},
+			[]string{"docs/notes.md:2", "main.go:2", "pkg/util.go:3"}},
 		{"no matches", Options{Query: "absent"}, []string{}},
 	}
 	for _, tt := range tests {

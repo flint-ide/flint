@@ -34,7 +34,7 @@ func TestScanFindsMarkersAsWholeUpperCaseWords(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "a.go"), []byte(src), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	res, err := Scan(t.Context(), []string{root})
+	res, err := Scan(t.Context(), []string{root}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

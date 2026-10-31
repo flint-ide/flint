@@ -195,6 +195,8 @@ interface EditorState {
   /** Opens a changed file of a pull request, right after the pull request's tab. */
   openPullRequestDiff: (root: string, number: number, path: string) => void
   renameScratchTab: (scratchId: string, title: string) => void
+  /** Renames a tab in place (terminals follow what they run). */
+  retitleTab: (id: string, title: string) => void
   closeTab: (id: string) => void
   closeScratch: (scratchId: string) => void
   /** Follows a rename on disk: file, diff and history tabs at or under `from` move to `to`. */
@@ -393,6 +395,9 @@ export const useEditor = createStore<EditorState>((set) => ({
       const after = siblings.length ? siblings[siblings.length - 1].id : s.activeId
       return { tabs: insertAfterActive(s.tabs, after, tab), ...activate(s, id) }
     }),
+
+  retitleTab: (id, title) =>
+    set((s) => (s.tabs.some((t) => t.id === id && t.title !== title) ? { tabs: s.tabs.map((t) => (t.id === id ? { ...t, title } : t)) } : s)),
 
   renameScratchTab: (scratchId, title) =>
     set((s) => ({

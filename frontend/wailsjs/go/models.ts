@@ -2662,6 +2662,7 @@ export namespace settings {
 	    defaultAgent: string;
 	    autoSave: boolean;
 	    keymap: Record<string, string>;
+	    todoExclude: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -2676,6 +2677,7 @@ export namespace settings {
 	        this.defaultAgent = source["defaultAgent"];
 	        this.autoSave = source["autoSave"];
 	        this.keymap = source["keymap"];
+	        this.todoExclude = source["todoExclude"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2856,6 +2858,7 @@ export namespace todo {
 	export class Result {
 	    items: Item[];
 	    truncated: boolean;
+	    skipped: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Result(source);
@@ -2865,6 +2868,7 @@ export namespace todo {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.items = this.convertValues(source["items"], Item);
 	        this.truncated = source["truncated"];
+	        this.skipped = source["skipped"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

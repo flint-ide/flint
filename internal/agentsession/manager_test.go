@@ -305,6 +305,41 @@ func TestResumeRegistersTheSession(t *testing.T) {
 	}
 }
 
+// slowStart blocks Start until release is closed.
+type slowStart struct {
+	*closeCounting
+	started, release chan struct{}
+}
+
+func (s *slowStart) Start(ctx context.Context, cwd string, sink Sink) (SessionInfo, error) {
+	close(s.started)
+	<-s.release
+	return s.closeCounting.Start(ctx, cwd, sink)
+}
+
+func TestDriverReplacedWhileStartingIsClosed(t *testing.T) {
+	m := NewManager(func(Event) {})
+	old := &slowStart{closeCounting: &closeCounting{fakeDriver: newFake("")}, started: make(chan struct{}), release: make(chan struct{})}
+	m.Register("gemini", old)
+	done := make(chan error, 1)
+	go func() {
+		_, err := m.Start(context.Background(), "gemini", t.TempDir())
+		done <- err
+	}()
+	<-old.started
+	m.Unregister("gemini") // settings saved while the chat starts
+	close(old.release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if old.closes != 1 {
+		t.Errorf("driver replaced during Start closed %d times on Close, want 1", old.closes)
+	}
+}
+
 // closeCounting records Close calls.
 type closeCounting struct {
 	*fakeDriver

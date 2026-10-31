@@ -262,6 +262,11 @@ func (m *Manager) open(agent, cwd string, fn func(Driver, Sink) (SessionInfo, er
 	}
 	m.mu.Lock()
 	m.sessions[info.ID] = &managed{agent: agent, cwd: cwd, driver: d}
+	// The driver may have been replaced while the session started; keep it
+	// for Close, or its process would outlive Flint.
+	if !slices.Contains(m.retired, d) && !slices.Contains(slices.Collect(maps.Values(m.drivers)), d) {
+		m.retired = append(m.retired, d)
+	}
 	m.mu.Unlock()
 	return info, nil
 }

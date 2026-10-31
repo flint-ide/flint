@@ -8,6 +8,7 @@ import * as AlertsAPI from "./alertsapi.js";
 import * as AppAPI from "./appapi.js";
 import * as DatabaseAPI from "./databaseapi.js";
 import * as DebugAPI from "./debugapi.js";
+import * as DiagnosticsAPI from "./diagnosticsapi.js";
 import * as DiffAPI from "./diffapi.js";
 import * as DockerAPI from "./dockerapi.js";
 import * as GitAPI from "./gitapi.js";
@@ -33,6 +34,7 @@ export {
     AppAPI,
     DatabaseAPI,
     DebugAPI,
+    DiagnosticsAPI,
     DiffAPI,
     DockerAPI,
     GitAPI,

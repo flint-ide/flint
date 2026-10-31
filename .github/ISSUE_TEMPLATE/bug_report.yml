@@ -1,0 +1,30 @@
+name: Bug report
+description: Something in Flint doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The fastest way to file a useful report is **Help ▸ Report an Issue…** in Flint: it opens this form with your versions, installed tools and the end of Flint's log already filled in (secrets and your home path removed). Please review it before submitting.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a Go project
+        2. …
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Paste from **Help ▸ Copy Diagnostics** (or attach ~/Library/Logs/Flint/flint.log after checking it).
+      render: markdown
+    validations:
+      required: true

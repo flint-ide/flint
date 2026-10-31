@@ -19,6 +19,7 @@ import { activeRoot } from './store/activeRoot'
 import { openDropped } from './store/drop'
 import { refreshTrust, useTrust } from './store/trust'
 import { TrustBanner } from './components/layout/TrustBanner'
+import { copyDiagnostics, reportIssue, showLogs } from './store/diagnostics'
 import { subscribeAlerts } from './store/alerts'
 import type { DroppedPath } from './lib/drop'
 import { UsagesModal } from './components/lsp/UsagesModal'
@@ -85,6 +86,9 @@ export default function App() {
     EventsOn('menu:open-folder', (path: string) => void useWorkspace.getState().openFolder(path))
     EventsOn('menu:add-project', () => void useWorkspace.getState().pickRoot())
     EventsOn('menu:settings', () => useEditor.getState().openSettings()) // app menu ▸ Settings… (⌘,)
+    EventsOn('menu:report-issue', () => void reportIssue())
+    EventsOn('menu:copy-diagnostics', () => void copyDiagnostics())
+    EventsOn('menu:show-logs', showLogs)
     EventsOn('files:dropped', (dropped: DroppedPath[]) => void openDropped(dropped))
     void useDatabase.getState().loadConnections()
     void useScratch.getState().load()

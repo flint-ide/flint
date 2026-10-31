@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  WAILS_VERSION: v3.0.0
+  GOVULNCHECK_VERSION: v1.9.0
+
+jobs:
+  test:
+    name: Build and test (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies (no install scripts)
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+
+      - name: Install wails3
+        run: go install "github.com/wailsapp/wails/v3/cmd/wails3@${WAILS_VERSION}"
+
+      - name: Bindings are up to date
+        run: |
+          wails3 generate bindings -ts -silent -d frontend/bindings ./
+          git diff --exit-code -- frontend/bindings || { echo "::error::frontend/bindings is stale: run 'wails3 task bindings' and commit"; exit 1; }
+
+      - name: Frontend typecheck, tests and build
+        working-directory: frontend
+        run: |
+          go run ../cmd/webbuild --test
+          go run ../cmd/webbuild --typecheck
+
+      - name: gofmt
+        run: test -z "$(gofmt -l . | grep -v '^frontend/node_modules/' | tee /dev/stderr)"
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test -race ./...
+
+      - name: Build (production and server tags)
+        run: |
+          go build -tags production -o /dev/null .
+          go build -tags server -o /dev/null .
+
+      - name: govulncheck
+        run: go run "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" ./...
+
+      - name: npm audit (runtime dependencies)
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high

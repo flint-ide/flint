@@ -4,10 +4,12 @@ import (
 	"embed"
 	"io/fs"
 	"log"
+	"log/slog"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
+	"flint/internal/diag"
 	"flint/internal/github"
 	"flint/internal/shellenv"
 )
@@ -16,6 +18,8 @@ import (
 var assets embed.FS
 
 func main() {
+	logger := diag.Setup()
+	slog.Info("start", "version", diag.Version(version))
 	shellenv.Load() // import the login-shell PATH in the background (git hooks, rg, brew)
 	flint, err := NewApp()
 	if err != nil {
@@ -30,7 +34,11 @@ func main() {
 	lspAPI := &LSPAPI{app: flint}
 	lspAPI.wire()
 	app := application.New(application.Options{
-		Name:        "Flint",
+		Name:   "Flint",
+		Logger: logger,
+		PanicHandler: func(p *application.PanicDetails) {
+			slog.Error("panic", "error", p.Error, "stack", p.StackTrace)
+		},
 		Description: "A fast scratchpad IDE for code, SQL and data.",
 		Assets:      application.AssetOptions{Handler: application.AssetFileServerFS(dist)},
 		Mac: application.MacOptions{
@@ -65,6 +73,7 @@ func main() {
 			application.NewService(newAlertsAPI(flint)),
 			application.NewService(newAWSAPI(flint)),
 			application.NewService(&KubeAPI{app: flint}),
+			application.NewService(&DiagnosticsAPI{app: flint}),
 		},
 	})
 	flint.wails = app

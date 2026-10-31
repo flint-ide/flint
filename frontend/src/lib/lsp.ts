@@ -3,8 +3,8 @@ import { EditorView, ViewPlugin, hoverTooltip, keymap, type ViewUpdate } from '@
 import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
 import { EditorState } from '@codemirror/state'
 import { lintGutter, lintKeymap, setDiagnostics, type Diagnostic as CMDiagnostic } from '@codemirror/lint'
-import * as LSP from '../../wailsjs/go/main/LSPAPI'
-import type { lsp } from '../../wailsjs/go/models'
+import * as LSP from '../../bindings/flint/lspapi'
+import type { lsp } from '../wails/models'
 import { onDiagnostics, currentDiagnostics } from '../store/lsp'
 import { agentActions, fixFileProblemsWithAgent } from './lspAgent'
 

@@ -1,0 +1,87 @@
+# Flint's build (Wails v3, macOS). Run with `wails3 task <name>`:
+#   build    the flint binary in build/bin
+#   package  build/bin/flint.app (ad-hoc signed)
+#   dev      the app with live reload of Go and the frontend
+#   server   the app as an HTTP server for a browser (no window), for UI checks
+version: '3'
+
+vars:
+  APP_NAME: flint
+  BIN_DIR: build/bin
+  DEV_PORT: 5173
+
+env:
+  CGO_ENABLED: 1
+  MACOSX_DEPLOYMENT_TARGET: "12.0"
+  CGO_CFLAGS: -mmacosx-version-min=12.0
+  CGO_LDFLAGS: -mmacosx-version-min=12.0
+
+tasks:
+  bindings:
+    summary: Generates the TypeScript bindings of the Go services
+    sources: ["*.go", "internal/**/*.go", go.mod]
+    generates: ["frontend/bindings/**/*"]
+    cmds:
+      - wails3 generate bindings -ts -silent -d frontend/bindings ./
+
+  frontend:
+    summary: Typechecks and bundles the frontend (cmd/webbuild, no npm scripts)
+    deps: [bindings]
+    dir: frontend
+    cmds:
+      - go run ../cmd/webbuild --typecheck
+
+  icons:
+    summary: Makes the macOS icon from build/appicon.png
+    sources: [build/appicon.png]
+    generates: [build/darwin/icons.icns]
+    cmds:
+      - wails3 generate icons -input build/appicon.png -macfilename build/darwin/icons.icns
+
+  build:
+    summary: Builds the production binary
+    deps: [frontend]
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o {{.BIN_DIR}}/{{.APP_NAME}}
+
+  package:
+    summary: Bundles build/bin/flint.app
+    deps: [build, icons]
+    cmds:
+      - rm -rf "{{.BIN_DIR}}/{{.APP_NAME}}.app"
+      - mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources"
+      - cp build/darwin/icons.icns "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources"
+      - cp "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS"
+      - cp build/darwin/Info.plist "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents"
+      - xattr -cr "{{.BIN_DIR}}/{{.APP_NAME}}.app"
+      - codesign --force --deep --sign - "{{.BIN_DIR}}/{{.APP_NAME}}.app"
+
+  dev:frontend:
+    summary: Rebuilds the frontend on change and serves it on DEV_PORT
+    dir: frontend
+    cmds:
+      - go run ../cmd/webbuild --watch
+
+  dev:build:
+    summary: Development binary (devtools on, frontend from the dev server)
+    deps: [bindings]
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - go build -buildvcs=false -gcflags=all=-l -o {{.BIN_DIR}}/{{.APP_NAME}}
+
+  dev:run:
+    summary: Runs the development binary
+    cmds:
+      - "{{.BIN_DIR}}/{{.APP_NAME}} {{.CLI_ARGS}}"
+
+  dev:
+    summary: Runs Flint with live reload (Go rebuilds on change, the page reloads)
+    cmds:
+      - wails3 dev -config ./build/config.yml -port {{.DEV_PORT}}
+
+  server:
+    summary: Runs Flint as an HTTP server for a browser (no window); frontend from dist
+    deps: [frontend]
+    cmds:
+      - go run -tags server . {{.CLI_ARGS}}

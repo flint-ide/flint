@@ -1,5 +1,5 @@
 // Pure helpers for git blame annotations and history lists (no CodeMirror, no React).
-import type { git } from '../../wailsjs/go/models'
+import type { git } from '../wails/models'
 
 export type BlameCommit = git.BlameCommit
 export type BlameRange = git.BlameRange

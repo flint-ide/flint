@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useSettings } from '../../store/settings'
 import { useAgent } from '../../store/agent'
 import { DEFAULT_SETTINGS, FONT_SIZE, LINE_HEIGHT, parseExcludes, type FontSettings, type ThemeMode } from '../../lib/settings'
-import * as TodoAPI from '../../../wailsjs/go/main/TodoAPI'
+import * as TodoAPI from '../../../bindings/flint/todoapi'
 import { Select } from '../ui/Select'
 import { KeymapSection } from './KeymapSection'
 
@@ -102,6 +102,8 @@ function AgentsSection() {
   const available = useAgent((s) => s.available)
   const loaded = useAgent((s) => s.loaded)
   const defaultAgent = useSettings((s) => s.settings.defaultAgent)
+  const notify = useSettings((s) => s.settings.notifyInBackground)
+  const update = useSettings((s) => s.update)
   useEffect(() => {
     if (!loaded) void useAgent.getState().load()
   }, [loaded])
@@ -122,6 +124,10 @@ function AgentsSection() {
             onChange={(a) => useAgent.getState().setPreferred(a)}
           />
         )}
+      </Row>
+      <h3>Notifications</h3>
+      <Row label="Tell me when work finishes in the background" hint="A macOS notification and a count on the Dock icon when a run, tests or an agent finish while Flint isn't the active app.">
+        <input type="checkbox" checked={notify} onChange={(e) => update({ notifyInBackground: e.target.checked })} />
       </Row>
     </section>
   )

@@ -105,7 +105,7 @@ export function EditableResults({ result, summary, connId, database, driver, rea
           table={`${target.schema}.${target.table}`}
           onClose={() => setPreview(null)}
           onApply={async () => {
-            const res = await Database.ApplyEdits(connId, database, editBatch(buildBatch(result, target, edits)))
+            const res = (await Database.ApplyEdits(connId, database, editBatch(buildBatch(result, target, edits))))!
             setPreview(null)
             setEdits(noEdits)
             showToast(`Applied ${res.statements} statement${res.statements === 1 ? '' : 's'} (${res.affected} row${res.affected === 1 ? '' : 's'})`)

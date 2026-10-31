@@ -1,6 +1,9 @@
-//go:build !darwin
+//go:build !darwin || server
 
 package main
+
+// Without the macOS window (other systems, or the browser-only server build)
+// the native tweaks are no-ops.
 
 // TitlebarMetrics describes where the OS draws window buttons (macOS only).
 type TitlebarMetrics struct {
@@ -11,12 +14,8 @@ type TitlebarMetrics struct {
 	ButtonHeight float64 `json:"buttonHeight"`
 }
 
-func styleNativeWindow() {}
-
 func setNativeAppearance(string) bool { return true }
 
 func systemPrefersDark() bool { return true }
-
-func addSettingsMenuItem() {}
 
 func titlebarMetrics() TitlebarMetrics { return TitlebarMetrics{} }

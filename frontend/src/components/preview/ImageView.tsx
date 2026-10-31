@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import * as PreviewAPI from '../../../wailsjs/go/main/PreviewAPI'
+import * as PreviewAPI from '../../../bindings/flint/previewapi'
 import { errorMessage } from '../../api/backend'
 import { toggleSvgSource } from '../../store/preview'
 import { onFileChanged } from '../../store/fsEvents'

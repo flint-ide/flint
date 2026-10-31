@@ -1,5 +1,5 @@
-import * as AppAPI from '../../wailsjs/go/main/AppAPI'
-import { EventsOn } from '../../wailsjs/runtime/runtime'
+import * as AppAPI from '../../bindings/flint/appapi'
+import { EventsOn } from '../wails/runtime'
 import { saveTab, useEditor } from './editor'
 import { confirmAction } from './dialog'
 import { saveSession } from './session'

@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wailsapp/wails/v3/pkg/application"
+
 	"flint/internal/agentsession"
 	"flint/internal/config"
 	"flint/internal/dap"
@@ -40,7 +42,9 @@ type appState struct {
 
 // App holds the services shared by all bound APIs.
 type App struct {
-	ctx       context.Context
+	ctx       context.Context // ends when the application shuts down
+	wails     *application.App
+	window    application.Window // the main window
 	configDir string
 	argFolder string
 
@@ -93,7 +97,7 @@ func NewApp() (*App, error) {
 	}
 	a := &App{
 		configDir: dir,
-		argFolder: folderFromArgs(os.Args[1:]),
+		argFolder: folderFromArgs(os.Args[1:], ""),
 		db:        db.NewManager(store),
 		scratch:   scratches,
 		sessions:  restore.New(filepath.Join(dir, "sessions")),
@@ -123,10 +127,9 @@ func NewApp() (*App, error) {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	menuApp = a
 }
 
-func (a *App) shutdown(context.Context) {
+func (a *App) shutdown() {
 	// Language servers and agents each have grace periods; stop them in parallel
 	// so quitting stays fast.
 	var wg sync.WaitGroup
@@ -178,11 +181,15 @@ func (a *App) recentFolders() []string {
 	return append([]string{}, a.state.RecentFolders...) // never nil: the frontend expects []
 }
 
-// folderFromArgs supports `flint <dir>`; flags (e.g. injected by macOS) are ignored.
-func folderFromArgs(args []string) string {
+// folderFromArgs supports `flint <dir>`; flags (e.g. injected by macOS) are
+// ignored. Relative paths are resolved against cwd ("" = this process's).
+func folderFromArgs(args []string, cwd string) string {
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "-") {
 			continue
+		}
+		if cwd != "" && !filepath.IsAbs(arg) {
+			arg = filepath.Join(cwd, arg)
 		}
 		abs, err := filepath.Abs(arg)
 		if err != nil {

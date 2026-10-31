@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Terminal as XTerm, type ILink } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
-import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
+import { BrowserOpenURL } from '../../wails/runtime'
 import {
   attachConsole, openRunLink, rerun, rerunFailedTests, fixFailedTestsWithAgent, runTestNode, sendRunInput, setConsoleSize, stopRun, useRun, type RunSession,
 } from '../../store/run'

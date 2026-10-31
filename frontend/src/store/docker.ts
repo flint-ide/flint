@@ -1,6 +1,6 @@
 import { createStore } from '../lib/store'
-import * as DockerAPI from '../../wailsjs/go/main/DockerAPI'
-import { docker } from '../../wailsjs/go/models'
+import * as DockerAPI from '../../bindings/flint/dockerapi'
+import { docker } from '../wails/models'
 import { errorMessage } from '../api/backend'
 import { confirmAction, showToast } from './dialog'
 import { useTerminal } from './terminal'

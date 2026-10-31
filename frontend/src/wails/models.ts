@@ -1,0 +1,23 @@
+// Go models by package, as the v2 bindings exposed them (`todo.Result`,
+// `main.TermData`…), re-exported from the Wails v3 generated bindings.
+
+export * as agentsession from '../../bindings/flint/internal/agentsession/models'
+export * as dap from '../../bindings/flint/internal/dap/models'
+export * as db from '../../bindings/flint/internal/db/models'
+export * as docker from '../../bindings/flint/internal/docker/models'
+export * as fuzzy from '../../bindings/flint/internal/fuzzy/models'
+export * as git from '../../bindings/flint/internal/git/models'
+export * as github from '../../bindings/flint/internal/github/models'
+export * as httpfile from '../../bindings/flint/internal/httpfile/models'
+export * as lsp from '../../bindings/flint/internal/lsp/models'
+export * as preview from '../../bindings/flint/internal/preview/models'
+export * as profiling from '../../bindings/flint/internal/profiling/models'
+export * as runconfig from '../../bindings/flint/internal/runconfig/models'
+export * as scratch from '../../bindings/flint/internal/scratch/models'
+export * as search from '../../bindings/flint/internal/search/models'
+export * as settings from '../../bindings/flint/internal/settings/models'
+export * as testrun from '../../bindings/flint/internal/testrun/models'
+export * as textdiff from '../../bindings/flint/internal/textdiff/models'
+export * as todo from '../../bindings/flint/internal/todo/models'
+export * as workspace from '../../bindings/flint/internal/workspace/models'
+export * as main from '../../bindings/flint/models'

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { EventsOn } from '../../../wailsjs/runtime/runtime'
+import { EventsOn } from '../../wails/runtime'
 import { useEditor } from '../../store/editor'
 import { useWorkspace } from '../../store/workspace'
 import { useSettings } from '../../store/settings'

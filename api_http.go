@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"flint/internal/httpfile"
 )
 
@@ -97,11 +95,7 @@ func (h *HTTPAPI) SaveBody(id, suggestedName string) (string, error) {
 	if !ok {
 		return "", errResponseGone
 	}
-	path, err := runtime.SaveFileDialog(h.app.ctx, runtime.SaveDialogOptions{
-		Title:                "Save response body",
-		DefaultFilename:      filepath.Base(suggestedName),
-		CanCreateDirectories: true,
-	})
+	path, err := h.app.pickSaveFile("Save response body", filepath.Base(suggestedName))
 	if err != nil || path == "" {
 		return "", err
 	}

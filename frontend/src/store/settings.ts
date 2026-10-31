@@ -6,8 +6,8 @@
 // before React's first paint, so a light theme doesn't flash dark on startup; the
 // backend's copy replaces them a moment later.
 import { createStore } from '../lib/store'
-import * as SettingsAPI from '../../wailsjs/go/main/SettingsAPI'
-import { settings as models } from '../../wailsjs/go/models'
+import * as SettingsAPI from '../../bindings/flint/settingsapi'
+import { settings as models } from '../wails/models'
 import { coerceSettings, DEFAULT_SETTINGS, editorCssVars, resolveTheme, type AppSettings, type ResolvedTheme } from '../lib/settings'
 import { setKeyOverrides } from '../lib/commands'
 import { errorMessage } from '../api/backend'

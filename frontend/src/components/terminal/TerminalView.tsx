@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Terminal as XTerm, type ILink } from '@xterm/xterm'
 import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
-import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
+import { BrowserOpenURL } from '../../wails/runtime'
 import {
   TerminalBackend,
   attachSink,

@@ -1,7 +1,7 @@
 import { createStore } from '../lib/store'
-import * as Chat from '../../wailsjs/go/main/AgentChatAPI'
-import { EventsOn } from '../../wailsjs/runtime/runtime'
-import { agentsession } from '../../wailsjs/go/models'
+import * as Chat from '../../bindings/flint/agentchatapi'
+import { EventsOn } from '../wails/runtime'
+import { agentsession } from '../wails/models'
 import { errorMessage } from '../api/backend'
 import {
   addUserMessage,
@@ -18,6 +18,7 @@ import { showToast } from './dialog'
 import { createReorderer, type Reorderer } from '../lib/reorder'
 import type { SavedChat } from '../lib/sessionSnapshot'
 import { useEditor } from './editor'
+import { alertDone } from './alerts'
 
 export interface ChatSession {
   id: string
@@ -222,6 +223,11 @@ const queued = new Map<string, AgentEvent[]>()
 let pendingFlush: { frame: number; timer: ReturnType<typeof setTimeout> } | null = null
 
 function enqueue(id: string, e: AgentEvent): void {
+  if (e.kind === 'turn_end' && e.stopReason !== 'cancelled') {
+    const tab = `chat:${id}`
+    const title = useEditor.getState().tabs.find((t) => t.id === tab)?.title ?? 'Agent'
+    alertDone(title, e.stopReason === 'error' ? 'The agent stopped with an error' : 'The agent finished its turn', tab)
+  }
   const q = queued.get(id)
   if (q) q.push(e)
   else queued.set(id, [e])

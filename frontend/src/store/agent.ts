@@ -1,5 +1,5 @@
 import { createStore } from '../lib/store'
-import * as Agent from '../../wailsjs/go/main/AgentAPI'
+import * as Agent from '../../bindings/flint/agentapi'
 import { errorMessage } from '../api/backend'
 import { showToast } from './dialog'
 import { useTerminal } from './terminal'

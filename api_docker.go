@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"flint/internal/docker"
 	"flint/internal/shellenv"
 )
@@ -116,7 +114,7 @@ func (d *DockerAPI) Watch(on bool) {
 		ctx, cancel := context.WithCancel(d.app.ctx)
 		d.stop = cancel
 		go func() {
-			_ = dk.Watch(ctx, dockerDebounce, func() { runtime.EventsEmit(d.app.ctx, eventDockerChanged) })
+			_ = dk.Watch(ctx, dockerDebounce, func() { d.app.emit(eventDockerChanged) })
 			d.mu.Lock()
 			if ctx.Err() == nil { // the stream died on its own (daemon gone)
 				d.stop = nil

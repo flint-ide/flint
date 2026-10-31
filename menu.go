@@ -6,9 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/wailsapp/wails/v2/pkg/menu"
-	"github.com/wailsapp/wails/v2/pkg/menu/keys"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"flint/internal/config"
 )
@@ -21,52 +19,52 @@ const (
 	eventMenuSettings   = "menu:settings"    // open the Settings tab (app menu, ⌘,)
 )
 
-// menuApp is the app that native menu items added outside Wails' menu talk to
-// (the app menu's Settings… item, see window_darwin.go).
-var menuApp *App
-
 // buildMenu creates the native macOS menu bar. File ▸ Open Recent mirrors the
 // recent-folders list and is rebuilt whenever it changes.
-func (a *App) buildMenu() *menu.Menu {
-	m := menu.NewMenu()
-	m.Append(menu.AppMenu())
+func (a *App) buildMenu() *application.Menu {
+	m := application.NewMenu()
+
+	// The first submenu is the app menu on macOS.
+	appMenu := m.AddSubmenu("flint")
+	appMenu.AddRole(application.About)
+	appMenu.AddSeparator()
+	appMenu.Add("Settings…").SetAccelerator("CmdOrCtrl+,").OnClick(func(*application.Context) { a.emit(eventMenuSettings) })
+	appMenu.AddSeparator()
+	appMenu.AddRole(application.ServicesMenu)
+	appMenu.AddSeparator()
+	appMenu.AddRole(application.Hide)
+	appMenu.AddRole(application.HideOthers)
+	appMenu.AddRole(application.ShowAll)
+	appMenu.AddSeparator()
+	appMenu.AddRole(application.Quit)
 
 	file := m.AddSubmenu("File")
-	file.AddText("Open Folder…", keys.CmdOrCtrl("o"), func(*menu.CallbackData) {
-		runtime.EventsEmit(a.ctx, eventMenuOpenRecent)
-	})
-	file.AddText("Add Project to Workspace…", keys.Combo("o", keys.CmdOrCtrlKey, keys.ShiftKey), func(*menu.CallbackData) {
-		runtime.EventsEmit(a.ctx, eventMenuAddProject)
-	})
+	file.Add("Open Folder…").SetAccelerator("CmdOrCtrl+O").OnClick(func(*application.Context) { a.emit(eventMenuOpenRecent) })
+	file.Add("Add Project to Workspace…").SetAccelerator("CmdOrCtrl+Shift+O").OnClick(func(*application.Context) { a.emit(eventMenuAddProject) })
 	recentMenu := file.AddSubmenu("Open Recent")
 	recent := a.recentFolders()
 	for _, path := range recent {
-		recentMenu.AddText(recentLabel(path), nil, func(*menu.CallbackData) {
-			runtime.EventsEmit(a.ctx, eventMenuOpenFolder, path)
-		})
+		recentMenu.Add(recentLabel(path)).OnClick(func(*application.Context) { a.emit(eventMenuOpenFolder, path) })
 	}
 	if len(recent) == 0 {
-		recentMenu.AddText("No Recent Folders", nil, nil).Disabled = true
+		recentMenu.Add("No Recent Folders").SetEnabled(false)
 	} else {
 		recentMenu.AddSeparator()
-		recentMenu.AddText("Clear Recently Opened", nil, func(*menu.CallbackData) {
-			_ = a.clearRecentFolders()
-		})
+		recentMenu.Add("Clear Recently Opened").OnClick(func(*application.Context) { _ = a.clearRecentFolders() })
 	}
 
-	m.Append(menu.EditMenu())
-	m.Append(menu.WindowMenu())
+	// Without an Edit menu macOS webviews ignore Cmd+C / Cmd+V / Cmd+Z.
+	m.AddRole(application.EditMenu)
+	m.AddRole(application.WindowMenu)
 	return m
 }
 
 // refreshMenu re-installs the menu after the recent list changed.
 func (a *App) refreshMenu() {
-	if a.ctx == nil {
-		return // menu is installed by wails.Run at startup
+	if a.wails == nil {
+		return // installed by main at startup
 	}
-	runtime.MenuSetApplicationMenu(a.ctx, a.buildMenu())
-	runtime.MenuUpdateApplicationMenu(a.ctx)
-	addSettingsMenuItem() // the rebuilt app menu lost it
+	a.wails.Menu.Set(a.buildMenu())
 }
 
 // recentLabel is "name — ~/parent/path", like Xcode's Open Recent.

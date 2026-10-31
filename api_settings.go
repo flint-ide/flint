@@ -1,11 +1,8 @@
 package main
 
 import (
+	"github.com/wailsapp/wails/v3/pkg/application"
 	"slices"
-
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/mac"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"flint/internal/settings"
 )
@@ -13,8 +10,8 @@ import (
 // Window background behind the web view per appearance (the --bg of each palette
 // in style.css; alpha as in the Wails template Flint started from).
 var (
-	darkBackground  = options.RGBA{R: 24, G: 25, B: 28, A: 1}
-	lightBackground = options.RGBA{R: 244, G: 244, B: 246, A: 1}
+	darkBackground  = application.RGBA{Red: 24, Green: 25, Blue: 28, Alpha: 255}
+	lightBackground = application.RGBA{Red: 244, Green: 244, Blue: 246, Alpha: 255}
 )
 
 // SettingsAPI reads and writes settings.json; the frontend applies the values live.
@@ -48,7 +45,7 @@ func (s *SettingsAPI) Save(next settings.Settings) (settings.Settings, error) {
 		if dark {
 			bg = darkBackground
 		}
-		runtime.WindowSetBackgroundColour(a.ctx, bg.R, bg.G, bg.B, bg.A)
+		a.setWindowBackground(bg)
 	}
 	return saved, nil
 }
@@ -69,19 +66,19 @@ func (a *App) currentSettings() settings.Settings {
 // startupAppearance picks the native appearance and window background for the
 // configured theme before the window exists, so a light theme opens without a
 // dark flash.
-func (a *App) startupAppearance() (mac.AppearanceType, *options.RGBA) {
+func (a *App) startupAppearance() (application.MacAppearanceType, application.RGBA) {
 	switch a.currentSettings().Theme {
 	case settings.ThemeLight:
 		bg := lightBackground
-		return mac.NSAppearanceNameAqua, &bg
+		return application.NSAppearanceNameAqua, bg
 	case settings.ThemeSystem:
 		bg := darkBackground
 		if !systemPrefersDark() {
 			bg = lightBackground
 		}
-		return mac.DefaultAppearance, &bg
+		return application.DefaultAppearance, bg
 	default:
 		bg := darkBackground
-		return mac.NSAppearanceNameDarkAqua, &bg
+		return application.NSAppearanceNameDarkAqua, bg
 	}
 }

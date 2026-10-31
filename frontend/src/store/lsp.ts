@@ -1,6 +1,6 @@
 import { createStore } from '../lib/store'
-import { EventsOn } from '../../wailsjs/runtime/runtime'
-import type { lsp } from '../../wailsjs/go/models'
+import { EventsOn } from '../wails/runtime'
+import type { lsp } from '../wails/models'
 
 // Event payload, not part of a bound method signature, so Wails doesn't generate it.
 export interface Diagnostic {

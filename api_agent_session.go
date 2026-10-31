@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	as "flint/internal/agentsession"
 	"flint/internal/config"
 )
@@ -23,7 +21,7 @@ type AgentChatAPI struct {
 
 // newAgentManager builds the session manager with every installed driver.
 func newAgentManager(a *App) *as.Manager {
-	m := as.NewManager(func(e as.Event) { runtime.EventsEmit(a.ctx, eventAgentEvent, e) })
+	m := as.NewManager(func(e as.Event) { a.emit(eventAgentEvent, e) })
 	registerDrivers(m)
 	if p, ok := a.agentPolicy(); ok {
 		m.SetPolicy(p)

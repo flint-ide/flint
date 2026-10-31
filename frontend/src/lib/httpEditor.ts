@@ -5,8 +5,8 @@
 import { Prec, RangeSet, StateEffect, StateField, type Extension } from '@codemirror/state'
 import { EditorView, GutterMarker, ViewPlugin, gutter, keymap, showPanel, type Panel, type ViewUpdate } from '@codemirror/view'
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
-import * as HTTP from '../../wailsjs/go/main/HTTPAPI'
-import type { httpfile } from '../../wailsjs/go/models'
+import * as HTTP from '../../bindings/flint/httpapi'
+import type { httpfile } from '../wails/models'
 import { envOf, pickEnvironment, sendRequest, setFollowRedirects, useHttpClient } from '../store/httpClient'
 
 type Mark = httpfile.Mark

@@ -20,6 +20,8 @@ export interface AppSettings {
   defaultAgent: string
   /** Save modified files when the window loses focus. */
   autoSave: boolean
+  /** Notification and Dock badge when work finishes while Flint is in the background. */
+  notifyInBackground: boolean
   /** Shortcut overrides: command id → keys ('' = none). */
   keymap: Record<string, string>
   /** Extra folders / globs the TODO list skips, gitignore-style. */
@@ -34,6 +36,7 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   terminal: Object.freeze({ fontFamily: `"JetBrains Mono", "SF Mono", Menlo, monospace`, fontSize: 13, lineHeight: 1.2 }),
   defaultAgent: '',
   autoSave: false,
+  notifyInBackground: true,
   keymap: Object.freeze({}) as Record<string, string>,
   todoExclude: Object.freeze([]) as unknown as string[],
 }) as AppSettings
@@ -105,6 +108,7 @@ export function coerceSettings(v: unknown): AppSettings {
     terminal: font(v.terminal, d.terminal),
     defaultAgent: typeof v.defaultAgent === 'string' ? v.defaultAgent : d.defaultAgent,
     autoSave: typeof v.autoSave === 'boolean' ? v.autoSave : d.autoSave,
+    notifyInBackground: typeof v.notifyInBackground === 'boolean' ? v.notifyInBackground : d.notifyInBackground,
     keymap,
     todoExclude: Array.isArray(v.todoExclude) ? v.todoExclude.filter((p): p is string => typeof p === 'string' && validExclude(p)) : [],
   }

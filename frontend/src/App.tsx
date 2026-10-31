@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
-import { EventsOn } from '../wailsjs/runtime/runtime'
+import { EventsOn } from './wails/runtime'
 import { useWorkspace } from './store/workspace'
 import { useEditor } from './store/editor'
 import { useDatabase } from './store/database'
@@ -16,6 +16,9 @@ import { subscribeRunEvents, useRun } from './store/run'
 import { subscribeDebugEvents } from './store/debug'
 import { subscribeAutoSave } from './store/settings'
 import { activeRoot } from './store/activeRoot'
+import { openDropped } from './store/drop'
+import { subscribeAlerts } from './store/alerts'
+import type { DroppedPath } from './lib/drop'
 import { UsagesModal } from './components/lsp/UsagesModal'
 import { showToast } from './store/dialog'
 import { errorMessage } from './api/backend'
@@ -72,11 +75,13 @@ export default function App() {
     subscribeDebugEvents()
     subscribeSessionAutosave()
     subscribeAutoSave()
+    subscribeAlerts()
     // Native File menu: Open Folder… / Open Recent ▸ <folder>.
     EventsOn('menu:open-recent', () => useWorkspace.getState().setRecentOpen(true))
     EventsOn('menu:open-folder', (path: string) => void useWorkspace.getState().openFolder(path))
     EventsOn('menu:add-project', () => void useWorkspace.getState().pickRoot())
     EventsOn('menu:settings', () => useEditor.getState().openSettings()) // app menu ▸ Settings… (⌘,)
+    EventsOn('files:dropped', (dropped: DroppedPath[]) => void openDropped(dropped))
     void useDatabase.getState().loadConnections()
     void useScratch.getState().load()
     void useWorkspace.getState().init()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/wailsapp/wails/v3/pkg/application"
 	"net/url"
 	"os"
 	"os/exec"
@@ -11,8 +12,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"flint/internal/profiling"
 	"flint/internal/runconfig"
@@ -163,13 +162,10 @@ func (p *ProfileAPI) Discard(dir string) error {
 
 // ChooseFile shows the native file picker for a profile. Returns "" when cancelled.
 func (p *ProfileAPI) ChooseFile() (string, error) {
-	return runtime.OpenFileDialog(p.app.ctx, runtime.OpenDialogOptions{
-		Title: "Open Profile",
-		Filters: []runtime.FileFilter{
-			{DisplayName: "pprof profiles (*.pprof, *.prof, *.pb.gz, *.out)", Pattern: "*.pprof;*.prof;*.pb.gz;*.out"},
-			{DisplayName: "All files", Pattern: "*"},
-		},
-	})
+	return p.app.pickFile("Open Profile",
+		application.FileFilter{DisplayName: "pprof profiles (*.pprof, *.prof, *.pb.gz, *.out)", Pattern: "*.pprof;*.prof;*.pb.gz;*.out"},
+		application.FileFilter{DisplayName: "All files", Pattern: "*"},
+	)
 }
 
 // Reveal selects a profile file in Finder (temporary profiles live outside

@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"flint/internal/runconfig"
 	"flint/internal/runner"
 	"flint/internal/testrun"
@@ -101,7 +99,7 @@ func (e *runEvents) emit(ev RunEvent) {
 	defer e.mu.Unlock() // stamp and emit together so sequence order equals send order
 	e.seq[ev.ID]++
 	ev.Seq = e.seq[ev.ID]
-	runtime.EventsEmit(e.app.ctx, eventRun, ev)
+	e.app.emit(eventRun, ev)
 }
 
 // RunConfigs lists a project's run configurations.

@@ -4,8 +4,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"flint/internal/terminal"
 )
 
@@ -46,11 +44,11 @@ func (e *terminalEvents) Output(id string, data []byte) {
 	e.mu.Lock()
 	defer e.mu.Unlock() // stamp and emit together so sequence order equals send order
 	e.seq[id]++
-	runtime.EventsEmit(e.app.ctx, eventTermData, TermData{ID: id, Seq: e.seq[id], Data: data})
+	e.app.emit(eventTermData, TermData{ID: id, Seq: e.seq[id], Data: data})
 }
 
 func (e *terminalEvents) Exited(id string, code int) {
-	runtime.EventsEmit(e.app.ctx, eventTermExit, TermExit{ID: id, Code: code})
+	e.app.emit(eventTermExit, TermExit{ID: id, Code: code})
 	e.mu.Lock()
 	delete(e.seq, id)
 	e.mu.Unlock()
@@ -63,7 +61,7 @@ type TermTitle struct {
 }
 
 func (e *terminalEvents) Title(id string, info terminal.Info) {
-	runtime.EventsEmit(e.app.ctx, eventTermTitle, TermTitle{ID: id, Info: info})
+	e.app.emit(eventTermTitle, TermTitle{ID: id, Info: info})
 }
 
 // TerminalAPI runs interactive shells (e.g. for claude / codex) inside Flint.

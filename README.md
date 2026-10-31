@@ -2,7 +2,7 @@
 
 Szybkie, minimalistyczne IDE „AI-first” na macOS. Kod piszą agenci (claude, codex) w wbudowanym terminalu, a Flint służy do nawigacji, przeszukiwania projektu, podglądu zmian agenta oraz brudnopisów SQL podpiętych do Postgresa i ClickHouse.
 
-**Stack:** Go + [Wails v2](https://wails.io) (systemowy WebView, bez Electrona) · React 19 + TypeScript · CodeMirror 6 · xterm.js (WebGL)
+**Stack:** Go + [Wails v3](https://v3.wails.io) (systemowy WebView, bez Electrona) · React 19 + TypeScript · CodeMirror 6 · xterm.js (WebGL)
 
 ## Co jest w MVP
 
@@ -35,6 +35,7 @@ Szybkie, minimalistyczne IDE „AI-first” na macOS. Kod piszą agenci (claude,
 | EXPLAIN | *Explain* (`⇧⌘E`) i *Analyze* (`⇧⌘A`) w pasku konsoli i w palecie. Postgres: `EXPLAIN (FORMAT JSON)`, a z Analyze `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`; JSON parsuje Go (`internal/db/explain.go`) do drzewa węzłów z typem, relacją, indeksem, kosztem, wierszami szacowanymi i faktycznymi, pętlami, czasem, buforami i filtrem. Widok to rozwijane drzewo z paskiem udziału każdego węzła w łącznym czasie własnym (Analyze) albo koszcie własnym (szacunek), klik w węzeł pokazuje szczegóły (warunki, klucze sortowania, bufory). Ostrzeżenia: Seq Scan czytający ≥ 10k wierszy (bez Analyze: ≥ 10k szacowanych lub koszt ≥ 2500), szacunek wierszy chybiony 10× i więcej, sortowanie albo hash wylewające się na dysk. ANALYZE wykonuje instrukcję zawsze w transakcji wycofywanej na końcu, a przed instrukcją inną niż SELECT (np. `DELETE`, `WITH … UPDATE`, `SELECT … INTO`) Flint pyta o zgodę (decyduje Go, `ExplainResult.needsConfirm`); w połączeniu read-only taka instrukcja jest odrzucana. EXPLAIN idzie protokołem rozszerzonym, więc przyjmuje tylko jedną instrukcję. ClickHouse: `EXPLAIN PLAN indexes = 1` albo (Analyze → *Pipeline*) `EXPLAIN PIPELINE` jako drzewo z wcięć (best effort); żadne z nich nie wykonuje zapytania. |
 | Edycja wyników | Postgres: gdy wszystkie kolumny wyniku pochodzące z tabel pochodzą z jednej tabeli (OID tabeli z `FieldDescriptions` pgx, bez dodatkowego zapytania), konsola po wyświetleniu wyników pobiera w tle kolumny i klucz główny z `pg_attribute`/`pg_index`. Jeśli tabela ma klucz główny i wszystkie jego kolumny są w wyniku, komórki można edytować: dwuklik lub `↵`/`F2` otwiera edytor zależny od typu (tekst, liczba z walidacją, boolean jako lista, JSON w polu wielowierszowym z walidacją, przełącznik NULL), „+ Row” dodaje wiersz (niewypełnione kolumny dostają DEFAULT), „− Row” / `⌘⌫` oznacza wiersz do usunięcia. Zmiany są tylko lokalne i podświetlone, *Revert* je porzuca, a *Submit…* pokazuje wygenerowany SQL i po *Apply* wykonuje w jednej transakcji `UPDATE`/`INSERT`/`DELETE` po kluczu głównym. Identyfikatory są cytowane i sprawdzane z katalogiem, wartości idą wyłącznie jako parametry (`$n::text::typ`, więc serwer parsuje je jak literał), a `UPDATE`/`DELETE`, który nie trafi dokładnie w jeden wiersz, wycofuje całość. Kolumny wyliczane, `GENERATED ALWAYS AS IDENTITY`, tablice i `bytea` są tylko do odczytu; wynik złączenia, widoku bez klucza czy połączenie read-only — także. ClickHouse: tylko odczyt. |
 | Ustawienia | `⌘,` (menu flint ▸ Settings… albo „Settings…” w palecie) otwiera kartę ustawień z sekcjami Appearance, Editor, Terminal, Agents i Keymap. Każda zmiana działa od razu, bez restartu, i zapisuje się sama. **Motyw**: Dark, Light albo System (za wyglądem macOS, `prefers-color-scheme`); kolory to zmienne CSS w `style.css` (`:root` i `[data-theme="light"]`), terminale mają własną paletę (`lib/terminalTheme.ts`), a pasek tytułu i przyciski okna przełącza Go (`NSApp.appearance`). Motyw z ostatniego uruchomienia jest stosowany przed pierwszym renderem (kopia w `localStorage` + wygląd okna ustawiany w Go przed jego utworzeniem), więc jasny motyw nie mignie ciemnym. **Edytor**: rodzina i rozmiar czcionki oraz interlinia wszystkich edytorów CodeMirror (pliki, diffy, brudnopisy), opcjonalny zapis plików przy utracie fokusu okna. **Terminal**: czcionka, rozmiar i interlinia terminali i konsol uruchomień (xterm dopasowuje się od razu, PTY dostaje nowy rozmiar). **Agents**: domyślny agent nowych czatów, opisów commitów i rozwiązywania konfliktów. **Keymap**: lista wszystkich komend z wyszukiwaniem (po nazwie albo skrócie, np. `⌘K`); klik w skrót i naciśnięcie nowej kombinacji zmienia go, konflikty z innymi komendami są pokazywane, `↺` przywraca domyślny, `✕` usuwa. Skróty obsługiwane przez CodeMirror (`⌘F`, `⌘S`, `⌘↵`…) są tylko wyświetlane. Nadpisania trafiają do warstwy w rejestrze komend (`lib/commands.ts`), więc paleta i dispatcher używają skutecznych skrótów. |
+| Integracja z macOS (Wails v3) | **Przeciąganie z Findera**: folder upuszczony w oknie otwiera się jako projekt (albo dołącza do przestrzeni roboczej, gdy jakiś jest otwarty), plik otwiera się w karcie (do 20 naraz); podczas przeciągania okno pokazuje, co się stanie. **Jedna instancja**: `flint <folder>` przy działającym Flincie przekazuje mu folder (ścieżki względne od katalogu wywołania) i wyciąga okno na wierzch; Flint z innym `FLINT_CONFIG_DIR` (np. dev) jest osobną instancją. **Powiadomienia w tle**: gdy uruchomienie, testy albo tura agenta skończą się, a Flint nie jest aktywny, przychodzi powiadomienie macOS (klik pokazuje kartę) i licznik na ikonie w Docku, zerowany po powrocie do okna; wyłączane w Settings ▸ Agents. Menu aplikacji (z `Settings… ⌘,`) i kompaktowy pasek tytułu to natywne opcje v3, bez wstawek w Objective-C. |
 
 ## Skróty
 
@@ -44,11 +45,12 @@ Paleta akcji (`⇧⌘P`, jak „Find Action” w IntelliJ) wyszukuje fuzzy wśr�
 
 ## Uruchomienie
 
-Wymagania: Go 1.25+, Node 22+, Xcode CLT, `wails` (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`), opcjonalnie `brew install ripgrep`.
+Wymagania: Go 1.26+, Node 22+, Xcode CLT, `wails3` (`go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0`), opcjonalnie `brew install ripgrep`.
 
 ```bash
-make dev        # hot reload
-make build      # build/bin/flint.app
+make dev        # live reload (wails3 task dev)
+make build      # build/bin/flint.app (wails3 task package, Taskfile.yml)
+make server     # Flint jako serwer HTTP dla przeglądarki, bez okna (tryb serwerowy Wails v3)
 make install    # /Applications + polecenie `flint` w ~/.local/bin
 flint .         # otwiera bieżący katalog
 ```
@@ -63,7 +65,7 @@ make test-db-down
 
 ## Architektura
 
-Flint to jeden proces Go z systemowym WebView (Wails v2, na macOS WKWebView). Cała logika — pliki, git, bazy, terminale, agenci, LSP — działa w Go. Frontend (React + TypeScript) tylko wyświetla i wysyła polecenia.
+Flint to jeden proces Go z systemowym WebView (Wails v3, na macOS WKWebView). Cała logika — pliki, git, bazy, terminale, agenci, LSP — działa w Go. Frontend (React + TypeScript) tylko wyświetla i wysyła polecenia.
 
 ```mermaid
 flowchart LR
@@ -108,7 +110,7 @@ flowchart LR
 ```
 
 **Komunikacja UI ↔ Go.**
-- **Wywołania:** frontend wywołuje metody `WorkspaceAPI`, `GitAPI`, `GitHubAPI`, `DatabaseAPI`, `LSPAPI`, `AgentChatAPI`, `HTTPAPI` itd. przez wygenerowane bindingi (`frontend/wailsjs`). Wails wykonuje każde wywołanie w osobnej gorutynie, dlatego zapisy i wpisywanie do terminala są kolejkowane po stronie UI.
+- **Wywołania:** frontend wywołuje metody `WorkspaceAPI`, `GitAPI`, `GitHubAPI`, `DatabaseAPI`, `LSPAPI`, `AgentChatAPI`, `HTTPAPI` itd. przez wygenerowane bindingi TypeScript (`frontend/bindings`, `wails3 generate bindings`; `src/wails/` daje im dawne nazwy przestrzeni modeli i funkcji runtime). Każde API to usługa Wails v3 (`application.NewService`), cykl życia `App` to usługa `lifecycle`. Wails wykonuje każde wywołanie w osobnej gorutynie, dlatego zapisy i wpisywanie do terminala są kolejkowane po stronie UI.
 - **Zdarzenia:** strumienie płyną zdarzeniami (wyjście terminala, odpowiedzi agenta, wyniki wyszukiwania, zmiany plików i gita, diagnostyka LSP).
 - **Workspace z kilkoma projektami:** `App` trzyma listę rootów (pierwszy to projekt główny) i watcher na każdy (`project.go`). `WorkspaceAPI.AddRoot` / `RemoveRoot` dołączają i odłączają foldery (zagnieżdżone i powtórzone są odrzucane, `workspace.CheckNewRoot`), a operacje na plikach szukają roota ścieżki (`workspace.RootOf`). `fuzzy.Index` trzyma listę plików per root, a przy kilku rootach szuka po wspólnej liście `etykieta/ścieżka` (etykiety: `workspace.Labels`, w UI `lib/workspaceRoots.ts`). `SearchAPI.Start` dostaje listę rootów (`search.RunRoots`, wspólny limit wyników) i każde trafienie ma swój root. `git:changed` niesie root, którego dotyczy. Konfiguracje uruchomieniowe, testy i debugger dostają root od frontendu (`RunAPI.Configs(root)`, `Start(id, root, …)`), więc Go nie ma pojęcia „bieżącego” projektu.
 - **Operacje na plikach:** tworzenie, zmianę nazwy i usuwanie z drzewa robi Go (`internal/workspace/fileops.go`, `WorkspaceAPI.CreateFile` / `CreateFolder` / `RenamePath` / `TrashPaths` / `RevealInFinder`). Każda ścieżka musi leżeć wewnątrz otwartego folderu (sam folder projektu nie da się usunąć ani przemianować), zmiana nazwy nigdy nie nadpisuje innego pliku, a usuwanie przenosi do Kosza macOS przez `NSFileManager trashItemAtURL` (cgo, `trash_darwin.go`), więc plik można przywrócić z Findera. Frontend (`store/fileOps.ts`) przenosi karty na nową ścieżkę (`useEditor.renamePath`) albo je zamyka (`closePaths`); niezapisane zmiany w przemianowywanym pliku są najpierw zapisywane.
@@ -116,7 +118,7 @@ flowchart LR
 - **Kolejność:** zdarzenia terminala, agenta i uruchomień (wyjście, wyniki testów i kod wyjścia w jednym strumieniu `run:event`) mają numery sekwencyjne, a UI układa je z powrotem w kolejności, bo transport nie gwarantuje kolejności (np. dev server Wails).
 
 **Frontend bez łańcucha narzędzi npm.**
-- **Build:** `cmd/webbuild` (Go, `github.com/evanw/esbuild/pkg/api`) bundluje TSX i CSS do `frontend/dist` w ~0,1 s, z podziałem na chunki: przy starcie ładuje się ok. 350 KB JS, a edytor (CodeMirror), terminal (xterm.js), języki, czat i panele dopiero przy pierwszym użyciu. `wails build` wywołuje go jako `frontend:build` z `--typecheck` (najpierw `tsc --noEmit`, bo esbuild tylko usuwa typy). `wails dev` uruchamia `webbuild --watch`: przebudowa po każdej zmianie i przeładowanie strony przez strumień SSE esbuild (`/esbuild`), bez HMR. Serwer dev działa na `localhost:5173` (`frontend:dev:serverUrl`).
+- **Build:** `cmd/webbuild` (Go, `github.com/evanw/esbuild/pkg/api`) bundluje TSX i CSS do `frontend/dist` w ~0,1 s, z podziałem na chunki: przy starcie ładuje się ok. 350 KB JS, a edytor (CodeMirror), terminal (xterm.js), języki, czat i panele dopiero przy pierwszym użyciu. `wails3 task build` (Taskfile.yml) wywołuje go z `--typecheck` (najpierw `tsc --noEmit`, bo esbuild tylko usuwa typy). `wails3 task dev` uruchamia `webbuild --watch`: przebudowa po każdej zmianie i przeładowanie strony przez strumień SSE esbuild (`/esbuild`), bez HMR. Serwer dev działa na `localhost:5173` (`FRONTEND_DEVSERVER_URL`), Go przebudowuje się po zmianie (`build/config.yml`).
 - **Testy:** `webbuild --test` kompiluje `src/**/*.test.ts(x)` do katalogu tymczasowego i uruchamia `node --test`. Testy używają `node:test` i `node:assert`. Typy sprawdza `tsc --noEmit`, a typy `node:test` są opisane lokalnie w `src/testing/node.d.ts` (bez `@types/node`).
 - **Stan:** `src/lib/store.ts` (`createStore`) to mały kontener na `useSyncExternalStore`. `setState` emituje zdarzenie `change` na event busie (`src/lib/bus.ts`). API jak wcześniej: `useX(selector)`, `useX.getState()`, `useX.setState()`, `useX.subscribe()`. Wynik selektora jest zapamiętywany i porównywany przez `Object.is`, więc selektor budujący nową tablicę nie zapętla renderów.
 - **Komendy:** rejestr `src/lib/commands.ts` (`registerCommand({ id, title, category, keys, when, run })`) zasila paletę `⇧⌘P` i jedyny globalny listener `keydown` (faza capture, przed CodeMirror i xterm). Skróty należące do edytora (np. `⌘B`, `⌘S`) paleta tylko wyświetla, a uruchamia je przez keymapę aktywnego edytora.

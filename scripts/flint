@@ -1,5 +1,6 @@
 #!/bin/sh
-# flint [folder] — opens a folder (default: the current one) in a new Flint window.
+# flint [folder] — opens a folder (default: the current one) in Flint. A running
+# Flint takes it over (single instance) and comes to the front.
 set -eu
 
 case "${1:-}" in

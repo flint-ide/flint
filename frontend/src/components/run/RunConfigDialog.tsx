@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { runconfig } from '../../../wailsjs/go/models'
+import { runconfig } from '../../wails/models'
 import { errorMessage } from '../../api/backend'
 import { confirmAction } from '../../store/dialog'
 import {
@@ -93,7 +93,7 @@ export function RunConfigDialog({ editing }: Props) {
           </label>
           <label className="run-type">
             Type
-            <Select block value={type} options={TYPES} onChange={(t) => update({ type: t })} />
+            <Select block value={type} options={TYPES} onChange={(t) => update({ type: t as RunConfig['type'] })} />
           </label>
         </div>
 

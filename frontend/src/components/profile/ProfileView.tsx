@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ClipboardSetText } from '../../../wailsjs/runtime/runtime'
+import { ClipboardSetText } from '../../wails/runtime'
 import { formatValue, frameAt, percent, searchFrames, type FlameFrame, type TopRow } from '../../lib/flame'
 import { showToast } from '../../store/dialog'
 import { useEditor } from '../../store/editor'

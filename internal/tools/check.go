@@ -49,9 +49,17 @@ type (
 // Check looks for every tool in parallel. It waits for the login-shell PATH
 // first: before that, a GUI app sees only launchd's minimal PATH and would
 // report Homebrew tools as missing.
-func Check(ctx context.Context) []Status {
+// overrides maps a tool id to the binary configured in Settings (an absolute
+// path or a command name), which is looked for before the usual names.
+func Check(ctx context.Context, overrides map[string]string) []Status {
 	shellenv.Wait()
-	return check(ctx, All(), exec.LookPath, runVersion)
+	list := All()
+	for i, t := range list {
+		if bin := overrides[t.ID]; bin != "" {
+			list[i] = t.withBinary(bin)
+		}
+	}
+	return check(ctx, list, exec.LookPath, runVersion)
 }
 
 func check(ctx context.Context, list []Tool, lookPath lookPathFunc, run runFunc) []Status {

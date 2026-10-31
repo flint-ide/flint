@@ -93,7 +93,9 @@ func headlessArgs(k Kind, cfg Config, prompt, input string, untrusted bool) ([]s
 		}
 	case Codex:
 		// `codex exec` runs non-interactively and prints the last message on stdout.
-		flint = []string{"exec"}
+		// The prompt carries the repository's diff, so the run may only read,
+		// whatever the user's Codex configuration says.
+		flint = []string{"exec", "--sandbox", "read-only"}
 		if cfg.Model != "" {
 			flint = append(flint, "--model", cfg.Model)
 		}

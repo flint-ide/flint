@@ -34,6 +34,8 @@ type Info struct {
 	Theme   string
 	Agent   string
 	Roots   int // open project folders (their paths stay private)
+	// Tools are the binaries configured in Settings, by tool id (see tools.Check).
+	Tools map[string]string
 }
 
 // Report is a Markdown bug-report body: versions, environment and the end of
@@ -48,7 +50,7 @@ func Report(ctx context.Context, info Info) string {
 	b.WriteString("\n### Tools\n\n")
 	// The same table as the tool check: their versions explain most
 	// environment-specific bugs.
-	for _, s := range tools.Check(ctx) {
+	for _, s := range tools.Check(ctx, info.Tools) {
 		b.WriteString("- " + tools.ReportLine(s) + "\n")
 	}
 	b.WriteString("\n### Log (last lines)\n\n```\n")

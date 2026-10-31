@@ -4,7 +4,11 @@
 // two never disagree about what Flint needs.
 package tools
 
-import "flint/internal/lsp"
+import (
+	"path/filepath"
+
+	"flint/internal/lsp"
+)
 
 // DocsBase is the user documentation site; Tool.Docs is a page relative to it.
 const DocsBase = "https://odudek.github.io/flint/"
@@ -165,4 +169,17 @@ func (t Tool) Binaries() []string {
 		out[i] = c.bin
 	}
 	return out
+}
+
+// withBinary puts a configured binary first. It is asked for its version only
+// when it has a known tool's name; another program may not take the flag.
+func (t Tool) withBinary(bin string) Tool {
+	c := candidate{bin: bin}
+	for _, known := range t.candidates {
+		if known.bin == filepath.Base(bin) {
+			c.args = known.args
+		}
+	}
+	t.candidates = append([]candidate{c}, t.candidates...)
+	return t
 }

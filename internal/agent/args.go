@@ -45,16 +45,20 @@ var reservedFlags = map[Kind][]string{
 		"--permission-prompt-tool", "--permission-mode", "--dangerously-skip-permissions", "--allow-dangerously-skip-permissions",
 		"--session-id", "-r", "--resume", "-c", "--continue", "--fork-session",
 		"--setting-sources", "--settings", "--model",
+		// Pre-approved tools would skip Flint's permission prompt.
+		"--allowedTools", "--allowed-tools", "--disallowedTools", "--disallowed-tools",
 	},
 	Codex: {
 		"-m", "--model", "-a", "--ask-for-approval", "-s", "--sandbox", "--full-auto",
 		"--dangerously-bypass-approvals-and-sandbox", "--yolo", "-C", "--cd", "--listen",
+		// A profile can carry its own sandbox and approval settings.
+		"-p", "--profile",
 	},
 }
 
 // reservedCodexConfig are `-c key=value` keys that would change Codex's
 // approvals, sandbox or which projects it trusts.
-var reservedCodexConfig = []string{"approval_policy", "sandbox", "projects", "dangerously"}
+var reservedCodexConfig = []string{"approval_policy", "sandbox", "projects", "profile", "dangerously"}
 
 // CheckPath validates a Config.Path.
 func CheckPath(path string) error {
@@ -128,7 +132,8 @@ func configOverride(args []string, i int) string {
 	case strings.HasPrefix(a, "--config="):
 		return strings.TrimPrefix(a, "--config=")
 	case strings.HasPrefix(a, "-c") && !strings.HasPrefix(a, "--"):
-		return a[2:]
+		// clap also accepts "-c=key=value".
+		return strings.TrimPrefix(a[2:], "=")
 	}
 	return ""
 }

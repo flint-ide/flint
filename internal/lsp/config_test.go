@@ -45,6 +45,7 @@ func TestCommandFor(t *testing.T) {
 		"pyright-langserver":      "/bin/pyright-langserver",
 		"/opt/pyright-langserver": "/opt/pyright-langserver",
 		"/opt/my-go-server":       "/opt/my-go-server",
+		"/repo/tools/gopls":       "/repo/tools/gopls",
 	}
 	trusted := true
 	cfg := map[string]ServerConfig{}
@@ -75,6 +76,8 @@ func TestCommandFor(t *testing.T) {
 		{"known server by path keeps its args", true, pyKey, ServerConfig{Command: "/opt/pyright-langserver"}, []string{"/opt/pyright-langserver", "--stdio"}, nil, ""},
 		{"gated language stays restricted", false, pyKey, ServerConfig{Command: "/opt/pyright-langserver"}, nil, ErrRestricted, ""},
 		{"custom server trusted", true, goKey, ServerConfig{Command: "/opt/my-go-server", Args: []string{"serve"}}, []string{"/opt/my-go-server", "serve"}, nil, ""},
+		{"known name by path trusted", true, goKey, ServerConfig{Command: "/repo/tools/gopls"}, []string{"/repo/tools/gopls"}, nil, ""},
+		{"known name by path untrusted", false, goKey, ServerConfig{Command: "/repo/tools/gopls"}, nil, ErrRestricted, ""},
 		{"custom server untrusted", false, goKey, ServerConfig{Command: "/opt/my-go-server"}, nil, ErrRestricted, ""},
 		{"relative command", true, goKey, ServerConfig{Command: "bin/gopls"}, nil, nil, "set in Settings"},
 		{"missing command", true, goKey, ServerConfig{Command: "/opt/none"}, nil, nil, "set in Settings"},

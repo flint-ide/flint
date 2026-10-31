@@ -110,5 +110,8 @@ func (s serverSpec) command(cfg ServerConfig, lookPath func(string) (string, err
 	if i < 0 {
 		return []string{path}, true, true
 	}
-	return append([]string{path}, s.Candidates[i][1:]...), false, true
+	// A path to a known server's name may still be a project's own copy or a
+	// wrapper (node_modules/.bin, tools/gopls), so only a bare name found on
+	// PATH counts as the known server in Restricted Mode.
+	return append([]string{path}, s.Candidates[i][1:]...), strings.ContainsRune(cfg.Command, '/'), true
 }

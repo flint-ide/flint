@@ -210,3 +210,23 @@ func headingIDs(md string) []string {
 	}
 	return ids
 }
+
+func TestWithBinary(t *testing.T) {
+	gopls := Tool{ID: "gopls", candidates: []candidate{{bin: "gopls", args: []string{"version"}}}}
+	tests := []struct {
+		bin      string
+		wantArgs []string
+	}{
+		{"/opt/go/bin/gopls", []string{"version"}}, // a known name is asked for its version
+		{"/opt/my-go-server", nil},                 // another program is only looked for
+	}
+	for _, tt := range tests {
+		got := gopls.withBinary(tt.bin)
+		if first := got.candidates[0]; first.bin != tt.bin || !slices.Equal(first.args, tt.wantArgs) {
+			t.Errorf("withBinary(%q) first candidate = %+v", tt.bin, first)
+		}
+		if len(got.candidates) != 2 || len(gopls.candidates) != 1 {
+			t.Errorf("withBinary(%q) = %d candidates, original %d", tt.bin, len(got.candidates), len(gopls.candidates))
+		}
+	}
+}

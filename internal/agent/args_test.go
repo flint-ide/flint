@@ -37,6 +37,11 @@ func TestCheckArgs(t *testing.T) {
 		{"codex config short inline", Codex, []string{`-cprojects."/x".trust_level=trusted`}, "projects"},
 		{"codex listen", Codex, []string{"--listen", "ws://0.0.0.0:1"}, "--listen"},
 		{"codex model short", Codex, []string{"-mo3"}, "-m"},
+		{"codex config short with =", Codex, []string{`-c=sandbox_mode="danger-full-access"`}, "sandbox_mode"},
+		{"codex profile", Codex, []string{"-p", "x"}, "-p"},
+		{"codex profile config", Codex, []string{"-c", `profiles.x.sandbox_mode="danger-full-access"`}, "profiles"},
+		{"claude allowed tools", Claude, []string{"--allowedTools", "Bash"}, "--allowedTools"},
+		{"claude allowed tools kebab", Claude, []string{"--allowed-tools=Bash"}, "--allowed-tools"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -110,7 +115,7 @@ func TestHeadlessArgs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"-c", "model_reasoning_effort=low", "exec", "--model", "o3", "describe\n\ndiff"}; !reflect.DeepEqual(got, want) {
+	if want := []string{"-c", "model_reasoning_effort=low", "exec", "--sandbox", "read-only", "--model", "o3", "describe\n\ndiff"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("codex args = %q, want %q", got, want)
 	}
 	if _, err := headlessArgs(Claude, Config{Model: "-x"}, "p", "", false); err == nil {

@@ -65,6 +65,7 @@ type Manager struct {
 	docs     map[string]*document
 	restarts map[key]int // crash restarts per server, to stop a crash loop
 	closed   bool
+	stopping sync.WaitGroup // servers Reconfigure stops, so Shutdown waits for them too
 }
 
 // maxRestarts bounds automatic restarts of a crashing server.
@@ -229,6 +230,7 @@ func (m *Manager) Shutdown() {
 		}
 	}
 	wg.Wait()
+	m.stopping.Wait()
 }
 
 // request waits for the document's server and performs a call.
@@ -392,7 +394,8 @@ func (m *Manager) Reconfigure(language string) {
 		select {
 		case <-e.ready:
 			if e.srv != nil {
-				go e.srv.shutdown()
+				m.stopping.Add(1)
+				go func(s *server) { defer m.stopping.Done(); s.shutdown() }(e.srv)
 			}
 		default:
 			// Still starting: start() sees the entry was replaced and stops it.

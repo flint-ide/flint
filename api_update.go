@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
 	"time"
 
 	"flint/internal/config"
@@ -17,12 +18,17 @@ const (
 	// The first check waits until launch is over, so it never competes with
 	// opening the project.
 	updateStartDelay = 5 * time.Second
+	// updateRecheck is how often the loop looks whether a day has passed.
+	updateRecheck = time.Hour
+	// manualCheckReuse: a manual check this soon after the last one reuses its answer.
+	manualCheckReuse = 10 * time.Second
 )
 
 // UpdateAPI tells the user about new Flint releases. Flint only links to the
 // release page; it never downloads or installs anything itself.
 type UpdateAPI struct {
 	app *App
+	mu  sync.Mutex // one manual check at a time
 }
 
 // Check asks GitHub now, ignoring the daily limit and the checkForUpdates
@@ -33,10 +39,20 @@ func (u *UpdateAPI) Check() (update.Result, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	rel, err := a.fetchRelease(ctx, time.Now())
-	if err != nil {
-		slog.Info("update check failed", "error", err)
-		return update.Result{}, err
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	// Repeated clicks reuse an answer a few seconds old instead of asking
+	// GitHub (and rewriting state.json) again.
+	st := a.updateState()
+	var rel update.Release
+	if st.Latest != nil && time.Since(st.CheckedAt) < manualCheckReuse {
+		rel = *st.Latest
+	} else {
+		var err error
+		if rel, err = a.fetchRelease(ctx, time.Now()); err != nil {
+			slog.Info("update check failed", "error", err)
+			return update.Result{}, err
+		}
 	}
 	r := update.Evaluate(diag.Version(version), rel, a.updateState().Skipped)
 	if r.Available && !r.Dev {
@@ -80,18 +96,22 @@ func (u *UpdateAPI) OpenRelease() error {
 	return u.app.openURL(link)
 }
 
-// watchForUpdates checks shortly after launch and then once a day while Flint
-// runs, until ctx ends (the application quits).
+// watchForUpdates checks shortly after launch and then whenever the last
+// check is a day old, until ctx ends (the application quits). It looks every
+// hour rather than sleeping a whole day, so a manual check or a setting
+// turned on later can't push the next check a day further.
 func (a *App) watchForUpdates(ctx context.Context) {
-	delay := updateStartDelay
+	delay, first := updateStartDelay, true
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-time.After(delay):
 		}
-		a.checkForUpdate(ctx, diag.Version(version), time.Now())
-		delay = update.Interval
+		if now := time.Now(); first || update.Due(a.updateState().CheckedAt, now) {
+			a.checkForUpdate(ctx, diag.Version(version), now)
+		}
+		delay, first = updateRecheck, false
 	}
 }
 

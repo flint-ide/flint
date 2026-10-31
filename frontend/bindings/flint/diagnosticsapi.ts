@@ -65,6 +65,8 @@ export function ToolCheckOnFirstRun(): $CancellablePromise<boolean> {
 /**
  * Tools reports which external tools Flint drives are installed, with their
  * versions. Only fixed version commands run, never in a project folder.
+ * Calls run one at a time, so a UI that keeps asking can't start a dozen
+ * version commands per call in parallel.
  */
 export function Tools(): $CancellablePromise<tools$0.Status[]> {
     return $Call.ByID(2039057627).then(($result: any) => {

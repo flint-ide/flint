@@ -4350,3 +4350,63 @@ body.file-drop-target-active::after {
   color: var(--accent);
   cursor: pointer;
 }
+
+.kube-view {
+  flex: none;
+}
+.kube-filter {
+  flex: 1;
+  min-width: 0;
+}
+.kube-partial {
+  font-size: 11px;
+}
+.kube-app-row .file-name {
+  font-weight: 600;
+}
+.kube-source {
+  flex: none;
+  font-size: 10px;
+  padding: 0 5px;
+  border-radius: 6px;
+  color: var(--badge-purple-fg);
+  background: var(--badge-purple-bg);
+}
+.kube-app-body {
+  padding-bottom: 4px;
+}
+.kube-pod {
+  padding-left: 40px;
+}
+.kube-problem {
+  padding: 1px 10px 2px 30px;
+  font-size: 11px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+.kube-problem.bad {
+  color: var(--danger);
+}
+.kube-problem.warn {
+  color: var(--warn);
+}
+.kube-pod-problem {
+  padding-left: 56px;
+}
+.kube-more {
+  margin-left: 30px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.kube-ai {
+  flex: none;
+  font-size: 10px;
+  padding: 0 6px;
+  border-radius: 6px;
+  color: var(--accent);
+}

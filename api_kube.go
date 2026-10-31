@@ -60,6 +60,15 @@ func (k *KubeAPI) RolloutRestart(kubeContext, namespace, kind, name string) erro
 	return kc.RolloutRestart(k.app.ctx, kubeContext, namespace, kind, name)
 }
 
+// RolloutUndo rolls a workload back to its previous revision.
+func (k *KubeAPI) RolloutUndo(kubeContext, namespace, kind, name string) error {
+	kc, err := k.kubectl()
+	if err != nil {
+		return err
+	}
+	return kc.RolloutUndo(k.app.ctx, kubeContext, namespace, kind, name)
+}
+
 // Scale sets a Deployment's or StatefulSet's replicas.
 func (k *KubeAPI) Scale(kubeContext, namespace, kind, name string, replicas int) error {
 	kc, err := k.kubectl()
@@ -145,4 +154,14 @@ func overrideKubeconfig(c kube.Context, namespace string) []byte {
 		out += "    namespace: " + q(namespace) + "\n"
 	}
 	return []byte(out)
+}
+
+// Diagnose gathers an unhealthy app's state and failing pods' logs (redacted)
+// for an AI agent.
+func (k *KubeAPI) Diagnose(kubeContext, namespace, appKey string) (string, error) {
+	kc, err := k.kubectl()
+	if err != nil {
+		return "", err
+	}
+	return kc.Diagnose(k.app.ctx, kubeContext, namespace, appKey)
 }

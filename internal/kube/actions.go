@@ -54,3 +54,16 @@ func (k *Kubectl) DeletePod(ctx context.Context, kubeContext, namespace, name st
 	_, err = k.run(ctx, actionTimeout, append(args, "delete", "pod", name, "--wait=false")...)
 	return err
 }
+
+// RolloutUndo rolls a workload back to its previous revision.
+func (k *Kubectl) RolloutUndo(ctx context.Context, kubeContext, namespace, kind, name string) error {
+	if !slices.Contains(restartable, kind) || !validName(name) {
+		return fmt.Errorf("cannot undo %s %q", kind, name)
+	}
+	args, err := scope(kubeContext, namespace)
+	if err != nil {
+		return err
+	}
+	_, err = k.run(ctx, actionTimeout, append(args, "rollout", "undo", kind+"/"+name)...)
+	return err
+}

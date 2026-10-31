@@ -101,6 +101,7 @@ func TestActionsBuildExactCommands(t *testing.T) {
 		k.Scale(ctx, kc, "apps", "StatefulSet", "db", 0),
 		k.DeletePod(ctx, kc, "apps", "api-7d9f-abcde"),
 		k.UseContext(ctx, kc),
+		k.RolloutUndo(ctx, kc, "apps", "Deployment", "api"),
 	} {
 		if err != nil {
 			t.Fatal(err)
@@ -110,7 +111,8 @@ func TestActionsBuildExactCommands(t *testing.T) {
 	want := "--context=" + kc + " --request-timeout=15s --namespace=apps rollout restart Deployment/api\n" +
 		"--context=" + kc + " --request-timeout=15s --namespace=apps scale StatefulSet/db --replicas=0\n" +
 		"--context=" + kc + " --request-timeout=15s --namespace=apps delete pod api-7d9f-abcde --wait=false\n" +
-		"config use-context " + kc + "\n"
+		"config use-context " + kc + "\n" +
+		"--context=" + kc + " --request-timeout=15s --namespace=apps rollout undo Deployment/api\n"
 	if string(b) != want {
 		t.Fatalf("calls:\n%s\nwant:\n%s", b, want)
 	}

@@ -12,6 +12,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as acpdriver$0 from "./internal/agentsession/acpdriver/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as settings$0 from "./internal/settings/models.js";
 
 /**
@@ -20,6 +23,14 @@ import * as settings$0 from "./internal/settings/models.js";
  */
 export function CheckAgent(name: string, a: settings$0.AgentSettings): $CancellablePromise<string> {
     return $Call.ByID(4264446072, name, a);
+}
+
+/**
+ * CheckCustomAgents reports why a list of custom agents would not be saved
+ * ("" when it would).
+ */
+export function CheckCustomAgents(list: settings$0.CustomAgent[]): $CancellablePromise<string> {
+    return $Call.ByID(1278730526, list);
 }
 
 /**
@@ -49,9 +60,24 @@ export function Get(): $CancellablePromise<settings$0.Settings> {
 }
 
 /**
+ * ProbeCustomAgent starts a saved custom agent, runs the ACP `initialize`
+ * handshake and stops it, so Settings can show whether the command speaks
+ * ACP (and the agent's name and version). Only agents already in settings
+ * can be checked, so this binding runs nothing the settings file doesn't
+ * name. The agent starts in an empty temporary folder, not in a project, so
+ * no project configuration is read; no session is opened.
+ */
+export function ProbeCustomAgent(id: string): $CancellablePromise<acpdriver$0.AgentInfo> {
+    return $Call.ByID(3601295811, id).then(($result: any) => {
+        return $$createType1($result);
+    });
+}
+
+/**
  * Save validates and stores the settings, returning what was written. The native
  * window follows a theme change right away and changed language servers restart;
- * agent settings are read when a session starts.
+ * agent settings are read when a session starts, and custom agents are
+ * registered again (running chats keep theirs).
  */
 export function Save(next: settings$0.Settings): $CancellablePromise<settings$0.Settings> {
     return $Call.ByID(2801417772, next).then(($result: any) => {
@@ -61,3 +87,4 @@ export function Save(next: settings$0.Settings): $CancellablePromise<settings$0.
 
 // Private type creation functions
 const $$createType0 = settings$0.Settings.createFrom;
+const $$createType1 = acpdriver$0.AgentInfo.createFrom;

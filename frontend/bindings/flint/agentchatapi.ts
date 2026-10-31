@@ -16,7 +16,8 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as agentsession$0 from "./internal/agentsession/models.js";
 
 /**
- * Agents lists the agents available for chat sessions.
+ * Agents lists the agents available for chat sessions: the native CLIs found,
+ * then the custom ACP agents whose command resolves.
  */
 export function Agents(): $CancellablePromise<string[]> {
     return $Call.ByID(2156074381).then(($result: any) => {

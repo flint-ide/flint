@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -88,6 +89,9 @@ func Inside(path, cwd string) bool {
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, "../") && !filepath.IsAbs(rel)
 }
 
+// Resolve cleans path and resolves the symlinks in its longest existing prefix.
+func Resolve(path string) string { return resolveExisting(filepath.Clean(path)) }
+
 // resolveExisting resolves symlinks in the longest existing prefix of p, so a link
 // inside the project pointing outside it is judged by its target.
 func resolveExisting(p string) string {
@@ -118,6 +122,7 @@ type Manager struct {
 
 	mu       sync.Mutex
 	drivers  map[string]Driver
+	retired  []Driver // replaced or removed drivers that may still run sessions
 	sessions map[string]*managed
 	policy   Policy
 }
@@ -147,11 +152,38 @@ func (m *Manager) emit(e Event) {
 	m.emitRaw(e)
 }
 
-// Register makes a driver available under name ("claude", "codex", ...).
+// Register makes a driver available under name ("claude", "codex", ...). A
+// driver it replaces keeps the sessions it runs until they stop.
 func (m *Manager) Register(name string, d Driver) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.retire(m.drivers[name])
 	m.drivers[name] = d
+}
+
+// Unregister removes name from new sessions; running ones keep their driver.
+func (m *Manager) Unregister(name string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.retire(m.drivers[name])
+	delete(m.drivers, name)
+}
+
+// retire keeps d for Close while sessions still use it, and forgets retired
+// drivers that no session uses any more (they have nothing left to stop).
+// Called with m.mu held.
+func (m *Manager) retire(d Driver) {
+	if d != nil {
+		m.retired = append(m.retired, d)
+	}
+	m.retired = slices.DeleteFunc(m.retired, func(r Driver) bool {
+		for _, s := range m.sessions {
+			if s.driver == r {
+				return false
+			}
+		}
+		return true
+	})
 }
 
 // Agents lists registered driver names, sorted.
@@ -349,7 +381,8 @@ func (m *Manager) Stop(sessionID string) error {
 // Close stops every session and driver.
 func (m *Manager) Close() error {
 	m.mu.Lock()
-	drivers := m.drivers
+	drivers := slices.Concat(slices.Collect(maps.Values(m.drivers)), m.retired)
+	m.retired = nil
 	for _, s := range m.sessions {
 		if s.cancel != nil {
 			s.cancel()

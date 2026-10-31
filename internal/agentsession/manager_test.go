@@ -304,3 +304,50 @@ func TestResumeRegistersTheSession(t *testing.T) {
 		t.Error("unknown agent should fail")
 	}
 }
+
+// closeCounting records Close calls.
+type closeCounting struct {
+	*fakeDriver
+	closes int
+}
+
+func (c *closeCounting) Close() error {
+	c.closes++
+	return nil
+}
+
+func TestReplacedDriverKeepsItsSessions(t *testing.T) {
+	m := NewManager(func(Event) {})
+	old := &closeCounting{fakeDriver: newFake("")}
+	idle := &closeCounting{fakeDriver: newFake("")}
+	m.Register("gemini", old)
+	m.Register("other", idle)
+	if _, err := m.Start(context.Background(), "gemini", t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	next := &closeCounting{fakeDriver: newFake("")}
+	m.Register("gemini", next) // settings changed
+	m.Unregister("other")      // removed from settings
+	if got := m.Agents(); len(got) != 1 || got[0] != "gemini" {
+		t.Errorf("Agents() = %v, want [gemini]", got)
+	}
+	// The running session still talks to the driver that started it.
+	if err := m.Respond("s1", "p1", "yes"); err != nil {
+		t.Fatal(err)
+	}
+	if opt := <-old.answered; opt != "yes" {
+		t.Errorf("old driver got %q", opt)
+	}
+	if _, err := m.Start(context.Background(), "other", t.TempDir()); err == nil {
+		t.Error("an unregistered agent still starts")
+	}
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if old.closes != 1 || next.closes != 1 {
+		t.Errorf("Close: old closed %d times, new %d; want both once", old.closes, next.closes)
+	}
+	if idle.closes != 0 {
+		t.Errorf("a removed driver without sessions was kept and closed %d times", idle.closes)
+	}
+}

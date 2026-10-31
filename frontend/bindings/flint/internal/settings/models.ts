@@ -56,6 +56,67 @@ export class AgentSettings {
 }
 
 /**
+ * CustomAgent is an agent Flint talks to over the Agent Client Protocol
+ * ("customAgents"): any CLI with an ACP mode, added without code. There is no
+ * environment field on purpose: settings.json is plain text, so API keys
+ * don't belong here; agents log in with their own command and keep the
+ * credentials themselves.
+ */
+export class CustomAgent {
+    /**
+     * ID names the agent in the agent pickers and in "defaultAgent"
+     * (lowercase, may not be a built-in agent's name).
+     */
+    "id": string;
+
+    /**
+     * Name is shown in Settings; empty shows the ID.
+     */
+    "name": string;
+
+    /**
+     * Command is the executable: a bare name looked up on the login PATH or
+     * an absolute path, never one relative to the project.
+     */
+    "command": string;
+
+    /**
+     * Args start the CLI in ACP mode (for example "--experimental-acp").
+     */
+    "args": string[];
+
+    /** Creates a new CustomAgent instance. */
+    constructor($$source: Partial<CustomAgent> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("command" in $$source)) {
+            this["command"] = "";
+        }
+        if (!("args" in $$source)) {
+            this["args"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CustomAgent instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CustomAgent {
+        const $$createField3_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("args" in $$parsedSource) {
+            $$parsedSource["args"] = $$createField3_0($$parsedSource["args"]);
+        }
+        return new CustomAgent($$parsedSource as Partial<CustomAgent>);
+    }
+}
+
+/**
  * Font is a monospace font setup shared by the editor and terminal sections.
  */
 export class Font {
@@ -193,8 +254,8 @@ export class Settings {
     "terminal": Font;
 
     /**
-     * DefaultAgent starts new agent chats ("claude" / "codex"); empty means the
-     * first installed one.
+     * DefaultAgent starts new agent chats ("claude", "codex" or a custom
+     * agent's id); empty means the first installed one.
      */
     "defaultAgent": string;
 
@@ -232,6 +293,11 @@ export class Settings {
      * Agents configures the agent CLIs by name ("claude", "codex").
      */
     "agents": { [_ in string]?: AgentSettings };
+
+    /**
+     * CustomAgents are ACP agents added by the user (see CustomAgent).
+     */
+    "customAgents": CustomAgent[];
 
     /**
      * LanguageServers configures language servers by language ("go", …).
@@ -278,6 +344,9 @@ export class Settings {
         if (!("agents" in $$source)) {
             this["agents"] = {};
         }
+        if (!("customAgents" in $$source)) {
+            this["customAgents"] = [];
+        }
         if (!("languageServers" in $$source)) {
             this["languageServers"] = {};
         }
@@ -298,7 +367,8 @@ export class Settings {
         const $$createField9_0 = $$createType0;
         const $$createField10_0 = $$createType4;
         const $$createField11_0 = $$createType6;
-        const $$createField12_0 = $$createType7;
+        const $$createField12_0 = $$createType8;
+        const $$createField13_0 = $$createType9;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -315,11 +385,14 @@ export class Settings {
         if ("agents" in $$parsedSource) {
             $$parsedSource["agents"] = $$createField10_0($$parsedSource["agents"]);
         }
+        if ("customAgents" in $$parsedSource) {
+            $$parsedSource["customAgents"] = $$createField11_0($$parsedSource["customAgents"]);
+        }
         if ("languageServers" in $$parsedSource) {
-            $$parsedSource["languageServers"] = $$createField11_0($$parsedSource["languageServers"]);
+            $$parsedSource["languageServers"] = $$createField12_0($$parsedSource["languageServers"]);
         }
         if ("refresh" in $$parsedSource) {
-            $$parsedSource["refresh"] = $$createField12_0($$parsedSource["refresh"]);
+            $$parsedSource["refresh"] = $$createField13_0($$parsedSource["refresh"]);
         }
         return new Settings($$parsedSource as Partial<Settings>);
     }
@@ -331,6 +404,8 @@ const $$createType1 = Font.createFrom;
 const $$createType2 = $Create.Map($Create.Any, $Create.Any);
 const $$createType3 = AgentSettings.createFrom;
 const $$createType4 = $Create.Map($Create.Any, $$createType3);
-const $$createType5 = LanguageServerSettings.createFrom;
-const $$createType6 = $Create.Map($Create.Any, $$createType5);
-const $$createType7 = Refresh.createFrom;
+const $$createType5 = CustomAgent.createFrom;
+const $$createType6 = $Create.Array($$createType5);
+const $$createType7 = LanguageServerSettings.createFrom;
+const $$createType8 = $Create.Map($Create.Any, $$createType7);
+const $$createType9 = Refresh.createFrom;

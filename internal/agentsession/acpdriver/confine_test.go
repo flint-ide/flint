@@ -5,7 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"testing"
+	"time"
 
 	"flint/internal/acp"
 	as "flint/internal/agentsession"
@@ -119,5 +121,84 @@ func TestProtectedWriteAsksTheUser(t *testing.T) {
 	s.sink = func(as.Event) {}
 	if err := h.WriteTextFile(cancelled, acp.WriteTextFileRequest{SessionID: "s1", Path: filepath.Join(cwd, ".idea/x.xml"), Content: "x"}); err == nil {
 		t.Error("write without an answer succeeded")
+	}
+}
+
+func TestReadRefusesFIFOsAndHugeFiles(t *testing.T) {
+	cwd := t.TempDir()
+	fifo := filepath.Join(cwd, "pipe")
+	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	big := filepath.Join(cwd, "big.log")
+	f, err := os.Create(big)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Truncate(maxReadBytes + 1); err != nil { // sparse: no disk used
+		t.Fatal(err)
+	}
+	f.Close()
+	h := &handler{s: &session{id: "s1", cwd: cwd}}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for _, path := range []string{fifo, big, cwd} {
+			if _, err := h.ReadTextFile(context.Background(), acp.ReadTextFileRequest{SessionID: "s1", Path: path}); err == nil {
+				t.Errorf("read of %s succeeded", path)
+			}
+		}
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("reading a FIFO blocked the handler")
+	}
+}
+
+// An agent's write never changes a file through another of its names (a
+// hard link to a file outside the project) and keeps the permissions.
+func TestWriteBreaksHardLinks(t *testing.T) {
+	cwd := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "zshrc")
+	if err := os.WriteFile(outside, []byte("original"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	linked := filepath.Join(cwd, "notes.txt")
+	if err := os.Link(outside, linked); err != nil {
+		t.Fatal(err)
+	}
+	h := &handler{s: &session{id: "s1", cwd: cwd}}
+	if err := h.WriteTextFile(context.Background(), acp.WriteTextFileRequest{SessionID: "s1", Path: linked, Content: "agent"}); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(outside); string(data) != "original" {
+		t.Errorf("the file outside the project became %q", data)
+	}
+	info, err := os.Stat(linked)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(linked); string(data) != "agent" || info.Mode().Perm() != 0o640 {
+		t.Errorf("written file = %q, mode %v", data, info.Mode().Perm())
+	}
+}
+
+func TestWriteRechecksTheResolvedTarget(t *testing.T) {
+	cwd := t.TempDir()
+	outside := t.TempDir()
+	// confine passed while dir was a real directory; by the time of the
+	// write it is a link out of the project.
+	if err := os.Symlink(outside, filepath.Join(cwd, "dir")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeConfined(cwd, filepath.Join(cwd, "dir", "x"), "x"); err == nil {
+		t.Error("write through a link out of the project succeeded")
+	}
+	if _, err := readRegular(cwd, filepath.Join(cwd, "dir", "x")); err == nil {
+		t.Error("read through a link out of the project succeeded")
+	}
+	if _, err := os.Stat(filepath.Join(outside, "x")); !os.IsNotExist(err) {
+		t.Errorf("file written outside: %v", err)
 	}
 }

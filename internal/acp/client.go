@@ -26,6 +26,9 @@ const (
 	exitGrace = 2 * time.Second
 	// killGrace is how long Close waits after SIGTERM before SIGKILL.
 	killGrace = 3 * time.Second
+	// handlerGrace is how long the shutdown waits for request handlers that
+	// were cancelled but haven't returned (one stuck in a system call).
+	handlerGrace = 2 * time.Second
 )
 
 const (
@@ -211,7 +214,18 @@ func (c *Client) supervise() {
 
 	c.err = c.finalError(waitErr)
 	c.conn.shutdown(c.err)
-	c.conn.waitHandlers()
+	// Handlers are cancelled now. One that ignores that (blocked reading a
+	// FIFO, say) must not keep Close, a one-shot run or quitting Flint
+	// waiting; its late reply goes to a closed pipe.
+	handlersDone := make(chan struct{})
+	go func() {
+		c.conn.waitHandlers()
+		close(handlersDone)
+	}()
+	select {
+	case <-handlersDone:
+	case <-time.After(handlerGrace):
+	}
 	close(c.done)
 }
 

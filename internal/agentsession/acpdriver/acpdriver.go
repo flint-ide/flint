@@ -8,14 +8,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"syscall"
 
 	"flint/internal/acp"
 	as "flint/internal/agentsession"
+	"flint/internal/config"
 	"flint/internal/shellenv"
 	"flint/internal/workspace"
 )
@@ -316,8 +320,7 @@ func (h *handler) WriteTextFile(ctx context.Context, req acp.WriteTextFileReques
 			return fmt.Errorf("writing %s was not approved (files in %s need your approval)", path, dir)
 		}
 	}
-	// Same save path as the editor: follows symlinks, keeps permissions.
-	return workspace.WriteFile(path, req.Content)
+	return writeConfined(h.s.cwd, path, req.Content)
 }
 
 // writeOptions answer a write Flint asks the user about itself.
@@ -339,17 +342,90 @@ func (s *session) approveWrite(ctx context.Context, path, content string) bool {
 	return ok && opt == writeOptions[0].ID
 }
 
+// maxReadBytes caps fs/read_text_file at the editor's limit, so a request
+// for a multi-GB file doesn't load it into memory.
+const maxReadBytes = workspace.MaxFileSize
+
 // readConfined serves fs/read_text_file inside root.
 func readConfined(root string, req acp.ReadTextFileRequest) (string, error) {
 	path, err := confine(root, req.Path)
 	if err != nil {
 		return "", err
 	}
-	data, err := os.ReadFile(path)
+	data, err := readRegular(root, path)
 	if err != nil {
 		return "", err
 	}
 	return acp.ApplyLineWindow(string(data), req), nil
+}
+
+// readRegular reads a regular file of at most maxReadBytes. The path is
+// resolved and checked against root again right before it is opened (a link
+// may have changed since confine), and the opened file is what's checked: a
+// FIFO or a device would block the handler, and with it Close and quitting.
+func readRegular(root, path string) ([]byte, error) {
+	target, err := resolveInside(root, path)
+	if err != nil {
+		return nil, err
+	}
+	// O_NONBLOCK: opening a FIFO doesn't wait for a writer. O_NOFOLLOW: the
+	// last component was just resolved, a link there now is a swap.
+	f, err := os.OpenFile(target, os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("not a regular file: %s", path)
+	}
+	data, err := io.ReadAll(io.LimitReader(f, maxReadBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxReadBytes {
+		return nil, fmt.Errorf("%s is larger than %d MB, too large to read through Flint", path, maxReadBytes>>20)
+	}
+	return data, nil
+}
+
+// writeConfined saves an agent's fs/write_text_file. Like the editor's save
+// it follows symlinks and keeps the file's permissions, but the target is
+// checked against root again right before writing, only regular files are
+// replaced, and the new content always goes to a temporary file that is
+// renamed into place: writing in place through a hard link would change the
+// file's other names too, which may be outside the project.
+func writeConfined(root, path, content string) error {
+	target, err := resolveInside(root, path)
+	if err != nil {
+		return err
+	}
+	perm := fs.FileMode(0o644)
+	info, err := os.Lstat(target)
+	switch {
+	case err == nil && !info.Mode().IsRegular():
+		return fmt.Errorf("not a regular file: %s", path)
+	case err == nil:
+		perm = info.Mode().Perm()
+	case !errors.Is(err, fs.ErrNotExist):
+		return err
+	}
+	return config.WriteFileAtomic(target, []byte(content), perm)
+}
+
+// resolveInside resolves the symlinks in path and refuses a result outside
+// root. What remains between this check and the use is a race with the agent
+// itself swapping a directory for a link, which an agent that can do that
+// could exploit with its own tools anyway.
+func resolveInside(root, path string) (string, error) {
+	target := as.Resolve(path)
+	if !as.Inside(target, root) {
+		return "", fmt.Errorf("access outside the project denied: %s", path)
+	}
+	return target, nil
 }
 
 // confine accepts only absolute paths that stay inside root (symlinks

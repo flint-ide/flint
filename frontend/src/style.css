@@ -1981,6 +1981,12 @@ button.small {
 .status-action.on {
   color: var(--accent);
 }
+.status-update {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
 
 .context-anchor {
   position: fixed;

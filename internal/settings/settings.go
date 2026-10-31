@@ -1,6 +1,6 @@
 // Package settings holds the user's preferences (settings.json in the config
-// directory): theme, editor and terminal fonts, the default agent and keyboard
-// shortcut overrides. Loading is forgiving (a hand-edited file never stops Flint
+// directory): theme, editor and terminal fonts, the default agent, keyboard
+// shortcut overrides and whether to look for new releases. Loading is forgiving (a hand-edited file never stops Flint
 // from starting: bad values fall back to defaults, unknown keys are ignored);
 // saving is strict. Nothing secret belongs here: credentials live in the Keychain.
 package settings
@@ -72,6 +72,10 @@ type Settings struct {
 	// NotifyInBackground shows a notification and a Dock badge when a run, a
 	// test run or an agent finishes while Flint is in the background.
 	NotifyInBackground bool `json:"notifyInBackground"`
+	// CheckForUpdates asks GitHub once a day whether a newer Flint release
+	// exists (internal/update). Off means Flint never asks on its own; the
+	// "Check for Updates…" command still works.
+	CheckForUpdates bool `json:"checkForUpdates"`
 	// Keymap overrides command shortcuts: command id → "Mod+Shift+X", or "" to
 	// remove the shortcut. Commands not listed keep their default keys.
 	Keymap map[string]string `json:"keymap"`
@@ -96,6 +100,7 @@ func Default() Settings {
 			LineHeight: 1.2,
 		},
 		NotifyInBackground: true,
+		CheckForUpdates:    true,
 		Keymap:             map[string]string{},
 		TodoExclude:        []string{},
 	}

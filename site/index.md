@@ -63,7 +63,7 @@ See [Kubernetes](guides/kubernetes.md), [AWS](guides/aws.md) and [Docker](guides
 
 ## Privacy
 
-Flint has no telemetry and sends nothing automatically. See [Privacy and security](reference/privacy-and-security.md).
+Flint has no telemetry. The only request it makes on its own is a daily check for a newer release, which you can turn off. See [Privacy and security](reference/privacy-and-security.md).
 
 ## Getting help
 

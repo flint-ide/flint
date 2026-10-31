@@ -22,6 +22,8 @@ export interface AppSettings {
   autoSave: boolean
   /** Notification and Dock badge when work finishes while Flint is in the background. */
   notifyInBackground: boolean
+  /** Ask GitHub once a day whether a newer Flint release exists. */
+  checkForUpdates: boolean
   /** Shortcut overrides: command id → keys ('' = none). */
   keymap: Record<string, string>
   /** Extra folders / globs the TODO list skips, gitignore-style. */
@@ -37,6 +39,7 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   defaultAgent: '',
   autoSave: false,
   notifyInBackground: true,
+  checkForUpdates: true,
   keymap: Object.freeze({}) as Record<string, string>,
   todoExclude: Object.freeze([]) as unknown as string[],
 }) as AppSettings
@@ -109,6 +112,7 @@ export function coerceSettings(v: unknown): AppSettings {
     defaultAgent: typeof v.defaultAgent === 'string' ? v.defaultAgent : d.defaultAgent,
     autoSave: typeof v.autoSave === 'boolean' ? v.autoSave : d.autoSave,
     notifyInBackground: typeof v.notifyInBackground === 'boolean' ? v.notifyInBackground : d.notifyInBackground,
+    checkForUpdates: typeof v.checkForUpdates === 'boolean' ? v.checkForUpdates : d.checkForUpdates,
     keymap,
     todoExclude: Array.isArray(v.todoExclude) ? v.todoExclude.filter((p): p is string => typeof p === 'string' && validExclude(p)) : [],
   }

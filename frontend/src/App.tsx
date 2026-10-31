@@ -21,6 +21,7 @@ import { refreshTrust, useTrust } from './store/trust'
 import { TrustBanner } from './components/layout/TrustBanner'
 import { copyDiagnostics, reportIssue, showLogs } from './store/diagnostics'
 import { subscribeAlerts } from './store/alerts'
+import { checkForUpdates, subscribeUpdates } from './store/update'
 import type { DroppedPath } from './lib/drop'
 import { UsagesModal } from './components/lsp/UsagesModal'
 import { showToast } from './store/dialog'
@@ -81,6 +82,7 @@ export default function App() {
     subscribeSessionAutosave()
     subscribeAutoSave()
     subscribeAlerts()
+    subscribeUpdates()
     // Native File menu: Open Folder… / Open Recent ▸ <folder>.
     EventsOn('menu:open-recent', () => useWorkspace.getState().setRecentOpen(true))
     EventsOn('menu:open-folder', (path: string) => void useWorkspace.getState().openFolder(path))
@@ -89,6 +91,7 @@ export default function App() {
     EventsOn('menu:report-issue', () => void reportIssue())
     EventsOn('menu:copy-diagnostics', () => void copyDiagnostics())
     EventsOn('menu:show-logs', showLogs)
+    EventsOn('menu:check-updates', () => void checkForUpdates())
     EventsOn('files:dropped', (dropped: DroppedPath[]) => void openDropped(dropped))
     void useDatabase.getState().loadConnections()
     void useScratch.getState().load()

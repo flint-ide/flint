@@ -56,6 +56,7 @@ The full reference, with every detail and all keyboard shortcuts, is in [docs/FE
 - Settings tab with theme (Dark, Light, System), fonts and a fully editable keymap; a command palette for every action
 - Restricted Mode for folders you have not trusted yet
 - Local diagnostics log and a Report an Issue command; no telemetry
+- A notice when a new release is out (one anonymous request to GitHub a day, can be turned off; nothing is downloaded or installed for you)
 
 ## Install
 

@@ -21,6 +21,7 @@ const (
 	eventMenuReportIssue     = "menu:report-issue"
 	eventMenuCopyDiagnostics = "menu:copy-diagnostics"
 	eventMenuShowLogs        = "menu:show-logs"
+	eventMenuCheckUpdates    = "menu:check-updates"
 )
 
 // buildMenu creates the native macOS menu bar. File ▸ Open Recent mirrors the
@@ -65,6 +66,8 @@ func (a *App) buildMenu() *application.Menu {
 	help.Add("Report an Issue…").OnClick(func(*application.Context) { a.emit(eventMenuReportIssue) })
 	help.Add("Copy Diagnostics").OnClick(func(*application.Context) { a.emit(eventMenuCopyDiagnostics) })
 	help.Add("Show Logs in Finder").OnClick(func(*application.Context) { a.emit(eventMenuShowLogs) })
+	help.AddSeparator()
+	help.Add("Check for Updates…").OnClick(func(*application.Context) { a.emit(eventMenuCheckUpdates) })
 	return m
 }
 

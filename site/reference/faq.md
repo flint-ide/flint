@@ -16,11 +16,11 @@ No. Flint is a single native process that uses the macOS system WebView (WKWebVi
 
 ### Does Flint collect telemetry?
 
-No. Flint sends nothing automatically. See [Privacy and security](privacy-and-security.md).
+No. The only request Flint makes on its own is a daily check for a newer release on GitHub, which sends no identifiers and can be turned off in Settings ▸ Updates. See [Privacy and security](privacy-and-security.md#update-check).
 
 ### Does Flint update itself?
 
-No. Download new versions from the [releases page](https://github.com/ODudek/flint/releases) and replace the app. See [Updating](../installation.md#updating).
+No. Flint tells you when a newer release exists (a notice in the status bar, or **Help ▸ Check for Updates…**), but you download it from the [releases page](https://github.com/ODudek/flint/releases) and replace the app yourself. See [Updating](../installation.md#updating).
 
 ## Agents
 

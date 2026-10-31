@@ -206,6 +206,11 @@ func TestPolicyMatrix(t *testing.T) {
 		{"edit escaping with ..", ToolCall{Kind: ToolEdit, Paths: []string{cwd + "/../evil"}}, false},
 		{"edit git hook", ToolCall{Kind: ToolEdit, Paths: []string{cwd + "/.git/hooks/pre-commit"}}, false},
 		{"edit agent config", ToolCall{Kind: ToolEdit, Paths: []string{cwd + "/.claude/settings.json"}}, false},
+		{"edit nested git config", ToolCall{Kind: ToolEdit, Paths: []string{cwd + "/vendor/x/.git/config"}}, false},
+		{"create a repository", ToolCall{Kind: ToolEdit, Paths: []string{"x/.git/HEAD"}}, false},
+		{"edit upper-case git dir", ToolCall{Kind: ToolEdit, Paths: []string{cwd + "/.GIT/config"}}, false},
+		{"edit nested editor config", ToolCall{Kind: ToolEdit, Paths: []string{cwd + "/app/.VSCode/tasks.json"}}, false},
+		{"edit a .gitignore", ToolCall{Kind: ToolEdit, Paths: []string{cwd + "/app/.gitignore"}}, true},
 		{"one path outside", ToolCall{Kind: ToolEdit, Paths: []string{in, "/etc/hosts"}}, false},
 		{"read ssh key", ToolCall{Kind: ToolRead, Paths: []string{"/Users/me/.ssh/id_ed25519"}}, false},
 		{"execute", ToolCall{Kind: ToolExecute, Paths: []string{in}}, false},
@@ -232,6 +237,22 @@ func TestSymlinkOutsideProjectIsNotInside(t *testing.T) {
 	}
 	if allInside([]string{cwd + "/link/x.go"}, cwd) {
 		t.Error("a symlink pointing outside the project must not count as inside")
+	}
+}
+
+func TestSymlinkIntoGitDirIsProtected(t *testing.T) {
+	cwd := t.TempDir()
+	if err := os.MkdirAll(cwd+"/.git", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(cwd+"/.git", cwd+"/gitdir"); err != nil {
+		t.Fatal(err)
+	}
+	if got := ProtectedDir(cwd+"/gitdir/config", cwd); got != ".git" {
+		t.Errorf("ProtectedDir through a link into .git = %q", got)
+	}
+	if got := ProtectedDir(cwd+"/src/a.go", cwd); got != "" {
+		t.Errorf("ProtectedDir of a source file = %q", got)
 	}
 }
 

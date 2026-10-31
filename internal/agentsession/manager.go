@@ -43,6 +43,9 @@ func (p Policy) autoApproves(tc ToolCall, cwd string) bool {
 }
 
 // protectedDirs are never touched without asking, even inside the project.
+// Each matches a path component at any depth (vendor/x/.git/config, a new
+// x/.git that makes a repository) in any letter case: macOS file systems
+// ignore case, so .GIT is the same directory.
 var protectedDirs = []string{".git", ".claude", ".codex", ".vscode", ".idea"}
 
 // allInside reports whether paths is non-empty and every path stays inside cwd
@@ -51,25 +54,38 @@ func allInside(paths []string, cwd string) bool {
 	if len(paths) == 0 || cwd == "" {
 		return false
 	}
-	root := filepath.Clean(cwd)
-	if real, err := filepath.EvalSymlinks(root); err == nil {
-		root = real
-	}
 	for _, p := range paths {
-		if !filepath.IsAbs(p) {
-			p = filepath.Join(cwd, p)
-		}
-		p = resolveExisting(filepath.Clean(p))
-		rel, err := filepath.Rel(root, p)
-		if err != nil || rel == ".." || strings.HasPrefix(rel, "../") || filepath.IsAbs(rel) {
-			return false
-		}
-		first, _, _ := strings.Cut(filepath.ToSlash(rel), "/")
-		if slices.Contains(protectedDirs, first) {
+		if !Inside(p, cwd) || ProtectedDir(p, cwd) != "" {
 			return false
 		}
 	}
 	return true
+}
+
+// ProtectedDir returns the protected directory (".git", ".vscode", ...) that
+// path (absolute, or relative to cwd) lies in or names below cwd, or "" for
+// none. The path is checked as given and with its symlinks resolved: tools
+// read .vscode/settings.json through a link named .vscode, and a link named
+// otherwise may point into .git.
+func ProtectedDir(path, cwd string) string {
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(cwd, path)
+	}
+	path = filepath.Clean(path)
+	for _, pair := range [][2]string{{filepath.Clean(cwd), path}, {Resolve(cwd), resolveExisting(path)}} {
+		rel, err := filepath.Rel(pair[0], pair[1])
+		if err != nil {
+			continue
+		}
+		for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
+			for _, dir := range protectedDirs {
+				if strings.EqualFold(part, dir) {
+					return dir
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // Inside reports whether path (absolute, or relative to cwd) stays inside cwd after

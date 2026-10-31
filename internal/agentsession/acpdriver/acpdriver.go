@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -63,6 +62,7 @@ type session struct {
 	permMu  sync.Mutex
 	pending map[string]chan string // permission request id → chosen option id
 	nextReq atomic.Int64
+	writes  atomic.Int64 // numbers the writes Flint asks about itself
 }
 
 // New creates a driver for an ACP agent binary.
@@ -252,30 +252,37 @@ func (h *handler) SessionUpdate(sessionID string, update json.RawMessage) {
 // session manager answers what the user's policy allows (the same policy as
 // for the native agents) and shows the rest in the chat.
 func (h *handler) RequestPermission(ctx context.Context, req acp.PermissionRequest) (acp.PermissionOutcome, error) {
-	s := h.s
+	opts := make([]as.PermissionOption, 0, len(req.Options))
+	for _, o := range req.Options {
+		opts = append(opts, as.PermissionOption{ID: o.OptionID, Name: o.Name, Kind: o.Kind})
+	}
+	opt, ok := h.s.ask(ctx, toolCallFromRaw(req.ToolCall.Raw), opts)
+	if !ok {
+		return acp.Cancelled(), nil
+	}
+	return acp.Selected(opt), nil
+}
+
+// ask shows a permission request through the session's sink and waits for
+// the answer (Driver.Respond); false when ctx ends first.
+func (s *session) ask(ctx context.Context, tc as.ToolCall, opts []as.PermissionOption) (string, bool) {
 	id := strconv.FormatInt(s.nextReq.Add(1), 10)
 	ch := make(chan string, 1)
 	s.permMu.Lock()
 	s.pending[id] = ch
 	s.permMu.Unlock()
-
-	opts := make([]as.PermissionOption, 0, len(req.Options))
-	for _, o := range req.Options {
-		opts = append(opts, as.PermissionOption{ID: o.OptionID, Name: o.Name, Kind: o.Kind})
-	}
-	tc := toolCallFromRaw(req.ToolCall.Raw)
-	s.emit(as.Event{SessionID: req.SessionID, Kind: as.KindPermission, Permission: &as.PermissionRequest{ID: id, ToolCall: tc, Options: opts}})
+	s.emit(as.Event{Kind: as.KindPermission, Permission: &as.PermissionRequest{ID: id, ToolCall: tc, Options: opts}})
 
 	select {
 	case opt := <-ch:
-		s.emit(as.Event{SessionID: req.SessionID, Kind: as.KindPermissionSettled, RequestID: id})
-		return acp.Selected(opt), nil
+		s.emit(as.Event{Kind: as.KindPermissionSettled, RequestID: id})
+		return opt, true
 	case <-ctx.Done():
 		s.permMu.Lock()
 		delete(s.pending, id)
 		s.permMu.Unlock()
-		s.emit(as.Event{SessionID: req.SessionID, Kind: as.KindPermissionSettled, RequestID: id})
-		return acp.Cancelled(), nil
+		s.emit(as.Event{Kind: as.KindPermissionSettled, RequestID: id})
+		return "", false
 	}
 }
 
@@ -286,7 +293,7 @@ func (h *handler) ReadTextFile(_ context.Context, req acp.ReadTextFileRequest) (
 	return readConfined(h.s.cwd, req)
 }
 
-func (h *handler) WriteTextFile(_ context.Context, req acp.WriteTextFileRequest) error {
+func (h *handler) WriteTextFile(ctx context.Context, req acp.WriteTextFileRequest) error {
 	if req.SessionID != h.s.sessionID() {
 		return fmt.Errorf("unknown session %q", req.SessionID)
 	}
@@ -294,13 +301,42 @@ func (h *handler) WriteTextFile(_ context.Context, req acp.WriteTextFileRequest)
 	if err != nil {
 		return err
 	}
-	if inGitDir(h.s.cwd, path) {
-		// A hook or a config there runs code on the next git command; no
-		// edit an agent is asked for needs to write git's own files.
+	switch dir := as.ProtectedDir(path, h.s.cwd); dir {
+	case "":
+	case ".git":
+		// A hook or a config there (or a new .git that makes a repository
+		// with one) runs code on the next git command; no edit an agent is
+		// asked for needs to write git's own files.
 		return fmt.Errorf("writing inside .git is not allowed: %s", path)
+	default:
+		// Agent and editor configuration can run code too (hooks, MCP
+		// servers, tasks): the user decides, in the chat. The default policy
+		// never answers this on its own (only "approve everything" does).
+		if !h.s.approveWrite(ctx, path, req.Content) {
+			return fmt.Errorf("writing %s was not approved (files in %s need your approval)", path, dir)
+		}
 	}
 	// Same save path as the editor: follows symlinks, keeps permissions.
 	return workspace.WriteFile(path, req.Content)
+}
+
+// writeOptions answer a write Flint asks the user about itself.
+var writeOptions = []as.PermissionOption{
+	{ID: "allow", Name: "Allow", Kind: as.AllowOnce},
+	{ID: "reject", Name: "Reject", Kind: as.RejectOnce},
+}
+
+// approveWrite asks the user about an fs/write_text_file into a protected
+// folder, showing the change as an edit of that path.
+func (s *session) approveWrite(ctx context.Context, path, content string) bool {
+	old, _ := readConfined(s.cwd, acp.ReadTextFileRequest{Path: path})
+	tc := as.ToolCall{
+		ID: "flint-write-" + strconv.FormatInt(s.writes.Add(1), 10), Title: "Write " + path,
+		Kind: as.ToolEdit, Status: as.StatusPending, Paths: []string{path},
+		Diffs: []as.Diff{{Path: path, OldText: old, NewText: content}},
+	}
+	opt, ok := s.ask(ctx, tc, writeOptions)
+	return ok && opt == writeOptions[0].ID
 }
 
 // readConfined serves fs/read_text_file inside root.
@@ -328,15 +364,4 @@ func confine(root, path string) (string, error) {
 		return "", fmt.Errorf("access outside the project denied: %s", clean)
 	}
 	return clean, nil
-}
-
-// inGitDir reports a path inside root's .git directory, symlinks resolved
-// and in any letter case (macOS file systems ignore case).
-func inGitDir(root, path string) bool {
-	rel, err := filepath.Rel(as.Resolve(root), as.Resolve(path))
-	if err != nil {
-		return false
-	}
-	first, _, _ := strings.Cut(filepath.ToSlash(rel), "/")
-	return strings.EqualFold(first, ".git")
 }

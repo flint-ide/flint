@@ -22,7 +22,7 @@ type AgentChatAPI struct {
 // newAgentManager builds the session manager with every installed driver.
 func newAgentManager(a *App) *as.Manager {
 	m := as.NewManager(func(e as.Event) { a.emit(eventAgentEvent, e) })
-	registerDrivers(m, func(cwd string) bool { return !a.isTrusted(cwd) })
+	registerDrivers(m, func(cwd string) bool { return !a.isTrusted(cwd) }, a.agentConfig)
 	if p, ok := a.agentPolicy(); ok {
 		m.SetPolicy(p)
 	}
@@ -30,7 +30,9 @@ func newAgentManager(a *App) *as.Manager {
 }
 
 // Agents lists the agents available for chat sessions.
-func (c *AgentChatAPI) Agents() []string { return installedAgents(c.app.agents.Agents()) }
+func (c *AgentChatAPI) Agents() []string {
+	return installedAgents(c.app.agents.Agents(), c.app.currentSettings().AgentConfigs())
+}
 
 // Start opens a conversation with agent in cwd.
 func (c *AgentChatAPI) Start(agent, cwd string) (as.SessionInfo, error) {

@@ -12,7 +12,7 @@ Most of Flint's data lives in:
 
 | File or folder | What it holds |
 |---|---|
-| `settings.json` | Your preferences: theme, fonts, default agent, auto-save, notifications, update check, shortcut overrides, TODO excludes. No secrets. See [Settings file](settings.md). |
+| `settings.json` | Your preferences: theme, fonts, default agent, auto-save, notifications, update check, shortcut overrides, TODO excludes, agent CLIs, language servers, refresh intervals. No secrets. See [Settings file](settings.md). |
 | `state.json` | Recent folders, the agent approval policy, trusted folders, whether the tool check has been shown, and the [update check](privacy-and-security.md#update-check)'s last time, the release it found and a version you skipped. |
 | `connections.json` | Database connection profiles: host, port, user, default database, ClickHouse protocol, TLS and read-only options. No passwords. |
 | `sessions/` | One file per project: open tabs, terminals, agent conversations, attached projects, the selected run configuration and breakpoints. |

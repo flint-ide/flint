@@ -54,6 +54,9 @@ type Manager struct {
 	// the project's code (needsTrust) start only in trusted folders. Nil
 	// trusts everything (tests).
 	Trusted func(root string) bool
+	// Config returns the user's settings for a language's server; it is read
+	// on every start, and Reconfigure applies a change. Nil uses the defaults.
+	Config func(language string) ServerConfig
 
 	lookPath func(string) (string, error)
 
@@ -300,21 +303,18 @@ func (m *Manager) ensureServerLocked(k key) *entry {
 }
 
 func (m *Manager) start(k key, e *entry) {
-	spec, _ := specFor(k.language)
 	shellenv.Wait() // servers live on the login-shell PATH (~/go/bin, ~/.cargo/bin, ...)
-	argv, ok := spec.resolveCommand(m.lookPath)
 	var srv *server
-	var err error
-	if reason, gated := needsTrust[k.language]; gated && m.Trusted != nil && !m.Trusted(k.root) {
-		err = fmt.Errorf("%w (%s)", ErrRestricted, reason)
-	} else if !ok {
-		err = fmt.Errorf("no %s language server installed — %s", k.language, spec.Install)
-	} else {
+	argv, err := m.commandFor(k)
+	if err == nil {
 		srv, err = startServer(context.Background(), k.language, k.root, argv, m.diagnostics)
 	}
 
 	m.mu.Lock()
-	if m.closed && srv != nil {
+	// Reconfigure replaced the entry while the server was booting: its
+	// documents belong to the new server.
+	stale := !m.closed && m.servers[k] != e
+	if (m.closed || stale) && srv != nil {
 		// Flint quit while the server was booting: don't leave it running.
 		m.mu.Unlock()
 		srv.kill()
@@ -322,6 +322,11 @@ func (m *Manager) start(k key, e *entry) {
 		m.mu.Lock()
 	}
 	e.srv, e.err = srv, err
+	if stale {
+		close(e.ready)
+		m.mu.Unlock()
+		return
+	}
 	if srv != nil {
 		for path, d := range m.docs {
 			if d.key == k {
@@ -333,6 +338,78 @@ func (m *Manager) start(k key, e *entry) {
 	status := m.statusFor(k, e)
 	m.mu.Unlock()
 	m.emit(status)
+}
+
+// commandFor is the command line of k's server under the user's settings and
+// Restricted Mode: servers that run the project's code (needsTrust) and
+// servers Flint doesn't know stay off in untrusted folders, and the extra
+// arguments apply only in trusted ones.
+func (m *Manager) commandFor(k key) ([]string, error) {
+	spec, _ := specFor(k.language)
+	var cfg ServerConfig
+	if m.Config != nil {
+		cfg = m.Config(k.language)
+	}
+	if cfg.Disabled {
+		return nil, fmt.Errorf("%s %w", k.language, ErrDisabled)
+	}
+	trusted := m.Trusted == nil || m.Trusted(k.root)
+	argv, custom, ok := spec.command(cfg, m.lookPath)
+	reason, gated := needsTrust[k.language]
+	if custom && !gated {
+		reason, gated = customServerReason, true
+	}
+	switch {
+	case gated && !trusted:
+		return nil, fmt.Errorf("%w (%s)", ErrRestricted, reason)
+	case !ok && cfg.Command != "":
+		return nil, fmt.Errorf("no %s language server at %q (set in Settings)", k.language, cfg.Command)
+	case !ok:
+		return nil, fmt.Errorf("no %s language server installed — %s", k.language, spec.Install)
+	case !trusted:
+		return argv, nil
+	}
+	if err := CheckArgs(cfg.Args); err != nil {
+		return nil, fmt.Errorf("%s language server arguments: %w", k.language, err)
+	}
+	return append(argv, cfg.Args...), nil
+}
+
+// Reconfigure restarts language's servers after its settings changed, for
+// the documents open in them; a disabled server just stops.
+func (m *Manager) Reconfigure(language string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return
+	}
+	for k, e := range m.servers {
+		if k.language != language {
+			continue
+		}
+		delete(m.servers, k)
+		delete(m.restarts, k)
+		select {
+		case <-e.ready:
+			if e.srv != nil {
+				go e.srv.shutdown()
+			}
+		default:
+			// Still starting: start() sees the entry was replaced and stops it.
+		}
+	}
+	for _, d := range m.docs {
+		if d.key.language == language {
+			d.opened = false
+		}
+	}
+	for _, d := range m.docs {
+		if d.key.language == language {
+			if _, running := m.servers[d.key]; !running {
+				m.ensureServerLocked(d.key)
+			}
+		}
+	}
 }
 
 func failedEntry(err error) *entry {
@@ -362,7 +439,7 @@ func (m *Manager) statusFor(k key, e *entry) Status {
 		return st
 	}
 	switch {
-	case e.err != nil && strings.HasPrefix(e.err.Error(), "no "):
+	case e.err != nil && (strings.HasPrefix(e.err.Error(), "no ") || errors.Is(e.err, ErrDisabled)):
 		st.State, st.Message = StateUnavailable, e.err.Error()
 	case e.err != nil:
 		st.State, st.Message = StateFailed, e.err.Error()

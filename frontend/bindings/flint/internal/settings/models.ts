@@ -6,6 +6,56 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
+ * AgentSettings configures one agent CLI ("agents" → "claude" / "codex").
+ * Changes apply to sessions started afterwards.
+ */
+export class AgentSettings {
+    /**
+     * Path of the executable; empty looks the agent up on the login PATH.
+     */
+    "path": string;
+
+    /**
+     * Model passed to the CLI; empty keeps the CLI's default.
+     */
+    "model": string;
+
+    /**
+     * Args are extra arguments. They come before Flint's own flags, may not
+     * name the flags Flint sets (agent.CheckArgs) and are ignored in
+     * Restricted Mode.
+     */
+    "args": string[];
+
+    /** Creates a new AgentSettings instance. */
+    constructor($$source: Partial<AgentSettings> = {}) {
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("model" in $$source)) {
+            this["model"] = "";
+        }
+        if (!("args" in $$source)) {
+            this["args"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AgentSettings instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AgentSettings {
+        const $$createField2_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("args" in $$parsedSource) {
+            $$parsedSource["args"] = $$createField2_0($$parsedSource["args"]);
+        }
+        return new AgentSettings($$parsedSource as Partial<AgentSettings>);
+    }
+}
+
+/**
  * Font is a monospace font setup shared by the editor and terminal sections.
  */
 export class Font {
@@ -45,6 +95,91 @@ export class Font {
     static createFrom($$source: any = {}): Font {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new Font($$parsedSource as Partial<Font>);
+    }
+}
+
+/**
+ * LanguageServerSettings configures one language's server ("languageServers"
+ * → "go" / "typescript" / "python" / "rust"). A change restarts the server.
+ */
+export class LanguageServerSettings {
+    /**
+     * Disabled keeps the server off.
+     */
+    "disabled": boolean;
+
+    /**
+     * Command is a known server's name, an absolute path, or another server
+     * (which, like rust-analyzer and Python servers, needs a trusted folder);
+     * empty picks the first installed known server.
+     */
+    "command": string;
+
+    /**
+     * Args are added after the server's own; ignored in Restricted Mode.
+     */
+    "args": string[];
+
+    /** Creates a new LanguageServerSettings instance. */
+    constructor($$source: Partial<LanguageServerSettings> = {}) {
+        if (!("disabled" in $$source)) {
+            this["disabled"] = false;
+        }
+        if (!("command" in $$source)) {
+            this["command"] = "";
+        }
+        if (!("args" in $$source)) {
+            this["args"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LanguageServerSettings instance from a string or object.
+     */
+    static createFrom($$source: any = {}): LanguageServerSettings {
+        const $$createField2_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("args" in $$parsedSource) {
+            $$parsedSource["args"] = $$createField2_0($$parsedSource["args"]);
+        }
+        return new LanguageServerSettings($$parsedSource as Partial<LanguageServerSettings>);
+    }
+}
+
+/**
+ * Refresh holds how often panels that poll re-read their data while shown.
+ */
+export class Refresh {
+    /**
+     * KubernetesSeconds: the Kubernetes panel's namespace overview.
+     */
+    "kubernetesSeconds": number;
+
+    /**
+     * AWSSeconds: the AWS profiles and their credential expiry.
+     */
+    "awsSeconds": number;
+
+    /** Creates a new Refresh instance. */
+    constructor($$source: Partial<Refresh> = {}) {
+        if (!("kubernetesSeconds" in $$source)) {
+            this["kubernetesSeconds"] = 0;
+        }
+        if (!("awsSeconds" in $$source)) {
+            this["awsSeconds"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Refresh instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Refresh {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Refresh($$parsedSource as Partial<Refresh>);
     }
 }
 
@@ -93,6 +228,21 @@ export class Settings {
      */
     "todoExclude": string[];
 
+    /**
+     * Agents configures the agent CLIs by name ("claude", "codex").
+     */
+    "agents": { [_ in string]?: AgentSettings };
+
+    /**
+     * LanguageServers configures language servers by language ("go", …).
+     */
+    "languageServers": { [_ in string]?: LanguageServerSettings };
+
+    /**
+     * Refresh sets how often polling panels re-read their data.
+     */
+    "refresh": Refresh;
+
     /** Creates a new Settings instance. */
     constructor($$source: Partial<Settings> = {}) {
         if (!("version" in $$source)) {
@@ -125,6 +275,15 @@ export class Settings {
         if (!("todoExclude" in $$source)) {
             this["todoExclude"] = [];
         }
+        if (!("agents" in $$source)) {
+            this["agents"] = {};
+        }
+        if (!("languageServers" in $$source)) {
+            this["languageServers"] = {};
+        }
+        if (!("refresh" in $$source)) {
+            this["refresh"] = (new Refresh());
+        }
 
         Object.assign(this, $$source);
     }
@@ -133,10 +292,13 @@ export class Settings {
      * Creates a new Settings instance from a string or object.
      */
     static createFrom($$source: any = {}): Settings {
-        const $$createField2_0 = $$createType0;
-        const $$createField3_0 = $$createType0;
-        const $$createField8_0 = $$createType1;
-        const $$createField9_0 = $$createType2;
+        const $$createField2_0 = $$createType1;
+        const $$createField3_0 = $$createType1;
+        const $$createField8_0 = $$createType2;
+        const $$createField9_0 = $$createType0;
+        const $$createField10_0 = $$createType4;
+        const $$createField11_0 = $$createType6;
+        const $$createField12_0 = $$createType7;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -150,11 +312,25 @@ export class Settings {
         if ("todoExclude" in $$parsedSource) {
             $$parsedSource["todoExclude"] = $$createField9_0($$parsedSource["todoExclude"]);
         }
+        if ("agents" in $$parsedSource) {
+            $$parsedSource["agents"] = $$createField10_0($$parsedSource["agents"]);
+        }
+        if ("languageServers" in $$parsedSource) {
+            $$parsedSource["languageServers"] = $$createField11_0($$parsedSource["languageServers"]);
+        }
+        if ("refresh" in $$parsedSource) {
+            $$parsedSource["refresh"] = $$createField12_0($$parsedSource["refresh"]);
+        }
         return new Settings($$parsedSource as Partial<Settings>);
     }
 }
 
 // Private type creation functions
-const $$createType0 = Font.createFrom;
-const $$createType1 = $Create.Map($Create.Any, $Create.Any);
-const $$createType2 = $Create.Array($Create.Any);
+const $$createType0 = $Create.Array($Create.Any);
+const $$createType1 = Font.createFrom;
+const $$createType2 = $Create.Map($Create.Any, $Create.Any);
+const $$createType3 = AgentSettings.createFrom;
+const $$createType4 = $Create.Map($Create.Any, $$createType3);
+const $$createType5 = LanguageServerSettings.createFrom;
+const $$createType6 = $Create.Map($Create.Any, $$createType5);
+const $$createType7 = Refresh.createFrom;

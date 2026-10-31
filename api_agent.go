@@ -30,7 +30,7 @@ type AgentAPI struct {
 
 // Info reports installed agents and the preferred one (first available by default).
 func (a *AgentAPI) Info() AgentInfo {
-	kinds := agent.Available()
+	kinds := agent.Available(a.app.currentSettings().AgentConfigs())
 	info := AgentInfo{Available: make([]string, 0, len(kinds))}
 	for _, k := range kinds {
 		info.Available = append(info.Available, string(k))
@@ -60,7 +60,7 @@ func (a *AgentAPI) SuggestCommitMessage(dir string, tracked, untracked []string)
 			return "", errors.New("no changes to describe")
 		}
 		prompt := agent.CommitMessagePrompt(r.RecentSubjects(ctx, recentSubjects))
-		msg, err := agent.Headless(ctx, kind, r.Root, prompt, diff, !a.app.isTrusted(r.Root))
+		msg, err := agent.Headless(ctx, kind, a.app.agentConfig(kind), r.Root, prompt, diff, !a.app.isTrusted(r.Root))
 		if err != nil {
 			return "", err
 		}
@@ -69,14 +69,15 @@ func (a *AgentAPI) SuggestCommitMessage(dir string, tracked, untracked []string)
 }
 
 // ResolveConflictsCommand returns the shell command that starts an interactive agent
-// session to resolve the conflicted files; the frontend runs it in a new terminal so
-// the user can watch and answer the agent's questions.
-func (a *AgentAPI) ResolveConflictsCommand(operation string, files []string) (string, error) {
+// session to resolve the conflicted files; the frontend runs it in a new terminal in
+// root so the user can watch and answer the agent's questions. In an untrusted root
+// the extra arguments from settings are left out, as for every agent run.
+func (a *AgentAPI) ResolveConflictsCommand(root, operation string, files []string) (string, error) {
 	kind, err := a.kind()
 	if err != nil {
 		return "", err
 	}
-	return agent.InteractiveCommand(kind, agent.ConflictPrompt(operation, files))
+	return agent.InteractiveCommand(kind, a.app.agentConfig(kind), agent.ConflictPrompt(operation, files), !a.app.isTrusted(root))
 }
 
 func (a *AgentAPI) kind() (agent.Kind, error) {
@@ -85,6 +86,11 @@ func (a *AgentAPI) kind() (agent.Kind, error) {
 		return "", errors.New("no agent found: install Claude Code (claude) or Codex CLI (codex)")
 	}
 	return agent.Kind(info.Preferred), nil
+}
+
+// agentConfig is the agent CLI's setup from settings (path, model, arguments).
+func (a *App) agentConfig(k agent.Kind) agent.Config {
+	return a.currentSettings().AgentConfig(string(k))
 }
 
 // preferredAgent is the default agent from settings, else the one remembered

@@ -19,15 +19,40 @@ func TestShellQuoteRoundTrip(t *testing.T) {
 }
 
 func TestInteractiveCommand(t *testing.T) {
-	cmd, err := InteractiveCommand(Claude, "fix it's conflicts")
+	cmd, err := InteractiveCommand(Claude, Config{}, "fix it's conflicts", false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cmd != `claude 'fix it'\''s conflicts'` {
 		t.Errorf("command = %s", cmd)
 	}
-	if _, err := InteractiveCommand("vim", "x"); err == nil {
+	if _, err := InteractiveCommand("vim", Config{}, "x", false); err == nil {
 		t.Error("unknown agent must be rejected")
+	}
+}
+
+func TestInteractiveCommandWithConfig(t *testing.T) {
+	cfg := Config{Path: "/opt/my tools/claude", Model: "opus", Args: []string{"--add-dir", "/tmp/notes"}}
+	cmd, err := InteractiveCommand(Claude, cfg, "go", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The prompt precedes the extra arguments: --add-dir takes several values.
+	if want := `'/opt/my tools/claude' '--model' 'opus' 'go' '--add-dir' '/tmp/notes'`; cmd != want {
+		t.Errorf("command = %s, want %s", cmd, want)
+	}
+	restricted, err := InteractiveCommand(Claude, cfg, "go", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(restricted, "--add-dir") {
+		t.Errorf("Restricted Mode kept the extra arguments: %s", restricted)
+	}
+	if _, err := InteractiveCommand(Claude, Config{Args: []string{"--resume"}}, "go", false); err == nil {
+		t.Error("reserved flag accepted")
+	}
+	if _, err := InteractiveCommand(Claude, Config{Path: "bin/claude"}, "go", false); err == nil {
+		t.Error("relative path accepted")
 	}
 }
 
@@ -67,7 +92,7 @@ func TestValidAndAvailable(t *testing.T) {
 	if !Valid(Claude) || !Valid(Codex) || Valid("emacs") {
 		t.Error("Valid misclassifies agents")
 	}
-	for _, k := range Available() {
+	for _, k := range Available(nil) {
 		if !Valid(k) {
 			t.Errorf("Available returned unknown agent %q", k)
 		}

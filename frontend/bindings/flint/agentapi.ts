@@ -25,11 +25,12 @@ export function Info(): $CancellablePromise<$models.AgentInfo> {
 
 /**
  * ResolveConflictsCommand returns the shell command that starts an interactive agent
- * session to resolve the conflicted files; the frontend runs it in a new terminal so
- * the user can watch and answer the agent's questions.
+ * session to resolve the conflicted files; the frontend runs it in a new terminal in
+ * root so the user can watch and answer the agent's questions. In an untrusted root
+ * the extra arguments from settings are left out, as for every agent run.
  */
-export function ResolveConflictsCommand(operation: string, files: string[]): $CancellablePromise<string> {
-    return $Call.ByID(198266051, operation, files);
+export function ResolveConflictsCommand(root: string, operation: string, files: string[]): $CancellablePromise<string> {
+    return $Call.ByID(198266051, root, operation, files);
 }
 
 /**

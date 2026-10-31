@@ -46,6 +46,26 @@ Modified files are written whenever you switch to another app.
 
 When on, you get a macOS notification and a Dock badge when a run, a test run or an agent finishes while Flint isn't the active app.
 
+## Use another agent model or executable
+
+1. Press `⌘,` and open **Agents**.
+2. Under **Claude Code** or **Codex**, set **Model** (for example `opus`), **Path** (for example `/opt/homebrew/bin/claude`) or **Extra arguments**, one per line.
+3. Click outside the field to save. If Flint can't accept a value, the reason appears under the field.
+
+New chats, commit messages and conflict resolution use the new settings; running chats keep theirs.
+
+## Choose or turn off a language server
+
+1. Press `⌘,` and open **Language Servers**.
+2. Under the language, clear **Enabled** to turn its server off, or type a server in **Server** (for example `pylsp`, or an absolute path).
+
+The language's server restarts right away. A server Flint doesn't know starts only in trusted folders.
+
+## Change how often panels refresh
+
+1. Press `⌘,` and open **Refresh**.
+2. Set the interval of the **Kubernetes panel** or the **AWS panel**, in seconds.
+
 ## Exclude folders from the TODO list
 
 1. Press `⌘,` and open **TODO List**.

@@ -10,13 +10,13 @@ Flint stores your preferences in `settings.json`. The [Settings tab](../guides/s
 
 The file is readable only by your user. It never contains secrets: database passwords live in the macOS Keychain, and other credentials stay with the tools that own them.
 
-> **Note:** Flint reads `settings.json` when it starts. If you edit the file by hand, restart Flint to apply your changes. Changes made in the Settings tab apply immediately.
+> **Note:** Flint reads `settings.json` when it starts. If you edit the file by hand, restart Flint to apply your changes. Changes made in the Settings tab apply immediately; agent settings apply to agent sessions started afterwards.
 
 ## How the file is read
 
 - Missing keys get their default value.
 - Unknown keys are ignored.
-- A value of the wrong type or out of range is replaced with its default. A hand-edited file never stops Flint from starting.
+- A value of the wrong type or out of range is replaced with its default (refresh intervals are clamped into their range instead). Invalid extra arguments of an agent or language server are dropped as a whole. A hand-edited file never stops Flint from starting.
 - When Flint saves the file, it checks every value strictly and writes the whole document.
 
 ## Example
@@ -43,7 +43,20 @@ The file is readable only by your user. It never contains secrets: database pass
     "terminal.new": "Mod+Alt+T",
     "git.push": ""
   },
-  "todoExclude": ["docs/legacy", "*.min.js"]
+  "todoExclude": ["docs/legacy", "*.min.js"],
+  "agents": {
+    "claude": {
+      "path": "/opt/homebrew/bin/claude",
+      "model": "opus",
+      "args": ["--add-dir", "/Users/me/notes"]
+    },
+    "codex": { "path": "", "model": "", "args": ["-c", "model_reasoning_effort=high"] }
+  },
+  "languageServers": {
+    "python": { "disabled": false, "command": "pylsp", "args": [] },
+    "rust": { "disabled": true, "command": "", "args": [] }
+  },
+  "refresh": { "kubernetesSeconds": 10, "awsSeconds": 60 }
 }
 ```
 
@@ -61,6 +74,9 @@ The file is readable only by your user. It never contains secrets: database pass
 | `checkForUpdates` | boolean | `true` | Once a day, ask GitHub whether a newer Flint release exists and show a notice in the status bar. When `false`, Flint makes no request on its own; **Help ▸ Check for Updates…** still works. See [Update check](privacy-and-security.md#update-check). |
 | `keymap` | object | `{}` | Shortcut overrides: command id → shortcut. See [keymap](#keymap). |
 | `todoExclude` | array of strings | `[]` | Extra folders or globs the TODO list skips. See [todoExclude](#todoexclude). |
+| `agents` | object | `{}` | Agent CLIs by name (`"claude"`, `"codex"`). See [agents](#agents). |
+| `languageServers` | object | `{}` | Language servers by language (`"go"`, `"typescript"`, `"python"`, `"rust"`). See [languageServers](#languageservers). |
+| `refresh` | object | see below | How often polling panels re-read their data. See [refresh](#refresh). |
 
 ### Font objects
 
@@ -105,6 +121,45 @@ A list of patterns in `.gitignore` style, such as `"docs/legacy"`, `"/generated"
 - is at most 200 characters long.
 
 Up to 100 patterns are kept; duplicates are removed.
+
+### agents
+
+Each entry configures one agent CLI. A missing entry or key uses the default.
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `path` | string | `""` | The executable. Empty looks up `claude` or `codex` on your login shell's `PATH`. Otherwise a command name (looked up on the `PATH`) or an absolute path; a path relative to the project is refused. |
+| `model` | string | `""` | The model, passed as `--model` (Claude Code, Codex commit messages) or as the chat thread's model (Codex). Empty uses the CLI's default. Letters, digits and `. _ : / @ [ ] -`, up to 128 characters, not starting with `-`. |
+| `args` | array of strings | `[]` | Extra command-line arguments for chats, commit messages and conflict resolution. |
+
+Extra arguments are placed before Flint's own flags, so where a CLI lets a repeated flag override an earlier one, Flint's flag wins. They also may not:
+
+- name a flag Flint sets. For Claude Code: `-p`/`--print`, `--input-format`, `--output-format`, `--include-partial-messages`, `--replay-user-messages`, `--permission-prompt-tool`, `--permission-mode`, `--dangerously-skip-permissions`, `--allow-dangerously-skip-permissions`, `--session-id`, `-r`/`--resume`, `-c`/`--continue`, `--fork-session`, `--setting-sources`, `--settings` and `--model` (use `model`). For Codex: `-m`/`--model`, `-a`/`--ask-for-approval`, `-s`/`--sandbox`, `--full-auto`, `--dangerously-bypass-approvals-and-sandbox`, `--yolo`, `-C`/`--cd`, `--listen`, and `-c` overrides of `approval_policy`, `sandbox*`, `projects*` or `dangerously*`. Short flags are checked in any combination (`-dp` counts as `-p`);
+- be `--`, empty, or contain a newline or another control character;
+- be more than 32 arguments or longer than 512 characters each.
+
+In [Restricted Mode](../guides/restricted-mode.md) the extra arguments are left out, because a flag such as `--mcp-config` or `--add-dir` with a relative path would load the project's files.
+
+### languageServers
+
+Each entry configures the server of one language. A missing entry or key uses the default.
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `disabled` | boolean | `false` | Keep the language's server off. |
+| `command` | string | `""` | The server. Empty tries the known servers in order: `gopls`; `vtsls`, then `typescript-language-server`; `basedpyright-langserver`, `pyright-langserver`, then `pylsp`; `rust-analyzer`. A known server's name, or an absolute path whose file name is a known server, gets that server's own arguments (`--stdio`). Any other command is started as is and, because Flint can't know what it runs, only in trusted folders. A path relative to the project is refused. |
+| `args` | array of strings | `[]` | Extra arguments, added after the server's own. Ignored in Restricted Mode. Same limits as agent arguments; `--tsserver-path` is refused, because typescript-language-server always uses its own TypeScript. |
+
+A change made in the Settings tab restarts that language's servers. Servers that run the project's code (rust-analyzer, the Python servers) still start only in trusted folders, whatever this setting says.
+
+### refresh
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `kubernetesSeconds` | integer (s) | 2–600 | `5` | How often the Kubernetes panel re-reads the namespace while it is shown and the window is visible. |
+| `awsSeconds` | integer (s) | 5–3600 | `30` | How often the AWS panel re-reads profiles and credential expiry while it is shown. |
+
+Git status, Docker and pull requests don't poll: they follow change events, and pull requests reload when the window regains focus.
 
 ## Related settings stored elsewhere
 

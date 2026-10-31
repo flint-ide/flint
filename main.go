@@ -10,6 +10,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 
+	"flint/internal/github"
 	"flint/internal/shellenv"
 )
 
@@ -23,6 +24,7 @@ func main() {
 		log.Fatalf("flint: %v", err)
 	}
 
+	appearance, background := app.startupAppearance()
 	gitAPI := &GitAPI{app: app}
 	lspAPI := &LSPAPI{app: app}
 	lspAPI.wire()
@@ -37,9 +39,9 @@ func main() {
 		},
 		// Without an Edit menu macOS webviews ignore Cmd+C / Cmd+V / Cmd+Z.
 		Menu:             app.buildMenu(),
-		BackgroundColour: &options.RGBA{R: 24, G: 25, B: 28, A: 1},
+		BackgroundColour: background,
 		OnStartup:        app.startup,
-		OnDomReady:       func(context.Context) { styleNativeWindow() },
+		OnDomReady:       func(context.Context) { styleNativeWindow(); addSettingsMenuItem() },
 		OnShutdown:       app.shutdown,
 		OnBeforeClose:    app.beforeClose,
 		Bind: []any{
@@ -58,11 +60,16 @@ func main() {
 			lspAPI,
 			&AgentChatAPI{app: app},
 			&DiffAPI{},
+			&TodoAPI{app: app},
+			app.dockerAPI,
 			&HTTPAPI{app: app},
 			&PreviewAPI{app: app},
+			&SettingsAPI{app: app},
+			&GitHubAPI{app: app, git: gitAPI, gh: github.New()},
 		},
 		Mac: &mac.Options{
-			TitleBar: mac.TitleBarHiddenInset(),
+			TitleBar:   mac.TitleBarHiddenInset(),
+			Appearance: appearance,
 			About: &mac.AboutInfo{
 				Title:   "Flint",
 				Message: "A fast scratchpad IDE for code, SQL and data.",

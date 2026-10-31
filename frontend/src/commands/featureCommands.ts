@@ -1,4 +1,4 @@
-// Commands of the run/test, debugger, git history, HTTP client and "fix with agent" features. Kept apart
+// Commands of the run/test, debugger, git history, GitHub, HTTP client and "fix with agent" features. Kept apart
 // from appCommands so each feature's actions read as one list.
 import { registerCommands, type Command } from '../lib/commands'
 import { isMarkdown } from '../lib/previewFiles'
@@ -9,6 +9,8 @@ import { useGit } from '../store/git'
 import { activeFilePath, showFileHistory, toggleBlame, useGitHistory } from '../store/gitHistory'
 import { openStashDialog } from '../store/stash'
 import { showToast } from '../store/dialog'
+import { useWorkspace } from '../store/workspace'
+import { checkoutPullRequest, detailsKey, loadDetails, loadPullRequests, openInBrowser, usePullRequests } from '../store/pullRequests'
 import {
   activeHttpFile,
   clearCookies,
@@ -70,7 +72,58 @@ const hasFailures = () => failedTests().length > 0
 
 export function registerFeatureCommands(): () => void {
   // Debug last: while debugging, its keys (⌘F2, F8) win over Run's and the editor's.
-  return registerCommands([...previewCommands(), ...runCommands(), ...profileCommands(), ...gitCommands(), ...agentCommands(), ...httpCommands(), ...debugCommands()])
+  return registerCommands([
+    ...previewCommands(),
+    ...runCommands(),
+    ...profileCommands(),
+    ...gitCommands(),
+    ...githubCommands(),
+    ...agentCommands(),
+    ...httpCommands(),
+    ...debugCommands(),
+  ])
+}
+
+function githubCommands(): Command[] {
+  // The pull request of the active tab (its overview or one of its files).
+  const activePullRequest = () => {
+    const { tabs, activeId } = useEditor.getState()
+    const tab = tabs.find((t) => t.id === activeId)
+    if (tab?.kind !== 'pr' && tab?.kind !== 'prdiff') return null
+    const data = usePullRequests.getState().details[detailsKey(tab.root, tab.number)]?.data
+    return { root: tab.root, number: tab.number, data }
+  }
+  const panelShown = () => {
+    const { sidebar, sidebarVisible } = useWorkspace.getState()
+    return sidebarVisible && sidebar === 'pulls'
+  }
+  return [
+    {
+      id: 'github.pullRequests', title: 'Pull Requests…', category: 'GitHub', keywords: 'pr review gh github list',
+      run: () => useWorkspace.getState().setSidebar('pulls'),
+    },
+    {
+      id: 'github.refresh', title: 'Refresh Pull Requests', category: 'GitHub', keywords: 'pr reload gh',
+      when: () => panelShown() || !!activePullRequest(),
+      run: () => {
+        const pr = activePullRequest()
+        if (pr) void loadDetails(pr.root, pr.number, true)
+        if (panelShown()) void loadPullRequests(usePullRequests.getState().root, true)
+      },
+    },
+    {
+      id: 'github.openInBrowser', title: 'Open Pull Request on GitHub', category: 'GitHub', keywords: 'pr browser web',
+      when: () => !!activePullRequest()?.data, run: () => openInBrowser(activePullRequest()?.data?.url ?? ''),
+    },
+    {
+      id: 'github.checkout', title: 'Check Out Pull Request', category: 'GitHub', keywords: 'pr branch gh pr checkout',
+      when: () => activePullRequest()?.data?.state === 'OPEN',
+      run: () => {
+        const pr = activePullRequest()
+        if (pr?.data) return checkoutPullRequest(pr.root, pr.number, pr.data.headRef)
+      },
+    },
+  ]
 }
 
 function httpCommands(): Command[] {

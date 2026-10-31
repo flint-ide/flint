@@ -186,7 +186,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
               size="sm"
               value={agents.preferred}
               options={agents.available.map((a) => ({ value: a, label: a }))}
-              onChange={(a) => void agents.setPreferred(a)}
+              onChange={(a) => agents.setPreferred(a)}
               title="Agent used for generating messages and resolving conflicts"
             />
           ) : (

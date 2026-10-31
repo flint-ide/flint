@@ -18,7 +18,12 @@ const (
 	eventMenuOpenRecent = "menu:open-recent" // show the Recent Projects popup
 	eventMenuOpenFolder = "menu:open-folder" // open the given folder
 	eventMenuAddProject = "menu:add-project" // pick a folder to attach to the workspace
+	eventMenuSettings   = "menu:settings"    // open the Settings tab (app menu, ⌘,)
 )
+
+// menuApp is the app that native menu items added outside Wails' menu talk to
+// (the app menu's Settings… item, see window_darwin.go).
+var menuApp *App
 
 // buildMenu creates the native macOS menu bar. File ▸ Open Recent mirrors the
 // recent-folders list and is rebuilt whenever it changes.
@@ -61,6 +66,7 @@ func (a *App) refreshMenu() {
 	}
 	runtime.MenuSetApplicationMenu(a.ctx, a.buildMenu())
 	runtime.MenuUpdateApplicationMenu(a.ctx)
+	addSettingsMenuItem() // the rebuilt app menu lost it
 }
 
 // recentLabel is "name — ~/parent/path", like Xcode's Open Recent.

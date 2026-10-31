@@ -23,18 +23,7 @@ import { registerUrlLinks } from '../../lib/terminalLinks'
 import { sendTerminalSelectionToAgent } from '../../lib/agentContext'
 import type { DropdownItem } from '../ui/Dropdown'
 import { openContextMenu } from '../../store/contextMenu'
-
-export const THEME = {
-  background: '#141518',
-  foreground: '#d4d4d8',
-  cursor: '#f59e0b',
-  cursorAccent: '#141518',
-  selectionBackground: '#3b3f4a',
-  black: '#1f2026', red: '#f87171', green: '#86efac', yellow: '#fcd34d',
-  blue: '#93c5fd', magenta: '#d8b4fe', cyan: '#67e8f9', white: '#d4d4d8',
-  brightBlack: '#6b7280', brightRed: '#fca5a5', brightGreen: '#bbf7d0', brightYellow: '#fde68a',
-  brightBlue: '#bfdbfe', brightMagenta: '#e9d5ff', brightCyan: '#a5f3fc', brightWhite: '#fafafa',
-}
+import { currentTerminalOptions, useTerminalSettings } from './useTerminalSettings'
 
 interface Props {
   tab: TerminalTab
@@ -49,10 +38,7 @@ export function TerminalView({ tab, active }: Props) {
   useEffect(() => {
     if (!host.current) return
     const xterm = new XTerm({
-      theme: THEME,
-      fontFamily: '"JetBrains Mono", "SF Mono", Menlo, monospace',
-      fontSize: 13,
-      lineHeight: 1.2,
+      ...currentTerminalOptions(),
       cursorBlink: true,
       scrollback: 10_000,
       allowProposedApi: true,
@@ -135,6 +121,8 @@ export function TerminalView({ tab, active }: Props) {
     // One PTY per tab for the component's lifetime.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab.id])
+
+  useTerminalSettings(term, active)
 
   // GPU rendering keeps agent output floods smooth, but each WebGL context holds a
   // canvas and texture atlas: only the visible terminal gets one. Hidden ones use the

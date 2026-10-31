@@ -5,8 +5,11 @@ const VIEWS: { id: SidebarView; icon: string; title: string }[] = [
   { id: 'files', icon: '▤', title: 'Files' },
   { id: 'search', icon: '⌕', title: 'Search (⇧⌘F)' },
   { id: 'git', icon: '⎇', title: 'Commit (⌘K)' },
+  { id: 'pulls', icon: '⇅', title: 'Pull Requests' },
   { id: 'database', icon: '⛁', title: 'Databases' },
   { id: 'scratch', icon: '✎', title: 'Scratchpads' },
+  { id: 'todo', icon: '☑', title: 'TODO' },
+  { id: 'docker', icon: '⛴', title: 'Docker' },
 ]
 
 export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {

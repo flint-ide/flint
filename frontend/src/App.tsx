@@ -14,6 +14,7 @@ import { subscribeLspEvents } from './store/lsp'
 import { subscribeAgentChatEvents } from './store/agentChat'
 import { subscribeRunEvents, useRun } from './store/run'
 import { subscribeDebugEvents } from './store/debug'
+import { subscribeAutoSave } from './store/settings'
 import { activeRoot } from './store/activeRoot'
 import { UsagesModal } from './components/lsp/UsagesModal'
 import { showToast } from './store/dialog'
@@ -34,8 +35,11 @@ import { usePersistentNumber } from './lib/usePersistentNumber'
 
 const ACTIVITY_BAR = 44
 
+const DockerPanel = lazy(() => import('./components/sidebar/DockerPanel').then((m) => ({ default: m.DockerPanel })))
+const TodoPanel = lazy(() => import('./components/sidebar/TodoPanel').then((m) => ({ default: m.TodoPanel })))
 const DatabasePanel = lazy(() => import('./components/sidebar/DatabasePanel').then((m) => ({ default: m.DatabasePanel })))
 const CommitPanel = lazy(() => import('./components/sidebar/CommitPanel').then((m) => ({ default: m.CommitPanel })))
+const PullRequestsPanel = lazy(() => import('./components/github/PullRequestsPanel').then((m) => ({ default: m.PullRequestsPanel })))
 const RecentProjects = lazy(() => import('./components/RecentProjects').then((m) => ({ default: m.RecentProjects })))
 const QuickOpen = lazy(() => import('./components/QuickOpen').then((m) => ({ default: m.QuickOpen })))
 const RunConfigDialog = lazy(() => import('./components/run/RunConfigDialog').then((m) => ({ default: m.RunConfigDialog })))
@@ -67,10 +71,12 @@ export default function App() {
     subscribeRunEvents()
     subscribeDebugEvents()
     subscribeSessionAutosave()
+    subscribeAutoSave()
     // Native File menu: Open Folder… / Open Recent ▸ <folder>.
     EventsOn('menu:open-recent', () => useWorkspace.getState().setRecentOpen(true))
     EventsOn('menu:open-folder', (path: string) => void useWorkspace.getState().openFolder(path))
     EventsOn('menu:add-project', () => void useWorkspace.getState().pickRoot())
+    EventsOn('menu:settings', () => useEditor.getState().openSettings()) // app menu ▸ Settings… (⌘,)
     void useDatabase.getState().loadConnections()
     void useScratch.getState().load()
     void useWorkspace.getState().init()
@@ -115,12 +121,27 @@ export default function App() {
                   <CommitPanel focusToken={commitFocus} />
                 </Suspense>
               )}
+              {sidebar === 'pulls' && (
+                <Suspense fallback={null}>
+                  <PullRequestsPanel />
+                </Suspense>
+              )}
               {sidebar === 'database' && (
                 <Suspense fallback={null}>
                   <DatabasePanel />
                 </Suspense>
               )}
               {sidebar === 'scratch' && <ScratchPanel />}
+              {sidebar === 'docker' && (
+                <Suspense fallback={null}>
+                  <DockerPanel />
+                </Suspense>
+              )}
+              {sidebar === 'todo' && (
+                <Suspense fallback={null}>
+                  <TodoPanel />
+                </Suspense>
+              )}
               </ErrorBoundary>
             </aside>
             <Splitter direction="horizontal" onResize={onSidebarResize} />

@@ -139,10 +139,14 @@ export function describe(c: RunConfig): string {
   }
 }
 
+// The run green of the current theme (style.css --run).
+const RUN_FILL = { fill: 'var(--run)' }
+const RUN_STROKE = { stroke: 'var(--run)' }
+
 export function PlayIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
-      <path d="M4.5 2.8v10.4l8.6-5.2z" fill="#5fbf7f" />
+      <path d="M4.5 2.8v10.4l8.6-5.2z" style={RUN_FILL} />
     </svg>
   )
 }
@@ -150,8 +154,8 @@ export function PlayIcon() {
 export function RerunIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
-      <path d="M13 8a5 5 0 1 1-1.5-3.6" fill="none" stroke="#5fbf7f" strokeWidth="1.6" strokeLinecap="round" />
-      <path d="M12.6 1.8v3.3H9.3" fill="none" stroke="#5fbf7f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M13 8a5 5 0 1 1-1.5-3.6" fill="none" style={RUN_STROKE} strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M12.6 1.8v3.3H9.3" fill="none" style={RUN_STROKE} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }

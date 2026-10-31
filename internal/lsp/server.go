@@ -23,6 +23,8 @@ type server struct {
 	conn     *conn
 	out      *outbox // ordered, non-blocking document notifications
 	onDiag   func(path string, diags []Diagnostic)
+	// initOptions go into initialize (see initializationOptions).
+	initOptions map[string]any
 
 	stderrMu sync.Mutex
 	stderr   bytes.Buffer // last bytes of stderr, for error messages
@@ -43,7 +45,7 @@ func startServer(ctx context.Context, language, root string, argv []string, onDi
 	if err != nil {
 		return nil, err
 	}
-	s := &server{language: language, root: root, cmd: cmd, onDiag: onDiag}
+	s := &server{language: language, root: root, cmd: cmd, onDiag: onDiag, initOptions: initializationOptions(argv[0])}
 	cmd.Stderr = (*tailWriter)(s)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start %s: %w", argv[0], err)
@@ -70,6 +72,7 @@ func (s *server) initialize(ctx context.Context) error {
 		"workspaceFolders": []map[string]any{
 			{"uri": rootURI, "name": filepath.Base(s.root)},
 		},
+		"initializationOptions": s.initOptions,
 		"capabilities": map[string]any{
 			"general": map[string]any{"positionEncodings": []string{"utf-16"}},
 			"textDocument": map[string]any{

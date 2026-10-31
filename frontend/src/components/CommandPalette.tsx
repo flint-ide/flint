@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { formatKeys, isAvailable, listCommands, runCommand, type Command } from '../lib/commands'
+import { formatKeys, isAvailable, listCommands, runCommand, shownKeys, type Command } from '../lib/commands'
 import { pushRecent, rankCommands } from '../lib/commandSearch'
 import { useWorkspace } from '../store/workspace'
 import { Modal } from './layout/Modal'
@@ -81,7 +81,7 @@ export function CommandPalette() {
       />
       <div className="quick-list" ref={list}>
         {rows.map(({ item, positions }, i) => {
-          const keys = item.keys ?? item.hintKeys
+          const keys = shownKeys(item) // the user's keymap, else the default
           return (
             <div
               key={item.id}

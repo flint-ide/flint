@@ -13,4 +13,10 @@ type TitlebarMetrics struct {
 
 func styleNativeWindow() {}
 
+func setNativeAppearance(string) bool { return true }
+
+func systemPrefersDark() bool { return true }
+
+func addSettingsMenuItem() {}
+
 func titlebarMetrics() TitlebarMetrics { return TitlebarMetrics{} }

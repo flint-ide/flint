@@ -37,11 +37,134 @@
   --syn-definition: #e5e7eb;
   --syn-punct: #9aa0aa;
 
+  /* git, diffs and changed rows */
+  --diff-ins-bg: rgba(134, 239, 172, 0.08);
+  --diff-del-bg: rgba(248, 113, 113, 0.1);
+  --diff-ins-text: rgba(134, 239, 172, 0.25);
+  --diff-del-text: rgba(248, 113, 113, 0.3);
+  --git-added: #3f8f5a;
+  --git-modified: #4f7ec4;
+  --git-deleted: #c45555;
+  --untracked: #e57373;
+  --edited: #7d9bd6;
+  --edited-bg: rgba(96, 125, 190, 0.22);
+
+  /* status colors */
+  --accent-fg: #1a1305; /* text on an accent background */
+  --info: #82aaff;
+  --warn: #fcd34d;
+  --run: #5fbf7f;
+  --debug: #6cb6ff;
+  --debug-line: rgba(108, 182, 255, 0.24);
+  --breakpoint: #e5534b;
+  --ok-bg: rgba(134, 239, 172, 0.12);
+  --info-bg: rgba(130, 170, 255, 0.12);
+  --danger-bg: rgba(248, 113, 113, 0.14);
+
+  /* badges and icons */
+  --fg-name: #c4c6cc; /* file names in lists */
+  --badge-blue-bg: #1e3a5f;
+  --badge-blue-fg: #93c5fd;
+  --badge-amber-bg: #4a3b10;
+  --badge-amber-fg: #fcd34d;
+  --badge-purple-bg: #2e1f4a;
+  --badge-purple-fg: #d8b4fe;
+  --icon-blue: #93c5fd;
+  --icon-purple: #d8b4fe;
+  --db-icon: #c9a227;
+  --file-page: #25272c;
+
+  --shadow: rgba(0, 0, 0, 0.45);
+  --backdrop: rgba(0, 0, 0, 0.45);
+
   --font-ui: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  /* CodeMirror editors; set from Settings ▸ Editor (store/settings.ts) */
+  --editor-font: var(--font-mono);
   --editor-font-size: 13px;
+  --editor-line-height: 1.55;
 
   color-scheme: dark;
+}
+
+/* Settings ▸ Appearance ▸ Light (also System while macOS is light). Terminal
+   colors live in lib/terminalTheme.ts. */
+:root[data-theme='light'] {
+  --bg: #f4f4f6;
+  --bg-sidebar: #ececef;
+  --bg-editor: #ffffff;
+  --bg-raised: #ffffff;
+  --bg-hover: #e6e6ea;
+  --bg-active: #dadbe1;
+  --border: #d5d6dc;
+  --fg: #1f2328;
+  --fg-muted: #5b616b;
+  --fg-faint: #979ca6;
+  --accent: #b45309;
+  --accent-dim: rgba(217, 119, 6, 0.22);
+  --danger: #d12d2d;
+  --ok: #1a7f37;
+  --selection: rgba(64, 120, 220, 0.24);
+  --selection-match: rgba(64, 120, 220, 0.13);
+  --search-match: rgba(245, 158, 11, 0.3);
+  --active-line: rgba(0, 0, 0, 0.035);
+  --flash: rgba(245, 158, 11, 0.22);
+
+  --flame-from: #f0a27a;
+  --flame-to: #f3cd7f;
+  --flame-runtime-from: #a9bedb;
+  --flame-runtime-to: #c7d5e9;
+  --flame-match: #b69cf0;
+  --flame-text: #1f2328;
+
+  --syn-keyword: #a626a4;
+  --syn-string: #3f8a3c;
+  --syn-number: #b35a00;
+  --syn-comment: #8a8f98;
+  --syn-function: #3567d6;
+  --syn-type: #a96b00;
+  --syn-property: #0b7bab;
+  --syn-definition: #1f2328;
+  --syn-punct: #5f6570;
+
+  --diff-ins-bg: rgba(26, 127, 55, 0.09);
+  --diff-del-bg: rgba(209, 45, 45, 0.08);
+  --diff-ins-text: rgba(26, 127, 55, 0.22);
+  --diff-del-text: rgba(209, 45, 45, 0.2);
+  --git-added: #4fae6c;
+  --git-modified: #5b8fd9;
+  --git-deleted: #d9534f;
+  --untracked: #c2410c;
+  --edited: #3d6bc4;
+  --edited-bg: rgba(61, 107, 196, 0.14);
+
+  --accent-fg: #ffffff;
+  --info: #2f63d1;
+  --warn: #a15c00;
+  --run: #2f9e55;
+  --debug: #1f6feb;
+  --debug-line: rgba(31, 111, 235, 0.14);
+  --breakpoint: #d73a33;
+  --ok-bg: rgba(26, 127, 55, 0.1);
+  --info-bg: rgba(47, 99, 209, 0.1);
+  --danger-bg: rgba(209, 45, 45, 0.1);
+
+  --fg-name: #2b2f36;
+  --badge-blue-bg: #dbe8fb;
+  --badge-blue-fg: #1d4ed8;
+  --badge-amber-bg: #fdf0c8;
+  --badge-amber-fg: #8a4b00;
+  --badge-purple-bg: #ece6fb;
+  --badge-purple-fg: #6d28d9;
+  --icon-blue: #3b82f6;
+  --icon-purple: #8b5cf6;
+  --db-icon: #a16207;
+  --file-page: #ffffff;
+
+  --shadow: rgba(0, 0, 0, 0.16);
+  --backdrop: rgba(0, 0, 0, 0.22);
+
+  color-scheme: light;
 }
 
 * {
@@ -100,7 +223,7 @@ button:disabled {
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #1a1305;
+  color: var(--accent-fg);
   font-weight: 600;
 }
 button.danger {
@@ -512,7 +635,7 @@ kbd {
   color: var(--fg);
 }
 .file-name {
-  color: #c4c6cc;
+  color: var(--fg-name);
 }
 .path-hint {
   font-size: 11px;
@@ -634,13 +757,13 @@ kbd {
 }
 /* Replace preview: what goes, then what comes. */
 .match-text del {
-  background: rgba(248, 113, 113, 0.18);
+  background: var(--diff-del-text);
   color: var(--fg-muted);
   text-decoration: line-through;
   border-radius: 2px;
 }
 .match-text ins {
-  background: rgba(74, 222, 128, 0.2);
+  background: var(--diff-ins-text);
   color: var(--fg);
   text-decoration: none;
   border-radius: 2px;
@@ -673,20 +796,20 @@ kbd {
   flex: none;
 }
 .driver-badge.postgres {
-  background: #1e3a5f;
-  color: #93c5fd;
+  background: var(--badge-blue-bg);
+  color: var(--badge-blue-fg);
 }
 .driver-badge.clickhouse {
-  background: #4a3b10;
-  color: #fcd34d;
+  background: var(--badge-amber-bg);
+  color: var(--badge-amber-fg);
 }
 .kind-badge.sql {
-  background: #1e3a5f;
-  color: #93c5fd;
+  background: var(--badge-blue-bg);
+  color: var(--badge-blue-fg);
 }
 .kind-badge.markdown {
-  background: #2e1f4a;
-  color: #d8b4fe;
+  background: var(--badge-purple-bg);
+  color: var(--badge-purple-fg);
 }
 .kind-badge.text {
   background: var(--bg-active);
@@ -698,7 +821,7 @@ kbd {
 .db-icon {
   flex: none;
   margin-right: 4px;
-  color: #c9a227;
+  color: var(--db-icon);
 }
 .db-icon.locked {
   color: var(--fg-faint);
@@ -780,10 +903,10 @@ kbd {
   background: var(--fg-faint);
 }
 .tab-icon.scratch-sql {
-  background: #93c5fd;
+  background: var(--icon-blue);
 }
 .tab-icon.scratch-markdown {
-  background: #d8b4fe;
+  background: var(--icon-purple);
 }
 .tab-icon.terminal {
   background: var(--ok);
@@ -968,17 +1091,17 @@ kbd {
   font-style: italic;
 }
 .grid-cell.edited {
-  background: rgba(96, 125, 190, 0.22);
-  box-shadow: inset 2px 0 0 #7d9bd6;
+  background: var(--edited-bg);
+  box-shadow: inset 2px 0 0 var(--edited);
 }
 .grid-row.inserted .grid-cell {
-  background: rgba(134, 239, 172, 0.08);
+  background: var(--diff-ins-bg);
 }
 .grid-row.inserted .grid-cell.index {
   color: var(--ok);
 }
 .grid-row.deleted .grid-cell {
-  background: rgba(248, 113, 113, 0.1);
+  background: var(--diff-del-bg);
   color: var(--fg-faint);
   text-decoration: line-through;
 }
@@ -987,7 +1110,7 @@ kbd {
   cursor: help;
 }
 .edit-count {
-  color: #7d9bd6;
+  color: var(--edited);
 }
 .edit-blocked {
   cursor: help;
@@ -1006,7 +1129,7 @@ button.small {
   background: var(--bg-raised);
   border: 1px solid var(--accent);
   border-radius: 4px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 24px var(--shadow);
   font-family: var(--font-mono);
 }
 .cell-editor-row {
@@ -1282,7 +1405,7 @@ button.small {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: #141518;
+  background: var(--bg-editor);
 }
 .terminal-view {
   flex: 1;
@@ -1348,7 +1471,7 @@ button.small {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--backdrop);
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -1360,7 +1483,7 @@ button.small {
   background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 50px var(--shadow);
   padding: 16px;
 }
 .modal-title {
@@ -1470,7 +1593,7 @@ button.small {
   border-radius: 8px;
   background: var(--bg-raised);
   border: 1px solid var(--border);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 10px 30px var(--shadow);
   z-index: 60;
   user-select: text;
   -webkit-user-select: text;
@@ -1540,7 +1663,7 @@ button.small {
 .change-kind.modified,
 .change-modified,
 .change-renamed {
-  color: #82aaff;
+  color: var(--info);
 }
 .change-kind.added,
 .change-added {
@@ -1553,7 +1676,7 @@ button.small {
 }
 .change-kind.untracked,
 .change-untracked {
-  color: #e57373;
+  color: var(--untracked);
 }
 .change-kind.conflicted,
 .change-conflicted {
@@ -1702,16 +1825,16 @@ button.small {
   overflow-y: visible !important;
 }
 .cm-diff-deleted {
-  background: rgba(248, 113, 113, 0.1);
+  background: var(--diff-del-bg);
 }
 .cm-diff-inserted {
-  background: rgba(134, 239, 172, 0.08);
+  background: var(--diff-ins-bg);
 }
 .cm-diff-deleted-text {
-  background: rgba(248, 113, 113, 0.3);
+  background: var(--diff-del-text);
 }
 .cm-diff-inserted-text {
-  background: rgba(134, 239, 172, 0.25);
+  background: var(--diff-ins-text);
 }
 .cm-diff-spacer {
   background: repeating-linear-gradient(-45deg, transparent 0 6px, var(--bg-raised) 6px 8px);
@@ -1734,16 +1857,16 @@ button.small {
   padding: 0 !important;
 }
 .cm-git-added {
-  background: #3f8f5a;
+  background: var(--git-added);
 }
 .cm-git-modified {
-  background: #4f7ec4;
+  background: var(--git-modified);
 }
 .cm-git-deleted {
-  background: linear-gradient(to bottom, #c45555 0 3px, transparent 3px);
+  background: linear-gradient(to bottom, var(--git-deleted) 0 3px, transparent 3px);
 }
 .tab-icon.diff {
-  background: #82aaff;
+  background: var(--info);
 }
 
 /* Annotate (git blame): IntelliJ-style column left of the line numbers. */
@@ -2152,10 +2275,10 @@ button.small {
   font: 11px/1.45 var(--font-mono);
 }
 .dl.add {
-  background: rgba(134, 239, 172, 0.07);
+  background: var(--diff-ins-bg);
 }
 .dl.del {
-  background: rgba(248, 113, 113, 0.08);
+  background: var(--diff-del-bg);
 }
 .dl.sep {
   color: var(--fg-faint);
@@ -2307,7 +2430,7 @@ button.small {
   align-self: center;
 }
 .terminal-view {
-  background: #141518;
+  background: var(--bg-editor);
 }
 
 /* ---------- ui kit: dropdown & select ---------- */
@@ -2321,7 +2444,7 @@ button.small {
   background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 14px 36px var(--shadow);
   outline: none;
   overflow: hidden;
   font-size: 13px;
@@ -2500,7 +2623,7 @@ button.small {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #141518;
+  background: var(--bg-editor);
 }
 .run-toolbar {
   height: 30px;
@@ -2557,7 +2680,7 @@ button.small {
   color: var(--danger);
 }
 .test-counts .skipped {
-  color: #fcd34d;
+  color: var(--warn);
 }
 .run-body {
   flex: 1;
@@ -2625,7 +2748,7 @@ button.small {
   color: var(--danger);
 }
 .test-icon.skipped {
-  color: #fcd34d;
+  color: var(--warn);
 }
 .test-icon.running {
   color: var(--fg-muted);
@@ -2641,7 +2764,7 @@ button.small {
 }
 .test-row .test-run {
   visibility: hidden;
-  color: #5fbf7f;
+  color: var(--run);
   padding: 0 4px;
   font-size: 10px;
 }
@@ -2678,7 +2801,7 @@ button.small {
   line-height: inherit;
   text-align: center;
   cursor: pointer;
-  color: #5fbf7f;
+  color: var(--run);
 }
 .cm-test-run:hover {
   filter: brightness(1.3);
@@ -2688,7 +2811,7 @@ button.small {
   color: var(--danger);
 }
 .cm-test-run.skipped {
-  color: #fcd34d;
+  color: var(--warn);
 }
 .cm-test-run.running {
   color: var(--fg-muted);
@@ -2760,7 +2883,7 @@ button.small {
   background: var(--accent);
 }
 .context-bar.full > span {
-  background: #f87171;
+  background: var(--danger);
 }
 
 /* ---------- debugger ---------- */
@@ -2781,14 +2904,14 @@ button.small {
 .run-toolbar .debug-step {
   min-width: 24px;
   justify-content: center;
-  color: #6cb6ff;
+  color: var(--debug);
   font-size: 13px;
 }
 .run-toolbar .debug-step:disabled {
   color: var(--fg-faint);
 }
 .run-status.paused {
-  color: #6cb6ff;
+  color: var(--debug);
 }
 .debug-side {
   flex: none;
@@ -2851,7 +2974,7 @@ button.small {
   font-family: var(--font-ui, inherit);
 }
 .debug-name {
-  color: var(--syn-property, #9cdcfe);
+  color: var(--syn-property);
 }
 .debug-value {
   color: var(--fg);
@@ -2897,11 +3020,11 @@ button.small {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #e5534b;
+  background: var(--breakpoint);
 }
 .cm-line.cm-debug-line {
-  background: rgba(108, 182, 255, 0.24) !important; /* over the active-line highlight */
-  box-shadow: inset 2px 0 0 #6cb6ff;
+  background: var(--debug-line) !important; /* over the active-line highlight */
+  box-shadow: inset 2px 0 0 var(--debug);
 }
 
 /* ---------- profile (flame graph) ---------- */
@@ -2984,7 +3107,7 @@ button.small {
   background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: 6px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 6px 20px var(--shadow);
   font-size: 12px;
   pointer-events: none;
 }
@@ -3130,12 +3253,12 @@ button.small {
 }
 .http-status.ok {
   color: var(--ok);
-  background: rgba(134, 239, 172, 0.12);
+  background: var(--ok-bg);
 }
 .http-status.redirect,
 .http-status.info {
   color: var(--syn-function);
-  background: rgba(130, 170, 255, 0.12);
+  background: var(--info-bg);
 }
 .http-status.client-error {
   color: var(--accent);
@@ -3143,7 +3266,7 @@ button.small {
 }
 .http-status.server-error {
   color: var(--danger);
-  background: rgba(248, 113, 113, 0.14);
+  background: var(--danger-bg);
 }
 .http-status.pending {
   color: var(--fg-muted);
@@ -3326,4 +3449,680 @@ button.small {
     linear-gradient(-45deg, transparent 75%, #d8d8d8 75%);
   background-size: 16px 16px;
   background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+/* ---------- settings (⌘,) ---------- */
+.settings-view {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-editor);
+}
+.settings-nav {
+  flex: 0 0 170px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 8px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+}
+.settings-nav button {
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 5px 10px;
+  color: var(--fg-muted);
+}
+.settings-nav button:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.settings-nav button.active {
+  background: var(--bg-active);
+  color: var(--fg);
+}
+.settings-body {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 18px 28px 40px;
+}
+.settings-body section {
+  max-width: 760px;
+}
+.settings-body h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+.settings-body h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 22px 0 8px;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+.settings-label {
+  flex: 0 0 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-label .muted {
+  font-size: 11.5px;
+}
+.settings-control {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-text {
+  width: 100%;
+  max-width: 420px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.settings-text.invalid,
+.number-field input.invalid {
+  border-color: var(--danger);
+}
+.number-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.number-field input {
+  width: 80px;
+}
+.settings-actions {
+  padding: 12px 0;
+}
+.settings-note {
+  font-size: 12px;
+  margin: 10px 0;
+}
+.settings-preview {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--fg);
+  background: var(--bg);
+}
+.editor-preview {
+  font-family: var(--editor-font);
+  font-size: var(--editor-font-size);
+  line-height: var(--editor-line-height);
+  tab-size: 4;
+}
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.segmented button {
+  border: none;
+  border-radius: 0;
+  background: var(--bg-raised);
+  padding: 4px 14px;
+}
+.segmented button + button {
+  border-left: 1px solid var(--border);
+}
+.segmented button.on {
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+.keymap-toolbar {
+  display: flex;
+  gap: 8px;
+}
+.keymap-list {
+  margin-top: 6px;
+}
+.keymap-category {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-faint);
+  padding: 14px 0 4px;
+}
+.keymap-row {
+  display: grid;
+  grid-template-columns: 1fr 190px 52px;
+  align-items: center;
+  column-gap: 10px;
+  min-height: 30px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.keymap-row:hover {
+  background: var(--bg-hover);
+}
+.keymap-row.changed .keymap-title::after {
+  content: ' •';
+  color: var(--accent);
+}
+.keymap-chord {
+  justify-self: start;
+  min-width: 90px;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  padding: 2px 6px;
+}
+button.keymap-chord:hover {
+  border-color: var(--border);
+  background: var(--bg-raised);
+}
+.keymap-chord.recording {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.keymap-chord.fixed {
+  cursor: default;
+}
+.keymap-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.keymap-shared {
+  grid-column: 1 / -1;
+  font-size: 11.5px;
+  padding-bottom: 3px;
+}
+.keymap-shared.warn {
+  color: var(--warn);
+}
+
+/* ---------- TODO list ---------- */
+
+.todo-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.todo-tag {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.todo-item {
+  padding-left: 22px;
+  gap: 6px;
+  font-size: 12px;
+}
+.todo-tag-label {
+  flex: none;
+  font: 600 10px var(--font-mono);
+  padding: 0 4px;
+  border-radius: 3px;
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+.todo-tag-label.fixme,
+.todo-tag-label.bug {
+  color: var(--danger);
+}
+.todo-tag-label.hack,
+.todo-tag-label.xxx {
+  color: var(--warn);
+}
+
+/* ---------- Docker ---------- */
+
+.docker-project .docker-icon {
+  color: var(--info);
+}
+.docker-container.indent {
+  padding-left: 26px;
+}
+.docker-container {
+  gap: 6px;
+}
+.docker-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fg-faint);
+}
+.docker-dot.running {
+  background: var(--ok);
+}
+.docker-dot.unhealthy {
+  background: var(--danger);
+}
+.docker-dot.paused {
+  background: var(--warn);
+}
+.docker-port {
+  flex: none;
+  font: 11px var(--font-mono);
+}
+.docker-actions {
+  margin-left: auto;
+  display: none;
+  flex: none;
+}
+.tree-row:hover .docker-actions {
+  display: flex;
+}
+.tree-row:hover .docker-actions + .path-hint,
+.tree-row:hover > .path-hint {
+  display: none;
+}
+
+/* ---------- pull requests (GitHub) ---------- */
+
+.pr-repo {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--fg-faint);
+}
+.pr-filters {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 6px;
+  font-size: 12px;
+}
+.pr-loading {
+  font-size: 11px;
+}
+.pr-row {
+  padding: 5px 10px 6px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.pr-row:hover {
+  background: var(--bg-hover);
+}
+.pr-row.active {
+  background: var(--bg-active);
+}
+.pr-row-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.pr-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+}
+.pr-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 11px;
+  white-space: nowrap;
+  min-width: 0;
+}
+.pr-branch {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  min-width: 0;
+}
+.pr-ci {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+.pr-ci.success {
+  color: var(--ok);
+}
+.pr-ci.failure {
+  color: var(--danger);
+}
+.pr-ci.pending {
+  color: var(--accent);
+}
+.pr-ci.skipped,
+.pr-ci.neutral {
+  color: var(--fg-faint);
+}
+.pr-badge {
+  flex: none;
+  font-size: 10px;
+  line-height: 15px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+.pr-badge.ok {
+  color: var(--ok);
+  border-color: rgba(134, 239, 172, 0.35);
+}
+.pr-badge.bad {
+  color: var(--danger);
+  border-color: rgba(248, 113, 113, 0.4);
+}
+.pr-badge.pending {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+}
+.pr-badge.merged {
+  color: var(--badge-purple-fg);
+  border-color: var(--badge-purple-bg);
+}
+
+.pr-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-editor);
+}
+.pr-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 28px 28px;
+}
+.pr-scroll > * {
+  max-width: 980px;
+}
+.pr-title-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pr-title-line h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.pr-subtitle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.pr-subtitle b {
+  color: var(--fg);
+}
+.pr-stat-add {
+  color: var(--ok);
+  font: 11px var(--font-mono);
+}
+.pr-stat-del {
+  color: var(--danger);
+  font: 11px var(--font-mono);
+}
+.pr-labels {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+.pr-section {
+  margin-top: 18px;
+}
+.pr-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.pr-section-title .badge {
+  margin-left: 0;
+}
+.clickable {
+  cursor: pointer;
+}
+.pr-description {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.pr-check,
+.pr-file,
+.pr-commit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  min-width: 0;
+}
+.pr-file {
+  cursor: pointer;
+}
+.pr-file:hover,
+.pr-check:hover,
+.pr-commit:hover {
+  background: var(--bg-hover);
+}
+.pr-file .path-hint {
+  flex: 1;
+}
+.pr-comment {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}
+.pr-comment:first-of-type {
+  border-top: none;
+}
+.pr-comment-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.pr-review-state.approved {
+  color: var(--ok);
+}
+.pr-review-state.changes_requested {
+  color: var(--danger);
+}
+
+/* Compact Markdown (descriptions, comments, reviews): rendered in Go without raw HTML. */
+.gh-md {
+  font: 13px/1.55 var(--font-ui);
+  overflow-wrap: anywhere;
+}
+.gh-md > :first-child {
+  margin-top: 0;
+}
+.gh-md > :last-child {
+  margin-bottom: 0;
+}
+.gh-md p,
+.gh-md ul,
+.gh-md ol,
+.gh-md pre,
+.gh-md blockquote {
+  margin: 0.4em 0;
+}
+.gh-md h1,
+.gh-md h2,
+.gh-md h3 {
+  font-size: 14px;
+  margin: 0.8em 0 0.4em;
+}
+.gh-md a {
+  color: var(--syn-function);
+}
+.gh-md code {
+  font: 12px var(--font-mono);
+  background: var(--bg-hover);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.gh-md pre {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px 10px;
+  overflow: auto;
+}
+.gh-md pre code {
+  background: none;
+  padding: 0;
+}
+.gh-md blockquote {
+  padding: 0 0.8em;
+  color: var(--fg-muted);
+  border-left: 3px solid var(--border);
+}
+.gh-md img {
+  max-width: 100%;
+}
+.gh-md table {
+  border-collapse: collapse;
+}
+.gh-md th,
+.gh-md td {
+  border: 1px solid var(--border);
+  padding: 3px 8px;
+}
+
+/* Threads: in the diff (inside CodeMirror) and above it. */
+.pr-thread {
+  margin: 6px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-sidebar);
+  font-family: var(--font-ui);
+  white-space: normal;
+}
+.pr-thread.resolved {
+  opacity: 0.8;
+}
+.pr-thread-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 10px 0 6px;
+  font-size: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.pr-composer .pr-thread-head {
+  cursor: default;
+  padding-left: 12px;
+}
+.pr-reply {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--border);
+}
+.pr-composer .pr-reply {
+  border-top: none;
+}
+.pr-reply textarea,
+.pr-review-bar textarea {
+  resize: vertical;
+  background: var(--bg-editor);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 5px 8px;
+  color: var(--fg);
+  font: 12px/1.45 var(--font-mono);
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.pr-reply textarea:focus,
+.pr-review-bar textarea:focus {
+  border-color: var(--accent);
+}
+.pr-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.cm-pr-thread {
+  /* Padding, not margin: the measured height must be the whole block. */
+  padding: 2px 0;
+  cursor: auto;
+}
+/* Stays in the visible part of a side however long its lines (lib/prThreadWidgets.ts). */
+.cm-pr-thread .pr-anchor {
+  position: sticky;
+  left: var(--pr-gutter-width, 0);
+  width: var(--pr-visible-width, auto);
+  box-sizing: border-box;
+  padding: 0 12px 0 6px;
+}
+.cm-pr-thread-mirror {
+  background: repeating-linear-gradient(-45deg, transparent 0 6px, rgba(255, 255, 255, 0.02) 6px 8px);
+}
+.cm-pr-gutter .cm-gutterElement {
+  width: 14px;
+  text-align: center;
+}
+.cm-pr-plus {
+  display: inline-block;
+  width: 13px;
+  line-height: 13px;
+  border-radius: 3px;
+  color: var(--accent-fg);
+  background: var(--accent);
+  font-weight: 700;
+  cursor: pointer;
+  opacity: 0;
+}
+.cm-pr-gutter .cm-gutterElement:hover .cm-pr-plus {
+  opacity: 1;
+}
+.pr-detached {
+  flex: none;
+  max-height: 40%;
+  overflow: auto;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pr-review-bar {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-sidebar);
+}
+.pr-pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+button.pr-approve {
+  border-color: rgba(134, 239, 172, 0.45);
+  color: var(--ok);
+}
+button.pr-request {
+  border-color: rgba(248, 113, 113, 0.45);
+  color: var(--danger);
 }

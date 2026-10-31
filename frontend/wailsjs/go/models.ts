@@ -728,6 +728,93 @@ export namespace db {
 
 }
 
+export namespace docker {
+	
+	export class ComposeProject {
+	    name: string;
+	    dir: string;
+	    files: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ComposeProject(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.dir = source["dir"];
+	        this.files = source["files"];
+	    }
+	}
+	export class Port {
+	    host: string;
+	    hostPort: number;
+	    container: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Port(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.host = source["host"];
+	        this.hostPort = source["hostPort"];
+	        this.container = source["container"];
+	    }
+	}
+	export class Container {
+	    id: string;
+	    name: string;
+	    image: string;
+	    state: string;
+	    status: string;
+	    ports: Port[];
+	    created: string;
+	    project: string;
+	    service: string;
+	    configFiles: string;
+	    workingDir: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Container(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.image = source["image"];
+	        this.state = source["state"];
+	        this.status = source["status"];
+	        this.ports = this.convertValues(source["ports"], Port);
+	        this.created = source["created"];
+	        this.project = source["project"];
+	        this.service = source["service"];
+	        this.configFiles = source["configFiles"];
+	        this.workingDir = source["workingDir"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
 export namespace fuzzy {
 	
 	export class Match {
@@ -1092,6 +1179,481 @@ export namespace git {
 	        this.locked = source["locked"];
 	        this.prunable = source["prunable"];
 	    }
+	}
+
+}
+
+export namespace github {
+	
+	export class Check {
+	    name: string;
+	    workflow: string;
+	    state: string;
+	    status: string;
+	    conclusion: string;
+	    url: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Check(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.workflow = source["workflow"];
+	        this.state = source["state"];
+	        this.status = source["status"];
+	        this.conclusion = source["conclusion"];
+	        this.url = source["url"];
+	    }
+	}
+	export class CheckCounts {
+	    success: number;
+	    failure: number;
+	    pending: number;
+	    skipped: number;
+	    neutral: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CheckCounts(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.failure = source["failure"];
+	        this.pending = source["pending"];
+	        this.skipped = source["skipped"];
+	        this.neutral = source["neutral"];
+	    }
+	}
+	export class Comment {
+	    id: string;
+	    databaseId: number;
+	    author: string;
+	    body: string;
+	    bodyHtml: string;
+	    createdAt: string;
+	    url: string;
+	    pending: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Comment(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.databaseId = source["databaseId"];
+	        this.author = source["author"];
+	        this.body = source["body"];
+	        this.bodyHtml = source["bodyHtml"];
+	        this.createdAt = source["createdAt"];
+	        this.url = source["url"];
+	        this.pending = source["pending"];
+	    }
+	}
+	export class Commit {
+	    oid: string;
+	    headline: string;
+	    author: string;
+	    date: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Commit(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.oid = source["oid"];
+	        this.headline = source["headline"];
+	        this.author = source["author"];
+	        this.date = source["date"];
+	    }
+	}
+	export class Repo {
+	    owner: string;
+	    name: string;
+	    nameWithOwner: string;
+	    url: string;
+	    defaultBranch: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Repo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.owner = source["owner"];
+	        this.name = source["name"];
+	        this.nameWithOwner = source["nameWithOwner"];
+	        this.url = source["url"];
+	        this.defaultBranch = source["defaultBranch"];
+	    }
+	}
+	export class Thread {
+	    id: string;
+	    path: string;
+	    line: number;
+	    startLine: number;
+	    originalLine: number;
+	    side: string;
+	    resolved: boolean;
+	    outdated: boolean;
+	    fileLevel: boolean;
+	    resolvedBy: string;
+	    canResolve: boolean;
+	    canUnresolve: boolean;
+	    canReply: boolean;
+	    comments: Comment[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Thread(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.path = source["path"];
+	        this.line = source["line"];
+	        this.startLine = source["startLine"];
+	        this.originalLine = source["originalLine"];
+	        this.side = source["side"];
+	        this.resolved = source["resolved"];
+	        this.outdated = source["outdated"];
+	        this.fileLevel = source["fileLevel"];
+	        this.resolvedBy = source["resolvedBy"];
+	        this.canResolve = source["canResolve"];
+	        this.canUnresolve = source["canUnresolve"];
+	        this.canReply = source["canReply"];
+	        this.comments = this.convertValues(source["comments"], Comment);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Review {
+	    author: string;
+	    state: string;
+	    bodyHtml: string;
+	    submittedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Review(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.author = source["author"];
+	        this.state = source["state"];
+	        this.bodyHtml = source["bodyHtml"];
+	        this.submittedAt = source["submittedAt"];
+	    }
+	}
+	export class File {
+	    path: string;
+	    previousPath: string;
+	    status: string;
+	    additions: number;
+	    deletions: number;
+	    noPatch: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new File(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.previousPath = source["previousPath"];
+	        this.status = source["status"];
+	        this.additions = source["additions"];
+	        this.deletions = source["deletions"];
+	        this.noPatch = source["noPatch"];
+	    }
+	}
+	export class Details {
+	    id: string;
+	    number: number;
+	    title: string;
+	    url: string;
+	    state: string;
+	    draft: boolean;
+	    author: string;
+	    baseRef: string;
+	    headRef: string;
+	    baseOid: string;
+	    headOid: string;
+	    crossRepository: boolean;
+	    headOwner: string;
+	    reviewDecision: string;
+	    createdAt: string;
+	    updatedAt: string;
+	    additions: number;
+	    deletions: number;
+	    labels: string[];
+	    bodyHtml: string;
+	    files: File[];
+	    commits: Commit[];
+	    checks: Check[];
+	    reviews: Review[];
+	    threads: Thread[];
+	    pendingReviewId: string;
+	    pendingReviewComments: number;
+	    repo: Repo;
+	
+	    static createFrom(source: any = {}) {
+	        return new Details(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.number = source["number"];
+	        this.title = source["title"];
+	        this.url = source["url"];
+	        this.state = source["state"];
+	        this.draft = source["draft"];
+	        this.author = source["author"];
+	        this.baseRef = source["baseRef"];
+	        this.headRef = source["headRef"];
+	        this.baseOid = source["baseOid"];
+	        this.headOid = source["headOid"];
+	        this.crossRepository = source["crossRepository"];
+	        this.headOwner = source["headOwner"];
+	        this.reviewDecision = source["reviewDecision"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	        this.additions = source["additions"];
+	        this.deletions = source["deletions"];
+	        this.labels = source["labels"];
+	        this.bodyHtml = source["bodyHtml"];
+	        this.files = this.convertValues(source["files"], File);
+	        this.commits = this.convertValues(source["commits"], Commit);
+	        this.checks = this.convertValues(source["checks"], Check);
+	        this.reviews = this.convertValues(source["reviews"], Review);
+	        this.threads = this.convertValues(source["threads"], Thread);
+	        this.pendingReviewId = source["pendingReviewId"];
+	        this.pendingReviewComments = source["pendingReviewComments"];
+	        this.repo = this.convertValues(source["repo"], Repo);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class LineRange {
+	    from: number;
+	    to: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LineRange(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.from = source["from"];
+	        this.to = source["to"];
+	    }
+	}
+	export class FileDiff {
+	    path: string;
+	    previousPath: string;
+	    status: string;
+	    base: string;
+	    head: string;
+	    binary: boolean;
+	    tooLarge: boolean;
+	    left: LineRange[];
+	    right: LineRange[];
+	
+	    static createFrom(source: any = {}) {
+	        return new FileDiff(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.previousPath = source["previousPath"];
+	        this.status = source["status"];
+	        this.base = source["base"];
+	        this.head = source["head"];
+	        this.binary = source["binary"];
+	        this.tooLarge = source["tooLarge"];
+	        this.left = this.convertValues(source["left"], LineRange);
+	        this.right = this.convertValues(source["right"], LineRange);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class ListFilter {
+	    who: string;
+	    state: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListFilter(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.who = source["who"];
+	        this.state = source["state"];
+	    }
+	}
+	export class NewComment {
+	    path: string;
+	    line: number;
+	    side: string;
+	    startLine: number;
+	    body: string;
+	    review: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new NewComment(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.line = source["line"];
+	        this.side = source["side"];
+	        this.startLine = source["startLine"];
+	        this.body = source["body"];
+	        this.review = source["review"];
+	    }
+	}
+	export class PullRequest {
+	    number: number;
+	    title: string;
+	    author: string;
+	    headRef: string;
+	    baseRef: string;
+	    draft: boolean;
+	    state: string;
+	    reviewDecision: string;
+	    checks: CheckCounts;
+	    updatedAt: string;
+	    url: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PullRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.number = source["number"];
+	        this.title = source["title"];
+	        this.author = source["author"];
+	        this.headRef = source["headRef"];
+	        this.baseRef = source["baseRef"];
+	        this.draft = source["draft"];
+	        this.state = source["state"];
+	        this.reviewDecision = source["reviewDecision"];
+	        this.checks = this.convertValues(source["checks"], CheckCounts);
+	        this.updatedAt = source["updatedAt"];
+	        this.url = source["url"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	export class Status {
+	    state: string;
+	    message: string;
+	    repo: Repo;
+	
+	    static createFrom(source: any = {}) {
+	        return new Status(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.state = source["state"];
+	        this.message = source["message"];
+	        this.repo = this.convertValues(source["repo"], Repo);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }
@@ -1509,6 +2071,38 @@ export namespace main {
 	        this.path = source["path"];
 	        this.seconds = source["seconds"];
 	    }
+	}
+	export class DockerOverview {
+	    containers: docker.Container[];
+	    projects: docker.ComposeProject[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DockerOverview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.containers = this.convertValues(source["containers"], docker.Container);
+	        this.projects = this.convertValues(source["projects"], docker.ComposeProject);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class FileHistory {
 	    root: string;
@@ -2042,6 +2636,69 @@ export namespace search {
 
 }
 
+export namespace settings {
+	
+	export class Font {
+	    fontFamily: string;
+	    fontSize: number;
+	    lineHeight: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Font(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fontFamily = source["fontFamily"];
+	        this.fontSize = source["fontSize"];
+	        this.lineHeight = source["lineHeight"];
+	    }
+	}
+	export class Settings {
+	    version: number;
+	    theme: string;
+	    editor: Font;
+	    terminal: Font;
+	    defaultAgent: string;
+	    autoSave: boolean;
+	    keymap: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new Settings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.theme = source["theme"];
+	        this.editor = this.convertValues(source["editor"], Font);
+	        this.terminal = this.convertValues(source["terminal"], Font);
+	        this.defaultAgent = source["defaultAgent"];
+	        this.autoSave = source["autoSave"];
+	        this.keymap = source["keymap"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
 export namespace testrun {
 	
 	export class Mark {
@@ -2166,6 +2823,67 @@ export namespace textdiff {
 	        this.line = source["line"];
 	        this.kind = source["kind"];
 	    }
+	}
+
+}
+
+export namespace todo {
+	
+	export class Item {
+	    root: string;
+	    path: string;
+	    line: number;
+	    column: number;
+	    tag: string;
+	    owner?: string;
+	    text: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Item(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.root = source["root"];
+	        this.path = source["path"];
+	        this.line = source["line"];
+	        this.column = source["column"];
+	        this.tag = source["tag"];
+	        this.owner = source["owner"];
+	        this.text = source["text"];
+	    }
+	}
+	export class Result {
+	    items: Item[];
+	    truncated: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Result(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.items = this.convertValues(source["items"], Item);
+	        this.truncated = source["truncated"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }

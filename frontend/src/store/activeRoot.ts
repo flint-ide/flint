@@ -14,6 +14,9 @@ export function activeContextPath(): string | null {
     case 'history':
     case 'http':
       return tab.path
+    case 'pr':
+    case 'prdiff':
+      return tab.root
     case 'terminal': {
       const term = useTerminal.getState().tabs.find((t) => t.id === tab.termId)
       return term?.project ?? term?.cwd ?? null

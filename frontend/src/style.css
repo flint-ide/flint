@@ -4219,3 +4219,15 @@ body.file-drop-target-active::after {
 .aws-identity.error {
   color: var(--danger);
 }
+.aws-actions.busy {
+  display: flex;
+}
+.aws-identity .link {
+  margin-left: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+}

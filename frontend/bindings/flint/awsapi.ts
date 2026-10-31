@@ -16,6 +16,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as awsprof$0 from "./internal/awsprof/models.js";
 
 /**
+ * CancelRefresh stops a running Refresh of profile.
+ */
+export function CancelRefresh(profile: string): $CancellablePromise<void> {
+    return $Call.ByID(3674250574, profile);
+}
+
+/**
  * Identity asks STS who a profile's credentials belong to (needs the network,
  * and may refresh SSO role credentials).
  */
@@ -32,6 +39,15 @@ export function Profiles(): $CancellablePromise<awsprof$0.Profile[]> {
     return $Call.ByID(2457997207).then(($result: any) => {
         return $$createType2($result);
     });
+}
+
+/**
+ * Refresh renews a profile's credentials without a terminal (aws sso login,
+ * saml2aws / aws-azure-login without prompts, or an STS call for roles and
+ * credential_process) and returns the end of the tool's output.
+ */
+export function Refresh(profile: string): $CancellablePromise<string> {
+    return $Call.ByID(870907332, profile);
 }
 
 // Private type creation functions

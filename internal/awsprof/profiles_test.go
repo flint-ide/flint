@@ -37,7 +37,9 @@ source_profile = default
 [profile tool]
 credential_process = /usr/local/bin/creds --json
 
+# Settings of aws-azure-login (deprecated): ignored, the profile only has a region.
 [profile azure-dev]
+region = eu-north-1
 azure_tenant_id = t
 azure_app_id_uri = https://signin.aws.amazon.com/saml
 s3 =
@@ -115,7 +117,7 @@ func TestLoadDescribesEveryKind(t *testing.T) {
 	check("new-sso", KindSSO, StatusValid, "222222222222", "ReadOnly", "2026-10-31T18:00:00Z")
 	check("deploy", KindRole, StatusUnknown, "333333333333", "Deployer", "")
 	check("tool", KindProcess, StatusUnknown, "", "", "")
-	check("azure-dev", KindAzure, StatusLoggedOut, "", "", "")
+	check("azure-dev", KindConfig, StatusUnknown, "", "", "")
 	check("saml-prod", KindTemporary, StatusValid, "444444444444", "Ops", "2026-10-31T11:00:00Z")
 	check("azure-old", KindTemporary, StatusExpired, "", "", "2026-10-30T08:00:00Z")
 	if p := byName["new-sso"]; p.Region != "us-east-1" || strings.Join(p.Login, " ") != "aws sso login --profile new-sso" {
@@ -124,7 +126,7 @@ func TestLoadDescribesEveryKind(t *testing.T) {
 	if got := strings.Join(byName["saml-prod"].Login, " "); got != "saml2aws login --profile saml-prod --role arn:aws:iam::444444444444:role/Ops" {
 		t.Errorf("saml2aws login %q", got)
 	}
-	if byName["deploy"].Source != "default" || byName["azure-dev"].Login[0] != "aws-azure-login" {
+	if byName["deploy"].Source != "default" || len(byName["azure-dev"].Login) != 0 || len(byName["azure-old"].Login) != 0 {
 		t.Errorf("deploy/azure %+v %+v", byName["deploy"], byName["azure-dev"])
 	}
 }

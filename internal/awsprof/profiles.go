@@ -19,11 +19,10 @@ import (
 // Kinds of profiles, by where their credentials come from.
 const (
 	KindSSO       = "sso"       // IAM Identity Center: sso_start_url / sso_session
-	KindTemporary = "temporary" // session keys written by saml2aws, aws-azure-login…
+	KindTemporary = "temporary" // session keys written by saml2aws and similar tools
 	KindKeys      = "keys"      // long-term access keys
 	KindRole      = "role"      // role_arn assumed from source_profile
 	KindProcess   = "process"   // credential_process
-	KindAzure     = "azure"     // aws-azure-login settings, no keys yet
 	KindConfig    = "config"    // settings only (region…), no credentials
 )
 
@@ -50,6 +49,8 @@ type Profile struct {
 	ExpiresAt string `json:"expiresAt,omitempty"`
 	// Login is the command that refreshes the credentials, empty when there is none.
 	Login []string `json:"login,omitempty"`
+	// Refreshable: Refresh can renew the credentials without a terminal.
+	Refreshable bool `json:"refreshable"`
 }
 
 // Files are where profiles are read from (AWS_CONFIG_FILE and
@@ -167,10 +168,7 @@ func describe(name string, conf, keys map[string]string, sessions map[string]map
 			}
 		}
 		p.Account, p.Role = fromARN(keys["x_principal_arn"])
-		switch {
-		case conf["azure_tenant_id"] != "":
-			p.Login = []string{"aws-azure-login", "--profile", name}
-		case keys["x_principal_arn"] != "" && p.Account != "" && p.Role != "":
+		if keys["x_principal_arn"] != "" && p.Account != "" && p.Role != "" {
 			// Written by saml2aws: log in again into the same role.
 			p.Login = []string{"saml2aws", "login", "--profile", name, "--role", "arn:aws:iam::" + p.Account + ":role/" + p.Role}
 		}
@@ -181,13 +179,11 @@ func describe(name string, conf, keys map[string]string, sessions map[string]map
 		p.Account, p.Role = fromARN(conf["role_arn"])
 	case conf["credential_process"] != "":
 		p.Kind = KindProcess
-	case conf["azure_tenant_id"] != "":
-		p.Kind, p.Status = KindAzure, StatusLoggedOut
-		p.Login = []string{"aws-azure-login", "--profile", name}
 	}
 	if p.Account == "" {
 		p.Account, _ = fromARN(conf["role_arn"])
 	}
+	_, _, p.Refreshable = refreshCommand(p)
 	return p
 }
 

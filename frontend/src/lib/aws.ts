@@ -14,7 +14,6 @@ const KIND_LABELS: Record<string, string> = {
   keys: 'access keys',
   role: 'assumed role',
   process: 'credential process',
-  azure: 'Azure AD',
   config: 'settings only',
 }
 

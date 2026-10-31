@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ClipboardSetText } from '../../wails/runtime'
-import { checkIdentity, loginProfile, openProfileTerminal, refreshAws, setAwsQuery, useAws } from '../../store/aws'
+import { cancelRefresh, checkIdentity, dismissRefresh, loginProfile, openProfileTerminal, refreshAws, refreshProfile, setAwsQuery, useAws } from '../../store/aws'
 import { openContextMenu } from '../../store/contextMenu'
 import { showToast } from '../../store/dialog'
 import { kindLabel, profileStatus, shellCommand, type AwsProfile } from '../../lib/aws'
@@ -11,7 +11,7 @@ const REFRESH_MS = 30_000
 
 /** AWS CLI profiles with the state of their credentials; terminals and logins per profile. */
 export function AwsPanel() {
-  const { profiles, loaded, loading, error, query, identities } = useAws()
+  const { profiles, loaded, loading, error, query, identities, refreshes } = useAws()
   const [now, setNow] = useState(Date.now)
 
   useEffect(() => {
@@ -39,6 +39,7 @@ export function AwsPanel() {
 
   const menu = (p: AwsProfile): DropdownItem[] => [
     { label: 'Open Terminal', hint: `AWS_PROFILE=${p.name}`, onSelect: () => openProfileTerminal(p) },
+    ...(p.refreshable ? [{ label: 'Refresh Credentials', disabled: refreshes[p.name] === 'running', onSelect: () => void refreshProfile(p) }] : []),
     ...(p.login?.length ? [{ label: 'Log In', hint: shellCommand(p.login), onSelect: () => loginProfile(p) }] : []),
     { label: 'Check Identity', hint: 'sts get-caller-identity', onSelect: () => void checkIdentity(p.name) },
     { type: 'separator' },
@@ -62,6 +63,8 @@ export function AwsPanel() {
         {shown.map((p) => {
           const status = profileStatus(p, now)
           const id = identities[p.name]
+          const refresh = refreshes[p.name]
+          const running = refresh === 'running'
           return (
             <div key={p.name} className="aws-profile">
               <div
@@ -76,14 +79,29 @@ export function AwsPanel() {
                 <span className="aws-icon">☁</span>
                 <span className="file-name">{p.name}</span>
                 <span className="muted path-hint">{[kindLabel(p.kind), p.account, p.region].filter(Boolean).join(' · ')}</span>
-                <span className={`aws-status ${status.tone}`}>{status.text}</span>
-                <span className="aws-actions">
+                <span className={`aws-status ${running ? 'warn' : status.tone}`}>{running ? (p.kind === 'sso' ? 'browser…' : 'refreshing…') : status.text}</span>
+                <span className={`aws-actions${running ? ' busy' : ''}`}>
+                  {running ? (
+                    <button className="icon" title="Stop refreshing" onClick={(e) => (e.stopPropagation(), cancelRefresh(p.name))}>■</button>
+                  ) : p.refreshable ? (
+                    <button className="icon" title="Refresh credentials (no terminal)" onClick={(e) => (e.stopPropagation(), void refreshProfile(p))}>↻</button>
+                  ) : null}
                   {p.login?.length ? (
                     <button className="icon" title={`Log in: ${shellCommand(p.login)}`} onClick={(e) => (e.stopPropagation(), loginProfile(p))}>⇥</button>
                   ) : null}
                   <button className="icon" title={`Terminal as ${p.name}`} onClick={(e) => (e.stopPropagation(), openProfileTerminal(p))}>❯_</button>
                 </span>
               </div>
+              {refresh && refresh !== 'running' && (
+                <div className={`aws-identity${refresh.ok ? '' : ' error'}`}>
+                  {refresh.ok ? refresh.message : refresh.error}
+                  {!refresh.ok && refresh.needsInput && p.login?.length ? (
+                    <button className="link" onClick={() => (dismissRefresh(p.name), loginProfile(p))}>Log In</button>
+                  ) : null}
+                  {!refresh.ok && <button className="link" title="Dismiss" onClick={() => dismissRefresh(p.name)}>✕</button>}
+                </div>
+              )}
+              {running && p.kind === 'sso' && <div className="aws-identity">Approve the login in your browser…</div>}
               {id && (
                 <div className={`aws-identity${typeof id === 'object' && 'error' in id ? ' error' : ''}`}>
                   {id === 'checking' ? 'Checking…' : 'error' in id ? id.error : `${id.account} · ${id.arn}`}

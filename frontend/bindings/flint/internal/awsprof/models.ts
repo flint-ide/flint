@@ -63,6 +63,11 @@ export class Profile {
      */
     "login"?: string[];
 
+    /**
+     * Refreshable: Refresh can renew the credentials without a terminal.
+     */
+    "refreshable": boolean;
+
     /** Creates a new Profile instance. */
     constructor($$source: Partial<Profile> = {}) {
         if (!("name" in $$source)) {
@@ -73,6 +78,9 @@ export class Profile {
         }
         if (!("status" in $$source)) {
             this["status"] = "";
+        }
+        if (!("refreshable" in $$source)) {
+            this["refreshable"] = false;
         }
 
         Object.assign(this, $$source);

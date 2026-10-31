@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"flint/internal/acp/acptest"
 )
 
 type recordedUpdate struct {
@@ -117,7 +119,7 @@ func fakeOptions(t *testing.T, mode string) Options {
 	}
 	return Options{
 		Command:       exe,
-		Env:           []string{fakeAgentEnv + "=1", fakeModeEnv + "=" + mode},
+		Env:           append(acptest.Env(mode), acptest.ClientNameEnv("flint-test")),
 		ClientName:    "flint-test",
 		ClientVersion: "0.1.0",
 	}

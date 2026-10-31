@@ -1,4 +1,9 @@
-package acp
+// Package acptest is a fake ACP agent for tests. A test binary doubles as the
+// agent: its TestMain calls RunIfAgent, and a test starts the binary itself
+// (os.Executable) with Env(mode). The agent is written against raw JSON (not
+// package acp's types) so that wire-shape mistakes in the client are not
+// mirrored on the agent side.
+package acptest
 
 import (
 	"bufio"
@@ -7,29 +12,70 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 )
 
-// The test binary doubles as a fake ACP agent: when re-executed with
-// fakeAgentEnv=1 it speaks the agent side of the protocol on stdio. It is
-// written against raw JSON (not this package's types) so that wire-shape
-// mistakes in the client are not mirrored on the agent side.
+// Environment of the re-executed test binary.
 const (
-	fakeAgentEnv = "FLINT_ACP_FAKE_AGENT"
-	fakeModeEnv  = "FLINT_ACP_FAKE_MODE"
+	agentEnv   = "FLINT_ACP_FAKE_AGENT"
+	modeEnv    = "FLINT_ACP_FAKE_MODE"
+	clientEnv  = "FLINT_ACP_FAKE_CLIENT"  // expected clientInfo.name; empty accepts any
+	pidFileEnv = "FLINT_ACP_FAKE_PIDFILE" // the agent and a child it spawns write their PIDs here
 )
 
-func TestMain(m *testing.M) {
-	if os.Getenv(fakeAgentEnv) == "1" {
-		runFakeAgent(os.Getenv(fakeModeEnv), os.Stdin, os.Stdout)
-		os.Exit(0)
+// Modes. Without one of these the first prompt text names the scenario
+// (stream, full, cancel, cancelreq, unknown, big, crash, hang).
+const (
+	// ModeHeadless answers every prompt the way a one-shot run sees it:
+	// chatter, a tool call, a permission request and a file write, then the
+	// final text "perm:<outcome>:<option> write:<error code>".
+	ModeHeadless = "headless"
+	// ModeEcho answers every prompt with "echo:" and the prompt's text.
+	ModeEcho = "echo"
+)
+
+// Env returns the environment that turns the test binary into the agent.
+func Env(mode string) []string {
+	return []string{agentEnv + "=1", modeEnv + "=" + mode}
+}
+
+// ClientNameEnv makes the agent insist on this clientInfo.name.
+func ClientNameEnv(name string) string { return clientEnv + "=" + name }
+
+// PIDFileEnv makes the agent spawn a child in its process group and write
+// both PIDs to path (one per line), so tests can check the group is killed.
+func PIDFileEnv(path string) string { return pidFileEnv + "=" + path }
+
+// RunIfAgent serves the protocol on stdio and exits when the process was
+// started as the fake agent; otherwise it returns at once. Call it first in
+// TestMain.
+func RunIfAgent() {
+	if os.Getenv(agentEnv) != "1" {
+		return
 	}
-	os.Exit(m.Run())
+	if path := os.Getenv(pidFileEnv); path != "" {
+		writePIDs(path)
+	}
+	Serve(os.Getenv(modeEnv), os.Stdin, os.Stdout)
+	os.Exit(0)
+}
+
+func writePIDs(path string) {
+	child := exec.Command("sleep", "60")
+	if err := child.Start(); err != nil {
+		fmt.Fprintln(os.Stderr, "fake agent: start child:", err)
+		os.Exit(8)
+	}
+	data := fmt.Sprintf("%d\n%d\n", os.Getpid(), child.Process.Pid)
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		fmt.Fprintln(os.Stderr, "fake agent: write pids:", err)
+		os.Exit(8)
+	}
 }
 
 type fakeMsg struct {
@@ -64,7 +110,8 @@ type fakeAgent struct {
 	parseErrors chan int
 }
 
-func runFakeAgent(mode string, in io.Reader, out io.Writer) {
+// Serve speaks the agent side of ACP on in/out until in ends.
+func Serve(mode string, in io.Reader, out io.Writer) {
 	a := &fakeAgent{
 		mode:        mode,
 		out:         out,
@@ -244,7 +291,7 @@ func (a *fakeAgent) initialize(m fakeMsg) {
 	_ = json.Unmarshal(m.Params, &p)
 	caps := p.ClientCapabilities
 	if p.ProtocolVersion == nil || *p.ProtocolVersion != 1 || !caps.FS.ReadTextFile || !caps.FS.WriteTextFile ||
-		caps.Terminal == nil || *caps.Terminal || p.ClientInfo.Name != "flint-test" || p.ClientInfo.Version == "" {
+		caps.Terminal == nil || *caps.Terminal || !clientNameOK(p.ClientInfo.Name) || p.ClientInfo.Version == "" {
 		a.fail(m.ID, -32602, "unexpected initialize params: "+string(m.Params))
 		return
 	}
@@ -310,6 +357,15 @@ func (a *fakeAgent) prompt(m fakeMsg) {
 		"big":       a.scenarioBig,
 		"crash":     a.scenarioCrash,
 		"hang":      a.scenarioHang,
+	}
+	switch a.mode {
+	case ModeHeadless:
+		a.scenarioHeadless(m.ID, p)
+		return
+	case ModeEcho:
+		a.message(p.SessionID, "echo:"+fmt.Sprint(p.Prompt[0]["text"]))
+		a.endTurn(m.ID, "end_turn")
+		return
 	}
 	run := scenarios[fmt.Sprint(p.Prompt[0]["text"])]
 	if run == nil {
@@ -464,4 +520,35 @@ func (a *fakeAgent) scenarioCrash(_ json.RawMessage, p fakePrompt) {
 func (a *fakeAgent) scenarioHang(_ json.RawMessage, p fakePrompt) {
 	a.message(p.SessionID, "hanging")
 	select {}
+}
+
+func (a *fakeAgent) scenarioHeadless(id json.RawMessage, p fakePrompt) {
+	sid := p.SessionID
+	a.message(sid, "Let me look at the changes.")
+	a.update(sid, map[string]any{"sessionUpdate": "tool_call", "toolCallId": "call_1",
+		"title": "Edit notes", "kind": "edit", "status": "pending"})
+	perm := a.call("session/request_permission", map[string]any{"sessionId": sid, "toolCall": fakeToolCall,
+		"options": []any{
+			map[string]any{"optionId": "allow-once", "name": "Allow", "kind": "allow_once"},
+			map[string]any{"optionId": "reject-once", "name": "Reject", "kind": "reject_once"},
+		}})
+	var out struct {
+		Outcome struct {
+			Outcome  string `json:"outcome"`
+			OptionID string `json:"optionId"`
+		} `json:"outcome"`
+	}
+	_ = json.Unmarshal(perm.Result, &out)
+	cwd, _ := os.Getwd()
+	w := a.call("fs/write_text_file", map[string]any{"sessionId": sid, "path": filepath.Join(cwd, "notes.txt"), "content": "x"})
+	a.message(sid, "perm:"+out.Outcome.Outcome+":"+out.Outcome.OptionID)
+	a.message(sid, fmt.Sprintf(" write:%d", w.code()))
+	a.endTurn(id, "end_turn")
+}
+
+func clientNameOK(name string) bool {
+	if want := os.Getenv(clientEnv); want != "" {
+		return name == want
+	}
+	return name != ""
 }

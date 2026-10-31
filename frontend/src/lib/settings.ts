@@ -2,6 +2,11 @@
 // applying it: theme resolution and the CSS variables editors read. Framework-free,
 // so it is testable with node:test; store/settings.ts does the applying.
 
+import {
+  coerceAgents, coerceRefresh, coerceServers, DEFAULT_REFRESH,
+  type AgentSettings, type LanguageServerSettings, type RefreshSettings,
+} from './toolSettings'
+
 export type ThemeMode = 'dark' | 'light' | 'system'
 export type ResolvedTheme = 'dark' | 'light'
 
@@ -26,6 +31,12 @@ export interface AppSettings {
   keymap: Record<string, string>
   /** Extra folders / globs the TODO list skips, gitignore-style. */
   todoExclude: string[]
+  /** Agent CLIs by name ('claude', 'codex'); missing = defaults. */
+  agents: Record<string, AgentSettings>
+  /** Language servers by language ('go', 'typescript', …); missing = defaults. */
+  languageServers: Record<string, LanguageServerSettings>
+  /** Polling intervals of the Kubernetes and AWS panels. */
+  refresh: RefreshSettings
 }
 
 /** Mirrors settings.Default() in Go (used until the backend answers). */
@@ -39,6 +50,9 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   notifyInBackground: true,
   keymap: Object.freeze({}) as Record<string, string>,
   todoExclude: Object.freeze([]) as unknown as string[],
+  agents: Object.freeze({}) as Record<string, AgentSettings>,
+  languageServers: Object.freeze({}) as Record<string, LanguageServerSettings>,
+  refresh: DEFAULT_REFRESH,
 }) as AppSettings
 
 /** Same limits as Go's settings.Validate, for the inputs. */
@@ -111,5 +125,8 @@ export function coerceSettings(v: unknown): AppSettings {
     notifyInBackground: typeof v.notifyInBackground === 'boolean' ? v.notifyInBackground : d.notifyInBackground,
     keymap,
     todoExclude: Array.isArray(v.todoExclude) ? v.todoExclude.filter((p): p is string => typeof p === 'string' && validExclude(p)) : [],
+    agents: coerceAgents(v.agents),
+    languageServers: coerceServers(v.languageServers),
+    refresh: coerceRefresh(v.refresh),
   }
 }

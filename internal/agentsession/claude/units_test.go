@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"flint/internal/agent"
 	"flint/internal/agentsession"
 )
 
@@ -254,15 +256,23 @@ func TestResolveBinary(t *testing.T) {
 }
 
 func TestBuildArgsAndEnv(t *testing.T) {
-	args := buildArgs("sid", false, Options{PermissionMode: "acceptEdits", ExtraArgs: []string{"--setting-sources", "project"}}, false)
-	joined := strings.Join(args, " ")
+	build := func(resume bool, opts Options, untrusted bool) string {
+		t.Helper()
+		args, err := buildArgs("sid", resume, opts, untrusted)
+		if err != nil {
+			t.Fatalf("buildArgs() error = %v", err)
+		}
+		return strings.Join(args, " ")
+	}
+	joined := build(false, Options{PermissionMode: "acceptEdits", ExtraArgs: []string{"--add-dir", "/tmp/notes"}}, false)
 	if !strings.Contains(joined, "--permission-mode acceptEdits") || strings.Contains(joined, "--model") ||
 		!strings.Contains(joined, "--session-id sid") || strings.Contains(joined, "--resume") ||
-		!strings.HasSuffix(joined, "--setting-sources project") {
+		!strings.HasPrefix(joined, "--add-dir /tmp/notes -p ") {
 		t.Errorf("args = %q", joined)
 	}
-	resumed := strings.Join(buildArgs("sid", true, Options{}, false), " ")
-	if untrusted := strings.Join(buildArgs("sid", false, Options{}, true), " "); !strings.Contains(untrusted, "--setting-sources user") {
+	resumed := build(true, Options{}, false)
+	if untrusted := build(false, Options{ExtraArgs: []string{"--mcp-config", ".mcp.json"}}, true); !strings.HasSuffix(untrusted, "--setting-sources user") ||
+		strings.Contains(untrusted, "--mcp-config") {
 		t.Errorf("untrusted folder args %q", untrusted)
 	}
 	if !strings.Contains(resumed, "--resume sid") || strings.Contains(resumed, "--session-id") {
@@ -332,5 +342,21 @@ func TestRingBufferAndLineReader(t *testing.T) {
 	small := newLineReader(strings.NewReader(strings.Repeat("y", 200)+"\n"), 10)
 	if _, err := small.next(); !errors.Is(err, errMessageTooLarge) {
 		t.Fatalf("too large = %v", err)
+	}
+}
+
+// Settings changes reach new sessions through Options.Settings, and extra
+// arguments that would override Flint's flags stop the start.
+func TestConfigIsReadOnStart(t *testing.T) {
+	cfg := agent.Config{Path: "/nonexistent/from-settings"}
+	d := New(Options{Binary: "/bin/sh", Settings: func() agent.Config { return cfg }})
+	defer d.Close()
+	sink := func(agentsession.Event) {}
+	if _, err := d.Start(context.Background(), t.TempDir(), sink); err == nil || !strings.Contains(err.Error(), "from-settings") {
+		t.Errorf("Start with configured path: %v", err)
+	}
+	cfg = agent.Config{Path: "/bin/sh", Args: []string{"--setting-sources", "user,project"}}
+	if _, err := d.Start(context.Background(), t.TempDir(), sink); err == nil || !strings.Contains(err.Error(), "--setting-sources") {
+		t.Errorf("Start with reserved extra argument: %v", err)
 	}
 }

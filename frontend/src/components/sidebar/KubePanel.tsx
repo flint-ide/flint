@@ -13,9 +13,8 @@ import {
 } from '../../lib/kube'
 import { Select } from '../ui/Select'
 import type { DropdownItem } from '../ui/Dropdown'
-
-/** While shown and the window is visible, the namespace is re-read this often. */
-const POLL_MS = 5000
+import { useSettings } from '../../store/settings'
+import { refreshMs } from '../../lib/toolSettings'
 
 /** One Kubernetes context at a time (picked here, the global current context untouched): workloads, pods, services, jobs. */
 export function KubePanel() {
@@ -24,17 +23,22 @@ export function KubePanel() {
   const awsRefreshes = useAws((s) => s.refreshes)
   const [now, setNow] = useState(Date.now)
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set())
+  // While shown and the window is visible, the namespace is re-read this often (Settings ▸ Refresh).
+  const pollMs = useSettings((s) => refreshMs(s.settings.refresh, 'kubernetesSeconds'))
 
   useEffect(() => {
     void loadContexts()
     void refreshAws()
+  }, [])
+
+  useEffect(() => {
     const timer = setInterval(() => {
       if (document.visibilityState !== 'visible') return
       setNow(Date.now())
       void refreshOverview()
-    }, POLL_MS)
+    }, pollMs)
     return () => clearInterval(timer)
-  }, [])
+  }, [pollMs])
 
   const ctx = contexts.find((c) => c.name === context)
   const aws = ctx?.awsProfile ? awsProfiles.find((p) => p.name === ctx.awsProfile) : undefined

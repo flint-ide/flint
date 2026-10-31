@@ -31,6 +31,7 @@ import (
 	"sync"
 	"time"
 
+	"flint/internal/agent"
 	"flint/internal/agentsession"
 	"flint/internal/shellenv"
 )
@@ -73,7 +74,9 @@ type Options struct {
 	Model string
 	// PermissionMode is passed as --permission-mode ("default" when empty).
 	PermissionMode string
-	// ExtraArgs are appended to the command line.
+	// ExtraArgs are the user's extra arguments. They go before Flint's own
+	// flags, may not name the flags Flint sets (agent.CheckArgs) and are left
+	// out in untrusted folders (agent.ComposeArgs).
 	ExtraArgs []string
 	// Env holds extra KEY=VALUE entries; later entries win.
 	Env []string
@@ -82,6 +85,21 @@ type Options struct {
 	// and permission rules don't apply (-p mode skips Claude Code's own
 	// workspace-trust prompt). Nil trusts every folder.
 	Untrusted func(cwd string) bool
+	// Settings, when set, is read on every Start and Resume and replaces Binary,
+	// Model and ExtraArgs, so settings changes apply to new sessions without
+	// re-creating the driver.
+	Settings func() agent.Config
+}
+
+// current returns the options for a new session.
+func (o Options) current() Options {
+	if o.Settings == nil {
+		return o
+	}
+	c := o.Settings()
+	out := o
+	out.Binary, out.Model, out.ExtraArgs = c.Path, c.Model, c.Args
+	return out
 }
 
 // Driver runs Claude Code sessions. It is safe for concurrent use.
@@ -131,9 +149,14 @@ func (d *Driver) start(ctx context.Context, cwd, id string, resume bool, sink ag
 	if d.isClosed() {
 		return agentsession.SessionInfo{}, ErrClosed
 	}
-	path, err := resolveBinary(d.opts.Binary)
+	opts := d.opts.current()
+	path, err := resolveBinary(opts.Binary)
 	if err != nil {
 		return agentsession.SessionInfo{}, err
+	}
+	args, err := buildArgs(id, resume, opts, opts.Untrusted != nil && opts.Untrusted(cwd))
+	if err != nil {
+		return agentsession.SessionInfo{}, fmt.Errorf("claude: %w", err)
 	}
 	d.mu.Lock()
 	_, taken := d.sessions[id]
@@ -141,7 +164,7 @@ func (d *Driver) start(ctx context.Context, cwd, id string, resume bool, sink ag
 	if taken {
 		return agentsession.SessionInfo{}, fmt.Errorf("claude: session %s is already open", id)
 	}
-	s, err := spawn(path, buildArgs(id, resume, d.opts, d.opts.Untrusted != nil && d.opts.Untrusted(cwd)), cwd, buildEnv(d.opts.Env, cwd), id, sink)
+	s, err := spawn(path, args, cwd, buildEnv(opts.Env, cwd), id, sink)
 	if err != nil {
 		return agentsession.SessionInfo{}, err
 	}
@@ -161,7 +184,7 @@ func (d *Driver) start(ctx context.Context, cwd, id string, resume bool, sink ag
 		s.shutdown()
 		return agentsession.SessionInfo{}, fmt.Errorf("claude: start session: %w", err)
 	}
-	model := resolveModel(raw, d.opts.Model)
+	model := resolveModel(raw, opts.Model)
 	s.mu.Lock()
 	s.model = model
 	s.mu.Unlock()
@@ -315,8 +338,11 @@ func (s *session) shutdownAsFailure() {
 }
 
 // buildArgs assembles the CLI command line. resume continues the saved
-// conversation sessionID instead of starting a new one under that id.
-func buildArgs(sessionID string, resume bool, opts Options, untrusted bool) []string {
+// conversation sessionID instead of starting a new one under that id. The
+// user's extra arguments come first, so Flint's flags (the stream protocol,
+// the permission prompt and, in untrusted folders, --setting-sources user)
+// are parsed last and win.
+func buildArgs(sessionID string, resume bool, opts Options, untrusted bool) ([]string, error) {
 	mode := opts.PermissionMode
 	if mode == "" {
 		mode = defaultPermissionMode
@@ -341,7 +367,7 @@ func buildArgs(sessionID string, resume bool, opts Options, untrusted bool) []st
 	if untrusted {
 		args = append(args, "--setting-sources", "user")
 	}
-	return append(args, opts.ExtraArgs...)
+	return agent.ComposeArgs(agent.Claude, opts.ExtraArgs, args, untrusted)
 }
 
 // buildEnv returns the CLI environment: Flint's (minus variables of an

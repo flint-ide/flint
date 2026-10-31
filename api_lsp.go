@@ -33,6 +33,10 @@ func (l *LSPAPI) wire() {
 	}
 }
 
+// Languages lists the languages with language servers and their known servers,
+// for Settings.
+func (l *LSPAPI) Languages() []lsp.LanguageInfo { return lsp.Languages() }
+
 // Supported reports whether a language server exists for the file type.
 func (l *LSPAPI) Supported(path string) bool { return lsp.Supported(path) }
 

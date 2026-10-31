@@ -115,6 +115,7 @@ func NewApp() (*App, error) {
 	a.debugs = dap.NewManager(a.debugEvents)
 	a.lsp = lsp.NewManager()
 	a.lsp.Trusted = a.isTrusted
+	a.lsp.Config = func(language string) lsp.ServerConfig { return a.currentSettings().ServerConfig(language) }
 	git.Untrusted = func(dir string) bool { return !a.isTrusted(dir) }
 	a.profiles = newProfiles()
 	if err := config.LoadJSON(a.statePath(), &a.state); err != nil {

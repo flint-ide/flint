@@ -95,6 +95,55 @@ export class CompletionList {
 }
 
 /**
+ * LanguageInfo describes a language Flint runs a server for (for Settings).
+ */
+export class LanguageInfo {
+    "language": string;
+
+    /**
+     * Servers are the known servers, in the order they are tried.
+     */
+    "servers": string[];
+
+    /**
+     * NeedsTrust: the servers run the project's code, so they start only in
+     * trusted folders.
+     */
+    "needsTrust": boolean;
+    "install": string;
+
+    /** Creates a new LanguageInfo instance. */
+    constructor($$source: Partial<LanguageInfo> = {}) {
+        if (!("language" in $$source)) {
+            this["language"] = "";
+        }
+        if (!("servers" in $$source)) {
+            this["servers"] = [];
+        }
+        if (!("needsTrust" in $$source)) {
+            this["needsTrust"] = false;
+        }
+        if (!("install" in $$source)) {
+            this["install"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LanguageInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): LanguageInfo {
+        const $$createField1_0 = $$createType4;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("servers" in $$parsedSource) {
+            $$parsedSource["servers"] = $$createField1_0($$parsedSource["servers"]);
+        }
+        return new LanguageInfo($$parsedSource as Partial<LanguageInfo>);
+    }
+}
+
+/**
  * Location is a range in a file, with the first line's text for result lists.
  */
 export class Location {
@@ -121,7 +170,7 @@ export class Location {
      * Creates a new Location instance from a string or object.
      */
     static createFrom($$source: any = {}): Location {
-        const $$createField1_0 = $$createType4;
+        const $$createField1_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("range" in $$parsedSource) {
             $$parsedSource["range"] = $$createField1_0($$parsedSource["range"]);
@@ -182,8 +231,8 @@ export class Range {
      * Creates a new Range instance from a string or object.
      */
     static createFrom($$source: any = {}): Range {
-        const $$createField0_0 = $$createType5;
-        const $$createField1_0 = $$createType5;
+        const $$createField0_0 = $$createType6;
+        const $$createField1_0 = $$createType6;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("start" in $$parsedSource) {
             $$parsedSource["start"] = $$createField0_0($$parsedSource["start"]);
@@ -254,7 +303,7 @@ export class TextEdit {
      * Creates a new TextEdit instance from a string or object.
      */
     static createFrom($$source: any = {}): TextEdit {
-        const $$createField0_0 = $$createType4;
+        const $$createField0_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("range" in $$parsedSource) {
             $$parsedSource["range"] = $$createField0_0($$parsedSource["range"]);
@@ -268,5 +317,6 @@ const $$createType0 = TextEdit.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);
 const $$createType2 = CompletionItem.createFrom;
 const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = Range.createFrom;
-const $$createType5 = Position.createFrom;
+const $$createType4 = $Create.Array($Create.Any);
+const $$createType5 = Range.createFrom;
+const $$createType6 = Position.createFrom;

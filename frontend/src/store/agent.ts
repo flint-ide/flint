@@ -48,7 +48,7 @@ export function suggestCommitMessage(root: string, tracked: string[], untracked:
  */
 export async function resolveConflictsWithAgent(root: string, operation: string, files: string[]): Promise<void> {
   try {
-    const command = await Agent.ResolveConflictsCommand(operation, files)
+    const command = await Agent.ResolveConflictsCommand(root, operation, files)
     const agent = useAgent.getState().preferred || 'agent'
     useTerminal.getState().create(root, { title: `${agent}: conflicts`, input: command })
   } catch (err) {

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { coerceSettings, DEFAULT_SETTINGS, editorCssVars, resolveTheme } from './settings'
+import { coerceSettings, DEFAULT_SETTINGS, editorCssVars, parseExcludes, resolveTheme } from './settings'
 import { TERMINAL_THEMES, terminalOptions } from './terminalTheme'
 
 describe('theme resolution', () => {
@@ -64,5 +64,20 @@ describe('coerceSettings', () => {
   it('falls back to the defaults for garbage', () => {
     assert.equal(coerceSettings(null), DEFAULT_SETTINGS)
     assert.equal(coerceSettings([1, 2]), DEFAULT_SETTINGS)
+  })
+})
+
+describe('TODO excludes', () => {
+  it('takes one pattern per line, trimmed and unique', () => {
+    assert.deepEqual(parseExcludes(' docs/legacy \n\n*.min.js\ndocs/legacy\n'), { patterns: ['docs/legacy', '*.min.js'], invalid: [] })
+  })
+
+  it('reports what Go would refuse', () => {
+    assert.deepEqual(parseExcludes('!src\na,b\ngen/').invalid, ['!src', 'a,b'])
+  })
+
+  it('drops invalid patterns from untrusted settings', () => {
+    assert.deepEqual(coerceSettings({ todoExclude: ['ok', '!no', 3] }).todoExclude, ['ok'])
+    assert.deepEqual(coerceSettings({}).todoExclude, [])
   })
 })

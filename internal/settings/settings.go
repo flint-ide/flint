@@ -14,7 +14,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
+	"unicode"
 
 	"flint/internal/agent"
 	"flint/internal/config"
@@ -45,6 +47,8 @@ const (
 	maxKeymapEntries = 1000
 	maxCommandIDLen  = 200
 	maxKeysLen       = 64
+	maxExcludes      = 100
+	maxExcludeLen    = 200
 )
 
 // Font is a monospace font setup shared by the editor and terminal sections.
@@ -68,6 +72,9 @@ type Settings struct {
 	// Keymap overrides command shortcuts: command id → "Mod+Shift+X", or "" to
 	// remove the shortcut. Commands not listed keep their default keys.
 	Keymap map[string]string `json:"keymap"`
+	// TodoExclude are extra folders or globs the TODO list skips ("docs/legacy",
+	// "*.min.js"), on top of the dependency folders it recognises itself.
+	TodoExclude []string `json:"todoExclude"`
 }
 
 // Default returns the settings Flint uses when nothing is configured.
@@ -85,7 +92,8 @@ func Default() Settings {
 			FontSize:   13,
 			LineHeight: 1.2,
 		},
-		Keymap: map[string]string{},
+		Keymap:      map[string]string{},
+		TodoExclude: []string{},
 	}
 }
 
@@ -143,6 +151,19 @@ func Normalize(s Settings) Settings {
 			out.Keymap[id] = keys
 		}
 	}
+	out.TodoExclude = CleanExcludes(s.TodoExclude)
+	return out
+}
+
+// CleanExcludes keeps the valid exclude patterns, trimmed and unique, up to the limit.
+func CleanExcludes(patterns []string) []string {
+	out := []string{}
+	for _, p := range patterns {
+		p = strings.TrimSpace(p)
+		if len(out) < maxExcludes && validExclude(p) == nil && !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
 	return out
 }
 
@@ -185,6 +206,28 @@ func Validate(s Settings) error {
 		if err := validKeymapEntry(id, keys); err != nil {
 			return err
 		}
+	}
+	if len(s.TodoExclude) > maxExcludes {
+		return fmt.Errorf("too many TODO exclude patterns (max %d)", maxExcludes)
+	}
+	for _, p := range s.TodoExclude {
+		if err := validExclude(p); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validExclude accepts one gitignore-style glob. Search options join excludes
+// with commas, and rg reads a leading "!" as "include", so neither is allowed.
+func validExclude(p string) error {
+	switch {
+	case p == "" || p != strings.TrimSpace(p):
+		return fmt.Errorf("invalid exclude pattern %q", p)
+	case len(p) > maxExcludeLen:
+		return fmt.Errorf("exclude pattern longer than %d characters", maxExcludeLen)
+	case strings.HasPrefix(p, "!") || strings.ContainsFunc(p, func(r rune) bool { return r == ',' || unicode.IsControl(r) }):
+		return fmt.Errorf("exclude pattern %q may not start with ! or contain commas", p)
 	}
 	return nil
 }

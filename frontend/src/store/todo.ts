@@ -1,11 +1,14 @@
 import { createStore } from '../lib/store'
 import * as TodoAPI from '../../wailsjs/go/main/TodoAPI'
 import { errorMessage } from '../api/backend'
+import { useSettings } from './settings'
 import type { TodoItem } from '../lib/todos'
 
 interface TodoState {
   items: TodoItem[]
   truncated: boolean
+  /** Dependency folders the scan left out (absolute). */
+  skipped: string[]
   scanning: boolean
   error: string | null
   /** Tags shown (empty = all). */
@@ -14,7 +17,7 @@ interface TodoState {
 }
 
 export const useTodo = createStore<TodoState>(() => ({
-  items: [], truncated: false, scanning: false, error: null, tags: new Set(), query: '',
+  items: [], truncated: false, skipped: [], scanning: false, error: null, tags: new Set(), query: '',
 }))
 
 let pending: Promise<void> | null = null
@@ -24,8 +27,8 @@ export function scanTodos(): Promise<void> {
   pending ??= (async () => {
     useTodo.setState({ scanning: true })
     try {
-      const res = await TodoAPI.Scan()
-      useTodo.setState({ items: res.items ?? [], truncated: res.truncated, error: null })
+      const res = await TodoAPI.Scan(useSettings.getState().settings.todoExclude)
+      useTodo.setState({ items: res.items ?? [], truncated: res.truncated, skipped: res.skipped ?? [], error: null })
     } catch (err) {
       useTodo.setState({ error: errorMessage(err) })
     } finally {

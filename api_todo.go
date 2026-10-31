@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"flint/internal/settings"
 	"flint/internal/todo"
 )
 
@@ -15,9 +16,13 @@ type TodoAPI struct {
 	app *App
 }
 
-// Scan finds the markers in every open folder.
-func (t *TodoAPI) Scan() (todo.Result, error) {
+// Scan finds the markers in every open folder, skipping the exclude patterns
+// (the frontend passes the setting as edited, before it is saved).
+func (t *TodoAPI) Scan(exclude []string) (todo.Result, error) {
 	ctx, cancel := context.WithTimeout(t.app.ctx, todoTimeout)
 	defer cancel()
-	return todo.Scan(ctx, t.app.projectRoots())
+	return todo.Scan(ctx, t.app.projectRoots(), settings.CleanExcludes(exclude))
 }
+
+// AutoExcluded lists the folder names the scan always skips (for Settings).
+func (t *TodoAPI) AutoExcluded() []string { return todo.AutoExcluded() }

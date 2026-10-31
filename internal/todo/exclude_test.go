@@ -4,7 +4,10 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
+
+	"flint/internal/ripgrep"
 )
 
 // dependencyTree is a workspace with a note in the project and in every kind of
@@ -65,6 +68,11 @@ func TestScanSkipsDependenciesAndUserExcludes(t *testing.T) {
 	}
 	slices.Sort(got)
 	want := []string{"docs/new.md", "java/target/Gen.java", "main.go", "svc/api/handler.py"}
+	if ripgrep.Path() == "" {
+		// Without rg the built-in search skips target/ and dist/ everywhere,
+		// standing in for the .gitignore it can't read.
+		want = slices.DeleteFunc(want, func(p string) bool { return strings.HasPrefix(p, "java/target/") })
+	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("found %q, want %q", got, want)
 	}

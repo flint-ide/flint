@@ -4231,3 +4231,81 @@ body.file-drop-target-active::after {
   font-size: 11px;
   cursor: pointer;
 }
+
+/* ---------- Kubernetes ---------- */
+
+.kube-pickers {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.kube-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kube-ns {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.kube-aws {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.kube-aws .link,
+.kube-error .link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+}
+.kube-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.kube-section .file-name {
+  font-weight: 600;
+  flex: 1;
+}
+.kube-item {
+  padding-left: 22px;
+}
+.kube-item .path-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kube-kind {
+  flex: none;
+  min-width: 22px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--info);
+}
+.kube-dot {
+  flex: none;
+  font-size: 9px;
+}
+.kube-dot.ok {
+  color: var(--ok);
+}
+.kube-dot.warn {
+  color: var(--warn);
+}
+.kube-dot.bad {
+  color: var(--danger);
+}
+.kube-dot.muted {
+  color: var(--fg-muted);
+}

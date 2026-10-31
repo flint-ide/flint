@@ -49,10 +49,7 @@ export function profileStatus(p: Pick<AwsProfile, 'status' | 'expiresAt' | 'sour
   }
 }
 
-/** A command line for a shell, single-quoting what needs it. */
-export function shellCommand(argv: readonly string[]): string {
-  return argv.map((a) => (/^[A-Za-z0-9_./:=@+,-]+$/.test(a) ? a : `'${a.replace(/'/g, `'\\''`)}'`)).join(' ')
-}
+export { shellCommand } from './shellArgs'
 
 /** Environment of a terminal working as a profile. */
 export function profileEnv(p: Pick<AwsProfile, 'name' | 'region'>): Record<string, string> {

@@ -64,6 +64,7 @@ func main() {
 			application.NewService(&GitHubAPI{app: flint, git: gitAPI, gh: github.New()}),
 			application.NewService(newAlertsAPI(flint)),
 			application.NewService(newAWSAPI(flint)),
+			application.NewService(&KubeAPI{app: flint}),
 		},
 	})
 	flint.wails = app

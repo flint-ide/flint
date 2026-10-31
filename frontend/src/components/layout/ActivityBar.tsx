@@ -11,6 +11,7 @@ const VIEWS: { id: SidebarView; icon: string; title: string }[] = [
   { id: 'todo', icon: '☑', title: 'TODO' },
   { id: 'docker', icon: '⛴', title: 'Docker' },
   { id: 'aws', icon: '☁', title: 'AWS Profiles' },
+  { id: 'kube', icon: '☸', title: 'Kubernetes' },
 ]
 
 export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {

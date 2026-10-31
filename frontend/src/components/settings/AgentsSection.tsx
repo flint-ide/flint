@@ -1,12 +1,12 @@
 import { useEffect } from 'react'
 import { flushSettings, useSettings } from '../../store/settings'
 import { useAgent } from '../../store/agent'
-import { useAgentChat } from '../../store/agentChat'
 import { EMPTY_AGENT, formatArgs, isDefaultAgent, parseArgs, withAgent, type AgentSettings } from '../../lib/toolSettings'
 import * as SettingsAPI from '../../../bindings/flint/settingsapi'
 import { settings as models } from '../../wails/models'
 import { Select } from '../ui/Select'
 import { CheckedField, Row } from './fields'
+import { CustomAgentsSection, reloadAgents } from './CustomAgentsSection'
 
 // The agent CLIs Flint drives (Go: agent.known).
 const AGENTS = [
@@ -29,9 +29,9 @@ export function AgentsSection() {
   return (
     <section>
       <h2>Agents</h2>
-      <Row label="Default agent" hint="Starts new agent chats, writes commit messages and resolves conflicts.">
+      <Row label="Default agent" hint="Starts new agent chats and writes commit messages; resolves conflicts when it is Claude Code or Codex.">
         {loaded && available.length === 0 ? (
-          <span className="muted">No agent installed (claude or codex)</span>
+          <span className="muted">No agent installed (claude, codex or a custom agent below)</span>
         ) : (
           <Select
             value={defaultAgent}
@@ -49,6 +49,7 @@ export function AgentsSection() {
         own flags, may not change the flags Flint sets (output format, permission prompt, setting sources, sandbox, approvals, model) and
         are ignored in Restricted Mode.
       </p>
+      <CustomAgentsSection />
       <h3>Notifications</h3>
       <Row label="Tell me when work finishes in the background" hint="A macOS notification and a count on the Dock icon when a run, tests or an agent finish while Flint isn't the active app.">
         <input type="checkbox" checked={notify} onChange={(e) => update({ notifyInBackground: e.target.checked })} />
@@ -92,9 +93,4 @@ function AgentRows({ id, label, modelHint }: { id: string; label: string; modelH
       )}
     </>
   )
-}
-
-function reloadAgents(): void {
-  void useAgent.getState().load()
-  void useAgentChat.getState().load()
 }

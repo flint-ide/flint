@@ -6,6 +6,7 @@ import {
   coerceAgents, coerceRefresh, coerceServers, DEFAULT_REFRESH,
   type AgentSettings, type LanguageServerSettings, type RefreshSettings,
 } from './toolSettings'
+import { coerceCustomAgents, type CustomAgent } from './customAgents'
 
 export type ThemeMode = 'dark' | 'light' | 'system'
 export type ResolvedTheme = 'dark' | 'light'
@@ -21,7 +22,7 @@ export interface AppSettings {
   theme: ThemeMode
   editor: FontSettings
   terminal: FontSettings
-  /** Agent for new chats; '' = the first installed one. */
+  /** Agent for new chats (a built-in or custom agent's id); '' = the first installed one. */
   defaultAgent: string
   /** Save modified files when the window loses focus. */
   autoSave: boolean
@@ -35,6 +36,8 @@ export interface AppSettings {
   todoExclude: string[]
   /** Agent CLIs by name ('claude', 'codex'); missing = defaults. */
   agents: Record<string, AgentSettings>
+  /** Agents added by the user, spoken to over ACP. */
+  customAgents: CustomAgent[]
   /** Language servers by language ('go', 'typescript', …); missing = defaults. */
   languageServers: Record<string, LanguageServerSettings>
   /** Polling intervals of the Kubernetes and AWS panels. */
@@ -54,6 +57,7 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   keymap: Object.freeze({}) as Record<string, string>,
   todoExclude: Object.freeze([]) as unknown as string[],
   agents: Object.freeze({}) as Record<string, AgentSettings>,
+  customAgents: Object.freeze([]) as unknown as CustomAgent[],
   languageServers: Object.freeze({}) as Record<string, LanguageServerSettings>,
   refresh: DEFAULT_REFRESH,
 }) as AppSettings
@@ -130,6 +134,7 @@ export function coerceSettings(v: unknown): AppSettings {
     keymap,
     todoExclude: Array.isArray(v.todoExclude) ? v.todoExclude.filter((p): p is string => typeof p === 'string' && validExclude(p)) : [],
     agents: coerceAgents(v.agents),
+    customAgents: coerceCustomAgents(v.customAgents),
     languageServers: coerceServers(v.languageServers),
     refresh: coerceRefresh(v.refresh),
   }

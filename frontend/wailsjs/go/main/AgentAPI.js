@@ -10,10 +10,6 @@ export function ResolveConflictsCommand(arg1, arg2) {
   return window['go']['main']['AgentAPI']['ResolveConflictsCommand'](arg1, arg2);
 }
 
-export function SetPreferred(arg1) {
-  return window['go']['main']['AgentAPI']['SetPreferred'](arg1);
-}
-
 export function SuggestCommitMessage(arg1, arg2, arg3) {
   return window['go']['main']['AgentAPI']['SuggestCommitMessage'](arg1, arg2, arg3);
 }

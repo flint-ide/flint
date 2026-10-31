@@ -118,7 +118,51 @@ export interface HttpTab {
   dirty: boolean // always false
 }
 
-export type Tab = FileTab | ScratchTab | DiffTab | HistoryTab | TerminalTab | ChatTab | RunTab | DebugTab | ProfileTab | HttpTab
+/** Settings (⌘,); there is at most one. */
+export interface SettingsTab {
+  id: 'settings'
+  kind: 'settings'
+  title: string
+  dirty: boolean // always false: settings save as they change
+}
+
+/** A GitHub pull request (store/pullRequests.ts) of the project at root. */
+export interface PullRequestTab {
+  id: string
+  kind: 'pr'
+  /** Workspace folder whose GitHub repository the pull request belongs to. */
+  root: string
+  number: number
+  title: string
+  dirty: boolean // always false
+}
+
+/** One changed file of a pull request: merge base vs head, with review threads inline. */
+export interface PullRequestDiffTab {
+  id: string
+  kind: 'prdiff'
+  root: string
+  number: number
+  /** Repository-relative path (head side). */
+  path: string
+  title: string
+  dirty: boolean // always false
+}
+
+export type Tab =
+  | FileTab
+  | ScratchTab
+  | DiffTab
+  | HistoryTab
+  | TerminalTab
+  | ChatTab
+  | RunTab
+  | DebugTab
+  | ProfileTab
+  | HttpTab
+  | PullRequestTab
+  | PullRequestDiffTab
+  | SettingsTab
 
 const HISTORY_LIMIT = 50
 
@@ -135,6 +179,7 @@ interface EditorState {
   openRun: (runKey: string, title: string, background?: boolean) => void
   openDebug: (title: string) => void
   openProfile: (profileId: string, title: string) => void
+  openSettings: () => void
   back: () => void
   forward: () => void
   openFile: (path: string, reveal?: Omit<Reveal, 'nonce'>) => void
@@ -146,12 +191,15 @@ interface EditorState {
   openHistory: (path: string) => void
   /** Opens the response tab of a .http file, right after the file's own tab. */
   openHttpResponse: (path: string) => void
+  openPullRequest: (root: string, number: number, title: string) => void
+  /** Opens a changed file of a pull request, right after the pull request's tab. */
+  openPullRequestDiff: (root: string, number: number, path: string) => void
   renameScratchTab: (scratchId: string, title: string) => void
   closeTab: (id: string) => void
   closeScratch: (scratchId: string) => void
   /** Follows a rename on disk: file, diff and history tabs at or under `from` move to `to`. */
   renamePath: (from: string, to: string) => void
-  /** Closes file, diff, history and response tabs at or under the given (deleted) paths. */
+  /** Closes file, diff, history and response tabs at or under the given (deleted) paths, and pull requests of removed projects. */
   closePaths: (paths: string[]) => void
   setActive: (id: string) => void
   setDirty: (id: string, dirty: boolean) => void
@@ -165,6 +213,8 @@ export const revisionDiffTabId = (d: Pick<DiffTab, 'path' | 'baseRev' | 'rev'>) 
 export const historyTabId = (path: string) => `history:${path}`
 export const profileTabId = (profileId: string) => `profile:${profileId}`
 export const httpTabId = (path: string) => `http:${path}`
+export const pullRequestTabId = (root: string, number: number) => `pr:${root}#${number}`
+export const pullRequestDiffTabId = (root: string, number: number, path: string) => `prdiff:${root}#${number}:${path}`
 const baseName = (path: string) => path.split('/').pop() ?? path
 
 let revealSeq = 0
@@ -225,6 +275,14 @@ export const useEditor = createStore<EditorState>((set) => ({
       const id = profileTabId(profileId)
       if (s.tabs.some((t) => t.id === id)) return activate(s, id)
       const tab: ProfileTab = { id, kind: 'profile', profileId, title, dirty: false }
+      return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
+    }),
+
+  openSettings: () =>
+    set((s) => {
+      const id = 'settings'
+      if (s.tabs.some((t) => t.id === id)) return activate(s, id)
+      const tab: SettingsTab = { id, kind: 'settings', title: 'Settings', dirty: false }
       return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
     }),
 
@@ -313,6 +371,29 @@ export const useEditor = createStore<EditorState>((set) => ({
       return { tabs: insertAfterActive(s.tabs, after, tab), ...activate(s, id) }
     }),
 
+  openPullRequest: (root, number, title) =>
+    set((s) => {
+      const id = pullRequestTabId(root, number)
+      const label = `#${number} ${title}`
+      if (s.tabs.some((t) => t.id === id)) {
+        return { tabs: s.tabs.map((t) => (t.id === id && t.title !== label ? { ...t, title: label } : t)), ...activate(s, id) }
+      }
+      const tab: PullRequestTab = { id, kind: 'pr', root, number, title: label, dirty: false }
+      return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
+    }),
+
+  openPullRequestDiff: (root, number, path) =>
+    set((s) => {
+      const id = pullRequestDiffTabId(root, number, path)
+      if (s.tabs.some((t) => t.id === id)) return activate(s, id)
+      const tab: PullRequestDiffTab = { id, kind: 'prdiff', root, number, path, title: `Δ ${baseName(path)} #${number}`, dirty: false }
+      // Next to the pull request (after the files already opened from it), else after the active tab.
+      const prId = pullRequestTabId(root, number)
+      const siblings = s.tabs.filter((t) => t.id === prId || (t.kind === 'prdiff' && t.root === root && t.number === number))
+      const after = siblings.length ? siblings[siblings.length - 1].id : s.activeId
+      return { tabs: insertAfterActive(s.tabs, after, tab), ...activate(s, id) }
+    }),
+
   renameScratchTab: (scratchId, title) =>
     set((s) => ({
       tabs: s.tabs.map((t) => (t.kind === 'scratch' && t.scratchId === scratchId ? { ...t, title } : t)),
@@ -344,7 +425,10 @@ export const useEditor = createStore<EditorState>((set) => ({
   closePaths: (paths) =>
     set((s) => {
       const gone = s.tabs.filter(
-        (t) => (t.kind === 'file' || t.kind === 'diff' || t.kind === 'history' || t.kind === 'http') && paths.some((p) => isWithin(p, t.path)),
+        (t) =>
+          ((t.kind === 'file' || t.kind === 'diff' || t.kind === 'history' || t.kind === 'http') && paths.some((p) => isWithin(p, t.path))) ||
+          // Pull requests belong to a project: they go when it leaves the workspace.
+          ((t.kind === 'pr' || t.kind === 'prdiff') && paths.some((p) => isWithin(p, t.root))),
       )
       return gone.reduce<Partial<EditorState>>((acc, t) => ({ ...acc, ...removeTab({ ...s, ...acc } as EditorState, t.id) }), {})
     }),

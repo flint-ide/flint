@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
@@ -30,7 +32,29 @@ var entryScript = regexp.MustCompile(`<script[^>]*src="\./src/main\.tsx"[^>]*></
 
 // liveReload listens to esbuild's change stream; a full reload is fast enough
 // for this app and keeps the dev loop free of HMR machinery.
-const liveReload = `<script>new EventSource('/esbuild').addEventListener('change', () => location.reload())</script>`
+const liveReloadJS = `new EventSource('/esbuild').addEventListener('change', () => location.reload())`
+const liveReload = `<script>` + liveReloadJS + `</script>`
+
+// csp limits what the page may load and run. With Wails every script in the
+// page can call the bound Go methods, so injected markup must never execute:
+// only the app's own scripts run (no inline or eval), nothing is framed or
+// posted elsewhere. Styles may be inline (CodeMirror and xterm set them);
+// images may come from the web (avatars, Markdown) and data:/blob: URLs.
+const csp = "default-src 'self'; script-src 'self'%s; style-src 'self' 'unsafe-inline'; " +
+	"img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'%s; " +
+	"object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+
+// cspTag is the policy as a <meta>; dev mode also allows the live-reload script
+// (by hash) and its event stream.
+func cspTag(dev bool) string {
+	script, connect := "", ""
+	if dev {
+		sum := sha256.Sum256([]byte(liveReloadJS))
+		script = " 'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'"
+		connect = " ws: http://localhost:*"
+	}
+	return fmt.Sprintf(`    <meta http-equiv="Content-Security-Policy" content="%s"/>`, fmt.Sprintf(csp, script, connect))
+}
 
 func bundleOptions(root string, dev bool) api.BuildOptions {
 	mode := "production"
@@ -175,6 +199,6 @@ func writeIndex(root string, dev bool) error {
 		tags += "\n" + liveReload
 	}
 	html := entryScript.ReplaceAllLiteral(src, []byte(tags))
-	html = bytes.Replace(html, []byte("</head>"), []byte(`    <link rel="stylesheet" href="./assets/main.css"/>`+"\n</head>"), 1)
+	html = bytes.Replace(html, []byte("</head>"), []byte(cspTag(dev)+"\n"+`    <link rel="stylesheet" href="./assets/main.css"/>`+"\n</head>"), 1)
 	return os.WriteFile(filepath.Join(root, distDir, "index.html"), html, 0o644)
 }

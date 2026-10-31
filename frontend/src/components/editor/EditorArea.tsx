@@ -10,6 +10,7 @@ import { closeRunSession, useRun } from '../../store/run'
 import { isDebugging, stopDebug, useDebug } from '../../store/debug'
 import { closeProfile } from '../../store/profile'
 import { useHttpClient } from '../../store/httpClient'
+import { dropDetails } from '../../store/pullRequests'
 import { useWorkspace } from '../../store/workspace'
 import { activeRoot } from '../../store/activeRoot'
 import { labelOf, rootLabels } from '../../lib/workspaceRoots'
@@ -29,7 +30,10 @@ const AgentChat = lazy(() => import('../agent/AgentChat').then((m) => ({ default
 const RunView = lazy(() => import('../run/RunView').then((m) => ({ default: m.RunView })))
 const DebugView = lazy(() => import('../debug/DebugView').then((m) => ({ default: m.DebugView })))
 const ProfileView = lazy(() => import('../profile/ProfileView').then((m) => ({ default: m.ProfileView })))
+const SettingsView = lazy(() => import('../settings/SettingsView').then((m) => ({ default: m.SettingsView })))
 const HttpResponseView = lazy(() => import('../http/HttpResponseView').then((m) => ({ default: m.HttpResponseView })))
+const PullRequestView = lazy(() => import('../github/PullRequestView').then((m) => ({ default: m.PullRequestView })))
+const PullRequestDiffView = lazy(() => import('../github/PullRequestDiffView').then((m) => ({ default: m.PullRequestDiffView })))
 // xterm.js is the biggest dependency; output that arrives first waits in store/terminal.
 const TerminalView = lazy(() => import('../terminal/TerminalView').then((m) => ({ default: m.TerminalView })))
 
@@ -67,6 +71,11 @@ export async function requestCloseTab(tab: Tab): Promise<void> {
       return
     case 'profile':
       closeProfile(tab.profileId) // also removes the editor tab and the temporary files
+      return
+    case 'pr':
+    case 'prdiff':
+      useEditor.getState().closeTab(tab.id)
+      dropDetails(tab.root, tab.number) // kept while another tab of the pull request is open
       return
   }
   useEditor.getState().closeTab(tab.id)
@@ -148,6 +157,9 @@ const TabPanel = memo(function TabPanel({ tab, active }: { tab: Tab; active: boo
           {tab.kind === 'debug' && <DebugView />}
           {tab.kind === 'profile' && <ProfileView profileId={tab.profileId} />}
           {tab.kind === 'http' && <HttpResponseView tab={tab} active={active} />}
+          {tab.kind === 'settings' && <SettingsView active={active} />}
+          {tab.kind === 'pr' && <PullRequestView tab={tab} active={active} />}
+          {tab.kind === 'prdiff' && <PullRequestDiffView tab={tab} active={active} />}
         </Suspense>
       </ErrorBoundary>
     </div>
@@ -185,6 +197,9 @@ function TabIcon({ tab, debugActive }: { tab: Tab; debugActive: boolean }) {
       return <TabKindIcon kind="debug" busy={debugActive} />
     case 'http':
       return <HttpTabIcon path={tab.path} />
+    case 'pr':
+    case 'prdiff':
+      return <TabKindIcon kind={tab.kind === 'pr' ? 'pr' : 'diff'} />
     default:
       return <TabKindIcon kind={tab.kind} busy={false} />
   }

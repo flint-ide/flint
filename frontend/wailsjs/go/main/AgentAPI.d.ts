@@ -6,6 +6,4 @@ export function Info():Promise<main.AgentInfo>;
 
 export function ResolveConflictsCommand(arg1:string,arg2:Array<string>):Promise<string>;
 
-export function SetPreferred(arg1:string):Promise<void>;
-
 export function SuggestCommitMessage(arg1:string,arg2:Array<string>,arg3:Array<string>):Promise<string>;

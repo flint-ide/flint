@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"slices"
@@ -20,6 +21,7 @@ import (
 	"flint/internal/restore"
 	"flint/internal/runner"
 	"flint/internal/scratch"
+	"flint/internal/settings"
 	"flint/internal/terminal"
 	"flint/internal/watcher"
 )
@@ -29,7 +31,9 @@ const maxRecentFolders = 10
 // appState is remembered between launches.
 type appState struct {
 	RecentFolders []string `json:"recentFolders"`
-	Agent         string   `json:"agent"` // preferred coding agent: "claude" or "codex"
+	// Agent is the preferred coding agent before settings.json existed; read only
+	// as a fallback for settings.DefaultAgent.
+	Agent string `json:"agent"`
 	// AgentPolicy is the approval policy for agent chat sessions (nil = default).
 	AgentPolicy *agentsession.Policy `json:"agentPolicy,omitempty"`
 }
@@ -47,7 +51,8 @@ type App struct {
 	runEvents   *runEvents
 	debugs      *dap.Manager // debug sessions (dlv dap)
 	debugEvents *debugEvents
-	profiles    *profiles // temporary profiles and recordings in progress
+	dockerAPI   *DockerAPI // bound API that also owns the docker events stream
+	profiles    *profiles  // temporary profiles and recordings in progress
 	lsp         *lsp.Manager
 	agents      *agentsession.Manager
 	sessions    *restore.Store
@@ -60,6 +65,9 @@ type App struct {
 
 	stateMu sync.Mutex
 	state   appState
+
+	settingsMu sync.Mutex
+	settings   settings.Settings // settings.json, loaded once at startup
 
 	closeMu      sync.Mutex
 	quitting     bool
@@ -96,17 +104,27 @@ func NewApp() (*App, error) {
 	a.runEvents = newRunEvents(a)
 	a.runs = runner.NewManager(a.runEvents)
 	a.debugEvents = newDebugEvents(a)
+	a.dockerAPI = &DockerAPI{app: a}
 	a.debugs = dap.NewManager(a.debugEvents)
 	a.lsp = lsp.NewManager()
 	a.profiles = newProfiles()
 	if err := config.LoadJSON(a.statePath(), &a.state); err != nil {
 		return nil, err
 	}
+	// A broken settings file must not keep Flint from starting: defaults are used
+	// and the file is left alone until the user saves.
+	a.settings, err = settings.Load(settings.Path(dir))
+	if err != nil {
+		log.Printf("flint: %v (using default settings)", err)
+	}
 	a.agents = newAgentManager(a)
 	return a, nil
 }
 
-func (a *App) startup(ctx context.Context) { a.ctx = ctx }
+func (a *App) startup(ctx context.Context) {
+	a.ctx = ctx
+	menuApp = a
+}
 
 func (a *App) shutdown(context.Context) {
 	// Language servers and agents each have grace periods; stop them in parallel
@@ -117,6 +135,7 @@ func (a *App) shutdown(context.Context) {
 		a.runs.CloseAll,
 		a.debugs.CloseAll,
 		a.http.CancelAll,
+		a.dockerAPI.close,
 		a.lsp.Shutdown,
 		func() { _ = a.agents.Close() },
 		a.db.CloseAll,

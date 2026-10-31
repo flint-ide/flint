@@ -19,7 +19,11 @@
 // replaces the earlier one, and shortcuts registered later win over earlier ones,
 // so a component can shadow an app-wide command while it is mounted.
 // Shortcuts owned by someone else (CodeMirror keymaps) go in `hintKeys`: shown in
-// the palette, never dispatched here.
+// the palette, never dispatched here, and not rebindable.
+//
+// The user's keymap (Settings ▸ Keymap) is an override layer on top: setKeyOverrides
+// maps a command id to other keys, or to '' for none. effectiveKeys is what the
+// dispatcher runs and the palette shows; `keys` stays the default.
 // Framework-free on purpose: no React, no stores, so it is testable with node:test.
 
 export interface Command {
@@ -45,6 +49,8 @@ export interface Command {
 /** The parts of a KeyboardEvent the dispatcher looks at (keeps it testable). */
 export interface KeyEventLike {
   key: string
+  /** Physical key ('KeyB', 'Digit2'); names the key when ⌥ or ⇧ changed `key` (⌥B gives '∫'). */
+  code?: string
   metaKey: boolean
   ctrlKey: boolean
   altKey: boolean
@@ -60,6 +66,7 @@ export interface Chord {
 }
 
 let commands = new Map<string, Command>()
+let overrides: Readonly<Record<string, string>> = {}
 let reportError: (err: unknown) => void = (err) => {
   setTimeout(() => {
     throw err
@@ -143,12 +150,147 @@ const chordFor = (keys: string): Chord => {
   return c
 }
 
+/**
+ * The key of an event as shortcuts name it: lower-case `key`, except that a letter
+ * or digit typed with ⌥ or ⇧ is named by its physical key (⌥⌘B is 'b', not '∫';
+ * ⇧⌘2 is '2', not '@'), and the space bar is 'space'.
+ */
+export function eventKey(e: KeyEventLike): string {
+  if ((e.altKey || e.shiftKey) && e.code) {
+    const m = /^(?:Key([A-Z])|Digit(\d))$/.exec(e.code)
+    if (m) return (m[1] ?? m[2]).toLowerCase()
+  }
+  return e.key === ' ' ? 'space' : e.key.toLowerCase()
+}
+
 /** Exact match: every modifier must agree, so ⌘P never fires on ⇧⌘P or ⌥⌘P. */
 export function matchesKeys(e: KeyEventLike, keys: string): boolean {
   const c = chordFor(keys)
-  return (
-    e.key.toLowerCase() === c.key && e.metaKey === c.meta && e.ctrlKey === c.ctrl && e.altKey === c.alt && e.shiftKey === c.shift
-  )
+  return eventKey(e) === c.key && e.metaKey === c.meta && e.ctrlKey === c.ctrl && e.altKey === c.alt && e.shiftKey === c.shift
+}
+
+const KEY_NAMES: Record<string, string> = {
+  enter: 'Enter', escape: 'Escape', backspace: 'Backspace', delete: 'Delete', tab: 'Tab', space: 'Space',
+  arrowup: 'ArrowUp', arrowdown: 'ArrowDown', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight',
+  home: 'Home', end: 'End', pageup: 'PageUp', pagedown: 'PageDown',
+}
+
+/** A chord in the canonical spelling ('Ctrl+Alt+Shift+Mod+K'), so equal shortcuts compare equal. */
+export function chordToKeys(c: Chord): string {
+  const named = KEY_NAMES[c.key] ?? (/^f\d{1,2}$/.test(c.key) ? c.key.toUpperCase() : c.key.length === 1 ? c.key.toUpperCase() : c.key)
+  const mods = [c.ctrl && 'Ctrl', c.alt && 'Alt', c.shift && 'Shift', c.meta && 'Mod'].filter(Boolean)
+  return [...mods, named].join('+')
+}
+
+/** 'shift+mod+p' → 'Shift+Mod+P'; throws on an unknown modifier like parseKeys. */
+export function canonicalKeys(keys: string): string {
+  return chordToKeys(parseKeys(keys))
+}
+
+const MODIFIER_KEYS = new Set(['meta', 'control', 'alt', 'shift', 'capslock', 'fn', 'os', 'hyper', 'super'])
+
+/**
+ * The shortcut a keydown would record in the keymap editor, or null for a lone
+ * modifier. Keys that type text need a modifier other than ⇧ (they'd stop typing);
+ * function keys and the like may stand alone.
+ */
+export function keysFromEvent(e: KeyEventLike): string | null {
+  const key = eventKey(e)
+  if (!key || MODIFIER_KEYS.has(key) || key === 'dead' || key === 'unidentified') return null
+  const typing = key.length === 1 || key === 'space' || key === 'enter' || key === 'backspace' || key === 'tab'
+  if (typing && !e.metaKey && !e.ctrlKey && !e.altKey) return null
+  return chordToKeys({ key, meta: e.metaKey, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey })
+}
+
+// ---------- user keymap (override layer) ----------
+
+/** Replaces the user's overrides: command id → keys, '' for no shortcut. Invalid keys are ignored. */
+export function setKeyOverrides(map: Readonly<Record<string, string>>): void {
+  const next: Record<string, string> = {}
+  for (const [id, keys] of Object.entries(map)) {
+    if (keys === '') next[id] = ''
+    else if (validKeys(keys)) next[id] = keys
+  }
+  overrides = next
+}
+
+export function getKeyOverrides(): Readonly<Record<string, string>> {
+  return overrides
+}
+
+function validKeys(keys: string): boolean {
+  try {
+    parseKeys(keys)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Whether the keymap may change this command's shortcut (not when CodeMirror owns it). */
+export function isRebindable(cmd: Command): boolean {
+  return !cmd.hintKeys
+}
+
+/** The shortcut the dispatcher runs: the user's override, else the default `keys`. */
+export function effectiveKeys(cmd: Command, map: Readonly<Record<string, string>> = overrides): string | undefined {
+  if (!isRebindable(cmd)) return cmd.keys
+  const own = Object.prototype.hasOwnProperty.call(map, cmd.id) ? map[cmd.id] : cmd.keys
+  return own || undefined
+}
+
+/** The shortcut to display (palette, keymap): the effective keys or the editor-owned hint. */
+export function shownKeys(cmd: Command, map: Readonly<Record<string, string>> = overrides): string | undefined {
+  return effectiveKeys(cmd, map) ?? cmd.hintKeys
+}
+
+/** Whether the command's shortcut differs from its default. */
+export function isOverridden(cmd: Command, map: Readonly<Record<string, string>> = overrides): boolean {
+  return isRebindable(cmd) && Object.prototype.hasOwnProperty.call(map, cmd.id) && !sameKeys(map[cmd.id], cmd.keys)
+}
+
+/** Equal shortcuts in any spelling ('' and undefined mean none). */
+export function sameKeys(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return !a && !b
+  try {
+    return canonicalKeys(a) === canonicalKeys(b)
+  } catch {
+    return a === b
+  }
+}
+
+/**
+ * Other commands showing the same shortcut (their effective or editor-owned keys).
+ * Not all are real clashes: `when` and keysIgnoredIn let commands share keys by
+ * context (⌘B toggles the sidebar, but is Go to Declaration in an editor).
+ */
+export function keyConflicts(
+  keys: string,
+  exceptId: string,
+  list: readonly Command[] = listCommands(),
+  map: Readonly<Record<string, string>> = overrides,
+): Command[] {
+  return list.filter((cmd) => cmd.id !== exceptId && sameKeys(shownKeys(cmd, map), keys))
+}
+
+/** The overrides after setting `keys` for a command; dropping the entry when it equals the default. */
+export function withOverride(
+  map: Readonly<Record<string, string>>,
+  cmd: Command,
+  keys: string | null,
+): Record<string, string> {
+  const rest = Object.fromEntries(Object.entries(map).filter(([id]) => id !== cmd.id))
+  if (keys === null || sameKeys(keys, cmd.keys)) return rest // reset to default
+  return { ...rest, [cmd.id]: keys }
+}
+
+// While the keymap editor records a shortcut, every keydown goes to it instead of
+// running commands.
+let capture: ((e: KeyboardEvent) => void) | null = null
+
+/** Sends keydowns to fn instead of the commands (null ends it). */
+export function setKeyCapture(fn: ((e: KeyboardEvent) => void) | null): void {
+  capture = fn
 }
 
 const KEY_GLYPHS: Record<string, string> = {
@@ -169,11 +311,11 @@ export function formatKeys(keys: string): string {
  * matching the selector (for keysIgnoredIn).
  */
 export function commandForKey(e: KeyEventLike, isInside: (selector: string) => boolean): Command | undefined {
-  const bound = keyIndex().get(e.key.toLowerCase())
+  const bound = keyIndex().get(eventKey(e))
   if (!bound) return undefined // plain typing: no command uses this key
   for (let i = bound.length - 1; i >= 0; i--) {
-    const cmd = bound[i]
-    if (!matchesKeys(e, cmd.keys!)) continue
+    const { cmd, keys } = bound[i]
+    if (!matchesKeys(e, keys)) continue
     if (cmd.keysIgnoredIn && isInside(cmd.keysIgnoredIn)) continue
     if (isAvailable(cmd)) return cmd
   }
@@ -181,17 +323,22 @@ export function commandForKey(e: KeyEventLike, isInside: (selector: string) => b
 }
 
 // Every keystroke reaches the dispatcher, so commands with a shortcut are indexed
-// by key (rebuilt when the registry changes; registration order kept).
-let indexed: { from: Map<string, Command>; byKey: Map<string, Command[]> } | null = null
-function keyIndex(): Map<string, Command[]> {
-  if (indexed?.from === commands) return indexed.byKey
-  const byKey = new Map<string, Command[]>()
+// by key (rebuilt when the registry or the overrides change; registration order kept).
+interface Bound {
+  cmd: Command
+  keys: string
+}
+let indexed: { from: Map<string, Command>; overrides: Readonly<Record<string, string>>; byKey: Map<string, Bound[]> } | null = null
+function keyIndex(): Map<string, Bound[]> {
+  if (indexed?.from === commands && indexed.overrides === overrides) return indexed.byKey
+  const byKey = new Map<string, Bound[]>()
   for (const cmd of commands.values()) {
-    if (!cmd.keys) continue
-    const key = chordFor(cmd.keys).key
-    byKey.set(key, [...(byKey.get(key) ?? []), cmd])
+    const keys = effectiveKeys(cmd)
+    if (!keys) continue
+    const key = chordFor(keys).key
+    byKey.set(key, [...(byKey.get(key) ?? []), { cmd, keys }])
   }
-  indexed = { from: commands, byKey }
+  indexed = { from: commands, overrides, byKey }
   return byKey
 }
 
@@ -200,6 +347,12 @@ function keyIndex(): Map<string, Command[]> {
  * before CodeMirror and xterm). Returns whether a command took the event.
  */
 export function handleGlobalKey(e: KeyboardEvent): boolean {
+  if (capture) {
+    e.preventDefault()
+    e.stopPropagation()
+    capture(e)
+    return true
+  }
   const target = e.target
   const cmd = commandForKey(e, (selector) => target instanceof Element && !!target.closest(selector))
   if (!cmd) return false

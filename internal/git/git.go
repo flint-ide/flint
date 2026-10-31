@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -83,8 +84,13 @@ func (r *Repo) gitInput(ctx context.Context, stdin []byte, args ...string) ([]by
 	return run(ctx, r.Root, stdin, args...)
 }
 
+// safeConfig is set on every git Flint runs: a repository's own .git/config
+// (e.g. from a downloaded archive) must not get commands run just by opening the
+// folder. core.fsmonitor names a program git starts on status/diff.
+var safeConfig = []string{"-c", "core.fsmonitor=false"}
+
 func run(ctx context.Context, dir string, stdin []byte, args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, gitBinary(), args...)
+	cmd := exec.CommandContext(ctx, gitBinary(), append(slices.Clone(safeConfig), args...)...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
 		"GIT_OPTIONAL_LOCKS=0",  // never fight an agent's git for index.lock on read-only commands

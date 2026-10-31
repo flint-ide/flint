@@ -4,7 +4,7 @@ import { restoreSession, saveSession, setSessionRoots } from './session'
 import { addRootError, withoutRoot } from '../lib/workspaceRoots'
 import { useEditor } from './editor'
 
-export type SidebarView = 'files' | 'search' | 'git' | 'database' | 'scratch'
+export type SidebarView = 'files' | 'search' | 'git' | 'pulls' | 'database' | 'scratch' | 'todo' | 'docker'
 /** What the branches popup opens on (title bar widget or the palette). */
 export type BranchesMode = 'list' | 'new-branch' | 'new-worktree'
 

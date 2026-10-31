@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"flint/internal/agent"
-	"flint/internal/config"
 	"flint/internal/git"
 )
 
@@ -43,14 +42,6 @@ func (a *AgentAPI) Info() AgentInfo {
 		info.Preferred = info.Available[0]
 	}
 	return info
-}
-
-// SetPreferred remembers which agent to use.
-func (a *AgentAPI) SetPreferred(kind string) error {
-	if !agent.Valid(agent.Kind(kind)) {
-		return errors.New("unsupported agent " + kind)
-	}
-	return a.app.setPreferredAgent(kind)
 }
 
 // SuggestCommitMessage asks the agent for a message describing the given changes
@@ -96,20 +87,13 @@ func (a *AgentAPI) kind() (agent.Kind, error) {
 	return agent.Kind(info.Preferred), nil
 }
 
+// preferredAgent is the default agent from settings, else the one remembered
+// before settings existed.
 func (a *App) preferredAgent() string {
+	if s := a.currentSettings(); s.DefaultAgent != "" {
+		return s.DefaultAgent
+	}
 	a.stateMu.Lock()
 	defer a.stateMu.Unlock()
 	return a.state.Agent
-}
-
-func (a *App) setPreferredAgent(kind string) error {
-	a.stateMu.Lock()
-	defer a.stateMu.Unlock()
-	next := a.state
-	next.Agent = kind
-	if err := config.SaveJSON(a.statePath(), next); err != nil {
-		return err
-	}
-	a.state = next
-	return nil
 }

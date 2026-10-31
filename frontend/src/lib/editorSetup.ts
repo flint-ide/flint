@@ -1,4 +1,4 @@
-import { EditorState, type Extension } from '@codemirror/state'
+import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import {
   EditorView,
   crosshairCursor,
@@ -10,6 +10,7 @@ import {
   keymap,
   lineNumbers,
   rectangularSelection,
+  ViewPlugin,
 } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import {
@@ -23,11 +24,12 @@ import {
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete'
 import { tags as t } from '@lezer/highlight'
+import { useSettings } from '../store/settings'
 
 const theme = EditorView.theme(
   {
     '&': { height: '100%', color: 'var(--fg)', backgroundColor: 'var(--bg-editor)', fontSize: 'var(--editor-font-size)' },
-    '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.55' },
+    '.cm-scroller': { fontFamily: 'var(--editor-font)', lineHeight: 'var(--editor-line-height)' },
     '.cm-content': { caretColor: 'var(--accent)' },
     '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--accent)', borderLeftWidth: '2px' },
     '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': {
@@ -47,8 +49,27 @@ const theme = EditorView.theme(
     '.cm-foldPlaceholder': { backgroundColor: 'var(--bg-raised)', border: 'none', color: 'var(--fg-muted)' },
     '.cm-flash-line': { backgroundColor: 'var(--flash)' },
   },
-  { dark: true },
 )
+
+// Colors and fonts are CSS variables (style.css, store/settings), so a settings
+// change restyles every editor by itself. What CSS can't do is done here for each
+// live editor: switch CodeMirror's own light/dark base theme, and re-measure lines
+// after a font change.
+const darkMode = new Compartment()
+const liveViews = new Set<EditorView>()
+const tracked = ViewPlugin.define((view) => {
+  liveViews.add(view)
+  return { destroy: () => liveViews.delete(view) }
+})
+
+useSettings.subscribe((s, prev) => {
+  const themeChanged = s.theme !== prev.theme
+  if (!themeChanged && s.settings.editor === prev.settings.editor) return
+  for (const view of liveViews) {
+    if (themeChanged) view.dispatch({ effects: darkMode.reconfigure(EditorView.darkTheme.of(s.theme === 'dark')) })
+    view.requestMeasure()
+  }
+})
 
 const highlight = HighlightStyle.define([
   { tag: [t.keyword, t.modifier, t.operatorKeyword, t.controlKeyword], color: 'var(--syn-keyword)' },
@@ -97,5 +118,7 @@ export function baseExtensions(): Extension[] {
       indentWithTab,
     ]),
     theme,
+    darkMode.of(EditorView.darkTheme.of(useSettings.getState().theme === 'dark')),
+    tracked,
   ]
 }

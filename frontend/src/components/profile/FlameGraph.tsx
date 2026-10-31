@@ -3,6 +3,7 @@ import {
   fitLabel, formatValue, hash01, hitTest, isRuntimeFrame, layoutDepth, layoutFlame, mixHex, packageOf, percent, samePath, shortName,
   type FlameFrame, type FramePath, type FrameRect, type SearchResult,
 } from '../../lib/flame'
+import { useSettings } from '../../store/settings'
 
 /** Row height of a frame (CSS px). */
 const ROW = 18
@@ -48,14 +49,16 @@ export function FlameGraph({ root, unit, focus, onFocus, search, onOpen }: Props
   const rects = useMemo(() => layoutFlame(root, focus, width), [root, focus, width])
   const rows = layoutDepth(rects)
 
-  // Redrawn when the hovered frame changes, not on every mouse move.
+  // Redrawn when the hovered frame changes, not on every mouse move, and when the
+  // theme does (the canvas reads its colors from CSS variables while drawing).
   const hovered = hover?.rect ?? null
+  const theme = useSettings((s) => s.theme)
   useEffect(() => {
     const c = canvas.current
     if (!c) return
     const frame = requestAnimationFrame(() => draw(c, rects, width, rows, search, hovered))
     return () => cancelAnimationFrame(frame)
-  }, [rects, width, rows, search, hovered])
+  }, [rects, width, rows, search, hovered, theme])
 
   const at = (e: MouseEvent): FrameRect | null => {
     const box = canvas.current?.getBoundingClientRect()

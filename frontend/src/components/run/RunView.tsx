@@ -13,7 +13,7 @@ import { focusSoon } from '../../lib/focusSoon'
 import { formatDuration } from '../../lib/format'
 import { usePersistentNumber } from '../../lib/usePersistentNumber'
 import { Splitter } from '../layout/Splitter'
-import { THEME } from '../terminal/TerminalView'
+import { currentTerminalOptions, useTerminalSettings } from '../terminal/useTerminalSettings'
 import { PlayIcon, RerunIcon, StopIcon } from './RunWidget'
 
 interface Props {
@@ -255,6 +255,9 @@ function linkify(line: string, open: (path: string, line?: number, column?: numb
 
 // ---------- console ----------
 
+// Run output is set a point smaller than the terminal font.
+const RUN_FONT_DELTA = -1
+
 /** xterm.js bound to the run's output; input goes to the process for configurations. */
 function RunConsole({ runKey, active, interactive }: { runKey: string; active: boolean; interactive: boolean }) {
   const host = useRef<HTMLDivElement>(null)
@@ -263,10 +266,7 @@ function RunConsole({ runKey, active, interactive }: { runKey: string; active: b
   useEffect(() => {
     if (!host.current) return
     const xterm = new XTerm({
-      theme: THEME,
-      fontFamily: '"JetBrains Mono", "SF Mono", Menlo, monospace',
-      fontSize: 12,
-      lineHeight: 1.2,
+      ...currentTerminalOptions(RUN_FONT_DELTA),
       cursorBlink: false,
       scrollback: 5_000,
       allowProposedApi: true,
@@ -318,6 +318,8 @@ function RunConsole({ runKey, active, interactive }: { runKey: string; active: b
     // One console per tab; `interactive` only changes with the tab's kind.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runKey])
+
+  useTerminalSettings(term, active, RUN_FONT_DELTA)
 
   useEffect(() => {
     if (!active) return

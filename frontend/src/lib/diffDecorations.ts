@@ -61,6 +61,9 @@ class Spacer extends WidgetType {
     const el = document.createElement('div')
     el.className = 'cm-diff-spacer'
     el.style.height = `${this.lines * view.defaultLineHeight}px`
+    // The editor builds spacers before it has measured its lines (defaultLineHeight is
+    // still an estimate then); the lh unit is the real line height. Ignored where unsupported.
+    el.style.height = `${this.lines}lh`
     return el
   }
 }

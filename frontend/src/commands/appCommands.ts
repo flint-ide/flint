@@ -63,6 +63,11 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
       id: 'app.commandPalette', title: 'Find Action…', category: 'General', keys: 'Mod+Shift+P',
       keywords: 'command palette', run: () => ws().setPaletteOpen(true),
     },
+    {
+      id: 'app.settings', title: 'Settings…', category: 'General', keys: 'Mod+,',
+      keywords: 'preferences options theme dark light font size keymap shortcuts keyboard agent',
+      run: () => useEditor.getState().openSettings(),
+    },
 
     // Navigate
     { id: 'nav.goToFile', title: 'Go to File…', category: 'Navigate', keys: 'Mod+P', keywords: 'open quick', run: () => ws().setQuickOpen(true) },
@@ -145,6 +150,8 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
     { id: 'view.files', title: 'Show Files', category: 'View', keywords: 'project tree explorer', run: showPanel('files') },
     { id: 'view.databases', title: 'Show Databases', category: 'View', keywords: 'sql postgres clickhouse', run: showPanel('database') },
     { id: 'view.scratchpads', title: 'Show Scratchpads', category: 'View', keywords: 'notes sql consoles', run: showPanel('scratch') },
+    { id: 'view.docker', title: 'Docker', category: 'View', keywords: 'containers compose logs', run: showPanel('docker') },
+    { id: 'view.todo', title: 'TODO List', category: 'View', keywords: 'fixme hack xxx bug notes comments', run: showPanel('todo') },
 
     // Project
     { id: 'project.recent', title: 'Recent Projects…', category: 'Project', keys: 'Mod+O', keywords: 'open folder', run: () => ws().setRecentOpen(true) },

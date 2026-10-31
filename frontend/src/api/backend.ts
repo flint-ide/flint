@@ -5,10 +5,11 @@ import * as Search from '../../wailsjs/go/main/SearchAPI'
 import * as Database from '../../wailsjs/go/main/DatabaseAPI'
 import * as Scratch from '../../wailsjs/go/main/ScratchAPI'
 import * as Diff from '../../wailsjs/go/main/DiffAPI'
+import * as GitHub from '../../wailsjs/go/main/GitHubAPI'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
-import { db, scratch, search, textdiff, workspace } from '../../wailsjs/go/models'
+import { db, github, scratch, search, textdiff, workspace } from '../../wailsjs/go/models'
 
-export { Workspace, Search, Database, Scratch, Diff }
+export { Workspace, Search, Database, Scratch, Diff, GitHub }
 
 export type Entry = workspace.Entry
 export type FileContent = workspace.FileContent
@@ -25,6 +26,14 @@ export type ScratchPad = scratch.Scratch
 export type Hunk = textdiff.Hunk
 export type LineMark = textdiff.LineMark
 export type SearchOptions = search.Options
+export type GitHubStatus = github.Status
+export type PullRequest = github.PullRequest
+export type PullRequestDetails = github.Details
+export type ReviewThread = github.Thread
+export type ReviewComment = github.Comment
+export type PullRequestFile = github.File
+export type PullRequestFileDiff = github.FileDiff
+export type PullRequestCheck = github.Check
 export type Driver = 'postgres' | 'clickhouse'
 export type ScratchKind = 'sql' | 'markdown' | 'text'
 export type ClickHouseProtocol = 'native' | 'http'
@@ -91,6 +100,16 @@ export function editBatch(batch: { tableOid: number; edits: { op: string; key: R
 /** Filter for DatabaseAPI.QueryHistory ("" database = the profile's default). */
 export function historyFilter(f: { database: string; allDatabases: boolean; filter: string; limit: number }): db.HistoryFilter {
   return db.HistoryFilter.createFrom(f)
+}
+
+/** Pull request list filter in the shape of Go's github.ListFilter. */
+export function pullRequestFilter(f: { who: string; state: string }): github.ListFilter {
+  return github.ListFilter.createFrom(f)
+}
+
+/** A new review comment in the shape of Go's github.NewComment. */
+export function newReviewComment(c: { path: string; line: number; side: 'LEFT' | 'RIGHT'; startLine: number; body: string; review: boolean }): github.NewComment {
+  return github.NewComment.createFrom(c)
 }
 
 /** Wails rejects bound-method promises with a plain string; normalize to a message. */

@@ -3,13 +3,16 @@ import * as Agent from '../../wailsjs/go/main/AgentAPI'
 import { errorMessage } from '../api/backend'
 import { showToast } from './dialog'
 import { useTerminal } from './terminal'
+import { useSettings } from './settings'
 
 interface AgentState {
   available: string[]
+  /** The agent in use: the default from settings, else the first installed one. */
   preferred: string
   loaded: boolean
   load: () => Promise<void>
-  setPreferred: (kind: string) => Promise<void>
+  /** '' = the first installed agent. */
+  setPreferred: (kind: string) => void
 }
 
 export const useAgent = createStore<AgentState>((set) => ({
@@ -26,13 +29,11 @@ export const useAgent = createStore<AgentState>((set) => ({
     }
   },
 
-  setPreferred: async (kind) => {
-    try {
-      await Agent.SetPreferred(kind)
-      set({ preferred: kind })
-    } catch (err) {
-      showToast(errorMessage(err), 'error')
-    }
+  // The default agent is a setting (settings.json); the commit panel's picker and
+  // Settings ▸ Agents both change it here.
+  setPreferred: (kind) => {
+    useSettings.getState().update({ defaultAgent: kind })
+    set((s) => ({ preferred: kind || s.available[0] || '' }))
   },
 }))
 

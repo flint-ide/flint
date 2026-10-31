@@ -116,7 +116,7 @@ function lookup(name: string): { badge?: Badge; glyph?: Glyph } {
 const PAGE = 'M4 1.5h5.3l3.2 3.2v8.8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2.5a1 1 0 0 1 1-1z'
 const FOLD = 'M9.2 1.6v2.6a.6.6 0 0 0 .6.6h2.6'
 const PAGE_STROKE = '#868c97'
-const PAGE_FILL = '#25272c'
+const PAGE_FILL = { fill: 'var(--file-page)' } // the page follows the theme
 
 function Svg({ children, className = 'file-icon' }: { children: ReactNode; className?: string }) {
   return (
@@ -129,7 +129,7 @@ function Svg({ children, className = 'file-icon' }: { children: ReactNode; class
 function Page({ withFold = true }: { withFold?: boolean }) {
   return (
     <>
-      <path d={PAGE} fill={PAGE_FILL} stroke={PAGE_STROKE} strokeWidth="1" strokeLinejoin="round" />
+      <path d={PAGE} style={PAGE_FILL} stroke={PAGE_STROKE} strokeWidth="1" strokeLinejoin="round" />
       {withFold && <path d={FOLD} fill="none" stroke={PAGE_STROKE} strokeWidth="1" strokeLinejoin="round" />}
     </>
   )
@@ -248,9 +248,19 @@ export const FileIcon = memo(function FileIcon({ name, isDir, open }: Props) {
   )
 })
 
+const GEAR = { stroke: 'var(--fg-muted)' }
+
 /** Icons for non-file tabs. */
-export function TabKindIcon({ kind, busy }: { kind: 'terminal' | 'chat' | 'diff' | 'history' | 'sql' | 'markdown' | 'text' | 'run' | 'debug' | 'profile' | 'http'; busy?: boolean }) {
+export function TabKindIcon({ kind, busy }: { kind: 'terminal' | 'chat' | 'diff' | 'history' | 'sql' | 'markdown' | 'text' | 'run' | 'debug' | 'profile' | 'http' | 'settings' | 'pr'; busy?: boolean }) {
   switch (kind) {
+    case 'settings':
+      return (
+        <Svg>
+          <circle cx="8" cy="8" r="5.5" fill="none" style={GEAR} strokeWidth="2.6" strokeDasharray="2.16 2.16" />
+          <circle cx="8" cy="8" r="4" fill="none" style={GEAR} strokeWidth="1.5" />
+          <circle cx="8" cy="8" r="1.3" style={{ fill: 'var(--fg-muted)' }} />
+        </Svg>
+      )
     case 'profile':
       return (
         <Svg className={`file-icon${busy ? ' pulse' : ''}`}>
@@ -292,6 +302,16 @@ export function TabKindIcon({ kind, busy }: { kind: 'terminal' | 'chat' | 'diff'
       return (
         <Svg className={`file-icon${busy ? ' pulse' : ''}`}>
           <path d="M8 1.3l1.7 4.9 5 1.8-5 1.8L8 14.7l-1.7-4.9-5-1.8 5-1.8z" fill="#f59e0b" />
+        </Svg>
+      )
+    case 'pr':
+      // Two commits joined by a merge arrow, like GitHub's pull request icon.
+      return (
+        <Svg>
+          <circle cx="4.2" cy="3.6" r="1.7" fill="none" stroke="#a78bfa" strokeWidth="1.2" />
+          <circle cx="4.2" cy="12.4" r="1.7" fill="none" stroke="#a78bfa" strokeWidth="1.2" />
+          <circle cx="11.8" cy="12.4" r="1.7" fill="none" stroke="#a78bfa" strokeWidth="1.2" />
+          <path d="M4.2 5.3v5.4M11.8 10.7V6.2a1.6 1.6 0 0 0-1.6-1.6H7.4M8.8 3.2L7.4 4.6l1.4 1.4" fill="none" stroke="#a78bfa" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       )
     case 'diff':

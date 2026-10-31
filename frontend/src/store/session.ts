@@ -88,6 +88,11 @@ async function captureTab(t: Tab, roots: string[]): Promise<SavedTab | null> {
       return null // temporary profiles are deleted when Flint quits
     case 'http':
       return null // responses live in memory only
+    case 'settings':
+      return null // opened with ⌘, when needed
+    case 'pr':
+    case 'prdiff':
+      return null // pull requests are fetched from GitHub when opened
   }
 }
 

@@ -73,7 +73,8 @@ func Probe(ctx context.Context, opts Options, dir string) (AgentInfo, error) {
 	client, err := acp.Start(ctx, opts.acpOptions(dir), &headlessHandler{root: dir})
 	if err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return AgentInfo{}, fmt.Errorf("%s did not answer the ACP handshake in time: is %q its ACP mode?", opts.Name, strings.Join(opts.Args, " "))
+			return AgentInfo{}, fmt.Errorf("%s did not answer the ACP handshake in time: check that %q starts its ACP mode and that the agent runs in a terminal",
+				opts.Name, strings.TrimSpace(opts.Command+" "+strings.Join(opts.Args, " ")))
 		}
 		return AgentInfo{}, err
 	}

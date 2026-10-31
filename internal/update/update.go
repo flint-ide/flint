@@ -167,6 +167,10 @@ func (c *Client) Latest(ctx context.Context) (Release, error) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxBody))
+		// GitHub answers 404 both before the first release and for a private repository.
+		if resp.StatusCode == http.StatusNotFound {
+			return Release{}, errors.New("no published release found on GitHub")
+		}
 		return Release{}, fmt.Errorf("GitHub answered %s", resp.Status)
 	}
 	return decodeRelease(io.LimitReader(resp.Body, maxBody))

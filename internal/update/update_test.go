@@ -138,7 +138,7 @@ func TestLatest(t *testing.T) {
 			body: `{"tag_name": "v1.3.0", "html_url": "https://evil.example/flint.dmg", "published_at": null}`,
 			want: Release{Tag: "v1.3.0", URL: ReleasesURL},
 		},
-		{name: "no releases", status: 404, body: `{"message": "Not Found"}`, wantErr: "404"},
+		{name: "no releases", status: 404, body: `{"message": "Not Found"}`, wantErr: "no published release"},
 		{name: "rate limited", status: 403, body: `{"message": "API rate limit exceeded"}`, wantErr: "403"},
 		{name: "not JSON", status: 200, body: `<html>`, wantErr: "decode"},
 		{name: "bad tag", status: 200, body: `{"tag_name": "nightly"}`, wantErr: "unexpected tag"},

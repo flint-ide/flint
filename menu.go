@@ -17,6 +17,10 @@ const (
 	eventMenuOpenFolder = "menu:open-folder" // open the given folder
 	eventMenuAddProject = "menu:add-project" // pick a folder to attach to the workspace
 	eventMenuSettings   = "menu:settings"    // open the Settings tab (app menu, ⌘,)
+	// Help menu: the frontend runs these so they share code with the palette.
+	eventMenuReportIssue     = "menu:report-issue"
+	eventMenuCopyDiagnostics = "menu:copy-diagnostics"
+	eventMenuShowLogs        = "menu:show-logs"
 )
 
 // buildMenu creates the native macOS menu bar. File ▸ Open Recent mirrors the
@@ -56,6 +60,11 @@ func (a *App) buildMenu() *application.Menu {
 	// Without an Edit menu macOS webviews ignore Cmd+C / Cmd+V / Cmd+Z.
 	m.AddRole(application.EditMenu)
 	m.AddRole(application.WindowMenu)
+
+	help := m.AddSubmenu("Help")
+	help.Add("Report an Issue…").OnClick(func(*application.Context) { a.emit(eventMenuReportIssue) })
+	help.Add("Copy Diagnostics").OnClick(func(*application.Context) { a.emit(eventMenuCopyDiagnostics) })
+	help.Add("Show Logs in Finder").OnClick(func(*application.Context) { a.emit(eventMenuShowLogs) })
 	return m
 }
 

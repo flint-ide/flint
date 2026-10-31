@@ -9,6 +9,9 @@ vars:
   APP_NAME: flint
   BIN_DIR: build/bin
   DEV_PORT: 5173
+  # Release builds pass VERSION=vX.Y.Z; it shows in diagnostics and About.
+  VERSION: '{{.VERSION | default "dev"}}'
+  LDFLAGS: -w -s -X main.version={{.VERSION}}
 
 env:
   CGO_ENABLED: 1
@@ -43,17 +46,43 @@ tasks:
     deps: [frontend]
     cmds:
       - mkdir -p {{.BIN_DIR}}
-      - go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o {{.BIN_DIR}}/{{.APP_NAME}}
+      - go build -tags production -trimpath -ldflags="{{.LDFLAGS}}" -o {{.BIN_DIR}}/{{.APP_NAME}}
+
+  build:universal:
+    summary: Builds one binary for Apple silicon and Intel (release builds)
+    deps: [frontend]
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - GOARCH=arm64 go build -tags production -trimpath -ldflags="{{.LDFLAGS}}" -o {{.BIN_DIR}}/{{.APP_NAME}}-arm64
+      - GOARCH=amd64 go build -tags production -trimpath -ldflags="{{.LDFLAGS}}" -o {{.BIN_DIR}}/{{.APP_NAME}}-amd64
+      - lipo -create -output {{.BIN_DIR}}/{{.APP_NAME}} {{.BIN_DIR}}/{{.APP_NAME}}-arm64 {{.BIN_DIR}}/{{.APP_NAME}}-amd64
+      - rm {{.BIN_DIR}}/{{.APP_NAME}}-arm64 {{.BIN_DIR}}/{{.APP_NAME}}-amd64
 
   package:
     summary: Bundles build/bin/flint.app
     deps: [build, icons]
+    cmds:
+      - task: bundle
+
+  package:universal:
+    summary: Bundles a universal build/bin/flint.app (releases)
+    deps: ["build:universal", icons]
+    cmds:
+      - task: bundle
+
+  bundle:
+    internal: true
     cmds:
       - rm -rf "{{.BIN_DIR}}/{{.APP_NAME}}.app"
       - mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources"
       - cp build/darwin/icons.icns "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources"
       - cp "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS"
       - cp build/darwin/Info.plist "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents"
+      - |
+        if [ "{{.VERSION}}" != dev ]; then
+          plutil -replace CFBundleShortVersionString -string "{{trimPrefix "v" .VERSION}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Info.plist"
+          plutil -replace CFBundleVersion -string "{{trimPrefix "v" .VERSION}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Info.plist"
+        fi
       - xattr -cr "{{.BIN_DIR}}/{{.APP_NAME}}.app"
       - codesign --force --deep --sign - "{{.BIN_DIR}}/{{.APP_NAME}}.app"
 

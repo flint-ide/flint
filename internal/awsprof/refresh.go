@@ -79,6 +79,7 @@ func (r *Refresher) Refresh(ctx context.Context, p Profile) (string, error) {
 
 	cmd := exec.CommandContext(ctx, bin, argv[1:]...)
 	cmd.Env = append(cmd.Environ(), "AWS_PAGER=", "AWS_CLI_AUTO_PROMPT=off")
+	stopTree(cmd)
 	// No stdin: a tool that asks a question gets EOF and fails instead of hanging.
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out

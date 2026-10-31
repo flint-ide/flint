@@ -1,12 +1,11 @@
 WAILS   ?= $(shell go env GOPATH)/bin/wails3
-# The corporate Go proxy is only reachable on VPN; fall back to the public one.
 export GOPROXY ?= https://proxy.golang.org,direct
 
 PG_PORT ?= 55432
 CH_PORT ?= 59000
 CH_HTTP_PORT ?= 58123
 
-.PHONY: dev build server test test-go test-web test-integration test-db-up test-db-down install lint
+.PHONY: dev build server vuln test test-go test-web test-integration test-db-up test-db-down install lint
 
 dev: ## Run with live reload (Go rebuilds on change, the page reloads)
 	$(WAILS) task dev
@@ -39,7 +38,11 @@ test-integration: ## Requires `make test-db-up`
 
 lint:
 	go vet ./...
-	gofmt -l . | (! grep .)
+	gofmt -l . | grep -v '^frontend/node_modules/' | (! grep .)
+
+vuln: ## Known vulnerabilities in Go and runtime npm dependencies
+	go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+	cd frontend && npm audit --omit=dev
 
 install: build ## Copy to /Applications and add a `flint` command to ~/.local/bin
 	rm -rf /Applications/flint.app && cp -R build/bin/flint.app /Applications/

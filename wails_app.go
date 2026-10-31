@@ -67,6 +67,20 @@ func (a *App) quit() {
 
 func (a *App) logf(format string, args ...any) { log.Printf("flint: "+format, args...) }
 
+func (a *App) copyText(text string) {
+	if a.wails != nil {
+		a.wails.Clipboard.SetText(text)
+	}
+}
+
+// openURL opens an http(s) link in the default browser.
+func (a *App) openURL(link string) error {
+	if a.wails == nil {
+		return nil
+	}
+	return a.wails.Browser.OpenURL(link)
+}
+
 // pickFolder shows the native folder picker; "" when cancelled.
 func (a *App) pickFolder(title string) (string, error) {
 	return a.wails.Dialog.OpenFileWithOptions(&application.OpenFileDialogOptions{

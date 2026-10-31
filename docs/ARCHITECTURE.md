@@ -191,7 +191,7 @@ Flint drives many CLIs (git, gh, docker, kubectl, aws, saml2aws, claude, codex).
 
 | What | Where | Notes |
 |---|---|---|
-| Recent folders, agent permission policy, trusted folders | `~/Library/Application Support/flint/state.json` | the preferred agent stored here before `settings.json` existed is read from it until you pick a default in Settings |
+| Recent folders, agent permission policy, trusted folders, whether the first-run tool check was shown | `~/Library/Application Support/flint/state.json` | the preferred agent stored here before `settings.json` existed is read from it until you pick a default in Settings |
 | Settings: theme, editor and terminal fonts, default agent, autosave, shortcut overrides (`keymap`: command id → shortcut, `""` = none) | `~/Library/Application Support/flint/settings.json` | has a schema version; missing keys get defaults, unknown keys are ignored, invalid values are replaced with defaults on load (writes validate strictly); `0600`; **no secrets**. A copy for the first render lives in `localStorage` (`flint.settings`) |
 | Database connection profiles (host, port, user, optional default database, ClickHouse protocol `native`/`http`, TLS, read-only) | `~/Library/Application Support/flint/connections.json` | **no passwords**, mode `0600` |
 | Database passwords | macOS Keychain, service `flint-db`, account = connection id | deleted together with the profile |
@@ -259,6 +259,7 @@ internal/docker             docker CLI: Compose projects, containers, events
 internal/awsprof            AWS CLI profiles, credential status, login and refresh
 internal/kube               kubectl: contexts, namespaces, resources, apps, rollout state, diagnosis
 internal/diag               Flint's log file, bug report and diagnostics
+internal/tools              external tools Flint drives: one table (feature, install command, docs) and the installed-version check
 internal/redact             removes credentials and the home path from logs, reports and agent context
 internal/agent              claude / codex: headless runs and interactive commands
 internal/shellenv           PATH from the login shell (git hooks, brew, nvm inside a GUI app)

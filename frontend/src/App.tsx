@@ -21,6 +21,7 @@ import { refreshTrust, useTrust } from './store/trust'
 import { TrustBanner } from './components/layout/TrustBanner'
 import { copyDiagnostics, reportIssue, showLogs } from './store/diagnostics'
 import { subscribeAlerts } from './store/alerts'
+import { openToolCheck, openToolCheckOnFirstRun, useToolCheck } from './store/toolCheck'
 import type { DroppedPath } from './lib/drop'
 import { UsagesModal } from './components/lsp/UsagesModal'
 import { showToast } from './store/dialog'
@@ -52,6 +53,7 @@ const RecentProjects = lazy(() => import('./components/RecentProjects').then((m)
 const QuickOpen = lazy(() => import('./components/QuickOpen').then((m) => ({ default: m.QuickOpen })))
 const RunConfigDialog = lazy(() => import('./components/run/RunConfigDialog').then((m) => ({ default: m.RunConfigDialog })))
 const CommandPalette = lazy(() => import('./components/CommandPalette').then((m) => ({ default: m.CommandPalette })))
+const ToolCheck = lazy(() => import('./components/layout/ToolCheck').then((m) => ({ default: m.ToolCheck })))
 
 export default function App() {
   const sidebar = useWorkspace((s) => s.sidebar)
@@ -59,6 +61,7 @@ export default function App() {
   const quickOpen = useWorkspace((s) => s.quickOpen)
   const recentOpen = useWorkspace((s) => s.recentOpen)
   const paletteOpen = useWorkspace((s) => s.paletteOpen)
+  const toolCheckOpen = useToolCheck((s) => s.open)
   const root = useWorkspace((s) => s.root)
   const error = useWorkspace((s) => s.error)
   const editingRun = useRun((s) => s.editing)
@@ -89,10 +92,12 @@ export default function App() {
     EventsOn('menu:report-issue', () => void reportIssue())
     EventsOn('menu:copy-diagnostics', () => void copyDiagnostics())
     EventsOn('menu:show-logs', showLogs)
+    EventsOn('menu:check-tools', openToolCheck)
     EventsOn('files:dropped', (dropped: DroppedPath[]) => void openDropped(dropped))
     void useDatabase.getState().loadConnections()
     void useScratch.getState().load()
     void useWorkspace.getState().init()
+    void openToolCheckOnFirstRun()
   }, [])
 
   useEffect(() => {
@@ -201,6 +206,11 @@ export default function App() {
       {paletteOpen && (
         <Suspense fallback={null}>
           <CommandPalette />
+        </Suspense>
+      )}
+      {toolCheckOpen && (
+        <Suspense fallback={null}>
+          <ToolCheck />
         </Suspense>
       )}
       <UsagesModal />

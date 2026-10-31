@@ -1465,6 +1465,101 @@ button.small {
 .shortcuts dd {
   margin: 0;
 }
+.welcome-tools {
+  font-size: 12px;
+}
+
+/* ---------- tool check ---------- */
+
+.modal.tool-check {
+  width: min(680px, 94vw);
+}
+.tool-check-intro,
+.tool-check-note {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+.tool-check-note {
+  margin-top: 10px;
+}
+.tool-check-list {
+  max-height: 56vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-editor);
+}
+.tool-check-empty {
+  padding: 12px;
+}
+.tool-group-title {
+  margin: 0;
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-faint);
+}
+.tool-row {
+  display: flex;
+  gap: 10px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+}
+.tool-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--fg-faint);
+}
+.tool-dot.ok {
+  background: var(--ok);
+}
+.tool-dot.warn {
+  background: var(--warn);
+}
+.tool-dot.bad {
+  background: var(--danger);
+}
+.tool-main {
+  flex: 1;
+  min-width: 0;
+}
+.tool-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.tool-name {
+  font-weight: 600;
+}
+.tool-head .muted,
+.tool-feature {
+  font-size: 12px;
+}
+.tool-detail {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--warn);
+  overflow-wrap: anywhere;
+}
+.tool-install {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.tool-install code {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--bg-raised);
+  overflow-wrap: anywhere;
+}
 
 /* ---------- overlays ---------- */
 

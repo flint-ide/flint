@@ -20,6 +20,7 @@ import { useAgentChat } from '../store/agentChat'
 import { showToast } from '../store/dialog'
 import { trustFolder, untrustFolder } from '../store/trust'
 import { copyDiagnostics, reportIssue, showLogs } from '../store/diagnostics'
+import { openToolCheck } from '../store/toolCheck'
 
 /** Focus requests that live in App state (the panels take them as focus tokens). */
 export interface AppCommandHooks {
@@ -81,6 +82,11 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
     { id: 'help.reportIssue', title: 'Report an Issue…', category: 'Help', keywords: 'bug feedback github diagnostics logs', run: () => void reportIssue() },
     { id: 'help.copyDiagnostics', title: 'Copy Diagnostics', category: 'Help', keywords: 'logs versions support', run: () => void copyDiagnostics() },
     { id: 'help.showLogs', title: 'Show Logs in Finder', category: 'Help', keywords: 'log file debug', run: showLogs },
+    {
+      id: 'help.checkTools', title: 'Check Tools…', category: 'Help',
+      keywords: 'install setup missing path version git ripgrep gh claude codex kubectl docker aws delve language server',
+      run: openToolCheck,
+    },
 
     // Navigate
     { id: 'nav.goToFile', title: 'Go to File…', category: 'Navigate', keys: 'Mod+P', keywords: 'open quick', run: () => ws().setQuickOpen(true) },

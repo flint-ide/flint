@@ -32,10 +32,11 @@ export function Resize(id: string, cols: number, rows: number): $CancellableProm
 }
 
 /**
- * Start launches the user's login shell in cwd (home when empty). The frontend picks the id.
+ * Start launches the user's login shell in cwd (home when empty) with extra
+ * environment variables (e.g. AWS_PROFILE). The frontend picks the id.
  */
-export function Start(id: string, cwd: string, cols: number, rows: number): $CancellablePromise<void> {
-    return $Call.ByID(1351803004, id, cwd, cols, rows);
+export function Start(id: string, cwd: string, cols: number, rows: number, env: { [_ in string]?: string }): $CancellablePromise<void> {
+    return $Call.ByID(1351803004, id, cwd, cols, rows, env);
 }
 
 /**

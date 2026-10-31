@@ -1,6 +1,7 @@
 // Go models by package, as the v2 bindings exposed them (`todo.Result`,
 // `main.TermData`…), re-exported from the Wails v3 generated bindings.
 
+export * as awsprof from '../../bindings/flint/internal/awsprof/models'
 export * as agentsession from '../../bindings/flint/internal/agentsession/models'
 export * as dap from '../../bindings/flint/internal/dap/models'
 export * as db from '../../bindings/flint/internal/db/models'

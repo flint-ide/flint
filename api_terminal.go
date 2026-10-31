@@ -1,7 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"regexp"
+	"slices"
+	"strings"
 	"sync"
 
 	"flint/internal/terminal"
@@ -69,12 +73,33 @@ type TerminalAPI struct {
 	app *App
 }
 
-// Start launches the user's login shell in cwd (home when empty). The frontend picks the id.
-func (t *TerminalAPI) Start(id, cwd string, cols, rows int) error {
+// Start launches the user's login shell in cwd (home when empty) with extra
+// environment variables (e.g. AWS_PROFILE). The frontend picks the id.
+func (t *TerminalAPI) Start(id, cwd string, cols, rows int, env map[string]string) error {
 	if cwd == "" {
 		cwd, _ = os.UserHomeDir()
 	}
-	return t.app.terminals.Start(id, terminal.Options{Cwd: cwd, Cols: cols, Rows: rows})
+	vars, err := terminalEnv(env)
+	if err != nil {
+		return err
+	}
+	return t.app.terminals.Start(id, terminal.Options{Cwd: cwd, Cols: cols, Rows: rows, Env: vars})
+}
+
+var envNameRe = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
+
+// terminalEnv turns the frontend's variables into NAME=value pairs, sorted;
+// names must be plain upper-case identifiers and values single-line.
+func terminalEnv(env map[string]string) ([]string, error) {
+	out := make([]string, 0, len(env))
+	for k, v := range env {
+		if !envNameRe.MatchString(k) || strings.ContainsAny(v, "\x00\n\r") || len(v) > 1024 {
+			return nil, fmt.Errorf("invalid terminal variable %q", k)
+		}
+		out = append(out, k+"="+v)
+	}
+	slices.Sort(out)
+	return out, nil
 }
 
 // Write sends keystrokes / pasted text to the terminal.

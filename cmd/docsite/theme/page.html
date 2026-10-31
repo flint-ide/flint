@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<title>{{.Page.Title}} · Flint</title>
+<link rel="stylesheet" href="{{.Root}}assets/style.css">
+<script src="{{.Root}}assets/theme.js"></script>
+<script defer src="{{.Root}}assets/search.js" data-root="{{.Root}}"></script>
+</head>
+<body>
+<header class="topbar">
+  <button class="menu" aria-label="Menu" aria-controls="sidebar" aria-expanded="false">☰</button>
+  <a class="brand" href="{{.Root}}index.html"><span class="logo">◆</span> Flint <span class="muted">docs</span></a>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search the docs  /" autocomplete="off" spellcheck="false" aria-label="Search the documentation">
+    <ol id="results" class="results" hidden></ol>
+  </div>
+  <nav class="links">
+    <a href="https://github.com/ODudek/flint/releases">Download</a>
+    <a href="https://github.com/ODudek/flint">GitHub</a>
+    <button class="theme-toggle" title="Toggle light/dark" aria-label="Toggle light or dark theme">◐</button>
+  </nav>
+</header>
+<div class="layout">
+  <aside id="sidebar" class="sidebar">
+    {{range .Nav}}<section>
+      <h2>{{.Title}}</h2>
+      <ul>{{range .Pages}}<li><a href="{{.Href}}"{{if .Active}} class="active" aria-current="page"{{end}}>{{.Title}}</a></li>{{end}}</ul>
+    </section>{{end}}
+  </aside>
+  <main class="content">
+    <article>
+      <h1>{{.Page.Title}}</h1>
+      {{.Body}}
+    </article>
+    {{if or .Prev .Next}}<nav class="pager">
+      {{with .Prev}}<a class="prev" href="{{.Path}}"><span>Previous</span>{{.Title}}</a>{{else}}<span></span>{{end}}
+      {{with .Next}}<a class="next" href="{{.Path}}"><span>Next</span>{{.Title}}</a>{{end}}
+    </nav>{{end}}
+    <footer>{{if .EditLink}}<a href="{{.EditLink}}">Edit this page on GitHub</a> · {{end}}Flint is MIT licensed.</footer>
+  </main>
+  {{if .Outline}}<nav class="outline" aria-label="On this page">
+    <h2>On this page</h2>
+    <ul>{{range .Outline}}<li class="l{{.Level}}"><a href="#{{.ID}}">{{.Text}}</a></li>{{end}}</ul>
+  </nav>{{end}}
+</div>
+</body>
+</html>

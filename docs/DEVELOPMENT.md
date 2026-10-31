@@ -144,3 +144,14 @@ Signing and notarization are optional. They run only when the Apple secrets are 
 ## Logs while developing
 
 Flint writes its log to `~/Library/Logs/Flint/flint.log` (Help ▸ Show Logs in Finder). Frontend errors and Go panics are logged there too. Use `internal/redact` for anything that might contain secrets or personal paths before it reaches the log.
+
+## User documentation site
+
+The user guide lives in `site/` as Markdown: one file per page, the sidebar in `site/_nav.md` (`## Section` and `- [Title](page.md)` lines). `cmd/docsite` renders it with goldmark (no other dependencies) and fails on pages missing from the nav and on broken links or anchors.
+
+```bash
+make docs                                   # build into _site/ and preview at http://localhost:8090
+go run ./cmd/docsite -src site -out _site   # build only
+```
+
+`.github/workflows/pages.yml` builds the site on pull requests that touch it and publishes it to GitHub Pages from `main` (repository Settings ▸ Pages ▸ Source: GitHub Actions).

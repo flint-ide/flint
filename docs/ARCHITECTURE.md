@@ -88,7 +88,7 @@ flowchart LR
 - Custom agents (`customAgents` in settings.json) are ACP agents: each gets one `acpdriver.Driver`, registered at startup and again whenever settings are saved (`syncCustomAgents`). A replaced or removed driver keeps the sessions it runs until they stop, and is still closed on quit. Adding an agent CLI with an ACP mode needs no code.
 - The agent lists (chat menus, default-agent pickers, `AgentAPI.Info`) are the native CLIs found on the login PATH, then the custom agents whose command resolves.
 - One-shot work goes through `AgentAPI`: commit messages run `agent.Headless` (`claude -p`, `codex exec`) or, for a custom agent, `acpdriver.Headless` (a fresh ACP session that declines every permission request and refuses writes). Conflict resolution types an interactive command into a terminal, so it always uses a native agent (`AgentInfo.conflictAgent`).
-- `SettingsAPI.ProbeCustomAgent` runs only the ACP `initialize` handshake of a saved custom agent, in an empty temporary folder, for the Check button.
+- `SettingsAPI.ProbeCustomAgent` runs only the ACP `initialize` handshake of a saved custom agent, in an empty temporary folder, for the Check button. Settings are written by the web view, so before a command line runs for the first time in a session Go shows a native dialog with that exact command line; the UI cannot answer or skip it.
 
 ### File operations
 
@@ -216,7 +216,7 @@ Every other connection is the result of a user action or of a CLI the user runs.
 
 ### Dev-only server mode
 
-`make server` / `wails3 task server` builds Flint with the `server` tag and serves the UI to a browser over HTTP. It exposes every binding on localhost **with no authentication**. It is a development tool only and must never run on a shared machine. See [DEVELOPMENT.md](DEVELOPMENT.md#server-mode-dev-only).
+`make server` / `wails3 task server` builds Flint with the `server` tag and serves the UI to a browser over HTTP. It exposes every binding on localhost **with no authentication**. It is a development tool only and must never run on a shared machine. It has no native dialogs, so confirmations that guard a binding against the web view (the custom agent Check) are skipped there: anyone who can reach it can already open a terminal. See [DEVELOPMENT.md](DEVELOPMENT.md#server-mode-dev-only).
 
 ## Where Flint stores data
 

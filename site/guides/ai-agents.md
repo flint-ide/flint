@@ -22,7 +22,7 @@ Many coding agents speak the [Agent Client Protocol](https://agentclientprotocol
 
 1. Install the agent's CLI and log in with its own command in a terminal, for example `gemini` (Gemini CLI) or `opencode auth login` (OpenCode). Flint stores no API keys for it.
 2. Open Settings (`⌘,`) ▸ Agents ▸ **Add a custom agent**. Click a preset (**Gemini CLI** fills in `gemini` with `--experimental-acp`, **OpenCode** fills in `opencode` with `acp`) or enter the command and the arguments that start its ACP mode, one per line. The command is a name on your login shell's `PATH` or an absolute path. Name and id are optional.
-3. Click **Add Agent**, then **Check**. Flint starts the agent in an empty temporary folder, runs the ACP handshake and shows the agent's name and version, or the error. If the check times out, run the same command in a terminal to see what it is waiting for.
+3. Click **Add Agent**, then **Check**. The first time you check a command line after Flint starts, Flint shows that exact command line and asks you to confirm. It starts the agent in an empty temporary folder, runs the ACP handshake and shows the agent's name and version, or the error. If the check times out, run the same command in a terminal to see what it is waiting for.
 4. The agent now appears in the `+` menu (for example **gemini chat**), in "New Chat with gemini" and in the default-agent pickers. Make it the default to use it for "Ask the agent" and commit messages.
 
 Other agents with an ACP mode work the same way once you install them, for example Goose (`goose acp`) or Zed's adapters for Claude Code and Codex (the `claude-agent-acp` and `codex-acp` commands). Check their documentation for the exact command.

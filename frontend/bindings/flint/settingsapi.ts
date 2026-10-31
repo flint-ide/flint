@@ -63,9 +63,10 @@ export function Get(): $CancellablePromise<settings$0.Settings> {
  * ProbeCustomAgent starts a saved custom agent, runs the ACP `initialize`
  * handshake and stops it, so Settings can show whether the command speaks
  * ACP (and the agent's name and version). Only agents already in settings
- * can be checked, so this binding runs nothing the settings file doesn't
- * name. The agent starts in an empty temporary folder, not in a project, so
- * no project configuration is read; no session is opened.
+ * can be checked, and a command line not confirmed yet this session runs
+ * only after the user confirms it in a native dialog (confirmAgentCommand).
+ * The agent starts in an empty temporary folder, not in a project, so no
+ * project configuration is read; no session is opened.
  */
 export function ProbeCustomAgent(id: string): $CancellablePromise<acpdriver$0.AgentInfo> {
     return $Call.ByID(3601295811, id).then(($result: any) => {

@@ -6,6 +6,105 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
+ * App is a group of objects deployed together: a Flux Kustomization, an Argo
+ * CD application, a Helm release, an app.kubernetes.io label, or one workload.
+ */
+export class App {
+    "key": string;
+    "name": string;
+
+    /**
+     * flux, argo, helm, label, workload
+     */
+    "source": string;
+
+    /**
+     * Kustomization of a Flux app (may live in flux-system).
+     */
+    "kustomization"?: Kustomization | null;
+    "ingresses": string[];
+    "services": string[];
+
+    /**
+     * "Kind/name"
+     */
+    "workloads": string[];
+
+    /**
+     * ok, warn, bad
+     */
+    "health": string;
+
+    /**
+     * Problems summarise what is wrong: the first Critical of them break the
+     * app, the rest are warnings.
+     */
+    "problems": string[];
+    "critical": number;
+
+    /** Creates a new App instance. */
+    constructor($$source: Partial<App> = {}) {
+        if (!("key" in $$source)) {
+            this["key"] = "";
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("source" in $$source)) {
+            this["source"] = "";
+        }
+        if (!("ingresses" in $$source)) {
+            this["ingresses"] = [];
+        }
+        if (!("services" in $$source)) {
+            this["services"] = [];
+        }
+        if (!("workloads" in $$source)) {
+            this["workloads"] = [];
+        }
+        if (!("health" in $$source)) {
+            this["health"] = "";
+        }
+        if (!("problems" in $$source)) {
+            this["problems"] = [];
+        }
+        if (!("critical" in $$source)) {
+            this["critical"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new App instance from a string or object.
+     */
+    static createFrom($$source: any = {}): App {
+        const $$createField3_0 = $$createType1;
+        const $$createField4_0 = $$createType2;
+        const $$createField5_0 = $$createType2;
+        const $$createField6_0 = $$createType2;
+        const $$createField8_0 = $$createType2;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("kustomization" in $$parsedSource) {
+            $$parsedSource["kustomization"] = $$createField3_0($$parsedSource["kustomization"]);
+        }
+        if ("ingresses" in $$parsedSource) {
+            $$parsedSource["ingresses"] = $$createField4_0($$parsedSource["ingresses"]);
+        }
+        if ("services" in $$parsedSource) {
+            $$parsedSource["services"] = $$createField5_0($$parsedSource["services"]);
+        }
+        if ("workloads" in $$parsedSource) {
+            $$parsedSource["workloads"] = $$createField6_0($$parsedSource["workloads"]);
+        }
+        if ("problems" in $$parsedSource) {
+            $$parsedSource["problems"] = $$createField8_0($$parsedSource["problems"]);
+        }
+        return new App($$parsedSource as Partial<App>);
+    }
+}
+
+/**
  * Context is one kubeconfig context, without credentials.
  */
 export class Context {
@@ -57,6 +156,128 @@ export class Context {
 }
 
 /**
+ * Event is a recent Warning event about an object of the namespace.
+ */
+export class Event {
+    "kind": string;
+    "name": string;
+    "reason": string;
+    "message": string;
+    "count": number;
+    "lastSeen": string;
+
+    /** Creates a new Event instance. */
+    constructor($$source: Partial<Event> = {}) {
+        if (!("kind" in $$source)) {
+            this["kind"] = "";
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("reason" in $$source)) {
+            this["reason"] = "";
+        }
+        if (!("message" in $$source)) {
+            this["message"] = "";
+        }
+        if (!("count" in $$source)) {
+            this["count"] = 0;
+        }
+        if (!("lastSeen" in $$source)) {
+            this["lastSeen"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Event instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Event {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Event($$parsedSource as Partial<Event>);
+    }
+}
+
+/**
+ * Ingress routes hosts and paths to Services.
+ */
+export class Ingress {
+    "name": string;
+    "class"?: string;
+    "routes": IngressRoute[];
+    "tls": boolean;
+    "address"?: string;
+    "app": string;
+
+    /** Creates a new Ingress instance. */
+    constructor($$source: Partial<Ingress> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("routes" in $$source)) {
+            this["routes"] = [];
+        }
+        if (!("tls" in $$source)) {
+            this["tls"] = false;
+        }
+        if (!("app" in $$source)) {
+            this["app"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Ingress instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Ingress {
+        const $$createField2_0 = $$createType4;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("routes" in $$parsedSource) {
+            $$parsedSource["routes"] = $$createField2_0($$parsedSource["routes"]);
+        }
+        return new Ingress($$parsedSource as Partial<Ingress>);
+    }
+}
+
+/**
+ * IngressRoute is one host/path → service:port rule.
+ */
+export class IngressRoute {
+    "host": string;
+    "path": string;
+    "service": string;
+    "port": string;
+
+    /** Creates a new IngressRoute instance. */
+    constructor($$source: Partial<IngressRoute> = {}) {
+        if (!("host" in $$source)) {
+            this["host"] = "";
+        }
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("service" in $$source)) {
+            this["service"] = "";
+        }
+        if (!("port" in $$source)) {
+            this["port"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new IngressRoute instance from a string or object.
+     */
+    static createFrom($$source: any = {}): IngressRoute {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new IngressRoute($$parsedSource as Partial<IngressRoute>);
+    }
+}
+
+/**
  * Job is a Job or a CronJob.
  */
 export class Job {
@@ -94,13 +315,65 @@ export class Job {
 }
 
 /**
+ * Kustomization is a Flux kustomize.toolkit.fluxcd.io Kustomization.
+ */
+export class Kustomization {
+    "name": string;
+    "namespace": string;
+
+    /**
+     * True, False, Unknown
+     */
+    "ready": string;
+    "reason"?: string;
+    "message"?: string;
+    "revision"?: string;
+    "suspended": boolean;
+
+    /** Creates a new Kustomization instance. */
+    constructor($$source: Partial<Kustomization> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("namespace" in $$source)) {
+            this["namespace"] = "";
+        }
+        if (!("ready" in $$source)) {
+            this["ready"] = "";
+        }
+        if (!("suspended" in $$source)) {
+            this["suspended"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Kustomization instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Kustomization {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Kustomization($$parsedSource as Partial<Kustomization>);
+    }
+}
+
+/**
  * Overview is what the Kubernetes panel shows for one namespace.
  */
 export class Overview {
     "workloads": Workload[];
     "pods": Pod[];
     "services": Service[];
+    "ingresses": Ingress[];
     "jobs": Job[];
+    "events": Event[];
+    "kustomizations": Kustomization[];
+    "apps": App[];
+
+    /**
+     * Partial lists what couldn't be read (RBAC, missing CRDs) besides the core kinds.
+     */
+    "partial": string[];
 
     /** Creates a new Overview instance. */
     constructor($$source: Partial<Overview> = {}) {
@@ -113,8 +386,23 @@ export class Overview {
         if (!("services" in $$source)) {
             this["services"] = [];
         }
+        if (!("ingresses" in $$source)) {
+            this["ingresses"] = [];
+        }
         if (!("jobs" in $$source)) {
             this["jobs"] = [];
+        }
+        if (!("events" in $$source)) {
+            this["events"] = [];
+        }
+        if (!("kustomizations" in $$source)) {
+            this["kustomizations"] = [];
+        }
+        if (!("apps" in $$source)) {
+            this["apps"] = [];
+        }
+        if (!("partial" in $$source)) {
+            this["partial"] = [];
         }
 
         Object.assign(this, $$source);
@@ -124,10 +412,15 @@ export class Overview {
      * Creates a new Overview instance from a string or object.
      */
     static createFrom($$source: any = {}): Overview {
-        const $$createField0_0 = $$createType1;
-        const $$createField1_0 = $$createType3;
-        const $$createField2_0 = $$createType5;
-        const $$createField3_0 = $$createType7;
+        const $$createField0_0 = $$createType6;
+        const $$createField1_0 = $$createType8;
+        const $$createField2_0 = $$createType10;
+        const $$createField3_0 = $$createType12;
+        const $$createField4_0 = $$createType14;
+        const $$createField5_0 = $$createType16;
+        const $$createField6_0 = $$createType17;
+        const $$createField7_0 = $$createType19;
+        const $$createField8_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("workloads" in $$parsedSource) {
             $$parsedSource["workloads"] = $$createField0_0($$parsedSource["workloads"]);
@@ -138,15 +431,30 @@ export class Overview {
         if ("services" in $$parsedSource) {
             $$parsedSource["services"] = $$createField2_0($$parsedSource["services"]);
         }
+        if ("ingresses" in $$parsedSource) {
+            $$parsedSource["ingresses"] = $$createField3_0($$parsedSource["ingresses"]);
+        }
         if ("jobs" in $$parsedSource) {
-            $$parsedSource["jobs"] = $$createField3_0($$parsedSource["jobs"]);
+            $$parsedSource["jobs"] = $$createField4_0($$parsedSource["jobs"]);
+        }
+        if ("events" in $$parsedSource) {
+            $$parsedSource["events"] = $$createField5_0($$parsedSource["events"]);
+        }
+        if ("kustomizations" in $$parsedSource) {
+            $$parsedSource["kustomizations"] = $$createField6_0($$parsedSource["kustomizations"]);
+        }
+        if ("apps" in $$parsedSource) {
+            $$parsedSource["apps"] = $$createField7_0($$parsedSource["apps"]);
+        }
+        if ("partial" in $$parsedSource) {
+            $$parsedSource["partial"] = $$createField8_0($$parsedSource["partial"]);
         }
         return new Overview($$parsedSource as Partial<Overview>);
     }
 }
 
 /**
- * Pod is a pod with the status kubectl get pods shows.
+ * Pod is a pod with the status kubectl get pods shows and what's wrong with it.
  */
 export class Pod {
     "name": string;
@@ -165,9 +473,21 @@ export class Pod {
      * workload name (Deployment for ReplicaSet pods)
      */
     "owner"?: string;
+    "ownerKind"?: string;
     "containers": string[];
     "ports": number[];
     "created": string;
+
+    /**
+     * Problem explains an unhealthy pod: "OOMKilled (exit 137) in app", the
+     * image pull error, a container not ready…
+     */
+    "problem"?: string;
+
+    /**
+     * Old: from a previous revision of its Deployment (a rollout is replacing it).
+     */
+    "old"?: boolean;
 
     /** Creates a new Pod instance. */
     constructor($$source: Partial<Pod> = {}) {
@@ -206,27 +526,34 @@ export class Pod {
      * Creates a new Pod instance from a string or object.
      */
     static createFrom($$source: any = {}): Pod {
-        const $$createField8_0 = $$createType8;
-        const $$createField9_0 = $$createType9;
+        const $$createField9_0 = $$createType2;
+        const $$createField10_0 = $$createType20;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("containers" in $$parsedSource) {
-            $$parsedSource["containers"] = $$createField8_0($$parsedSource["containers"]);
+            $$parsedSource["containers"] = $$createField9_0($$parsedSource["containers"]);
         }
         if ("ports" in $$parsedSource) {
-            $$parsedSource["ports"] = $$createField9_0($$parsedSource["ports"]);
+            $$parsedSource["ports"] = $$createField10_0($$parsedSource["ports"]);
         }
         return new Pod($$parsedSource as Partial<Pod>);
     }
 }
 
 /**
- * Service is a Service with its ports.
+ * Service is a Service with its ports and how many ready pods back it.
  */
 export class Service {
     "name": string;
     "type": string;
     "clusterIP": string;
     "ports": ServicePort[];
+
+    /**
+     * Ready / Backends: pods matching the selector, and those ready.
+     */
+    "ready": number;
+    "backends": number;
+    "app": string;
 
     /** Creates a new Service instance. */
     constructor($$source: Partial<Service> = {}) {
@@ -242,6 +569,15 @@ export class Service {
         if (!("ports" in $$source)) {
             this["ports"] = [];
         }
+        if (!("ready" in $$source)) {
+            this["ready"] = 0;
+        }
+        if (!("backends" in $$source)) {
+            this["backends"] = 0;
+        }
+        if (!("app" in $$source)) {
+            this["app"] = "";
+        }
 
         Object.assign(this, $$source);
     }
@@ -250,7 +586,7 @@ export class Service {
      * Creates a new Service instance from a string or object.
      */
     static createFrom($$source: any = {}): Service {
-        const $$createField3_0 = $$createType11;
+        const $$createField3_0 = $$createType22;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("ports" in $$parsedSource) {
             $$parsedSource["ports"] = $$createField3_0($$parsedSource["ports"]);
@@ -293,7 +629,7 @@ export class ServicePort {
 }
 
 /**
- * Workload is a Deployment, StatefulSet or DaemonSet.
+ * Workload is a Deployment, StatefulSet or DaemonSet with its rollout state.
  */
 export class Workload {
     "kind": string;
@@ -301,7 +637,17 @@ export class Workload {
     "ready": number;
     "desired": number;
     "updated": number;
+    "available": number;
     "created": string;
+    "images": string[];
+    "revision"?: string;
+    "rollout": string;
+
+    /**
+     * RolloutMessage explains a rollout that isn't complete.
+     */
+    "rolloutMessage"?: string;
+    "app": string;
 
     /** Creates a new Workload instance. */
     constructor($$source: Partial<Workload> = {}) {
@@ -320,8 +666,20 @@ export class Workload {
         if (!("updated" in $$source)) {
             this["updated"] = 0;
         }
+        if (!("available" in $$source)) {
+            this["available"] = 0;
+        }
         if (!("created" in $$source)) {
             this["created"] = "";
+        }
+        if (!("images" in $$source)) {
+            this["images"] = [];
+        }
+        if (!("rollout" in $$source)) {
+            this["rollout"] = "";
+        }
+        if (!("app" in $$source)) {
+            this["app"] = "";
         }
 
         Object.assign(this, $$source);
@@ -331,21 +689,36 @@ export class Workload {
      * Creates a new Workload instance from a string or object.
      */
     static createFrom($$source: any = {}): Workload {
+        const $$createField7_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("images" in $$parsedSource) {
+            $$parsedSource["images"] = $$createField7_0($$parsedSource["images"]);
+        }
         return new Workload($$parsedSource as Partial<Workload>);
     }
 }
 
 // Private type creation functions
-const $$createType0 = Workload.createFrom;
-const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = Pod.createFrom;
-const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = Service.createFrom;
-const $$createType5 = $Create.Array($$createType4);
-const $$createType6 = Job.createFrom;
-const $$createType7 = $Create.Array($$createType6);
-const $$createType8 = $Create.Array($Create.Any);
-const $$createType9 = $Create.Array($Create.Any);
-const $$createType10 = ServicePort.createFrom;
-const $$createType11 = $Create.Array($$createType10);
+const $$createType0 = Kustomization.createFrom;
+const $$createType1 = $Create.Nullable($$createType0);
+const $$createType2 = $Create.Array($Create.Any);
+const $$createType3 = IngressRoute.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = Workload.createFrom;
+const $$createType6 = $Create.Array($$createType5);
+const $$createType7 = Pod.createFrom;
+const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = Service.createFrom;
+const $$createType10 = $Create.Array($$createType9);
+const $$createType11 = Ingress.createFrom;
+const $$createType12 = $Create.Array($$createType11);
+const $$createType13 = Job.createFrom;
+const $$createType14 = $Create.Array($$createType13);
+const $$createType15 = Event.createFrom;
+const $$createType16 = $Create.Array($$createType15);
+const $$createType17 = $Create.Array($$createType0);
+const $$createType18 = App.createFrom;
+const $$createType19 = $Create.Array($$createType18);
+const $$createType20 = $Create.Array($Create.Any);
+const $$createType21 = ServicePort.createFrom;
+const $$createType22 = $Create.Array($$createType21);

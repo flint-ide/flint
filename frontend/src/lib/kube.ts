@@ -6,6 +6,10 @@ export type KubeOverview = kube.Overview
 export type KubePod = kube.Pod
 export type KubeWorkload = kube.Workload
 export type KubeService = kube.Service
+export type KubeIngress = kube.Ingress
+export type KubeApp = kube.App
+export type KubeEvent = kube.Event
+export type KubeKustomization = kube.Kustomization
 
 /**
  * A readable context name: EKS ARNs become "cluster (account)", GKE names
@@ -74,4 +78,61 @@ export const isAuthError = (message: string) =>
 export function matches(query: string, ...fields: (string | undefined)[]): boolean {
   const q = query.trim().toLowerCase()
   return !q || fields.some((f) => f?.toLowerCase().includes(q))
+}
+
+export const rolloutStatusCommand = (context: string, namespace: string, target: string) => kubectl(context, namespace, 'rollout', 'status', target)
+
+export const rolloutHistoryCommand = (context: string, namespace: string, target: string) => kubectl(context, namespace, 'rollout', 'history', target)
+
+/** `flux reconcile` of a Kustomization and its source, in the Kustomization's namespace. */
+export const fluxReconcileCommand = (context: string, k: Pick<KubeKustomization, 'name' | 'namespace'>) =>
+  ['flux', `--context=${context}`, 'reconcile', 'kustomization', k.name, `--namespace=${k.namespace}`, '--with-source']
+
+/** The rollout badge of a workload: "rev 7 ✓", "rolling out", "failed"… */
+export function rolloutBadge(w: Pick<KubeWorkload, 'rollout' | 'revision' | 'rolloutMessage'>): { text: string; tone: Tone; title: string } {
+  const rev = w.revision ? `rev ${w.revision}` : ''
+  switch (w.rollout) {
+    case 'complete':
+      return { text: rev ? `${rev} ✓` : '✓', tone: 'ok', title: 'Rolled out' }
+    case 'progressing':
+      return { text: 'rolling out', tone: 'warn', title: w.rolloutMessage || 'Rollout in progress' }
+    case 'failed':
+      return { text: 'failed', tone: 'bad', title: w.rolloutMessage || 'Rollout failed' }
+    case 'paused':
+      return { text: 'paused', tone: 'warn', title: 'Rollout paused' }
+    case 'scaled-down':
+      return { text: 'scaled to 0', tone: 'muted', title: 'No replicas' }
+  }
+  return { text: w.rollout, tone: 'muted', title: '' }
+}
+
+export const healthTone = (health: string): Tone => (health === 'ok' ? 'ok' : health === 'bad' ? 'bad' : 'warn')
+
+const SOURCE_LABELS: Record<string, string> = { flux: 'Flux', argo: 'Argo CD', helm: 'Helm', label: 'label', workload: '' }
+export const appSourceLabel = (source: string) => SOURCE_LABELS[source] ?? source
+
+/** "abc123" from Flux's "main@sha1:abc123def…" (branch kept when present). */
+export function shortRevision(revision: string): string {
+  const m = /^(?:(.+)@)?(?:sha1|sha256):([0-9a-f]{7})[0-9a-f]*$/.exec(revision)
+  return m ? (m[1] ? `${m[1]}@${m[2]}` : m[2]) : revision
+}
+
+/**
+ * The agent prompt for an unhealthy app: read-only investigation with the
+ * cluster pinned, the fix proposed where it belongs (manifests in the repo),
+ * the gathered diagnostics attached.
+ */
+export function diagnosePrompt(context: string, namespace: string, app: string, diagnostics: string): string {
+  return [
+    `The Kubernetes app "${app}" in namespace ${namespace} (context ${context}) is unhealthy. Find the root cause.`,
+    '',
+    `- Investigate with read-only kubectl only, always with --context=${context} --namespace=${namespace} (get, describe, logs, events, rollout history).`,
+    '- Do not change the cluster (no apply, edit, delete, scale, rollout restart/undo) unless I ask.',
+    '- If the fix belongs in manifests in this repository (Kustomize, Helm, Flux), find them and propose the change there.',
+    '- Start with the root cause in one or two sentences, then the evidence, then the fix.',
+    '',
+    'What Flint gathered (secrets redacted):',
+    '',
+    diagnostics.trim(),
+  ].join('\n')
 }

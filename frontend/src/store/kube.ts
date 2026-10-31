@@ -2,28 +2,36 @@ import { createStore } from '../lib/store'
 import * as KubeAPI from '../../bindings/flint/kubeapi'
 import { errorMessage } from '../api/backend'
 import {
-  describeCommand, execCommand, logsCommand, portForwardCommand, resourceRef, shortContext,
-  type KubeContext, type KubeOverview, type KubePod, type KubeWorkload,
+  describeCommand, diagnosePrompt, execCommand, fluxReconcileCommand, logsCommand, portForwardCommand, resourceRef, rolloutHistoryCommand,
+  rolloutStatusCommand, shortContext, type KubeApp, type KubeContext, type KubeKustomization, type KubeOverview, type KubePod, type KubeWorkload,
 } from '../lib/kube'
 import { shellCommand } from '../lib/shellArgs'
 import { useTerminal } from './terminal'
 import { activeRoot } from './activeRoot'
 import { confirmAction, showToast } from './dialog'
+import { askAgent } from '../lib/askAgent'
 
 /** Remembered between launches: the context shown and each context's namespace. */
 const STORAGE_KEY = 'flint.kube'
 
+export type KubeView = 'apps' | 'resources'
+
 interface Saved {
   context: string
   namespaces: Record<string, string>
+  view: KubeView
 }
 
 function readSaved(): Saved {
   try {
     const v = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')
-    return { context: typeof v.context === 'string' ? v.context : '', namespaces: v.namespaces && typeof v.namespaces === 'object' ? v.namespaces : {} }
+    return {
+      context: typeof v.context === 'string' ? v.context : '',
+      namespaces: v.namespaces && typeof v.namespaces === 'object' ? v.namespaces : {},
+      view: v.view === 'resources' ? 'resources' : 'apps',
+    }
   } catch {
-    return { context: '', namespaces: {} }
+    return { context: '', namespaces: {}, view: 'apps' }
   }
 }
 
@@ -47,16 +55,23 @@ interface KubeState {
   query: string
   /** Rows with an action running ("Deployment/api"). */
   busy: ReadonlySet<string>
+  /** Apps (grouped, for debugging deploys) or the flat resource lists. */
+  view: KubeView
 }
 
 const saved = readSaved()
 
 export const useKube = createStore<KubeState>(() => ({
   contexts: [], contextsError: null, context: saved.context, namespaces: [], namespace: '',
-  overview: null, loading: false, error: null, query: '', busy: new Set(),
+  overview: null, loading: false, error: null, query: '', busy: new Set(), view: saved.view,
 }))
 
 export const setKubeQuery = (query: string) => useKube.setState({ query })
+
+export function setKubeView(view: KubeView): void {
+  useKube.setState({ view })
+  writeSaved({ ...readSaved(), view })
+}
 
 export const selectedContext = (): KubeContext | undefined => {
   const { contexts, context } = useKube.getState()
@@ -203,5 +218,53 @@ export async function useAsCurrent(): Promise<void> {
     await loadContexts()
   } catch (err) {
     showToast(errorMessage(err), 'error')
+  }
+}
+
+export function openRolloutStatus(w: KubeWorkload): void {
+  const { context, namespace } = useKube.getState()
+  runInTerminal(`rollout: ${w.name}`, rolloutStatusCommand(context, namespace, resourceRef(w.kind, w.name)))
+}
+
+export function openRolloutHistory(w: KubeWorkload): void {
+  const { context, namespace } = useKube.getState()
+  runInTerminal(`history: ${w.name}`, rolloutHistoryCommand(context, namespace, resourceRef(w.kind, w.name)))
+}
+
+/** Rolls a workload back to its previous revision (after asking). */
+export async function undoRollout(w: KubeWorkload): Promise<void> {
+  const { context, namespace } = useKube.getState()
+  const from = w.revision ? ` from revision ${w.revision}` : ''
+  if (!(await confirmAction(`Roll ${w.kind} ${w.name} back${from} to the previous revision in ${shortContext(context)}?`, 'Undo Rollout'))) return
+  await act(`${w.kind}/${w.name}`, () => KubeAPI.RolloutUndo(context, namespace, w.kind, w.name), `Rolling back ${w.name}`)
+}
+
+/** `flux reconcile kustomization … --with-source` in a terminal. */
+export function reconcileFlux(k: KubeKustomization): void {
+  const { context } = useKube.getState()
+  runInTerminal(`flux: ${k.name}`, fluxReconcileCommand(context, k))
+}
+
+/**
+ * Gathers the app's state and failing pods' logs (redacted in Go) and puts a
+ * diagnosis request in the agent chat's draft: it is reviewed before anything
+ * reaches the AI provider.
+ */
+export async function diagnoseWithAI(app: KubeApp): Promise<void> {
+  const { context, namespace } = useKube.getState()
+  const key = `app:${app.key}`
+  useKube.setState((s) => ({ busy: new Set(s.busy).add(key) }))
+  try {
+    const diagnostics = await KubeAPI.Diagnose(context, namespace, app.key)
+    const id = await askAgent({ prompt: diagnosePrompt(context, namespace, app.name, diagnostics), root: activeRoot() })
+    if (id) showToast('Diagnosis ready in the agent chat — review it and press Enter to send')
+  } catch (err) {
+    showToast(errorMessage(err), 'error')
+  } finally {
+    useKube.setState((s) => {
+      const busy = new Set(s.busy)
+      busy.delete(key)
+      return { busy }
+    })
   }
 }

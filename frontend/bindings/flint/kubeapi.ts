@@ -32,6 +32,14 @@ export function DeletePod(kubeContext: string, $namespace: string, name: string)
 }
 
 /**
+ * Diagnose gathers an unhealthy app's state and failing pods' logs (redacted)
+ * for an AI agent.
+ */
+export function Diagnose(kubeContext: string, $namespace: string, appKey: string): $CancellablePromise<string> {
+    return $Call.ByID(1525368489, kubeContext, $namespace, appKey);
+}
+
+/**
  * Namespaces lists a cluster's namespaces.
  */
 export function Namespaces(kubeContext: string): $CancellablePromise<string[]> {
@@ -54,6 +62,13 @@ export function Overview(kubeContext: string, $namespace: string): $CancellableP
  */
 export function RolloutRestart(kubeContext: string, $namespace: string, kind: string, name: string): $CancellablePromise<void> {
     return $Call.ByID(2862035025, kubeContext, $namespace, kind, name);
+}
+
+/**
+ * RolloutUndo rolls a workload back to its previous revision.
+ */
+export function RolloutUndo(kubeContext: string, $namespace: string, kind: string, name: string): $CancellablePromise<void> {
+    return $Call.ByID(3407836444, kubeContext, $namespace, kind, name);
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { age, execCommand, isAuthError, logsCommand, podTone, shortContext, workloadTone } from './kube'
+import { age, diagnosePrompt, execCommand, fluxReconcileCommand, isAuthError, logsCommand, podTone, rolloutBadge, shortContext, shortRevision, workloadTone } from './kube'
 import { shellCommand } from './shellArgs'
 
 describe('kubernetes', () => {
@@ -41,5 +41,32 @@ describe('kubernetes', () => {
     assert.equal(isAuthError('error: You must be logged in to the server (Unauthorized)'), true)
     assert.equal(isAuthError('ExpiredToken: The security token included in the request is expired'), true)
     assert.equal(isAuthError('pods "x" not found'), false)
+  })
+})
+
+describe('apps view', () => {
+  it('labels rollouts', () => {
+    assert.deepEqual(rolloutBadge({ rollout: 'complete', revision: '7', rolloutMessage: '' }).text, 'rev 7 ✓')
+    assert.equal(rolloutBadge({ rollout: 'failed', revision: '', rolloutMessage: 'timed out' }).tone, 'bad')
+    assert.equal(rolloutBadge({ rollout: 'progressing', revision: '', rolloutMessage: '1 of 3 new replicas updated' }).title, '1 of 3 new replicas updated')
+  })
+
+  it('shortens Flux revisions', () => {
+    assert.equal(shortRevision('main@sha1:abc1234def5678'), 'main@abc1234')
+    assert.equal(shortRevision('sha256:0123456789abcdef'), '0123456')
+    assert.equal(shortRevision('v1.2.3'), 'v1.2.3')
+  })
+
+  it('reconciles Flux in the right namespace', () => {
+    assert.equal(shellCommand(fluxReconcileCommand('prod', { name: 'shop', namespace: 'flux-system' })), 'flux --context=prod reconcile kustomization shop --namespace=flux-system --with-source')
+  })
+})
+
+describe('AI diagnosis', () => {
+  it('pins the cluster and keeps the agent read-only', () => {
+    const p = diagnosePrompt('prod', 'shop', 'shop', 'Problems:\n- pod crashed\n')
+    assert.match(p, /--context=prod --namespace=shop/)
+    assert.match(p, /Do not change the cluster/)
+    assert.ok(p.endsWith('- pod crashed'))
   })
 })

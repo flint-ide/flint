@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   deletePod, describe, loadContexts, openContextTerminal, openLogs, openShell, portForward, refreshOverview,
-  restartWorkload, scaleWorkload, selectContext, selectNamespace, setKubeQuery, useAsCurrent, useKube,
+  restartWorkload, scaleWorkload, selectContext, selectNamespace, setKubeQuery, setKubeView, useAsCurrent, useKube,
 } from '../../store/kube'
+import { KubeApps } from './KubeApps'
 import { loginProfile, refreshAws, refreshProfile, useAws } from '../../store/aws'
 import { openContextMenu } from '../../store/contextMenu'
 import { profileStatus } from '../../lib/aws'
@@ -18,7 +19,7 @@ const POLL_MS = 5000
 
 /** One Kubernetes context at a time (picked here, the global current context untouched): workloads, pods, services, jobs. */
 export function KubePanel() {
-  const { contexts, contextsError, context, namespaces, namespace, overview, loading, error, query, busy } = useKube()
+  const { contexts, contextsError, context, namespaces, namespace, overview, loading, error, query, busy, view } = useKube()
   const awsProfiles = useAws((s) => s.profiles)
   const awsRefreshes = useAws((s) => s.refreshes)
   const [now, setNow] = useState(Date.now)
@@ -144,9 +145,19 @@ export function KubePanel() {
             ) : null}
           </div>
         )}
-        <div className="search-input">
-          <input value={query} placeholder="Filter" spellCheck={false} onChange={(e) => setKubeQuery(e.target.value)} />
+        <div className="kube-row">
+          <div className="segmented kube-view" role="radiogroup" aria-label="View">
+            {(['apps', 'resources'] as const).map((v) => (
+              <button key={v} role="radio" aria-checked={view === v} className={view === v ? 'on' : ''} onClick={() => setKubeView(v)}>
+                {v === 'apps' ? 'Apps' : 'Resources'}
+              </button>
+            ))}
+          </div>
+          <div className="search-input kube-filter">
+            <input value={query} placeholder="Filter" spellCheck={false} onChange={(e) => setKubeQuery(e.target.value)} />
+          </div>
         </div>
+        {overview && overview.partial?.length > 0 && <div className="muted kube-partial">Not shown (no access): {overview.partial.join(', ')}</div>}
       </div>
       <div className="tree scroll">
         {contextsError && <div className="placeholder error">{contextsError}</div>}
@@ -161,7 +172,8 @@ export function KubePanel() {
           </div>
         )}
         {!overview && !error && context && <div className="placeholder muted">{loading ? 'Loading…' : ''}</div>}
-        {section('workloads', 'Workloads', shown.workloads.length, shown.workloads.map((w) => (
+        {overview && view === 'apps' && <KubeApps overview={overview} />}
+        {view === 'resources' && section('workloads', 'Workloads', shown.workloads.length, shown.workloads.map((w) => (
           <div key={`${w.kind}/${w.name}`} className="tree-row static kube-item" onContextMenu={menu(workloadMenu(w))} onDoubleClick={() => openLogs(resourceRef(w.kind, w.name))} title={`${w.kind} ${w.name}\n${w.ready}/${w.desired} ready, ${w.updated} updated\nDouble-click: logs`}>
             <span className="kube-kind">{w.kind === 'Deployment' ? 'D' : w.kind === 'StatefulSet' ? 'S' : 'DS'}</span>
             <span className="file-name">{w.name}</span>
@@ -169,7 +181,7 @@ export function KubePanel() {
             <span className={`aws-status ${workloadTone(w)}`}>{busy.has(`${w.kind}/${w.name}`) ? '…' : `${w.ready}/${w.desired}`}</span>
           </div>
         )))}
-        {section('pods', 'Pods', shown.pods.length, shown.pods.map((p) => (
+        {view === 'resources' && section('pods', 'Pods', shown.pods.length, shown.pods.map((p) => (
           <div key={p.name} className="tree-row static kube-item" onContextMenu={menu(podMenu(p))} onDoubleClick={() => openLogs(`pod/${p.name}`)} title={`${p.name}\n${p.status}, ${p.ready}/${p.total} ready, ${p.restarts} restarts${p.node ? `\nnode ${p.node}` : ''}\nDouble-click: logs`}>
             <span className={`kube-dot ${podTone(p)}`}>●</span>
             <span className="file-name">{p.name}</span>
@@ -177,7 +189,7 @@ export function KubePanel() {
             <span className={`aws-status ${podTone(p)}`}>{busy.has(`Pod/${p.name}`) ? '…' : p.status === 'Running' ? `${p.ready}/${p.total}` : p.status}</span>
           </div>
         )))}
-        {section('services', 'Services', shown.services.length, shown.services.map((s) => (
+        {view === 'resources' && section('services', 'Services', shown.services.length, shown.services.map((s) => (
           <div key={s.name} className="tree-row static kube-item" onContextMenu={menu(serviceMenu(s))} title={`${s.type} ${s.clusterIP}\n${s.ports.map((p) => `${p.port} → ${p.target}/${p.protocol}`).join('\n')}`}>
             <span className="kube-kind">SVC</span>
             <span className="file-name">{s.name}</span>
@@ -185,7 +197,7 @@ export function KubePanel() {
             <span className="aws-status muted">{s.type}</span>
           </div>
         )))}
-        {section('jobs', 'Jobs', shown.jobs.length, shown.jobs.map((j) => (
+        {view === 'resources' && section('jobs', 'Jobs', shown.jobs.length, shown.jobs.map((j) => (
           <div key={`${j.kind}/${j.name}`} className="tree-row static kube-item" onContextMenu={menu([{ label: 'Describe', onSelect: () => describe(j.kind, j.name) }])} title={j.schedule ? `schedule ${j.schedule}` : j.name}>
             <span className="kube-kind">{j.kind === 'CronJob' ? 'CJ' : 'J'}</span>
             <span className="file-name">{j.name}</span>
@@ -193,7 +205,7 @@ export function KubePanel() {
             <span className={`aws-status ${/fail/.test(j.status) ? 'bad' : j.status === 'running' ? 'warn' : 'muted'}`}>{j.status}</span>
           </div>
         )))}
-        {overview && !error && shown.workloads.length + shown.pods.length + shown.services.length + shown.jobs.length === 0 && (
+        {overview && !error && view === 'resources' && shown.workloads.length + shown.pods.length + shown.services.length + shown.jobs.length === 0 && (
           <div className="placeholder muted">{query ? 'Nothing matches.' : `Namespace ${namespace} is empty.`}</div>
         )}
       </div>

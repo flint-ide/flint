@@ -150,6 +150,7 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
     { id: 'view.files', title: 'Show Files', category: 'View', keywords: 'project tree explorer', run: showPanel('files') },
     { id: 'view.databases', title: 'Show Databases', category: 'View', keywords: 'sql postgres clickhouse', run: showPanel('database') },
     { id: 'view.scratchpads', title: 'Show Scratchpads', category: 'View', keywords: 'notes sql consoles', run: showPanel('scratch') },
+    { id: 'view.kube', title: 'Kubernetes', category: 'View', keywords: 'k8s kubectl cluster pods context namespace', run: showPanel('kube') },
     { id: 'view.aws', title: 'AWS Profiles', category: 'View', keywords: 'amazon sso login credentials terminal', run: showPanel('aws') },
     { id: 'view.docker', title: 'Docker', category: 'View', keywords: 'containers compose logs', run: showPanel('docker') },
     { id: 'view.todo', title: 'TODO List', category: 'View', keywords: 'fixme hack xxx bug notes comments', run: showPanel('todo') },

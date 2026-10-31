@@ -53,3 +53,8 @@ export function formatEnv(env: Record<string, string | undefined> | undefined): 
     .map(([k, v]) => `${k}=${v}`)
     .join('\n')
 }
+
+/** A command line for a shell, single-quoting what needs it. */
+export function shellCommand(argv: readonly string[]): string {
+  return argv.map((a) => (/^[A-Za-z0-9_./:=@+,-]+$/.test(a) ? a : `'${a.replace(/'/g, `'\\''`)}'`)).join(' ')
+}

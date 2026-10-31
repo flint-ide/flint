@@ -43,8 +43,7 @@ export function Profiles(): $CancellablePromise<awsprof$0.Profile[]> {
 
 /**
  * Refresh renews a profile's credentials without a terminal (aws sso login,
- * saml2aws / aws-azure-login without prompts, or an STS call for roles and
- * credential_process) and returns the end of the tool's output.
+ * saml2aws without prompts, or an STS call for roles and credential_process) and returns the end of the tool's output.
  */
 export function Refresh(profile: string): $CancellablePromise<string> {
     return $Call.ByID(870907332, profile);

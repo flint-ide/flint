@@ -13,6 +13,9 @@ permissions:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
+    # Code scanning is free for public repositories; on a private one it
+    # needs GitHub Advanced Security, so the job waits for the repo to go public.
+    if: ${{ !github.event.repository.private }}
     runs-on: macos-latest
     timeout-minutes: 45
     permissions:

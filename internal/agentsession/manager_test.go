@@ -407,3 +407,107 @@ func TestReplacedDriverKeepsItsSessions(t *testing.T) {
 		t.Errorf("a removed driver without sessions was kept and closed %d times", idle.closes)
 	}
 }
+
+// askingStart asks for permission while its session starts, under the id
+// the agent chose.
+type askingStart struct {
+	*fakeDriver
+	path string
+}
+
+func (a *askingStart) Start(ctx context.Context, cwd string, sink Sink) (SessionInfo, error) {
+	sink(Event{SessionID: "s1", Kind: KindPermission, Permission: &PermissionRequest{
+		ID: "p1", ToolCall: ToolCall{ID: "t1", Kind: ToolEdit, Paths: []string{a.path}},
+		Options: []PermissionOption{{ID: "no", Kind: RejectOnce}, {ID: "yes", Kind: AllowOnce}},
+	}})
+	return a.fakeDriver.Start(ctx, cwd, sink)
+}
+
+func (f *fakeDriver) stoppedIDs() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.stopped...)
+}
+
+func TestDuplicateSessionIDIsRefused(t *testing.T) {
+	rec := &recorder{}
+	m := NewManager(rec.emit)
+	first := newFake(ToolEdit)
+	// The second agent picks the same id and, while starting, asks to edit a
+	// file inside the first chat's folder but outside its own.
+	second := &askingStart{fakeDriver: newFake(""), path: "/first/src/a.go"}
+	m.Register("first", first)
+	m.Register("second", second)
+	if _, err := m.Start(context.Background(), "first", "/first"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Start(context.Background(), "second", "/second"); err == nil {
+		t.Fatal("a second chat under an open chat's id started")
+	}
+	if got := second.stoppedIDs(); len(got) != 1 || got[0] != "s1" {
+		t.Errorf("the refused session's driver stopped %v, want [s1]", got)
+	}
+	if got := first.stoppedIDs(); len(got) != 0 {
+		t.Errorf("the open chat was stopped: %v", got)
+	}
+	select {
+	case opt := <-second.answered:
+		t.Errorf("the colliding session's request was answered (%q) with the other chat's folder", opt)
+	case <-time.After(200 * time.Millisecond): // auto-approval answers on its own goroutine
+	}
+	if contains(rec.kinds(), KindPermission) {
+		t.Error("the colliding session's request reached the open chat")
+	}
+	// The open chat still answers to its own driver.
+	if err := m.Respond("s1", "p1", "yes"); err != nil {
+		t.Fatal(err)
+	}
+	if opt := <-first.answered; opt != "yes" {
+		t.Errorf("first driver got %q", opt)
+	}
+}
+
+func TestAutoApprovalUsesTheSessionsOwnFolder(t *testing.T) {
+	cwd := t.TempDir()
+	m := NewManager(func(Event) {})
+	// The request arrives before the session is registered; it is still
+	// judged against the folder the session was started in.
+	d := &askingStart{fakeDriver: newFake(""), path: cwd + "/src/a.go"}
+	m.Register("fake", d)
+	if _, err := m.Start(context.Background(), "fake", cwd); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case opt := <-d.answered:
+		if opt != "yes" {
+			t.Errorf("auto-approve picked %q", opt)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("an edit inside the session's folder was not auto-approved")
+	}
+}
+
+func TestSessionStartedDuringCloseIsStopped(t *testing.T) {
+	m := NewManager(func(Event) {})
+	d := &slowStart{closeCounting: &closeCounting{fakeDriver: newFake("")}, started: make(chan struct{}), release: make(chan struct{})}
+	m.Register("gemini", d)
+	done := make(chan error, 1)
+	go func() {
+		_, err := m.Start(context.Background(), "gemini", t.TempDir())
+		done <- err
+	}()
+	<-d.started
+	if err := m.Close(); err != nil { // quitting while the chat starts
+		t.Fatal(err)
+	}
+	close(d.release)
+	if err := <-done; !errors.Is(err, ErrClosed) {
+		t.Errorf("Start finishing after Close = %v, want ErrClosed", err)
+	}
+	if got := d.stoppedIDs(); len(got) != 1 || got[0] != "s1" {
+		t.Errorf("late session stopped %v, want [s1]", got)
+	}
+	if _, err := m.Start(context.Background(), "gemini", t.TempDir()); !errors.Is(err, ErrClosed) {
+		t.Errorf("Start after Close = %v, want ErrClosed", err)
+	}
+}

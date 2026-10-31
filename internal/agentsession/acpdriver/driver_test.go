@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"flint/internal/acp"
 	"flint/internal/acp/acptest"
 	as "flint/internal/agentsession"
 )
@@ -215,5 +216,37 @@ func waitGone(t *testing.T, pid int) {
 			t.Fatalf("process %d still runs after Stop", pid)
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+// The fake agent numbers sessions per process, so two chats get the same id
+// (real agents use random ones): the second is refused and the first keeps
+// working.
+func TestDuplicateSessionIDIsRefused(t *testing.T) {
+	d := New(fakeOpts(t, acptest.ModeEcho))
+	t.Cleanup(func() { _ = d.Close() })
+	first, err := d.Start(testCtx(t), t.TempDir(), func(as.Event) {})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Start(testCtx(t), t.TempDir(), func(as.Event) {}); err == nil || !strings.Contains(err.Error(), "reused the id") {
+		t.Fatalf("second Start = %v, want a refused duplicate", err)
+	}
+	if stop, err := d.Prompt(testCtx(t), first.ID, "still here", nil); err != nil || stop != as.StopEndTurn {
+		t.Fatalf("first chat after the refused one: %q, %v", stop, err)
+	}
+}
+
+func TestHandlerIgnoresOtherSessions(t *testing.T) {
+	rec := &recorder{}
+	s := &session{id: "s1", cwd: t.TempDir(), sink: rec.sink, pending: map[string]chan string{}}
+	h := &handler{s: s}
+	h.SessionUpdate("s2", []byte(`{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"x"}}`))
+	out, err := h.RequestPermission(testCtx(t), acp.PermissionRequest{SessionID: "s2"})
+	if err != nil || out.Outcome != "cancelled" {
+		t.Errorf("permission for another session = %+v, %v", out, err)
+	}
+	if len(rec.events) != 0 {
+		t.Errorf("events for another session were emitted: %+v", rec.events)
 	}
 }

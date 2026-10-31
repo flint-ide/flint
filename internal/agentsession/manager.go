@@ -141,6 +141,7 @@ type Manager struct {
 	retired  []Driver // replaced or removed drivers that may still run sessions
 	sessions map[string]*managed
 	policy   Policy
+	closed   bool // Close ran; sessions that finish starting afterwards are stopped
 }
 
 type managed struct {
@@ -228,6 +229,9 @@ func (m *Manager) SetPolicy(p Policy) {
 	m.policy = p
 }
 
+// ErrClosed is returned when a session would open after Close.
+var ErrClosed = errors.New("agent sessions are shutting down")
+
 // ErrNoResume is returned by Resume for agents that cannot reopen a conversation.
 var ErrNoResume = errors.New("this agent cannot resume earlier conversations")
 
@@ -252,11 +256,15 @@ func (m *Manager) Resume(ctx context.Context, agent, cwd, sessionID string) (Ses
 // open starts or resumes a session through fn and registers it.
 func (m *Manager) open(agent, cwd string, fn func(Driver, Sink) (SessionInfo, error)) (SessionInfo, error) {
 	m.mu.Lock()
-	d := m.drivers[agent]
+	d, closed := m.drivers[agent], m.closed
 	m.mu.Unlock()
+	if closed {
+		return SessionInfo{}, ErrClosed
+	}
 	if d == nil {
 		return SessionInfo{}, fmt.Errorf("unknown agent %q", agent)
 	}
+	s := &managed{agent: agent, cwd: cwd, driver: d}
 	var sessionID string
 	var idMu sync.Mutex
 	info, err := fn(d, func(e Event) {
@@ -265,7 +273,7 @@ func (m *Manager) open(agent, cwd string, fn func(Driver, Sink) (SessionInfo, er
 			e.SessionID = sessionID
 		}
 		idMu.Unlock()
-		m.route(d, e)
+		m.route(s, e)
 	})
 	if err != nil {
 		return SessionInfo{}, err
@@ -277,7 +285,22 @@ func (m *Manager) open(agent, cwd string, fn func(Driver, Sink) (SessionInfo, er
 		info.Agent = agent
 	}
 	m.mu.Lock()
-	m.sessions[info.ID] = &managed{agent: agent, cwd: cwd, driver: d}
+	switch {
+	case m.closed:
+		// Close took its snapshot while this session started; nothing
+		// else would stop its process.
+		m.mu.Unlock()
+		_ = d.Stop(info.ID)
+		return SessionInfo{}, ErrClosed
+	case m.sessions[info.ID] != nil:
+		// Session ids are chosen by the agents; a second chat under the same
+		// id would orphan the first one's process and answer its approvals
+		// with the wrong folder.
+		m.mu.Unlock()
+		_ = d.Stop(info.ID)
+		return SessionInfo{}, fmt.Errorf("%s reused the id of an open chat (%s)", agent, info.ID)
+	}
+	m.sessions[info.ID] = s
 	// The driver may have been replaced while the session started; keep it
 	// for Close, or its process would outlive Flint.
 	if !slices.Contains(m.retired, d) && !slices.Contains(slices.Collect(maps.Values(m.drivers)), d) {
@@ -287,13 +310,22 @@ func (m *Manager) open(agent, cwd string, fn func(Driver, Sink) (SessionInfo, er
 	return info, nil
 }
 
-// route applies the policy to permission requests and forwards everything else.
-func (m *Manager) route(d Driver, e Event) {
+// route applies the policy to permission requests and forwards everything
+// else. s is the session the events come from: its folder decides
+// auto-approval, never a lookup by the id an event carries, and events that
+// name another open chat are dropped.
+func (m *Manager) route(s *managed, e Event) {
+	m.mu.Lock()
+	owner, policy := m.sessions[e.SessionID], m.policy
+	m.mu.Unlock()
+	if owner != nil && owner != s {
+		return
+	}
 	if e.Kind == KindPermission && e.Permission != nil {
-		if opt, ok := m.autoOption(e.SessionID, *e.Permission); ok {
+		if opt, ok := autoOption(policy, s.cwd, *e.Permission); ok {
 			// Answer off the driver's goroutine: drivers may hold locks while emitting.
 			go func() {
-				if err := d.Respond(e.SessionID, e.Permission.ID, opt); err != nil {
+				if err := s.driver.Respond(e.SessionID, e.Permission.ID, opt); err != nil {
 					m.emit(Event{SessionID: e.SessionID, Kind: KindError, Text: "auto-approve failed: " + err.Error()})
 				}
 			}()
@@ -303,14 +335,7 @@ func (m *Manager) route(d Driver, e Event) {
 	m.emit(e)
 }
 
-func (m *Manager) autoOption(sessionID string, req PermissionRequest) (string, bool) {
-	m.mu.Lock()
-	policy := m.policy
-	cwd := ""
-	if s := m.sessions[sessionID]; s != nil {
-		cwd = s.cwd
-	}
-	m.mu.Unlock()
+func autoOption(policy Policy, cwd string, req PermissionRequest) (string, bool) {
 	if !policy.autoApproves(req.ToolCall, cwd) {
 		return "", false
 	}
@@ -402,6 +427,7 @@ func (m *Manager) Stop(sessionID string) error {
 // Close stops every session and driver.
 func (m *Manager) Close() error {
 	m.mu.Lock()
+	m.closed = true
 	drivers := slices.Concat(slices.Collect(maps.Values(m.drivers)), m.retired)
 	m.retired = nil
 	for _, s := range m.sessions {

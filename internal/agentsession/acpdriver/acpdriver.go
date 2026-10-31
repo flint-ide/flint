@@ -97,9 +97,16 @@ func (d *Driver) Start(ctx context.Context, cwd string, sink as.Sink) (as.Sessio
 		_ = client.Close()
 		return as.SessionInfo{}, err
 	}
+	d.mu.Lock()
+	if d.sessions[res.SessionID] != nil {
+		// The id is the agent's choice; replacing the open chat under it
+		// would orphan that chat's process.
+		d.mu.Unlock()
+		_ = client.Close()
+		return as.SessionInfo{}, fmt.Errorf("%s reused the id of an open chat (%s)", d.opts.Name, res.SessionID)
+	}
 	s.client = client
 	s.setID(res.SessionID)
-	d.mu.Lock()
 	d.sessions[res.SessionID] = s
 	d.mu.Unlock()
 	return as.SessionInfo{ID: res.SessionID, Agent: d.opts.Name, Cwd: cwd}, nil
@@ -246,6 +253,9 @@ func (s *session) emit(e as.Event) {
 type handler struct{ s *session }
 
 func (h *handler) SessionUpdate(sessionID string, update json.RawMessage) {
+	if id := h.s.sessionID(); id != "" && sessionID != id {
+		return // each process serves one chat; another id is a confused agent
+	}
 	for _, e := range translate(update) {
 		e.SessionID = sessionID
 		h.s.emit(e)
@@ -256,6 +266,9 @@ func (h *handler) SessionUpdate(sessionID string, update json.RawMessage) {
 // session manager answers what the user's policy allows (the same policy as
 // for the native agents) and shows the rest in the chat.
 func (h *handler) RequestPermission(ctx context.Context, req acp.PermissionRequest) (acp.PermissionOutcome, error) {
+	if req.SessionID != h.s.sessionID() {
+		return acp.Cancelled(), nil // approvals go to this chat only
+	}
 	opts := make([]as.PermissionOption, 0, len(req.Options))
 	for _, o := range req.Options {
 		opts = append(opts, as.PermissionOption{ID: o.OptionID, Name: o.Name, Kind: o.Kind})

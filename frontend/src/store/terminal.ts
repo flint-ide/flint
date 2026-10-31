@@ -22,6 +22,10 @@ export interface TerminalTab {
   restored?: string
   /** Project the terminal was opened for (its cwd may be elsewhere after a restore). */
   project?: string
+  /** Extra environment of the shell (AWS_PROFILE…). */
+  env?: Record<string, string>
+  /** Shown first in the tab name ("aws:prod"). */
+  tag?: string
 }
 
 export interface CreateOptions {
@@ -32,6 +36,8 @@ export interface CreateOptions {
   /** Open the tab without switching to it (session restore). */
   background?: boolean
   project?: string
+  env?: Record<string, string>
+  tag?: string
 }
 
 interface TerminalState {
@@ -48,9 +54,10 @@ export const useTerminal = createStore<TerminalState>((set, get) => ({
 
   create: (cwd, opts = {}) => {
     const id = crypto.randomUUID()
-    const title = opts.title ?? terminalTitle({ command: '', cwd })
+    const title = opts.title ?? terminalTitle({ command: '', cwd, tag: opts.tag })
     const tab: TerminalTab = {
       id, title, pinned: opts.title !== undefined, command: '', cwd, exitCode: null, initialInput: opts.input, restored: opts.restored, project: opts.project ?? cwd,
+      env: opts.env, tag: opts.tag,
     }
     set((s) => ({ tabs: [...s.tabs, tab] }))
     useEditor.getState().openTerminal(id, title, opts.background)

@@ -98,7 +98,7 @@ export function TerminalView({ tab, active }: Props) {
 
     // The PTY outlives this view (remounts, StrictMode); it is closed with the tab.
     if (claimStart(tab.id)) {
-      TerminalBackend.Start(tab.id, tab.cwd, xterm.cols, xterm.rows)
+      TerminalBackend.Start(tab.id, tab.cwd, xterm.cols, xterm.rows, tab.env ?? {})
         .then(() => tab.initialInput && sendInput(tab.id, `${tab.initialInput}\r`))
         .catch((err) => showToast(`Terminal failed: ${errorMessage(err)}`, 'error'))
     } else {

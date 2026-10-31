@@ -4167,3 +4167,55 @@ body.file-drop-target-active::after {
   font-size: 15px;
   pointer-events: none;
 }
+
+/* ---------- AWS profiles ---------- */
+
+.aws-row .aws-icon {
+  color: var(--warn);
+  flex: none;
+}
+.aws-row .path-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.aws-status {
+  flex: none;
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.aws-status.ok {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+}
+.aws-status.warn {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+}
+.aws-status.bad {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+.aws-status.muted {
+  color: var(--fg-muted);
+}
+.aws-actions {
+  display: none;
+  flex: none;
+  gap: 2px;
+}
+.aws-row:hover .aws-actions {
+  display: flex;
+}
+.aws-identity {
+  padding: 0 10px 4px 34px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  word-break: break-all;
+}
+.aws-identity.error {
+  color: var(--danger);
+}

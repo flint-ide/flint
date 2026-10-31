@@ -33,6 +33,8 @@ type Options struct {
 	// Shell and Args default to the user's login shell ($SHELL -l).
 	Shell string
 	Args  []string
+	// Env adds variables ("AWS_PROFILE=prod") on top of Environ.
+	Env []string
 }
 
 type session struct {
@@ -74,7 +76,7 @@ func (m *Manager) Start(id string, opts Options) error {
 	}
 	cmd := exec.Command(shell, args...)
 	cmd.Dir = opts.Cwd
-	cmd.Env = Environ()
+	cmd.Env = append(Environ(), opts.Env...)
 
 	ptmx, err := pty.StartWithSize(cmd, winsize(opts.Cols, opts.Rows))
 	if err != nil {

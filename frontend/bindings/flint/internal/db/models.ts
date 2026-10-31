@@ -58,9 +58,16 @@ export class Connection {
     "protocol": string;
 
     /**
-     * TLS enables encrypted transport (Postgres sslmode=require, ClickHouse secure native port).
+     * TLS enables encrypted transport with the server's certificate and host
+     * name verified (Postgres sslmode=verify-full, ClickHouse secure ports).
      */
     "tls": boolean;
+
+    /**
+     * TLSInsecure skips that verification (self-signed or private CAs): the
+     * traffic is encrypted but a man in the middle can read it.
+     */
+    "tlsInsecure": boolean;
 
     /**
      * ReadOnly makes Flint refuse statements that modify data.
@@ -95,6 +102,9 @@ export class Connection {
         }
         if (!("tls" in $$source)) {
             this["tls"] = false;
+        }
+        if (!("tlsInsecure" in $$source)) {
+            this["tlsInsecure"] = false;
         }
         if (!("readOnly" in $$source)) {
             this["readOnly"] = false;

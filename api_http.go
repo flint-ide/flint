@@ -36,6 +36,7 @@ func (h *HTTPAPI) Environments(path string) ([]string, error) {
 
 // Send sends the request at target.Line under id (for Cancel) and waits for the response.
 func (h *HTTPAPI) Send(id string, target httpfile.Target, opts SendOptions) (*httpfile.Response, error) {
+	target.Roots = h.app.projectRoots()
 	p, err := httpfile.Prepare(target, time.Now)
 	if err != nil {
 		return nil, err
@@ -76,6 +77,7 @@ func (h *HTTPAPI) CurlOf(id string) (string, error) {
 
 // Curl renders the request at target.Line as a curl command without sending it.
 func (h *HTTPAPI) Curl(target httpfile.Target, opts SendOptions) (string, error) {
+	target.Roots = h.app.projectRoots()
 	p, err := httpfile.Prepare(target, time.Now)
 	if err != nil {
 		return "", err

@@ -71,6 +71,13 @@ export function InitialFolder(): $CancellablePromise<string> {
 }
 
 /**
+ * IsTrusted reports whether a folder is trusted (Restricted Mode is off there).
+ */
+export function IsTrusted(path: string): $CancellablePromise<boolean> {
+    return $Call.ByID(3808977924, path);
+}
+
+/**
  * ListDir lists one directory level for the file tree.
  */
 export function ListDir(path: string): $CancellablePromise<workspace$0.Entry[]> {
@@ -140,6 +147,29 @@ export function TrashPaths(paths: string[]): $CancellablePromise<string[]> {
     return $Call.ByID(1905251671, paths).then(($result: any) => {
         return $$createType4($result);
     });
+}
+
+/**
+ * TrustFolder trusts a folder and starts what Restricted Mode held back.
+ */
+export function TrustFolder(path: string): $CancellablePromise<void> {
+    return $Call.ByID(21941429, path);
+}
+
+/**
+ * TrustedFolders lists the trusted folders, for Settings.
+ */
+export function TrustedFolders(): $CancellablePromise<string[]> {
+    return $Call.ByID(4156167161).then(($result: any) => {
+        return $$createType4($result);
+    });
+}
+
+/**
+ * UntrustFolder revokes trust (servers already running keep running until restart).
+ */
+export function UntrustFolder(path: string): $CancellablePromise<void> {
+    return $Call.ByID(743511924, path);
 }
 
 /**

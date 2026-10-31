@@ -48,13 +48,19 @@ func Valid(k Kind) bool {
 
 // Headless runs a one-shot prompt in dir and returns the agent's final answer.
 // input is extra context (e.g. a diff) that is piped or appended to the prompt.
-func Headless(ctx context.Context, k Kind, dir, prompt, input string) (string, error) {
+// In an untrusted folder Claude loads only the user's settings: the project's
+// hooks and permission rules would otherwise run (-p skips the trust prompt).
+func Headless(ctx context.Context, k Kind, dir, prompt, input string, untrusted bool) (string, error) {
 	shellenv.Wait()
 	var cmd *exec.Cmd
 	switch k {
 	case Claude:
 		// `claude -p` prints only the final response; stdin becomes context.
-		cmd = exec.CommandContext(ctx, "claude", "-p", prompt)
+		args := []string{"-p", prompt}
+		if untrusted {
+			args = append(args, "--setting-sources", "user")
+		}
+		cmd = exec.CommandContext(ctx, "claude", args...)
 		cmd.Stdin = strings.NewReader(input)
 	case Codex:
 		// `codex exec` runs non-interactively and prints the last message on stdout.

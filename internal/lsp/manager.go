@@ -50,6 +50,10 @@ type document struct {
 type Manager struct {
 	OnDiagnostics func(path string, diags []Diagnostic)
 	OnStatus      func(Status)
+	// Trusted reports whether a workspace folder is trusted; servers that run
+	// the project's code (needsTrust) start only in trusted folders. Nil
+	// trusts everything (tests).
+	Trusted func(root string) bool
 
 	lookPath func(string) (string, error)
 
@@ -301,7 +305,9 @@ func (m *Manager) start(k key, e *entry) {
 	argv, ok := spec.resolveCommand(m.lookPath)
 	var srv *server
 	var err error
-	if !ok {
+	if reason, gated := needsTrust[k.language]; gated && m.Trusted != nil && !m.Trusted(k.root) {
+		err = fmt.Errorf("%w (%s)", ErrRestricted, reason)
+	} else if !ok {
 		err = fmt.Errorf("no %s language server installed — %s", k.language, spec.Install)
 	} else {
 		srv, err = startServer(context.Background(), k.language, k.root, argv, m.diagnostics)
@@ -446,4 +452,23 @@ func decodeCompletion(raw json.RawMessage) CompletionList {
 		list.Items = append(list.Items, it.toItem())
 	}
 	return list
+}
+
+// Retrust starts the servers that Restricted Mode held back in root, now
+// that the folder is trusted, for the documents already open there.
+func (m *Manager) Retrust(root string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for k, e := range m.servers {
+		if k.root == root && errors.Is(e.err, ErrRestricted) {
+			delete(m.servers, k)
+		}
+	}
+	for _, d := range m.docs {
+		if d.key.root == root {
+			if _, running := m.servers[d.key]; !running {
+				m.ensureServerLocked(d.key)
+			}
+		}
+	}
 }

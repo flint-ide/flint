@@ -11,8 +11,9 @@ import (
 
 // registerDrivers adds every native agent driver Flint ships (no npm adapters).
 // Drivers resolve their CLI lazily on Start, so registering costs nothing.
-func registerDrivers(m *as.Manager) {
-	m.Register(string(agent.Claude), claude.New(claude.Options{}))
+// untrusted marks folders whose project agent settings must not load.
+func registerDrivers(m *as.Manager, untrusted func(cwd string) bool) {
+	m.Register(string(agent.Claude), claude.New(claude.Options{Untrusted: untrusted}))
 	m.Register(string(agent.Codex), codex.New(codex.Options{}))
 }
 

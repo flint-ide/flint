@@ -77,6 +77,11 @@ type Options struct {
 	ExtraArgs []string
 	// Env holds extra KEY=VALUE entries; later entries win.
 	Env []string
+	// Untrusted reports a folder the user hasn't trusted: sessions there load
+	// only the user's settings, so the project's .claude/settings.json hooks
+	// and permission rules don't apply (-p mode skips Claude Code's own
+	// workspace-trust prompt). Nil trusts every folder.
+	Untrusted func(cwd string) bool
 }
 
 // Driver runs Claude Code sessions. It is safe for concurrent use.
@@ -136,7 +141,7 @@ func (d *Driver) start(ctx context.Context, cwd, id string, resume bool, sink ag
 	if taken {
 		return agentsession.SessionInfo{}, fmt.Errorf("claude: session %s is already open", id)
 	}
-	s, err := spawn(path, buildArgs(id, resume, d.opts), cwd, buildEnv(d.opts.Env, cwd), id, sink)
+	s, err := spawn(path, buildArgs(id, resume, d.opts, d.opts.Untrusted != nil && d.opts.Untrusted(cwd)), cwd, buildEnv(d.opts.Env, cwd), id, sink)
 	if err != nil {
 		return agentsession.SessionInfo{}, err
 	}
@@ -311,7 +316,7 @@ func (s *session) shutdownAsFailure() {
 
 // buildArgs assembles the CLI command line. resume continues the saved
 // conversation sessionID instead of starting a new one under that id.
-func buildArgs(sessionID string, resume bool, opts Options) []string {
+func buildArgs(sessionID string, resume bool, opts Options, untrusted bool) []string {
 	mode := opts.PermissionMode
 	if mode == "" {
 		mode = defaultPermissionMode
@@ -332,6 +337,9 @@ func buildArgs(sessionID string, resume bool, opts Options) []string {
 	}
 	if opts.Model != "" {
 		args = append(args, "--model", opts.Model)
+	}
+	if untrusted {
+		args = append(args, "--setting-sources", "user")
 	}
 	return append(args, opts.ExtraArgs...)
 }

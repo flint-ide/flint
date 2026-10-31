@@ -45,6 +45,14 @@ export function TerminalView({ tab, active }: Props) {
       allowProposedApi: true,
       macOptionIsMeta: false, // Option composes Polish diacritics (ą, ę, ż…)
       macOptionClickForcesSelection: true,
+      // OSC 8 hyperlinks printed by programs: only http(s), opened by the
+      // system browser (xterm's default would window.open any scheme).
+      linkHandler: {
+        allowNonHttpProtocols: false,
+        activate: (event, uri) => {
+          if (event.metaKey && /^https?:\/\//i.test(uri)) BrowserOpenURL(uri)
+        },
+      },
     })
     xterm.open(host.current)
     registerUrlLinks(xterm, BrowserOpenURL)

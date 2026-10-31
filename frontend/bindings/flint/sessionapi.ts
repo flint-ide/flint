@@ -36,6 +36,8 @@ export function Load(root: string): $CancellablePromise<string> {
 
 /**
  * Save stores the session of root; data is a JSON document owned by the UI.
+ * Terminal scrollback in it may show tokens or passwords: credentials are
+ * removed from every string value before the file is written.
  */
 export function Save(root: string, data: string): $CancellablePromise<void> {
     return $Call.ByID(1046005473, root, data);

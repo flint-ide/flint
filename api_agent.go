@@ -60,7 +60,7 @@ func (a *AgentAPI) SuggestCommitMessage(dir string, tracked, untracked []string)
 			return "", errors.New("no changes to describe")
 		}
 		prompt := agent.CommitMessagePrompt(r.RecentSubjects(ctx, recentSubjects))
-		msg, err := agent.Headless(ctx, kind, r.Root, prompt, diff)
+		msg, err := agent.Headless(ctx, kind, r.Root, prompt, diff, !a.app.isTrusted(r.Root))
 		if err != nil {
 			return "", err
 		}

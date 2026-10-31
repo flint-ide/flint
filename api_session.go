@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"path/filepath"
+
+	"flint/internal/redact"
 )
 
 // SessionAPI saves and restores what was open in a project (tabs, terminals,
@@ -24,7 +27,41 @@ func (s *SessionAPI) Load(root string) string {
 }
 
 // Save stores the session of root; data is a JSON document owned by the UI.
-func (s *SessionAPI) Save(root, data string) error { return s.app.sessions.Save(root, data) }
+// Terminal scrollback in it may show tokens or passwords: credentials are
+// removed from every string value before the file is written.
+func (s *SessionAPI) Save(root, data string) error {
+	return s.app.sessions.Save(root, redactJSONStrings(data))
+}
+
+// redactJSONStrings removes credentials from the string values of a JSON
+// document (keys and structure stay); invalid JSON is stored unchanged.
+func redactJSONStrings(data string) string {
+	var doc any
+	if json.Unmarshal([]byte(data), &doc) != nil {
+		return data
+	}
+	var walk func(v any) any
+	walk = func(v any) any {
+		switch x := v.(type) {
+		case string:
+			return redact.Secrets(x)
+		case []any:
+			for i := range x {
+				x[i] = walk(x[i])
+			}
+		case map[string]any:
+			for k := range x {
+				x[k] = walk(x[k])
+			}
+		}
+		return v
+	}
+	out, err := json.Marshal(walk(doc))
+	if err != nil {
+		return data
+	}
+	return string(out)
+}
 
 // Forget drops the saved session of root.
 func (s *SessionAPI) Forget(root string) error { return s.app.sessions.Forget(root) }

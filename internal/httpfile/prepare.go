@@ -37,6 +37,10 @@ type Target struct {
 	Line int `json:"line"`
 	// Env is the selected environment ("" = none).
 	Env string `json:"env"`
+	// Roots are the open project folders: "< file" bodies must be inside
+	// one (default: the .http file's folder). An untrusted .http file must not
+	// send ~/.aws/credentials to its URL.
+	Roots []string `json:"-"`
 }
 
 // Prepare parses t.Text, picks the request at t.Line and substitutes its variables.
@@ -75,6 +79,13 @@ func Prepare(t Target, now func() time.Time) (Prepared, error) {
 		path := req.BodyFile
 		if !filepath.IsAbs(path) {
 			path = filepath.Join(dir, path)
+		}
+		roots := t.Roots
+		if len(roots) == 0 {
+			roots = []string{dir}
+		}
+		if err := insideRoots(path, roots); err != nil {
+			return Prepared{}, fmt.Errorf("line %d: %w", req.BodyLine, err)
 		}
 		data, err := readBodyFile(path, req.BodyLine)
 		if err != nil {
@@ -152,4 +163,22 @@ func OutlineOf(src string) Outline {
 		marks = append(marks, Mark{Line: r.Line, Name: r.Name, Method: r.Method, URL: r.URL})
 	}
 	return Outline{Requests: marks, Errors: file.Errors}
+}
+
+// insideRoots requires path, with symlinks resolved, to lie in one of roots.
+func insideRoots(path string, roots []string) error {
+	real, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return nil // missing: readBodyFile reports it
+	}
+	for _, root := range roots {
+		r, err := filepath.EvalSymlinks(root)
+		if err != nil {
+			continue
+		}
+		if real == r || strings.HasPrefix(real, r+string(filepath.Separator)) {
+			return nil
+		}
+	}
+	return fmt.Errorf("body file %s is outside the project: copy it into the project to send it", path)
 }

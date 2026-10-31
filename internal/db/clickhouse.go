@@ -41,7 +41,7 @@ func openClickHouse(_ context.Context, c Connection, password string) (*chSessio
 		opts.Settings = clickhouse.Settings{"cancel_http_readonly_queries_on_client_close": 1}
 	}
 	if c.TLS {
-		opts.TLS = &tls.Config{ServerName: c.Host, MinVersion: tls.VersionTLS12}
+		opts.TLS = &tls.Config{ServerName: c.Host, MinVersion: tls.VersionTLS12, InsecureSkipVerify: c.TLSInsecure} //nolint:gosec // the user's explicit choice
 	}
 	conn, err := clickhouse.Open(opts)
 	if err != nil {

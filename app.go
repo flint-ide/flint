@@ -18,6 +18,7 @@ import (
 	"flint/internal/dap"
 	"flint/internal/db"
 	"flint/internal/fuzzy"
+	"flint/internal/git"
 	"flint/internal/httpfile"
 	"flint/internal/lsp"
 	"flint/internal/restore"
@@ -38,6 +39,8 @@ type appState struct {
 	Agent string `json:"agent"`
 	// AgentPolicy is the approval policy for agent chat sessions (nil = default).
 	AgentPolicy *agentsession.Policy `json:"agentPolicy,omitempty"`
+	// TrustedFolders the user trusts to run their code (see trust.go).
+	TrustedFolders []string `json:"trustedFolders,omitempty"`
 }
 
 // App holds the services shared by all bound APIs.
@@ -111,6 +114,8 @@ func NewApp() (*App, error) {
 	a.dockerAPI = &DockerAPI{app: a}
 	a.debugs = dap.NewManager(a.debugEvents)
 	a.lsp = lsp.NewManager()
+	a.lsp.Trusted = a.isTrusted
+	git.Untrusted = func(dir string) bool { return !a.isTrusted(dir) }
 	a.profiles = newProfiles()
 	if err := config.LoadJSON(a.statePath(), &a.state); err != nil {
 		return nil, err

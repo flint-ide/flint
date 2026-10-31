@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"flint/internal/shellenv"
 )
@@ -89,8 +90,69 @@ func (r *Repo) gitInput(ctx context.Context, stdin []byte, args ...string) ([]by
 // folder. core.fsmonitor names a program git starts on status/diff.
 var safeConfig = []string{"-c", "core.fsmonitor=false"}
 
+// driverKeys are config entries naming programs git runs on its own for
+// paths whose attributes select them: clean/smudge filters and textconv.
+// (External diff drivers are off: Flint passes --no-ext-diff. Merge drivers
+// only run when the user merges.)
+const driverKeys = `^(filter|diff)\..+\.(clean|smudge|process|textconv)$`
+
+// driverTTL: how long a repository's drivers are trusted to be unchanged.
+const driverTTL = 2 * time.Second
+
+type driverEntry struct {
+	at        time.Time
+	overrides []string
+}
+
+var (
+	driverMu    sync.Mutex
+	driverCache = map[string]driverEntry{}
+)
+
+// repoDriverOverrides switches off the drivers a repository defines in its own
+// config (and files it includes): "-c filter.x.clean=" makes git skip them. A
+// folder from an archive or an untrusted clone must not run programs when
+// Flint only reads its status, blame or diff. Drivers from the user's global
+// config (git-lfs…) are the user's own and stay.
+func repoDriverOverrides(ctx context.Context, dir string) []string {
+	driverMu.Lock()
+	e, ok := driverCache[dir]
+	driverMu.Unlock()
+	if ok && time.Since(e.at) < driverTTL {
+		return e.overrides
+	}
+	cmd := exec.CommandContext(ctx, gitBinary(), append(slices.Clone(safeConfig), "config", "--local", "--includes", "--name-only", "--get-regexp", driverKeys)...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0", "LC_ALL=C")
+	out, _ := cmd.Output() // exit 1: none defined; outside a repository: nothing to switch off
+	var overrides []string
+	for _, key := range strings.Fields(string(out)) {
+		value := "" // an empty filter is no filter
+		if strings.HasSuffix(key, ".textconv") {
+			value = "cat" // an empty textconv is an error; cat converts nothing
+		}
+		overrides = append(overrides, "-c", key+"="+value)
+	}
+	driverMu.Lock()
+	if len(driverCache) > 256 {
+		clear(driverCache)
+	}
+	driverCache[dir] = driverEntry{at: time.Now(), overrides: overrides}
+	driverMu.Unlock()
+	return overrides
+}
+
+// Untrusted reports a folder in Restricted Mode (set by the app; nil trusts
+// everything). There, hooks don't run even on commit or push: a folder from
+// an archive can ship .git/hooks or point core.hooksPath at its own scripts.
+var Untrusted func(dir string) bool
+
 func run(ctx context.Context, dir string, stdin []byte, args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, gitBinary(), append(slices.Clone(safeConfig), args...)...)
+	full := append(slices.Clone(safeConfig), repoDriverOverrides(ctx, dir)...)
+	if Untrusted != nil && Untrusted(dir) {
+		full = append(full, "-c", "core.hooksPath=/dev/null")
+	}
+	cmd := exec.CommandContext(ctx, gitBinary(), append(full, args...)...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
 		"GIT_OPTIONAL_LOCKS=0",  // never fight an agent's git for index.lock on read-only commands

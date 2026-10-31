@@ -1,6 +1,6 @@
 module flint
 
-go 1.26.0
+go 1.27.3
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.50.0
@@ -16,6 +16,7 @@ require (
 )
 
 require (
+	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/ClickHouse/ch-go v0.74.0 // indirect
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/andybalholm/brotli v1.2.6 // indirect
@@ -39,7 +40,7 @@ require (
 	github.com/shopspring/decimal v1.5.0 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
+	golang.org/x/image v0.45.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 )
-

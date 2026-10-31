@@ -18,8 +18,11 @@ type pgSession struct {
 
 func postgresDSN(c Connection, password string) string {
 	sslmode := "prefer"
-	if c.TLS {
+	switch {
+	case c.TLS && c.TLSInsecure:
 		sslmode = "require"
+	case c.TLS:
+		sslmode = "verify-full"
 	}
 	q := url.Values{}
 	q.Set("sslmode", sslmode)

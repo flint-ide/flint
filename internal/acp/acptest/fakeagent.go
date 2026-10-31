@@ -13,10 +13,12 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -26,6 +28,7 @@ const (
 	modeEnv    = "FLINT_ACP_FAKE_MODE"
 	clientEnv  = "FLINT_ACP_FAKE_CLIENT"  // expected clientInfo.name; empty accepts any
 	pidFileEnv = "FLINT_ACP_FAKE_PIDFILE" // the agent and a child it spawns write their PIDs here
+	childEnv   = "FLINT_ACP_FAKE_CHILD"   // set in the relaunched child
 )
 
 // Modes. Without one of these the first prompt text names the scenario
@@ -37,7 +40,19 @@ const (
 	ModeHeadless = "headless"
 	// ModeEcho answers every prompt with "echo:" and the prompt's text.
 	ModeEcho = "echo"
+	// ModeRelaunch behaves like gemini-cli stuck before its handshake: the
+	// agent relaunches itself as a child that shares its stdio, both ignore
+	// SIGTERM, and the child never answers `initialize` and keeps running
+	// after stdin ends. With PIDFileEnv both PIDs are written.
+	ModeRelaunch = "relaunch"
+	// ModeRelaunchEcho is ModeRelaunch with a child that serves ModeEcho
+	// (and still outlives stdin).
+	ModeRelaunchEcho = "relaunch-echo"
 )
+
+// orphanLimit ends a relaunched child that nothing killed, so a failing
+// test doesn't leave it running.
+const orphanLimit = time.Minute
 
 // Env returns the environment that turns the test binary into the agent.
 func Env(mode string) []string {
@@ -58,6 +73,9 @@ func RunIfAgent() {
 	if os.Getenv(agentEnv) != "1" {
 		return
 	}
+	if mode := os.Getenv(modeEnv); mode == ModeRelaunch || mode == ModeRelaunchEcho {
+		relaunch(mode)
+	}
 	if path := os.Getenv(pidFileEnv); path != "" {
 		writePIDs(path)
 	}
@@ -76,6 +94,41 @@ func writePIDs(path string) {
 		fmt.Fprintln(os.Stderr, "fake agent: write pids:", err)
 		os.Exit(8)
 	}
+}
+
+// relaunch runs the agent the way gemini-cli does: a parent that waits for
+// a child sharing its stdin, stdout and stderr. Neither returns.
+func relaunch(mode string) {
+	signal.Ignore(syscall.SIGTERM)
+	if os.Getenv(childEnv) == "1" {
+		go func() {
+			time.Sleep(orphanLimit)
+			os.Exit(7)
+		}()
+		fmt.Fprintln(os.Stderr, "fake agent: relaunched, waiting for sign-in")
+		if mode == ModeRelaunchEcho {
+			Serve(ModeEcho, os.Stdin, os.Stdout)
+		} else {
+			_, _ = io.Copy(io.Discard, os.Stdin)
+		}
+		select {} // stdin ended; keep running like a hung agent
+	}
+	child := exec.Command(os.Args[0], os.Args[1:]...)
+	child.Stdin, child.Stdout, child.Stderr = os.Stdin, os.Stdout, os.Stderr
+	child.Env = append(os.Environ(), childEnv+"=1")
+	if err := child.Start(); err != nil {
+		fmt.Fprintln(os.Stderr, "fake agent: relaunch:", err)
+		os.Exit(8)
+	}
+	if path := os.Getenv(pidFileEnv); path != "" {
+		data := fmt.Sprintf("%d\n%d\n", os.Getpid(), child.Process.Pid)
+		if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, "fake agent: write pids:", err)
+			os.Exit(8)
+		}
+	}
+	_ = child.Wait()
+	os.Exit(0)
 }
 
 type fakeMsg struct {

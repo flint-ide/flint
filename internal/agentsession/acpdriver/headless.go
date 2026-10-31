@@ -10,6 +10,7 @@ import (
 
 	"flint/internal/acp"
 	as "flint/internal/agentsession"
+	"flint/internal/redact"
 )
 
 // Headless runs one prompt in a fresh session in cwd and returns the agent's
@@ -23,7 +24,11 @@ func Headless(ctx context.Context, opts Options, cwd, prompt string) (string, er
 		return "", err
 	}
 	h := &headlessHandler{root: cwd}
-	client, err := acp.Start(ctx, opts.acpOptions(cwd), h)
+	aopts, err := opts.acpOptions(ctx, cwd)
+	if err != nil {
+		return "", headlessError(ctx, opts.Name, err)
+	}
+	client, err := acp.Start(ctx, aopts, h)
 	if err != nil {
 		return "", headlessError(ctx, opts.Name, err)
 	}
@@ -51,9 +56,31 @@ func Headless(ctx context.Context, opts Options, cwd, prompt string) (string, er
 
 func headlessError(ctx context.Context, name string, err error) error {
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return fmt.Errorf("%s did not answer in time", name)
+		return fmt.Errorf("%s did not answer in time%s", name, stderrNote(err))
 	}
 	return fmt.Errorf("%s: %w", name, err)
+}
+
+// stderrShown is how much of an agent's stderr a timeout error quotes.
+const stderrShown = 800
+
+// stderrNote quotes the end of what an agent that failed its handshake
+// printed (often the reason: a login prompt, a question on the terminal),
+// with credentials and the home directory taken out; "" when it printed
+// nothing.
+func stderrNote(err error) string {
+	var hs *acp.HandshakeError
+	if !errors.As(err, &hs) {
+		return ""
+	}
+	tail := strings.TrimSpace(redact.String(hs.Stderr))
+	if tail == "" {
+		return ""
+	}
+	if len(tail) > stderrShown {
+		tail = "…" + strings.ToValidUTF8(tail[len(tail)-stderrShown:], "")
+	}
+	return "; it printed: " + tail
 }
 
 // AgentInfo is what an agent reports about itself in `initialize`.
@@ -68,13 +95,14 @@ type AgentInfo struct {
 
 // Probe starts the agent in dir, runs the `initialize` handshake and stops
 // it again, to tell the user whether the command speaks ACP. No session is
-// opened, so nothing reaches a model.
+// opened, so nothing reaches a model. It returns within moments of ctx's
+// deadline: an agent that misses the handshake is killed at once.
 func Probe(ctx context.Context, opts Options, dir string) (AgentInfo, error) {
-	client, err := acp.Start(ctx, opts.acpOptions(dir), &headlessHandler{root: dir})
+	client, err := startProbe(ctx, opts, dir)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return AgentInfo{}, fmt.Errorf("%s did not answer the ACP handshake in time: check that %q starts its ACP mode and that the agent runs in a terminal",
-				opts.Name, strings.TrimSpace(opts.Command+" "+strings.Join(opts.Args, " ")))
+			return AgentInfo{}, fmt.Errorf("%s did not answer the ACP handshake in time: check that %q starts its ACP mode and that the agent runs in a terminal%s",
+				opts.Name, strings.TrimSpace(opts.Command+" "+strings.Join(opts.Args, " ")), stderrNote(err))
 		}
 		return AgentInfo{}, err
 	}
@@ -88,6 +116,14 @@ func Probe(ctx context.Context, opts Options, dir string) (AgentInfo, error) {
 		out.AuthMethods = append(out.AuthMethods, m.Name)
 	}
 	return out, nil
+}
+
+func startProbe(ctx context.Context, opts Options, dir string) (*acp.Client, error) {
+	aopts, err := opts.acpOptions(ctx, dir)
+	if err != nil {
+		return nil, err
+	}
+	return acp.Start(ctx, aopts, &headlessHandler{root: dir})
 }
 
 // headlessHandler serves a session nobody watches: it collects the answer

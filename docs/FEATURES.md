@@ -107,7 +107,7 @@ Persistent SQL consoles and notes (MD/TXT) with autosave. `⌘↵` runs the quer
 ### Custom agents (ACP)
 
 - Each entry in `customAgents` (settings.json) is an agent: an id (lowercase, not `claude` or `codex`), an optional name, a command (a name on the login PATH or an absolute path) and the arguments that start its ACP mode. Settings offers Gemini CLI (`gemini --experimental-acp`) and OpenCode (`opencode acp`) as one-click fill-ins; you install and log in to the CLI yourself.
-- **Check** starts the agent in an empty temporary folder, runs the ACP `initialize` handshake (30 s timeout) and shows its name and version, or the error. No session is opened.
+- **Check** starts the agent in an empty temporary folder, runs the ACP `initialize` handshake (25 s timeout) and shows its name and version, or the error with the end of what the agent printed. No session is opened.
 - A custom agent appears in the agent menus, the default-agent pickers and "Ask the agent" once its command is found. Saving settings registers the agents again; open chats keep the agent process they started with.
 - It starts only in a trusted folder (see [Restricted Mode](#restricted-mode-workspace-trust)). Its permission requests go through the same approval policy as the native agents. Flint offers it file reads and writes (ACP `fs/*`) only inside the chat's folder, never into `.git`, and no terminal; the agent runs in its own process group, which is killed when the chat closes and when Flint quits.
 - There is no environment setting: `settings.json` is plain text, so API keys don't belong there. Log in with the agent's own command (`gemini`, `opencode auth login`) before using it.

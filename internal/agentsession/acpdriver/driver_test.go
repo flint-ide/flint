@@ -18,8 +18,11 @@ import (
 )
 
 // TestMain lets the test binary double as the fake ACP agent.
+// The fake agent is started by absolute path, so the login shell's PATH
+// isn't needed (and its start-up time doesn't eat the tests' timeouts).
 func TestMain(m *testing.M) {
 	acptest.RunIfAgent()
+	waitShellEnv = func() {}
 	os.Exit(m.Run())
 }
 
@@ -186,9 +189,89 @@ func TestStopKillsProcessGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(pidFile)
+	pids := readPIDs(t, pidFile)
+	if err := d.Stop(info.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, pid := range pids {
+		waitGone(t, pid)
+	}
+}
+
+// A login shell that is slow to report its PATH counts against the probe's
+// timeout instead of adding to it.
+func TestProbeWaitsForThePATHWithinItsTimeout(t *testing.T) {
+	release := make(chan struct{})
+	waitShellEnv = func() { <-release }
+	t.Cleanup(func() {
+		close(release)
+		waitShellEnv = func() {}
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	if _, err := Probe(ctx, fakeOpts(t, ""), t.TempDir()); !errors.Is(err, context.DeadlineExceeded) && (err == nil || !strings.Contains(err.Error(), "in time")) {
+		t.Errorf("Probe = %v, want a timeout", err)
+	}
+	if took := time.Since(start); took > time.Second {
+		t.Errorf("Probe took %v waiting for the PATH", took)
+	}
+}
+
+// gemini-cli relaunches itself as a child that shares its stdio; a probe
+// that times out must kill both at once, even when they ignore SIGTERM and
+// the end of stdin, and quote what the agent printed.
+func TestProbeKillsARelaunchedAgent(t *testing.T) {
+	pidFile := filepath.Join(t.TempDir(), "pids")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	start := time.Now()
+	_, err := Probe(ctx, fakeOpts(t, acptest.ModeRelaunch, acptest.PIDFileEnv(pidFile)), t.TempDir())
+	took := time.Since(start)
+	if err == nil || !strings.Contains(err.Error(), "did not answer the ACP handshake in time") ||
+		!strings.Contains(err.Error(), "it printed: fake agent: relaunched, waiting for sign-in") {
+		t.Errorf("Probe = %v, want a timeout quoting the agent's stderr", err)
+	}
+	if took > 3*time.Second {
+		t.Errorf("Probe took %v with a 2s timeout", took)
+	}
+	for _, pid := range readPIDs(t, pidFile) {
+		waitGone(t, pid)
+	}
+}
+
+func TestStopKillsARelaunchedAgent(t *testing.T) {
+	pidFile := filepath.Join(t.TempDir(), "pids")
+	d := New(fakeOpts(t, acptest.ModeRelaunchEcho, acptest.PIDFileEnv(pidFile)))
+	info, err := d.Start(testCtx(t), t.TempDir(), func(as.Event) {})
 	if err != nil {
 		t.Fatal(err)
+	}
+	pids := readPIDs(t, pidFile)
+	start := time.Now()
+	if err := d.Stop(info.ID); err != nil {
+		t.Fatal(err)
+	}
+	if took := time.Since(start); took > 6*time.Second {
+		t.Errorf("Stop took %v", took)
+	}
+	for _, pid := range pids {
+		waitGone(t, pid)
+	}
+}
+
+// readPIDs reads the agent's and its child's PIDs and kills them when the
+// test ends, so a failing test leaves no process behind.
+func readPIDs(t *testing.T, path string) []int {
+	t.Helper()
+	var data []byte
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		data, _ = os.ReadFile(path)
+		if len(strings.Fields(string(data))) == 2 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 	var pids []int
 	for _, f := range strings.Fields(string(data)) {
@@ -198,12 +281,12 @@ func TestStopKillsProcessGroup(t *testing.T) {
 	if len(pids) != 2 {
 		t.Fatalf("pids = %q", data)
 	}
-	if err := d.Stop(info.ID); err != nil {
-		t.Fatal(err)
-	}
-	for _, pid := range pids {
-		waitGone(t, pid)
-	}
+	t.Cleanup(func() {
+		for _, pid := range pids {
+			_ = syscall.Kill(pid, syscall.SIGKILL)
+		}
+	})
+	return pids
 }
 
 // waitGone waits until pid no longer exists (a child of the killed agent is

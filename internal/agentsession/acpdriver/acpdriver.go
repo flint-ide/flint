@@ -88,7 +88,11 @@ func (d *Driver) Start(ctx context.Context, cwd string, sink as.Sink) (as.Sessio
 		return as.SessionInfo{}, err
 	}
 	s := &session{cwd: cwd, sink: sink, pending: map[string]chan string{}}
-	client, err := acp.Start(ctx, d.opts.acpOptions(cwd), &handler{s: s})
+	aopts, err := d.opts.acpOptions(ctx, cwd)
+	if err != nil {
+		return as.SessionInfo{}, err
+	}
+	client, err := acp.Start(ctx, aopts, &handler{s: s})
 	if err != nil {
 		return as.SessionInfo{}, err
 	}
@@ -117,10 +121,20 @@ func (d *Driver) Start(ctx context.Context, cwd string, sink as.Sink) (as.Sessio
 var waitShellEnv = shellenv.Wait
 
 // acpOptions launches the agent in dir with Flint's environment (the login
-// shell's PATH), like the native agents.
-func (o Options) acpOptions(dir string) acp.Options {
-	waitShellEnv()
-	return acp.Options{Command: o.Command, Args: o.Args, Env: o.Env, Dir: dir, ClientName: "flint", ClientVersion: clientVersion}
+// shell's PATH), like the native agents. Waiting for that PATH counts
+// against ctx, so a slow login shell can't stretch a caller's timeout.
+func (o Options) acpOptions(ctx context.Context, dir string) (acp.Options, error) {
+	ready, wait := make(chan struct{}), waitShellEnv
+	go func() {
+		wait()
+		close(ready)
+	}()
+	select {
+	case <-ready:
+	case <-ctx.Done():
+		return acp.Options{}, fmt.Errorf("waiting for the login shell's PATH: %w", ctx.Err())
+	}
+	return acp.Options{Command: o.Command, Args: o.Args, Env: o.Env, Dir: dir, ClientName: "flint", ClientVersion: clientVersion}, nil
 }
 
 // Prompt sends text plus attachments and waits for the turn to end.

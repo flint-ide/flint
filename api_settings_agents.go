@@ -10,8 +10,10 @@ import (
 )
 
 // probeTimeout bounds the "Check" of a custom agent: a node-based CLI can
-// take several seconds to start.
-const probeTimeout = 30 * time.Second
+// take several seconds to start. An agent that misses it is killed at once,
+// so the call returns within moments of it, also below the 30 s write
+// timeout of the server build's HTTP bindings.
+const probeTimeout = 25 * time.Second
 
 // ProbeCustomAgent starts a saved custom agent, runs the ACP `initialize`
 // handshake and stops it, so Settings can show whether the command speaks

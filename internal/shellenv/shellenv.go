@@ -15,6 +15,8 @@ import (
 const (
 	marker  = "__FLINT_PATH__="
 	timeout = 4 * time.Second
+	// waitDelay bounds the wait for stdout to close after the shell exits.
+	waitDelay = time.Second
 )
 
 var (
@@ -50,6 +52,10 @@ func loginPath() string {
 	// -i loads .zshrc/.bashrc too, where nvm & co. usually extend PATH.
 	cmd := exec.CommandContext(ctx, shell, "-ilc", `printf '\n`+marker+`%s\n' "$PATH"`)
 	cmd.Stdin = nil
+	// A startup file may leave a background process (an agent, a daemon)
+	// holding stdout; Output would wait for it to exit, and with it every
+	// caller of Wait (git, agents, language servers).
+	cmd.WaitDelay = waitDelay
 	out, err := cmd.Output()
 	if err != nil && len(out) == 0 {
 		return ""

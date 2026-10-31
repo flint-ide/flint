@@ -184,7 +184,7 @@ A custom agent is a binary the user configured, so it runs with the user's right
 - It starts with Flint's environment (the login shell's `PATH`); settings have no environment field, so no keys are stored in `settings.json`.
 - The client offers file reads and writes (`fs/read_text_file`, `fs/write_text_file`) but no terminal. Paths must be absolute and stay inside the session folder after resolving symlinks, and writes into `.git` (hooks, config) are refused.
 - Every `session/request_permission` goes through `agentsession.Manager`: the user's approval policy answers what it allows (by default edits and reads of known paths inside the project, outside `.git` and agent config folders) and the chat asks about the rest, exactly as for Claude Code and Codex. One-shot runs (commit messages) decline every request.
-- The agent runs in its own process group (`Setpgid`); stopping a chat, a one-shot run or Flint sends SIGTERM to the group and SIGKILL after a grace period.
+- The agent runs in its own process group (`Setpgid`), which also holds the processes it starts (gemini-cli relaunches itself as a child that shares its stdio); stopping a chat, a one-shot run or Flint sends SIGTERM to the group and SIGKILL after a grace period. An agent that misses the `initialize` handshake gets SIGKILL at once, so the Check returns right after its timeout.
 
 ### Untrusted rendered content
 

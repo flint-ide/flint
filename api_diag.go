@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"flint/internal/diag"
+	"flint/internal/tools"
 )
 
 // version is set at release builds (-ldflags "-X main.version=v1.2.3").
@@ -22,7 +23,8 @@ const (
 
 // DiagnosticsAPI is how people report problems: the log, a redacted report,
 // and a prefilled GitHub issue. Nothing leaves the machine unless the user
-// submits the issue themselves.
+// submits the issue themselves. It also runs the tool check (which external
+// tools are installed).
 type DiagnosticsAPI struct {
 	app *App
 
@@ -50,6 +52,14 @@ func (d *DiagnosticsAPI) OpenIssue(title string) error {
 	d.app.copyText(report)
 	return d.app.openURL(diag.IssueLink(title, report))
 }
+
+// Tools reports which external tools Flint drives are installed, with their
+// versions. Only fixed version commands run, never in a project folder.
+func (d *DiagnosticsAPI) Tools() []tools.Status { return tools.Check(d.app.ctx) }
+
+// ToolCheckOnFirstRun is true once, on the first launch, so the tool check
+// opens by itself only then.
+func (d *DiagnosticsAPI) ToolCheckOnFirstRun() bool { return d.app.claimToolCheck() }
 
 // LogPath is the log file, for the UI.
 func (d *DiagnosticsAPI) LogPath() string { return diag.LogPath() }

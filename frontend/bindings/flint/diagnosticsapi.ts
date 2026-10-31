@@ -4,13 +4,18 @@
 /**
  * DiagnosticsAPI is how people report problems: the log, a redacted report,
  * and a prefilled GitHub issue. Nothing leaves the machine unless the user
- * submits the issue themselves.
+ * submits the issue themselves. It also runs the tool check (which external
+ * tools are installed).
  * @module
  */
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as tools$0 from "./internal/tools/models.js";
 
 /**
  * LogFrontend records an error of the web UI (uncaught exceptions, failed
@@ -48,3 +53,25 @@ export function Report(): $CancellablePromise<string> {
 export function RevealLogs(): $CancellablePromise<void> {
     return $Call.ByID(4119293350);
 }
+
+/**
+ * ToolCheckOnFirstRun is true once, on the first launch, so the tool check
+ * opens by itself only then.
+ */
+export function ToolCheckOnFirstRun(): $CancellablePromise<boolean> {
+    return $Call.ByID(3943411136);
+}
+
+/**
+ * Tools reports which external tools Flint drives are installed, with their
+ * versions. Only fixed version commands run, never in a project folder.
+ */
+export function Tools(): $CancellablePromise<tools$0.Status[]> {
+    return $Call.ByID(2039057627).then(($result: any) => {
+        return $$createType1($result);
+    });
+}
+
+// Private type creation functions
+const $$createType0 = tools$0.Status.createFrom;
+const $$createType1 = $Create.Array($$createType0);

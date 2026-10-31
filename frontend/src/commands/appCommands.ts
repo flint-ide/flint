@@ -22,6 +22,7 @@ import { useAgentChat } from '../store/agentChat'
 import { showToast } from '../store/dialog'
 import { trustFolder, untrustFolder } from '../store/trust'
 import { copyDiagnostics, reportIssue, showLogs } from '../store/diagnostics'
+import { openToolCheck } from '../store/toolCheck'
 
 // Where a global shortcut belongs to the focused widget instead: ⌘B in an editor is
 // "go to declaration" (IntelliJ), ⌘K in a terminal clears the screen.
@@ -75,6 +76,11 @@ function appCommands(): Command[] {
     { id: 'help.reportIssue', title: 'Report an Issue…', category: 'Help', keywords: 'bug feedback github diagnostics logs', run: () => void reportIssue() },
     { id: 'help.copyDiagnostics', title: 'Copy Diagnostics', category: 'Help', keywords: 'logs versions support', run: () => void copyDiagnostics() },
     { id: 'help.showLogs', title: 'Show Logs in Finder', category: 'Help', keywords: 'log file debug', run: showLogs },
+    {
+      id: 'help.checkTools', title: 'Check Tools…', category: 'Help',
+      keywords: 'install setup missing path version git ripgrep gh claude codex kubectl docker aws delve language server',
+      run: openToolCheck,
+    },
 
     // Navigate
     { id: 'nav.goToFile', title: 'Go to File…', category: 'Navigate', keys: 'Mod+P', keywords: 'open quick', run: () => ws().setQuickOpen(true) },

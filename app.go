@@ -41,6 +41,8 @@ type appState struct {
 	AgentPolicy *agentsession.Policy `json:"agentPolicy,omitempty"`
 	// TrustedFolders the user trusts to run their code (see trust.go).
 	TrustedFolders []string `json:"trustedFolders,omitempty"`
+	// ToolCheckShown: the tool check has opened on its own once (first launch).
+	ToolCheckShown bool `json:"toolCheckShown,omitempty"`
 }
 
 // App holds the services shared by all bound APIs.
@@ -178,6 +180,24 @@ func (a *App) rememberFolder(path string) error {
 	a.state = next
 	go a.refreshMenu() // outside stateMu: building the menu reads the list again
 	return nil
+}
+
+// claimToolCheck is true only the first time it is asked, ever: the tool check
+// opens on its own once. A failed save still counts for this run, so a broken
+// config directory shows it once per launch rather than never.
+func (a *App) claimToolCheck() bool {
+	a.stateMu.Lock()
+	defer a.stateMu.Unlock()
+	if a.state.ToolCheckShown {
+		return false
+	}
+	next := a.state
+	next.ToolCheckShown = true
+	if err := config.SaveJSON(a.statePath(), next); err != nil {
+		a.logf("save state: %v", err)
+	}
+	a.state = next
+	return true
 }
 
 func (a *App) recentFolders() []string {

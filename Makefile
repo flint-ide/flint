@@ -5,7 +5,7 @@ PG_PORT ?= 55432
 CH_PORT ?= 59000
 CH_HTTP_PORT ?= 58123
 
-.PHONY: dev build server vuln test test-go test-web test-integration test-db-up test-db-down install lint
+.PHONY: dev build server docs vuln test test-go test-web test-integration test-db-up test-db-down install lint
 
 dev: ## Run with live reload (Go rebuilds on change, the page reloads)
 	$(WAILS) task dev
@@ -39,6 +39,9 @@ test-integration: ## Requires `make test-db-up`
 lint:
 	go vet ./...
 	gofmt -l . | grep -v '^frontend/node_modules/' | (! grep .)
+
+docs: ## Build the user docs into _site/ and preview them at http://localhost:8090
+	go run ./cmd/docsite -serve :8090
 
 vuln: ## Known vulnerabilities in Go and runtime npm dependencies
 	go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...

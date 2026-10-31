@@ -3,10 +3,17 @@ import * as Terminal from '../../wailsjs/go/main/TerminalAPI'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
 import { createReorderer } from '../lib/reorder'
 import { useEditor } from './editor'
+import { terminalTitle } from '../lib/terminalTitle'
 
 export interface TerminalTab {
   id: string
   title: string
+  /** The title was given (Docker logs, an agent task) and stays; otherwise it follows what runs. */
+  pinned: boolean
+  /** The running command, '' at the prompt (term:title). */
+  command: string
+  /** Title the running program set (OSC 0/2), dropped when the command ends. */
+  programTitle?: string
   cwd: string
   exitCode: number | null
   /** Typed into the shell once it starts, e.g. a `claude '…'` command. */
@@ -18,6 +25,7 @@ export interface TerminalTab {
 }
 
 export interface CreateOptions {
+  /** A fixed tab name; without it the tab is named after what the terminal runs. */
   title?: string
   input?: string
   restored?: string
@@ -32,8 +40,6 @@ interface TerminalState {
   close: (id: string) => void
 }
 
-let seq = 0
-
 /** Editor tab id of a terminal (terminals live among the editor tabs). */
 export const terminalTabId = (termId: string) => `term:${termId}`
 
@@ -42,9 +48,9 @@ export const useTerminal = createStore<TerminalState>((set, get) => ({
 
   create: (cwd, opts = {}) => {
     const id = crypto.randomUUID()
-    const title = opts.title ?? `${cwd.split('/').pop() || '~'} ${++seq}`
+    const title = opts.title ?? terminalTitle({ command: '', cwd })
     const tab: TerminalTab = {
-      id, title, cwd, exitCode: null, initialInput: opts.input, restored: opts.restored, project: opts.project ?? cwd,
+      id, title, pinned: opts.title !== undefined, command: '', cwd, exitCode: null, initialInput: opts.input, restored: opts.restored, project: opts.project ?? cwd,
     }
     set((s) => ({ tabs: [...s.tabs, tab] }))
     useEditor.getState().openTerminal(id, title, opts.background)
@@ -84,6 +90,21 @@ export function toggleTerminal(cwd: string): void {
   const target = recent ?? any
   if (target) editor.setActive(target)
   else useTerminal.getState().create(cwd)
+}
+
+/** Applies a change to a terminal and renames its tab when the name follows what runs. */
+function updateTab(id: string, change: (t: TerminalTab) => Partial<TerminalTab>): void {
+  const tab = useTerminal.getState().tabs.find((t) => t.id === id)
+  if (!tab) return
+  const next = { ...tab, ...change(tab) }
+  if (!next.pinned) next.title = terminalTitle(next)
+  useTerminal.setState((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? next : t)) }))
+  if (next.title !== tab.title) useEditor.getState().retitleTab(terminalTabId(id), next.title)
+}
+
+/** A title set by the program in the terminal (OSC 0/2); shells setting one at the prompt are ignored. */
+export function setProgramTitle(id: string, title: string): void {
+  updateTab(id, (t) => (t.command ? { programTitle: title } : {}))
 }
 
 /** Recent plain-text output of each mounted terminal, for session snapshots. */
@@ -232,6 +253,14 @@ export function subscribeTerminalEvents(): void {
   if (subscribed) return
   subscribed = true
   EventsOn('term:data', (msg: { id: string; seq?: number; data: string }) => deliver(msg.id, msg))
+  EventsOn('term:title', (msg: { id: string; command: string; cwd: string }) => {
+    if (closed.has(msg.id)) return
+    updateTab(msg.id, (t) => ({
+      command: msg.command,
+      cwd: msg.cwd || t.cwd,
+      programTitle: msg.command === t.command ? t.programTitle : undefined,
+    }))
+  })
   EventsOn('term:exit', (msg: { id: string; code: number }) => {
     if (closed.has(msg.id)) return forgetClosedLater(msg.id)
     useTerminal.setState((s) => ({

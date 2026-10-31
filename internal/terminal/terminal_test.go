@@ -12,9 +12,10 @@ type recorder struct {
 	mu     sync.Mutex
 	out    bytes.Buffer
 	exited chan int
+	titles chan Info
 }
 
-func newRecorder() *recorder { return &recorder{exited: make(chan int, 1)} }
+func newRecorder() *recorder { return &recorder{exited: make(chan int, 1), titles: make(chan Info, 32)} }
 
 func (r *recorder) Output(_ string, data []byte) {
 	r.mu.Lock()
@@ -23,6 +24,13 @@ func (r *recorder) Output(_ string, data []byte) {
 }
 
 func (r *recorder) Exited(_ string, code int) { r.exited <- code }
+
+func (r *recorder) Title(_ string, info Info) {
+	select {
+	case r.titles <- info:
+	default:
+	}
+}
 
 func (r *recorder) output() string {
 	r.mu.Lock()

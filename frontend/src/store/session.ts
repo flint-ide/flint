@@ -70,7 +70,7 @@ async function captureTab(t: Tab, roots: string[]): Promise<SavedTab | null> {
       const term = useTerminal.getState().tabs.find((x) => x.id === t.termId)
       if (!term || (!roots.includes(term.project ?? '') && !inWorkspace(term.cwd))) return null
       const cwd = term.exitCode === null ? await TerminalBackend.Cwd(t.termId).catch(() => '') : ''
-      return { kind: 'terminal', title: t.title, cwd: cwd || term.cwd, output: recentOutput(t.termId, SCROLLBACK_LINES), project: term.project }
+      return { kind: 'terminal', title: t.title, pinned: term.pinned, cwd: cwd || term.cwd, output: recentOutput(t.termId, SCROLLBACK_LINES), project: term.project }
     }
     case 'chat': {
       const s = useAgentChat.getState().sessions[t.sessionId]
@@ -152,7 +152,7 @@ async function apply(root: string, snap: Snapshot, roots: string[]): Promise<voi
       case 'terminal': {
         const project = t.project && roots.includes(t.project) ? t.project : root
         const cwd = dirs.get(t.cwd) ? t.cwd : project
-        const id = useTerminal.getState().create(cwd, { title: t.title, restored: t.output || undefined, background: true, project })
+        const id = useTerminal.getState().create(cwd, { title: t.pinned ? t.title : undefined, restored: t.output || undefined, background: true, project })
         ids.push(terminalTabId(id))
         break
       }

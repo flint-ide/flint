@@ -11,8 +11,9 @@ import (
 
 // Events emitted by running terminals.
 const (
-	eventTermData = "term:data"
-	eventTermExit = "term:exit"
+	eventTermData  = "term:data"
+	eventTermExit  = "term:exit"
+	eventTermTitle = "term:title"
 )
 
 // TermData carries raw PTY output; Data is base64-encoded by JSON so split UTF-8
@@ -53,6 +54,16 @@ func (e *terminalEvents) Exited(id string, code int) {
 	e.mu.Lock()
 	delete(e.seq, id)
 	e.mu.Unlock()
+}
+
+// TermTitle reports what a terminal runs, for its tab name.
+type TermTitle struct {
+	ID string `json:"id"`
+	terminal.Info
+}
+
+func (e *terminalEvents) Title(id string, info terminal.Info) {
+	runtime.EventsEmit(e.app.ctx, eventTermTitle, TermTitle{ID: id, Info: info})
 }
 
 // TerminalAPI runs interactive shells (e.g. for claude / codex) inside Flint.

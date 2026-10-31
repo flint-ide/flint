@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef } from 'react'
 import { EventsOn } from './wails/runtime'
 import { useWorkspace } from './store/workspace'
 import { useEditor } from './store/editor'
@@ -34,20 +34,12 @@ import { ErrorBoundary } from './components/layout/ErrorBoundary'
 import { StatusBar } from './components/layout/StatusBar'
 import { TitleBar } from './components/layout/TitleBar'
 import { EditorArea } from './components/editor/EditorArea'
-import { FileTree } from './components/sidebar/FileTree'
-import { SearchPanel } from './components/sidebar/SearchPanel'
-import { ScratchPanel } from './components/sidebar/ScratchPanel'
+import { PANELS } from './panels'
+import { resolvePanel } from './panels/registry'
 import { usePersistentNumber } from './lib/usePersistentNumber'
 
 const ACTIVITY_BAR = 44
 
-const KubePanel = lazy(() => import('./components/sidebar/KubePanel').then((m) => ({ default: m.KubePanel })))
-const AwsPanel = lazy(() => import('./components/sidebar/AwsPanel').then((m) => ({ default: m.AwsPanel })))
-const DockerPanel = lazy(() => import('./components/sidebar/DockerPanel').then((m) => ({ default: m.DockerPanel })))
-const TodoPanel = lazy(() => import('./components/sidebar/TodoPanel').then((m) => ({ default: m.TodoPanel })))
-const DatabasePanel = lazy(() => import('./components/sidebar/DatabasePanel').then((m) => ({ default: m.DatabasePanel })))
-const CommitPanel = lazy(() => import('./components/sidebar/CommitPanel').then((m) => ({ default: m.CommitPanel })))
-const PullRequestsPanel = lazy(() => import('./components/github/PullRequestsPanel').then((m) => ({ default: m.PullRequestsPanel })))
 const RecentProjects = lazy(() => import('./components/RecentProjects').then((m) => ({ default: m.RecentProjects })))
 const QuickOpen = lazy(() => import('./components/QuickOpen').then((m) => ({ default: m.QuickOpen })))
 const RunConfigDialog = lazy(() => import('./components/run/RunConfigDialog').then((m) => ({ default: m.RunConfigDialog })))
@@ -55,6 +47,9 @@ const CommandPalette = lazy(() => import('./components/CommandPalette').then((m)
 
 export default function App() {
   const sidebar = useWorkspace((s) => s.sidebar)
+  // An unknown id (a panel that was removed or renamed) shows the Files panel.
+  const panel = resolvePanel(PANELS, sidebar)
+  const focusToken = useWorkspace((s) => (panel ? (s.panelFocus[panel.id] ?? 0) : 0))
   const sidebarVisible = useWorkspace((s) => s.sidebarVisible)
   const quickOpen = useWorkspace((s) => s.quickOpen)
   const recentOpen = useWorkspace((s) => s.recentOpen)
@@ -64,8 +59,6 @@ export default function App() {
   const editingRun = useRun((s) => s.editing)
   const ready = useWorkspace((s) => s.ready)
   const [sidebarWidth, setSidebarWidth] = usePersistentNumber('flint.sidebarWidth', 280)
-  const [searchFocus, setSearchFocus] = useState(0)
-  const [commitFocus, setCommitFocus] = useState(0)
   const workbench = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -114,10 +107,7 @@ export default function App() {
     }
   }, [ready, root, rootTrusted])
 
-  // Stable, so the commands are registered once rather than on every render.
-  const focusSearch = useCallback(() => setSearchFocus((n) => n + 1), [])
-  const focusCommit = useCallback(() => setCommitFocus((n) => n + 1), [])
-  useGlobalShortcuts(focusSearch, focusCommit)
+  useGlobalShortcuts()
 
   const onSidebarResize = (ratio: number) => {
     const width = workbench.current?.getBoundingClientRect().width ?? 1200
@@ -133,42 +123,10 @@ export default function App() {
           <>
             <aside className="sidebar" style={{ width: sidebarWidth }}>
               <ErrorBoundary label="Sidebar">
-              {sidebar === 'files' && <FileTree />}
-              {sidebar === 'search' && <SearchPanel focusToken={searchFocus} />}
-              {sidebar === 'git' && (
-                <Suspense fallback={null}>
-                  <CommitPanel focusToken={commitFocus} />
-                </Suspense>
-              )}
-              {sidebar === 'pulls' && (
-                <Suspense fallback={null}>
-                  <PullRequestsPanel />
-                </Suspense>
-              )}
-              {sidebar === 'database' && (
-                <Suspense fallback={null}>
-                  <DatabasePanel />
-                </Suspense>
-              )}
-              {sidebar === 'scratch' && <ScratchPanel />}
-              {sidebar === 'docker' && (
-                <Suspense fallback={null}>
-                  <DockerPanel />
-                </Suspense>
-              )}
-              {sidebar === 'kube' && (
-                <Suspense fallback={null}>
-                  <KubePanel />
-                </Suspense>
-              )}
-              {sidebar === 'aws' && (
-                <Suspense fallback={null}>
-                  <AwsPanel />
-                </Suspense>
-              )}
-              {sidebar === 'todo' && (
-                <Suspense fallback={null}>
-                  <TodoPanel />
+              {panel && (
+                // key: switching panels unmounts the previous one, as separate elements did.
+                <Suspense key={panel.id} fallback={null}>
+                  <panel.component focusToken={focusToken} />
                 </Suspense>
               )}
               </ErrorBoundary>
@@ -213,15 +171,15 @@ export default function App() {
  * Registers the app's commands and runs their shortcuts from one capturing keydown
  * listener, so they fire before editors and terminals see the keys (see lib/commands.ts).
  */
-function useGlobalShortcuts(focusSearch: () => void, focusCommit: () => void) {
+function useGlobalShortcuts() {
   useEffect(() => {
     setCommandErrorHandler((err) => showToast(errorMessage(err), 'error'))
-    const unregister = registerAppCommands({ focusSearch, focusCommit })
+    const unregister = registerAppCommands()
     const onKey = (e: KeyboardEvent) => void handleGlobalKey(e)
     window.addEventListener('keydown', onKey, true)
     return () => {
       window.removeEventListener('keydown', onKey, true)
       unregister()
     }
-  }, [focusSearch, focusCommit])
+  }, [])
 }

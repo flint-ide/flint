@@ -97,11 +97,8 @@ function githubCommands(): Command[] {
     const { sidebar, sidebarVisible } = useWorkspace.getState()
     return sidebarVisible && sidebar === 'pulls'
   }
+  // "Pull Requests…" itself comes from the panel registry (panels/index.ts).
   return [
-    {
-      id: 'github.pullRequests', title: 'Pull Requests…', category: 'GitHub', keywords: 'pr review gh github list',
-      run: () => useWorkspace.getState().setSidebar('pulls'),
-    },
     {
       id: 'github.refresh', title: 'Refresh Pull Requests', category: 'GitHub', keywords: 'pr reload gh',
       when: () => panelShown() || !!activePullRequest(),

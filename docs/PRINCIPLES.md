@@ -28,7 +28,7 @@ The simplest design that works is the easiest to secure, review and change.
 
 Adding a language, an agent, a panel, a database or a run type should mean adding one unit, not editing a dozen files.
 
-- Features register themselves in a registry (commands and shortcuts in `lib/commands.ts`, agent drivers, LSP server specs, run-configuration detectors) instead of being listed in several places.
+- Features register themselves in a registry (commands and shortcuts in `lib/commands.ts`, sidebar panels in `panels/index.ts`, agent drivers, LSP server specs, run-configuration detectors) instead of being listed in several places.
 - Backends talk to the UI through Wails services and events with stable, typed contracts (generated bindings).
 - A new external tool is a package under `internal/` with a narrow API, validated inputs and its own tests.
 

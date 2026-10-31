@@ -3,8 +3,10 @@ import { Workspace, errorMessage, type Entry } from '../api/backend'
 import { restoreSession, saveSession, setSessionRoots } from './session'
 import { addRootError, withoutRoot } from '../lib/workspaceRoots'
 import { useEditor } from './editor'
+import type { PanelId } from '../panels'
 
-export type SidebarView = 'files' | 'search' | 'git' | 'pulls' | 'database' | 'scratch' | 'todo' | 'docker' | 'aws' | 'kube'
+/** The open sidebar panel; the list lives in panels/index.ts. */
+export type SidebarView = PanelId
 /** What the branches popup opens on (title bar widget or the palette). */
 export type BranchesMode = 'list' | 'new-branch' | 'new-worktree'
 
@@ -22,6 +24,8 @@ interface WorkspaceState {
   expanded: Record<string, boolean>
   sidebar: SidebarView
   sidebarVisible: boolean
+  /** Per-panel focus requests, passed to the panel as its focusToken. */
+  panelFocus: Partial<Record<SidebarView, number>>
   quickOpen: boolean
   recentOpen: boolean
   paletteOpen: boolean
@@ -40,6 +44,8 @@ interface WorkspaceState {
   toggleDir: (path: string) => Promise<void>
   reloadTree: () => Promise<void>
   setSidebar: (view: SidebarView) => void
+  /** Shows the panel and asks it to focus its main input (⇧⌘F, ⌘K). */
+  focusPanel: (view: SidebarView) => void
   toggleSidebar: () => void
   setQuickOpen: (open: boolean) => void
   setRecentOpen: (open: boolean) => void
@@ -77,6 +83,7 @@ export const useWorkspace = createStore<WorkspaceState>((set, get) => ({
   expanded: {},
   sidebar: 'files',
   sidebarVisible: true,
+  panelFocus: {},
   quickOpen: false,
   recentOpen: false,
   paletteOpen: false,
@@ -217,6 +224,8 @@ export const useWorkspace = createStore<WorkspaceState>((set, get) => ({
   },
 
   setSidebar: (view) => set({ sidebar: view, sidebarVisible: true }),
+  focusPanel: (view) =>
+    set((s) => ({ sidebar: view, sidebarVisible: true, panelFocus: { ...s.panelFocus, [view]: (s.panelFocus[view] ?? 0) + 1 } })),
   toggleSidebar: () => set((s) => ({ sidebarVisible: !s.sidebarVisible })),
   setQuickOpen: (open) => set({ quickOpen: open }),
   setRecentOpen: (open) => set({ recentOpen: open }),

@@ -121,6 +121,15 @@ flowchart LR
 
 The registry in `src/lib/commands.ts` (`registerCommand({ id, title, category, keys, when, run })`) feeds the `⇧⌘P` palette and the only global `keydown` listener (capture phase, ahead of CodeMirror and xterm). Shortcuts owned by the editor (for example `⌘B`, `⌘S`) are only displayed by the palette, which runs them through the active editor's keymap.
 
+### Sidebar panels
+
+`src/panels/index.ts` lists the sidebar panels; the activity bar, the sidebar, the `SidebarView` type and one palette command per panel are derived from that list (`src/panels/registry.ts`). To add a panel:
+
+1. Write the component (for example `components/sidebar/GcpPanel.tsx`). It receives `focusToken`, which `focusPanel(id)` bumps when a command asks the panel to focus its input.
+2. Add one entry to `PANELS`: `{ id: 'gcp', title: 'Google Cloud', icon: '◇', order: 95, component: GcpPanel }`. Wrap the component in `React.lazy` unless it is small, so its code is fetched on first open rather than at startup.
+
+That entry also registers "Show Google Cloud" (`view.gcp`) in the palette. Optional fields: `command` (another id, title, keywords or a default shortcut, or `false` for no command), `shortcutCommand` (a command whose shortcut the tooltip shows, read on hover so it follows rebinding) and `when` (hides the button and the command). Panel ids are not persisted today; an unknown id still falls back to the Files panel. Keep the command id of an existing panel when you edit it, since keymap overrides are stored by command id.
+
 ### Own code instead of libraries
 
 Virtualization of fixed-row-height lists (`src/lib/virtualList.ts`), fitting the terminal to its container (`terminalFit.ts`), and clickable URLs in the terminal, including ones wrapped across several rows (`terminalLinks.ts`).
@@ -269,7 +278,7 @@ internal/agentsession       shared agent event model, approval policy, session m
   claude/ codex/ acpdriver/ native agent drivers
 frontend/bindings           generated TypeScript bindings of the Go services (do not edit)
 frontend/src/wails          compatibility layer over the bindings and the Wails runtime
-frontend/src                React: store (createStore + event bus), components, lib, commands
+frontend/src                React: store (createStore + event bus), components, lib, commands, panels (sidebar registry)
 ```
 
 For data storage details see [Where Flint stores data](#where-flint-stores-data).

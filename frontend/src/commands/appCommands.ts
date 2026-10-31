@@ -5,7 +5,9 @@ import { parseKeys, registerCommands, type Command } from '../lib/commands'
 import { attachSelectionToAgent } from '../lib/agentContext'
 import { registerFeatureCommands } from './featureCommands'
 import { requestCloseTab } from '../components/editor/EditorArea'
-import { useWorkspace, type SidebarView } from '../store/workspace'
+import { useWorkspace } from '../store/workspace'
+import { PANELS } from '../panels'
+import { panelCommands } from '../panels/registry'
 import { saveTab, useEditor, viewFor, type Tab } from '../store/editor'
 import { toggleTerminal, useTerminal } from '../store/terminal'
 import { activeRoot } from '../store/activeRoot'
@@ -20,12 +22,6 @@ import { useAgentChat } from '../store/agentChat'
 import { showToast } from '../store/dialog'
 import { trustFolder, untrustFolder } from '../store/trust'
 import { copyDiagnostics, reportIssue, showLogs } from '../store/diagnostics'
-
-/** Focus requests that live in App state (the panels take them as focus tokens). */
-export interface AppCommandHooks {
-  focusSearch: () => void
-  focusCommit: () => void
-}
 
 // Where a global shortcut belongs to the focused widget instead: ⌘B in an editor is
 // "go to declaration" (IntelliJ), ⌘K in a terminal clears the screen.
@@ -42,11 +38,9 @@ const hasEditor = () => {
   const id = useEditor.getState().activeId
   return !!id && !!viewFor(id)
 }
-const showPanel = (view: SidebarView) => () => ws().setSidebar(view)
-
 /** Registers everything below; returns the matching unregister. */
-export function registerAppCommands(hooks: AppCommandHooks): () => void {
-  const offStatic = registerCommands(appCommands(hooks))
+export function registerAppCommands(): () => void {
+  const offStatic = registerCommands(appCommands())
   const offAgents = registerAgentChatCommands()
   const offFeatures = registerFeatureCommands()
   const offRoots = registerWorkspaceRootCommands()
@@ -58,7 +52,7 @@ export function registerAppCommands(hooks: AppCommandHooks): () => void {
   }
 }
 
-function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
+function appCommands(): Command[] {
   return [
     // General
     {
@@ -86,17 +80,13 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
     { id: 'nav.goToFile', title: 'Go to File…', category: 'Navigate', keys: 'Mod+P', keywords: 'open quick', run: () => ws().setQuickOpen(true) },
     {
       id: 'nav.findInFiles', title: 'Find in Files…', category: 'Navigate', keys: 'Mod+Shift+F', keywords: 'search grep',
-      run: () => {
-        ws().setSidebar('search')
-        focusSearch()
-      },
+      run: () => ws().focusPanel('search'),
     },
     {
       id: 'nav.replaceInFiles', title: 'Replace in Files…', category: 'Navigate', keys: 'Mod+Shift+R', keywords: 'search substitute rename text',
       run: () => {
         useSearch.getState().setParams({ replaceOn: true })
-        ws().setSidebar('search')
-        focusSearch()
+        ws().focusPanel('search')
       },
     },
     {
@@ -140,10 +130,7 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
     // Git
     {
       id: 'git.commit', title: 'Commit…', category: 'Git', keys: 'Mod+K', keysIgnoredIn: IN_TERMINAL,
-      run: () => {
-        ws().setSidebar('git')
-        focusCommit()
-      },
+      run: () => ws().focusPanel('git'),
     },
     { id: 'git.push', title: 'Push', category: 'Git', keys: 'Mod+Shift+K', keysIgnoredIn: IN_TERMINAL, run: () => useGit.getState().remote('push') },
     { id: 'git.pull', title: 'Update Project (Pull)', category: 'Git', when: isRepo, run: () => useGit.getState().remote('pull') },
@@ -160,13 +147,8 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
 
     // View
     { id: 'view.toggleSidebar', title: 'Toggle Sidebar', category: 'View', keys: 'Mod+B', keysIgnoredIn: IN_EDITOR, keywords: 'panel hide show', run: () => ws().toggleSidebar() },
-    { id: 'view.files', title: 'Show Files', category: 'View', keywords: 'project tree explorer', run: showPanel('files') },
-    { id: 'view.databases', title: 'Show Databases', category: 'View', keywords: 'sql postgres clickhouse', run: showPanel('database') },
-    { id: 'view.scratchpads', title: 'Show Scratchpads', category: 'View', keywords: 'notes sql consoles', run: showPanel('scratch') },
-    { id: 'view.kube', title: 'Kubernetes', category: 'View', keywords: 'k8s kubectl cluster pods context namespace', run: showPanel('kube') },
-    { id: 'view.aws', title: 'AWS Profiles', category: 'View', keywords: 'amazon sso login credentials terminal', run: showPanel('aws') },
-    { id: 'view.docker', title: 'Docker', category: 'View', keywords: 'containers compose logs', run: showPanel('docker') },
-    { id: 'view.todo', title: 'TODO List', category: 'View', keywords: 'fixme hack xxx bug notes comments', run: showPanel('todo') },
+    // One "Show <panel>" per sidebar panel (panels/index.ts).
+    ...panelCommands(PANELS, (id) => ws().setSidebar(id)),
 
     // Project
     { id: 'project.recent', title: 'Recent Projects…', category: 'Project', keys: 'Mod+O', keywords: 'open folder', run: () => ws().setRecentOpen(true) },

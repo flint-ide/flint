@@ -40,6 +40,9 @@ jobs:
         working-directory: frontend
         run: npm ci --ignore-scripts
 
+      - name: Install ripgrep (Flint's search engine; the built-in fallback is tested too)
+        run: brew install ripgrep
+
       - name: Install wails3
         run: go install "github.com/wailsapp/wails/v3/cmd/wails3@${WAILS_VERSION}"
 

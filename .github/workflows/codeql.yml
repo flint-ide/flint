@@ -16,6 +16,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 45
     permissions:
+      actions: read # the action reads its own workflow run
       contents: read
       security-events: write
     strategy:

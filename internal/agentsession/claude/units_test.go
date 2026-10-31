@@ -254,14 +254,17 @@ func TestResolveBinary(t *testing.T) {
 }
 
 func TestBuildArgsAndEnv(t *testing.T) {
-	args := buildArgs("sid", false, Options{PermissionMode: "acceptEdits", ExtraArgs: []string{"--setting-sources", "project"}})
+	args := buildArgs("sid", false, Options{PermissionMode: "acceptEdits", ExtraArgs: []string{"--setting-sources", "project"}}, false)
 	joined := strings.Join(args, " ")
 	if !strings.Contains(joined, "--permission-mode acceptEdits") || strings.Contains(joined, "--model") ||
 		!strings.Contains(joined, "--session-id sid") || strings.Contains(joined, "--resume") ||
 		!strings.HasSuffix(joined, "--setting-sources project") {
 		t.Errorf("args = %q", joined)
 	}
-	resumed := strings.Join(buildArgs("sid", true, Options{}), " ")
+	resumed := strings.Join(buildArgs("sid", true, Options{}, false), " ")
+	if untrusted := strings.Join(buildArgs("sid", false, Options{}, true), " "); !strings.Contains(untrusted, "--setting-sources user") {
+		t.Errorf("untrusted folder args %q", untrusted)
+	}
 	if !strings.Contains(resumed, "--resume sid") || strings.Contains(resumed, "--session-id") {
 		t.Errorf("resume args = %q", resumed)
 	}

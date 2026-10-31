@@ -153,8 +153,14 @@ func TestPostgresDSN(t *testing.T) {
 			wantSSL:  "prefer",
 		},
 		{
-			name:     "tls requires ssl, ipv6 host, db with space",
+			name:     "tls verifies the certificate, ipv6 host, db with space",
 			conn:     Connection{Driver: Postgres, Host: "::1", Port: 6543, Database: "my db", User: "bob", TLS: true},
+			password: "",
+			wantSSL:  "verify-full",
+		},
+		{
+			name:     "tls without verification only when asked",
+			conn:     Connection{Driver: Postgres, Host: "db", Port: 5432, Database: "app", User: "bob", TLS: true, TLSInsecure: true},
 			password: "",
 			wantSSL:  "require",
 		},

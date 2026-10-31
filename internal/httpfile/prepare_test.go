@@ -200,3 +200,32 @@ func TestCurl(t *testing.T) {
 		t.Errorf("GET: %q", got)
 	}
 }
+
+// A .http file must not send a file from outside the project (an untrusted
+// repo could aim "< ../../.aws/credentials" at its own URL).
+func TestBodyFileMustBeInsideTheProject(t *testing.T) {
+	project := t.TempDir()
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret"), []byte("key"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(project, "body.json"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(outside, "secret"), filepath.Join(project, "link")); err != nil {
+		t.Fatal(err)
+	}
+	httpPath := filepath.Join(project, "api.http")
+	send := func(body string) error {
+		_, err := Prepare(Target{Path: httpPath, Text: "POST https://example.com\n\n< " + body + "\n", Line: 1, Roots: []string{project}}, time.Now)
+		return err
+	}
+	if err := send("./body.json"); err != nil {
+		t.Fatalf("file inside the project refused: %v", err)
+	}
+	for _, body := range []string{filepath.Join(outside, "secret"), "../" + filepath.Base(outside) + "/secret", "./link"} {
+		if err := send(body); err == nil || !strings.Contains(err.Error(), "outside the project") {
+			t.Errorf("%s: err = %v", body, err)
+		}
+	}
+}

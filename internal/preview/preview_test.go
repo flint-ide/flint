@@ -76,3 +76,16 @@ func TestReadImageCapsSize(t *testing.T) {
 		t.Fatalf("img %+v err %v", img, err)
 	}
 }
+
+func TestRemoteImagesWaitForTheUser(t *testing.T) {
+	html, err := MarkdownBlockingRemote("![pixel](https://tracker.example/p.gif?id=1) ![local](img/a.png)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(html, `<img src="https://`) || !strings.Contains(html, `data-remote-src="https://tracker.example/p.gif?id=1"`) {
+		t.Errorf("remote image would load:\n%s", html)
+	}
+	if !strings.Contains(html, `src="img/a.png"`) {
+		t.Errorf("local image lost:\n%s", html)
+	}
+}

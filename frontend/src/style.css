@@ -4309,3 +4309,44 @@ body.file-drop-target-active::after {
 .kube-dot.muted {
   color: var(--fg-muted);
 }
+
+/* ---------- Restricted Mode ---------- */
+
+.trust-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--warn) 14%, var(--bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+}
+.trust-icon {
+  color: var(--warn);
+  flex: none;
+}
+.trust-text {
+  flex: 1;
+  min-width: 0;
+}
+.trust-banner button {
+  flex: none;
+}
+
+.preview-remote-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  border-bottom: 1px solid var(--border);
+}
+.preview-remote-bar .link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}

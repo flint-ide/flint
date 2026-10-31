@@ -18,6 +18,7 @@ import { useDatabase } from '../store/database'
 import { activeSqlConsole } from '../store/sqlConsole'
 import { useAgentChat } from '../store/agentChat'
 import { showToast } from '../store/dialog'
+import { trustFolder, untrustFolder } from '../store/trust'
 
 /** Focus requests that live in App state (the panels take them as focus tokens). */
 export interface AppCommandHooks {
@@ -67,6 +68,14 @@ function appCommands({ focusSearch, focusCommit }: AppCommandHooks): Command[] {
       id: 'app.settings', title: 'Settings…', category: 'General', keys: 'Mod+,',
       keywords: 'preferences options theme dark light font size keymap shortcuts keyboard agent',
       run: () => useEditor.getState().openSettings(),
+    },
+    {
+      id: 'workspace.trust', title: 'Trust Folder', category: 'Workspace', keywords: 'restricted mode security trust',
+      run: () => void trustFolder(activeRoot()),
+    },
+    {
+      id: 'workspace.untrust', title: 'Revoke Folder Trust (Restricted Mode)', category: 'Workspace', keywords: 'restricted mode security untrust',
+      run: () => void untrustFolder(activeRoot()),
     },
 
     // Navigate

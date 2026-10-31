@@ -24,7 +24,8 @@ export function Image(path: string): $CancellablePromise<preview$0.Image> {
 }
 
 /**
- * Markdown renders Markdown source to safe HTML (no raw HTML, no script links).
+ * Markdown renders Markdown source to safe HTML (no raw HTML, no script links);
+ * remote images wait for the user (data-remote-src).
  */
 export function Markdown(src: string): $CancellablePromise<string> {
     return $Call.ByID(496859621, src);

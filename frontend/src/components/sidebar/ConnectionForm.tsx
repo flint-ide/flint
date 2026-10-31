@@ -126,9 +126,15 @@ export function ConnectionForm({ initial, onClose }: Props) {
         </div>
         <div className="form-row checks">
           <label className="check">
-            <input type="checkbox" checked={conn.tls} onChange={(e) => update({ tls: e.target.checked, port: 0 })} />
+            <input type="checkbox" checked={conn.tls} onChange={(e) => update({ tls: e.target.checked, tlsInsecure: false, port: 0 })} />
             TLS
           </label>
+          {conn.tls && (
+            <label className="check" title="Encrypts without checking the server's certificate: anyone in between can read the traffic. Only for self-signed or private CAs.">
+              <input type="checkbox" checked={conn.tlsInsecure} onChange={(e) => update({ tlsInsecure: e.target.checked })} />
+              Don't verify certificate (insecure)
+            </label>
+          )}
           <label className="check">
             <input type="checkbox" checked={conn.readOnly} onChange={(e) => update({ readOnly: e.target.checked })} />
             Read-only

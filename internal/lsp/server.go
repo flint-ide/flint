@@ -45,7 +45,11 @@ func startServer(ctx context.Context, language, root string, argv []string, onDi
 	if err != nil {
 		return nil, err
 	}
-	s := &server{language: language, root: root, cmd: cmd, onDiag: onDiag, initOptions: initializationOptions(argv[0])}
+	initOptions, err := initializationOptions(argv[0])
+	if err != nil {
+		return nil, err
+	}
+	s := &server{language: language, root: root, cmd: cmd, onDiag: onDiag, initOptions: initOptions}
 	cmd.Stderr = (*tailWriter)(s)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start %s: %w", argv[0], err)

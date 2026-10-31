@@ -17,6 +17,8 @@ import { subscribeDebugEvents } from './store/debug'
 import { subscribeAutoSave } from './store/settings'
 import { activeRoot } from './store/activeRoot'
 import { openDropped } from './store/drop'
+import { refreshTrust, useTrust } from './store/trust'
+import { TrustBanner } from './components/layout/TrustBanner'
 import { subscribeAlerts } from './store/alerts'
 import type { DroppedPath } from './lib/drop'
 import { UsagesModal } from './components/lsp/UsagesModal'
@@ -95,12 +97,18 @@ export default function App() {
     useWorkspace.getState().clearError()
   }, [error])
 
-  // AI-first: a shell in the project is the first tab once the folder is known.
+  const roots = useWorkspace((s) => s.roots)
+  useEffect(() => void refreshTrust(roots), [roots])
+  const rootTrusted = useTrust((s) => (root ? s.trusted[root] : undefined))
+
+  // AI-first: a shell in the project is the first tab once the folder is known —
+  // only in a trusted folder: a shell prompt runs git and version-manager hooks
+  // that a hostile repository could abuse (Restricted Mode).
   useEffect(() => {
-    if (ready && !useEditor.getState().tabs.some((t) => t.kind === 'terminal')) {
+    if (ready && rootTrusted === true && !useEditor.getState().tabs.some((t) => t.kind === 'terminal')) {
       useTerminal.getState().create(root ?? '')
     }
-  }, [ready, root])
+  }, [ready, root, rootTrusted])
 
   // Stable, so the commands are registered once rather than on every render.
   const focusSearch = useCallback(() => setSearchFocus((n) => n + 1), [])
@@ -166,6 +174,7 @@ export default function App() {
         )}
         {/* Files, terminals and agent chats share one tab area. */}
         <main className="main">
+          <TrustBanner />
           <EditorArea />
         </main>
       </div>

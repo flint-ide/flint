@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/yuin/goldmark"
@@ -38,6 +39,21 @@ func Markdown(src string) (string, error) {
 		return "", fmt.Errorf("render markdown: %w", err)
 	}
 	return b.String(), nil
+}
+
+// remoteImg matches goldmark's <img> tags with a remote source.
+var remoteImg = regexp.MustCompile(`<img src="(https?://)`)
+
+// MarkdownBlockingRemote renders src like Markdown but keeps remote images
+// from loading: their address moves to data-remote-src, and the preview
+// loads them only when asked (a file's tracking pixel would otherwise learn
+// who opened it, and when).
+func MarkdownBlockingRemote(src string) (string, error) {
+	html, err := Markdown(src)
+	if err != nil {
+		return "", err
+	}
+	return remoteImg.ReplaceAllString(html, `<img data-remote-src="$1`), nil
 }
 
 // Image is an image file ready for an <img>.

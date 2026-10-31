@@ -18,7 +18,21 @@ interface Props {
 export function MarkdownPreview({ path, source, topLine }: Props) {
   const [html, setHtml] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [remoteLoaded, setRemoteLoaded] = useState(false)
   const box = useRef<HTMLDivElement>(null)
+  const blocked = !remoteLoaded && html.includes('data-remote-src=')
+
+  // Remote images arrive without src (Go moved it aside): a file opened in
+  // Flint must not tell a tracker who opened it. One click loads them.
+  const loadRemote = () => setRemoteLoaded(true)
+  useEffect(() => setRemoteLoaded(false), [path])
+  useEffect(() => {
+    if (!remoteLoaded) return
+    for (const img of box.current?.querySelectorAll<HTMLImageElement>('img[data-remote-src]') ?? []) {
+      const src = img.dataset.remoteSrc ?? ''
+      if (/^https?:\/\//i.test(src)) img.src = src
+    }
+  }, [html, remoteLoaded])
 
   useEffect(() => {
     let cancelled = false
@@ -83,5 +97,15 @@ export function MarkdownPreview({ path, source, topLine }: Props) {
   }
 
   if (error) return <div className="placeholder error">{error}</div>
-  return <div ref={box} className="markdown-preview" onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />
+  return (
+    <>
+      {blocked && (
+        <div className="preview-remote-bar">
+          Remote images are blocked so the file can't track you.
+          <button className="link" onClick={loadRemote}>Load remote images</button>
+        </div>
+      )}
+      <div ref={box} className="markdown-preview" onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />
+    </>
+  )
 }

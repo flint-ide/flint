@@ -37,8 +37,12 @@ type Connection struct {
 	User     string `json:"user"`
 	// Protocol selects the ClickHouse transport (ProtocolNative or ProtocolHTTP); unused for Postgres.
 	Protocol string `json:"protocol"`
-	// TLS enables encrypted transport (Postgres sslmode=require, ClickHouse secure native port).
+	// TLS enables encrypted transport with the server's certificate and host
+	// name verified (Postgres sslmode=verify-full, ClickHouse secure ports).
 	TLS bool `json:"tls"`
+	// TLSInsecure skips that verification (self-signed or private CAs): the
+	// traffic is encrypted but a man in the middle can read it.
+	TLSInsecure bool `json:"tlsInsecure"`
 	// ReadOnly makes Flint refuse statements that modify data.
 	ReadOnly bool `json:"readOnly"`
 }

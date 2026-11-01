@@ -133,8 +133,14 @@ var ErrBusy = errors.New("the agent is still working on the previous message")
 type Manager struct {
 	emitRaw func(Event)
 
-	seqMu sync.Mutex
-	seq   map[string]uint64
+	seqMu     sync.Mutex
+	seq       map[string]uint64
+	pending   map[string]map[string]bool // session → its unanswered permission requests
+	logs      map[string]*sessionLog     // session → its latest events (eventlog.go)
+	logLimits LogLimits
+
+	hookMu sync.Mutex
+	hook   func(sessionID string) // SetStateHook
 
 	mu       sync.Mutex
 	drivers  map[string]Driver
@@ -154,7 +160,7 @@ type managed struct {
 // NewManager creates a manager that forwards events to emit.
 func NewManager(emit func(Event)) *Manager {
 	return &Manager{
-		emitRaw: emit, seq: map[string]uint64{},
+		emitRaw: emit, seq: map[string]uint64{}, pending: map[string]map[string]bool{}, logs: map[string]*sessionLog{},
 		drivers: map[string]Driver{}, sessions: map[string]*managed{}, policy: DefaultPolicy(),
 	}
 }
@@ -167,6 +173,9 @@ func (m *Manager) emit(e Event) {
 	m.seq[e.SessionID]++
 	e.Seq = m.seq[e.SessionID]
 	m.emitRaw(e)
+	if m.record(e) {
+		m.stateChanged(e.SessionID)
+	}
 }
 
 // Register makes a driver available under name ("claude", "codex", ...). A
@@ -307,6 +316,7 @@ func (m *Manager) open(agent, cwd string, fn func(Driver, Sink) (SessionInfo, er
 		m.retired = append(m.retired, d)
 	}
 	m.mu.Unlock()
+	m.stateChanged(info.ID)
 	return info, nil
 }
 
@@ -364,6 +374,7 @@ func (m *Manager) Prompt(sessionID, text string, attachments []Attachment) error
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 	m.mu.Unlock()
+	m.stateChanged(sessionID)
 
 	go func() {
 		defer cancel()
@@ -371,6 +382,7 @@ func (m *Manager) Prompt(sessionID, text string, attachments []Attachment) error
 		m.mu.Lock()
 		s.cancel = nil
 		m.mu.Unlock()
+		m.stateChanged(sessionID)
 		if err != nil && ctx.Err() == nil {
 			// Drivers emit KindError/KindTurnEnd themselves; this covers early failures.
 			m.emit(Event{SessionID: sessionID, Kind: KindError, Text: err.Error()})
@@ -418,6 +430,8 @@ func (m *Manager) Stop(sessionID string) error {
 	if s == nil {
 		return nil
 	}
+	m.forget(sessionID)
+	m.stateChanged(sessionID)
 	if cancel != nil {
 		cancel()
 	}
@@ -437,6 +451,7 @@ func (m *Manager) Close() error {
 	}
 	m.sessions = map[string]*managed{}
 	m.mu.Unlock()
+	m.SetLogLimits(LogLimits{}) // frees every log
 	// Drivers drain and kill their processes with grace periods; do it in parallel
 	// so quitting Flint doesn't wait for each agent in turn.
 	var wg sync.WaitGroup

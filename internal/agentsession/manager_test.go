@@ -19,6 +19,7 @@ type fakeDriver struct {
 	release   chan struct{}     // closed to let the turn finish
 	stopped   []string
 	answered  chan string
+	id        string // session id Start returns ("" = "s1")
 }
 
 func newFake(permKind string, paths ...string) *fakeDriver {
@@ -31,8 +32,12 @@ func newFake(permKind string, paths ...string) *fakeDriver {
 func (f *fakeDriver) Start(_ context.Context, cwd string, sink Sink) (SessionInfo, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.sinks["s1"] = sink
-	return SessionInfo{ID: "s1", Cwd: cwd}, nil
+	id := f.id
+	if id == "" {
+		id = "s1"
+	}
+	f.sinks[id] = sink
+	return SessionInfo{ID: id, Cwd: cwd}, nil
 }
 
 func (f *fakeDriver) Prompt(ctx context.Context, id, text string, _ []Attachment) (string, error) {

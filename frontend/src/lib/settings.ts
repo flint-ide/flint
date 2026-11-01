@@ -13,6 +13,7 @@ import {
   type CompletionSettings, type InlineEditSettings,
 } from './editorAiSettings'
 import { coerceAgentTasks, DEFAULT_AGENT_TASKS, type AgentTaskSettings } from './agentTasks'
+import { coerceUsage, DEFAULT_USAGE, type UsageSettings } from './usageSettings'
 
 import type { ResolvedTheme, ThemeMode } from './themeMode'
 
@@ -71,6 +72,8 @@ export interface AppSettings {
   inlineEdit: InlineEditSettings
   /** Where agent task worktrees go and how their branches start. */
   agentTasks: AgentTaskSettings
+  /** Usage dashboard: retention, budgets and prices for estimates. */
+  usage: UsageSettings
 }
 
 /** Mirrors settings.Default() in Go (used until the backend answers). */
@@ -94,6 +97,7 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   completions: DEFAULT_COMPLETIONS,
   inlineEdit: DEFAULT_INLINE_EDIT,
   agentTasks: DEFAULT_AGENT_TASKS,
+  usage: DEFAULT_USAGE,
 }) as AppSettings
 
 /** Same limits as Go's settings.Validate, for the inputs. */
@@ -206,5 +210,6 @@ export function coerceSettings(v: unknown): AppSettings {
     completions: coerceCompletions(v.completions),
     inlineEdit: coerceInlineEdit(v.inlineEdit),
     agentTasks: coerceAgentTasks(v.agentTasks),
+    usage: coerceUsage(v.usage),
   }
 }

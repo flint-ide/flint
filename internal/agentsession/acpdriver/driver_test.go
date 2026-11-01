@@ -2,6 +2,7 @@ package acpdriver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -115,6 +116,38 @@ func TestChatTurnWithPermission(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(file); string(data) != "patched\n" {
 		t.Errorf("file = %q, want the approved write", data)
+	}
+}
+
+// Flint's MCP server goes into session/new only for agents that can speak
+// HTTP MCP, and only when the provider offers one.
+func TestMCPServersInNewSession(t *testing.T) {
+	offer := as.MCPProvider(func(cwd string) (as.MCPServer, bool) {
+		return as.MCPServer{URL: "http://127.0.0.1:9/mcp", Token: "tok"}, cwd == "/p"
+	})
+	got := mcpServers(acp.MCPCapabilities{HTTP: true}, offer, "/p")
+	want := `{"type":"http","name":"flint","url":"http://127.0.0.1:9/mcp","headers":[{"name":"Authorization","value":"Bearer tok"}]}`
+	if len(got) != 1 || string(got[0]) != want {
+		t.Fatalf("mcpServers = %s", got)
+	}
+	for name, servers := range map[string][]json.RawMessage{
+		"no http":     mcpServers(acp.MCPCapabilities{SSE: true}, offer, "/p"),
+		"not offered": mcpServers(acp.MCPCapabilities{HTTP: true}, offer, "/q"),
+		"no provider": mcpServers(acp.MCPCapabilities{HTTP: true}, nil, "/p"),
+	} {
+		if servers == nil || len(servers) != 0 {
+			t.Errorf("%s: %s (must be an empty list, never null)", name, servers)
+		}
+	}
+	// The fake agent advertises HTTP MCP and accepts the server.
+	opts := fakeOpts(t, "")
+	opts.MCP = func(string) (as.MCPServer, bool) {
+		return as.MCPServer{URL: "http://127.0.0.1:9/mcp", Token: "tok"}, true
+	}
+	d := New(opts)
+	t.Cleanup(func() { _ = d.Close() })
+	if _, err := d.Start(testCtx(t), t.TempDir(), func(as.Event) {}); err != nil {
+		t.Fatal(err)
 	}
 }
 

@@ -19,7 +19,7 @@ This guide covers building, running and testing Flint from source. For how the c
 Optional tools, used by the features that need them:
 
 - `ripgrep` (`brew install ripgrep`): fast search and `⌘P`; without it a slower Go fallback is used
-- `kubectl`, `docker`, `aws` (and `saml2aws` if you use it): the infrastructure panels
+- `kubectl`, `aws` (and `saml2aws` if you use it): the infrastructure panels; `docker` only for Compose up/down/pull (the Docker panel talks to the Engine API)
 - `dlv` (`go install github.com/go-delve/delve/cmd/dlv@latest`): the debugger
 - language servers (`gopls`, `rust-analyzer`, `vtsls` or `typescript-language-server`, `basedpyright` or `pyright`)
 - `claude` and/or `codex`: the agent chat
@@ -152,13 +152,13 @@ What differs per system is listed in [ARCHITECTURE.md](ARCHITECTURE.md#platforms
 
 ```bash
 make test                                  # Go (race) + frontend (tsc + node --test)
-make test-db-up && make test-integration   # Postgres + ClickHouse (TCP and HTTP) in Docker
+make test-db-up && make test-integration   # Postgres + ClickHouse in Docker
 make test-db-down
 ```
 
 - `make test-go`: `go test ./internal/... -race -cover`.
 - `make test-web`: `npm run typecheck` (`tsc --noEmit`) and `npm test` (`go run ../cmd/webbuild --test`, which compiles `src/**/*.test.ts(x)` to a temporary directory and runs `node --test`). Tests use `node:test` and `node:assert`; there is no jest or vitest.
-- `make test-integration`: Go tests with the `integration` build tag against throwaway Postgres 16 and ClickHouse 24.8 containers started by `make test-db-up`. Ports default to 55432 (Postgres), 59000 (ClickHouse native) and 58123 (ClickHouse HTTP) and can be changed with `PG_PORT`, `CH_PORT` and `CH_HTTP_PORT`.
+- `make test-integration`: Go tests with the `integration` build tag against throwaway Postgres 16 and ClickHouse 24.8 containers started by `make test-db-up`. Ports default to 55432 (Postgres) and 58123 (ClickHouse HTTP, the only ClickHouse port Flint uses) and can be changed with `PG_PORT` and `CH_HTTP_PORT`. The ClickHouse tests read `FLINT_TEST_CH_HTTP`. They cover exact 64-bit and Decimal values, per-console sessions, cancellation (checked in `system.processes`) and errors in the middle of a stream.
 - GitHub tests use `internal/github/githubtest`, a fake GitHub (REST, GraphQL, device flow and a separate host for redirected job logs) on a loopback `httptest` server, so they never contact GitHub. Account tests use a fake keyring, never the real Keychain.
 
 ## Benchmark

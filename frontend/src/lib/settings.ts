@@ -18,6 +18,7 @@ import { coercePromptSettings, DEFAULT_PROMPT_SETTINGS, type PromptSettings } fr
 import { coerceAgentReview, DEFAULT_AGENT_REVIEW, type AgentReviewSettings } from './reviewSettings'
 import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
 import { coerceGitHub, DEFAULT_GITHUB, type GitHubSettings } from './githubSettings'
+import { coerceDocker, DEFAULT_DOCKER, type DockerSettings } from './dockerSettings'
 
 import type { ResolvedTheme, ThemeMode } from './themeMode'
 
@@ -88,6 +89,8 @@ export interface AppSettings {
   ci: CISettings
   /** GitHub host, the OAuth App Flint signs in with, scopes and the retry wait (lib/githubSettings.ts). */
   github: GitHubSettings
+  /** How the Docker panel reaches the engine (lib/dockerSettings.ts). */
+  docker: DockerSettings
 }
 
 /** Mirrors settings.Default() in Go (used until the backend answers). */
@@ -117,6 +120,7 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   agentReview: DEFAULT_AGENT_REVIEW,
   ci: DEFAULT_CI,
   github: DEFAULT_GITHUB,
+  docker: DEFAULT_DOCKER,
 }) as AppSettings
 
 /** Same limits as Go's settings.Validate, for the inputs. */
@@ -238,5 +242,6 @@ export function coerceSettings(v: unknown): AppSettings {
     agentReview: coerceAgentReview(v.agentReview),
     ci: coerceCI(v.ci),
     github: coerceGitHub(v.github),
+    docker: coerceDocker(v.docker),
   }
 }

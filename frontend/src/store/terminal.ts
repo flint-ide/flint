@@ -26,6 +26,14 @@ export interface TerminalTab {
   env?: Record<string, string>
   /** Shown first in the tab name ("aws:prod"). */
   tag?: string
+  /** The tab shows a container's log or a shell in it (Docker Engine API stream), not a local shell. */
+  docker?: DockerSource
+}
+
+/** What a Docker tab is attached to. */
+export interface DockerSource {
+  kind: 'logs' | 'shell'
+  container: string
 }
 
 export interface CreateOptions {
@@ -38,6 +46,7 @@ export interface CreateOptions {
   project?: string
   env?: Record<string, string>
   tag?: string
+  docker?: DockerSource
 }
 
 interface TerminalState {
@@ -57,7 +66,7 @@ export const useTerminal = createStore<TerminalState>((set, get) => ({
     const title = opts.title ?? terminalTitle({ command: '', cwd, tag: opts.tag })
     const tab: TerminalTab = {
       id, title, pinned: opts.title !== undefined, command: '', cwd, exitCode: null, initialInput: opts.input, restored: opts.restored, project: opts.project ?? cwd,
-      env: opts.env, tag: opts.tag,
+      env: opts.env, tag: opts.tag, docker: opts.docker,
     }
     set((s) => ({ tabs: [...s.tabs, tab] }))
     useEditor.getState().openTerminal(id, title, opts.background)

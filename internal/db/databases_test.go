@@ -191,12 +191,6 @@ func TestKeyForResolvesDefault(t *testing.T) {
 	}
 }
 
-func TestClickHouseProtocol(t *testing.T) {
-	if clickhouseProtocol(ProtocolHTTP).String() != "http" || clickhouseProtocol("").String() != "native" {
-		t.Errorf("protocols = %s / %s", clickhouseProtocol(ProtocolHTTP), clickhouseProtocol(""))
-	}
-}
-
 // fakeClock drives Manager.now so idle eviction is tested without sleeping.
 type fakeClock struct {
 	mu sync.Mutex

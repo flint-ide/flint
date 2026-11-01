@@ -27,27 +27,17 @@ func TestConnectionNormalized(t *testing.T) {
 		{
 			name: "clickhouse plain port",
 			in:   Connection{Driver: ClickHouse, Host: "ch", Name: "  Prod CH "},
-			want: Connection{Driver: ClickHouse, Host: "ch", Port: 9000, Name: "Prod CH", Protocol: ProtocolNative},
+			want: Connection{Driver: ClickHouse, Host: "ch", Port: 8123, Name: "Prod CH"},
 		},
 		{
 			name: "clickhouse tls port",
 			in:   Connection{Driver: ClickHouse, Host: "ch", TLS: true, Name: "x"},
-			want: Connection{Driver: ClickHouse, Host: "ch", TLS: true, Port: 9440, Name: "x", Protocol: ProtocolNative},
+			want: Connection{Driver: ClickHouse, Host: "ch", TLS: true, Port: 8443, Name: "x"},
 		},
 		{
-			name: "clickhouse http port",
-			in:   Connection{Driver: ClickHouse, Host: "ch", Protocol: ProtocolHTTP, Name: "x"},
-			want: Connection{Driver: ClickHouse, Host: "ch", Port: 8123, Name: "x", Protocol: ProtocolHTTP},
-		},
-		{
-			name: "clickhouse https port",
-			in:   Connection{Driver: ClickHouse, Host: "ch", Protocol: ProtocolHTTP, TLS: true, Name: "x"},
-			want: Connection{Driver: ClickHouse, Host: "ch", Port: 8443, TLS: true, Name: "x", Protocol: ProtocolHTTP},
-		},
-		{
-			name: "protocol dropped for postgres",
-			in:   Connection{Driver: Postgres, Host: "h", Protocol: ProtocolHTTP, Name: "x"},
-			want: Connection{Driver: Postgres, Host: "h", Port: 5432, Name: "x"},
+			name: "clickhouse custom http port kept",
+			in:   Connection{Driver: ClickHouse, Host: "ch", Port: 18123, Name: "x"},
+			want: Connection{Driver: ClickHouse, Host: "ch", Port: 18123, Name: "x"},
 		},
 		{
 			name: "explicit port kept",
@@ -86,8 +76,6 @@ func TestConnectionValidate(t *testing.T) {
 		{"port too big", func(c Connection) Connection { c.Port = 65536; return c }, "invalid port 65536"},
 		{"no user", func(c Connection) Connection { c.User = ""; return c }, "user is required"},
 		{"no database is fine", func(c Connection) Connection { c.Database = ""; return c }, ""},
-		{"clickhouse http", func(c Connection) Connection { c.Driver, c.Protocol = ClickHouse, ProtocolHTTP; return c }, ""},
-		{"clickhouse bad protocol", func(c Connection) Connection { c.Driver, c.Protocol = ClickHouse, "grpc"; return c }, `unsupported clickhouse protocol "grpc"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

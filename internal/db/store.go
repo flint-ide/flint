@@ -61,9 +61,11 @@ type Store struct {
 // OpenStore loads profiles from dir/connections.json.
 func OpenStore(dir string, secrets Secrets) (*Store, error) {
 	s := &Store{path: filepath.Join(dir, "connections.json"), secrets: secrets}
-	if err := config.LoadJSON(s.path, &s.conns); err != nil {
+	conns, err := loadConnections(dir, s.path)
+	if err != nil {
 		return nil, err
 	}
+	s.conns = conns
 	return s, nil
 }
 

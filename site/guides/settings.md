@@ -8,7 +8,7 @@ Flint's settings open in a tab. Every change applies immediately, without a rest
 - **flint ▸ Settings…** in the menu bar
 - "Settings…" in the command palette
 
-The tab has fourteen sections: Appearance, Editor, Terminal, Agents, Agent Context, Usage, AI in the Editor, Language Servers, Refresh, CI, TODO List, Keymap, Updates and Import.
+The tab has fifteen sections: Appearance, Editor, Terminal, Agents, Agent Context, Usage, AI in the Editor, Language Servers, Refresh, Docker, CI, TODO List, Keymap, Updates and Import.
 
 ## Appearance
 
@@ -101,6 +101,10 @@ How often panels that poll re-read their data while they are shown:
 - **AWS panel**: 5 to 3600 seconds (default 30).
 
 Git status, Docker and pull requests update on their own, without polling.
+
+## Docker
+
+How the Docker panel reaches the engine: an optional **Host** (empty finds the engine like the docker CLI does) and how many **Log lines** a container's log tab starts with (1 to 10000, default 500). See [docker](../reference/settings.md#docker).
 
 ## CI
 

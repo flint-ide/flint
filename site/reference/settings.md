@@ -86,7 +86,8 @@ The file is readable only by your user. It never contains secrets: database pass
   },
   "agentReview": { "scope": "selected", "maxDiffKB": 128, "agent": "", "timeoutSeconds": 300 },
   "ci": { "pollSeconds": 60, "logTailLines": 80, "logErrorLines": 40, "notify": true },
-  "github": { "host": "github.com", "clientId": "", "scopes": ["repo", "read:org", "workflow"], "maxRetryWaitSeconds": 60 }
+  "github": { "host": "github.com", "clientId": "", "scopes": ["repo", "read:org", "workflow"], "maxRetryWaitSeconds": 60 },
+  "docker": { "host": "", "logTailLines": 500 }
 }
 ```
 
@@ -118,6 +119,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
 | `ci` | object | see below | Following your pull requests' CI: poll interval, Fix with agent's log excerpt, notifications. See [ci](#ci). |
 | `github` | object | see below | The GitHub host, the OAuth App Sign in with GitHub uses, scopes and the retry wait. See [github](#github). |
+| `docker` | object | see below | How the Docker panel finds the engine and how much log it starts with. See [docker](#docker). |
 
 ### Font objects
 
@@ -348,6 +350,17 @@ Used by [Pull requests](../guides/git-and-github.md#pull-requests) and [When CI 
 | `maxRetryWaitSeconds` | integer (s) | 0–300 | `60` | When GitHub answers "retry after" (a secondary rate limit), a read waits that long and tries once more if the wait is at most this; otherwise, and for writes, the limit is reported. |
 
 Flint caps a GitHub answer at 32 MB, a file side of a diff at 4 MB and the pages one listing follows at 30; these limits are not settings.
+
+### docker
+
+Used by the [Docker panel](../guides/docker.md).
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `host` | string | | `""` | Where the Docker Engine is: `unix:///path/docker.sock`, `tcp://host:2376` or `https://host:2376`. Empty finds it like the docker CLI: `DOCKER_HOST`, then the current docker context, then the default sockets (Docker Desktop, Colima, OrbStack, Rancher Desktop, `/var/run/docker.sock`). With `DOCKER_TLS_VERIFY` set, `tcp://` uses TLS with the certificates in `DOCKER_CERT_PATH` (default `~/.docker`). Plain `tcp://` without TLS works but Flint warns in the panel. `ssh://` hosts are not supported. |
+| `logTailLines` | integer | 1–10000 | `500` | Past lines a container's log tab starts with before it follows new output. |
+
+Response bodies from the engine are capped at 32 MiB; this limit is not a setting.
 
 ## Related settings stored elsewhere
 

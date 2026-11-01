@@ -35,8 +35,8 @@ flowchart LR
     acct["accounts: device flow · tokens in the keyring"]
     lsp["lsp (JSON-RPC)"]
     ag["agentsession: claude · codex · acp"]
-    term["terminal (PTY)"]
-    db["db: pgx · clickhouse-go"]
+    term["terminal (PTY · streams)"]
+    db["db: pgx · clickhouse (HTTP, net/http)"]
     http["httpfile: .http files · net/http"]
     infra["docker · awsprof · kube"]
     cfg["config · scratch · OS keyring · diag (log)"]
@@ -48,7 +48,8 @@ flowchart LR
     ghapi[("GitHub API (github.com or Enterprise)")]
     agents["claude -p stream-json · codex app-server · ACP agents (stdio)"]
     shell["login shell (zsh)"]
-    clis["docker · aws · kubectl"]
+    clis["docker compose · aws · kubectl"]
+    sock["Docker Engine API socket"]
     dbs[("PostgreSQL · ClickHouse")]
     apis[("Your APIs (HTTP)")]
   end
@@ -60,6 +61,7 @@ flowchart LR
   ag --> agents
   term --> shell
   infra --> clis
+  infra --> sock
   db --> dbs
   http --> apis
 ```
@@ -261,7 +263,7 @@ Markdown files, PR descriptions and comments, HTTP responses and terminal output
 
 ### CLI argument validation
 
-Flint drives many CLIs (git, docker, kubectl, aws, saml2aws, claude, codex). Names and identifiers that come from the UI or from external output (container names, contexts, namespaces, pod names) are validated before they are passed to a command, and user strings are never passed in a position where they could be read as a flag. Text for GitHub (comments, reviews) goes in JSON request bodies; owners, repositories, numbers, run, job and thread ids from the web view are validated (and thread ids must belong to the pull request) before a URL is built, and every path segment is escaped. Every kubectl call passes explicit `--context` and `--namespace`.
+Flint drives many CLIs (git, docker compose, kubectl, aws, saml2aws, claude, codex). Names and identifiers that come from the UI or from external output (container names, contexts, namespaces, pod names) are validated before they are passed to a command, and user strings are never passed in a position where they could be read as a flag. Text for GitHub (comments, reviews) goes in JSON request bodies; owners, repositories, numbers, run, job and thread ids from the web view are validated (and thread ids must belong to the pull request) before a URL is built, and every path segment is escaped. Every kubectl call passes explicit `--context` and `--namespace`.
 
 ### Secrets
 
@@ -292,7 +294,7 @@ Paths are the macOS ones. On Linux, `~/Library/Application Support/flint` is `$X
 |---|---|---|
 | Recent folders, agent permission policy, trusted folders, whether the first-run tool check was shown, update check (last check time, the latest release found, the skipped version), signed-in accounts (provider, host, login, name, avatar URL, scopes; no token) | `~/Library/Application Support/flint/state.json` | the preferred agent stored here before `settings.json` existed is read from it until you pick a default in Settings |
 | Settings: theme, editor and terminal fonts, default agent, autosave, shortcut overrides (`keymap`: command id → shortcut, `""` = none), agent CLIs (`agents`), custom ACP agents (`customAgents`: id, name, command, arguments), language servers (`languageServers`), panel refresh intervals (`refresh`) | `~/Library/Application Support/flint/settings.json` | has a schema version; missing keys get defaults, unknown keys are ignored, invalid values are replaced with defaults on load (writes validate strictly); `0600`; **no secrets**. A copy for the first render lives in `localStorage` (`flint.settings`) |
-| Database connection profiles (host, port, user, optional default database, ClickHouse protocol `native`/`http`, TLS, read-only) | `~/Library/Application Support/flint/connections.json` | **no passwords**, mode `0600` |
+| Database connection profiles (host, port, user, optional default database, TLS, read-only) | `~/Library/Application Support/flint/connections.json` | **no passwords**, mode `0600` |
 | Database passwords | OS keyring (Keychain / Secret Service), service `flint-db`, account = connection id | deleted together with the profile |
 | Scratchpads (SQL consoles, notes) | `~/Library/Application Support/flint/scratch/`: `index.json` (including the selected connection `connId` and database `database`; empty = the profile default) plus `<id>.sql/.md/.txt` | autosaved |
 | Query history | `~/Library/Application Support/flint/history/<connection id>.jsonl`: one JSON line per statement (database, SQL, time, duration, rows, error, kind: query / explain / edit) | last 5000 per connection, `0600`. Appended with a single `write` using `O_APPEND`; when the file grows 25% past the limit, Go rewrites it atomically without the oldest entries (a truncated last line is skipped on load). No connection profiles or passwords; passwords in statements are masked. Deleted with the profile or with "Clear History…" |
@@ -342,6 +344,7 @@ internal/ripgrep            locating the rg binary
 internal/preview            Markdown rendering (goldmark) and image reading for preview tabs
 internal/todo               TODO / FIXME / HACK / XXX / BUG markers
 internal/httpfile           .http files: parser, variables and environments, sending (net/http), response history, curl
+internal/clickhouse         ClickHouse HTTP client on net/http: streaming rows, exact types, errors, KILL QUERY
 internal/db                 connection profiles, Keychain, pgx/clickhouse, type normalization, query history,
                             EXPLAIN (Postgres plan parser, warnings), row editing by primary key
 internal/scratch            persistent scratchpads
@@ -349,7 +352,7 @@ internal/config             on-disk locations, atomic JSON writes
 internal/settings           settings.json: settings, defaults, validation, schema version, custom theme
 internal/vscodeimport       Import from VS Code / Cursor / VSCodium: JSONC, settings, keybindings and color theme
                             mapped onto settings (read-only; ImportAPI previews, then saves through settings)
-internal/terminal           PTY, output coalescing, shell cwd (proc_pidinfo)
+internal/terminal           PTY, output coalescing, shell cwd (proc_pidinfo); stream-backed sessions (Docker logs and container shells)
 internal/runconfig          .flint/run.json: schema, validation, save, detection (Go main, make, npm)
 internal/runner             configuration and test processes: steps, PTY or pipes, process group, Stop
 internal/testrun            test run plans, go test -json and TAP parsers, tests in a file (gutter)
@@ -362,7 +365,7 @@ internal/github             GitHub REST/GraphQL client: repository from remotes,
                             resolve, review, checkout, create, a branch's checks (conditional requests), runs, failed-step logs (tail-bounded),
                             rerunning failed jobs, Identify and the GitHub CLI token import; githubtest is a fake GitHub for tests and cmd/fakegithub
 internal/cilog              CI logs for the agent: parse --log-failed output, excerpt the failing step, map file:line references to the workspace
-internal/docker             docker CLI: Compose projects, containers, events
+internal/docker             Docker Engine API (unix socket or TLS): endpoint discovery, version negotiation, containers, logs, exec shell, events; Compose via the CLI
 internal/awsprof            AWS CLI profiles, credential status, login and refresh
 internal/kube               kubectl: contexts, namespaces, resources, apps, rollout state, diagnosis
 internal/diag               Flint's log file, bug report and diagnostics
@@ -390,6 +393,7 @@ For data storage details see [Where Flint stores data](#where-flint-stores-data)
 
 - At runtime Flint downloads nothing from npm (no `npx`). Agents and LSP servers are your installed binaries.
 - GitHub is called with the standard library (`net/http`, `encoding/json`), no GitHub client library and no `gh`. Tests use `internal/github/githubtest`, a fake GitHub on a loopback port, so they never connect to GitHub.
+- ClickHouse has no driver module: `internal/clickhouse` speaks its HTTP interface on `net/http` (the native-protocol driver pulled in 14 more modules: a production build now lists 14 dependencies, down from 28). The only Go database module left is `pgx`.
 - pprof profiles are read with `github.com/google/pprof/profile` (a Go module that uses only the standard library). The flame graph and its layout are Flint's own code, with no npm dependency.
 - Frontend: `frontend/.npmrc` disables install scripts (`ignore-scripts=true`) and enforces exact versions, and the build uses `npm ci --ignore-scripts`.
 - Frontend dependencies are limited to React, CodeMirror (single author, no `@codemirror/merge`), xterm.js (core + WebGL renderer), the Wails runtime, and TypeScript plus React types for type checking: 43 packages in `node_modules` in total (down from 145). The bundler (esbuild through its Go API) and the test runner (`node --test`) do not come from npm. State management, list virtualization, terminal fitting, terminal links, diffs and fuzzy matching are Flint's own code.

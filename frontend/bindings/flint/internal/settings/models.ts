@@ -396,6 +396,44 @@ export class CustomTheme {
 }
 
 /**
+ * Docker configures how the Docker panel reaches the engine.
+ */
+export class Docker {
+    /**
+     * Host overrides where the Docker Engine is: "unix:///path/docker.sock",
+     * "tcp://host:2376" (TLS from DOCKER_CERT_PATH when DOCKER_TLS_VERIFY is
+     * set) or "https://host:2376". Empty follows DOCKER_HOST, the current
+     * docker context and the default sockets, like the docker CLI.
+     */
+    "host": string;
+
+    /**
+     * LogTailLines is how many past lines a container's log tab starts with.
+     */
+    "logTailLines": number;
+
+    /** Creates a new Docker instance. */
+    constructor($$source: Partial<Docker> = {}) {
+        if (!("host" in $$source)) {
+            this["host"] = "";
+        }
+        if (!("logTailLines" in $$source)) {
+            this["logTailLines"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Docker instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Docker {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Docker($$parsedSource as Partial<Docker>);
+    }
+}
+
+/**
  * EditorSettings is the editor's font plus editing behaviour.
  */
 export class EditorSettings {
@@ -899,6 +937,11 @@ export class Settings {
      */
     "github": GitHub;
 
+    /**
+     * Docker configures how the Docker panel reaches the engine (docker.go).
+     */
+    "docker": Docker;
+
     /** Creates a new Settings instance. */
     constructor($$source: Partial<Settings> = {}) {
         if (!("version" in $$source)) {
@@ -976,6 +1019,9 @@ export class Settings {
         if (!("github" in $$source)) {
             this["github"] = (new GitHub());
         }
+        if (!("docker" in $$source)) {
+            this["docker"] = (new Docker());
+        }
 
         Object.assign(this, $$source);
     }
@@ -1003,6 +1049,7 @@ export class Settings {
         const $$createField22_0 = $$createType19;
         const $$createField23_0 = $$createType20;
         const $$createField24_0 = $$createType21;
+        const $$createField25_0 = $$createType22;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -1060,6 +1107,9 @@ export class Settings {
         }
         if ("github" in $$parsedSource) {
             $$parsedSource["github"] = $$createField24_0($$parsedSource["github"]);
+        }
+        if ("docker" in $$parsedSource) {
+            $$parsedSource["docker"] = $$createField25_0($$parsedSource["docker"]);
         }
         return new Settings($$parsedSource as Partial<Settings>);
     }
@@ -1136,7 +1186,7 @@ export class Usage {
      * Creates a new Usage instance from a string or object.
      */
     static createFrom($$source: any = {}): Usage {
-        const $$createField1_0 = $$createType23;
+        const $$createField1_0 = $$createType24;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("prices" in $$parsedSource) {
             $$parsedSource["prices"] = $$createField1_0($$parsedSource["prices"]);
@@ -1168,5 +1218,6 @@ const $$createType18 = Prompts.createFrom;
 const $$createType19 = AgentReview.createFrom;
 const $$createType20 = CI.createFrom;
 const $$createType21 = GitHub.createFrom;
-const $$createType22 = usage$0.Price.createFrom;
-const $$createType23 = $Create.Map($Create.Any, $$createType22);
+const $$createType22 = Docker.createFrom;
+const $$createType23 = usage$0.Price.createFrom;
+const $$createType24 = $Create.Map($Create.Any, $$createType23);

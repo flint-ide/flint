@@ -15,6 +15,7 @@ import {
 } from '../../store/terminal'
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
+import * as DockerBackend from '../../../bindings/flint/dockerapi'
 import { findPathLinks, resolvePath } from '../../lib/pathLinks'
 import { showToast } from '../../store/dialog'
 import { errorMessage } from '../../api/backend'
@@ -118,7 +119,7 @@ export function TerminalView({ tab, active }: Props) {
 
     // The PTY outlives this view (remounts, StrictMode); it is closed with the tab.
     if (claimStart(tab.id)) {
-      TerminalBackend.Start(tab.id, tab.cwd, xterm.cols, xterm.rows, tab.env ?? {})
+      startSession(tab, xterm.cols, xterm.rows)
         .then(() => tab.initialInput && sendInput(tab.id, `${tab.initialInput}\r`))
         .catch((err) => showToast(`Terminal failed: ${errorMessage(err)}`, 'error'))
     } else {
@@ -230,4 +231,11 @@ function readBuffer(xterm: XTerm, maxLines: number): string {
   }
   while (lines.length > 0 && lines[lines.length - 1].trim() === '') lines.pop()
   return lines.slice(-maxLines).join('\n')
+}
+
+/** Starts what the tab shows: a local shell, or a Docker log / container shell stream. */
+function startSession(tab: TerminalTab, cols: number, rows: number): Promise<void> {
+  if (tab.docker?.kind === 'logs') return DockerBackend.OpenLogs(tab.id, tab.docker.container)
+  if (tab.docker?.kind === 'shell') return DockerBackend.OpenShell(tab.id, tab.docker.container, cols, rows)
+  return TerminalBackend.Start(tab.id, tab.cwd, cols, rows, tab.env ?? {})
 }

@@ -6,19 +6,19 @@ Recipes for the Docker panel. For what it shows, see [Docker](../guides/docker.m
 
 1. Click `⛴` on the activity bar, or run "Docker" from the palette.
 
-You need the `docker` CLI with a running engine (Docker Desktop, Colima or OrbStack).
+You need a running Docker engine (Docker Desktop, Colima, OrbStack or a plain daemon). The `docker` CLI is optional: only Compose **Up**, **Down** and **Pull Images** need it. If Flint doesn't find your engine, set Settings ▸ Docker ▸ Host (for example `unix:///home/me/.colima/default/docker.sock`).
 
 ## Follow a container's logs
 
 1. Double-click a running container, or click its Logs button.
 
-The logs follow in a terminal tab (`docker logs -f`).
+The logs follow in a terminal tab, starting with the container's last 500 lines (Settings ▸ Docker).
 
 ## Open a shell in a container
 
 1. Click `❯_` on a running container, or right-click it and choose **Open Shell**.
 
-Flint opens `docker exec -it` with bash, or sh if bash isn't available.
+Flint opens a shell inside the container in a terminal tab, with bash, or sh if bash isn't available. No CLI is needed.
 
 ## Open a published port in the browser
 
@@ -38,9 +38,9 @@ Flint opens `docker exec -it` with bash, or sh if bash isn't available.
 
 1. Find the project in the panel. Flint lists projects from running containers and from `compose.yaml` / `docker-compose.yml` files in your project folders.
 2. Right-click it, or use the buttons on its row:
-   - **Up** runs `docker compose up -d`;
+   - **Up** runs `docker compose up -d` (needs the `docker` CLI; the button is disabled without it);
    - **Down…** stops and removes the project's containers, after a confirmation;
-   - **Restart**, **Stop** and **Pull Images** do what they say.
+   - **Restart** and **Stop** do what they say and work without the CLI; **Pull Images** needs it.
 
 ## Copy a container ID
 

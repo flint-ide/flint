@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { dockerTree, logsCommand, shellCommand, statusOf, type ComposeProject, type Container } from './dockerTree'
+import { dockerTree, statusOf, validContainerRef, rowClass, type ComposeProject, type Container } from './dockerTree'
 
 const c = (name: string, state: string, project = '', service = '', workingDir = ''): Container =>
   ({ id: name, name, image: 'x', state, status: '', ports: [], created: '', project, service, configFiles: '', workingDir }) as unknown as Container
@@ -21,12 +21,13 @@ describe('docker tree', () => {
     assert.equal(statusOf({ state: 'exited', status: 'Exited (1)' }), 'stopped')
   })
 
-  it('builds shell commands only for valid names', () => {
-    assert.equal(logsCommand('shop-db-1', 100), 'docker logs -f --tail 100 shop-db-1')
-    assert.match(shellCommand('shop-db-1') ?? '', /^docker exec -it shop-db-1 sh -c /)
-    for (const bad of ['a; rm -rf ~', '-it', '$(x)', 'a b', '']) {
-      assert.equal(shellCommand(bad), null)
-      assert.equal(logsCommand(bad), null)
-    }
+  it('lays rows out in the sidebar flow, not absolutely over the title bar', () => {
+    assert.equal(rowClass('docker-container', 'indent'), 'tree-row static docker-container indent')
+    assert.equal(rowClass('docker-project', ''), 'tree-row static docker-project')
+  })
+
+  it('accepts only container ids and names the engine accepts', () => {
+    for (const ok of ['shop-db-1', 'abc123', 'a_b.c']) assert.ok(validContainerRef(ok), ok)
+    for (const bad of ['a; rm -rf ~', '-it', '$(x)', 'a b', '', '../x', 'a/b', 'a?b']) assert.ok(!validContainerRef(bad), bad)
   })
 })

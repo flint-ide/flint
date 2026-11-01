@@ -13,12 +13,13 @@ import { EditorAiSection } from './EditorAiSection'
 import { UsageSection } from './UsageSection'
 import { CISection } from './CISection'
 import { AccountsSection } from './AccountsSection'
+import { DockerSection } from './DockerSection'
 import { NumberField, Row, TextField } from './fields'
 import { openVSCodeImport } from '../../store/vscodeImport'
 import { isMac } from '../../lib/platform'
 
 type Section =
-  | 'appearance' | 'editor' | 'terminal' | 'accounts' | 'agents' | 'agentContext' | 'usage' | 'editorAi' | 'lsp' | 'refresh' | 'ci' | 'todo'
+  | 'appearance' | 'editor' | 'terminal' | 'accounts' | 'agents' | 'agentContext' | 'usage' | 'editorAi' | 'lsp' | 'refresh' | 'docker' | 'ci' | 'todo'
   | 'keymap' | 'updates' | 'import'
 
 const SECTIONS: { id: Section; label: string }[] = [
@@ -32,6 +33,7 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: 'editorAi', label: 'AI in the Editor' },
   { id: 'lsp', label: 'Language Servers' },
   { id: 'refresh', label: 'Refresh' },
+  { id: 'docker', label: 'Docker' },
   { id: 'ci', label: 'CI' },
   { id: 'todo', label: 'TODO List' },
   { id: 'keymap', label: 'Keymap' },
@@ -70,6 +72,7 @@ export function SettingsView({ active }: { active: boolean }) {
             <WatchSection />
           </>
         )}
+        {section === 'docker' && <DockerSection />}
         {section === 'ci' && <CISection />}
         {section === 'todo' && <TodoSection />}
         {section === 'keymap' && <KeymapSection active={active} />}

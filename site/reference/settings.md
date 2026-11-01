@@ -8,7 +8,7 @@ Flint stores your preferences in `settings.json`. The [Settings tab](../guides/s
 ~/Library/Application Support/flint/settings.json
 ```
 
-The file is readable only by your user. It never contains secrets: database passwords live in the macOS Keychain, and other credentials stay with the tools that own them.
+The file is readable only by your user. It never contains secrets: database passwords and the completion endpoint's API key live in the macOS Keychain, and other credentials stay with the tools that own them.
 
 > **Note:** Flint reads `settings.json` when it starts. If you edit the file by hand, restart Flint to apply your changes. Changes made in the Settings tab apply immediately; agent settings apply to agent sessions started afterwards.
 
@@ -59,7 +59,17 @@ The file is readable only by your user. It never contains secrets: database pass
     "python": { "disabled": false, "command": "pylsp", "args": [] },
     "rust": { "disabled": true, "command": "", "args": [] }
   },
-  "refresh": { "kubernetesSeconds": 10, "awsSeconds": 60 }
+  "refresh": { "kubernetesSeconds": 10, "awsSeconds": 60 },
+  "completions": {
+    "enabled": true,
+    "provider": "ollama",
+    "endpoint": "http://localhost:11434",
+    "model": "qwen2.5-coder:1.5b-base",
+    "debounceMs": 300,
+    "maxTokens": 64,
+    "contextLines": 100
+  },
+  "inlineEdit": { "contextLines": 60 }
 }
 ```
 
@@ -81,6 +91,8 @@ The file is readable only by your user. It never contains secrets: database pass
 | `customAgents` | array | `[]` | Other agents, spoken to over the Agent Client Protocol. See [customAgents](#customagents). |
 | `languageServers` | object | `{}` | Language servers by language (`"go"`, `"typescript"`, `"python"`, `"rust"`). See [languageServers](#languageservers). |
 | `refresh` | object | see below | How often polling panels re-read their data. See [refresh](#refresh). |
+| `completions` | object | see below | Inline suggestions from a code model (off by default). See [completions](#completions). |
+| `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
 
 ### Font objects
 
@@ -114,6 +126,7 @@ The easiest way to find a command id is Settings ▸ Keymap: hover a command's n
 | Toggle Terminal | `terminal.toggle` |
 | New Terminal | `terminal.new` |
 | Send Selection to Agent | `agent.sendSelection` |
+| Edit Selection with Agent | `agent.inlineEdit` |
 | Run | `run.selected` |
 | Debug | `debug.selected` |
 
@@ -179,6 +192,30 @@ A change made in the Settings tab restarts that language's servers. Servers that
 | `awsSeconds` | integer (s) | 5–3600 | `30` | How often the AWS panel re-reads profiles and credential expiry while it is shown. |
 
 Git status, Docker and pull requests don't poll: they follow change events, and pull requests reload when the window regains focus.
+
+### completions
+
+Ghost-text suggestions in file editors from a fill-in-the-middle code model. See [AI in the editor](../guides/editor-and-navigation.md#ai-in-the-editor).
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `enabled` | boolean | | `false` | Ask for suggestions while you type. Off by default, because it sends the code around the cursor to `endpoint`. |
+| `provider` | string | `"ollama"`, `"openai"` | `"ollama"` | `"ollama"` uses Ollama's `/api/generate` with a suffix; `"openai"` uses an OpenAI-compatible `/v1/completions` with `prompt` and `suffix`. |
+| `endpoint` | string | up to 256 characters | `"http://localhost:11434"` | The server's base URL. `http` only for `localhost`, `127.0.0.1` and `::1`; anything else needs `https`. No credentials, query or fragment. For `"openai"`, `/v1/completions` is added (or `/completions` when the URL already ends in `/v1`). |
+| `model` | string | up to 200 characters | `"qwen2.5-coder:1.5b-base"` | The model name. Letters, digits and `. _ : / @ + -`. |
+| `debounceMs` | integer (ms) | 50–5000 | `300` | Typing pause before a suggestion is asked for. |
+| `maxTokens` | integer | 1–512 | `64` | Longest suggestion. |
+| `contextLines` | integer | 1–1000 | `100` | Lines before and after the cursor that are sent (at most about 20,000 characters each way). |
+
+An API key, if the endpoint needs one, is set in Settings ▸ AI in the Editor and stored in the macOS Keychain (service `flint-completions`), never in this file. It is sent as a bearer token. Code sent to an endpoint that isn't on this machine has secrets redacted first. Each request has a 30-second timeout and a 1 MB answer limit, and redirects are not followed. Each new request cancels the editor's previous one.
+
+### inlineEdit
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `contextLines` | integer | 0–500 | `60` | Lines above and below the selection the agent sees with your instruction (at most about 10,000 characters each way). |
+
+See [Edit with Agent in the editor](../guides/ai-agents.md#edit-with-agent-in-the-editor).
 
 ## Related settings stored elsewhere
 

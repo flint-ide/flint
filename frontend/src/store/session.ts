@@ -92,7 +92,8 @@ async function captureTab(t: Tab, roots: string[]): Promise<SavedTab | null> {
       return null // opened with ⌘, when needed
     case 'pr':
     case 'prdiff':
-      return null // pull requests are fetched from GitHub when opened
+    case 'cilog':
+      return null // pull requests and CI logs are fetched from GitHub when opened
   }
 }
 

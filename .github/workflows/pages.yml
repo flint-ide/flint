@@ -2,7 +2,9 @@ name: Docs site
 
 # Builds the user documentation (site/, rendered by cmd/docsite) and
 # publishes it to GitHub Pages. Pull requests only build it, which also
-# fails on broken links between pages.
+# fails on broken links between pages. A private repository only builds it
+# too: Pages needs a public repository on the free plan, and uploading the
+# site there would only use up the account's artifact storage.
 
 on:
   push:
@@ -39,12 +41,12 @@ jobs:
         run: go run ./cmd/docsite -src site -out _site
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && !github.event.repository.private
         with:
           path: _site
 
   deploy:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && !github.event.repository.private
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -290,44 +290,6 @@ export class Commit {
 }
 
 /**
- * ConflictBlock is one conflict as git writes it into a file: the current side
- * (ours), the base (only with merge.conflictStyle diff3 / zdiff3) and the incoming
- * side (theirs). Each side keeps its line endings.
- */
-export class ConflictBlock {
-    "current": string;
-    "base": string;
-    "hasBase": boolean;
-    "incoming": string;
-
-    /** Creates a new ConflictBlock instance. */
-    constructor($$source: Partial<ConflictBlock> = {}) {
-        if (!("current" in $$source)) {
-            this["current"] = "";
-        }
-        if (!("base" in $$source)) {
-            this["base"] = "";
-        }
-        if (!("hasBase" in $$source)) {
-            this["hasBase"] = false;
-        }
-        if (!("incoming" in $$source)) {
-            this["incoming"] = "";
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new ConflictBlock instance from a string or object.
-     */
-    static createFrom($$source: any = {}): ConflictBlock {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new ConflictBlock($$parsedSource as Partial<ConflictBlock>);
-    }
-}
-
-/**
  * ConflictFile is everything the merge editor needs for one conflicted file.
  */
 export class ConflictFile {
@@ -347,11 +309,11 @@ export class ConflictFile {
     "working": Revision;
 
     /**
-     * Blocks are the conflicts of a fresh three-way merge of the stages, each with
-     * its base, so a block of the working file can be shown with the base it lacks
-     * (git's default conflict style leaves the base out).
+     * Diff3 is a fresh three-way merge of the stages in diff3 style: every conflict
+     * with its base. Git's default conflict style leaves the base out of the working
+     * file (and joins nearby conflicts), so the merge editor finds it here.
      */
-    "blocks": ConflictBlock[];
+    "diff3": string;
     "sides": ConflictSides;
 
     /** Creates a new ConflictFile instance. */
@@ -368,8 +330,8 @@ export class ConflictFile {
         if (!("working" in $$source)) {
             this["working"] = (new Revision());
         }
-        if (!("blocks" in $$source)) {
-            this["blocks"] = [];
+        if (!("diff3" in $$source)) {
+            this["diff3"] = "";
         }
         if (!("sides" in $$source)) {
             this["sides"] = (new ConflictSides());
@@ -386,8 +348,7 @@ export class ConflictFile {
         const $$createField1_0 = $$createType5;
         const $$createField2_0 = $$createType5;
         const $$createField3_0 = $$createType5;
-        const $$createField4_0 = $$createType7;
-        const $$createField5_0 = $$createType8;
+        const $$createField5_0 = $$createType6;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("base" in $$parsedSource) {
             $$parsedSource["base"] = $$createField0_0($$parsedSource["base"]);
@@ -400,9 +361,6 @@ export class ConflictFile {
         }
         if ("working" in $$parsedSource) {
             $$parsedSource["working"] = $$createField3_0($$parsedSource["working"]);
-        }
-        if ("blocks" in $$parsedSource) {
-            $$parsedSource["blocks"] = $$createField4_0($$parsedSource["blocks"]);
         }
         if ("sides" in $$parsedSource) {
             $$parsedSource["sides"] = $$createField5_0($$parsedSource["sides"]);
@@ -479,8 +437,8 @@ export class ConflictSides {
      * Creates a new ConflictSides instance from a string or object.
      */
     static createFrom($$source: any = {}): ConflictSides {
-        const $$createField1_0 = $$createType9;
-        const $$createField2_0 = $$createType9;
+        const $$createField1_0 = $$createType7;
+        const $$createField2_0 = $$createType7;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("current" in $$parsedSource) {
             $$parsedSource["current"] = $$createField1_0($$parsedSource["current"]);
@@ -540,7 +498,7 @@ export class DiffStat {
      * Creates a new DiffStat instance from a string or object.
      */
     static createFrom($$source: any = {}): DiffStat {
-        const $$createField1_0 = $$createType11;
+        const $$createField1_0 = $$createType9;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
@@ -648,7 +606,7 @@ export class FileCommit {
      * Creates a new FileCommit instance from a string or object.
      */
     static createFrom($$source: any = {}): FileCommit {
-        const $$createField0_0 = $$createType12;
+        const $$createField0_0 = $$createType10;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("commit" in $$parsedSource) {
             $$parsedSource["commit"] = $$createField0_0($$parsedSource["commit"]);
@@ -905,7 +863,7 @@ export class Status {
      * Creates a new Status instance from a string or object.
      */
     static createFrom($$source: any = {}): Status {
-        const $$createField5_0 = $$createType14;
+        const $$createField5_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField5_0($$parsedSource["files"]);
@@ -981,12 +939,10 @@ const $$createType2 = BlameRange.createFrom;
 const $$createType3 = $Create.Array($$createType2);
 const $$createType4 = $Create.Array($Create.Any);
 const $$createType5 = Revision.createFrom;
-const $$createType6 = ConflictBlock.createFrom;
-const $$createType7 = $Create.Array($$createType6);
-const $$createType8 = ConflictSides.createFrom;
-const $$createType9 = ConflictSide.createFrom;
-const $$createType10 = FileStat.createFrom;
-const $$createType11 = $Create.Array($$createType10);
-const $$createType12 = Commit.createFrom;
-const $$createType13 = FileChange.createFrom;
-const $$createType14 = $Create.Array($$createType13);
+const $$createType6 = ConflictSides.createFrom;
+const $$createType7 = ConflictSide.createFrom;
+const $$createType8 = FileStat.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = Commit.createFrom;
+const $$createType11 = FileChange.createFrom;
+const $$createType12 = $Create.Array($$createType11);

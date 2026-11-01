@@ -58,7 +58,7 @@ func TestMarkResolvedOnlyInsideOpenFolders(t *testing.T) {
 
 	path := filepath.Join(open, "f.txt")
 	c, err := g.Conflict(path)
-	if err != nil || len(c.Blocks) != 1 || c.Sides.Incoming.Label != "feature" {
+	if err != nil || !git.HasConflictMarkers(c.Diff3) || c.Sides.Incoming.Label != "feature" {
 		t.Fatalf("Conflict = %+v, %v", c, err)
 	}
 	if err := g.MarkResolved(path, c.Working.Content, false); err == nil || !strings.Contains(err.Error(), git.ErrConflictMarkers.Error()) {

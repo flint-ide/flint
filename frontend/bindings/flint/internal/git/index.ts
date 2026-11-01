@@ -7,7 +7,6 @@ export {
     BlameRange,
     Branch,
     Commit,
-    ConflictBlock,
     ConflictFile,
     ConflictSide,
     ConflictSides,

@@ -41,8 +41,12 @@ func TestConflictDuringMerge(t *testing.T) {
 	if !strings.Contains(c.Working.Content, "<<<<<<< HEAD") || !strings.Contains(c.Working.Content, "six-feature") {
 		t.Fatalf("working file should hold git's markers and the clean hunk:\n%s", c.Working.Content)
 	}
-	if len(c.Blocks) != 1 || c.Blocks[0].Current != "two-main\n" || c.Blocks[0].Base != "two\n" || c.Blocks[0].Incoming != "two-feature\n" {
-		t.Fatalf("blocks from the stages = %+v", c.Blocks)
+	blocks := ParseConflictMarkers(c.Diff3)
+	if len(blocks) != 1 || blocks[0].Current != "two-main\n" || blocks[0].Base != "two\n" || blocks[0].Incoming != "two-feature\n" {
+		t.Fatalf("diff3 merge of the stages:\n%s", c.Diff3)
+	}
+	if !strings.Contains(c.Diff3, "six-feature") {
+		t.Fatalf("the diff3 merge should hold the clean hunks too:\n%s", c.Diff3)
 	}
 	s := c.Sides
 	if s.Operation != "merging" || s.Current.Label != "main" || s.Incoming.Label != "feature" {
@@ -213,7 +217,7 @@ func TestConflictAddAddWithoutBase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Base.Exists || !c.Current.Exists || !c.Incoming.Exists || len(c.Blocks) != 1 {
+	if c.Base.Exists || !c.Current.Exists || !c.Incoming.Exists || len(ParseConflictMarkers(c.Diff3)) != 1 {
 		t.Fatalf("add/add conflict = %+v", c)
 	}
 }

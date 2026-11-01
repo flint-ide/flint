@@ -34,11 +34,11 @@ type ConflictFile struct {
 	// whatever the user or an agent changed since. Exists is false when it is missing
 	// or not a regular file.
 	Working Revision `json:"working"`
-	// Blocks are the conflicts of a fresh three-way merge of the stages, each with
-	// its base, so a block of the working file can be shown with the base it lacks
-	// (git's default conflict style leaves the base out).
-	Blocks []ConflictBlock `json:"blocks"`
-	Sides  ConflictSides   `json:"sides"`
+	// Diff3 is a fresh three-way merge of the stages in diff3 style: every conflict
+	// with its base. Git's default conflict style leaves the base out of the working
+	// file (and joins nearby conflicts), so the merge editor finds it here.
+	Diff3 string        `json:"diff3"`
+	Sides ConflictSides `json:"sides"`
 }
 
 // Conflict reads the stages and the working file of a conflicted path (repo-relative).
@@ -64,10 +64,7 @@ func (r *Repo) Conflict(ctx context.Context, rel string) (ConflictFile, error) {
 		if err != nil {
 			return ConflictFile{}, err
 		}
-		c.Blocks = ParseConflictMarkers(merged)
-	}
-	if c.Blocks == nil {
-		c.Blocks = []ConflictBlock{}
+		c.Diff3 = merged
 	}
 	c.Sides, err = r.ConflictSides(ctx)
 	return c, err

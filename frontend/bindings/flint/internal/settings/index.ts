@@ -4,6 +4,7 @@
 export {
     AgentSettings,
     AgentTasks,
+    CI,
     Completions,
     CustomAgent,
     CustomTheme,

@@ -95,6 +95,62 @@ export class AgentTasks {
 }
 
 /**
+ * CI configures how Flint follows the checks of your pull requests (the
+ * status-bar CI badge, Fix with agent, background notifications).
+ */
+export class CI {
+    /**
+     * PollSeconds is how often a pull request's checks are re-read while some
+     * are still running. Nothing is read while no check is running.
+     */
+    "pollSeconds": number;
+
+    /**
+     * LogTailLines is how many lines from the end of a failed step go into
+     * the agent's draft.
+     */
+    "logTailLines": number;
+
+    /**
+     * LogErrorLines caps the error lines (test failures, compiler errors,
+     * file:line references) picked from the rest of the failed step.
+     */
+    "logErrorLines": number;
+
+    /**
+     * Notify shows a notification when CI fails or passes on your pull
+     * request while Flint is in the background (needs NotifyInBackground).
+     */
+    "notify": boolean;
+
+    /** Creates a new CI instance. */
+    constructor($$source: Partial<CI> = {}) {
+        if (!("pollSeconds" in $$source)) {
+            this["pollSeconds"] = 0;
+        }
+        if (!("logTailLines" in $$source)) {
+            this["logTailLines"] = 0;
+        }
+        if (!("logErrorLines" in $$source)) {
+            this["logErrorLines"] = 0;
+        }
+        if (!("notify" in $$source)) {
+            this["notify"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CI instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CI {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CI($$parsedSource as Partial<CI>);
+    }
+}
+
+/**
  * Completions configures inline suggestions from a code model ("completions").
  * The API key, when the endpoint needs one, is in the Keychain, never here.
  */
@@ -665,6 +721,11 @@ export class Settings {
      */
     "agentTasks": AgentTasks;
 
+    /**
+     * CI configures following your pull requests' checks (ci.go).
+     */
+    "ci": CI;
+
     /** Creates a new Settings instance. */
     constructor($$source: Partial<Settings> = {}) {
         if (!("version" in $$source)) {
@@ -724,6 +785,9 @@ export class Settings {
         if (!("agentTasks" in $$source)) {
             this["agentTasks"] = (new AgentTasks());
         }
+        if (!("ci" in $$source)) {
+            this["ci"] = (new CI());
+        }
 
         Object.assign(this, $$source);
     }
@@ -745,6 +809,7 @@ export class Settings {
         const $$createField16_0 = $$createType14;
         const $$createField17_0 = $$createType15;
         const $$createField18_0 = $$createType16;
+        const $$createField19_0 = $$createType17;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -785,6 +850,9 @@ export class Settings {
         if ("agentTasks" in $$parsedSource) {
             $$parsedSource["agentTasks"] = $$createField18_0($$parsedSource["agentTasks"]);
         }
+        if ("ci" in $$parsedSource) {
+            $$parsedSource["ci"] = $$createField19_0($$parsedSource["ci"]);
+        }
         return new Settings($$parsedSource as Partial<Settings>);
     }
 }
@@ -807,3 +875,4 @@ const $$createType13 = MCPServer.createFrom;
 const $$createType14 = Completions.createFrom;
 const $$createType15 = InlineEdit.createFrom;
 const $$createType16 = AgentTasks.createFrom;
+const $$createType17 = CI.createFrom;

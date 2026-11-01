@@ -33,6 +33,10 @@ type Check struct {
 	Status     string `json:"status"`
 	Conclusion string `json:"conclusion"`
 	URL        string `json:"url"`
+	// RunID and JobID name the GitHub Actions run and job behind a check run
+	// (0 for other CI systems): what Fix with agent and Open log read.
+	RunID int64 `json:"runId"`
+	JobID int64 `json:"jobId"`
 }
 
 // CheckCounts sums checks by normalized state (the list's CI badge).
@@ -80,6 +84,7 @@ func (g ghCheck) check() Check {
 	if g.Typename == "StatusContext" {
 		return Check{Name: g.Context, State: statusState(g.State), Status: g.State, URL: g.TargetURL}
 	}
+	run, job := actionsIDs(g.DetailsURL)
 	return Check{
 		Name:       g.Name,
 		Workflow:   g.WorkflowName,
@@ -87,6 +92,8 @@ func (g ghCheck) check() Check {
 		Status:     g.Status,
 		Conclusion: g.Conclusion,
 		URL:        g.DetailsURL,
+		RunID:      run,
+		JobID:      job,
 	}
 }
 

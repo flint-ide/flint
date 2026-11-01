@@ -4,9 +4,9 @@
 // but only if the range still holds the text the agent was given. Esc closes
 // the widget and cancels the run, which stops the agent process. No
 // accept/reject step: the edit is applied, and undo takes it back.
-import { EditorSelection, Prec, StateEffect, StateField, Transaction, type Extension } from '@codemirror/state'
+import { EditorSelection, StateEffect, StateField, Transaction, type Extension } from '@codemirror/state'
 import { isolateHistory } from '@codemirror/commands'
-import { Decoration, EditorView, ViewPlugin, WidgetType, keymap, type DecorationSet } from '@codemirror/view'
+import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet } from '@codemirror/view'
 import { buildEditRequest, canApply, editRange, fitReplacement, mapPending, type EditRequest, type Pending } from './inlineEdit'
 
 /** A running request the widget can cancel (a Wails CancellablePromise). */
@@ -223,9 +223,16 @@ export function inlineEdit(config: InlineEditConfig): Extension {
   return [
     editField,
     ViewPlugin.define((view) => new Controller(view, config)),
-    Prec.highest(keymap.of([{ key: 'Escape', run: (view) => controllerOf(view)?.close() ?? false }])),
     widgetTheme,
   ]
+}
+
+/**
+ * Closes the prompt and stops a running agent (Esc in the editor; bound with
+ * the suggestions' Esc in store/editorAi.ts). False when nothing is open.
+ */
+export function closeInlineEdit(view: EditorView): boolean {
+  return controllerOf(view)?.close() ?? false
 }
 
 /** Opens the prompt in view (⌘I); false when the editor has no inline edit. */

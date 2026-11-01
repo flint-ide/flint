@@ -153,7 +153,8 @@ function accept(view: EditorView): boolean {
   return true
 }
 
-function dismiss(view: EditorView): boolean {
+/** Hides a shown suggestion (Esc, bound in store/editorAi.ts); false when none is shown. */
+export function dismissSuggestion(view: EditorView): boolean {
   if (!view.state.field(ghostField, false)) return false
   view.dispatch({ effects: setGhost.of(null) })
   return true
@@ -164,10 +165,7 @@ export function inlineCompletion(config: InlineCompletionConfig): Extension {
   return [
     ghostField,
     ViewPlugin.define((view) => new Controller(view, config)),
-    Prec.highest(keymap.of([
-      { key: 'Tab', run: accept },
-      { key: 'Escape', run: dismiss },
-    ])),
+    Prec.highest(keymap.of([{ key: 'Tab', run: accept }])),
     EditorView.baseTheme({
       '.cm-ghost-text': { color: 'var(--fg-faint)', fontStyle: 'italic', whiteSpace: 'pre', pointerEvents: 'none' },
     }),

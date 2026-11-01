@@ -98,6 +98,6 @@ See [Review a pull request](review-a-pull-request.md) for the review side.
 ## Tips
 
 - **Keep chats focused.** Start a new chat for an unrelated task; the context bar in the header shows how full the current conversation is.
-- **Work in parallel with worktrees.** From the branch widget, create a worktree and open it with a terminal for an agent. Each agent then has its own checkout.
+- **Work in parallel with agent tasks.** Run "New Agent Task…" (`⇧⌘P`), describe the task, pick the agent and the base branch, and click **Start**: Flint creates a branch and a worktree, opens it in the window and hands the description to the agent in a new chat. The **Agent Tasks** panel shows every task's state (working, waiting for you, finished, failed), its changes, and Open, Show diff, Merge, Create PR and Remove. See [Agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel). You can still create a worktree by hand from the branch widget and open a terminal there.
 - **Watch the cost.** The chat header shows tokens and, for Claude, the cost; the status bar shows the total for the project.
 - **Let it finish in the background.** Switch to another app; Flint notifies you when the agent's turn is done.

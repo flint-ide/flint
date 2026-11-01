@@ -56,6 +56,122 @@ export class AgentSettings {
 }
 
 /**
+ * AgentTasks configures agent tasks (an agent on its own branch in its own
+ * worktree, see internal/agenttask).
+ */
+export class AgentTasks {
+    /**
+     * WorktreeDir is where task worktrees go: an absolute path or one starting
+     * with "~/", holding "<repo>/<branch>". Empty follows the branch widget:
+     * "<repo>.worktrees/<branch>" next to the main checkout.
+     */
+    "worktreeDir": string;
+
+    /**
+     * BranchPrefix starts every task branch, e.g. "agent/" gives
+     * "agent/add-rate-limiting". May be empty.
+     */
+    "branchPrefix": string;
+
+    /** Creates a new AgentTasks instance. */
+    constructor($$source: Partial<AgentTasks> = {}) {
+        if (!("worktreeDir" in $$source)) {
+            this["worktreeDir"] = "";
+        }
+        if (!("branchPrefix" in $$source)) {
+            this["branchPrefix"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AgentTasks instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AgentTasks {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AgentTasks($$parsedSource as Partial<AgentTasks>);
+    }
+}
+
+/**
+ * Completions configures inline suggestions from a code model ("completions").
+ * The API key, when the endpoint needs one, is in the Keychain, never here.
+ */
+export class Completions {
+    /**
+     * Enabled turns suggestions on (off by default: they send code to Endpoint).
+     */
+    "enabled": boolean;
+
+    /**
+     * Provider is "ollama" (/api/generate) or "openai" (an OpenAI-compatible
+     * /v1/completions).
+     */
+    "provider": string;
+
+    /**
+     * Endpoint is the server's base URL; http only for localhost.
+     */
+    "endpoint": string;
+
+    /**
+     * Model is a fill-in-the-middle capable code model.
+     */
+    "model": string;
+
+    /**
+     * DebounceMs is the typing pause before a suggestion is asked for.
+     */
+    "debounceMs": number;
+
+    /**
+     * MaxTokens bounds the length of a suggestion.
+     */
+    "maxTokens": number;
+
+    /**
+     * ContextLines is how many lines before and after the cursor are sent.
+     */
+    "contextLines": number;
+
+    /** Creates a new Completions instance. */
+    constructor($$source: Partial<Completions> = {}) {
+        if (!("enabled" in $$source)) {
+            this["enabled"] = false;
+        }
+        if (!("provider" in $$source)) {
+            this["provider"] = "";
+        }
+        if (!("endpoint" in $$source)) {
+            this["endpoint"] = "";
+        }
+        if (!("model" in $$source)) {
+            this["model"] = "";
+        }
+        if (!("debounceMs" in $$source)) {
+            this["debounceMs"] = 0;
+        }
+        if (!("maxTokens" in $$source)) {
+            this["maxTokens"] = 0;
+        }
+        if (!("contextLines" in $$source)) {
+            this["contextLines"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Completions instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Completions {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Completions($$parsedSource as Partial<Completions>);
+    }
+}
+
+/**
  * CustomAgent is an agent Flint talks to over the Agent Client Protocol
  * ("customAgents"): any CLI with an ACP mode, added without code. There is no
  * environment field on purpose: settings.json is plain text, so API keys
@@ -117,6 +233,106 @@ export class CustomAgent {
 }
 
 /**
+ * CustomTheme is a user palette, for example one imported from VS Code: CSS
+ * variables of style.css overridden on top of a built-in palette.
+ */
+export class CustomTheme {
+    /**
+     * Name is shown in Settings ▸ Appearance.
+     */
+    "name": string;
+
+    /**
+     * Base is the palette ("dark" or "light") the colors are laid over; it also
+     * picks the native window appearance and the terminal's ANSI colors.
+     */
+    "base": string;
+
+    /**
+     * Colors maps a CSS variable ("--bg-editor") to a hex color ("#1e1e1e").
+     */
+    "colors": { [_ in string]?: string };
+
+    /** Creates a new CustomTheme instance. */
+    constructor($$source: Partial<CustomTheme> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("base" in $$source)) {
+            this["base"] = "";
+        }
+        if (!("colors" in $$source)) {
+            this["colors"] = {};
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CustomTheme instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CustomTheme {
+        const $$createField2_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("colors" in $$parsedSource) {
+            $$parsedSource["colors"] = $$createField2_0($$parsedSource["colors"]);
+        }
+        return new CustomTheme($$parsedSource as Partial<CustomTheme>);
+    }
+}
+
+/**
+ * EditorSettings is the editor's font plus editing behaviour.
+ */
+export class EditorSettings {
+    /**
+     * CSS font-family list
+     */
+    "fontFamily": string;
+
+    /**
+     * px
+     */
+    "fontSize": number;
+
+    /**
+     * multiple of the font size
+     */
+    "lineHeight": number;
+
+    /**
+     * VimMode turns on Vim key bindings in every editor.
+     */
+    "vimMode": boolean;
+
+    /** Creates a new EditorSettings instance. */
+    constructor($$source: Partial<EditorSettings> = {}) {
+        if (!("fontFamily" in $$source)) {
+            this["fontFamily"] = "";
+        }
+        if (!("fontSize" in $$source)) {
+            this["fontSize"] = 0;
+        }
+        if (!("lineHeight" in $$source)) {
+            this["lineHeight"] = 0;
+        }
+        if (!("vimMode" in $$source)) {
+            this["vimMode"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new EditorSettings instance from a string or object.
+     */
+    static createFrom($$source: any = {}): EditorSettings {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new EditorSettings($$parsedSource as Partial<EditorSettings>);
+    }
+}
+
+/**
  * Font is a monospace font setup shared by the editor and terminal sections.
  */
 export class Font {
@@ -156,6 +372,33 @@ export class Font {
     static createFrom($$source: any = {}): Font {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new Font($$parsedSource as Partial<Font>);
+    }
+}
+
+/**
+ * InlineEdit configures "Edit with Agent" on the selection.
+ */
+export class InlineEdit {
+    /**
+     * ContextLines is how many lines before and after the selection the agent sees.
+     */
+    "contextLines": number;
+
+    /** Creates a new InlineEdit instance. */
+    constructor($$source: Partial<InlineEdit> = {}) {
+        if (!("contextLines" in $$source)) {
+            this["contextLines"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new InlineEdit instance from a string or object.
+     */
+    static createFrom($$source: any = {}): InlineEdit {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new InlineEdit($$parsedSource as Partial<InlineEdit>);
     }
 }
 
@@ -210,6 +453,94 @@ export class LanguageServerSettings {
 }
 
 /**
+ * MCPServer configures Flint's own MCP server, which gives the agents Flint
+ * starts read-only access to what Flint knows (internal/mcpserver).
+ */
+export class MCPServer {
+    /**
+     * Enabled offers the server to new agent sessions.
+     */
+    "enabled": boolean;
+    "tools": MCPTools;
+
+    /**
+     * TerminalLines is the most lines of one terminal's output an agent gets.
+     */
+    "terminalLines": number;
+
+    /** Creates a new MCPServer instance. */
+    constructor($$source: Partial<MCPServer> = {}) {
+        if (!("enabled" in $$source)) {
+            this["enabled"] = false;
+        }
+        if (!("tools" in $$source)) {
+            this["tools"] = (new MCPTools());
+        }
+        if (!("terminalLines" in $$source)) {
+            this["terminalLines"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MCPServer instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MCPServer {
+        const $$createField1_0 = $$createType2;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("tools" in $$parsedSource) {
+            $$parsedSource["tools"] = $$createField1_0($$parsedSource["tools"]);
+        }
+        return new MCPServer($$parsedSource as Partial<MCPServer>);
+    }
+}
+
+/**
+ * MCPTools switches the server's tools on and off. Diagnostics, the editor
+ * and test results show the project's own state and are on by default.
+ * Terminal output and cluster status can show anything the user saw
+ * (credentials printed outside the project, other clusters' names), so they
+ * are off by default and, when on, the agent asks before each call.
+ */
+export class MCPTools {
+    "diagnostics": boolean;
+    "editor": boolean;
+    "terminals": boolean;
+    "tests": boolean;
+    "kubernetes": boolean;
+
+    /** Creates a new MCPTools instance. */
+    constructor($$source: Partial<MCPTools> = {}) {
+        if (!("diagnostics" in $$source)) {
+            this["diagnostics"] = false;
+        }
+        if (!("editor" in $$source)) {
+            this["editor"] = false;
+        }
+        if (!("terminals" in $$source)) {
+            this["terminals"] = false;
+        }
+        if (!("tests" in $$source)) {
+            this["tests"] = false;
+        }
+        if (!("kubernetes" in $$source)) {
+            this["kubernetes"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MCPTools instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MCPTools {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MCPTools($$parsedSource as Partial<MCPTools>);
+    }
+}
+
+/**
  * Refresh holds how often panels that poll re-read their data while shown.
  */
 export class Refresh {
@@ -250,8 +581,13 @@ export class Refresh {
 export class Settings {
     "version": number;
     "theme": string;
-    "editor": Font;
+    "editor": EditorSettings;
     "terminal": Font;
+
+    /**
+     * CustomTheme is the palette used when Theme is "custom".
+     */
+    "customTheme": CustomTheme;
 
     /**
      * DefaultAgent starts new agent chats ("claude", "codex" or a custom
@@ -309,6 +645,26 @@ export class Settings {
      */
     "refresh": Refresh;
 
+    /**
+     * MCPServer configures what Flint's own MCP server tells agents.
+     */
+    "mcpServer": MCPServer;
+
+    /**
+     * Completions configures inline suggestions from a code model (editorai.go).
+     */
+    "completions": Completions;
+
+    /**
+     * InlineEdit configures "Edit with Agent" on the selection (editorai.go).
+     */
+    "inlineEdit": InlineEdit;
+
+    /**
+     * AgentTasks configures agent tasks (worktree folder, branch prefix).
+     */
+    "agentTasks": AgentTasks;
+
     /** Creates a new Settings instance. */
     constructor($$source: Partial<Settings> = {}) {
         if (!("version" in $$source)) {
@@ -318,10 +674,13 @@ export class Settings {
             this["theme"] = "";
         }
         if (!("editor" in $$source)) {
-            this["editor"] = (new Font());
+            this["editor"] = (new EditorSettings());
         }
         if (!("terminal" in $$source)) {
             this["terminal"] = (new Font());
+        }
+        if (!("customTheme" in $$source)) {
+            this["customTheme"] = (new CustomTheme());
         }
         if (!("defaultAgent" in $$source)) {
             this["defaultAgent"] = "";
@@ -353,6 +712,18 @@ export class Settings {
         if (!("refresh" in $$source)) {
             this["refresh"] = (new Refresh());
         }
+        if (!("mcpServer" in $$source)) {
+            this["mcpServer"] = (new MCPServer());
+        }
+        if (!("completions" in $$source)) {
+            this["completions"] = (new Completions());
+        }
+        if (!("inlineEdit" in $$source)) {
+            this["inlineEdit"] = (new InlineEdit());
+        }
+        if (!("agentTasks" in $$source)) {
+            this["agentTasks"] = (new AgentTasks());
+        }
 
         Object.assign(this, $$source);
     }
@@ -361,14 +732,19 @@ export class Settings {
      * Creates a new Settings instance from a string or object.
      */
     static createFrom($$source: any = {}): Settings {
-        const $$createField2_0 = $$createType1;
-        const $$createField3_0 = $$createType1;
-        const $$createField8_0 = $$createType2;
-        const $$createField9_0 = $$createType0;
-        const $$createField10_0 = $$createType4;
-        const $$createField11_0 = $$createType6;
-        const $$createField12_0 = $$createType8;
-        const $$createField13_0 = $$createType9;
+        const $$createField2_0 = $$createType3;
+        const $$createField3_0 = $$createType4;
+        const $$createField4_0 = $$createType5;
+        const $$createField9_0 = $$createType1;
+        const $$createField10_0 = $$createType0;
+        const $$createField11_0 = $$createType7;
+        const $$createField12_0 = $$createType9;
+        const $$createField13_0 = $$createType11;
+        const $$createField14_0 = $$createType12;
+        const $$createField15_0 = $$createType13;
+        const $$createField16_0 = $$createType14;
+        const $$createField17_0 = $$createType15;
+        const $$createField18_0 = $$createType16;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -376,23 +752,38 @@ export class Settings {
         if ("terminal" in $$parsedSource) {
             $$parsedSource["terminal"] = $$createField3_0($$parsedSource["terminal"]);
         }
+        if ("customTheme" in $$parsedSource) {
+            $$parsedSource["customTheme"] = $$createField4_0($$parsedSource["customTheme"]);
+        }
         if ("keymap" in $$parsedSource) {
-            $$parsedSource["keymap"] = $$createField8_0($$parsedSource["keymap"]);
+            $$parsedSource["keymap"] = $$createField9_0($$parsedSource["keymap"]);
         }
         if ("todoExclude" in $$parsedSource) {
-            $$parsedSource["todoExclude"] = $$createField9_0($$parsedSource["todoExclude"]);
+            $$parsedSource["todoExclude"] = $$createField10_0($$parsedSource["todoExclude"]);
         }
         if ("agents" in $$parsedSource) {
-            $$parsedSource["agents"] = $$createField10_0($$parsedSource["agents"]);
+            $$parsedSource["agents"] = $$createField11_0($$parsedSource["agents"]);
         }
         if ("customAgents" in $$parsedSource) {
-            $$parsedSource["customAgents"] = $$createField11_0($$parsedSource["customAgents"]);
+            $$parsedSource["customAgents"] = $$createField12_0($$parsedSource["customAgents"]);
         }
         if ("languageServers" in $$parsedSource) {
-            $$parsedSource["languageServers"] = $$createField12_0($$parsedSource["languageServers"]);
+            $$parsedSource["languageServers"] = $$createField13_0($$parsedSource["languageServers"]);
         }
         if ("refresh" in $$parsedSource) {
-            $$parsedSource["refresh"] = $$createField13_0($$parsedSource["refresh"]);
+            $$parsedSource["refresh"] = $$createField14_0($$parsedSource["refresh"]);
+        }
+        if ("mcpServer" in $$parsedSource) {
+            $$parsedSource["mcpServer"] = $$createField15_0($$parsedSource["mcpServer"]);
+        }
+        if ("completions" in $$parsedSource) {
+            $$parsedSource["completions"] = $$createField16_0($$parsedSource["completions"]);
+        }
+        if ("inlineEdit" in $$parsedSource) {
+            $$parsedSource["inlineEdit"] = $$createField17_0($$parsedSource["inlineEdit"]);
+        }
+        if ("agentTasks" in $$parsedSource) {
+            $$parsedSource["agentTasks"] = $$createField18_0($$parsedSource["agentTasks"]);
         }
         return new Settings($$parsedSource as Partial<Settings>);
     }
@@ -400,12 +791,19 @@ export class Settings {
 
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = Font.createFrom;
-const $$createType2 = $Create.Map($Create.Any, $Create.Any);
-const $$createType3 = AgentSettings.createFrom;
-const $$createType4 = $Create.Map($Create.Any, $$createType3);
-const $$createType5 = CustomAgent.createFrom;
-const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = LanguageServerSettings.createFrom;
-const $$createType8 = $Create.Map($Create.Any, $$createType7);
-const $$createType9 = Refresh.createFrom;
+const $$createType1 = $Create.Map($Create.Any, $Create.Any);
+const $$createType2 = MCPTools.createFrom;
+const $$createType3 = EditorSettings.createFrom;
+const $$createType4 = Font.createFrom;
+const $$createType5 = CustomTheme.createFrom;
+const $$createType6 = AgentSettings.createFrom;
+const $$createType7 = $Create.Map($Create.Any, $$createType6);
+const $$createType8 = CustomAgent.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = LanguageServerSettings.createFrom;
+const $$createType11 = $Create.Map($Create.Any, $$createType10);
+const $$createType12 = Refresh.createFrom;
+const $$createType13 = MCPServer.createFrom;
+const $$createType14 = Completions.createFrom;
+const $$createType15 = InlineEdit.createFrom;
+const $$createType16 = AgentTasks.createFrom;

@@ -49,8 +49,27 @@ static void flintTitlebarMetrics(double *height, double *x, double *y, double *w
 	});
 	*height = hh; *x = bx; *y = by; *w = bw; *h = bh;
 }
+
+// flintFindWebView finds the window's WKWebView (Wails puts it in the content
+// view).
+static NSView *flintFindWebView(NSView *view) {
+	if ([view isKindOfClass:NSClassFromString(@"WKWebView")]) return view;
+	for (NSView *sub in view.subviews) {
+		NSView *found = flintFindWebView(sub);
+		if (found) return found;
+	}
+	return nil;
+}
+
+// flintSetWebViewHidden hides or shows the window's web view. Main thread only.
+static void flintSetWebViewHidden(void *nsWindow, int hidden) {
+	NSWindow *win = (__bridge NSWindow *)nsWindow;
+	flintFindWebView(win.contentView).hidden = hidden != 0;
+}
 */
 import "C"
+
+import "github.com/wailsapp/wails/v3/pkg/application"
 
 // setNativeAppearance makes the window chrome follow theme ("dark", "light" or
 // "system") and reports whether it is now dark. Not for the main thread.
@@ -81,4 +100,38 @@ func titlebarMetrics() TitlebarMetrics {
 	var h, x, y, w, bh C.double
 	C.flintTitlebarMetrics(&h, &x, &y, &w, &bh)
 	return TitlebarMetrics{Height: float64(h), ButtonsLeft: float64(x), ButtonsTop: float64(y), ButtonWidth: float64(w), ButtonHeight: float64(bh)}
+}
+
+// showWindowEarly shows the window as soon as it exists. Wails shows it only
+// once the page has loaded, which leaves the screen empty while WebKit starts
+// its processes; this way the title bar and the theme's background appear at
+// once. The web view stays hidden until the page is loaded (onPageLoaded), so
+// it never flashes white.
+func (a *App) showWindowEarly() {
+	created := false
+	application.InvokeSync(func() {
+		w := a.window.NativeWindow()
+		if w == nil {
+			return // not created yet: onPageLoaded shows it
+		}
+		if !a.pageLoaded.Load() {
+			C.flintSetWebViewHidden(w, 1)
+		}
+		created = true
+	})
+	if created {
+		a.window.Show()
+	}
+}
+
+// onPageLoaded reveals the web view once the page has loaded and shows the
+// window, as Wails does for a window that isn't created hidden.
+func (a *App) onPageLoaded() {
+	a.pageLoaded.Store(true)
+	application.InvokeSync(func() {
+		if w := a.window.NativeWindow(); w != nil {
+			C.flintSetWebViewHidden(w, 0)
+		}
+	})
+	a.window.Show()
 }

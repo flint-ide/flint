@@ -47,6 +47,8 @@ var reservedFlags = map[Kind][]string{
 		"--setting-sources", "--settings", "--model",
 		// Pre-approved tools would skip Flint's permission prompt.
 		"--allowedTools", "--allowed-tools", "--disallowedTools", "--disallowed-tools",
+		// Headless runs limit the built-in tools to reading.
+		"--tools",
 	},
 	Codex: {
 		"-m", "--model", "-a", "--ask-for-approval", "-s", "--sandbox", "--full-auto",
@@ -57,8 +59,9 @@ var reservedFlags = map[Kind][]string{
 }
 
 // reservedCodexConfig are `-c key=value` keys that would change Codex's
-// approvals, sandbox or which projects it trusts.
-var reservedCodexConfig = []string{"approval_policy", "sandbox", "projects", "profile", "dangerously"}
+// approvals, sandbox or which projects it trusts, or replace Flint's own MCP
+// server (mcp_servers.flint; the user's other MCP servers are fine).
+var reservedCodexConfig = []string{"approval_policy", "sandbox", "projects", "profile", "dangerously", "mcp_servers.flint"}
 
 // CheckPath validates a Config.Path.
 func CheckPath(path string) error {
@@ -186,14 +189,49 @@ func reservedConfigKey(kv string) string {
 	if kv == "" {
 		return ""
 	}
-	key, _, _ := strings.Cut(strings.TrimSpace(kv), "=")
-	key = strings.Trim(strings.TrimSpace(key), `"'`)
+	key := tomlKeyPath(kv)
 	for _, r := range reservedCodexConfig {
-		if strings.HasPrefix(key, r) {
+		// A key above a reserved one sets it through an inline table
+		// (`mcp_servers={flint={...}}`).
+		if strings.HasPrefix(key, r) || strings.Contains(r, ".") && strings.HasPrefix(r, key+".") {
 			return key
 		}
 	}
 	return ""
+}
+
+// tomlKeyPath normalizes the key of a "key=value" override the way TOML
+// reads it: the dotted parts, unquoted ("..." or '...') and without the
+// spaces around them, joined by dots. `mcp_servers . "flint".url` becomes
+// mcp_servers.flint.url.
+func tomlKeyPath(kv string) string {
+	var parts []string
+	var cur strings.Builder
+	quote := byte(0)
+	for i := 0; i < len(kv); i++ {
+		c := kv[i]
+		switch {
+		case quote != 0 && c == quote:
+			quote = 0
+		case quote == '"' && c == '\\' && i+1 < len(kv):
+			i++
+			cur.WriteByte(kv[i])
+		case quote != 0:
+			cur.WriteByte(c)
+		case c == '"' || c == '\'':
+			quote = c
+		case c == '.':
+			parts = append(parts, strings.TrimSpace(cur.String()))
+			cur.Reset()
+		case c == '=':
+			return strings.Join(append(parts, strings.TrimSpace(cur.String())), ".")
+		case c == ' ' || c == '\t':
+			// spaces around a part are not part of the key
+		default:
+			cur.WriteByte(c)
+		}
+	}
+	return strings.Join(append(parts, strings.TrimSpace(cur.String())), ".")
 }
 
 // ComposeArgs builds a command line from Flint's own arguments and the

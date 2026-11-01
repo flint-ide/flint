@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { coerceSettings, DEFAULT_SETTINGS, editorCssVars, parseExcludes, resolveTheme } from './settings'
+import { coerceSettings, DEFAULT_SETTINGS, editorCssVars, parseExcludes, resolveTheme, themeCssVars } from './settings'
 import { TERMINAL_THEMES, terminalOptions } from './terminalTheme'
 
 describe('theme resolution', () => {
@@ -29,7 +29,7 @@ describe('theme resolution', () => {
 
 describe('editor variables', () => {
   it('maps the editor font to CSS custom properties', () => {
-    const s = { ...DEFAULT_SETTINGS, editor: { fontFamily: 'Menlo', fontSize: 15, lineHeight: 1.4 } }
+    const s = { ...DEFAULT_SETTINGS, editor: { fontFamily: 'Menlo', fontSize: 15, lineHeight: 1.4, vimMode: false } }
     assert.deepEqual(editorCssVars(s), {
       '--editor-font': 'Menlo',
       '--editor-font-size': '15px',
@@ -68,6 +68,43 @@ describe('coerceSettings', () => {
   it('falls back to the defaults for garbage', () => {
     assert.equal(coerceSettings(null), DEFAULT_SETTINGS)
     assert.equal(coerceSettings([1, 2]), DEFAULT_SETTINGS)
+  })
+})
+
+describe('custom theme', () => {
+  const custom = { name: 'Acme Night', base: 'light', colors: { '--bg-editor': '#1b1d23', '--syn-keyword': '#e06c75aa' } }
+
+  it('resolves to its base palette', () => {
+    assert.equal(resolveTheme('custom', true, 'light'), 'light')
+    assert.equal(resolveTheme('custom', false), 'dark')
+  })
+
+  it('sets its colors only while Theme is Custom', () => {
+    const s = coerceSettings({ theme: 'custom', customTheme: custom })
+    assert.equal(s.theme, 'custom')
+    assert.deepEqual(themeCssVars(s), custom.colors)
+    assert.deepEqual(themeCssVars({ ...s, theme: 'dark' }), {})
+  })
+
+  it('drops colors that are not hex or not CSS variables', () => {
+    const s = coerceSettings({ customTheme: { name: 3, base: 'neon', colors: { '--bg': 'red; }', 'color': '#fff', '--fg': '#ABCDEF', '--editor-font-size': '#123' } } })
+    assert.deepEqual(s.customTheme, { name: '', base: 'dark', colors: { '--fg': '#ABCDEF' } })
+  })
+
+  it('recolors terminals from the custom colors', () => {
+    const font = DEFAULT_SETTINGS.terminal
+    const t = terminalOptions(font, 'light', 0, custom.colors).theme
+    assert.equal(t.background, '#1b1d23')
+    assert.equal(t.cursorAccent, '#1b1d23')
+    assert.equal(t.red, TERMINAL_THEMES.light.red)
+  })
+})
+
+describe('vim mode', () => {
+  it('is off by default and read from the editor section', () => {
+    assert.equal(coerceSettings({}).editor.vimMode, false)
+    assert.equal(coerceSettings({ editor: { vimMode: true } }).editor.vimMode, true)
+    assert.equal(coerceSettings({ editor: { vimMode: 'yes' } }).editor.vimMode, false)
   })
 })
 

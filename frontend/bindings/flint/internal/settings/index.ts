@@ -3,9 +3,16 @@
 
 export {
     AgentSettings,
+    AgentTasks,
+    Completions,
     CustomAgent,
+    CustomTheme,
+    EditorSettings,
     Font,
+    InlineEdit,
     LanguageServerSettings,
+    MCPServer,
+    MCPTools,
     Refresh,
     Settings
 } from "./models.js";

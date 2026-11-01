@@ -26,6 +26,7 @@ type LSPAPI struct {
 
 func (l *LSPAPI) wire() {
 	l.app.lsp.OnDiagnostics = func(path string, diags []lsp.Diagnostic) {
+		l.app.mcpSources.Diagnostics.Set(path, diags)
 		l.app.emit(eventLSPDiagnostics, LSPDiagnostics{Path: path, Diagnostics: diags})
 	}
 	l.app.lsp.OnStatus = func(s lsp.Status) {

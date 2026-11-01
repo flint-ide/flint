@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -37,6 +38,8 @@ func TestDescribeTool(t *testing.T) {
 		{"ExitPlanMode", `{"plan":"1. do it"}`, agentsession.ToolThink, "Plan ready for review", nil, "1. do it", ""},
 		{"Skill", `{"skill":"pdf"}`, agentsession.ToolOther, "Skill: pdf", nil, "", ""},
 		{"mcp__bad", `{}`, agentsession.ToolOther, "mcp__bad", nil, "", ""},
+		{"mcp__github__create_issue", `{}`, agentsession.ToolOther, "github: create_issue", nil, "", ""},
+		{"mcp__flint__get_diagnostics", `{}`, agentsession.ToolOther, "flint: get_diagnostics", nil, "", ""},
 		{"Mystery", `not json`, agentsession.ToolOther, "Mystery", nil, "not json", ""},
 	}
 	for _, tt := range tests {
@@ -255,10 +258,77 @@ func TestResolveBinary(t *testing.T) {
 	}
 }
 
+// Only a session given Flint's server treats "flint" tools as Flint's, and
+// only the project-state tools become reads; terminal output and cluster
+// status keep asking.
+func TestFlintToolClassification(t *testing.T) {
+	cwd := t.TempDir()
+	call := func(name string, flintMCP bool) agentsession.ToolCall {
+		return flintTool(describeTool("id", name, json.RawMessage(`{}`), cwd), name, cwd, flintMCP)
+	}
+	for _, tool := range []string{"get_diagnostics", "get_editor_state", "get_test_results"} {
+		if tc := call("mcp__flint__"+tool, true); tc.Kind != agentsession.ToolRead || tc.Title != "Flint: "+tool || len(tc.Paths) != 1 || tc.Paths[0] != cwd {
+			t.Errorf("%s: %+v", tool, tc)
+		}
+	}
+	for _, tool := range []string{"get_terminal_output", "get_kubernetes_status", "anything_else"} {
+		if tc := call("mcp__flint__"+tool, true); tc.Kind != agentsession.ToolOther || tc.Title != "Flint: "+tool {
+			t.Errorf("%s must ask: %+v", tool, tc)
+		}
+	}
+	if tc := call("mcp__flint__get_diagnostics", false); tc.Kind != agentsession.ToolOther || tc.Title != "flint: get_diagnostics" {
+		t.Errorf("someone else's flint server treated as Flint's: %+v", tc)
+	}
+	if tc := call("Read", true); tc.Kind != agentsession.ToolRead || tc.Title == "" {
+		t.Errorf("built-in tool changed: %+v", tc)
+	}
+}
+
+// Flint's MCP server is passed with --mcp-config after the user's own
+// (Claude Code merges them); the token travels in the environment only.
+func TestBuildArgsWithFlintMCPServer(t *testing.T) {
+	srv := &agentsession.MCPServer{URL: "http://127.0.0.1:4321/mcp", Token: "tok-secret"}
+	args, err := buildArgs("sid", false, Options{ExtraArgs: []string{"--mcp-config", "/home/me/mcp.json"}}, false, srv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.Index(args[2:], "--mcp-config") + 2
+	if i < 2 || args[0] != "--mcp-config" || i+2 >= len(args) {
+		t.Fatalf("args %q", args)
+	}
+	var cfg struct {
+		MCPServers map[string]struct {
+			Type    string            `json:"type"`
+			URL     string            `json:"url"`
+			Headers map[string]string `json:"headers"`
+		} `json:"mcpServers"`
+	}
+	if err := json.Unmarshal([]byte(args[i+1]), &cfg); err != nil {
+		t.Fatalf("config %q: %v", args[i+1], err)
+	}
+	flint := cfg.MCPServers["flint"]
+	if flint.Type != "http" || flint.URL != srv.URL || flint.Headers["Authorization"] != "Bearer ${FLINT_MCP_TOKEN}" {
+		t.Fatalf("config %+v", cfg)
+	}
+	if strings.Contains(strings.Join(args, " "), "tok-secret") {
+		t.Fatal("token on the command line")
+	}
+	if !strings.HasPrefix(args[i+2], "-") {
+		t.Fatalf("a non-flag after the variadic --mcp-config would be read as a config: %q", args[i+2])
+	}
+	if lookup(buildEnv(nil, "/w", srv), "FLINT_MCP_TOKEN") != "tok-secret" {
+		t.Fatal("token not in the environment")
+	}
+	t.Setenv("FLINT_MCP_TOKEN", "inherited")
+	if lookup(buildEnv(nil, "/w", nil), "FLINT_MCP_TOKEN") != "" {
+		t.Fatal("an inherited token reaches a session without the server")
+	}
+}
+
 func TestBuildArgsAndEnv(t *testing.T) {
 	build := func(resume bool, opts Options, untrusted bool) string {
 		t.Helper()
-		args, err := buildArgs("sid", resume, opts, untrusted)
+		args, err := buildArgs("sid", resume, opts, untrusted, nil)
 		if err != nil {
 			t.Fatalf("buildArgs() error = %v", err)
 		}
@@ -279,7 +349,7 @@ func TestBuildArgsAndEnv(t *testing.T) {
 		t.Errorf("resume args = %q", resumed)
 	}
 	t.Setenv("CLAUDECODE", "1")
-	env := buildEnv([]string{"CLAUDE_CODE_ENABLE_TODO_TOOLS=0"}, "/w")
+	env := buildEnv([]string{"CLAUDE_CODE_ENABLE_TODO_TOOLS=0"}, "/w", nil)
 	if lookup(env, "CLAUDECODE") != "" || lookup(env, "CLAUDE_CODE_ENABLE_TODO_TOOLS") != "0" || lookup(env, "PWD") != "/w" {
 		t.Errorf("env lookups: %q %q %q", lookup(env, "CLAUDECODE"), lookup(env, "CLAUDE_CODE_ENABLE_TODO_TOOLS"), lookup(env, "PWD"))
 	}

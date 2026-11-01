@@ -70,6 +70,8 @@ wails3 task server -- /path/to/folder
 
 This builds Flint with the `server` build tag and serves the UI over HTTP (`http://localhost:8080`) so you can check it in a regular browser, without a window. It is meant for UI checks during development.
 
+To try **Import from VS Code** without your own editor's settings, point it at the test fixtures: `FLINT_IMPORT_HOME=$PWD/internal/vscodeimport/testdata/home` (server builds only).
+
 **Warning: server mode exposes every Go binding on localhost with no authentication.** Anything that can reach the port can read and write files, run commands in terminals, and use your database connections. Never run it on a shared machine, and never expose the port. Server mode is out of scope for security reports.
 
 ## Bindings
@@ -115,6 +117,10 @@ make test-db-down
 - `make test-integration`: Go tests with the `integration` build tag against throwaway Postgres 16 and ClickHouse 24.8 containers started by `make test-db-up`. Ports default to 55432 (Postgres), 59000 (ClickHouse native) and 58123 (ClickHouse HTTP) and can be changed with `PG_PORT`, `CH_PORT` and `CH_HTTP_PORT`.
 - GitHub tests use a fake `gh` on `PATH` (answers from `internal/github/testdata`), so they never contact GitHub.
 
+## Benchmark
+
+`go run ./cmd/bench -flint build/bin/flint.app` measures time to the first window and memory after 30 s idle for Flint, VS Code, Zed and Cursor (those installed), each with a fresh profile, on the Go source tree. It opens editor windows, so quit those editors first and leave the machine idle. The method, the latest results and the caveats are in [BENCHMARK.md](BENCHMARK.md); update the README table from it.
+
 ## Lint
 
 ```bash
@@ -127,6 +133,7 @@ CI (`.github/workflows/ci.yml`, macOS) runs on every pull request and on pushes 
 ## npm policy
 
 - Keep runtime dependencies minimal. The frontend depends on React, CodeMirror, xterm.js and the Wails runtime; TypeScript and React types are dev dependencies for type checking. Do not add a new npm dependency without discussing it in an issue first.
+- `@replit/codemirror-vim` (MIT) provides Vim mode; writing a Vim emulation ourselves is not a reasonable alternative. It is pinned at 6.3.0, the last version without runtime dependencies (6.4.0 adds `@replit/codemirror-vim-core`), has no install scripts, and only peer-depends on `@codemirror/*`. `lib/editorSetup.ts` imports it lazily, so it is a separate chunk (about 120 KB minified) that is fetched only when Vim mode is switched on.
 - Install with `npm ci --ignore-scripts`. `frontend/.npmrc` disables lifecycle scripts and enforces exact versions.
 - No `npx`, at build time or at runtime. The bundler and test runner are Go (`cmd/webbuild`).
 
@@ -136,6 +143,19 @@ CI (`.github/workflows/ci.yml`, macOS) runs on every pull request and on pushes 
 2. Tag the release: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 3. The release workflow (`.github/workflows/release.yml`) runs the tests, builds a universal (Apple silicon + Intel) `Flint.app` with `wails3 task package:universal VERSION=vX.Y.Z`, packs it as `.zip` and `.dmg` with SHA-256 checksums and build provenance, and drafts a GitHub release.
 4. Review the draft and publish it.
+5. Publishing runs the workflow's `homebrew` job (on macOS): it downloads the release's `.zip`, checks it against `SHA256SUMS.txt`, checks that the app is notarized (a valid signature and a stapled ticket: `codesign --verify` and `xcrun stapler validate`), renders `packaging/homebrew/flint.rb` with the version and SHA-256, and pushes it to the tap as `Casks/flint.rb`. Prereleases, tags that aren't `vX.Y.Z` and releases that aren't notarized are skipped with a notice: an ad-hoc signed app installed by Homebrew would be blocked by Gatekeeper. The tap token is passed to the push step only.
+
+### Homebrew tap: one-time setup
+
+The `homebrew` job does nothing (it logs a notice) until this is done. It also needs notarized releases, so the Apple signing secrets listed above must be set first.
+
+1. Create a public repository for the tap. Homebrew requires the name to start with `homebrew-`; the default is `ODudek/homebrew-tap`, which users install from with `brew install --cask odudek/tap/flint`.
+2. Create a fine-grained personal access token with access to that repository only and the **Contents: Read and write** permission.
+3. In this repository's **Settings ▸ Secrets and variables ▸ Actions**, add the token as the secret `HOMEBREW_TAP_TOKEN`.
+4. If the tap has another name, add the repository variable `HOMEBREW_TAP` (`owner/homebrew-name`) and update the `brew install` command in `site/installation.md`.
+5. Publish a release (or re-run the `homebrew` job of the last release's workflow run) and check that `Casks/flint.rb` appears in the tap, then remove the "not published yet" note from `site/installation.md`.
+
+To check the cask locally after a release: `brew install --cask odudek/tap/flint`, `brew audit --cask --online odudek/tap/flint` and `brew uninstall --zap --cask flint`.
 
 The version is embedded with `-ldflags -X main.version=…` and written into `Info.plist`; local builds report `dev`. To build a universal app locally, run `wails3 task package:universal`.
 
@@ -156,4 +176,4 @@ make docs                                   # build into _site/ and preview at h
 go run ./cmd/docsite -src site -out _site   # build only
 ```
 
-`.github/workflows/pages.yml` builds the site on pull requests that touch it and publishes it to GitHub Pages from `main` (repository Settings ▸ Pages ▸ Source: GitHub Actions).
+`.github/workflows/pages.yml` builds the site on pull requests that touch it and publishes it to GitHub Pages from `main` (repository Settings ▸ Pages ▸ Source: GitHub Actions). While the repository is private it only builds it: Pages needs a public repository on the free plan.

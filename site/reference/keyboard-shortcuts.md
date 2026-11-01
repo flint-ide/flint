@@ -45,6 +45,16 @@ These are Flint's default shortcuts. All of them, except the ones that belong to
 | `F8` | Next problem (when not debugging) |
 | `⇧⌘V` | Markdown preview |
 
+### Vim mode
+
+With [Vim mode](../how-to/customize-flint.md#use-vim-key-bindings) on, editors take Vim's keys. A focused Vim editor also keeps `⌃` with a letter, `[` or `]` (so `⌃R` is redo there, not Run, and `⌃D` scrolls instead of starting the debugger); Flint's other shortcuts come first.
+
+| Command | Action |
+|---|---|
+| `:w` | Save |
+| `:q` | Close the tab |
+| `:wq` / `:x` | Save and close the tab |
+
 ## Image preview
 
 | Shortcut | Action |
@@ -59,6 +69,9 @@ These are Flint's default shortcuts. All of them, except the ones that belong to
 |---|---|
 | `⌘L` | Send to agent (selection in the editor or terminal) |
 | `⌥⇧⌘L` | Fix all problems in file with the agent |
+| `⌘I` | Edit the selection (or the current line) with the agent; `Esc` closes the prompt or stops the agent |
+| `⇥` | Accept an inline completion (when one is shown; otherwise indent) |
+| `Esc` | Dismiss an inline completion |
 | `↵` | Send the message (in the chat) |
 | `⇧↵` | New line (in the chat) |
 | `Esc` | Stop the agent while it works |

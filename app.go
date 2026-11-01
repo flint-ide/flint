@@ -9,11 +9,13 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"flint/internal/agentsession"
+	"flint/internal/agenttask"
 	"flint/internal/config"
 	"flint/internal/dap"
 	"flint/internal/db"
@@ -22,6 +24,8 @@ import (
 	"flint/internal/git"
 	"flint/internal/httpfile"
 	"flint/internal/lsp"
+	"flint/internal/mcpserver"
+	"flint/internal/mcptools"
 	"flint/internal/restore"
 	"flint/internal/runner"
 	"flint/internal/scratch"
@@ -48,15 +52,19 @@ type appState struct {
 	// Update remembers the release check (api_update.go): when GitHub was last
 	// asked, its answer, and the release the user skipped.
 	Update update.State `json:"update,omitzero"`
+	// AgentTasks are the agent tasks per repository (tasks_state.go).
+	AgentTasks agenttask.Store `json:"agentTasks,omitempty"`
 }
 
 // App holds the services shared by all bound APIs.
 type App struct {
-	ctx       context.Context // ends when the application shuts down
-	wails     *application.App
-	window    application.Window // the main window
-	configDir string
-	argFolder string
+	ctx    context.Context // ends when the application shuts down
+	wails  *application.App
+	window application.Window // the main window
+	// pageLoaded is set once the window's page has loaded (window_darwin.go).
+	pageLoaded atomic.Bool
+	configDir  string
+	argFolder  string
 
 	db          *db.Manager
 	scratch     *scratch.Store
@@ -69,6 +77,9 @@ type App struct {
 	profiles    *profiles  // temporary profiles and recordings in progress
 	lsp         *lsp.Manager
 	agents      *agentsession.Manager
+	mcp         *mcpserver.Server  // Flint's MCP server for its agents (api_mcp.go)
+	mcpSources  *mcptools.Sources  // what the MCP server's tools read
+	tasks       *agenttask.Tracker // state of agent tasks from their chats
 	sessions    *restore.Store
 	files       fuzzy.Index      // quick-open file list of the open folder
 	http        *httpfile.Client // requests of .http files, sent only on demand
@@ -144,6 +155,8 @@ func NewApp() (*App, error) {
 	if err != nil {
 		log.Printf("flint: %v (using default settings)", err)
 	}
+	a.mcp, a.mcpSources = newMCP(a)
+	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
 	a.agents = newAgentManager(a)
 	return a, nil
 }
@@ -165,6 +178,7 @@ func (a *App) shutdown() {
 		a.dockerAPI.close,
 		a.lsp.Shutdown,
 		func() { _ = a.agents.Close() },
+		func() { _ = a.mcp.Close() },
 		a.db.CloseAll,
 		a.profiles.closeAll,
 		a.closeProject,

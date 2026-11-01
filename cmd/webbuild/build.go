@@ -20,7 +20,9 @@ import (
 )
 
 const (
-	entry     = "src/main.tsx"
+	entry = "src/main.tsx"
+	// bootEntry, if present, runs before the first paint (see bootOptions).
+	bootEntry = "src/boot.ts"
 	distDir   = "dist"
 	assetsDir = "assets"
 	// WKWebView on the oldest macOS Flint supports.
@@ -29,6 +31,9 @@ const (
 
 // entryScript matches the dev entry in index.html, replaced by the built bundle.
 var entryScript = regexp.MustCompile(`<script[^>]*src="\./src/main\.tsx"[^>]*></script>`)
+
+// bootScript matches the boot entry in index.html, replaced by the built script.
+var bootScript = regexp.MustCompile(`<script[^>]*src="\./src/boot\.ts"[^>]*></script>`)
 
 // liveReload listens to esbuild's change stream; a full reload is fast enough
 // for this app and keeps the dev loop free of HMR machinery.
@@ -97,6 +102,26 @@ func bundleOptions(root string, dev bool) api.BuildOptions {
 	return opts
 }
 
+// bootOptions builds src/boot.ts as one classic script, dist/assets/boot.js:
+// index.html loads it in <head>, where it runs before the first paint (module
+// scripts run only after the document is parsed). Keep it tiny.
+func bootOptions(root string, dev bool) api.BuildOptions {
+	opts := bundleOptions(root, dev)
+	opts.EntryPoints = []string{bootEntry}
+	opts.Outdir = ""
+	opts.Outfile = filepath.Join(root, distDir, assetsDir, "boot.js")
+	opts.EntryNames, opts.ChunkNames = "", ""
+	opts.Splitting = false
+	opts.Format = api.FormatIIFE
+	return opts
+}
+
+// hasBoot reports whether the frontend has a boot script.
+func hasBoot(root string) bool {
+	_, err := os.Stat(filepath.Join(root, bootEntry))
+	return err == nil
+}
+
 // build writes a production bundle and index.html into dist/.
 func build(root string) error {
 	start := time.Now()
@@ -106,6 +131,11 @@ func build(root string) error {
 	result := api.Build(bundleOptions(root, false))
 	if len(result.Errors) > 0 {
 		return fmt.Errorf("bundle failed with %d error(s)", len(result.Errors))
+	}
+	if hasBoot(root) {
+		if boot := api.Build(bootOptions(root, false)); len(boot.Errors) > 0 {
+			return fmt.Errorf("boot script failed with %d error(s)", len(boot.Errors))
+		}
 	}
 	if err := writeIndex(root, false); err != nil {
 		return err
@@ -129,6 +159,16 @@ func serve(root string, port int) error {
 	defer ctx.Dispose()
 	if err := ctx.Watch(api.WatchOptions{}); err != nil {
 		return fmt.Errorf("watch: %w", err)
+	}
+	if hasBoot(root) {
+		boot, bootErr := api.Context(bootOptions(root, true))
+		if bootErr != nil {
+			return fmt.Errorf("esbuild boot context: %v", bootErr.Errors)
+		}
+		defer boot.Dispose()
+		if err := boot.Watch(api.WatchOptions{}); err != nil {
+			return fmt.Errorf("watch boot: %w", err)
+		}
 	}
 	inner, err := freePort()
 	if err != nil {
@@ -199,6 +239,7 @@ func writeIndex(root string, dev bool) error {
 		tags += "\n" + liveReload
 	}
 	html := entryScript.ReplaceAllLiteral(src, []byte(tags))
+	html = bootScript.ReplaceAllLiteral(html, []byte(`<script src="./assets/boot.js"></script>`))
 	html = bytes.Replace(html, []byte("</head>"), []byte(cspTag(dev)+"\n"+`    <link rel="stylesheet" href="./assets/main.css"/>`+"\n</head>"), 1)
 	return os.WriteFile(filepath.Join(root, distDir, "index.html"), html, 0o644)
 }

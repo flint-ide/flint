@@ -15,6 +15,7 @@ import { subscribeAgentChatEvents } from './store/agentChat'
 import { subscribeRunEvents, useRun } from './store/run'
 import { subscribeDebugEvents } from './store/debug'
 import { subscribeAutoSave } from './store/settings'
+import { subscribeEditorContext } from './store/editorContext'
 import { activeRoot } from './store/activeRoot'
 import { openDropped } from './store/drop'
 import { refreshTrust, useTrust } from './store/trust'
@@ -23,6 +24,7 @@ import { copyDiagnostics, reportIssue, showLogs } from './store/diagnostics'
 import { subscribeAlerts } from './store/alerts'
 import { openToolCheck, openToolCheckOnFirstRun, useToolCheck } from './store/toolCheck'
 import { checkForUpdates, subscribeUpdates } from './store/update'
+import { useVSCodeImport } from './store/vscodeImport'
 import type { DroppedPath } from './lib/drop'
 import { UsagesModal } from './components/lsp/UsagesModal'
 import { showToast } from './store/dialog'
@@ -47,6 +49,7 @@ const QuickOpen = lazy(() => import('./components/QuickOpen').then((m) => ({ def
 const RunConfigDialog = lazy(() => import('./components/run/RunConfigDialog').then((m) => ({ default: m.RunConfigDialog })))
 const CommandPalette = lazy(() => import('./components/CommandPalette').then((m) => ({ default: m.CommandPalette })))
 const ToolCheck = lazy(() => import('./components/layout/ToolCheck').then((m) => ({ default: m.ToolCheck })))
+const ImportVSCodeDialog = lazy(() => import('./components/settings/ImportVSCodeDialog').then((m) => ({ default: m.ImportVSCodeDialog })))
 
 export default function App() {
   const sidebar = useWorkspace((s) => s.sidebar)
@@ -58,6 +61,7 @@ export default function App() {
   const recentOpen = useWorkspace((s) => s.recentOpen)
   const paletteOpen = useWorkspace((s) => s.paletteOpen)
   const toolCheckOpen = useToolCheck((s) => s.open)
+  const importOpen = useVSCodeImport((s) => s.open)
   const root = useWorkspace((s) => s.root)
   const error = useWorkspace((s) => s.error)
   const editingRun = useRun((s) => s.editing)
@@ -79,6 +83,7 @@ export default function App() {
     subscribeAutoSave()
     subscribeAlerts()
     subscribeUpdates()
+    subscribeEditorContext()
     // Native File menu: Open Folder… / Open Recent ▸ <folder>.
     EventsOn('menu:open-recent', () => useWorkspace.getState().setRecentOpen(true))
     EventsOn('menu:open-folder', (path: string) => void useWorkspace.getState().openFolder(path))
@@ -172,6 +177,11 @@ export default function App() {
       {toolCheckOpen && (
         <Suspense fallback={null}>
           <ToolCheck />
+        </Suspense>
+      )}
+      {importOpen && (
+        <Suspense fallback={null}>
+          <ImportVSCodeDialog />
         </Suspense>
       )}
       <UsagesModal />

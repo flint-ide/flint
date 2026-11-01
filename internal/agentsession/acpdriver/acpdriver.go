@@ -43,6 +43,39 @@ type Options struct {
 	// Untrusted reports a folder the user hasn't trusted; sessions there are
 	// refused (ErrRestricted). Nil trusts every folder (tests).
 	Untrusted func(cwd string) bool
+	// MCP offers Flint's own read-only MCP server in session/new, to agents
+	// that advertise mcpCapabilities.http. Nil offers none.
+	MCP as.MCPProvider
+}
+
+// mcpServers is session/new's mcpServers: Flint's server as an HTTP McpServer
+// when the agent can connect to one, else none. The token travels over the
+// agent's stdin, never its command line. revoke ends the token (a no-op when
+// none was issued).
+func mcpServers(caps acp.MCPCapabilities, provider as.MCPProvider, cwd string) (servers []json.RawMessage, revoke func()) {
+	none := func() {}
+	if !caps.HTTP {
+		return []json.RawMessage{}, none
+	}
+	srv, ok := provider.Offer(cwd)
+	if !ok {
+		return []json.RawMessage{}, none
+	}
+	type header struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	}
+	raw, err := json.Marshal(struct {
+		Type    string   `json:"type"`
+		Name    string   `json:"name"`
+		URL     string   `json:"url"`
+		Headers []header `json:"headers"`
+	}{"http", as.MCPServerName, srv.URL, []header{{"Authorization", "Bearer " + srv.Token}}})
+	if err != nil {
+		srv.Revoke()
+		return []json.RawMessage{}, none
+	}
+	return []json.RawMessage{raw}, srv.Revoke
 }
 
 // Driver starts one ACP agent process per session.
@@ -96,7 +129,12 @@ func (d *Driver) Start(ctx context.Context, cwd string, sink as.Sink) (as.Sessio
 	if err != nil {
 		return as.SessionInfo{}, err
 	}
-	res, err := client.NewSession(ctx, cwd, []json.RawMessage{})
+	servers, revoke := mcpServers(client.Info().AgentCapabilities.MCPCapabilities, d.opts.MCP, cwd)
+	go func() {
+		<-client.Done() // the session's token dies with the agent process
+		revoke()
+	}()
+	res, err := client.NewSession(ctx, cwd, servers)
 	if err != nil {
 		_ = client.Close()
 		return as.SessionInfo{}, err

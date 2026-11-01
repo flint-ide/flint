@@ -22,9 +22,12 @@ type AgentChatAPI struct {
 
 // newAgentManager builds the session manager with every installed driver.
 func newAgentManager(a *App) *as.Manager {
-	m := as.NewManager(func(e as.Event) { a.emit(eventAgentEvent, e) })
-	registerDrivers(m, a.untrusted, a.agentConfig)
-	syncCustomAgents(m, nil, a.currentSettings().CustomAgents, a.untrusted)
+	m := as.NewManager(func(e as.Event) {
+		a.emit(eventAgentEvent, e)
+		a.tasks.Observe(e) // agent tasks follow their chats (tasks_state.go)
+	})
+	registerDrivers(m, a.untrusted, a.agentConfig, a.offerMCP)
+	syncCustomAgents(m, nil, a.currentSettings().CustomAgents, a.untrusted, a.offerMCP)
 	if p, ok := a.agentPolicy(); ok {
 		m.SetPolicy(p)
 	}
@@ -41,7 +44,11 @@ func (c *AgentChatAPI) Agents() []string {
 func (c *AgentChatAPI) Start(agent, cwd string) (as.SessionInfo, error) {
 	ctx, cancel := context.WithTimeout(c.app.ctx, agentStartTimeout)
 	defer cancel()
-	return c.app.agents.Start(ctx, agent, cwd)
+	info, err := c.app.agents.Start(ctx, agent, cwd)
+	if err == nil {
+		c.app.tasks.Bind(info.ID, cwd)
+	}
+	return info, err
 }
 
 // Resume reopens a conversation from an earlier run (after a restart). The
@@ -49,11 +56,19 @@ func (c *AgentChatAPI) Start(agent, cwd string) (as.SessionInfo, error) {
 func (c *AgentChatAPI) Resume(agent, cwd, sessionID string) (as.SessionInfo, error) {
 	ctx, cancel := context.WithTimeout(c.app.ctx, agentStartTimeout)
 	defer cancel()
-	return c.app.agents.Resume(ctx, agent, cwd, sessionID)
+	info, err := c.app.agents.Resume(ctx, agent, cwd, sessionID)
+	if err == nil {
+		c.app.tasks.Bind(info.ID, cwd)
+	}
+	return info, err
 }
 
 // Prompt sends a message; the reply streams as "agent:event" events.
 func (c *AgentChatAPI) Prompt(sessionID, text string, attachments []as.Attachment) error {
+	// Before the turn starts: an early failure's events must come after it.
+	if !c.app.agents.Busy(sessionID) {
+		c.app.tasks.Prompted(sessionID)
+	}
 	return c.app.agents.Prompt(sessionID, text, attachments)
 }
 
@@ -66,7 +81,10 @@ func (c *AgentChatAPI) Respond(sessionID, requestID, optionID string) error {
 }
 
 // Stop ends a conversation and its agent process.
-func (c *AgentChatAPI) Stop(sessionID string) error { return c.app.agents.Stop(sessionID) }
+func (c *AgentChatAPI) Stop(sessionID string) error {
+	c.app.tasks.Unbind(sessionID)
+	return c.app.agents.Stop(sessionID)
+}
 
 // Policy returns which permission requests are answered automatically.
 func (c *AgentChatAPI) Policy() as.Policy { return c.app.agents.Policy() }

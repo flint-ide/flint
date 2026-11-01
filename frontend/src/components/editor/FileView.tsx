@@ -26,6 +26,7 @@ import { CodeEditor } from './CodeEditor'
 import { useBlame } from './useBlame'
 import { isMarkdown } from '../../lib/previewFiles'
 import { markdownMode, setMarkdownMode, usePreview, type MarkdownMode } from '../../store/preview'
+import { editorAi } from '../../store/editorAi'
 
 const MarkdownPreview = lazy(() => import('../preview/MarkdownPreview').then((m) => ({ default: m.MarkdownPreview })))
 const PREVIEW_DELAY_MS = 150
@@ -103,9 +104,10 @@ export function FileView({ tab, active }: Props) {
   const tests = useMemo(() => testGutter(tab.path, { ...testGutterHooks, debug: debugTestMark, menu: testMarkMenu }), [tab.path])
   const breakpoints = useMemo(() => (tab.path.endsWith('.go') ? breakpointGutter(tab.path, breakpointHooks) : []), [tab.path])
   const http = useHttpEditor(tab.path)
+  const ai = useMemo(() => editorAi(tab.path), [tab.path])
   const extensions = useMemo(
-    () => [language, indentation, breakpoints, gitGutter(), blameGutter(), tests, http, lsp, crlf ? EditorState.lineSeparator.of('\r\n') : []],
-    [crlf, language, indentation, breakpoints, tests, http, lsp],
+    () => [language, indentation, breakpoints, gitGutter(), blameGutter(), tests, http, lsp, ai, crlf ? EditorState.lineSeparator.of('\r\n') : []],
+    [crlf, language, indentation, breakpoints, tests, http, lsp, ai],
   )
 
   // Gutter baseline: the file at HEAD of the work tree that contains it (which may be
@@ -260,6 +262,7 @@ export function FileView({ tab, active }: Props) {
 
   const editor = (
     <CodeEditor
+      fileCommands
       initialDoc={file.content}
       language={extensions}
       keys={keys}

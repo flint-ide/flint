@@ -85,6 +85,9 @@ type Options struct {
 	// and permission rules don't apply (-p mode skips Claude Code's own
 	// workspace-trust prompt). Nil trusts every folder.
 	Untrusted func(cwd string) bool
+	// MCP offers Flint's own read-only MCP server to the session (--mcp-config,
+	// next to any the user configured). Nil offers none.
+	MCP agentsession.MCPProvider
 	// Settings, when set, is read on every Start and Resume and replaces Binary,
 	// Model and ExtraArgs, so settings changes apply to new sessions without
 	// re-creating the driver.
@@ -154,20 +157,31 @@ func (d *Driver) start(ctx context.Context, cwd, id string, resume bool, sink ag
 	if err != nil {
 		return agentsession.SessionInfo{}, err
 	}
-	args, err := buildArgs(id, resume, opts, opts.Untrusted != nil && opts.Untrusted(cwd))
-	if err != nil {
-		return agentsession.SessionInfo{}, fmt.Errorf("claude: %w", err)
-	}
 	d.mu.Lock()
 	_, taken := d.sessions[id]
 	d.mu.Unlock()
 	if taken {
 		return agentsession.SessionInfo{}, fmt.Errorf("claude: session %s is already open", id)
 	}
-	s, err := spawn(path, args, cwd, buildEnv(opts.Env, cwd), id, sink)
+	var mcp *agentsession.MCPServer
+	if srv, ok := opts.MCP.Offer(cwd); ok {
+		mcp = &srv
+	}
+	args, err := buildArgs(id, resume, opts, opts.Untrusted != nil && opts.Untrusted(cwd), mcp)
 	if err != nil {
+		mcp.Revoke()
+		return agentsession.SessionInfo{}, fmt.Errorf("claude: %w", err)
+	}
+	s, err := spawn(path, args, cwd, buildEnv(opts.Env, cwd, mcp), id, mcp != nil, sink)
+	if err != nil {
+		mcp.Revoke()
 		return agentsession.SessionInfo{}, err
 	}
+	// The session's token dies with its process, however it ends.
+	go func() {
+		<-s.done
+		mcp.Revoke()
+	}()
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, startTimeout)
@@ -341,8 +355,9 @@ func (s *session) shutdownAsFailure() {
 // conversation sessionID instead of starting a new one under that id. The
 // user's extra arguments come first, so Flint's flags (the stream protocol,
 // the permission prompt and, in untrusted folders, --setting-sources user)
-// are parsed last and win.
-func buildArgs(sessionID string, resume bool, opts Options, untrusted bool) ([]string, error) {
+// are parsed last and win. mcp, when set, is Flint's MCP server: Claude Code
+// merges every --mcp-config, so the user's own servers stay.
+func buildArgs(sessionID string, resume bool, opts Options, untrusted bool, mcp *agentsession.MCPServer) ([]string, error) {
 	mode := opts.PermissionMode
 	if mode == "" {
 		mode = defaultPermissionMode
@@ -355,6 +370,10 @@ func buildArgs(sessionID string, resume bool, opts Options, untrusted bool) ([]s
 		"--include-partial-messages",
 		"--permission-prompt-tool", "stdio",
 		"--permission-mode", mode,
+	}
+	if mcp != nil {
+		// --mcp-config is variadic: the next argument must be a flag.
+		args = append(args, "--mcp-config", mcpConfig(mcp.URL))
 	}
 	if resume {
 		args = append(args, "--resume", sessionID)
@@ -370,14 +389,34 @@ func buildArgs(sessionID string, resume bool, opts Options, untrusted bool) ([]s
 	return agent.ComposeArgs(agent.Claude, opts.ExtraArgs, args, untrusted)
 }
 
+// mcpConfig is an inline --mcp-config for Flint's server. The token is not
+// in it: Claude Code expands ${FLINT_MCP_TOKEN} from the environment, so the
+// token never shows on the command line.
+func mcpConfig(url string) string {
+	type server struct {
+		Type    string            `json:"type"`
+		URL     string            `json:"url"`
+		Headers map[string]string `json:"headers"`
+	}
+	out, _ := json.Marshal(map[string]map[string]server{"mcpServers": {
+		agentsession.MCPServerName: {Type: "http", URL: url, Headers: map[string]string{"Authorization": "Bearer ${" + agentsession.MCPTokenEnv + "}"}},
+	}})
+	return string(out)
+}
+
 // buildEnv returns the CLI environment: Flint's (minus variables of an
-// enclosing Claude Code session), the defaults, the caller's extras and PWD.
-func buildEnv(extra []string, cwd string) []string {
+// enclosing Claude Code session and any inherited MCP token), the defaults,
+// the caller's extras, the MCP token when mcp is set, and PWD.
+func buildEnv(extra []string, cwd string, mcp *agentsession.MCPServer) []string {
 	env := slices.DeleteFunc(os.Environ(), func(kv string) bool {
 		key, _, _ := strings.Cut(kv, "=")
-		return slices.Contains(inheritedEnvDrop, key)
+		return slices.Contains(inheritedEnvDrop, key) || key == agentsession.MCPTokenEnv
 	})
-	return slices.Concat(env, defaultEnv, extra, []string{"PWD=" + cwd})
+	var token []string
+	if mcp != nil {
+		token = []string{agentsession.MCPTokenEnv + "=" + mcp.Token}
+	}
+	return slices.Concat(env, defaultEnv, extra, token, []string{"PWD=" + cwd})
 }
 
 // resolveBinary finds the claude executable. Bare names are looked up on the

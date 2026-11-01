@@ -25,6 +25,8 @@ import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete'
 import { tags as t } from '@lezer/highlight'
 import { useSettings } from '../store/settings'
+import { useVimStatus } from '../store/vimStatus'
+import { showToast } from '../store/dialog'
 
 const theme = EditorView.theme(
   {
@@ -62,7 +64,40 @@ const tracked = ViewPlugin.define((view) => {
   return { destroy: () => liveViews.delete(view) }
 })
 
+// Vim mode (Settings ▸ Editor): @replit/codemirror-vim is fetched the first time it
+// is switched on (its own chunk), then turned on and off in every live editor.
+const vimMode = new Compartment()
+let vimExt: Extension | null = null
+let vimLoad: Promise<void> | null = null
+
+function vimFor(on: boolean): Extension {
+  if (!on) return []
+  if (!vimExt) void loadVim()
+  return vimExt ?? []
+}
+
+function loadVim(): Promise<void> {
+  vimLoad ??= import('./vim').then(
+    (m) => {
+      vimExt = m.vimExtension((mode) => useVimStatus.setState({ mode }))
+      applyVim(useSettings.getState().settings.editor.vimMode)
+    },
+    (err: unknown) => {
+      vimLoad = null
+      showToast(`Vim mode could not be loaded: ${err instanceof Error ? err.message : String(err)}`, 'error')
+    },
+  )
+  return vimLoad
+}
+
+function applyVim(on: boolean): void {
+  const ext = vimFor(on)
+  for (const view of liveViews) view.dispatch({ effects: vimMode.reconfigure(ext) })
+  useVimStatus.setState({ mode: on && vimExt ? 'NORMAL' : '' })
+}
+
 useSettings.subscribe((s, prev) => {
+  if (s.settings.editor.vimMode !== prev.settings.editor.vimMode) applyVim(s.settings.editor.vimMode)
   const themeChanged = s.theme !== prev.theme
   if (!themeChanged && s.settings.editor === prev.settings.editor) return
   for (const view of liveViews) {
@@ -91,6 +126,8 @@ const highlight = HighlightStyle.define([
 /** Base editor extensions: a trimmed-down basicSetup with Flint's theme. */
 export function baseExtensions(): Extension[] {
   return [
+    // First, so Vim's keys come before the other keymaps.
+    vimMode.of(vimFor(useSettings.getState().settings.editor.vimMode)),
     lineNumbers(),
     highlightActiveLineGutter(),
     highlightSpecialChars(),

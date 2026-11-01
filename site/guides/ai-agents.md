@@ -75,6 +75,42 @@ Open chats are part of the project session. After a restart you see the transcri
 
 Context goes to the chat of the project it belongs to: the active or most recently used chat there, or a new chat with the default agent if there is none. It lands in the draft so you can add your own words before sending. `⌥`-click sends it immediately.
 
+## What agents can see in Flint
+
+An agent chat in Flint can also look things up by itself. Flint runs a small [MCP](https://modelcontextprotocol.io) server and offers it to every chat, so the agent can read what Flint knows and a terminal doesn't:
+
+| Tool | What the agent gets | Default |
+|---|---|---|
+| `get_diagnostics` | The errors and warnings the language servers report, for the project, a folder or a file. Only files a language server has checked are included: usually the open files and, for Go, their packages. | On |
+| `get_editor_state` | The files open in the editor (and which have unsaved changes), the active file, and your selection with its text, or the cursor position. Ask about "this function" and the agent can see which one. | On |
+| `get_test_results` | The last test run in Flint: totals, and each failed test with its location and output. | On |
+| `get_terminal_output` | The recent output your terminals and run consoles printed while they were in the project (dev servers, builds), as plain text without colors. | Off |
+| `get_kubernetes_status` | What is failing in a namespace of the current Kubernetes context: unhealthy apps, workloads that didn't roll out, failing pods with their reason, failed jobs and warning events. No secrets and no logs. | Off |
+
+The tools only read. Claude Code shows them as `mcp__flint__…`.
+
+- Diagnostics, editor state and test results show only the project's own state. With the default approval policy ("Read and search the project" on) Claude Code runs them without asking, so the agent can look at what you are looking at without a prompt each time.
+- Terminal output and Kubernetes status can show anything you saw: a token printed in a terminal, another cluster's names. They are off until you turn them on, and then the agent asks before each call, even with "Read and search" on. This keeps Flint's rule that nothing goes to an AI provider without you seeing it.
+- Codex and custom agents decide about all of them with their own rules.
+
+How it is protected:
+
+- The server listens only on `127.0.0.1`, on a port the system picks. It starts with the first chat and closes when you switch it off or quit.
+- Each chat gets its own random token, which stops working when the chat's agent stops or its project is closed. An agent only ever sees its own project (the Kubernetes tool is the exception: it reads the current context, like `kubectl` does). Requests without a valid token, or from a web page, are refused.
+- Terminal output is kept by where it was printed: output from before a terminal moved into the project (with `cd`) isn't shown. A command that changes folders and prints in one go (`cd ~ && cat secrets`) can still land in the project's part, because Flint learns the new folder just after the output.
+- The token reaches the agent through the `FLINT_MCP_TOKEN` environment variable (Claude Code expands it in the server's `Authorization` header; Codex reads it with `bearer_token_env_var`) or the ACP connection, never on a command line. Programs the agent runs inherit the variable, so they can use the tools too while the chat lasts.
+- Answers are bounded in size, and credentials (keys, tokens, passwords in URLs) are redacted before they reach the agent.
+- Folders in [Restricted Mode](restricted-mode.md) get no access.
+
+Which agents get it:
+
+- **Claude Code**: through `--mcp-config`, next to your own MCP servers.
+- **Codex**: through `-c mcp_servers.flint…` overrides, when `codex mcp add --help` shows it supports HTTP MCP servers (`--url` and `--bearer-token-env-var`); an older Codex starts without it.
+- **Custom (ACP) agents**: when the agent says it can connect to HTTP MCP servers (`mcpCapabilities.http`); otherwise not.
+- Commit messages and other one-shot runs don't use it.
+
+To turn it off, or to switch single tools on or off, open Settings (`⌘,`) ▸ **Agent Context**. Switching the server off closes it and cuts running chats off at once. See [`mcpServer`](../reference/settings.md#mcpserver) for the keys.
+
 ## What the agent may do without asking
 
 The link in the chat header (for example **auto: edits**) shows and changes the approval policy. The policy is shared by all chats and kept between runs.
@@ -98,13 +134,58 @@ You never have to accept diffs one by one. Edits are applied directly, show up i
 - **✦ Generate message** in the Commit panel gives the agent the diff of the ticked files and your recent commit messages. The result lands in the message field for you to edit.
 - **Resolve with claude** (or your default agent, when it is Claude Code or Codex) appears when there are merge conflicts. It opens an interactive agent session in a new terminal. The agent runs `git add` on resolved files but doesn't commit.
 
+## Edit with Agent in the editor
+
+Select code (or put the cursor on a line) and press `⌘I` ("Edit Selection with Agent…"). A small prompt opens above it; type what to change, for example "add error handling", and press `↵`.
+
+- The default agent runs once, headless, like **Generate message**. It gets the file's path, its language, the selection and the lines around it (Settings ▸ AI in the Editor ▸ Context lines, 60 by default), and is asked for the replacement text only. Secrets in the surrounding lines are redacted; a selection that contains something that looks like a credential is not sent.
+- Claude Code runs with read-only tools (Read, Grep, Glob) and without MCP servers, and Codex in its read-only sandbox, so text in the file can't make the agent change files or run commands. Files that hold credentials (`.env*`, keys, kubeconfig) are refused.
+- The answer replaces the selection directly, as one change: one `⌘Z` takes it back. There is no accept or reject step.
+- If you edit the selected code while the agent works, its answer is not applied and the prompt says so. Typing elsewhere in the file is fine.
+- `Esc` closes the prompt; while the agent works, it also stops the agent. Errors (no agent installed, a timeout) appear in the prompt.
+- In Restricted Mode the run follows the rules below: Claude Code without the project's settings, no extra arguments, and custom ACP agents don't start.
+
+Change the shortcut in Settings ▸ Keymap.
+## Agent tasks: agents in parallel
+
+An agent task gives an agent its own branch in its own [git worktree](git-and-github.md), so several agents can work at once without touching each other's files or yours.
+
+1. Run "New Agent Task…" from the command palette (`⇧⌘P`), or click `＋` in the **Agent Tasks** panel (`⑂` on the activity bar).
+2. Describe the task. Its first line names the branch: "Add rate limiting" becomes `agent/add-rate-limiting` (`-2`, `-3`… when the name is taken).
+3. Pick the agent (the default agent is preselected; Claude Code, Codex or a custom agent) and the branch to start from (the current one by default), then click **Start** (`⌘↵`).
+
+Flint creates the branch and the worktree (by default in `<repository>.worktrees/` next to your checkout, like **New Worktree…** in the branch widget), attaches the folder to the window as another project, opens a chat there and sends your description as the first message. Nothing else is added to it.
+
+The panel lists the tasks of every repository open in the window, newest first. Each row shows:
+
+| What | Meaning |
+|---|---|
+| State | **working**, **waiting for you** (the agent asks for approval in its chat), **finished** (the turn ended: review it), **failed** (the error is shown under the row) or **idle**. It follows the chat's own events; nothing polls. |
+| Branch | The task's branch, and **↑N** for the commits its base doesn't have yet. |
+| Changes | Files changed since the branch left its base, committed or not, new files included, with added and removed lines (**merged** once its base has every commit). Refreshed when files or Git change. |
+
+The actions:
+
+- **Open** shows the task's folder and its chat (a new chat if you closed it).
+- **Show diff** lists the changed files; click one for a side-by-side diff against the point where the branch started.
+- **✦ Ask agent** (failed tasks) puts the error into the task's chat draft, so you can add a hint and send it.
+- **Merge** merges the branch into its base, in the checkout where the base is checked out. Flint refuses while the task or that checkout has uncommitted changes, or while the agent is working. When the merge would conflict, nothing is changed: Flint offers to merge the base into the task's branch instead (always with a merge commit) and let an agent resolve the conflicts there, in a terminal (as **Resolve with claude** does); then merge again.
+- **Create PR** pushes the task's branch (whatever the worktree has checked out at the moment) and creates a pull request into its base with `gh`, titled with the task's first line and described by its text. Flint asks first, because it publishes the branch. **PR ↗** opens it afterwards.
+- **✕** removes the task: it stops the task's chats, closes its folder and deletes the worktree. Uncommitted work, new files, ignored files such as `.env` or build output, and a branch with commits its base doesn't have are deleted only if you confirm; otherwise the branch is kept.
+
+Tasks are remembered per repository in `state.json`, so they survive a restart. A task whose worktree folder was deleted outside Flint shows as **stale** and can only be removed; removing it forgets only that worktree, not other missing ones (for example on a disk that isn't connected).
+
+In [Restricted Mode](restricted-mode.md), a task's worktree is trusted when the checkout it started from is trusted (it holds the same repository's commits); otherwise it stays restricted like any new folder. Removing the task, or the worktree folder disappearing, removes that trust again. Because trust follows folders, a task from an untrusted checkout can't put its worktree inside a trusted folder, and no task worktree may lie inside the checkout itself; Flint refuses and asks you to pick another worktree folder. Worktrees you create by hand with **New Worktree…** don't inherit trust: trust them like any other folder.
+
+The worktree folder and the branch prefix are settings (Settings ▸ Agents ▸ Agent tasks; [`agentTasks`](../reference/settings.md#agenttasks) in `settings.json`).
+
 ## Notifications
 
 When an agent turn finishes while Flint isn't the active app, you get a macOS notification (click it to jump to the chat) and a badge on the Dock icon. Turn this off in Settings ▸ Agents.
 
 ## Agents in Restricted Mode
 
-In a folder you haven't trusted, agents run without the project's own agent settings and hooks (Claude Code is started with `--setting-sources user`). Trust the folder to let them apply. Custom ACP agents don't start there at all. See [Restricted Mode](restricted-mode.md).
+In a folder you haven't trusted, agents run without the project's own agent settings and hooks (Claude Code is started with `--setting-sources user`). Trust the folder to let them apply. Custom ACP agents don't start there at all, and chats there don't get [Flint's MCP server](#what-agents-can-see-in-flint): a hostile repository could otherwise steer the agent into reading your terminals or cluster without a prompt. See [Restricted Mode](restricted-mode.md).
 
 ## Related
 

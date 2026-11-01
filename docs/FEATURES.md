@@ -88,6 +88,17 @@ Panel ☑ (palette: "TODO List"):
 - On errors and warnings there is a *Fix with agent* button (and *Fix all N in file*, also `⌥⇧⌘L`): the chat receives the path, line:column, severity, source (for example gopls), message and the surrounding lines as an attachment.
 - Server status and an install hint are shown in the status bar.
 
+### Vim mode
+
+- `editor.vimMode` (Settings ▸ Editor, or "Toggle Vim Mode" in the palette) turns on Vim key bindings in every editor, live, through [`@replit/codemirror-vim`](https://github.com/replit/codemirror-vim) loaded as a separate chunk only when the mode is on. The status bar shows `-- NORMAL --`, `-- INSERT --` or `-- VISUAL --`.
+- `:w`, `:q`, `:wq` and `:x` save and close the file's tab; in diffs and other read-only views they only show a note.
+- A focused Vim editor keeps `⌃` plus a letter, `[` or `]` (redo, half-page scrolls, visual block, and so on); Flint's own `⌃R` / `⌃D` still work outside editors, and `⌘` shortcuts work everywhere.
+
+### AI in the editor
+
+- **Edit with Agent** (`⌘I`, "Edit Selection with Agent…"): a prompt above the selection (or the cursor's line). The default agent runs headless with the file path, the selection and `inlineEdit.contextLines` lines around it (secrets redacted), and its answer replaces the selection as one edit (`⌘Z` undoes it), but only if that text hasn't changed meanwhile. `Esc` stops the agent. Claude Code runs with only `Read`, `Grep` and `Glob` and no MCP servers; Codex with `--sandbox read-only`; a custom agent only in a trusted folder. Files that hold secrets (`.env*`, keys, `credentials`, kubeconfig, …) are refused.
+- **Inline completions** (off by default): ghost text from a fill-in-the-middle model, Ollama (`/api/generate`) or an OpenAI-compatible server (`/v1/completions`), requested after a typing pause. `Tab` accepts, `Esc` or any other edit dismisses, and each new request cancels the previous one. Plain `http` is allowed only for `localhost`; for a remote endpoint secrets in the context are redacted, secret files are never sent, and the API key lives in the Keychain per endpoint origin. The status bar shows ✦ while on and ⚠ with the error (for example "Ollama is not running").
+
 ### Scratchpads
 
 Persistent SQL consoles and notes (MD/TXT) with autosave. `⌘↵` runs the query under the cursor or the selection. Results go to a virtualized table (up to 200k rows) with export to TSV/JSON.
@@ -112,6 +123,20 @@ Persistent SQL consoles and notes (MD/TXT) with autosave. `⌘↵` runs the quer
 - It starts only in a trusted folder (see [Restricted Mode](#restricted-mode-workspace-trust)). Its permission requests go through the same approval policy as the native agents. Flint offers it file reads and writes (ACP `fs/*`) only inside the chat's folder, never into `.git`, and no terminal; the agent runs in its own process group, which is killed when the chat closes and when Flint quits.
 - There is no environment setting: `settings.json` is plain text, so API keys don't belong there. Log in with the agent's own command (`gemini`, `opencode auth login`) before using it.
 - Custom agents can't be resumed after a restart; a restored chat continues in a new conversation and says so.
+
+### Agent tasks (parallel agents in worktrees)
+
+- "New Agent Task…" (palette, or `＋` in the Agent Tasks panel ⑂): a description, an agent (default from settings; Claude Code, Codex or a custom agent) and a base branch (default: current). Flint creates a branch (`agentTasks.branchPrefix` + a slug of the first line, made unique) and a worktree (`agentTasks.worktreeDir`, default `<repo>.worktrees/<branch>` like the branch widget), attaches it to the window, starts a chat there and sends the description as the first message (`TaskAPI`, `internal/agenttask`).
+- The panel lists the tasks of the open repositories with their state (working / waiting for approval / idle / finished / failed), derived in Go from the chats' agent session events (`agenttask.Tracker`, bound when a chat starts or resumes in the worktree; no polling), the branch, commits ahead of base, and changed files with +/- against the merge base (committed, uncommitted and new files), refreshed on file-watcher and git events.
+- Actions: Open (folder + chat), Show diff (per-file side-by-side diff against the merge base), ✦ Ask agent on a failed task (error in the chat draft), Merge (in the checkout where base is checked out; refused while the task or that checkout is dirty; conflicts are found with `git merge-tree` without touching anything, and Flint offers to merge base into the task and hand the conflicts to the agent in a terminal), Create PR (push + `gh pr create` after a native confirmation), Remove (stops the chats, deletes the worktree; uncommitted work and unmerged branches only after confirmation).
+- Tasks are kept per repository (keyed by the common git dir) in `state.json` with their last settled state; a task whose worktree vanished is shown as stale and can be removed (only its own entry under `.git/worktrees` goes; other missing worktrees are left alone). A task's worktree is trusted when the checkout it started from is trusted; a task from an untrusted checkout may not put its worktree inside a trusted folder (trust is by path), and no task worktree may lie inside the checkout. Worktrees made by hand from the branch widget don't inherit trust. Branches are always named by full ref (`refs/heads/…`), so a same-named tag can't stand in for one; the base must be a plain local branch name.
+
+### Agent context (Flint's MCP server)
+
+- Chats started by Flint get Flint's own MCP server (`internal/mcpserver`, MCP over HTTP on `127.0.0.1`, standard library only) with read-only tools (`internal/mcptools`): `get_diagnostics` (language server problems), `get_editor_state` (open files, the active file and the selection), `get_test_results` (the last test runs), and, when turned on in Settings ▸ Agent Context, `get_terminal_output` and `get_kubernetes_status`.
+- Claude Code gets it through `--mcp-config`, Codex through `-c mcp_servers.flint.*` (only when the installed Codex supports HTTP servers), custom ACP agents in `session/new` when they advertise HTTP MCP support. Commit messages and inline edits don't get it.
+- Every chat gets its own token (in `FLINT_MCP_TOKEN`, never on a command line), revoked when the chat ends or its project closes; a token only sees its own project. Requests from web pages are refused (Host and Origin checks), answers are redacted and bounded, and turning the server off closes its port.
+- Diagnostics, editor state and test results count as reads (no prompt). Terminal output and cluster status are off by default and always ask, because they can show anything, including what a command printed from outside the project. Untrusted folders get no server.
 
 ### Commit messages and conflicts
 
@@ -327,7 +352,7 @@ Unhealthy apps are sorted first and expanded.
 
 ### Settings
 
-`⌘,` (flint menu ▸ Settings…, or "Settings…" in the palette) opens a settings tab with Appearance, Editor, Terminal, Agents, Language Servers, Refresh, TODO List, Keymap and Updates sections. Every change applies immediately, without a restart, and saves itself (agent settings apply to sessions started afterwards).
+`⌘,` (flint menu ▸ Settings…, or "Settings…" in the palette) opens a settings tab with Appearance, Editor, Terminal, Agents, Agent Context, AI in the Editor, Language Servers, Refresh, TODO List, Keymap, Updates and Import sections. Every change applies immediately, without a restart, and saves itself (agent settings apply to sessions started afterwards).
 
 - **Theme**: Dark, Light or System (follows the macOS appearance, `prefers-color-scheme`). Colors are CSS variables in `style.css` (`:root` and `[data-theme="light"]`); terminals have their own palette (`lib/terminalTheme.ts`); Go switches the title bar and window buttons (`NSApp.appearance`). The theme from the last run is applied before the first render (a copy in `localStorage`, and the window appearance set in Go before the window is created), so a light theme never flashes dark.
 - **Editor**: font family, size and line height for all CodeMirror editors (files, diffs, scratchpads); optional save on window focus loss.
@@ -337,6 +362,8 @@ Unhealthy apps are sorted first and expanded.
 - **Refresh**: how often the Kubernetes panel (default 5 s, 2–600 s) and the AWS panel (default 30 s, 5–3600 s) re-read their data while shown; values out of range are clamped. Git status, Docker and pull requests don't poll.
 - **Keymap**: a searchable list of all commands (by name or by shortcut, for example `⌘K`). Click a shortcut and press a new combination to change it; conflicts with other commands are shown, `↺` restores the default and `✕` removes it. Shortcuts handled by CodeMirror (`⌘F`, `⌘S`, `⌘↵`, and so on) are display-only. Overrides go into a layer of the command registry (`lib/commands.ts`), so the palette and the dispatcher use the effective shortcuts.
 - **Updates**: the daily release check (see [Update check](#update-check)) can be turned off; **Check Now** checks right away.
+- **Agent Context** and **AI in the Editor**: see [Agent context](#agent-context-flints-mcp-server) and [AI in the editor](#ai-in-the-editor).
+- **Import** ("Import from VS Code…" in the palette): reads VS Code's, Cursor's or VSCodium's `settings.json`, `keybindings.json` and active color theme (from its extension, following `include`), and shows what it would change and what it skips and why (chords, `when` clauses, settings Flint doesn't have, built-in themes). Nothing is written until you confirm. An imported theme becomes `theme: "custom"`: a palette over the dark or light base, limited to Flint's own color variables and hex colors.
 - **Trusted folders**: see [Restricted Mode](#restricted-mode-workspace-trust).
 
 ### macOS integration (Wails v3)

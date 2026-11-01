@@ -31,6 +31,7 @@ func main() {
 	}
 
 	gitAPI := &GitAPI{app: flint}
+	gh := github.New()
 	lspAPI := &LSPAPI{app: flint}
 	lspAPI.wire()
 	app := application.New(application.Options{
@@ -63,18 +64,22 @@ func main() {
 			application.NewService(&AgentAPI{app: flint, git: gitAPI}),
 			application.NewService(lspAPI),
 			application.NewService(&AgentChatAPI{app: flint}),
+			application.NewService(&EditorContextAPI{app: flint}),
 			application.NewService(&DiffAPI{}),
 			application.NewService(&TodoAPI{app: flint}),
 			application.NewService(flint.dockerAPI),
 			application.NewService(&HTTPAPI{app: flint}),
 			application.NewService(&PreviewAPI{app: flint}),
 			application.NewService(&SettingsAPI{app: flint}),
-			application.NewService(&GitHubAPI{app: flint, git: gitAPI, gh: github.New()}),
+			application.NewService(&GitHubAPI{app: flint, git: gitAPI, gh: gh}),
+			application.NewService(&TaskAPI{app: flint, git: gitAPI, pr: gh}),
+			application.NewService(&ImportAPI{app: flint}),
 			application.NewService(newAlertsAPI(flint)),
 			application.NewService(newAWSAPI(flint)),
 			application.NewService(&KubeAPI{app: flint}),
 			application.NewService(&DiagnosticsAPI{app: flint}),
 			application.NewService(&UpdateAPI{app: flint}),
+			application.NewService(newCompletionsAPI(flint)),
 		},
 	})
 	flint.wails = app
@@ -89,6 +94,8 @@ func main() {
 		MinWidth:         800,
 		MinHeight:        500,
 		BackgroundColour: background,
+		// Shown by showWindowEarly as soon as it exists, not after the page loads.
+		Hidden: true,
 		// Folders and files dragged from Finder (see filesDropped).
 		EnableFileDrop: true,
 		Mac: application.MacWindow{
@@ -114,6 +121,12 @@ func main() {
 		flint.emit(eventFilesDropped, droppedPaths(e.Context().DroppedFiles()))
 	})
 	flint.window = win
+	app.Event.OnApplicationEvent(events.Mac.ApplicationDidFinishLaunching, func(*application.ApplicationEvent) {
+		flint.showWindowEarly()
+	})
+	win.OnWindowEvent(events.Mac.WebViewDidFinishNavigation, func(*application.WindowEvent) {
+		flint.onPageLoaded()
+	})
 
 	if err := app.Run(); err != nil {
 		log.Fatalf("flint: %v", err)

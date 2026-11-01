@@ -290,6 +290,63 @@ export class Commit {
 }
 
 /**
+ * DiffStat summarises what the work tree changed since it forked from base.
+ */
+export class DiffStat {
+    /**
+     * MergeBase is where the branch left base; diffs are taken against it.
+     */
+    "mergeBase": string;
+    "files": FileStat[];
+
+    /**
+     * Count covers every file. Added and Deleted cover every tracked file but
+     * only the new files that are listed (their lines are counted by reading
+     * them, so the rest are left out).
+     */
+    "count": number;
+    "added": number;
+    "deleted": number;
+    "truncated": boolean;
+
+    /** Creates a new DiffStat instance. */
+    constructor($$source: Partial<DiffStat> = {}) {
+        if (!("mergeBase" in $$source)) {
+            this["mergeBase"] = "";
+        }
+        if (!("files" in $$source)) {
+            this["files"] = [];
+        }
+        if (!("count" in $$source)) {
+            this["count"] = 0;
+        }
+        if (!("added" in $$source)) {
+            this["added"] = 0;
+        }
+        if (!("deleted" in $$source)) {
+            this["deleted"] = 0;
+        }
+        if (!("truncated" in $$source)) {
+            this["truncated"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new DiffStat instance from a string or object.
+     */
+    static createFrom($$source: any = {}): DiffStat {
+        const $$createField1_0 = $$createType6;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("files" in $$parsedSource) {
+            $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
+        }
+        return new DiffStat($$parsedSource as Partial<DiffStat>);
+    }
+}
+
+/**
  * FileChange is one entry of `git status`.
  */
 export class FileChange {
@@ -383,12 +440,67 @@ export class FileCommit {
      * Creates a new FileCommit instance from a string or object.
      */
     static createFrom($$source: any = {}): FileCommit {
-        const $$createField0_0 = $$createType5;
+        const $$createField0_0 = $$createType7;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("commit" in $$parsedSource) {
             $$parsedSource["commit"] = $$createField0_0($$parsedSource["commit"]);
         }
         return new FileCommit($$parsedSource as Partial<FileCommit>);
+    }
+}
+
+/**
+ * FileStat is one file's line counts in a DiffStat.
+ */
+export class FileStat {
+    /**
+     * relative to the work tree
+     */
+    "path": string;
+
+    /**
+     * source of a rename
+     */
+    "origPath": string;
+    "added": number;
+    "deleted": number;
+    "binary": boolean;
+
+    /**
+     * Untracked: a new file git doesn't track yet.
+     */
+    "untracked": boolean;
+
+    /** Creates a new FileStat instance. */
+    constructor($$source: Partial<FileStat> = {}) {
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("origPath" in $$source)) {
+            this["origPath"] = "";
+        }
+        if (!("added" in $$source)) {
+            this["added"] = 0;
+        }
+        if (!("deleted" in $$source)) {
+            this["deleted"] = 0;
+        }
+        if (!("binary" in $$source)) {
+            this["binary"] = false;
+        }
+        if (!("untracked" in $$source)) {
+            this["untracked"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new FileStat instance from a string or object.
+     */
+    static createFrom($$source: any = {}): FileStat {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new FileStat($$parsedSource as Partial<FileStat>);
     }
 }
 
@@ -585,7 +697,7 @@ export class Status {
      * Creates a new Status instance from a string or object.
      */
     static createFrom($$source: any = {}): Status {
-        const $$createField5_0 = $$createType7;
+        const $$createField5_0 = $$createType9;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField5_0($$parsedSource["files"]);
@@ -660,6 +772,8 @@ const $$createType1 = $Create.Array($$createType0);
 const $$createType2 = BlameRange.createFrom;
 const $$createType3 = $Create.Array($$createType2);
 const $$createType4 = $Create.Array($Create.Any);
-const $$createType5 = Commit.createFrom;
-const $$createType6 = FileChange.createFrom;
-const $$createType7 = $Create.Array($$createType6);
+const $$createType5 = FileStat.createFrom;
+const $$createType6 = $Create.Array($$createType5);
+const $$createType7 = Commit.createFrom;
+const $$createType8 = FileChange.createFrom;
+const $$createType9 = $Create.Array($$createType8);

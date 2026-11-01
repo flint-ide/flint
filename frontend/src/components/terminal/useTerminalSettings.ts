@@ -4,11 +4,12 @@ import type { Terminal } from '@xterm/xterm'
 import { useSettings } from '../../store/settings'
 import { terminalOptions, type TerminalOptions } from '../../lib/terminalTheme'
 import { fitTerminal } from '../../lib/terminalFit'
+import type { AppSettings } from '../../lib/settings'
 
 /** Options for a new terminal from the current settings. */
 export function currentTerminalOptions(sizeDelta = 0): TerminalOptions {
   const { settings, theme } = useSettings.getState()
-  return terminalOptions(settings.terminal, theme, sizeDelta)
+  return terminalOptions(settings.terminal, theme, sizeDelta, customColors(settings))
 }
 
 /**
@@ -19,11 +20,17 @@ export function currentTerminalOptions(sizeDelta = 0): TerminalOptions {
 export function useTerminalSettings(term: RefObject<Terminal | null>, active: boolean, sizeDelta = 0): void {
   const font = useSettings((s) => s.settings.terminal)
   const theme = useSettings((s) => s.theme)
+  const custom = useSettings((s) => customColors(s.settings))
   useEffect(() => {
     const xterm = term.current
     if (!xterm || !active) return
-    if (apply(xterm, terminalOptions(font, theme, sizeDelta))) fitTerminal(xterm)
-  }, [term, active, font, theme, sizeDelta])
+    if (apply(xterm, terminalOptions(font, theme, sizeDelta, custom))) fitTerminal(xterm)
+  }, [term, active, font, theme, sizeDelta, custom])
+}
+
+/** The custom theme's colors while Theme is Custom. */
+function customColors(s: AppSettings): Readonly<Record<string, string>> | undefined {
+  return s.theme === 'custom' ? s.customTheme.colors : undefined
 }
 
 /** Sets the options that changed; true when the cell size may have. */

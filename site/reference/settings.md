@@ -8,7 +8,7 @@ Flint stores your preferences in `settings.json`. The [Settings tab](../guides/s
 ~/Library/Application Support/flint/settings.json
 ```
 
-The file is readable only by your user. It never contains secrets: database passwords live in the macOS Keychain, and other credentials stay with the tools that own them.
+The file is readable only by your user. It never contains secrets: database passwords and the completion endpoint's API key live in the macOS Keychain, and other credentials stay with the tools that own them.
 
 > **Note:** Flint reads `settings.json` when it starts. If you edit the file by hand, restart Flint to apply your changes. Changes made in the Settings tab apply immediately; agent settings apply to agent sessions started afterwards.
 
@@ -28,7 +28,8 @@ The file is readable only by your user. It never contains secrets: database pass
   "editor": {
     "fontFamily": "'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace",
     "fontSize": 14,
-    "lineHeight": 1.55
+    "lineHeight": 1.55,
+    "vimMode": false
   },
   "terminal": {
     "fontFamily": "\"JetBrains Mono\", \"SF Mono\", Menlo, monospace",
@@ -59,7 +60,23 @@ The file is readable only by your user. It never contains secrets: database pass
     "python": { "disabled": false, "command": "pylsp", "args": [] },
     "rust": { "disabled": true, "command": "", "args": [] }
   },
-  "refresh": { "kubernetesSeconds": 10, "awsSeconds": 60 }
+  "refresh": { "kubernetesSeconds": 10, "awsSeconds": 60 },
+  "mcpServer": {
+    "enabled": true,
+    "tools": { "diagnostics": true, "editor": true, "terminals": true, "tests": true, "kubernetes": false },
+    "terminalLines": 200
+  },
+  "completions": {
+    "enabled": true,
+    "provider": "ollama",
+    "endpoint": "http://localhost:11434",
+    "model": "qwen2.5-coder:1.5b-base",
+    "debounceMs": 300,
+    "maxTokens": 64,
+    "contextLines": 100
+  },
+  "inlineEdit": { "contextLines": 60 },
+  "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/" }
 }
 ```
 
@@ -68,9 +85,10 @@ The file is readable only by your user. It never contains secrets: database pass
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `version` | number | `1` | Schema version. Written by Flint; you don't need to change it. |
-| `theme` | string | `"dark"` | `"dark"`, `"light"` or `"system"` (follows the macOS appearance). |
-| `editor` | object | see below | Font for all editors: files, diffs and scratchpads. |
+| `theme` | string | `"dark"` | `"dark"`, `"light"`, `"system"` (follows the macOS appearance) or `"custom"` (uses `customTheme`). |
+| `editor` | object | see below | Font for all editors (files, diffs and scratchpads), and `vimMode`: Vim key bindings in every editor (default `false`). |
 | `terminal` | object | see below | Font for terminals and run consoles. |
+| `customTheme` | object | see below | The palette of the `"custom"` theme, usually imported from VS Code. See [customTheme](#customtheme). |
 | `defaultAgent` | string | `""` | Agent for new chats, commit messages and conflict resolution: `"claude"`, `"codex"` or the `id` of a custom agent. Empty means the first installed agent. Conflict resolution always uses Claude Code or Codex. |
 | `autoSave` | boolean | `false` | Save modified files when the Flint window loses focus. |
 | `notifyInBackground` | boolean | `true` | Show a macOS notification and a Dock badge when a run, a test run or an agent finishes while Flint is in the background. |
@@ -81,6 +99,10 @@ The file is readable only by your user. It never contains secrets: database pass
 | `customAgents` | array | `[]` | Other agents, spoken to over the Agent Client Protocol. See [customAgents](#customagents). |
 | `languageServers` | object | `{}` | Language servers by language (`"go"`, `"typescript"`, `"python"`, `"rust"`). See [languageServers](#languageservers). |
 | `refresh` | object | see below | How often polling panels re-read their data. See [refresh](#refresh). |
+| `mcpServer` | object | see below | What Flint's own MCP server tells the agents Flint starts. See [mcpServer](#mcpserver). |
+| `completions` | object | see below | Inline suggestions from a code model (off by default). See [completions](#completions). |
+| `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
+| `agentTasks` | object | see below | Where agent task worktrees go and how their branches are named. See [agentTasks](#agenttasks). |
 
 ### Font objects
 
@@ -93,6 +115,28 @@ The file is readable only by your user. It never contains secrets: database pass
 | `lineHeight` | number (multiple of the font size) | 1.0–2.5 | `1.55` | `1.2` |
 
 `fontFamily` is a CSS font list; the first installed font is used. It may not contain `;`, `{`, `}`, `<`, `>` or `\`.
+
+`editor` also has `vimMode` (boolean, default `false`): Vim key bindings in every editor. See [Use Vim key bindings](../how-to/customize-flint.md#use-vim-key-bindings).
+
+### customTheme
+
+The palette used when `theme` is `"custom"`. [Import from VS Code](../how-to/customize-flint.md#import-your-settings-from-vs-code) writes it; you can also edit it by hand.
+
+```json
+"customTheme": {
+  "name": "One Dark Pro",
+  "base": "dark",
+  "colors": { "--bg-editor": "#282c34", "--fg": "#abb2bf", "--syn-keyword": "#c678dd" }
+}
+```
+
+| Key | Type | Meaning |
+|---|---|---|
+| `name` | string | Shown in Settings ▸ Appearance; up to 100 characters. |
+| `base` | string | `"dark"` or `"light"`: the palette the colors are laid over. It also sets the window appearance and the terminal's ANSI colors. |
+| `colors` | object | CSS variable → hex color (`#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`). Variables not listed keep the base palette's color. |
+
+Accepted variables: `--bg`, `--bg-sidebar`, `--bg-editor`, `--bg-raised`, `--bg-hover`, `--bg-active`, `--border`, `--fg`, `--fg-muted`, `--fg-faint`, `--fg-name`, `--accent`, `--accent-dim`, `--accent-fg`, `--danger`, `--warn`, `--info`, `--ok`, `--selection`, `--selection-match`, `--search-match`, `--active-line`, `--git-added`, `--git-modified`, `--git-deleted`, `--diff-ins-bg`, `--diff-del-bg`, and the syntax colors `--syn-keyword`, `--syn-string`, `--syn-number`, `--syn-comment`, `--syn-function`, `--syn-type`, `--syn-property`, `--syn-definition` and `--syn-punct`. Other names and other color formats are dropped when the file is read and refused when it is saved.
 
 ### keymap
 
@@ -114,6 +158,7 @@ The easiest way to find a command id is Settings ▸ Keymap: hover a command's n
 | Toggle Terminal | `terminal.toggle` |
 | New Terminal | `terminal.new` |
 | Send Selection to Agent | `agent.sendSelection` |
+| Edit Selection with Agent | `agent.inlineEdit` |
 | Run | `run.selected` |
 | Debug | `debug.selected` |
 
@@ -138,7 +183,7 @@ Each entry configures one agent CLI. A missing entry or key uses the default.
 
 Extra arguments are placed before Flint's own flags, so where a CLI lets a repeated flag override an earlier one, Flint's flag wins. They also may not:
 
-- name a flag Flint sets. For Claude Code: `-p`/`--print`, `--input-format`, `--output-format`, `--include-partial-messages`, `--replay-user-messages`, `--permission-prompt-tool`, `--permission-mode`, `--dangerously-skip-permissions`, `--allow-dangerously-skip-permissions`, `--session-id`, `-r`/`--resume`, `-c`/`--continue`, `--fork-session`, `--setting-sources`, `--settings`, `--allowedTools`/`--allowed-tools`, `--disallowedTools`/`--disallowed-tools` and `--model` (use `model`). For Codex: `-m`/`--model`, `-a`/`--ask-for-approval`, `-s`/`--sandbox`, `--full-auto`, `--dangerously-bypass-approvals-and-sandbox`, `--yolo`, `-C`/`--cd`, `--listen`, `-p`/`--profile`, and `-c` overrides of `approval_policy`, `sandbox*`, `projects*`, `profile*` or `dangerously*`. Commit messages from Codex always run with `--sandbox read-only`. Short flags are checked in any combination (`-dp` counts as `-p`);
+- name a flag Flint sets (your own `--mcp-config` for Claude Code and `-c mcp_servers.<name>…` for Codex are fine: Flint adds its server next to yours). For Claude Code: `-p`/`--print`, `--input-format`, `--output-format`, `--include-partial-messages`, `--replay-user-messages`, `--permission-prompt-tool`, `--permission-mode`, `--dangerously-skip-permissions`, `--allow-dangerously-skip-permissions`, `--session-id`, `-r`/`--resume`, `-c`/`--continue`, `--fork-session`, `--setting-sources`, `--settings`, `--allowedTools`/`--allowed-tools`, `--disallowedTools`/`--disallowed-tools`, `--tools` and `--model` (use `model`). Commit messages and inline edits from Claude Code always run with only the `Read`, `Grep` and `Glob` tools and without MCP servers (`--tools Read,Grep,Glob --strict-mcp-config`). For Codex: `-m`/`--model`, `-a`/`--ask-for-approval`, `-s`/`--sandbox`, `--full-auto`, `--dangerously-bypass-approvals-and-sandbox`, `--yolo`, `-C`/`--cd`, `--listen`, `-p`/`--profile`, and `-c` overrides of `approval_policy`, `sandbox*`, `projects*`, `profile*`, `dangerously*`, `mcp_servers.flint*` or the whole `mcp_servers` table (quoted keys such as `mcp_servers."flint"` count too). Commit messages from Codex always run with `--sandbox read-only`. Short flags are checked in any combination (`-dp` counts as `-p`);
 - be `--`, empty, or contain a newline or another control character;
 - be more than 32 arguments or longer than 512 characters each.
 
@@ -180,11 +225,60 @@ A change made in the Settings tab restarts that language's servers. Servers that
 
 Git status, Docker and pull requests don't poll: they follow change events, and pull requests reload when the window regains focus.
 
+### mcpServer
+
+Flint's own read-only MCP server for agent chats. See [What agents can see in Flint](../guides/ai-agents.md#what-agents-can-see-in-flint).
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `enabled` | boolean | | `true` | Offer the server to new agent chats. When `false`, the server closes and running chats lose access. |
+| `tools.diagnostics` | boolean | | `true` | `get_diagnostics`: language-server errors and warnings. |
+| `tools.editor` | boolean | | `true` | `get_editor_state`: open files, the active file and the selection. When `false`, Flint also stops sending the editor state to its backend. |
+| `tools.terminals` | boolean | | `false` | `get_terminal_output`: recent output terminals and run consoles printed in the project. The agent asks before each call. |
+| `tools.tests` | boolean | | `true` | `get_test_results`: the last test run. |
+| `tools.kubernetes` | boolean | | `false` | `get_kubernetes_status`: what is failing in the current Kubernetes context. The agent asks before each call. |
+| `terminalLines` | integer | 10–2000 | `200` | The most lines of one terminal's output an agent gets (clamped into the range). |
+
+Tool switches apply right away, also to running chats.
+### completions
+
+Ghost-text suggestions in file editors from a fill-in-the-middle code model. See [AI in the editor](../guides/editor-and-navigation.md#ai-in-the-editor).
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `enabled` | boolean | | `false` | Ask for suggestions while you type. Off by default, because it sends the code around the cursor to `endpoint`. |
+| `provider` | string | `"ollama"`, `"openai"` | `"ollama"` | `"ollama"` uses Ollama's `/api/generate` with a suffix; `"openai"` uses an OpenAI-compatible `/v1/completions` with `prompt` and `suffix`. |
+| `endpoint` | string | up to 256 characters | `"http://localhost:11434"` | The server's base URL. `http` only for `localhost`, `127.0.0.1` and `::1`; anything else needs `https`. No credentials, query or fragment. For `"openai"`, `/v1/completions` is added (or `/completions` when the URL already ends in `/v1`). |
+| `model` | string | up to 200 characters | `"qwen2.5-coder:1.5b-base"` | The model name. Letters, digits and `. _ : / @ + -`. |
+| `debounceMs` | integer (ms) | 50–5000 | `300` | Typing pause before a suggestion is asked for. |
+| `maxTokens` | integer | 1–512 | `64` | Longest suggestion. |
+| `contextLines` | integer | 1–1000 | `100` | Lines before and after the cursor that are sent (at most about 20,000 characters each way). |
+
+An API key, if the endpoint needs one, is set in Settings ▸ AI in the Editor and stored in the macOS Keychain (service `flint-completions`, one entry per endpoint origin), never in this file. It is sent as a bearer token, and only to the endpoint it was stored for: after you change `endpoint` to another server, set its key again. Completions are never asked for in files that hold credentials (`.env*`, `*.pem`, `*.key`, SSH keys, `credentials`, `.npmrc`, `.netrc`, kubeconfig). Code sent to an endpoint that isn't on this machine has secrets redacted first. Each request has a 30-second timeout and a 1 MB answer limit, and redirects are not followed. Each new request cancels the editor's previous one.
+
+### inlineEdit
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `contextLines` | integer | 0–500 | `60` | Lines above and below the selection the agent sees with your instruction (at most about 10,000 characters each way). |
+
+See [Edit with Agent in the editor](../guides/ai-agents.md#edit-with-agent-in-the-editor).
+### agentTasks
+
+Used by [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel).
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `worktreeDir` | string | `""` | Folder for task worktrees, which go to `<worktreeDir>/<repository>/<branch>`. An absolute path or one starting with `~/`, up to 1024 characters. Empty puts them in `<repository>.worktrees/<branch>` next to the main checkout, like **New Worktree…** in the branch widget. |
+| `branchPrefix` | string | `"agent/"` | Starts every task branch, followed by a name made from the task's first line. Letters, digits, `.`, `_`, `-` and `/`, up to 40 characters; may be empty. It may not start with `-`, `/` or `.`, or contain `..`, `//` or `/.`. |
+
+Slashes in a branch name become dashes in the folder name. The tasks themselves are kept in `state.json`.
+
 ## Related settings stored elsewhere
 
 Some preferences are not in `settings.json`:
 
-- Recent folders, the agent approval policy, trusted folders and the update check's last result (including a skipped version) are in `state.json`.
+- Recent folders, the agent approval policy, trusted folders, agent tasks and the update check's last result (including a skipped version) are in `state.json`.
 - The sidebar width is kept by the app's web view.
 - The selected HTTP environment is remembered only until Flint quits.
 

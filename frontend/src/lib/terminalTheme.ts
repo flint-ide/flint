@@ -60,12 +60,29 @@ export interface TerminalOptions {
   lineHeight: number
 }
 
-/** Options for an xterm instance; sizeDelta makes secondary consoles (runs) a bit smaller. */
-export function terminalOptions(font: FontSettings, theme: ResolvedTheme, sizeDelta = 0): TerminalOptions {
+/**
+ * Options for an xterm instance; sizeDelta makes secondary consoles (runs) a bit
+ * smaller. A custom theme's colors (CSS variables) recolor the background,
+ * text, cursor and selection; ANSI colors stay those of its base palette.
+ */
+export function terminalOptions(font: FontSettings, theme: ResolvedTheme, sizeDelta = 0, custom?: Readonly<Record<string, string>>): TerminalOptions {
   return {
-    theme: TERMINAL_THEMES[theme],
+    theme: custom ? customColors(TERMINAL_THEMES[theme], custom) : TERMINAL_THEMES[theme],
     fontFamily: font.fontFamily,
     fontSize: Math.max(6, font.fontSize + sizeDelta),
     lineHeight: font.lineHeight,
+  }
+}
+
+function customColors(base: Readonly<TerminalColors>, vars: Readonly<Record<string, string>>): TerminalColors {
+  const pick = (name: string, fallback: string) => vars[name] ?? fallback
+  const background = pick('--bg-editor', base.background)
+  return {
+    ...base,
+    background,
+    foreground: pick('--fg', base.foreground),
+    cursor: pick('--accent', base.cursor),
+    cursorAccent: background,
+    selectionBackground: pick('--selection', base.selectionBackground),
   }
 }

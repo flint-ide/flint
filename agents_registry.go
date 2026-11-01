@@ -15,14 +15,17 @@ import (
 // Drivers resolve their CLI lazily on Start, so registering costs nothing.
 // untrusted marks folders whose project agent settings (and the user's extra
 // arguments) must not load; config is read on every start, so settings
-// changes apply to new sessions.
-func registerDrivers(m *as.Manager, untrusted func(cwd string) bool, config func(agent.Kind) agent.Config) {
+// changes apply to new sessions. mcp offers Flint's own MCP server to each
+// new session.
+func registerDrivers(m *as.Manager, untrusted func(cwd string) bool, config func(agent.Kind) agent.Config, mcp as.MCPProvider) {
 	m.Register(string(agent.Claude), claude.New(claude.Options{
 		Untrusted: untrusted,
+		MCP:       mcp,
 		Settings:  func() agent.Config { return config(agent.Claude) },
 	}))
 	m.Register(string(agent.Codex), codex.New(codex.Options{
 		Untrusted: untrusted,
+		MCP:       mcp,
 		Settings:  func() agent.Config { return config(agent.Codex) },
 	}))
 }
@@ -30,8 +33,9 @@ func registerDrivers(m *as.Manager, untrusted func(cwd string) bool, config func
 // syncCustomAgents registers one ACP driver per custom agent in next and
 // removes the ones only prev had; an unchanged agent keeps its driver.
 // Sessions already running keep the driver that started them (Manager).
-// untrusted folders refuse every custom agent (acpdriver.ErrRestricted).
-func syncCustomAgents(m *as.Manager, prev, next []settings.CustomAgent, untrusted func(cwd string) bool) {
+// untrusted folders refuse every custom agent (acpdriver.ErrRestricted); mcp
+// offers Flint's MCP server to agents that speak HTTP MCP.
+func syncCustomAgents(m *as.Manager, prev, next []settings.CustomAgent, untrusted func(cwd string) bool, mcp as.MCPProvider) {
 	for _, p := range prev {
 		if !slices.ContainsFunc(next, func(c settings.CustomAgent) bool { return c.ID == p.ID }) {
 			m.Unregister(p.ID)
@@ -42,7 +46,9 @@ func syncCustomAgents(m *as.Manager, prev, next []settings.CustomAgent, untruste
 		if i >= 0 && prev[i].Equal(c) {
 			continue
 		}
-		m.Register(c.ID, acpdriver.New(customAgentOptions(c, untrusted)))
+		opts := customAgentOptions(c, untrusted)
+		opts.MCP = mcp
+		m.Register(c.ID, acpdriver.New(opts))
 	}
 }
 

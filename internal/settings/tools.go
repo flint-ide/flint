@@ -227,6 +227,7 @@ func (s Settings) Clone() Settings {
 	out.Agents = cloneAgents(s.Agents)
 	out.CustomAgents = cloneCustomAgents(s.CustomAgents)
 	out.LanguageServers = cloneLanguageServers(s.LanguageServers)
+	out.CustomTheme = s.CustomTheme.clone()
 	return out
 }
 

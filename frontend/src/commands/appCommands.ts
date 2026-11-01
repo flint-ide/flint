@@ -4,6 +4,7 @@ import { Workspace } from '../api/backend'
 import { parseKeys, registerCommands, type Command } from '../lib/commands'
 import { attachSelectionToAgent } from '../lib/agentContext'
 import { registerFeatureCommands } from './featureCommands'
+import { registerTaskCommands } from './taskCommands'
 import { requestCloseTab } from '../components/editor/EditorArea'
 import { useWorkspace } from '../store/workspace'
 import { PANELS } from '../panels'
@@ -24,6 +25,9 @@ import { trustFolder, untrustFolder } from '../store/trust'
 import { copyDiagnostics, reportIssue, showLogs } from '../store/diagnostics'
 import { openToolCheck } from '../store/toolCheck'
 import { checkForUpdates } from '../store/update'
+import { openInlineEditInActiveEditor } from '../store/editorAi'
+import { useSettings } from '../store/settings'
+import { openVSCodeImport } from '../store/vscodeImport'
 
 // Where a global shortcut belongs to the focused widget instead: ⌘B in an editor is
 // "go to declaration" (IntelliJ), ⌘K in a terminal clears the screen.
@@ -46,7 +50,9 @@ export function registerAppCommands(): () => void {
   const offAgents = registerAgentChatCommands()
   const offFeatures = registerFeatureCommands()
   const offRoots = registerWorkspaceRootCommands()
+  const offTasks = registerTaskCommands()
   return () => {
+    offTasks()
     offStatic()
     offAgents()
     offFeatures()
@@ -65,6 +71,20 @@ function appCommands(): Command[] {
       id: 'app.settings', title: 'Settings…', category: 'General', keys: 'Mod+,',
       keywords: 'preferences options theme dark light font size keymap shortcuts keyboard agent',
       run: () => useEditor.getState().openSettings(),
+    },
+    {
+      id: 'app.importVSCode', title: 'Import from VS Code…', category: 'General',
+      keywords: 'migrate switch cursor vscodium settings keybindings shortcuts theme colors',
+      run: () => void openVSCodeImport(),
+    },
+    {
+      id: 'editor.toggleVimMode', title: 'Toggle Vim Mode', category: 'Editor', keywords: 'vi keybindings modal normal insert',
+      run: () => {
+        const { settings, update } = useSettings.getState()
+        const vimMode = !settings.editor.vimMode
+        update({ editor: { ...settings.editor, vimMode } })
+        showToast(vimMode ? 'Vim mode on' : 'Vim mode off')
+      },
     },
     {
       id: 'workspace.trust', title: 'Trust Folder', category: 'Workspace', keywords: 'restricted mode security trust',
@@ -132,6 +152,16 @@ function appCommands(): Command[] {
     {
       id: 'agent.sendSelection', title: 'Send Selection to Agent', category: 'Agent', keys: 'Mod+L',
       keywords: 'attach file context chat claude codex', run: () => attachSelectionToAgent(),
+    },
+    {
+      id: 'agent.inlineEdit', title: 'Edit Selection with Agent…', category: 'Agent', keys: 'Mod+I', keysIgnoredIn: IN_TERMINAL,
+      keywords: 'inline edit rewrite refactor ai prompt claude codex', when: () => activeTab()?.kind === 'file' && hasEditor(),
+      run: openInlineEditInActiveEditor,
+    },
+    {
+      id: 'editor.toggleCompletions', title: 'Toggle Inline Completions', category: 'Editor',
+      keywords: 'ai suggestions ghost text ollama local model autocomplete copilot',
+      run: () => useSettings.getState().update((s) => ({ completions: { ...s.completions, enabled: !s.completions.enabled } })),
     },
     ...policyToggles(),
 

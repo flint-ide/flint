@@ -3,7 +3,9 @@ import { Compartment, EditorSelection, EditorState, type Extension } from '@code
 import { EditorView, keymap, type KeyBinding } from '@codemirror/view'
 import { baseExtensions } from '../../lib/editorSetup'
 import { focusSoon } from '../../lib/focusSoon'
+import { vimFileCommands } from '../../lib/vimFacet'
 import type { Reveal } from '../../store/editor'
+import { scheduleEditorContextSync } from '../../store/editorContext'
 
 interface Props {
   /** Initial document; the editor owns the text afterwards. */
@@ -14,10 +16,12 @@ interface Props {
   active: boolean
   onDocChange?: () => void
   onReady?: (view: EditorView) => void
+  /** The editor is its tab's document: Vim's :w and :q may save and close the tab. */
+  fileCommands?: boolean
 }
 
 /** Thin CodeMirror 6 wrapper. Language and keymap are swappable without recreating the view. */
-export function CodeEditor({ initialDoc, language, keys = [], reveal, active, onDocChange, onReady }: Props) {
+export function CodeEditor({ initialDoc, language, keys = [], reveal, active, onDocChange, onReady, fileCommands = false }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
   const languageConf = useRef(new Compartment())
@@ -34,9 +38,11 @@ export function CodeEditor({ initialDoc, language, keys = [], reveal, active, on
         extensions: [
           keysConf.current.of(keymap.of(keys)),
           baseExtensions(),
+          vimFileCommands.of(fileCommands),
           languageConf.current.of(language),
           EditorView.updateListener.of((u) => {
             if (u.docChanged) onChangeRef.current?.()
+            if (u.selectionSet || u.focusChanged) scheduleEditorContextSync()
           }),
         ],
       }),

@@ -1,0 +1,12 @@
+{
+	"name": "night",
+	"publisher": "acme",
+	"version": "1.2.0",
+	"contributes": {
+		"themes": [
+			{ "label": "%night.label%", "uiTheme": "vs-dark", "path": "./themes/night-color-theme.json" },
+			{ "label": "Acme Day", "uiTheme": "vs", "path": "./themes/day.tmTheme" },
+			{ "label": "Acme Escape", "uiTheme": "vs-dark", "path": "../../../outside.json" }
+		]
+	}
+}

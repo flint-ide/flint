@@ -106,9 +106,14 @@ type session struct {
 	readerDone chan struct{}
 	done       chan struct{} // closed when the process and all goroutines ended
 	stopOnce   sync.Once
+
+	// flintMCP: the session was given Flint's own MCP server, so calls of
+	// its tools are classified as Flint's (flintTool). Set before the
+	// goroutines start.
+	flintMCP bool
 }
 
-func spawn(path string, args []string, cwd string, env []string, id string, sink agentsession.Sink) (*session, error) {
+func spawn(path string, args []string, cwd string, env []string, id string, flintMCP bool, sink agentsession.Sink) (*session, error) {
 	cmd := exec.Command(path, args...)
 	cmd.Dir = cwd
 	cmd.Env = env
@@ -149,6 +154,7 @@ func spawn(path string, args []string, cwd string, env []string, id string, sink
 		tr:         newTranslator(),
 		readerDone: make(chan struct{}),
 		done:       make(chan struct{}),
+		flintMCP:   flintMCP,
 	}
 	go s.readLoop()
 	go s.supervise()

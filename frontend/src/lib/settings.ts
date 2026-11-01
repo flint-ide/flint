@@ -7,9 +7,16 @@ import {
   type AgentSettings, type LanguageServerSettings, type RefreshSettings,
 } from './toolSettings'
 import { coerceCustomAgents, type CustomAgent } from './customAgents'
+import { coerceMcpServer, DEFAULT_MCP_SERVER, type McpServerSettings } from './mcpSettings'
+import {
+  coerceCompletions, coerceInlineEdit, DEFAULT_COMPLETIONS, DEFAULT_INLINE_EDIT,
+  type CompletionSettings, type InlineEditSettings,
+} from './editorAiSettings'
+import { coerceAgentTasks, DEFAULT_AGENT_TASKS, type AgentTaskSettings } from './agentTasks'
 
-export type ThemeMode = 'dark' | 'light' | 'system'
-export type ResolvedTheme = 'dark' | 'light'
+import type { ResolvedTheme, ThemeMode } from './themeMode'
+
+export { resolveTheme, type ResolvedTheme, type ThemeMode } from './themeMode'
 
 export interface FontSettings {
   fontFamily: string
@@ -17,11 +24,25 @@ export interface FontSettings {
   lineHeight: number
 }
 
+export interface EditorSettings extends FontSettings {
+  /** Vim key bindings in every editor. */
+  vimMode: boolean
+}
+
+/** A palette laid over the dark or light one (Theme "custom"), e.g. imported from VS Code. */
+export interface CustomTheme {
+  name: string
+  base: ResolvedTheme
+  /** CSS variable ('--bg-editor') → hex color; Go allows only style.css's theme variables. */
+  colors: Record<string, string>
+}
+
 export interface AppSettings {
   version: number
   theme: ThemeMode
-  editor: FontSettings
+  editor: EditorSettings
   terminal: FontSettings
+  customTheme: CustomTheme
   /** Agent for new chats (a built-in or custom agent's id); '' = the first installed one. */
   defaultAgent: string
   /** Save modified files when the window loses focus. */
@@ -42,14 +63,23 @@ export interface AppSettings {
   languageServers: Record<string, LanguageServerSettings>
   /** Polling intervals of the Kubernetes and AWS panels. */
   refresh: RefreshSettings
+  /** What Flint's own MCP server tells agents. */
+  mcpServer: McpServerSettings
+  /** Inline suggestions from a code model (lib/editorAiSettings.ts). */
+  completions: CompletionSettings
+  /** Edit with Agent on the selection. */
+  inlineEdit: InlineEditSettings
+  /** Where agent task worktrees go and how their branches start. */
+  agentTasks: AgentTaskSettings
 }
 
 /** Mirrors settings.Default() in Go (used until the backend answers). */
 export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   version: 1,
   theme: 'dark',
-  editor: Object.freeze({ fontFamily: `'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace`, fontSize: 13, lineHeight: 1.55 }),
+  editor: Object.freeze({ fontFamily: `'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace`, fontSize: 13, lineHeight: 1.55, vimMode: false }),
   terminal: Object.freeze({ fontFamily: `"JetBrains Mono", "SF Mono", Menlo, monospace`, fontSize: 13, lineHeight: 1.2 }),
+  customTheme: Object.freeze({ name: '', base: 'dark', colors: Object.freeze({}) as Record<string, string> }) as CustomTheme,
   defaultAgent: '',
   autoSave: false,
   notifyInBackground: true,
@@ -60,6 +90,10 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   customAgents: Object.freeze([]) as unknown as CustomAgent[],
   languageServers: Object.freeze({}) as Record<string, LanguageServerSettings>,
   refresh: DEFAULT_REFRESH,
+  mcpServer: DEFAULT_MCP_SERVER,
+  completions: DEFAULT_COMPLETIONS,
+  inlineEdit: DEFAULT_INLINE_EDIT,
+  agentTasks: DEFAULT_AGENT_TASKS,
 }) as AppSettings
 
 /** Same limits as Go's settings.Validate, for the inputs. */
@@ -84,10 +118,37 @@ export function parseExcludes(text: string): { patterns: string[]; invalid: stri
   return { patterns, invalid }
 }
 
-/** The palette to use: System follows macOS (prefers-color-scheme). */
-export function resolveTheme(mode: ThemeMode, systemDark: boolean): ResolvedTheme {
-  if (mode === 'system') return systemDark ? 'dark' : 'light'
-  return mode
+/** The custom theme's CSS variables, set on :root over the base palette (none unless Theme is Custom). */
+export function themeCssVars(s: AppSettings): Record<string, string> {
+  return s.theme === 'custom' ? s.customTheme.colors : {}
+}
+
+const HEX_COLOR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i
+/** The CSS variables a custom theme may set: Go's settings.ThemeVariables (a Go test keeps them equal). */
+export const THEME_VARIABLES: readonly string[] = Object.freeze([
+  '--bg', '--bg-sidebar', '--bg-editor', '--bg-raised', '--bg-hover', '--bg-active', '--border',
+  '--fg', '--fg-muted', '--fg-faint', '--fg-name',
+  '--accent', '--accent-dim', '--accent-fg', '--danger', '--warn', '--info', '--ok',
+  '--selection', '--selection-match', '--search-match', '--active-line',
+  '--git-added', '--git-modified', '--git-deleted', '--diff-ins-bg', '--diff-del-bg',
+  '--syn-keyword', '--syn-string', '--syn-number', '--syn-comment', '--syn-function',
+  '--syn-type', '--syn-property', '--syn-definition', '--syn-punct',
+])
+const THEME_VARIABLE_SET = new Set(THEME_VARIABLES)
+
+function customTheme(v: unknown, def: CustomTheme): CustomTheme {
+  if (!isObject(v)) return def
+  const colors: Record<string, string> = {}
+  if (isObject(v.colors)) {
+    for (const [name, color] of Object.entries(v.colors)) {
+      if (THEME_VARIABLE_SET.has(name) && typeof color === 'string' && HEX_COLOR.test(color)) colors[name] = color
+    }
+  }
+  return {
+    name: typeof v.name === 'string' ? v.name : '',
+    base: v.base === 'light' ? 'light' : 'dark',
+    colors,
+  }
 }
 
 /** CSS custom properties on :root that the editors read (style.css, lib/editorSetup.ts). */
@@ -124,9 +185,13 @@ export function coerceSettings(v: unknown): AppSettings {
   }
   return {
     version: typeof v.version === 'number' ? v.version : d.version,
-    theme: v.theme === 'light' || v.theme === 'system' || v.theme === 'dark' ? v.theme : d.theme,
-    editor: font(v.editor, d.editor),
+    theme: v.theme === 'light' || v.theme === 'system' || v.theme === 'dark' || v.theme === 'custom' ? v.theme : d.theme,
+    editor: {
+      ...font(v.editor, d.editor),
+      vimMode: isObject(v.editor) && typeof v.editor.vimMode === 'boolean' ? v.editor.vimMode : d.editor.vimMode,
+    },
     terminal: font(v.terminal, d.terminal),
+    customTheme: customTheme(v.customTheme, d.customTheme),
     defaultAgent: typeof v.defaultAgent === 'string' ? v.defaultAgent : d.defaultAgent,
     autoSave: typeof v.autoSave === 'boolean' ? v.autoSave : d.autoSave,
     notifyInBackground: typeof v.notifyInBackground === 'boolean' ? v.notifyInBackground : d.notifyInBackground,
@@ -137,5 +202,9 @@ export function coerceSettings(v: unknown): AppSettings {
     customAgents: coerceCustomAgents(v.customAgents),
     languageServers: coerceServers(v.languageServers),
     refresh: coerceRefresh(v.refresh),
+    mcpServer: coerceMcpServer(v.mcpServer),
+    completions: coerceCompletions(v.completions),
+    inlineEdit: coerceInlineEdit(v.inlineEdit),
+    agentTasks: coerceAgentTasks(v.agentTasks),
   }
 }

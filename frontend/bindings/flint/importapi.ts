@@ -21,7 +21,8 @@ import * as vscodeimport$0 from "./internal/vscodeimport/models.js";
 
 /**
  * Apply saves the previewed plan with this id onto the current settings and
- * returns what was written. A plan is applied at most once.
+ * returns what was written. A plan is applied at most once; when saving fails
+ * it stays, so the user can fix the cause and click Import again.
  */
 export function Apply(planID: string): $CancellablePromise<settings$0.Settings> {
     return $Call.ByID(1423746103, planID).then(($result: any) => {

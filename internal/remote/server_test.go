@@ -272,14 +272,14 @@ func TestForeignHostOrOriginGets403(t *testing.T) {
 		"localhost, other port":  {map[string]string{"Host": "localhost:8000"}, 200}, // ssh -L 8000:127.0.0.1:7419
 		"ipv6 loopback":          {map[string]string{"Host": "[::1]:8000"}, 200},
 		"allowed host":           {map[string]string{"Host": "Laptop.tail1234.ts.net"}, 200},
-		"allowed host origin":    {map[string]string{"Host": "laptop.tail1234.ts.net", "Origin": "https://laptop.tail1234.ts.net"}, 200},
+		"allowed host origin":    {map[string]string{"Host": "laptop.tail1234.ts.net", "Origin": "https://laptop.tail1234.ts.net"}, 403}, // any Origin: a browser
 		"rebinding host":         {map[string]string{"Host": "evil.example:" + e.port}, 403},
 		"suffix trick":           {map[string]string{"Host": "laptop.tail1234.ts.net.evil.example"}, 403},
 		"foreign origin":         {map[string]string{"Origin": "https://evil.example"}, 403},
 		"null origin":            {map[string]string{"Origin": "null"}, 403},
 		"origin with userinfo":   {map[string]string{"Origin": "http://127.0.0.1@evil.example"}, 403},
 		"non-http origin":        {map[string]string{"Origin": "file://127.0.0.1"}, 403},
-		"loopback origin":        {map[string]string{"Origin": "http://127.0.0.1:" + e.port}, 200},
+		"loopback origin":        {map[string]string{"Origin": "http://127.0.0.1:" + e.port}, 403},
 		"rebinding without auth": {map[string]string{"Host": "evil.example", "Authorization": ""}, 403},
 	} {
 		h := map[string]string{"Authorization": auth}

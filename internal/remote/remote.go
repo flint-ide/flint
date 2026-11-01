@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"flint/internal/agentsession"
@@ -27,16 +28,19 @@ import (
 
 // Security limits and protocol timing: constants, not settings.
 const (
-	maxBody           = 4 << 10 // bytes of one request body (pairing is the only one)
-	maxStreamsDevice  = 4
-	maxStreams        = 32
-	maxSince          = 256 // sessions one stream request may name
-	maxOutMessage     = 1 << 20
-	pingInterval      = 30 * time.Second
-	closeWait         = time.Second // for the client's close frame
-	shutdownTimeout   = 2 * time.Second
-	requestTimeout    = 30 * time.Second
-	readHeaderTimeout = 5 * time.Second
+	maxBody = 4 << 10 // bytes of one request body (pairing is the only one)
+	// auditRefusedPerMinute bounds the audit lines of refused requests that
+	// name no device.
+	auditRefusedPerMinute = 10
+	maxStreamsDevice      = 4
+	maxStreams            = 32
+	maxSince              = 256 // sessions one stream request may name
+	maxOutMessage         = 1 << 20
+	pingInterval          = 30 * time.Second
+	closeWait             = time.Second // for the client's close frame
+	shutdownTimeout       = 2 * time.Second
+	requestTimeout        = 30 * time.Second
+	readHeaderTimeout     = 5 * time.Second
 )
 
 // Chat is an open agent chat as a remote client lists it.
@@ -132,10 +136,13 @@ type Server struct {
 	opts Options
 	lim  *limiter
 	hub  *hub
+	// auditLim samples the audit lines of refused requests from no device.
+	auditLim     *limiter
+	auditSkipped atomic.Int64
 
 	mu      sync.Mutex
 	cfg     Config
-	hosts   map[string]bool // allowed Host / Origin names, lowercased
+	hosts   map[string]bool // allowed Host names, lowercased (replaced, never changed)
 	srv     *http.Server    // nil while stopped
 	served  chan struct{}
 	ctx     context.Context // ends when the listener stops
@@ -151,7 +158,10 @@ func New(opts Options) *Server {
 	if opts.Logf == nil {
 		opts.Logf = func(string, ...any) {}
 	}
-	return &Server{opts: opts, lim: newLimiter(120), hub: newHub(), streams: map[*stream]struct{}{}}
+	return &Server{
+		opts: opts, lim: newLimiter(120), hub: newHub(), streams: map[*stream]struct{}{},
+		auditLim: newLimiter(auditRefusedPerMinute),
+	}
 }
 
 // Start listens with cfg, or applies cfg to the running server: a new
@@ -195,6 +205,12 @@ func (s *Server) applyLocked(cfg Config) {
 }
 
 func (s *Server) listen(cfg Config) error {
+	// Read the token hashes now, so requests don't wait for the Keychain,
+	// and finish revocations a failure left pending.
+	s.opts.Devices.LoadHashes()
+	if err := s.opts.Devices.RetryRevocations(); err != nil {
+		s.opts.Logf("remote: revocation still not saved: %v", err)
+	}
 	ln, err := net.Listen("tcp", net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)))
 	if err != nil {
 		return fmt.Errorf("remote: listen: %w", err)

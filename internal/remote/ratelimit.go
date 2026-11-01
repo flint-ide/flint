@@ -24,11 +24,17 @@ type bucket struct {
 // tunnel they all come from 127.0.0.1, so there is no address to tell them by.
 const anonKey = ""
 
-// anonPerMinute and anonBurst bound pairing attempts and bad tokens (a
-// security limit; a pairing secret also dies after a few wrong tries).
+// pairKey is the budget of pairing attempts (POST /api/pair with JSON).
+const pairKey = "\x00pair"
+
+// Fixed budgets (security limits): tokens of unknown devices or wrong
+// secrets, and pairing attempts (a pairing secret also dies after five wrong
+// tries). Requests without any token are charged nothing.
 const (
 	anonPerMinute = 20
 	anonBurst     = 20
+	pairPerMinute = 10
+	pairBurst     = 10
 )
 
 func newLimiter(perMin int) *limiter {
@@ -51,8 +57,11 @@ func (l *limiter) allow(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	rate, capacity := l.perMin, burst(l.perMin)
-	if key == anonKey {
+	switch key {
+	case anonKey:
 		rate, capacity = anonPerMinute, anonBurst
+	case pairKey:
+		rate, capacity = pairPerMinute, pairBurst
 	}
 	now := l.now()
 	b := l.buckets[key]

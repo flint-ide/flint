@@ -127,6 +127,99 @@ func TestSecretFileOutputIsWithheldAfterAReconnect(t *testing.T) {
 	}
 }
 
+// The review's proof of concept: what <img src="http://127.0.0.1:7419/api/pair">
+// on any web page sends (a GET with an allowed Host, no Origin, Sec-Fetch-*)
+// burned the pairing budget, so the real phone then got 429.
+func TestWebPagesCanNotLockOutPairing(t *testing.T) {
+	e := newEnv(t, 120)
+	for i := range 25 {
+		req, _ := http.NewRequest(http.MethodGet, e.base+"/api/pair", nil)
+		req.Header.Set("Sec-Fetch-Mode", "no-cors")
+		req.Header.Set("Sec-Fetch-Dest", "image")
+		resp, err := e.hc.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Fatalf("browser request %d: %d", i, resp.StatusCode)
+		}
+	}
+	// Plain GETs and wrong content types (a form post) are refused uncharged.
+	for range 25 {
+		if got := e.request(t, http.MethodGet, "/api/pair", nil, ""); got != http.StatusMethodNotAllowed {
+			t.Fatalf("GET pair: %d", got)
+		}
+		if got := e.request(t, http.MethodPost, "/api/pair", map[string]string{"Content-Type": "text/plain"}, "x"); got != http.StatusUnsupportedMediaType {
+			t.Fatalf("text pair: %d", got)
+		}
+	}
+	p, _ := e.devices.BeginPairing()
+	if _, _, err := client.Pair(context.Background(), e.hc, e.base, p.Secret, "phone"); err != nil {
+		t.Fatalf("the phone can't pair after a web page tried: %v", err)
+	}
+	// Every browser-marked request is refused, with a token too.
+	for _, h := range []map[string]string{{"Origin": "http://127.0.0.1:7419"}, {"Sec-Fetch-Site": "cross-site"}, {"Origin": "null"}} {
+		if got := e.request(t, http.MethodGet, "/api/chats", h, ""); got != http.StatusForbidden {
+			t.Fatalf("%v: %d", h, got)
+		}
+	}
+}
+
+func TestPairingAttemptsHaveTheirOwnBudget(t *testing.T) {
+	e := newEnv(t, 120)
+	got := map[int]int{}
+	for range 15 {
+		got[e.request(t, http.MethodPost, "/api/pair", map[string]string{"Content-Type": "application/json"}, `{"secret":"AAAAAAAAAAAAAAAA","name":"x"}`)]++
+	}
+	if got[http.StatusTooManyRequests] == 0 || got[http.StatusUnauthorized] == 0 {
+		t.Fatalf("pairing attempts: %v", got)
+	}
+	// Bad tokens are a separate budget: still 401, not 429.
+	if s := e.request(t, http.MethodGet, "/api/chats", map[string]string{"Authorization": "Bearer 0123456789abcdef.x"}, ""); s != http.StatusUnauthorized {
+		t.Fatalf("bad token after pairing attempts: %d", s)
+	}
+}
+
+func TestRequestsWithoutATokenCostNothingAndFloodNoLog(t *testing.T) {
+	e := newEnv(t, 120)
+	for i := range 100 {
+		if got := e.request(t, http.MethodGet, "/api/chats", nil, ""); got != http.StatusUnauthorized {
+			t.Fatalf("request %d without a token: %d", i, got)
+		}
+		_ = e.request(t, http.MethodGet, "/api/chats", map[string]string{"Host": "evil.example"}, "")
+	}
+	lines := strings.Count(e.logs.all(), "op=chats.list status=")
+	if lines > 15 {
+		t.Fatalf("%d audit lines for 200 refused requests", lines)
+	}
+	// Paired devices are still logged in full.
+	c := e.pair(t, "phone")
+	if _, err := c.Chats(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(e.logs.all(), `("phone") op=chats.list status=200`) {
+		t.Fatal("a device's request was not logged")
+	}
+}
+
+// A device's budget is charged before its token is checked, so wrong
+// secrets for a device can't make Flint compare hashes or read the Keychain
+// without limit.
+func TestRateLimitComesBeforeAuthentication(t *testing.T) {
+	e := newEnv(t, 10) // burst 5
+	c := e.pair(t, "phone")
+	for range 5 {
+		if _, err := c.Chats(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	id := strings.SplitN(c.Token, ".", 2)[0]
+	if got := e.request(t, http.MethodGet, "/api/chats", map[string]string{"Authorization": "Bearer " + id + ".wrong"}, ""); got != http.StatusTooManyRequests {
+		t.Fatalf("wrong secret for a device over its budget: %d, want 429", got)
+	}
+}
+
 // openRaw opens a stream with a hand-written handshake (a Host the client
 // couldn't dial) and returns the connection after the 101.
 func openRaw(t *testing.T, e *env, token, host string) (net.Conn, *bufio.Reader) {

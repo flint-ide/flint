@@ -8,7 +8,6 @@ import (
 	"mime"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 )
@@ -60,46 +59,53 @@ func operation(r *http.Request) string {
 	return "unknown"
 }
 
-// ServeHTTP checks every request (Host and Origin, token, rate, scope) before
-// routing it, and writes one audit line when it ends.
+// ServeHTTP checks every request (browser, Host, token, rate, scope) before
+// routing it, and writes one audit line when it ends (refused requests that
+// prove no device are sampled, so a flood can't fill the log).
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rec := &statusRecorder{ResponseWriter: w}
 	start, op, who := time.Now(), operation(r), "-"
-	defer func() {
-		s.opts.Logf("remote: device=%s op=%s status=%d duration=%s", who, op, rec.status, time.Since(start).Round(time.Millisecond))
-	}()
+	defer func() { s.audit(who, op, rec.status, time.Since(start)) }()
 	h := rec.Header()
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Content-Type-Options", "nosniff")
-	if !s.allowedRequest(r) {
-		// DNS rebinding: a web page that resolved its own name to 127.0.0.1
-		// sends its own Host (and Origin).
+	if fromBrowser(r) || !s.allowedHost(r) {
+		// A web page can reach a loopback port (an <img>, a form, fetch,
+		// DNS rebinding with its own Host). Browsers mark their requests;
+		// Flint's clients call the API from Go and send no such headers.
 		http.Error(rec, "forbidden", http.StatusForbidden)
 		return
 	}
 	if r.URL.Path == pathPair {
-		if !s.lim.allow(anonKey) {
-			tooMany(rec)
-			return
-		}
 		s.handlePair(rec, r, &who)
 		return
 	}
-	dev, ok := s.opts.Devices.Authenticate(bearer(r.Header.Get("Authorization")))
-	if !ok {
-		if !s.lim.allow(anonKey) {
-			tooMany(rec)
-			return
-		}
-		h.Set("WWW-Authenticate", `Bearer realm="flint"`)
-		http.Error(rec, "unauthorized", http.StatusUnauthorized)
+	token := bearer(r.Header.Get("Authorization"))
+	if token == "" {
+		// Costs nothing to answer, so it is charged to no budget.
+		unauthorized(rec)
 		return
 	}
-	who = deviceLabel(dev)
-	if !s.lim.allow(dev.ID) {
+	// Charge the device the token names before any work for it (hash
+	// compare, a Keychain read); tokens of unknown devices share one budget.
+	id, known := s.opts.Devices.TokenDevice(token)
+	if !known {
+		id = anonKey
+	}
+	if !s.lim.allow(id) {
 		tooMany(rec)
 		return
 	}
+	dev, ok := s.opts.Devices.Authenticate(token)
+	if !ok {
+		if known && !s.lim.allow(anonKey) { // wrong secrets for a real device count as bad tokens too
+			tooMany(rec)
+			return
+		}
+		unauthorized(rec)
+		return
+	}
+	who = deviceLabel(dev)
 	if op == "unknown" {
 		http.NotFound(rec, r)
 		return
@@ -149,6 +155,42 @@ func quoteName(name string) string {
 	return string(b)
 }
 
+func unauthorized(w http.ResponseWriter) {
+	w.Header().Set("WWW-Authenticate", `Bearer realm="flint"`)
+	http.Error(w, "unauthorized", http.StatusUnauthorized)
+}
+
+// fromBrowser reports a request a web browser made: browsers send Origin on
+// cross-origin and non-GET requests and Sec-Fetch-* on every request to a
+// secure context (loopback is one). The API is never meant for pages.
+func fromBrowser(r *http.Request) bool {
+	if _, ok := r.Header["Origin"]; ok {
+		return true
+	}
+	for k := range r.Header {
+		if strings.HasPrefix(k, "Sec-Fetch-") {
+			return true
+		}
+	}
+	return false
+}
+
+// audit writes the audit line of a request. Lines of refused requests from
+// no device are limited to auditRefusedPerMinute; the next one written says
+// how many were left out.
+func (s *Server) audit(who, op string, status int, d time.Duration) {
+	if who == "-" && status >= 400 {
+		if !s.auditLim.allow("refused") {
+			s.auditSkipped.Add(1)
+			return
+		}
+		if n := s.auditSkipped.Swap(0); n > 0 {
+			s.opts.Logf("remote: %d refused requests not logged", n)
+		}
+	}
+	s.opts.Logf("remote: device=%s op=%s status=%d duration=%s", who, op, status, d.Round(time.Millisecond))
+}
+
 func tooMany(w http.ResponseWriter) {
 	w.Header().Set("Retry-After", "10")
 	http.Error(w, "too many requests", http.StatusTooManyRequests)
@@ -173,6 +215,11 @@ func (s *Server) handlePair(w http.ResponseWriter, r *http.Request, who *string)
 	}
 	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
 		http.Error(w, "expected application/json", http.StatusUnsupportedMediaType)
+		return
+	}
+	// Only real pairing attempts are charged, to a budget of their own.
+	if !s.lim.allow(pairKey) {
+		tooMany(w)
 		return
 	}
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBody))
@@ -209,25 +256,13 @@ func (s *Server) handlePair(w http.ResponseWriter, r *http.Request, who *string)
 	writeJSON(w, map[string]any{"token": token, "device": dev})
 }
 
-// allowedRequest accepts loopback names and the allowed hosts (any port: an
-// ssh -L tunnel may use another local port) in Host and, when a browser
-// sends one, Origin. Native clients send no Origin.
-func (s *Server) allowedRequest(r *http.Request) bool {
+// allowedHost accepts loopback names and the allowed hosts in Host, on any
+// port (an ssh -L tunnel may use another local port): DNS rebinding sends
+// the attacker's own name.
+func (s *Server) allowedHost(r *http.Request) bool {
 	s.mu.Lock()
-	hosts := s.hosts
-	s.mu.Unlock()
-	if !hosts[hostOnly(r.Host)] {
-		return false
-	}
-	origin := r.Header.Get("Origin")
-	if origin == "" {
-		return true
-	}
-	u, err := url.Parse(origin)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || (u.Path != "" && u.Path != "/") {
-		return false
-	}
-	return hosts[hostOnly(u.Host)]
+	defer s.mu.Unlock()
+	return s.hosts[hostOnly(r.Host)]
 }
 
 // hostOnly lowercases a host[:port] and drops the port and IPv6 brackets.

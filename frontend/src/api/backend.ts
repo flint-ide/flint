@@ -36,7 +36,6 @@ export type PullRequestFileDiff = github.FileDiff
 export type PullRequestCheck = github.Check
 export type Driver = 'postgres' | 'clickhouse'
 export type ScratchKind = 'sql' | 'markdown' | 'text'
-export type ClickHouseProtocol = 'native' | 'http'
 
 // Event payloads aren't part of any bound method signature, so Wails doesn't generate them.
 export interface SearchMatch {
@@ -86,7 +85,6 @@ export function newConnection(driver: Driver = 'postgres'): Connection {
     port: 0,
     database: '',
     user: '',
-    protocol: driver === 'clickhouse' ? 'native' : '',
     tls: false,
     readOnly: false,
   })

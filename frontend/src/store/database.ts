@@ -1,7 +1,7 @@
 import { createStore } from '../lib/store'
 import { Database, errorMessage, type Connection, type DatabaseInfo, type Table } from '../api/backend'
 import { isSchemaKeyOf, schemaKey } from '../lib/databases'
-import { showToast } from './dialog'
+import { confirmAction, showToast } from './dialog'
 
 interface SchemaEntry {
   tables: Table[]
@@ -50,6 +50,9 @@ export const useDatabase = createStore<DatabaseState>((set, get) => ({
   loadConnections: async () => {
     try {
       set({ connections: (await Database.ListConnections()) ?? [] })
+      // Connections moved from ClickHouse's native protocol to HTTP: tell the user once.
+      const notice = await Database.MigrationNotice()
+      if (notice) void confirmAction(notice, 'OK')
     } catch (err) {
       showToast(errorMessage(err), 'error')
     }

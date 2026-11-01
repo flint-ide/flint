@@ -197,39 +197,32 @@ func TestPostgresEditIntegration(t *testing.T) {
 }
 
 func TestClickHouseExplainIntegration(t *testing.T) {
-	for _, env := range []struct{ name, env, protocol string }{
-		{"native", "FLINT_TEST_CH", ProtocolNative},
-		{"http", "FLINT_TEST_CH_HTTP", ProtocolHTTP},
-	} {
-		t.Run(env.name, func(t *testing.T) {
-			m, conn := integrationManager(t, env.env, Connection{Driver: ClickHouse, User: "flint", Protocol: env.protocol})
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			sql := "SELECT number % 10 AS k, count() FROM numbers(1000) GROUP BY k ORDER BY k"
-			plan, err := m.Explain(ctx, conn.ID, "", "", sql, false, false)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(plan.Lines) < 2 || plan.Lines[0].Depth != 0 || !strings.HasPrefix(plan.Statement, "EXPLAIN PLAN") {
-				t.Fatalf("plan = %+v", plan)
-			}
-			deeper := false
-			for _, l := range plan.Lines {
-				deeper = deeper || l.Depth > 0
-			}
-			if !deeper {
-				t.Errorf("plan has no nesting: %+v", plan.Lines)
-			}
-			pipe, err := m.Explain(ctx, conn.ID, "", "", sql, true, false)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(pipe.Lines) == 0 || !pipe.Analyze || pipe.NeedsConfirm {
-				t.Errorf("pipeline = %+v", pipe)
-			}
-			if _, err := m.EditTarget(ctx, conn.ID, "", 1); err != ErrEditUnsupported {
-				t.Errorf("clickhouse edit err = %v", err)
-			}
-		})
+	m, conn := integrationManager(t, "FLINT_TEST_CH_HTTP", Connection{Driver: ClickHouse, User: "flint"})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	sql := "SELECT number % 10 AS k, count() FROM numbers(1000) GROUP BY k ORDER BY k"
+	plan, err := m.Explain(ctx, conn.ID, "", "", sql, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Lines) < 2 || plan.Lines[0].Depth != 0 || !strings.HasPrefix(plan.Statement, "EXPLAIN PLAN") {
+		t.Fatalf("plan = %+v", plan)
+	}
+	deeper := false
+	for _, l := range plan.Lines {
+		deeper = deeper || l.Depth > 0
+	}
+	if !deeper {
+		t.Errorf("plan has no nesting: %+v", plan.Lines)
+	}
+	pipe, err := m.Explain(ctx, conn.ID, "", "", sql, true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pipe.Lines) == 0 || !pipe.Analyze || pipe.NeedsConfirm {
+		t.Errorf("pipeline = %+v", pipe)
+	}
+	if _, err := m.EditTarget(ctx, conn.ID, "", 1); err != ErrEditUnsupported {
+		t.Errorf("clickhouse edit err = %v", err)
 	}
 }

@@ -2,7 +2,7 @@
 
 // Integration tests against real servers. Start them with `make test-db-up`, then:
 //
-//	FLINT_TEST_PG=localhost:55432 FLINT_TEST_CH=localhost:59000 go test -tags integration ./internal/db/
+//	FLINT_TEST_PG=localhost:55432 FLINT_TEST_CH_HTTP=localhost:58123 go test -tags integration ./internal/db/
 package db
 
 import (
@@ -144,7 +144,7 @@ func TestPostgresIntegration(t *testing.T) {
 }
 
 func TestClickHouseIntegration(t *testing.T) {
-	m, conn := integrationManager(t, "FLINT_TEST_CH", Connection{
+	m, conn := integrationManager(t, "FLINT_TEST_CH_HTTP", Connection{
 		Driver: ClickHouse, Database: "default", User: "flint",
 	})
 
@@ -154,7 +154,7 @@ func TestClickHouseIntegration(t *testing.T) {
 			toDateTime('2024-01-02 03:04:05', 'UTC') AS ts, CAST(NULL AS Nullable(DateTime)) AS nts,
 			[1, 2] AS arr, map('a', 1) AS m, 'zażółć' AS pl`, 10)
 		row := res.Rows[0]
-		want := map[int]any{0: "18446744073709551615", 1: "1.5", 2: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", 4: nil, 7: "zażółć"}
+		want := map[int]any{0: "18446744073709551615", 1: "1.50", 2: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", 4: nil, 7: "zażółć"}
 		for i, w := range want {
 			if row[i] != w {
 				t.Errorf("column %s = %#v, want %#v", res.Columns[i].Name, row[i], w)

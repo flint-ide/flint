@@ -6,6 +6,7 @@ import { useTerminal } from '../../store/terminal'
 import { confirmAction, showToast } from '../../store/dialog'
 import { Modal } from '../layout/Modal'
 import { NewWorktreeForm } from './NewWorktreeForm'
+import { Icon } from '../ui/Icon'
 
 /** IntelliJ-like branches popup: filter, checkout, new branch, worktrees, remote ops. */
 export function BranchesPopup({ onClose, initialMode = 'list' }: { onClose: () => void; initialMode?: BranchesMode }) {
@@ -128,7 +129,7 @@ export function BranchesPopup({ onClose, initialMode = 'list' }: { onClose: () =
                     <span className="muted path-hint">{w.path}</span>
                     <span className="row-actions inline">
                       <button className="icon" title="Open in new window" onClick={(e) => (e.stopPropagation(), void run(() => Git.OpenWindow(w.path)))}>⧉</button>
-                      <button className="icon" title="Open terminal here" onClick={(e) => (e.stopPropagation(), useTerminal.getState().create(w.path), onClose())}>❯_</button>
+                      <button className="icon" title="Open terminal here" onClick={(e) => (e.stopPropagation(), useTerminal.getState().create(w.path), onClose())}><Icon name="terminal" size={14} /></button>
                       {!w.main && !w.current && (
                         <button className="icon" title="Remove worktree" onClick={(e) => (e.stopPropagation(), void removeWorktree(w))}>✕</button>
                       )}

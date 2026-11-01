@@ -6,6 +6,7 @@ import { openContextMenu } from '../../store/contextMenu'
 import { useEditor } from '../../store/editor'
 import { dockerTree, statusOf, type ComposeProject, type Container } from '../../lib/dockerTree'
 import type { DropdownItem } from '../ui/Dropdown'
+import { Icon } from '../ui/Icon'
 
 /** Containers grouped by Compose project; live while shown (docker events), idle when hidden. */
 export function DockerPanel() {
@@ -50,7 +51,7 @@ export function DockerPanel() {
               }}
             >
               <span className="twisty">{collapsed.has(project.dir) ? '▸' : '▾'}</span>
-              <span className="docker-icon">⛴</span>
+              <span className="docker-icon"><Icon name="ship" size={14} /></span>
               <span className="file-name">{project.name || project.dir.split('/').pop()}</span>
               <span className="muted path-hint">{cs.length ? `${running}/${cs.length} running` : 'not started'}</span>
               <span className="docker-actions">
@@ -99,7 +100,7 @@ function ContainerRow({ c, busy, indent, label }: { c: Container; busy: boolean;
       <span className="muted path-hint">{c.status}</span>
       <span className="docker-actions">
         <button className="icon" title="Logs" onClick={() => openLogs(c)}>≡</button>
-        {running && <button className="icon" title="Shell" onClick={() => openShell(c)}>❯_</button>}
+        {running && <button className="icon" title="Shell" onClick={() => openShell(c)}><Icon name="terminal" size={14} /></button>}
         <button className="icon" title={running ? 'Restart' : 'Start'} disabled={busy} onClick={() => void containerAction(c, running ? 'restart' : 'start')}>
           {running ? '↻' : '▶'}
         </button>

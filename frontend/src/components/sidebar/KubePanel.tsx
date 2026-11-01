@@ -15,6 +15,7 @@ import { Select } from '../ui/Select'
 import type { DropdownItem } from '../ui/Dropdown'
 import { useSettings } from '../../store/settings'
 import { refreshMs } from '../../lib/toolSettings'
+import { Icon } from '../ui/Icon'
 
 /** One Kubernetes context at a time (picked here, the global current context untouched): workloads, pods, services, jobs. */
 export function KubePanel() {
@@ -112,7 +113,7 @@ export function KubePanel() {
     <div className="panel">
       <div className="panel-header">
         <span className="panel-title">Kubernetes</span>
-        <button className="icon" title="Terminal in this context and namespace" disabled={!context} onClick={() => void openContextTerminal()}>❯_</button>
+        <button className="icon" title="Terminal in this context and namespace" disabled={!context} onClick={() => void openContextTerminal()}><Icon name="terminal" size={14} /></button>
         <button className="icon" title="Refresh" disabled={loading} onClick={() => (setNow(Date.now()), void loadContexts(), void refreshOverview())}>↻</button>
       </div>
       <div className="search-form kube-pickers">

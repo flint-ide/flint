@@ -71,5 +71,5 @@ function runInTerminal(title: string, command: string | null): void {
   useTerminal.getState().create(activeRoot(), { title, input: `${command}\n` })
 }
 
-export const openLogs = (c: Container) => runInTerminal(`⛴ logs ${c.name}`, logsCommand(c.name))
-export const openShell = (c: Container) => runInTerminal(`⛴ ${c.name}`, shellCommand(c.name))
+export const openLogs = (c: Container) => runInTerminal(`docker logs ${c.name}`, logsCommand(c.name))
+export const openShell = (c: Container) => runInTerminal(`docker exec ${c.name}`, shellCommand(c.name))

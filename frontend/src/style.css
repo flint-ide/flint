@@ -436,9 +436,18 @@ kbd {
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
 }
+/* Line icons (components/ui/Icon.tsx) sit on the text's line like the glyphs they replaced. */
+.icon-svg {
+  display: inline-block;
+  flex: none;
+  vertical-align: -0.15em;
+}
 .activity {
   width: 34px;
   height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: none;
   font-size: 16px;

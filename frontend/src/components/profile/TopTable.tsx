@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { formatValue, percent, shortName, sortTop, type TopRow, type TopSortKey } from '../../lib/flame'
+import { Icon } from '../ui/Icon'
 
 interface Props {
   rows: TopRow[]
@@ -64,7 +65,7 @@ export function TopTable({ rows, total, unit, query, onOpen, onHighlight }: Prop
                       onHighlight(r)
                     }}
                   >
-                    ⌕
+                    <Icon name="search" size={14} />
                   </button>
                 </div>
               </td>

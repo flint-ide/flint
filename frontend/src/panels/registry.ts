@@ -3,6 +3,7 @@
 // Framework-free on purpose (React only as a type), so it is testable with node:test.
 import type { ComponentType } from 'react'
 import { formatKeys, type Command } from '../lib/commands'
+import type { IconName } from '../components/ui/icons'
 
 /** Props every panel component receives (panels without an input ignore them). */
 export interface PanelProps {
@@ -27,8 +28,8 @@ export interface PanelSpec<Id extends string = string> {
   id: Id
   /** Name shown in the tooltip and, by default, in the "Show …" command. */
   title: string
-  /** Activity bar glyph. */
-  icon: string
+  /** Activity bar icon (components/ui/icons.ts). */
+  icon: IconName
   /** Position on the activity bar, ascending; ties keep listing order. */
   order: number
   /** Wrap heavy panels in React.lazy so their code is fetched on first open, not at startup. */

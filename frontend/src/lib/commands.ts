@@ -305,14 +305,28 @@ export function formatKeys(keys: string): string {
   return `${c.ctrl ? '⌃' : ''}${c.alt ? '⌥' : ''}${c.shift ? '⇧' : ''}${c.meta ? '⌘' : ''}${key}`
 }
 
+/** An editor with Vim mode on (class set by lib/vim.ts). */
+export const VIM_EDITOR = '.flint-vim'
+
+/**
+ * Keys a focused Vim editor keeps for itself: ⌃ with a letter, [ or ] and no
+ * other modifier (⌃R redo, ⌃D/⌃U scroll, ⌃V block visual, ⌃O/⌃I jumps,
+ * ⌃A/⌃X numbers, ⌃W windows, ⌃[ escape…). Flint's shortcuts on those keys
+ * (⌃R Run, ⌃D Debug) still work everywhere else.
+ */
+export function vimOwnsKey(e: KeyEventLike): boolean {
+  return e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && /^[a-z[\]]$/.test(eventKey(e))
+}
+
 /**
  * The available command bound to this key event, latest registration first.
  * `isInside(selector)` says whether the event target sits inside an element
- * matching the selector (for keysIgnoredIn).
+ * matching the selector (for keysIgnoredIn and Vim editors).
  */
 export function commandForKey(e: KeyEventLike, isInside: (selector: string) => boolean): Command | undefined {
   const bound = keyIndex().get(eventKey(e))
   if (!bound) return undefined // plain typing: no command uses this key
+  if (vimOwnsKey(e) && isInside(VIM_EDITOR)) return undefined
   for (let i = bound.length - 1; i >= 0; i--) {
     const { cmd, keys } = bound[i]
     if (!matchesKeys(e, keys)) continue

@@ -117,6 +117,7 @@ export function ScratchView({ tab, active }: Props) {
 
   const editor = (
     <CodeEditor
+      fileCommands
       initialDoc={initial}
       language={language}
       keys={keys}

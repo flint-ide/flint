@@ -262,6 +262,7 @@ export function FileView({ tab, active }: Props) {
 
   const editor = (
     <CodeEditor
+      fileCommands
       initialDoc={file.content}
       language={extensions}
       keys={keys}

@@ -20,7 +20,7 @@ The tab has twelve sections: Appearance, Editor, Terminal, Agents, Agent Context
 - **Font size**: 8 to 32 px (default 13).
 - **Line height**: 1.0 to 2.5 times the font size (default 1.55).
 - **Save files when Flint loses focus**: writes modified files when you switch to another app. Off by default.
-- **Vim mode**: Vim key bindings in every editor, with the mode in the status bar; `:w` saves and `:q` closes the tab. Flint's own shortcuts still come first. Off by default. See [Use Vim key bindings](../how-to/customize-flint.md#use-vim-key-bindings).
+- **Vim mode**: Vim key bindings in every editor, with the mode in the status bar; `:w` saves and `:q` closes the tab. A focused Vim editor keeps the `⌃` keys Vim uses (`⌃R` redo instead of Run, `⌃D` instead of Debug); other Flint shortcuts keep working. Off by default. See [Use Vim key bindings](../how-to/customize-flint.md#use-vim-key-bindings).
 
 The font settings apply to all editors: files, diffs and scratchpads. **Reset to Defaults** restores the font settings.
 

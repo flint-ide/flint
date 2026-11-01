@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -54,5 +55,27 @@ func TestImportPreviewThenApply(t *testing.T) {
 	}
 	if _, err := api.Apply(plan.ID); err == nil {
 		t.Error("a plan was applied twice")
+	}
+}
+
+func TestImportApplyKeepsPlanWhenSaveFails(t *testing.T) {
+	useImportHome(t)
+	dir := t.TempDir()
+	blocked := filepath.Join(dir, "not-a-dir")
+	if err := os.WriteFile(blocked, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{configDir: blocked, settings: settings.Default()} // settings.json can't be written under a file
+	api := &ImportAPI{app: a}
+	plan, err := api.Preview("vscode")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := api.Apply(plan.ID); err == nil {
+		t.Fatal("Apply() succeeded although settings.json can't be written")
+	}
+	a.configDir = dir
+	if saved, err := api.Apply(plan.ID); err != nil || saved.Editor.FontSize != 14 {
+		t.Errorf("retried Apply() = %v, %v; want the plan still there", saved.Editor, err)
 	}
 }

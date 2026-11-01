@@ -47,7 +47,7 @@ These are Flint's default shortcuts. All of them, except the ones that belong to
 
 ### Vim mode
 
-With [Vim mode](../how-to/customize-flint.md#use-vim-key-bindings) on, editors take Vim's keys. Flint's shortcuts above still come first.
+With [Vim mode](../how-to/customize-flint.md#use-vim-key-bindings) on, editors take Vim's keys. A focused Vim editor also keeps `⌃` with a letter, `[` or `]` (so `⌃R` is redo there, not Run, and `⌃D` scrolls instead of starting the debugger); Flint's other shortcuts come first.
 
 | Command | Action |
 |---|---|

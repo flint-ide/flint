@@ -130,14 +130,24 @@ export function themeCssVars(s: AppSettings): Record<string, string> {
 }
 
 const HEX_COLOR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i
-const CSS_VAR = /^--[a-z0-9-]+$/
+/** The CSS variables a custom theme may set: Go's settings.ThemeVariables (a Go test keeps them equal). */
+export const THEME_VARIABLES: readonly string[] = Object.freeze([
+  '--bg', '--bg-sidebar', '--bg-editor', '--bg-raised', '--bg-hover', '--bg-active', '--border',
+  '--fg', '--fg-muted', '--fg-faint', '--fg-name',
+  '--accent', '--accent-dim', '--accent-fg', '--danger', '--warn', '--info', '--ok',
+  '--selection', '--selection-match', '--search-match', '--active-line',
+  '--git-added', '--git-modified', '--git-deleted', '--diff-ins-bg', '--diff-del-bg',
+  '--syn-keyword', '--syn-string', '--syn-number', '--syn-comment', '--syn-function',
+  '--syn-type', '--syn-property', '--syn-definition', '--syn-punct',
+])
+const THEME_VARIABLE_SET = new Set(THEME_VARIABLES)
 
 function customTheme(v: unknown, def: CustomTheme): CustomTheme {
   if (!isObject(v)) return def
   const colors: Record<string, string> = {}
   if (isObject(v.colors)) {
     for (const [name, color] of Object.entries(v.colors)) {
-      if (CSS_VAR.test(name) && typeof color === 'string' && HEX_COLOR.test(color)) colors[name] = color
+      if (THEME_VARIABLE_SET.has(name) && typeof color === 'string' && HEX_COLOR.test(color)) colors[name] = color
     }
   }
   return {

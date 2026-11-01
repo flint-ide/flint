@@ -108,7 +108,7 @@ function EditorSection() {
         <input type="checkbox" checked={autoSave} onChange={(e) => update({ autoSave: e.target.checked })} />
       </Row>
       <h3>Keys</h3>
-      <Row label="Vim mode" hint="Vim key bindings in every editor; :w saves, :q closes the tab. Flint's own shortcuts (such as ⌃R Run) still win.">
+      <Row label="Vim mode" hint="Vim key bindings in every editor; :w saves, :q closes the tab. A focused Vim editor keeps Vim's ⌃ keys (⌃R redo, not Run); other Flint shortcuts keep working.">
         <input type="checkbox" checked={editor.vimMode} onChange={(e) => update({ editor: { ...editor, vimMode: e.target.checked } })} />
       </Row>
     </section>

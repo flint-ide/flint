@@ -41,7 +41,9 @@ System follows the macOS appearance and switches with it. Custom lays the import
 
 Every open editor switches right away. The status bar shows the mode of the focused editor (`-- NORMAL --`, `-- INSERT --`, `-- VISUAL --`). `:w` saves, `:q` closes the tab, and `:wq` or `:x` do both.
 
-Flint's own shortcuts still come first, including `⌃R` (Run) and `⌃D` (Debug), which Vim uses for redo and half-page down. To get Vim's behaviour, remove or change those shortcuts in **Keymap**.
+While a Vim editor has the focus, it keeps the `⌃` keys Vim uses (`⌃` with a letter, `[` or `]` and no other modifier), so `⌃R` is redo, `⌃D`/`⌃U` scroll, `⌃V` starts a block selection, `⌃O`/`⌃I` jump and `⌃A`/`⌃X` change numbers. Flint's `⌃R` (Run) and `⌃D` (Debug) still work everywhere else, and from the command palette. All other Flint shortcuts, such as `⌘P` or `⌃⇧R`, keep working in a Vim editor.
+
+`:w` and `:q` work in file and scratchpad editors; diffs and other read-only views show a note instead.
 
 ## Change the editor font
 

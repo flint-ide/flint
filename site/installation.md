@@ -26,7 +26,7 @@ The file you downloaded should be reported as `OK`. A line for the file you did 
 
 ## Homebrew
 
-> **Note:** The Homebrew cask is not published yet. These commands will work once the `ODudek/homebrew-tap` tap exists and a release has been published after it; until then, use the download above.
+> **Note:** The Homebrew cask is not published yet. These commands will work once the `ODudek/homebrew-tap` tap exists and a notarized release has been published after it (only notarized releases go to Homebrew); until then, use the download above.
 
 ```bash
 brew install --cask odudek/tap/flint
@@ -34,7 +34,7 @@ brew install --cask odudek/tap/flint
 
 Homebrew downloads the same universal `.zip` from the releases page and checks its SHA-256. To update, run `brew upgrade --cask flint`. Flint's own update check still tells you about new releases, but Flint never updates itself.
 
-The [first launch](#first-launch) note below applies to a Homebrew install too.
+Homebrew only gets notarized releases, so the [first launch](#first-launch) warning below doesn't apply to a Homebrew install.
 
 ## First launch
 

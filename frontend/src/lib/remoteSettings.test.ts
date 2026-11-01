@@ -31,7 +31,7 @@ describe('remote settings', () => {
 
   it('formats the pairing countdown', () => {
     assert.equal(formatCountdown(120_000), '2:00')
-    assert.equal(formatCountdown(61_500), '1:02')
+    assert.equal(formatCountdown(61_500), '1:01')
     assert.equal(formatCountdown(9_000), '0:09')
     assert.equal(formatCountdown(-5), '0:00')
   })

@@ -102,7 +102,9 @@ a:hover {
   text-decoration: none;
 }
 .logo {
-  color: var(--accent);
+  width: 20px;
+  height: 20px;
+  vertical-align: -4px;
 }
 .menu {
   display: none;

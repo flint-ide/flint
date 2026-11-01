@@ -1,3 +1,5 @@
+<img src="build/logo.svg" alt="Flint logo: a flint stone striking an amber spark" width="96" height="96">
+
 # Flint
 
 [![CI](https://github.com/flint-ide/flint/actions/workflows/ci.yml/badge.svg)](https://github.com/flint-ide/flint/actions/workflows/ci.yml)

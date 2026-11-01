@@ -56,6 +56,14 @@ var reviewKinds = []string{"modified", "added", "deleted", "renamed", "copied", 
 // refuses to start. Secrets are redacted and files that hold credentials are
 // not sent. Cancelling the call stops the agent and what it started.
 func (a *AgentAPI) ReviewChanges(ctx context.Context, req ReviewRequest) (ReviewResult, error) {
+	res, err := a.review(ctx, req)
+	if err != nil && errors.Is(ctx.Err(), context.Canceled) {
+		return ReviewResult{}, ctx.Err() // whichever step was running when it was cancelled
+	}
+	return res, err
+}
+
+func (a *AgentAPI) review(ctx context.Context, req ReviewRequest) (ReviewResult, error) {
 	if err := a.checkReviewRequest(req); err != nil {
 		return ReviewResult{}, err
 	}
@@ -84,9 +92,6 @@ func (a *AgentAPI) ReviewChanges(ctx context.Context, req ReviewRequest) (Review
 	}
 	answer, err := a.headless(ctx, name, r.Root, review.Prompt(), in.Text)
 	if err != nil {
-		if errors.Is(ctx.Err(), context.Canceled) {
-			return ReviewResult{}, ctx.Err()
-		}
 		return ReviewResult{}, err
 	}
 	sent := make(map[string][]string, len(in.Files))

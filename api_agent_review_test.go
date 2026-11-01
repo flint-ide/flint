@@ -175,26 +175,46 @@ func TestReviewChangesCancelStopsTheAgent(t *testing.T) {
 	claude, out := fakeClaude(t, "sleep 30 & echo $! > \""+"$(dirname \"$0\")"+"/child\"\nwait")
 	api, root := reviewRepo(t, claude, true)
 	ctx, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(500*time.Millisecond, cancel)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := api.ReviewChanges(ctx, ReviewRequest{Root: root, Files: reviewFiles[:1]})
+		done <- err
+	}()
+	// Cancel once the agent runs and has started a child of its own.
+	pid := ""
+	for deadline := time.Now().Add(30 * time.Second); pid == ""; time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the fake agent did not start its child")
+		}
+		data, _ := os.ReadFile(filepath.Join(out, "child"))
+		pid = strings.TrimSpace(string(data))
+	}
 	start := time.Now()
-	_, err := api.ReviewChanges(ctx, ReviewRequest{Root: root, Files: reviewFiles[:1]})
-	if !errors.Is(err, context.Canceled) {
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
 		t.Errorf("err = %v, want context.Canceled", err)
 	}
 	if d := time.Since(start); d > 10*time.Second {
 		t.Errorf("cancelled run took %s", d)
 	}
 	// The agent's own child (a grandchild of Flint) is gone too.
-	pid, _ := os.ReadFile(filepath.Join(out, "child"))
-	if p := strings.TrimSpace(string(pid)); p != "" {
-		deadline := time.Now().Add(5 * time.Second)
-		for exec.Command("kill", "-0", p).Run() == nil {
-			if time.Now().After(deadline) {
-				t.Fatalf("child %s still runs", p)
-			}
-			time.Sleep(50 * time.Millisecond)
+	for deadline := time.Now().Add(5 * time.Second); exec.Command("kill", "-0", pid).Run() == nil; time.Sleep(50 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("child %s still runs", pid)
 		}
-	} else {
-		t.Error("the fake agent did not start its child")
+	}
+}
+
+func TestReviewChangesCancelledBeforeTheAgentStarts(t *testing.T) {
+	claude, out := fakeClaude(t, `echo '{"findings": []}'`)
+	api, root := reviewRepo(t, claude, true)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := api.ReviewChanges(ctx, ReviewRequest{Root: root, Files: reviewFiles[:1]}); !errors.Is(err, context.Canceled) {
+		t.Errorf("err = %v, want context.Canceled", err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "args")); err == nil {
+		t.Error("the agent ran after the review was cancelled")
 	}
 }

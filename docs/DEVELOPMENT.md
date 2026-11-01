@@ -20,7 +20,7 @@ Optional tools, used by the features that need them:
 
 - `ripgrep` (`brew install ripgrep`): fast search and `⌘P`; without it a slower Go fallback is used
 - `gh`: pull request review
-- `kubectl`, `docker`, `aws` (and `saml2aws` if you use it): the infrastructure panels
+- `kubectl`, `aws` (and `saml2aws` if you use it): the infrastructure panels; `docker` only for Compose up/down/pull (the Docker panel talks to the Engine API)
 - `dlv` (`go install github.com/go-delve/delve/cmd/dlv@latest`): the debugger
 - language servers (`gopls`, `rust-analyzer`, `vtsls` or `typescript-language-server`, `basedpyright` or `pyright`)
 - `claude` and/or `codex`: the agent chat

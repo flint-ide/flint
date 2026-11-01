@@ -21,7 +21,7 @@ You only need to do this once per version. See [Installation](../installation.md
 
 ## A panel is empty or a feature is missing
 
-Most panels drive a command-line tool: Pull Requests needs `gh`, Kubernetes needs `kubectl`, Docker needs `docker`, AWS Profiles needs `aws`, agent chat needs `claude` or `codex`. Choose **Help ▸ Check Tools…** (or "Check Tools…" in the command palette) to see which tools Flint found, their versions, and an install command for each missing one.
+Most panels drive a command-line tool: Pull Requests needs `gh`, Kubernetes needs `kubectl`, Docker needs a running Docker engine (and `docker` only for Compose up, down and pull), AWS Profiles needs `aws`, agent chat needs `claude` or `codex`. Choose **Help ▸ Check Tools…** (or "Check Tools…" in the command palette) to see which tools Flint found, their versions, and an install command for each missing one.
 
 - **Not installed** although it is: Flint uses your login shell's `PATH`. Check that the tool runs in a new Terminal window; if you just added its folder to `PATH` (for example `~/go/bin`), restart Flint.
 - **Not working**: the tool is on your `PATH` but its version command failed. The window shows the error. A common case is `rust-analyzer` provided by rustup without the component installed: run `rustup component add rust-analyzer`.

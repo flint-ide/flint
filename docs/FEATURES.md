@@ -308,13 +308,13 @@ IntelliJ-style `.http` / `.rest` files with requests to your own APIs.
 
 ### Docker / Compose
 
-Panel ⛴ (palette: "Docker"), through the `docker` CLI (Docker Desktop, Colima, OrbStack):
+Panel ⛴ (palette: "Docker"), through the Docker Engine API (Docker Desktop, Colima, OrbStack, a plain daemon); the `docker` CLI is optional and only Compose Up / Down / Pull need it. The engine is found like the CLI does (Settings ▸ Docker ▸ Host, `DOCKER_HOST` incl. TLS, the current docker context, default sockets); the API version is negotiated; plain `tcp://` shows a warning:
 
 - Compose projects (from the labels of running containers and from `compose.yaml` / `docker-compose.yml` files in project folders and one level below) with their services, plus all other containers.
 - Status (running / unhealthy / paused / stopped) and ports that open in the browser on click.
-- Actions: Logs (`docker logs -f` in a terminal tab), Shell (`docker exec -it` with bash or sh), Start / Stop / Restart / Remove (with confirmation). For a project: Up / Down (with confirmation) / Restart / Stop / Pull.
-- Changes arrive from `docker events` only while the panel is visible.
-- Container names are validated before they reach a terminal.
+- Actions: Logs (the container's log, last N lines then following, in a terminal tab backed by the API stream), Shell (an exec with a TTY on a hijacked connection, resized with the tab; bash or sh), Start / Stop / Restart / Remove (with confirmation). For a project: Up / Down (with confirmation) / Pull need the CLI and are disabled with a hint without it; Restart / Stop use Compose when the CLI exists and otherwise act on the project's containers through the API.
+- Changes arrive from the engine's event stream only while the panel is visible (it reconnects with a growing delay if the engine goes away).
+- Container names are validated before they reach a request; redirects are never followed; responses and log tails are bounded.
 
 ### AWS profiles
 

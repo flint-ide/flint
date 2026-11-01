@@ -14,6 +14,7 @@ const DatabasePanel = lazy(() => import('../components/sidebar/DatabasePanel').t
 const TodoPanel = lazy(() => import('../components/sidebar/TodoPanel').then((m) => ({ default: m.TodoPanel })))
 const DockerPanel = lazy(() => import('../components/sidebar/DockerPanel').then((m) => ({ default: m.DockerPanel })))
 const AwsPanel = lazy(() => import('../components/sidebar/AwsPanel').then((m) => ({ default: m.AwsPanel })))
+const TasksPanel = lazy(() => import('../components/tasks/TasksPanel').then((m) => ({ default: m.TasksPanel })))
 const KubePanel = lazy(() => import('../components/sidebar/KubePanel').then((m) => ({ default: m.KubePanel })))
 
 // Command ids and titles predating the registry are kept: keymap overrides are stored by id.
@@ -26,6 +27,10 @@ export const PANELS = definePanels([
   {
     id: 'git', title: 'Commit', icon: '⎇', order: 30, component: CommitPanel, shortcutCommand: 'git.commit',
     command: { keywords: 'git changes' },
+  },
+  {
+    id: 'tasks', title: 'Agent Tasks', icon: '⑂', order: 35, component: TasksPanel,
+    command: { id: 'view.agentTasks', category: 'Agent', keywords: 'worktree parallel agents branch claude codex' },
   },
   {
     id: 'pulls', title: 'Pull Requests', icon: '⇅', order: 40, component: PullRequestsPanel,

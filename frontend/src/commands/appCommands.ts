@@ -4,6 +4,7 @@ import { Workspace } from '../api/backend'
 import { parseKeys, registerCommands, type Command } from '../lib/commands'
 import { attachSelectionToAgent } from '../lib/agentContext'
 import { registerFeatureCommands } from './featureCommands'
+import { registerTaskCommands } from './taskCommands'
 import { requestCloseTab } from '../components/editor/EditorArea'
 import { useWorkspace } from '../store/workspace'
 import { PANELS } from '../panels'
@@ -46,7 +47,9 @@ export function registerAppCommands(): () => void {
   const offAgents = registerAgentChatCommands()
   const offFeatures = registerFeatureCommands()
   const offRoots = registerWorkspaceRootCommands()
+  const offTasks = registerTaskCommands()
   return () => {
+    offTasks()
     offStatic()
     offAgents()
     offFeatures()

@@ -452,7 +452,8 @@ export class RepoInfo {
 }
 
 /**
- * ReviewFile is one change to review, as the Commit panel lists it.
+ * ReviewFile is one change to review, as the Commit panel lists it. Go takes
+ * only the path from it: the kind and a rename's source come from git status.
  */
 export class ReviewFile {
     /**

@@ -45,6 +45,26 @@ func TestAgentReviewValidate(t *testing.T) {
 	}
 }
 
+func TestAutoApproveArgs(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--experimental-acp"}, ""},
+		{[]string{"--experimental-acp", "--yolo"}, "--yolo"},
+		{[]string{"-y", "--model", "x"}, "-y"},
+		{[]string{"--approval-mode", "yolo"}, "--approval-mode yolo"},
+		{[]string{"--approval-mode=auto_edit"}, "--approval-mode auto_edit"},
+		{[]string{"--approval-mode", "default"}, ""},
+		{[]string{"--dangerously-skip-permissions", "--auto-approve"}, "--dangerously-skip-permissions,--auto-approve"},
+		{[]string{"--yolo-ish", "yolo"}, ""},
+	} {
+		if got := strings.Join(AutoApproveArgs(tc.args), ","); got != tc.want {
+			t.Errorf("AutoApproveArgs(%q) = %q, want %q", tc.args, got, tc.want)
+		}
+	}
+}
+
 func TestAgentReviewNormalize(t *testing.T) {
 	s, err := decode([]byte(`{"agentReview": {"scope": "bogus", "maxDiffKB": 99999, "timeoutSeconds": 1, "agent": "gone"}}`))
 	if err != nil {

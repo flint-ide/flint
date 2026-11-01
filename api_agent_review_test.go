@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"flint/internal/acp/acptest"
 	"flint/internal/settings"
 )
 
@@ -130,9 +131,11 @@ func TestReviewChangesRejectsBadRequests(t *testing.T) {
 		"no files":        {Root: root},
 		"escaping path":   {Root: root, Files: []ReviewFile{{Path: "../x.go", Kind: "modified"}}},
 		"absolute path":   {Root: root, Files: []ReviewFile{{Path: "/etc/hosts", Kind: "untracked"}}},
-		"escaping rename": {Root: root, Files: []ReviewFile{{Path: "a.go", OrigPath: "../b.go", Kind: "renamed"}}},
-		"unknown kind":    {Root: root, Files: []ReviewFile{{Path: "main.go", Kind: "rm -rf"}}},
+		"unchanged file":  {Root: root, Files: []ReviewFile{{Path: "README.md", Kind: "modified"}}},
+		"missing file":    {Root: root, Files: []ReviewFile{{Path: "nope.go", Kind: "untracked"}}},
 		"only secrets":    {Root: root, Files: []ReviewFile{{Path: ".env", Kind: "untracked"}}},
+		"parent of root":  {Root: filepath.Dir(root), Files: reviewFiles},
+		"filesystem root": {Root: "/", Files: reviewFiles},
 	} {
 		if _, err := api.ReviewChanges(context.Background(), req); err == nil {
 			t.Errorf("%s: accepted", name)
@@ -140,6 +143,85 @@ func TestReviewChangesRejectsBadRequests(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(out, "args")); err == nil {
 		t.Error("the agent ran for a rejected request")
+	}
+}
+
+// The WebView only names paths: kinds and rename sources come from git
+// status, so a forged kind or source can't make Flint read another file.
+func TestReviewChangesTakesKindsFromGit(t *testing.T) {
+	claude, out := fakeClaude(t, `echo '{"findings": []}'`)
+	api, root := reviewRepo(t, claude, true)
+	req := ReviewRequest{Root: root, Files: []ReviewFile{
+		{Path: "main.go", OrigPath: "../../etc/hosts", Kind: "untracked"},
+		{Path: "main.go", Kind: "modified"}, // twice: reviewed once
+	}}
+	res, err := api.ReviewChanges(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdin, _ := os.ReadFile(filepath.Join(out, "stdin"))
+	if !strings.Contains(string(stdin), "## main.go (modified)") || strings.Contains(string(stdin), "hosts") || strings.Join(res.Files, ",") != "main.go" {
+		t.Errorf("files %v, input:\n%s", res.Files, stdin)
+	}
+}
+
+// The Commit panel's repository may be the work tree around an open folder.
+func TestReviewChangesAcceptsTheRepositoryOfAnOpenSubfolder(t *testing.T) {
+	claude, _ := fakeClaude(t, `echo '{"findings": []}'`)
+	api, root := reviewRepo(t, claude, true)
+	sub := filepath.Join(root, "sub")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	api.app.roots = []string{sub}
+	if _, err := api.ReviewChanges(context.Background(), ReviewRequest{Root: root, Files: reviewFiles[:1]}); err != nil {
+		t.Errorf("repository of an open subfolder: %v", err)
+	}
+	if _, err := api.ReviewChanges(context.Background(), ReviewRequest{Root: sub, Files: reviewFiles[:1]}); err == nil {
+		t.Error("a folder that is not the repository root was accepted")
+	}
+}
+
+// A custom agent started with an auto-approve flag runs its own tools
+// without asking: the review says it was not read-only.
+func TestReviewChangesWarnsAboutAutoApprovingCustomAgents(t *testing.T) {
+	cmd := useFakeAgent(t, acptest.ModeEcho) // echoes the prompt, whose example finding names no reviewed file
+	claude, _ := fakeClaude(t, `echo '{"findings": []}'`)
+	api, root := reviewRepo(t, claude, true)
+	s := api.app.settings
+	s.CustomAgents = []settings.CustomAgent{{ID: "gemini", Command: cmd, Args: []string{"--experimental-acp", "--yolo"}}}
+	s.AgentReview.Agent = "gemini"
+	api.app.settings = s
+	res, err := api.ReviewChanges(context.Background(), ReviewRequest{Root: root, Files: reviewFiles[:1]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if notes := strings.Join(res.Notes, "\n"); res.Agent != "gemini" || !strings.Contains(notes, "gemini was started with --yolo") {
+		t.Errorf("agent %s, notes:\n%s", res.Agent, notes)
+	}
+}
+
+// A large untracked file is read only as far as its share of the limit, and
+// the input stays within it.
+func TestReviewChangesBoundsTheInput(t *testing.T) {
+	claude, out := fakeClaude(t, `echo '{"findings": []}'`)
+	api, root := reviewRepo(t, claude, true)
+	s := api.app.settings
+	s.AgentReview.MaxDiffKB = 8
+	api.app.settings = s
+	if err := os.WriteFile(filepath.Join(root, "big.txt"), []byte(strings.Repeat("some text line\n", 200000)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := api.ReviewChanges(context.Background(), ReviewRequest{Root: root, Files: append(reviewFiles[:1:1], ReviewFile{Path: "big.txt"})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdin, _ := os.ReadFile(filepath.Join(out, "stdin"))
+	if len(stdin) > 8<<10 || !strings.Contains(string(stdin), "## big.txt (new file)") {
+		t.Errorf("input is %d bytes:\n%s", len(stdin), stdin[:min(300, len(stdin))])
+	}
+	if !strings.Contains(strings.Join(res.Notes, " "), "8 KB limit") {
+		t.Errorf("notes = %v", res.Notes)
 	}
 }
 

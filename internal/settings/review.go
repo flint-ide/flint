@@ -1,6 +1,10 @@
 package settings
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+	"strings"
+)
 
 // AgentReview configures "Review Changes with Agent" (internal/review).
 type AgentReview struct {
@@ -57,6 +61,36 @@ func normalizeAgentReview(r AgentReview, custom []CustomAgent) AgentReview {
 	out.TimeoutSeconds = clamp(r.TimeoutSeconds, MinReviewTimeout, MaxReviewTimeout, def.TimeoutSeconds)
 	if !validAgent(r.Agent, custom) {
 		out.Agent = ""
+	}
+	return out
+}
+
+// autoApproveFlags are command-line flags that make an agent run its own
+// tools without asking (gemini, qwen, opencode, goose, codex, claude, …).
+var autoApproveFlags = []string{
+	"--yolo", "-y", "--dangerously-skip-permissions", "--dangerously-bypass-approvals-and-sandbox",
+	"--auto-approve", "--approve-all", "--allow-all-tools", "--trust-all-tools", "--full-auto", "--no-confirm",
+}
+
+// AutoApproveArgs are the arguments in args that let an agent run its own
+// tools without asking. Flint declines every permission request of a
+// one-shot run, but an agent started like this never asks: its own read and
+// write tools run anyway.
+func AutoApproveArgs(args []string) []string {
+	var out []string
+	for i, a := range args {
+		name, value, hasValue := strings.Cut(a, "=")
+		switch {
+		case slices.Contains(autoApproveFlags, name):
+			out = append(out, a)
+		case name == "--approval-mode" || name == "--permission-mode":
+			if !hasValue && i+1 < len(args) {
+				value = args[i+1]
+			}
+			if v := strings.ToLower(value); v == "yolo" || v == "auto_edit" || v == "auto-edit" || v == "bypasspermissions" || v == "never" {
+				out = append(out, name+" "+value)
+			}
+		}
 	}
 	return out
 }

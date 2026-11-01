@@ -54,12 +54,16 @@ export function ResolveConflictsCommand(root: string, operation: string, files: 
 /**
  * ReviewChanges asks an agent (settings: agentReview.agent, else the default
  * one) to review req.Files against HEAD, as the Commit panel shows them, and
- * returns its findings on lines of the new versions. The run is headless and
- * read-only like commit messages: Claude gets only Read, Grep and Glob, Codex
- * a read-only sandbox, a custom agent a session that refuses writes; in
- * Restricted Mode Claude loads only the user's settings and a custom agent
- * refuses to start. Secrets are redacted and files that hold credentials are
- * not sent. Cancelling the call stops the agent and what it started.
+ * returns its findings on lines of the new versions. Only files git status
+ * reports as changed in a repository of an open folder are reviewed. The run
+ * is headless like commit messages: Claude gets only Read, Grep and Glob and
+ * may not read credential files, Codex a read-only sandbox (which can still
+ * read any file the user can), a custom agent a session in which Flint
+ * declines every permission request and refuses writes. In Restricted Mode
+ * Claude loads only the user's settings and a custom agent refuses to start.
+ * Secrets are redacted in the input and in the findings, and files that hold
+ * credentials are not sent. Cancelling the call stops the agent and what it
+ * started.
  */
 export function ReviewChanges(req: $models.ReviewRequest): $CancellablePromise<$models.ReviewResult> {
     return $Call.ByID(262253562, req).then(($result: any) => {

@@ -16,7 +16,7 @@ Flint writes the configuration to `.flint/run.json` in the project. Commit that 
 ## Edit a run configuration
 
 1. Select it in the title bar selector.
-2. Run "Edit Configurations…" from the palette.
+2. Right-click the configuration selector in the title bar and choose Edit, or run "Edit Configurations…" from the palette.
 
 You can also edit `.flint/run.json` directly; Flint reports invalid fields.
 

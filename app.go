@@ -173,8 +173,8 @@ func NewApp() (*App, error) {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	go a.watchForUpdates(ctx)
-	if r := a.currentSettings().Remote; r.Enabled {
-		go a.applyRemote(r)
+	if a.currentSettings().Remote.Enabled {
+		go a.applyRemote()
 	}
 }
 

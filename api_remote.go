@@ -55,10 +55,12 @@ func (remoteKeychain) Delete(account string) error {
 	return err
 }
 
-// remoteState is the server's last start error, for Settings.
+// remoteState is the server's last start error, for Settings; apply
+// serializes starting and stopping (startup and a settings save may race).
 type remoteState struct {
-	mu  sync.Mutex
-	err string
+	apply sync.Mutex
+	mu    sync.Mutex
+	err   string
 }
 
 // newRemote builds the (stopped) server over the App's chats and tasks.
@@ -147,12 +149,15 @@ func (a *App) remoteTasks(ctx context.Context) ([]remote.Task, error) {
 	return out, ctx.Err()
 }
 
-// applyRemote starts, reconfigures or stops the server for r, and sizes the
-// agents' event log (kept only while the server is on).
-func (a *App) applyRemote(r settings.Remote) {
+// applyRemote starts, reconfigures or stops the server for the current
+// settings, and sizes the agents' event log (kept only while it is on).
+func (a *App) applyRemote() {
 	if a.remote == nil {
 		return
 	}
+	a.remoteErr.apply.Lock()
+	defer a.remoteErr.apply.Unlock()
+	r := a.currentSettings().Remote // read under the lock: the latest save wins
 	if !r.Enabled {
 		a.remote.Stop()
 		a.remoteDevices.CancelPairing()
@@ -176,7 +181,7 @@ func (a *App) applyRemote(r settings.Remote) {
 
 func (a *App) remoteSettingsChanged(prev, next settings.Remote) {
 	if prev.Enabled || next.Enabled {
-		a.applyRemote(next)
+		a.applyRemote()
 	}
 }
 

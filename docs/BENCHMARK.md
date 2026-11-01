@@ -8,11 +8,11 @@ Measured on 2026-11-01 on an Apple M4 Pro with 24 GB of memory, macOS 27.0.1. Th
 
 | Editor | Version | First window | Memory after 30 s idle |
 |---|---|---|---|
-| Flint | build of `main` | 0.44 s | 135 MB |
-| Visual Studio Code | 1.115.0 | 0.56 s | 599 MB |
-| Zed | 1.27.0 (Preview) | 0.34 s | 160 MB |
+| Flint | build of `main` | 0.29 s | 120 MB |
+| Visual Studio Code | 1.115.0 | 0.48 s | 592 MB |
+| Zed | 1.27.0 (Preview) | 0.32 s | 134 MB |
 
-Flint before it showed its window early (see [Startup](ARCHITECTURE.md#startup)), measured in the same session: 0.56 s and 136 MB. Zed's memory varied most between runs (134 to 169 MB).
+Flint before it started the login shell only after showing its window (see [Startup](ARCHITECTURE.md#startup)), measured in the same session: 0.39 s and 118 MB. An earlier session, before Flint showed its window early, measured 0.56 s for Flint (0.44 s once it did), 0.56 s for VS Code and 0.34 s for Zed: the numbers move between sessions, so compare editors within one.
 
 Cursor wasn't installed on that machine; the program measures it too when it is.
 

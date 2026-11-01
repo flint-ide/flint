@@ -42,7 +42,7 @@ export function DockerPanel() {
         {tree.projects.map(({ project, containers: cs, running }) => (
           <div key={project.dir}>
             <div
-              className="tree-row docker-project"
+              className="tree-row static docker-project"
               title={project.files.join('\n')}
               onClick={() => toggle(project.dir)}
               onContextMenu={(e) => {
@@ -64,7 +64,7 @@ export function DockerPanel() {
         ))}
         {tree.others.length > 0 && (
           <>
-            <div className="tree-row docker-project" onClick={() => toggle('')}>
+            <div className="tree-row static docker-project" onClick={() => toggle('')}>
               <span className="twisty">{collapsed.has('') ? '▸' : '▾'}</span>
               <span className="file-name">Other containers</span>
             </div>
@@ -82,7 +82,7 @@ function ContainerRow({ c, busy, indent, label }: { c: Container; busy: boolean;
   const running = c.state === 'running'
   return (
     <div
-      className={`tree-row docker-container${indent ? ' indent' : ''}`}
+      className={`tree-row static docker-container${indent ? ' indent' : ''}`}
       title={`${c.name}\n${c.image}\n${c.status}`}
       onDoubleClick={() => (running ? openLogs(c) : undefined)}
       onContextMenu={(e) => {

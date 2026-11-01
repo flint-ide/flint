@@ -28,7 +28,8 @@ The file is readable only by your user. It never contains secrets: database pass
   "editor": {
     "fontFamily": "'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace",
     "fontSize": 14,
-    "lineHeight": 1.55
+    "lineHeight": 1.55,
+    "vimMode": false
   },
   "terminal": {
     "fontFamily": "\"JetBrains Mono\", \"SF Mono\", Menlo, monospace",
@@ -84,9 +85,10 @@ The file is readable only by your user. It never contains secrets: database pass
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `version` | number | `1` | Schema version. Written by Flint; you don't need to change it. |
-| `theme` | string | `"dark"` | `"dark"`, `"light"` or `"system"` (follows the macOS appearance). |
-| `editor` | object | see below | Font for all editors: files, diffs and scratchpads. |
+| `theme` | string | `"dark"` | `"dark"`, `"light"`, `"system"` (follows the macOS appearance) or `"custom"` (uses `customTheme`). |
+| `editor` | object | see below | Font for all editors (files, diffs and scratchpads), and `vimMode`: Vim key bindings in every editor (default `false`). |
 | `terminal` | object | see below | Font for terminals and run consoles. |
+| `customTheme` | object | see below | The palette of the `"custom"` theme, usually imported from VS Code. See [customTheme](#customtheme). |
 | `defaultAgent` | string | `""` | Agent for new chats, commit messages and conflict resolution: `"claude"`, `"codex"` or the `id` of a custom agent. Empty means the first installed agent. Conflict resolution always uses Claude Code or Codex. |
 | `autoSave` | boolean | `false` | Save modified files when the Flint window loses focus. |
 | `notifyInBackground` | boolean | `true` | Show a macOS notification and a Dock badge when a run, a test run or an agent finishes while Flint is in the background. |
@@ -113,6 +115,28 @@ The file is readable only by your user. It never contains secrets: database pass
 | `lineHeight` | number (multiple of the font size) | 1.0–2.5 | `1.55` | `1.2` |
 
 `fontFamily` is a CSS font list; the first installed font is used. It may not contain `;`, `{`, `}`, `<`, `>` or `\`.
+
+`editor` also has `vimMode` (boolean, default `false`): Vim key bindings in every editor. See [Use Vim key bindings](../how-to/customize-flint.md#use-vim-key-bindings).
+
+### customTheme
+
+The palette used when `theme` is `"custom"`. [Import from VS Code](../how-to/customize-flint.md#import-your-settings-from-vs-code) writes it; you can also edit it by hand.
+
+```json
+"customTheme": {
+  "name": "One Dark Pro",
+  "base": "dark",
+  "colors": { "--bg-editor": "#282c34", "--fg": "#abb2bf", "--syn-keyword": "#c678dd" }
+}
+```
+
+| Key | Type | Meaning |
+|---|---|---|
+| `name` | string | Shown in Settings ▸ Appearance; up to 100 characters. |
+| `base` | string | `"dark"` or `"light"`: the palette the colors are laid over. It also sets the window appearance and the terminal's ANSI colors. |
+| `colors` | object | CSS variable → hex color (`#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`). Variables not listed keep the base palette's color. |
+
+Accepted variables: `--bg`, `--bg-sidebar`, `--bg-editor`, `--bg-raised`, `--bg-hover`, `--bg-active`, `--border`, `--fg`, `--fg-muted`, `--fg-faint`, `--fg-name`, `--accent`, `--accent-dim`, `--accent-fg`, `--danger`, `--warn`, `--info`, `--ok`, `--selection`, `--selection-match`, `--search-match`, `--active-line`, `--git-added`, `--git-modified`, `--git-deleted`, `--diff-ins-bg`, `--diff-del-bg`, and the syntax colors `--syn-keyword`, `--syn-string`, `--syn-number`, `--syn-comment`, `--syn-function`, `--syn-type`, `--syn-property`, `--syn-definition` and `--syn-punct`. Other names and other color formats are dropped when the file is read and refused when it is saved.
 
 ### keymap
 

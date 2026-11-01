@@ -233,6 +233,106 @@ export class CustomAgent {
 }
 
 /**
+ * CustomTheme is a user palette, for example one imported from VS Code: CSS
+ * variables of style.css overridden on top of a built-in palette.
+ */
+export class CustomTheme {
+    /**
+     * Name is shown in Settings ▸ Appearance.
+     */
+    "name": string;
+
+    /**
+     * Base is the palette ("dark" or "light") the colors are laid over; it also
+     * picks the native window appearance and the terminal's ANSI colors.
+     */
+    "base": string;
+
+    /**
+     * Colors maps a CSS variable ("--bg-editor") to a hex color ("#1e1e1e").
+     */
+    "colors": { [_ in string]?: string };
+
+    /** Creates a new CustomTheme instance. */
+    constructor($$source: Partial<CustomTheme> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("base" in $$source)) {
+            this["base"] = "";
+        }
+        if (!("colors" in $$source)) {
+            this["colors"] = {};
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CustomTheme instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CustomTheme {
+        const $$createField2_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("colors" in $$parsedSource) {
+            $$parsedSource["colors"] = $$createField2_0($$parsedSource["colors"]);
+        }
+        return new CustomTheme($$parsedSource as Partial<CustomTheme>);
+    }
+}
+
+/**
+ * EditorSettings is the editor's font plus editing behaviour.
+ */
+export class EditorSettings {
+    /**
+     * CSS font-family list
+     */
+    "fontFamily": string;
+
+    /**
+     * px
+     */
+    "fontSize": number;
+
+    /**
+     * multiple of the font size
+     */
+    "lineHeight": number;
+
+    /**
+     * VimMode turns on Vim key bindings in every editor.
+     */
+    "vimMode": boolean;
+
+    /** Creates a new EditorSettings instance. */
+    constructor($$source: Partial<EditorSettings> = {}) {
+        if (!("fontFamily" in $$source)) {
+            this["fontFamily"] = "";
+        }
+        if (!("fontSize" in $$source)) {
+            this["fontSize"] = 0;
+        }
+        if (!("lineHeight" in $$source)) {
+            this["lineHeight"] = 0;
+        }
+        if (!("vimMode" in $$source)) {
+            this["vimMode"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new EditorSettings instance from a string or object.
+     */
+    static createFrom($$source: any = {}): EditorSettings {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new EditorSettings($$parsedSource as Partial<EditorSettings>);
+    }
+}
+
+/**
  * Font is a monospace font setup shared by the editor and terminal sections.
  */
 export class Font {
@@ -387,7 +487,7 @@ export class MCPServer {
      * Creates a new MCPServer instance from a string or object.
      */
     static createFrom($$source: any = {}): MCPServer {
-        const $$createField1_0 = $$createType1;
+        const $$createField1_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("tools" in $$parsedSource) {
             $$parsedSource["tools"] = $$createField1_0($$parsedSource["tools"]);
@@ -477,8 +577,13 @@ export class Refresh {
 export class Settings {
     "version": number;
     "theme": string;
-    "editor": Font;
+    "editor": EditorSettings;
     "terminal": Font;
+
+    /**
+     * CustomTheme is the palette used when Theme is "custom".
+     */
+    "customTheme": CustomTheme;
 
     /**
      * DefaultAgent starts new agent chats ("claude", "codex" or a custom
@@ -565,10 +670,13 @@ export class Settings {
             this["theme"] = "";
         }
         if (!("editor" in $$source)) {
-            this["editor"] = (new Font());
+            this["editor"] = (new EditorSettings());
         }
         if (!("terminal" in $$source)) {
             this["terminal"] = (new Font());
+        }
+        if (!("customTheme" in $$source)) {
+            this["customTheme"] = (new CustomTheme());
         }
         if (!("defaultAgent" in $$source)) {
             this["defaultAgent"] = "";
@@ -620,18 +728,19 @@ export class Settings {
      * Creates a new Settings instance from a string or object.
      */
     static createFrom($$source: any = {}): Settings {
-        const $$createField2_0 = $$createType2;
-        const $$createField3_0 = $$createType2;
-        const $$createField8_0 = $$createType3;
-        const $$createField9_0 = $$createType0;
-        const $$createField10_0 = $$createType5;
+        const $$createField2_0 = $$createType3;
+        const $$createField3_0 = $$createType4;
+        const $$createField4_0 = $$createType5;
+        const $$createField9_0 = $$createType1;
+        const $$createField10_0 = $$createType0;
         const $$createField11_0 = $$createType7;
         const $$createField12_0 = $$createType9;
-        const $$createField13_0 = $$createType10;
-        const $$createField14_0 = $$createType11;
-        const $$createField15_0 = $$createType12;
-        const $$createField16_0 = $$createType13;
-        const $$createField17_0 = $$createType14;
+        const $$createField13_0 = $$createType11;
+        const $$createField14_0 = $$createType12;
+        const $$createField15_0 = $$createType13;
+        const $$createField16_0 = $$createType14;
+        const $$createField17_0 = $$createType15;
+        const $$createField18_0 = $$createType16;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -639,35 +748,38 @@ export class Settings {
         if ("terminal" in $$parsedSource) {
             $$parsedSource["terminal"] = $$createField3_0($$parsedSource["terminal"]);
         }
+        if ("customTheme" in $$parsedSource) {
+            $$parsedSource["customTheme"] = $$createField4_0($$parsedSource["customTheme"]);
+        }
         if ("keymap" in $$parsedSource) {
-            $$parsedSource["keymap"] = $$createField8_0($$parsedSource["keymap"]);
+            $$parsedSource["keymap"] = $$createField9_0($$parsedSource["keymap"]);
         }
         if ("todoExclude" in $$parsedSource) {
-            $$parsedSource["todoExclude"] = $$createField9_0($$parsedSource["todoExclude"]);
+            $$parsedSource["todoExclude"] = $$createField10_0($$parsedSource["todoExclude"]);
         }
         if ("agents" in $$parsedSource) {
-            $$parsedSource["agents"] = $$createField10_0($$parsedSource["agents"]);
+            $$parsedSource["agents"] = $$createField11_0($$parsedSource["agents"]);
         }
         if ("customAgents" in $$parsedSource) {
-            $$parsedSource["customAgents"] = $$createField11_0($$parsedSource["customAgents"]);
+            $$parsedSource["customAgents"] = $$createField12_0($$parsedSource["customAgents"]);
         }
         if ("languageServers" in $$parsedSource) {
-            $$parsedSource["languageServers"] = $$createField12_0($$parsedSource["languageServers"]);
+            $$parsedSource["languageServers"] = $$createField13_0($$parsedSource["languageServers"]);
         }
         if ("refresh" in $$parsedSource) {
-            $$parsedSource["refresh"] = $$createField13_0($$parsedSource["refresh"]);
+            $$parsedSource["refresh"] = $$createField14_0($$parsedSource["refresh"]);
         }
         if ("mcpServer" in $$parsedSource) {
-            $$parsedSource["mcpServer"] = $$createField14_0($$parsedSource["mcpServer"]);
+            $$parsedSource["mcpServer"] = $$createField15_0($$parsedSource["mcpServer"]);
         }
         if ("completions" in $$parsedSource) {
-            $$parsedSource["completions"] = $$createField15_0($$parsedSource["completions"]);
+            $$parsedSource["completions"] = $$createField16_0($$parsedSource["completions"]);
         }
         if ("inlineEdit" in $$parsedSource) {
-            $$parsedSource["inlineEdit"] = $$createField16_0($$parsedSource["inlineEdit"]);
+            $$parsedSource["inlineEdit"] = $$createField17_0($$parsedSource["inlineEdit"]);
         }
         if ("agentTasks" in $$parsedSource) {
-            $$parsedSource["agentTasks"] = $$createField17_0($$parsedSource["agentTasks"]);
+            $$parsedSource["agentTasks"] = $$createField18_0($$parsedSource["agentTasks"]);
         }
         return new Settings($$parsedSource as Partial<Settings>);
     }
@@ -675,17 +787,19 @@ export class Settings {
 
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = MCPTools.createFrom;
-const $$createType2 = Font.createFrom;
-const $$createType3 = $Create.Map($Create.Any, $Create.Any);
-const $$createType4 = AgentSettings.createFrom;
-const $$createType5 = $Create.Map($Create.Any, $$createType4);
-const $$createType6 = CustomAgent.createFrom;
-const $$createType7 = $Create.Array($$createType6);
-const $$createType8 = LanguageServerSettings.createFrom;
-const $$createType9 = $Create.Map($Create.Any, $$createType8);
-const $$createType10 = Refresh.createFrom;
-const $$createType11 = MCPServer.createFrom;
-const $$createType12 = Completions.createFrom;
-const $$createType13 = InlineEdit.createFrom;
-const $$createType14 = AgentTasks.createFrom;
+const $$createType1 = $Create.Map($Create.Any, $Create.Any);
+const $$createType2 = MCPTools.createFrom;
+const $$createType3 = EditorSettings.createFrom;
+const $$createType4 = Font.createFrom;
+const $$createType5 = CustomTheme.createFrom;
+const $$createType6 = AgentSettings.createFrom;
+const $$createType7 = $Create.Map($Create.Any, $$createType6);
+const $$createType8 = CustomAgent.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = LanguageServerSettings.createFrom;
+const $$createType11 = $Create.Map($Create.Any, $$createType10);
+const $$createType12 = Refresh.createFrom;
+const $$createType13 = MCPServer.createFrom;
+const $$createType14 = Completions.createFrom;
+const $$createType15 = InlineEdit.createFrom;
+const $$createType16 = AgentTasks.createFrom;

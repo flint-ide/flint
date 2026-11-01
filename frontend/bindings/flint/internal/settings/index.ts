@@ -6,6 +6,8 @@ export {
     AgentTasks,
     Completions,
     CustomAgent,
+    CustomTheme,
+    EditorSettings,
     Font,
     InlineEdit,
     LanguageServerSettings,

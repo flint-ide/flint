@@ -1561,6 +1561,51 @@ button.small {
   overflow-wrap: anywhere;
 }
 
+.status-vim {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+}
+
+/* ---------- import from VS Code (same frame as the tool check) ---------- */
+
+.import-sources {
+  margin-bottom: 10px;
+}
+.import-row {
+  align-items: baseline;
+  font-size: 12px;
+}
+.import-row .tool-dot {
+  align-self: center;
+  margin-top: 0;
+}
+.import-name {
+  flex: 0 1 40%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+.import-value {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.import-target {
+  flex: 0 1 30%;
+  text-align: right;
+}
+.import-reason {
+  flex: 1;
+  min-width: 0;
+}
+.import-skipped summary {
+  cursor: pointer;
+  border-top: 1px solid var(--border);
+}
+
 /* ---------- overlays ---------- */
 
 .modal-backdrop {

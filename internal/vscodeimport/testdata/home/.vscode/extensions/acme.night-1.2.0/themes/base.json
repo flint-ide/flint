@@ -1,0 +1,12 @@
+{
+	"colors": {
+		"editor.background": "#000000",
+		"editorError.foreground": "#f44747",
+		"editorLineNumber.foreground": "#495162"
+	},
+	"tokenColors": [
+		{ "settings": { "foreground": "#abb2bf" } },
+		{ "scope": "entity.name.type", "settings": { "foreground": "#e5c07b" } },
+		{ "scope": "comment", "settings": { "foreground": "#111111" } }
+	]
+}

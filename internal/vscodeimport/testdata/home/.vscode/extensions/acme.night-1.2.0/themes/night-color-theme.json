@@ -1,0 +1,24 @@
+{
+	// Acme Night: builds on the base theme
+	"name": "Acme Night",
+	"type": "dark",
+	"include": "./base.json",
+	"colors": {
+		"editor.background": "#1b1d23",
+		"editor.foreground": "#c8ccd4",
+		"sideBar.background": "#16181d",
+		"editor.lineHighlightBackground": "#2c313a",
+		"activityBarBadge.background": "#e5a50a",
+		"activityBarBadge.foreground": "#101010",
+		"editor.selectionBackground": "not-a-color",
+	},
+	"tokenColors": [
+		{ "scope": "comment", "settings": { "foreground": "#5c6370", "fontStyle": "italic" } },
+		{ "scope": ["string", "string.quoted"], "settings": { "foreground": "#98c379" } },
+		{ "scope": "keyword, storage.type", "settings": { "foreground": "#c678dd" } },
+		{ "scope": "keyword.control", "settings": { "foreground": "#e06c75" } },
+		{ "scope": "source.go keyword", "settings": { "foreground": "#ffffff" } },
+		{ "scope": "entity.name.function", "settings": { "foreground": "#61afef" } },
+		{ "scope": "constant.numeric", "settings": { "foreground": "javascript:alert(1)" } },
+	],
+}

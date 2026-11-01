@@ -10,8 +10,9 @@ import { RefreshSection } from './RefreshSection'
 import { McpServerSection } from './McpServerSection'
 import { EditorAiSection } from './EditorAiSection'
 import { NumberField, Row, TextField } from './fields'
+import { openVSCodeImport } from '../../store/vscodeImport'
 
-type Section = 'appearance' | 'editor' | 'terminal' | 'agents' | 'agentContext' | 'editorAi' | 'lsp' | 'refresh' | 'todo' | 'keymap' | 'updates'
+type Section = 'appearance' | 'editor' | 'terminal' | 'agents' | 'agentContext' | 'editorAi' | 'lsp' | 'refresh' | 'todo' | 'keymap' | 'updates' | 'import'
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
@@ -25,6 +26,7 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: 'todo', label: 'TODO List' },
   { id: 'keymap', label: 'Keymap' },
   { id: 'updates', label: 'Updates' },
+  { id: 'import', label: 'Import' },
 ]
 
 // Offered in the font pickers; any installed font can be typed instead.
@@ -54,6 +56,7 @@ export function SettingsView({ active }: { active: boolean }) {
         {section === 'todo' && <TodoSection />}
         {section === 'keymap' && <KeymapSection active={active} />}
         {section === 'updates' && <UpdatesSection />}
+        {section === 'import' && <ImportSection />}
       </div>
     </div>
   )
@@ -62,16 +65,23 @@ export function SettingsView({ active }: { active: boolean }) {
 function AppearanceSection() {
   const mode = useSettings((s) => s.settings.theme)
   const theme = useSettings((s) => s.theme)
+  const custom = useSettings((s) => s.settings.customTheme)
   const update = useSettings((s) => s.update)
+  const hasCustom = Object.keys(custom.colors).length > 0
   const options: { value: ThemeMode; label: string }[] = [
     { value: 'dark', label: 'Dark' },
     { value: 'light', label: 'Light' },
     { value: 'system', label: 'System' },
+    ...(hasCustom || mode === 'custom' ? [{ value: 'custom' as const, label: 'Custom' }] : []),
   ]
+  const hint =
+    mode === 'system' ? `Follows macOS (now ${theme})`
+    : mode === 'custom' ? `${custom.name || 'Imported theme'} on the ${custom.base} palette`
+    : undefined
   return (
     <section>
       <h2>Appearance</h2>
-      <Row label="Theme" hint={mode === 'system' ? `Follows macOS (now ${theme})` : undefined}>
+      <Row label="Theme" hint={hint}>
         <div className="segmented" role="radiogroup" aria-label="Theme">
           {options.map((o) => (
             <button key={o.value} role="radio" aria-checked={mode === o.value} className={mode === o.value ? 'on' : ''} onClick={() => update({ theme: o.value })}>
@@ -91,12 +101,31 @@ function EditorSection() {
   return (
     <section>
       <h2>Editor</h2>
-      <FontRows font={editor} defaults={DEFAULT_SETTINGS.editor} onChange={(f) => update({ editor: f })} />
+      <FontRows font={editor} defaults={DEFAULT_SETTINGS.editor} onChange={(f) => update({ editor: { ...editor, ...f } })} />
       <pre className="settings-preview editor-preview">{`func greet(name string) string {\n\treturn "Hello, " + name // 0O 1lI {}[]\n}`}</pre>
       <h3>Saving</h3>
       <Row label="Save files when Flint loses focus" hint="Modified files are written when you switch to another app.">
         <input type="checkbox" checked={autoSave} onChange={(e) => update({ autoSave: e.target.checked })} />
       </Row>
+      <h3>Keys</h3>
+      <Row label="Vim mode" hint="Vim key bindings in every editor; :w saves, :q closes the tab. Flint's own shortcuts (such as ⌃R Run) still win.">
+        <input type="checkbox" checked={editor.vimMode} onChange={(e) => update({ editor: { ...editor, vimMode: e.target.checked } })} />
+      </Row>
+    </section>
+  )
+}
+
+function ImportSection() {
+  return (
+    <section>
+      <h2>Import</h2>
+      <p className="muted settings-note">
+        Bring your fonts, auto-save, keyboard shortcuts, color theme and Vim extension over from Visual Studio Code, Cursor or VSCodium. You see
+        everything that would change, and what is skipped and why, before anything is saved.
+      </p>
+      <div className="settings-actions">
+        <button onClick={() => void openVSCodeImport()}>Import from VS Code…</button>
+      </div>
     </section>
   )
 }
@@ -197,7 +226,12 @@ function FontRows({ font, defaults, onChange }: { font: FontSettings; defaults: 
         <NumberField value={font.lineHeight} min={LINE_HEIGHT.min} max={LINE_HEIGHT.max} step={0.05} onCommit={(v) => onChange({ ...font, lineHeight: Math.round(v * 100) / 100 })} />
       </Row>
       <div className="settings-actions">
-        <button disabled={isDefault} onClick={() => onChange(defaults)}>Reset to Defaults</button>
+        <button
+          disabled={isDefault}
+          onClick={() => onChange({ fontFamily: defaults.fontFamily, fontSize: defaults.fontSize, lineHeight: defaults.lineHeight })}
+        >
+          Reset to Defaults
+        </button>
       </div>
     </>
   )

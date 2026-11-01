@@ -24,6 +24,18 @@ shasum -a 256 -c SHA256SUMS.txt
 
 The file you downloaded should be reported as `OK`. A line for the file you did not download (for example the `.zip` when you took the `.dmg`) reports that it is missing; you can ignore it.
 
+## Homebrew
+
+> **Note:** The Homebrew cask is not published yet. These commands will work once the `ODudek/homebrew-tap` tap exists and a release has been published after it; until then, use the download above.
+
+```bash
+brew install --cask odudek/tap/flint
+```
+
+Homebrew downloads the same universal `.zip` from the releases page and checks its SHA-256. To update, run `brew upgrade --cask flint`. Flint's own update check still tells you about new releases, but Flint never updates itself.
+
+The [first launch](#first-launch) note below applies to a Homebrew install too.
+
 ## First launch
 
 Release builds are notarized only when the project's signing keys are configured; otherwise they are ad-hoc signed and macOS may refuse to open the app the first time. If you see a warning that Flint cannot be opened:
@@ -90,6 +102,8 @@ Flint doesn't update itself. Once a day it checks whether a newer release exists
    - `~/Library/Application Support/flint` (settings, recent folders, sessions, scratchpads, database connections and query history);
    - `~/Library/Logs/Flint` (the log file).
 4. Database passwords are stored in the macOS Keychain. Delete each connection in Flint before uninstalling to remove its password, or remove the `flint-db` items in Keychain Access.
+
+If you installed Flint with Homebrew, `brew uninstall --cask flint` removes the app, and `brew uninstall --zap --cask flint` also removes the folders above and macOS's caches and preferences for Flint. Keychain items stay; remove them as described in step 4.
 
 Project files such as `.flint/run.json` and `.http` environment files stay in your repositories. Agent conversation histories belong to the agent CLIs (`~/.claude`, `~/.codex`) and are not removed.
 

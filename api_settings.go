@@ -29,10 +29,16 @@ func (s *SettingsAPI) Defaults() settings.Settings { return settings.Default() }
 // agent settings are read when a session starts, and custom agents are
 // registered again (running chats keep theirs).
 func (s *SettingsAPI) Save(next settings.Settings) (settings.Settings, error) {
-	a := s.app
+	return s.app.updateSettings(func(settings.Settings) settings.Settings { return next })
+}
+
+// updateSettings saves change(current settings) through the same validation and
+// side effects as Settings ▸ Save; the read and the write are one step, so a
+// concurrent save is never lost.
+func (a *App) updateSettings(change func(settings.Settings) settings.Settings) (settings.Settings, error) {
 	a.settingsMu.Lock()
 	prev := a.settings
-	saved, err := settings.Save(settings.Path(a.configDir), next)
+	saved, err := settings.Save(settings.Path(a.configDir), change(prev.Clone()))
 	if err == nil {
 		a.settings = saved
 		// Under settingsMu, so two saves register in the order they were written.
@@ -45,8 +51,8 @@ func (s *SettingsAPI) Save(next settings.Settings) (settings.Settings, error) {
 	for _, language := range settings.ChangedLanguageServers(prev, saved) {
 		a.lsp.Reconfigure(language)
 	}
-	if saved.Theme != prev.Theme && a.ctx != nil {
-		dark := setNativeAppearance(saved.Theme)
+	if appearance := settings.Appearance(saved); appearance != settings.Appearance(prev) && a.ctx != nil {
+		dark := setNativeAppearance(appearance)
 		bg := lightBackground
 		if dark {
 			bg = darkBackground
@@ -92,7 +98,7 @@ func (a *App) currentSettings() settings.Settings {
 // configured theme before the window exists, so a light theme opens without a
 // dark flash.
 func (a *App) startupAppearance() (application.MacAppearanceType, application.RGBA) {
-	switch a.currentSettings().Theme {
+	switch settings.Appearance(a.currentSettings()) {
 	case settings.ThemeLight:
 		bg := lightBackground
 		return application.NSAppearanceNameAqua, bg

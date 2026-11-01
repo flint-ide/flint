@@ -73,6 +73,7 @@ func main() {
 			application.NewService(&SettingsAPI{app: flint}),
 			application.NewService(&GitHubAPI{app: flint, git: gitAPI, gh: gh}),
 			application.NewService(&TaskAPI{app: flint, git: gitAPI, pr: gh}),
+			application.NewService(&ImportAPI{app: flint}),
 			application.NewService(newAlertsAPI(flint)),
 			application.NewService(newAWSAPI(flint)),
 			application.NewService(&KubeAPI{app: flint}),

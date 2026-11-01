@@ -49,6 +49,28 @@ type StatusError struct {
 
 func (e *StatusError) Error() string { return fmt.Sprintf("flint remote: %d %s", e.Status, e.Body) }
 
+// CheckBase refuses a server address a token must not be sent to: anything
+// but http(s), and plain http to a host that isn't this machine (the token
+// would cross the network readable; use https, e.g. tailscale serve, or an
+// ssh tunnel to a local port).
+func CheckBase(base string) error {
+	u, err := url.Parse(base)
+	if err != nil || u.Host == "" {
+		return fmt.Errorf("flint remote: invalid address %q", base)
+	}
+	switch u.Scheme {
+	case "https":
+		return nil
+	case "http":
+		h := u.Hostname()
+		if ip := net.ParseIP(h); h == "localhost" || ip != nil && ip.IsLoopback() {
+			return nil
+		}
+		return fmt.Errorf("flint remote: refusing plain http to %s: use https (tailscale serve) or an ssh tunnel to a local port", h)
+	}
+	return fmt.Errorf("flint remote: unsupported scheme %q", u.Scheme)
+}
+
 func httpClient(c *http.Client) *http.Client {
 	if c != nil {
 		return c
@@ -58,6 +80,9 @@ func httpClient(c *http.Client) *http.Client {
 
 // Pair exchanges a pairing secret for a device token.
 func Pair(ctx context.Context, hc *http.Client, base, secret, name string) (string, remote.Device, error) {
+	if err := CheckBase(base); err != nil {
+		return "", remote.Device{}, err
+	}
 	body, _ := json.Marshal(map[string]string{"secret": secret, "name": name})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSuffix(base, "/")+"/api/pair", bytes.NewReader(body))
 	if err != nil {
@@ -91,6 +116,9 @@ func do(hc *http.Client, req *http.Request, out any) error {
 }
 
 func (c *Client) get(ctx context.Context, path string, out any) error {
+	if err := CheckBase(c.Base); err != nil {
+		return err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(c.Base, "/")+path, nil)
 	if err != nil {
 		return err
@@ -144,6 +172,9 @@ func SinceQuery(since map[string]uint64) string {
 
 // Stream opens the event stream, replaying each chat after since[chat].
 func (c *Client) Stream(ctx context.Context, since map[string]uint64) (*Stream, error) {
+	if err := CheckBase(c.Base); err != nil {
+		return nil, err
+	}
 	u, err := url.Parse(strings.TrimSuffix(c.Base, "/") + "/api/stream")
 	if err != nil {
 		return nil, err

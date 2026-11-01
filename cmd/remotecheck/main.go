@@ -2,22 +2,25 @@
 // command line, the way the phone app will: pair with the code Flint shows,
 // list chats and tasks, and follow the event stream.
 //
-//	go run ./cmd/remotecheck -url http://127.0.0.1:7419 pair ABCD-EFGH-IJKL-MNOP
+//	go run ./cmd/remotecheck -url http://127.0.0.1:7419 pair     # asks for the code
 //	export FLINT_REMOTE_TOKEN=…        # printed by pair
 //	go run ./cmd/remotecheck -url http://127.0.0.1:7419 chats
 //	go run ./cmd/remotecheck -url http://127.0.0.1:7419 tasks
 //	go run ./cmd/remotecheck -url http://127.0.0.1:7419 follow [chatId:seq …]
 //
-// The token is read from FLINT_REMOTE_TOKEN, never from the command line
-// (other users can read process arguments).
+// The pairing code is read from standard input and the token from
+// FLINT_REMOTE_TOKEN, never from the command line (other users can read
+// process arguments). Plain http is refused for any host but this machine.
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strconv"
@@ -31,7 +34,7 @@ func main() {
 	base := flag.String("url", "http://127.0.0.1:7419", "Flint Remote's address")
 	name := flag.String("name", "remotecheck", "device name to pair as")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: remotecheck [-url URL] pair CODE | chats | tasks | follow [chatId:seq …]")
+		fmt.Fprintln(os.Stderr, "usage: remotecheck [-url URL] pair | chats | tasks | follow [chatId:seq …]")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -49,10 +52,15 @@ func main() {
 
 func run(ctx context.Context, base, name string, args []string) error {
 	if args[0] == "pair" {
-		if len(args) != 2 {
-			return errors.New("pair needs the code Flint shows")
+		if len(args) != 1 {
+			return errors.New("pair reads the code from standard input, not from the command line")
 		}
-		token, dev, err := client.Pair(ctx, nil, base, args[1], name)
+		fmt.Fprint(os.Stderr, "Pairing code: ")
+		code, err := bufio.NewReader(io.LimitReader(os.Stdin, 256)).ReadString('\n')
+		if err != nil && !errors.Is(err, io.EOF) {
+			return err
+		}
+		token, dev, err := client.Pair(ctx, nil, base, strings.TrimSpace(code), name)
 		if err != nil {
 			return err
 		}

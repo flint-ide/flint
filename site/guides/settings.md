@@ -43,8 +43,8 @@ Font family, size (default 13) and line height (default 1.2) for terminals and r
 
 What agent chats can read from Flint through its own MCP server (see [What agents can see in Flint](ai-agents.md#what-agents-can-see-in-flint)):
 
-- **Share Flint's context with agents**: offer the server to agent chats. On by default. Turning it off cuts running chats off at once.
-- **Tools**: diagnostics, open editors and selection, terminal output, test results and Kubernetes status, each on or off. Changes apply to running chats too.
+- **Share Flint's context with agents**: offer the server to agent chats. On by default. Turning it off closes the server and cuts running chats off at once.
+- **Tools**: diagnostics, open editors and selection, and test results (on by default); terminal output and Kubernetes status (off by default, and the agent asks before each call). Changes apply to running chats too.
 - **Terminal lines**: the most lines of one terminal's output an agent gets, 10 to 2000 (default 200).
 
 ## Language Servers

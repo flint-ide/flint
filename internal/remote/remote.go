@@ -172,6 +172,11 @@ func (s *Server) Start(cfg Config) error {
 	}
 	running, sameBind := s.srv != nil, s.cfg.Host == cfg.Host && s.cfg.Port == cfg.Port
 	s.applyLocked(cfg)
+	for st := range s.streams {
+		if !s.hosts[st.host] {
+			st.end(errHostRemoved) // opened through a host that is no longer allowed
+		}
+	}
 	s.mu.Unlock()
 	if running && sameBind {
 		return nil
@@ -260,19 +265,23 @@ func (s *Server) Addr() string {
 	return s.addr
 }
 
-// Revoke forgets a device and ends its open streams at once.
+// Revoke forgets a device and ends its open streams at once. The device is
+// removed before the streams are cut (see register), then its Keychain
+// entry and the list are updated.
 func (s *Server) Revoke(id string) error {
-	err := s.opts.Devices.Revoke(id)
+	if !s.opts.Devices.forget(id) {
+		return fmt.Errorf("no paired device %q", id)
+	}
 	s.cutStreams(func(st *stream) bool { return st.device == id })
 	s.lim.forget(id)
-	return err
+	return s.opts.Devices.RetryRevocations()
 }
 
 // RevokeAll forgets every device and ends every stream.
 func (s *Server) RevokeAll() error {
-	err := s.opts.Devices.RevokeAll()
+	s.opts.Devices.forgetAll()
 	s.cutStreams(func(*stream) bool { return true })
-	return err
+	return s.opts.Devices.RetryRevocations()
 }
 
 func (s *Server) cutStreams(match func(*stream) bool) {
@@ -280,7 +289,7 @@ func (s *Server) cutStreams(match func(*stream) bool) {
 	defer s.mu.Unlock()
 	for st := range s.streams {
 		if match(st) {
-			st.revoke()
+			st.end(errRevoked)
 		}
 	}
 }

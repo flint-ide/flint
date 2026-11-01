@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 )
@@ -143,6 +144,15 @@ type wsConn struct {
 	closeSent  bool
 	closeOnce  sync.Once
 	writeError error
+	// hurried: the stream is ending; writes get closeWait, not writeTimeout.
+	hurried atomic.Bool
+}
+
+// hurry caps the current and every later write at closeWait, so a client
+// that stopped reading can't hold the server for writeTimeout.
+func (c *wsConn) hurry() {
+	c.hurried.Store(true)
+	_ = c.conn.SetWriteDeadline(time.Now().Add(closeWait))
 }
 
 func newWSConn(conn net.Conn, br *bufio.Reader) *wsConn {
@@ -173,7 +183,14 @@ func (c *wsConn) writeFrame(op byte, payload []byte) error {
 		binary.BigEndian.PutUint64(hdr[2:], uint64(l))
 		n = 10
 	}
-	_ = c.conn.SetWriteDeadline(time.Now().Add(writeTimeout))
+	timeout := writeTimeout
+	if c.hurried.Load() {
+		timeout = closeWait
+	}
+	_ = c.conn.SetWriteDeadline(time.Now().Add(timeout))
+	if timeout != closeWait && c.hurried.Load() { // hurry ran between the two lines above
+		_ = c.conn.SetWriteDeadline(time.Now().Add(closeWait))
+	}
 	bufs := net.Buffers{hdr[:n]}
 	if len(payload) > 0 {
 		bufs = append(bufs, payload)

@@ -358,27 +358,38 @@ func (d *Devices) Authenticate(token string) (Device, bool) {
 // restart: the revocation is kept, retried (RetryRevocations), and the
 // error returned.
 func (d *Devices) Revoke(id string) error {
-	d.mu.Lock()
-	if d.devices[id] == nil {
-		d.mu.Unlock()
+	if !d.forget(id) {
 		return fmt.Errorf("no paired device %q", id)
 	}
-	delete(d.devices, id)
-	d.revoked[id] = true
-	d.mu.Unlock()
 	return d.RetryRevocations()
 }
 
 // RevokeAll forgets every device.
 func (d *Devices) RevokeAll() error {
+	d.forgetAll()
+	return d.RetryRevocations()
+}
+
+// forget removes a device from memory and marks its revocation pending.
+func (d *Devices) forget(id string) bool {
 	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.devices[id] == nil {
+		return false
+	}
+	delete(d.devices, id)
+	d.revoked[id] = true
+	return true
+}
+
+func (d *Devices) forgetAll() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	for id := range d.devices {
 		d.revoked[id] = true
 	}
 	d.devices = map[string]*device{}
 	d.pairHash = nil
-	d.mu.Unlock()
-	return d.RetryRevocations()
 }
 
 // RetryRevocations finishes revocations: it deletes their Keychain entries

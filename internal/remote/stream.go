@@ -38,15 +38,29 @@ type StreamMessage struct {
 // stream is one open WebSocket of a device.
 type stream struct {
 	device string
+	host   string // the Host it was opened with (hostOnly)
 	cancel context.CancelCauseFunc
 }
 
 var (
-	errRevoked  = errors.New("device revoked")
-	errStopping = errors.New("server stopping")
+	errRevoked     = errors.New("device revoked")
+	errStopping    = errors.New("server stopping")
+	errHostRemoved = errors.New("host no longer allowed")
 )
 
-func (st *stream) revoke() { st.cancel(errRevoked) }
+func (st *stream) end(cause error) { st.cancel(cause) }
+
+// closeFor sends the close frame that tells the client why its stream ended.
+func closeFor(ws *wsConn, cause error) {
+	switch cause {
+	case errRevoked:
+		ws.sendClose(closePolicy, "device revoked")
+	case errHostRemoved:
+		ws.sendClose(closePolicy, "host no longer allowed")
+	default:
+		ws.sendClose(closeGoingAway, "Flint Remote stopped")
+	}
+}
 
 // parseSince reads since=<chatId>:<seq> values (repeated or comma-separated).
 func parseSince(values []string) (map[string]uint64, error) {
@@ -73,13 +87,22 @@ func parseSince(values []string) (map[string]uint64, error) {
 	return out, nil
 }
 
-// register adds a stream unless the server is stopping or the device (or
-// the server) has too many.
-func (s *Server) register(device string) (*stream, context.Context, error) {
+// register adds a stream unless the server is stopping, the device was
+// revoked or its host removed after the request was authenticated, or the
+// device (or the server) has too many. Revoke removes the device before it
+// cuts streams under s.mu, so a stream registered here is either seen by
+// that cut or refused by the check below.
+func (s *Server) register(device, host string) (*stream, context.Context, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.srv == nil || s.ctx.Err() != nil {
 		return nil, nil, errStopping
+	}
+	if !s.opts.Devices.Has(device) {
+		return nil, nil, errRevoked
+	}
+	if !s.hosts[host] {
+		return nil, nil, errHostRemoved
 	}
 	n := 0
 	for st := range s.streams {
@@ -91,7 +114,7 @@ func (s *Server) register(device string) (*stream, context.Context, error) {
 		return nil, nil, errors.New("too many open streams")
 	}
 	ctx, cancel := context.WithCancelCause(s.ctx)
-	st := &stream{device: device, cancel: cancel}
+	st := &stream{device: device, host: host, cancel: cancel}
 	s.streams[st] = struct{}{}
 	s.wg.Add(1)
 	return st, ctx, nil
@@ -115,13 +138,19 @@ func (s *Server) handleStream(w *statusRecorder, r *http.Request, dev Device) {
 		_, _ = upgrade(w, r) // writes the refusal
 		return
 	}
-	st, ctx, err := s.register(dev.ID)
-	if err != nil {
-		if errors.Is(err, errStopping) {
-			http.Error(w, "stopping", http.StatusServiceUnavailable)
-		} else {
-			tooMany(w)
-		}
+	st, ctx, err := s.register(dev.ID, hostOnly(r.Host))
+	switch {
+	case errors.Is(err, errStopping):
+		http.Error(w, "stopping", http.StatusServiceUnavailable)
+		return
+	case errors.Is(err, errRevoked):
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	case errors.Is(err, errHostRemoved):
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	case err != nil:
+		tooMany(w)
 		return
 	}
 	defer s.unregister(st)
@@ -140,11 +169,15 @@ func (s *Server) handleStream(w *statusRecorder, r *http.Request, dev Device) {
 
 // streamState tracks what one stream has sent.
 type streamState struct {
+	ctx  context.Context
 	ws   *wsConn
 	sent map[string]uint64 // chat → last Seq sent
 }
 
 func (st *streamState) send(m StreamMessage) error {
+	if err := st.ctx.Err(); err != nil {
+		return err // revoked or stopped: send nothing more
+	}
 	p, err := json.Marshal(m)
 	if err != nil {
 		return err
@@ -190,9 +223,18 @@ func (s *Server) runStream(ctx context.Context, ws *wsConn, sub *subscriber, sin
 		}
 	}()
 
-	st := &streamState{ws: ws, sent: map[string]uint64{}}
+	// Once the stream is cut, a write blocked on a client that stopped
+	// reading must not hold Stop or Revoke: cap it at closeWait.
+	stopHurry := context.AfterFunc(ctx, ws.hurry)
+	defer stopHurry()
+
+	st := &streamState{ctx: ctx, ws: ws, sent: map[string]uint64{}}
 	if err := s.replay(st, since); err != nil {
-		ws.sendClose(closeInternal, "")
+		if ctx.Err() != nil {
+			closeFor(ws, context.Cause(ctx))
+		} else {
+			ws.sendClose(closeInternal, "")
+		}
 		return
 	}
 	ping := time.NewTicker(pingInterval)
@@ -207,12 +249,7 @@ func (s *Server) runStream(ctx context.Context, ws *wsConn, sub *subscriber, sin
 		var err error
 		select {
 		case <-ctx.Done():
-			switch context.Cause(ctx) {
-			case errRevoked:
-				ws.sendClose(closePolicy, "device revoked")
-			default:
-				ws.sendClose(closeGoingAway, "Flint Remote stopped")
-			}
+			closeFor(ws, context.Cause(ctx))
 			return
 		case <-readDone:
 			readEnded = true
@@ -226,6 +263,9 @@ func (s *Server) runStream(ctx context.Context, ws *wsConn, sub *subscriber, sin
 			err = ws.ping()
 		}
 		if err != nil {
+			if ctx.Err() != nil {
+				closeFor(ws, context.Cause(ctx))
+			}
 			return
 		}
 	}

@@ -2,11 +2,40 @@ package remote
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
 	as "flint/internal/agentsession"
 )
+
+// The window the review found: a request authenticated, then its device was
+// revoked (and the streams cut) before the stream registered. register must
+// refuse it.
+func TestRegisterRefusesARevokedDevice(t *testing.T) {
+	d, _, _, _ := newTestDevices(t)
+	s := New(Options{Devices: d})
+	if err := s.Start(Config{Host: "127.0.0.1", Port: 0, RequestsPerMinute: 60}); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	p, _ := d.BeginPairing()
+	dev, _, _ := d.Pair(p.Secret, "phone")
+	st, _, err := s.register(dev.ID, "127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.unregister(st)
+	if !d.forget(dev.ID) {
+		t.Fatal("forget")
+	}
+	if _, _, err := s.register(dev.ID, "127.0.0.1"); !errors.Is(err, errRevoked) {
+		t.Fatalf("register after revoke: %v", err)
+	}
+	if _, _, err := s.register("0123456789abcdef", "127.0.0.1"); err == nil {
+		t.Fatal("registered for an unknown device")
+	}
+}
 
 func TestParseSince(t *testing.T) {
 	got, err := parseSince([]string{"a:1,b:22", "urn:uuid:x:3", ""})

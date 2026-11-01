@@ -7,6 +7,8 @@ This page covers downloading Flint, opening it for the first time, the `flint` c
 - macOS 12 (Monterey) or later.
 - An Apple silicon or Intel Mac. Release builds are universal, so the same download runs on both.
 
+Flint also runs on Linux (x86_64 and arm64); see [Linux](#linux) below.
+
 ## Download
 
 1. Open the [Flint releases page](https://github.com/ODudek/flint/releases).
@@ -36,6 +38,44 @@ Homebrew downloads the same universal `.zip` from the releases page and checks i
 
 Homebrew only gets notarized releases, so the [first launch](#first-launch) warning below doesn't apply to a Homebrew install.
 
+## Linux
+
+There are no Linux downloads on the releases page yet, so on Linux you build Flint yourself. It takes a few minutes.
+
+### What you need
+
+- x86_64 or arm64, with GTK 4 and WebKitGTK 6.0: Ubuntu 24.04 or later, Debian 13 or later, Fedora 39 or later, Arch, or another distribution that ships them. Older ones (Ubuntu 22.04) only have WebKitGTK 4.1 and aren't supported.
+- To store database passwords and API keys: a Secret Service, which GNOME and KDE run already (GNOME Keyring, KWallet). Without one, saving a password fails with an error; nothing is written to disk instead.
+- To build: Go 1.27.3 or later, Node 22 or later, a C compiler, and the development packages. On Debian and Ubuntu:
+
+  ```bash
+  sudo apt install build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev libx11-dev
+  go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
+  ```
+
+### Build and install
+
+```bash
+git clone https://github.com/ODudek/flint.git
+cd flint
+cd frontend && npm ci --ignore-scripts && cd ..
+wails3 task package:linux
+tar -xzf build/bin/flint-dev-linux-*.tar.gz -C ~/.local
+```
+
+This installs the `flint` command in `~/.local/bin`, a Flint launcher in your desktop's app list, and its icon. `flint .` opens the current folder; a running Flint takes the folder over, as on macOS.
+
+### Differences from macOS
+
+- **Shortcuts** use Ctrl where macOS uses ⌘ (`Ctrl+Shift+P` for the command palette, `Ctrl+P` to go to a file), and the app shows them that way. Run, Run Test at Cursor and Debug are `Shift+F10`, `Ctrl+Shift+F10` and `Shift+F9`. In a terminal, `Ctrl` with a letter goes to the shell (`Ctrl+C`, `Ctrl+R`, `Ctrl+W`…), copy and paste are `Ctrl+Shift+C` and `Ctrl+Shift+V`, and `Ctrl+J` still switches back to the editor.
+- **The menu** is the button in the window's header bar.
+- **Files** live in `~/.config/flint` (settings, sessions, connections) and `~/.local/state/flint` (the log). Deleted files go to the desktop's Trash and can be restored from the file manager.
+- **Notifications** use the desktop's notifications; there is no badge count.
+
+### Uninstall on Linux
+
+Delete `~/.local/bin/flint`, `~/.local/share/applications/io.github.odudek.flint.desktop`, `~/.local/share/icons/hicolor/512x512/apps/io.github.odudek.flint.png`, and, to remove your data, `~/.config/flint` and `~/.local/state/flint`. Stored passwords are `flint-db` items in your keyring (Seahorse, KWalletManager); delete the connections in Flint first to remove them.
+
 ## First launch
 
 Release builds are notarized only when the project's signing keys are configured; otherwise they are ad-hoc signed and macOS may refuse to open the app the first time. If you see a warning that Flint cannot be opened:
@@ -64,7 +104,7 @@ If Flint is already running, it takes the folder over and comes to the front ins
 
 ## Recommended tools
 
-Flint launches the tools already installed on your Mac, with your login shell's `PATH`, so sign-ins and configuration work the same as in your terminal. Flint starts without any of them, but Git is the one you will almost certainly want; each of the others unlocks the features that need it.
+Flint launches the tools already installed on your computer, with your login shell's `PATH`, so sign-ins and configuration work the same as in your terminal. Flint starts without any of them, but Git is the one you will almost certainly want; each of the others unlocks the features that need it.
 
 ### Check which tools you have
 
@@ -88,7 +128,7 @@ The check only runs each tool's version command, outside your projects, and inst
 | `aws` (`brew install awscli`), and `saml2aws` if you use it | The AWS profiles panel and credential refresh. |
 | `node` (`brew install node`) | Only needed for the language servers installed with `npm`. |
 
-> **Note:** The Go debugger also needs macOS developer mode: run `sudo DevToolsSecurity -enable` once.
+> **Note:** The Go debugger also needs macOS developer mode: run `sudo DevToolsSecurity -enable` once. On Linux, the install commands the Tools window shows are the Debian/Ubuntu (`apt`), npm or snap ones; use your distribution's packages where they differ.
 
 ## Updating
 

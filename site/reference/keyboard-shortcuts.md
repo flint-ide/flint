@@ -2,6 +2,8 @@
 
 These are Flint's default shortcuts. All of them, except the ones that belong to the editor itself, can be changed in Settings ▸ Keymap (see [Customize Flint](../how-to/customize-flint.md#rebind-a-keyboard-shortcut)). The command palette (`⇧⌘P`) always shows the current shortcut of each command.
 
+The keys below are the macOS ones. On Linux, read Ctrl for ⌘ and Alt for ⌥ (`Ctrl+Shift+P`, `Ctrl+P`), with these exceptions: Run is `Shift+F10`, Run Test at Cursor `Ctrl+Shift+F10` and Debug `Shift+F9`; in a terminal, `Ctrl` with a letter goes to the shell, and copy and paste are `Ctrl+Shift+C` and `Ctrl+Shift+V` (see [Installation](../installation.md#differences-from-macos)).
+
 ## General and navigation
 
 | Shortcut | Action |

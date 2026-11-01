@@ -13,11 +13,12 @@ Most of Flint's data lives in:
 | File or folder | What it holds |
 |---|---|
 | `state.json` | Recent folders, the agent approval policy, trusted folders, [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel) per repository (description with credentials removed, agent, branch, base, worktree folder, last state, pull request link), whether the tool check has been shown, and the [update check](privacy-and-security.md#update-check)'s last time, the release it found and a version you skipped. |
-| `settings.json` | Your preferences: theme (and an imported custom theme), fonts, Vim mode, default agent, auto-save, notifications, update check, shortcut overrides, TODO excludes, agent CLIs, language servers, refresh intervals, agent context, inline completions, agent tasks. No secrets. See [Settings file](settings.md). |
+| `settings.json` | Your preferences: theme (and an imported custom theme), fonts, Vim mode, default agent, auto-save, notifications, update check, shortcut overrides, TODO excludes, agent CLIs, language servers, refresh intervals, agent context, inline completions, agent tasks, usage budgets and model prices. No secrets. See [Settings file](settings.md). |
 | `connections.json` | Database connection profiles: host, port, user, default database, ClickHouse protocol, TLS and read-only options. No passwords. |
 | `sessions/` | One file per project: open tabs, terminals, agent conversations, attached projects, the selected run configuration and breakpoints. |
 | `scratch/` | Scratchpads: SQL consoles and notes, with the connection and database each console uses. |
 | `history/` | Query history, one file per database connection. |
+| `usage.json` | [Agent usage](../guides/ai-agents.md#usage-and-budgets): totals per day, project, agent, model and agent task (tokens, cache tokens, reported cost, turns); the chats that used the most, named after their first message (with recognized credentials removed); and which budget warnings were already shown. Kept for `usage.retentionDays` days (default 90), at most 20,000 daily rows and 500 chats. A file that can't be read is renamed `usage.json.bad` and Flint starts a new one. |
 
 ### Project sessions
 

@@ -8,7 +8,7 @@ Flint's settings open in a tab. Every change applies immediately, without a rest
 - **flint ▸ Settings…** in the menu bar
 - "Settings…" in the command palette
 
-The tab has twelve sections: Appearance, Editor, Terminal, Agents, Agent Context, AI in the Editor, Language Servers, Refresh, TODO List, Keymap, Updates and Import.
+The tab has thirteen sections: Appearance, Editor, Terminal, Agents, Agent Context, Usage, AI in the Editor, Language Servers, Refresh, TODO List, Keymap, Updates and Import.
 
 ## Appearance
 
@@ -50,6 +50,16 @@ What agent chats can read from Flint through its own MCP server (see [What agent
 - **Share Flint's context with agents**: offer the server to agent chats. On by default. Turning it off closes the server and cuts running chats off at once.
 - **Tools**: diagnostics, open editors and selection, and test results (on by default); terminal output and Kubernetes status (off by default, and the agent asks before each call). Changes apply to running chats too.
 - **Terminal lines**: the most lines of one terminal's output an agent gets, 10 to 2000 (default 200).
+## Usage
+
+Agent usage and budgets (see [Usage and budgets](ai-agents.md#usage-and-budgets)):
+
+- **Keep daily totals for**: how many days `usage.json` keeps, 7 to 3650 (default 90).
+- **Daily budget** and **Daily token budget**: for all agent chats of the day; 0 turns a budget off.
+- **Budget per agent task** and **Token budget per agent task**: for everything one agent task's chats used.
+- **Pause new turns over budget**: a chat over budget sends no new messages until you choose **Continue anyway** in its warning. Off by default.
+- **Model prices**: one `model input output` per line, in USD per million tokens, for agents that report no cost (Codex). Costs computed from them are marked as estimates.
+
 ## AI in the Editor
 
 - **Edit with Agent (⌘I) ▸ Context lines**: lines above and below the selection the agent sees (0 to 500, default 60).

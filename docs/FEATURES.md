@@ -115,6 +115,14 @@ Persistent SQL consoles and notes (MD/TXT) with autosave. `⌘↵` runs the quer
 - "Send to agent" (LSP problems, terminal output) uses the shared `askAgent` (`frontend/src/lib/askAgent.ts`): it picks the active or most recently used chat of the project the content belongs to (the file's project, or the active tab's project when there is no file). If there is none, it opens a new chat in that project with the preferred agent. The content goes into the draft so you can add to it; `⌥`-click sends it immediately.
 - The chat header shows usage: cumulative input/output tokens, cost in USD when the agent reports it (codex usually does not), and a context fill bar (for example "42% context"), with details in a tooltip. The status bar shows the total for the project (with several projects, for the whole workspace, broken down in the tooltip). Usage is part of the saved session.
 
+### Usage and budgets
+
+- Usage is recorded in Go as it arrives: every `usage` event of a chat is one turn, added to a daily row per project (a task's chats count for the repository's main checkout), agent, model and agent task in `usage.json` (`internal/usage`, `usage_state.go`). Tokens in/out, cache read/write tokens when reported (Claude Code), the cost only when the agent reports it. The file is rewritten atomically after each turn and bounded by `usage.retentionDays` (default 90) and row/chat caps.
+- No invented prices: tokens without a reported cost stay tokens, unless `usage.prices` gives the model a price ($/Mtok in/out); those costs are kept apart and always labelled as estimates.
+- The Usage panel (∑, `UsageAPI`) shows today / 7 / 30-day totals, a per-day SVG bar chart (7 or 30 days), breakdowns by project, agent task, agent and model (click a project or task to filter), top chats, and a CSV export of the daily rows (native save dialog; a download in the browser build). It reloads on `usage:changed`, never polls.
+- Budgets: daily (USD and/or tokens, all chats) and per agent task. When a turn reaches one, `usage:alert` fires once per threshold per day or task (remembered in `usage.json`, so not again after a restart): a warning under the chat header, a toast, or a background notification through `AlertsAPI`. With `usage.pauseOverBudget`, `AgentChatAPI.Prompt` refuses new turns until **Continue anyway** in the warning (per day and task).
+- Nothing is sent anywhere; see [Files and data](../site/reference/files-and-data.md).
+
 ### Custom agents (ACP)
 
 - Each entry in `customAgents` (settings.json) is an agent: an id (lowercase, not `claude` or `codex`), an optional name, a command (a name on the login PATH or an absolute path) and the arguments that start its ACP mode. Settings offers Gemini CLI (`gemini --experimental-acp`) and OpenCode (`opencode acp`) as one-click fill-ins; you install and log in to the CLI yourself.
@@ -352,7 +360,7 @@ Unhealthy apps are sorted first and expanded.
 
 ### Settings
 
-`⌘,` (flint menu ▸ Settings…, or "Settings…" in the palette) opens a settings tab with Appearance, Editor, Terminal, Agents, Agent Context, AI in the Editor, Language Servers, Refresh, TODO List, Keymap, Updates and Import sections. Every change applies immediately, without a restart, and saves itself (agent settings apply to sessions started afterwards).
+`⌘,` (flint menu ▸ Settings…, or "Settings…" in the palette) opens a settings tab with Appearance, Editor, Terminal, Agents, Agent Context, Usage, AI in the Editor, Language Servers, Refresh, TODO List, Keymap, Updates and Import sections. Every change applies immediately, without a restart, and saves itself (agent settings apply to sessions started afterwards).
 
 - **Theme**: Dark, Light or System (follows the macOS appearance, `prefers-color-scheme`). Colors are CSS variables in `style.css` (`:root` and `[data-theme="light"]`); terminals have their own palette (`lib/terminalTheme.ts`); Go switches the title bar and window buttons (`NSApp.appearance`). The theme from the last run is applied before the first render (a copy in `localStorage`, and the window appearance set in Go before the window is created), so a light theme never flashes dark.
 - **Editor**: font family, size and line height for all CodeMirror editors (files, diffs, scratchpads); optional save on window focus loss.
@@ -362,7 +370,7 @@ Unhealthy apps are sorted first and expanded.
 - **Refresh**: how often the Kubernetes panel (default 5 s, 2–600 s) and the AWS panel (default 30 s, 5–3600 s) re-read their data while shown; values out of range are clamped. Git status, Docker and pull requests don't poll.
 - **Keymap**: a searchable list of all commands (by name or by shortcut, for example `⌘K`). Click a shortcut and press a new combination to change it; conflicts with other commands are shown, `↺` restores the default and `✕` removes it. Shortcuts handled by CodeMirror (`⌘F`, `⌘S`, `⌘↵`, and so on) are display-only. Overrides go into a layer of the command registry (`lib/commands.ts`), so the palette and the dispatcher use the effective shortcuts.
 - **Updates**: the daily release check (see [Update check](#update-check)) can be turned off; **Check Now** checks right away.
-- **Agent Context** and **AI in the Editor**: see [Agent context](#agent-context-flints-mcp-server) and [AI in the editor](#ai-in-the-editor).
+- **Agent Context**, **Usage** and **AI in the Editor**: see [Agent context](#agent-context-flints-mcp-server), [Usage and budgets](#usage-and-budgets) and [AI in the editor](#ai-in-the-editor).
 - **Import** ("Import from VS Code…" in the palette): reads VS Code's, Cursor's or VSCodium's `settings.json`, `keybindings.json` and active color theme (from its extension, following `include`), and shows what it would change and what it skips and why (chords, `when` clauses, settings Flint doesn't have, built-in themes). Nothing is written until you confirm. An imported theme becomes `theme: "custom"`: a palette over the dark or light base, limited to Flint's own color variables and hex colors.
 - **Trusted folders**: see [Restricted Mode](#restricted-mode-workspace-trust).
 

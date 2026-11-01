@@ -142,11 +142,16 @@ func (t *TaskAPI) List(dir string) ([]TaskView, error) { return t.ListAll([]stri
 // workspace folders), each repository once however many of its worktrees
 // are open. A task whose worktree vanished loses the trust Flint gave it.
 func (t *TaskAPI) ListAll(dirs []string) ([]TaskView, error) {
+	ctx, cancel := t.ctx(gitTimeout)
+	defer cancel()
+	return t.listAll(ctx, dirs)
+}
+
+// listAll is ListAll under the caller's context (Flint Remote's request).
+func (t *TaskAPI) listAll(ctx context.Context, dirs []string) ([]TaskView, error) {
 	if len(dirs) > maxListDirs {
 		return nil, fmt.Errorf("too many folders (max %d)", maxListDirs)
 	}
-	ctx, cancel := t.ctx(gitTimeout)
-	defer cancel()
 	out := []TaskView{}
 	seen := map[string]bool{}
 	for _, dir := range dirs {
@@ -212,13 +217,22 @@ func (t *TaskAPI) view(ctx context.Context, r *git.Repo, task agenttask.Task) Ta
 // Changes lists what a task changed since it left its base (committed or
 // not, new files included) with line counts.
 func (t *TaskAPI) Changes(id string) (git.DiffStat, error) {
+	ctx, cancel := t.ctx(gitTimeout)
+	defer cancel()
+	return t.changes(ctx, id)
+}
+
+// changes is Changes under the caller's context.
+func (t *TaskAPI) changes(ctx context.Context, id string) (git.DiffStat, error) {
 	task, err := t.liveTask(id)
 	if err != nil {
 		return git.DiffStat{}, err
 	}
-	return with(t.git, task.Worktree, gitTimeout, func(ctx context.Context, r *git.Repo) (git.DiffStat, error) {
-		return r.DiffStat(ctx, task.Base, taskChangesLimit)
-	})
+	r, err := t.git.repo(ctx, task.Worktree)
+	if err != nil {
+		return git.DiffStat{}, err
+	}
+	return r.DiffStat(ctx, task.Base, taskChangesLimit)
 }
 
 // Create makes the task's branch and worktree and remembers the task. The UI

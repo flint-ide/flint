@@ -387,6 +387,26 @@ func TestRemoteTasksListTheWorkspaceTasksWithTheirChanges(t *testing.T) {
 	if len(tasks) != 1 || tasks[0].ID != v.ID || tasks[0].Title != "Add a Retry button" || tasks[0].Changes == nil || tasks[0].Changes.Files != 1 || tasks[0].Changes.Added != 2 {
 		t.Fatalf("tasks %+v", tasks)
 	}
+
+	// The list is reused for a while (each one runs git per task)…
+	if err := os.WriteFile(filepath.Join(v.Worktree, "c.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := a.remoteTasks(context.Background()); again[0].Changes.Files != 1 {
+		t.Fatalf("not reused: %+v", again[0].Changes)
+	}
+	// …until git or the tasks change.
+	a.emit(eventGitChanged)
+	if again, _ := a.remoteTasks(context.Background()); again[0].Changes.Files != 2 {
+		t.Fatalf("not recomputed after git:changed: %+v", again[0].Changes)
+	}
+	// The request's context bounds the work.
+	a.emit(eventTasksChanged)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := a.remoteTasks(ctx); err == nil {
+		t.Fatal("a cancelled request computed the list")
+	}
 }
 
 func waitUntil(t *testing.T, cond func() bool) {

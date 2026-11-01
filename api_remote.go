@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/zalando/go-keyring"
 
@@ -56,11 +58,13 @@ func (remoteKeychain) Delete(account string) error {
 }
 
 // remoteState is the server's last start error, for Settings; apply
-// serializes starting and stopping (startup and a settings save may race).
+// serializes starting and stopping (startup and a settings save may race);
+// tasks caches the task list.
 type remoteState struct {
 	apply sync.Mutex
 	mu    sync.Mutex
 	err   string
+	tasks remoteTaskCache
 }
 
 // newRemote builds the (stopped) server over the App's chats and tasks.
@@ -107,7 +111,10 @@ func (a *App) remoteFanout(name string, data []any) {
 			}
 		}
 	case eventTasksChanged:
+		a.remoteErr.tasks.gen.Add(1)
 		a.remote.TasksChanged()
+	case eventGitChanged:
+		a.remoteErr.tasks.gen.Add(1) // ahead, merged and the diff stat follow git
 	}
 }
 
@@ -126,10 +133,47 @@ func (a *App) remoteChats() []remote.Chat {
 	return out
 }
 
-// remoteTasks lists the agent tasks of the open folders with their diff stat.
+// remoteTasksTTL is how long a computed task list is reused (it runs git for
+// every task); tasks:changed and git:changed drop it sooner.
+const remoteTasksTTL = 10 * time.Second
+
+// remoteTaskCache keeps the last task list. Computing holds mu, so
+// concurrent requests wait for one computation; invalidation only bumps gen
+// (it runs on the desktop's emit path and must not wait).
+type remoteTaskCache struct {
+	gen   atomic.Uint64
+	mu    sync.Mutex
+	git   *GitAPI // keeps its repository cache between requests
+	at    time.Time
+	atGen uint64
+	tasks []remote.Task
+}
+
+// remoteTasks lists the agent tasks of the open folders with their diff
+// stat, under the request's context, reusing a recent list.
 func (a *App) remoteTasks(ctx context.Context) ([]remote.Task, error) {
-	tasks := &TaskAPI{app: a, git: &GitAPI{app: a}}
-	views, err := tasks.ListAll(a.projectRoots())
+	c := &a.remoteErr.tasks
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	gen := c.gen.Load()
+	if c.tasks != nil && c.atGen == gen && time.Since(c.at) < remoteTasksTTL {
+		return slices.Clone(c.tasks), nil
+	}
+	if c.git == nil {
+		c.git = &GitAPI{app: a}
+	}
+	ctx, cancel := context.WithTimeout(ctx, gitTimeout)
+	defer cancel()
+	out, err := a.computeRemoteTasks(ctx, &TaskAPI{app: a, git: c.git})
+	if err != nil {
+		return nil, err
+	}
+	c.tasks, c.at, c.atGen = out, time.Now(), gen
+	return slices.Clone(out), nil
+}
+
+func (a *App) computeRemoteTasks(ctx context.Context, tasks *TaskAPI) ([]remote.Task, error) {
+	views, err := tasks.listAll(ctx, a.projectRoots())
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +184,7 @@ func (a *App) remoteTasks(ctx context.Context) ([]remote.Task, error) {
 			Stale: v.Stale, Ahead: v.Ahead, Merged: v.Merged, PullRequest: v.PullRequest, CreatedAt: v.CreatedAt,
 		}
 		if !v.Stale && ctx.Err() == nil {
-			if ds, err := tasks.Changes(v.ID); err == nil {
+			if ds, err := tasks.changes(ctx, v.ID); err == nil {
 				t.Changes = &remote.DiffSummary{Files: ds.Count, Added: ds.Added, Deleted: ds.Deleted, Truncated: ds.Truncated}
 			}
 		}

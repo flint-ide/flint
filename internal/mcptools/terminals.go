@@ -50,14 +50,19 @@ type TerminalInfo struct {
 // NewTerminals returns an empty store.
 func NewTerminals() *Terminals { return &Terminals{byID: map[string]*console{}} }
 
-// Open starts keeping output for id; the oldest console is forgotten when
-// too many are open. Reopening an id starts it over.
+// Open starts keeping output for id; when too many are kept, the oldest
+// finished console (else the oldest) is forgotten. Reopening an id starts it
+// over.
 func (t *Terminals) Open(id, kind, title, cwd string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.removeLocked(id)
 	if len(t.order) >= maxTerminals {
-		t.removeLocked(t.order[0])
+		victim := t.order[0]
+		if i := slices.IndexFunc(t.order, func(x string) bool { return t.byID[x].exited }); i >= 0 {
+			victim = t.order[i]
+		}
+		t.removeLocked(victim)
 	}
 	t.byID[id] = &console{kind: kind, title: title, cwd: filepath.Clean(cwd)}
 	t.order = append(t.order, id)

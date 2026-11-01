@@ -120,7 +120,7 @@ func (s *Server) dispatch(ctx context.Context, root, method string, params json.
 	case "tools/call":
 		return s.callTool(ctx, root, params)
 	}
-	return nil, &rpcError{Code: codeMethodNotFound, Message: "method not found: " + method}
+	return nil, &rpcError{Code: codeMethodNotFound, Message: "method not found: " + cutName(method)}
 }
 
 func (s *Server) initialize(params json.RawMessage) (any, *rpcError) {
@@ -203,11 +203,12 @@ func (s *Server) callTool(ctx context.Context, root string, params json.RawMessa
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, &rpcError{Code: codeInvalidParams, Message: "invalid tools/call params"}
 	}
-	i := slices.IndexFunc(s.tools(), func(t Tool) bool { return t.Name == p.Name })
-	if i < 0 || p.Name == "" {
-		return nil, &rpcError{Code: codeInvalidParams, Message: "unknown tool: " + p.Name}
+	tools := s.tools()
+	i := slices.IndexFunc(tools, func(t Tool) bool { return t.Name == p.Name })
+	if i < 0 || p.Name == "" || tools[i].Call == nil {
+		return nil, &rpcError{Code: codeInvalidParams, Message: "unknown tool: " + cutName(p.Name)}
 	}
-	tool := s.tools()[i]
+	tool := tools[i]
 	if len(p.Arguments) == 0 || string(p.Arguments) == "null" {
 		p.Arguments = json.RawMessage("{}")
 	}
@@ -224,6 +225,14 @@ func (s *Server) callTool(ctx context.Context, root string, params json.RawMessa
 		text = err.Error()
 	}
 	return callResult{Content: []textContent{{Type: "text", Text: bound(redact.Secrets(text))}}, IsError: err != nil}, nil
+}
+
+// cutName bounds a tool name echoed in an error.
+func cutName(name string) string {
+	if len(name) > 64 {
+		return name[:64] + "…"
+	}
+	return name
 }
 
 // bound cuts text at maxToolOutput bytes without splitting a character.

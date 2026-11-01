@@ -87,6 +87,14 @@ func TestTerminalsEvictOldest(t *testing.T) {
 	if _, ok := ts.Tail("0", 1); ok {
 		t.Fatal("oldest not evicted")
 	}
+	ts.Exit("40", 0)
+	ts.Open("new", KindRun, "run", "/p")
+	if _, ok := ts.Tail("40", 1); ok {
+		t.Fatal("a finished console must go before older live ones")
+	}
+	if _, ok := ts.Tail("5", 1); !ok {
+		t.Fatal("a live console was evicted while a finished one was kept")
+	}
 }
 
 func TestDiagnosticsStore(t *testing.T) {

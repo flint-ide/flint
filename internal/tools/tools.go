@@ -1,5 +1,6 @@
-// Package tools is the list of external programs Flint drives (git, rg, gh,
+// Package tools is the list of external programs Flint drives (git, rg,
 // agents, cloud CLIs, language servers) and a check of which are installed.
+// GitHub needs no program: Flint talks to its API (internal/github).
 // One table feeds both the first-run tool check and the bug report, so the
 // two never disagree about what Flint needs.
 package tools
@@ -99,12 +100,6 @@ func All() []Tool {
 			Feature: "Fast project search, Go to File and the TODO list",
 			Install: install("brew install ripgrep", "sudo apt install ripgrep"), Docs: "how-to/search-and-replace.md#make-search-faster",
 			candidates: one("rg", "--version"),
-		},
-		{
-			ID: "gh", Name: "GitHub CLI", Group: GroupCore,
-			Feature: "Pull request review",
-			Install: install("brew install gh", "sudo apt install gh"), Docs: "guides/git-and-github.md#pull-requests",
-			candidates: one("gh", "--version"),
 		},
 		{
 			ID: "claude", Name: "Claude Code", Group: GroupAgents,

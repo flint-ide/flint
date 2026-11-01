@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -15,7 +16,7 @@ import (
 const maxDiffBytes = 4 << 20
 
 // rawAccept asks the REST API for file contents as-is instead of base64 JSON.
-const rawAccept = "Accept: application/vnd.github.raw+json"
+const rawAccept = "application/vnd.github.raw+json"
 
 // Local reads objects from the project's own clone, which saves a round trip to
 // GitHub whenever the pull request's commits are already fetched.
@@ -61,27 +62,31 @@ func (c *Client) FileDiff(ctx context.Context, dir string, number int, path stri
 	if !ok {
 		return FileDiff{}, fmt.Errorf("%s is not changed by #%d", path, number)
 	}
+	a, err := c.auth()
+	if err != nil {
+		return FileDiff{}, err
+	}
 	d := data.details
-	key := fmt.Sprintf("%s|%s|%s", prKey(d.Repo, number), d.HeadOID, path)
+	key := fmt.Sprintf("%s|%s|%s|%s", a.Host, prKey(d.Repo, number), d.HeadOID, path)
 	return c.diffs.get(key, false, func() (FileDiff, error) {
 		ctx, cancel := context.WithTimeout(ctx, readTimeout)
 		defer cancel()
-		return c.buildDiff(ctx, dir, d, f, local)
+		return c.buildDiff(ctx, a, d, f, local)
 	})
 }
 
-func (c *Client) buildDiff(ctx context.Context, dir string, d Details, f restFile, local Local) (FileDiff, error) {
+func (c *Client) buildDiff(ctx context.Context, a Auth, d Details, f restFile, local Local) (FileDiff, error) {
 	out := FileDiff{Path: f.Filename, PreviousPath: f.PreviousFilename, Status: f.Status, Left: []LineRange{}, Right: []LineRange{}}
 	var head []byte
 	if f.Status != "removed" {
 		var err error
-		if head, err = c.blob(ctx, dir, d.Repo, f.SHA, local); err != nil {
+		if head, err = c.blob(ctx, a, d.Repo, f.SHA, local); err != nil {
 			return FileDiff{}, err
 		}
 	}
 	var base []byte
 	rebuilt := false
-	if f.Status != "added" && f.Patch != "" {
+	if f.Status != "added" && f.Patch != "" && len(head) <= maxDiffBytes {
 		if b, err := reversePatch(string(head), f.Patch); err == nil {
 			base, rebuilt = []byte(b), true
 		}
@@ -92,7 +97,7 @@ func (c *Client) buildDiff(ctx context.Context, dir string, d Details, f restFil
 			basePath = f.PreviousFilename
 		}
 		var err error
-		if base, err = c.mergeBaseFile(ctx, dir, d, basePath, local); err != nil {
+		if base, err = c.mergeBaseFile(ctx, a, d, basePath, local); err != nil {
 			return FileDiff{}, err
 		}
 	}
@@ -116,20 +121,33 @@ func (c *Client) buildDiff(ctx context.Context, dir string, d Details, f restFil
 	return out, nil
 }
 
+// shaRE: an object id (SHA-1 or SHA-256), as GitHub names blobs and commits.
+var shaRE = regexp.MustCompile(`^(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
+
+// rawFile reads a file through the REST API as-is (no base64 JSON). Only
+// maxDiffBytes+1 bytes are kept: anything longer is shown as too large.
+func (c *Client) rawFile(ctx context.Context, a Auth, u string) ([]byte, error) {
+	resp, err := c.do(ctx, a, call{method: http.MethodGet, url: u, accept: rawAccept, limit: maxDiffBytes + 1, truncate: true})
+	return resp.body, err
+}
+
 // blob reads a blob by sha: locally when possible, else through the REST API.
-func (c *Client) blob(ctx context.Context, dir string, repo Repo, sha string, local Local) ([]byte, error) {
+func (c *Client) blob(ctx context.Context, a Auth, repo Repo, sha string, local Local) ([]byte, error) {
+	if !shaRE.MatchString(sha) {
+		return nil, fmt.Errorf("unexpected blob id from GitHub: %q", sha)
+	}
 	if local != nil {
 		if b, ok := local.Object(ctx, sha); ok {
 			return b, nil
 		}
 	}
-	return c.run(ctx, dir, nil, "api", "-H", rawAccept, fmt.Sprintf("repos/%s/git/blobs/%s", repo.NameWithOwner, sha))
+	return c.rawFile(ctx, a, rest(a, "/repos/%s/%s/git/blobs/%s", repo.Owner, repo.Name, sha))
 }
 
 // mergeBaseFile reads path at the merge base of the pull request ("" when the file
 // didn't exist there).
-func (c *Client) mergeBaseFile(ctx context.Context, dir string, d Details, path string, local Local) ([]byte, error) {
-	base, err := c.mergeBase(ctx, dir, d, local)
+func (c *Client) mergeBaseFile(ctx context.Context, a Auth, d Details, path string, local Local) ([]byte, error) {
+	base, err := c.mergeBase(ctx, a, d, local)
 	if err != nil {
 		return nil, err
 	}
@@ -138,31 +156,36 @@ func (c *Client) mergeBaseFile(ctx context.Context, dir string, d Details, path 
 			return b, nil
 		}
 	}
-	out, err := c.run(ctx, dir, nil, "api", "-H", rawAccept,
-		fmt.Sprintf("repos/%s/contents/%s?ref=%s", d.Repo.NameWithOwner, escapePath(path), base))
-	var gerr *Error
-	if errors.As(err, &gerr) && strings.Contains(gerr.Msg, "HTTP 404") {
+	u := rest(a, "/repos/%s/%s/contents/", d.Repo.Owner, d.Repo.Name) + escapePath(path) + "?ref=" + base
+	out, err := c.rawFile(ctx, a, u)
+	if isStatus(err, http.StatusNotFound) {
 		return nil, nil
 	}
 	return out, err
 }
 
-func (c *Client) mergeBase(ctx context.Context, dir string, d Details, local Local) (string, error) {
+func (c *Client) mergeBase(ctx context.Context, a Auth, d Details, local Local) (string, error) {
+	if !shaRE.MatchString(d.BaseOID) || !shaRE.MatchString(d.HeadOID) {
+		return "", errors.New("unexpected commit ids from GitHub")
+	}
 	if local != nil {
 		if sha, ok := local.MergeBase(ctx, d.BaseOID, d.HeadOID); ok {
 			return sha, nil
 		}
 	}
-	out, err := c.run(ctx, dir, nil, "api", fmt.Sprintf("repos/%s/compare/%s...%s", d.Repo.NameWithOwner, d.BaseOID, d.HeadOID),
-		"--jq", ".merge_base_commit.sha")
-	if err != nil {
+	var cmp struct {
+		MergeBaseCommit struct {
+			SHA string `json:"sha"`
+		} `json:"merge_base_commit"`
+	}
+	u := rest(a, "/repos/%s/%s/compare/%s...%s", d.Repo.Owner, d.Repo.Name, d.BaseOID, d.HeadOID) + "?per_page=1"
+	if err := c.getJSON(ctx, a, call{url: u}, &cmp); err != nil {
 		return "", err
 	}
-	sha := strings.TrimSpace(string(out))
-	if sha == "" {
+	if !shaRE.MatchString(cmp.MergeBaseCommit.SHA) {
 		return "", errors.New("GitHub returned no merge base")
 	}
-	return sha, nil
+	return cmp.MergeBaseCommit.SHA, nil
 }
 
 func escapePath(p string) string {

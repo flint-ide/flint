@@ -85,7 +85,7 @@ Compiler errors and warnings in the editor work the same way: hover the problem 
 
 ## 8. Open and review the pull request
 
-Flint shows and reviews pull requests through `gh`, but you create them the usual way: ask the agent to run `gh pr create` (it will ask for permission), run it yourself in a terminal (`⌘J`), or use GitHub in your browser.
+Flint shows and reviews pull requests with your [GitHub account](../guides/git-and-github.md#signing-in); for a branch of your own you create the pull request the usual way: on GitHub in your browser, or ask the agent to open one (it will ask for permission). An [agent task](../guides/ai-agents.md#agent-tasks-agents-in-parallel) has **Create PR**.
 
 Then:
 

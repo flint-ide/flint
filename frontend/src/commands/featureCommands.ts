@@ -103,7 +103,7 @@ function githubCommands(): Command[] {
   // "Pull Requests…" itself comes from the panel registry (panels/index.ts).
   return [
     {
-      id: 'github.refresh', title: 'Refresh Pull Requests', category: 'GitHub', keywords: 'pr reload gh',
+      id: 'github.refresh', title: 'Refresh Pull Requests', category: 'GitHub', keywords: 'pr reload github',
       when: () => panelShown() || !!activePullRequest(),
       run: () => {
         const pr = activePullRequest()
@@ -116,7 +116,7 @@ function githubCommands(): Command[] {
       when: () => !!activePullRequest()?.data, run: () => openInBrowser(activePullRequest()?.data?.url ?? ''),
     },
     {
-      id: 'github.checkout', title: 'Check Out Pull Request', category: 'GitHub', keywords: 'pr branch gh pr checkout',
+      id: 'github.checkout', title: 'Check Out Pull Request', category: 'GitHub', keywords: 'pr branch checkout fetch',
       when: () => activePullRequest()?.data?.state === 'OPEN',
       run: () => {
         const pr = activePullRequest()

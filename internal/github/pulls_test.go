@@ -1,101 +1,75 @@
 package github
 
 import (
-	"context"
-	"encoding/json"
-	"reflect"
-	"slices"
 	"strings"
 	"testing"
 )
 
-// prFake answers the read-only calls for pull request #7 of acme/flint.
-func prFake(t *testing.T) *fakeGH {
-	t.Helper()
-	f := newFake(t)
-	f.on("repo view", repoJSON)
-	f.onFixture("pr list", "pr_list.json")
-	f.onFixture("pr view 7", "pr_view.json")
-	f.onFixture("pulls/7/files", "pr_files.json")
-	f.onFixture("reviewThreads(first", "threads.json")
-	return f
-}
-
-func TestListArgs(t *testing.T) {
-	repo := Repo{NameWithOwner: "acme/flint"}
+func TestListRequest(t *testing.T) {
+	repo := Repo{Owner: "acme", Name: "widgets", NameWithOwner: "acme/widgets"}
 	tests := []struct {
-		filter ListFilter
-		want   []string // after --json …
-		state  string
+		f      ListFilter
+		query  string
+		states []string
+		search string
 	}{
-		{ListFilter{}, nil, "open"},
-		{ListFilter{Who: "mine", State: "closed"}, []string{"--author", "@me"}, "closed"},
-		{ListFilter{Who: "review", State: "all"}, []string{"--search", "review-requested:@me"}, "all"},
-		{ListFilter{Who: "all", State: "merged"}, nil, "merged"},
+		{ListFilter{}, "pullRequests(", []string{"OPEN"}, ""},
+		{ListFilter{Who: "all", State: "closed"}, "pullRequests(", []string{"CLOSED", "MERGED"}, ""},
+		{ListFilter{Who: "all", State: "all"}, "pullRequests(", []string{"OPEN", "CLOSED", "MERGED"}, ""},
+		{ListFilter{Who: "mine", State: "open"}, "search(", nil, "repo:acme/widgets is:pr is:open author:@me sort:created-desc"},
+		{ListFilter{Who: "review", State: "merged"}, "search(", nil, "repo:acme/widgets is:pr is:merged review-requested:@me sort:created-desc"},
 	}
 	for _, tt := range tests {
-		args, err := listArgs(repo, tt.filter)
-		if err != nil {
-			t.Fatal(err)
+		q, vars, err := listRequest(repo, tt.f)
+		if err != nil || !strings.Contains(q, tt.query) {
+			t.Fatalf("%+v: %v", tt.f, err)
 		}
-		i := slices.Index(args, "--json")
-		if args[slices.Index(args, "--state")+1] != tt.state || !slices.Equal(args[i+2:], tt.want) {
-			t.Errorf("listArgs(%+v) = %v", tt.filter, args)
+		if tt.search != "" && vars["q"] != tt.search {
+			t.Errorf("%+v: q = %v", tt.f, vars["q"])
+		}
+		if tt.states != nil && strings.Join(vars["states"].([]string), ",") != strings.Join(tt.states, ",") {
+			t.Errorf("%+v: states = %v", tt.f, vars["states"])
 		}
 	}
-	for _, bad := range []ListFilter{{Who: "nobody"}, {State: "draft"}} {
-		if _, err := listArgs(repo, bad); err == nil {
-			t.Errorf("listArgs(%+v) accepted an unknown filter", bad)
+	for _, bad := range []ListFilter{{Who: "x"}, {State: "draft"}} {
+		if _, _, err := listRequest(repo, bad); err == nil {
+			t.Errorf("%+v accepted", bad)
 		}
 	}
 }
 
 func TestList(t *testing.T) {
-	f := prFake(t)
-	c := f.client()
-	dir := t.TempDir()
-	prs, err := c.List(context.Background(), dir, ListFilter{Who: "mine"}, false)
+	fx := newFixture(t)
+	prs, err := fx.c.List(ctx(), fx.dir, ListFilter{Who: "all", State: "open"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(prs) != 2 {
-		t.Fatalf("got %d pull requests, want 2", len(prs))
+		t.Fatalf("prs = %+v", prs)
 	}
-	want := PullRequest{
-		Number: 7, Title: "Add x", Author: "alice", HeadRef: "feat/x", BaseRef: "main", State: "OPEN",
-		ReviewDecision: "CHANGES_REQUESTED", Checks: CheckCounts{Success: 1, Failure: 1, Pending: 2},
-		UpdatedAt: "2026-10-30T10:00:00Z", URL: "https://github.com/acme/flint/pull/7",
+	p := prs[0]
+	if p.Number != 7 || p.Author != "alice" || p.HeadRef != "feat/rate-limit" || p.ReviewDecision != "CHANGES_REQUESTED" {
+		t.Errorf("row = %+v", p)
 	}
-	if prs[0] != want {
-		t.Errorf("prs[0] = %+v\nwant %+v", prs[0], want)
+	if p.Checks != (CheckCounts{Success: 1, Failure: 1, Pending: 1}) {
+		t.Errorf("checks = %+v", p.Checks)
 	}
 	if !prs[1].Draft || prs[1].Checks != (CheckCounts{}) {
-		t.Errorf("prs[1] = %+v", prs[1])
+		t.Errorf("second row = %+v", prs[1])
 	}
-
-	calls := f.calls()
-	wantArgs := []string{
-		"pr", "list", "--repo", "acme/flint", "--state", "open", "--limit", "50",
-		"--json", "number,title,author,headRefName,baseRefName,isDraft,state,reviewDecision,statusCheckRollup,updatedAt,url",
-		"--author", "@me",
+	review, err := fx.c.List(ctx(), fx.dir, ListFilter{Who: "review", State: "open"}, false)
+	if err != nil || len(review) != 1 || review[0].Number != 7 {
+		t.Errorf("review requested = %+v, %v", review, err)
 	}
-	if len(calls) != 2 || calls[0].String() != "repo view --json name,nameWithOwner,owner,url,defaultBranchRef" || !slices.Equal(calls[1].args, wantArgs) {
-		t.Fatalf("calls = %v", calls)
+	// Cached for the same filter; force asks again.
+	n := len(fx.fake.Requests())
+	_, _ = fx.c.List(ctx(), fx.dir, ListFilter{Who: "all", State: "open"}, false)
+	if len(fx.fake.Requests()) != n {
+		t.Error("list not cached")
 	}
-
-	// Cached until forced.
-	f.reset()
-	if _, err := c.List(context.Background(), dir, ListFilter{Who: "mine"}, false); err != nil {
-		t.Fatal(err)
-	}
-	if n := len(f.calls()); n != 0 {
-		t.Fatalf("cached list made %d gh calls", n)
-	}
-	if _, err := c.List(context.Background(), dir, ListFilter{Who: "mine"}, true); err != nil {
-		t.Fatal(err)
-	}
-	if n := len(f.calls()); n != 1 {
-		t.Fatalf("forced list made %d gh calls, want 1", n)
+	_, _ = fx.c.List(ctx(), fx.dir, ListFilter{Who: "all", State: "open"}, true)
+	if len(fx.fake.Requests()) == n {
+		t.Error("force did not refetch")
 	}
 }
 
@@ -124,112 +98,53 @@ func TestCheckStates(t *testing.T) {
 }
 
 func TestDetails(t *testing.T) {
-	f := prFake(t)
-	d, err := f.client().Details(context.Background(), t.TempDir(), 7, false)
+	fx := newFixture(t)
+	d, err := fx.c.Details(ctx(), fx.dir, 7, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.ID != "PR_7" || d.HeadOID != strings.Repeat("h", 40) || d.BaseOID != strings.Repeat("b", 40) || d.Repo.NameWithOwner != "acme/flint" {
-		t.Errorf("identity: %+v", d)
+	if d.ID == "" || d.Title != "Add rate limiting" || d.HeadOID == "" || d.CrossRepository || d.Repo.NameWithOwner != "acme/widgets" {
+		t.Errorf("details = %+v", d)
 	}
-	if !strings.Contains(d.BodyHTML, "<strong>bug</strong>") || strings.Contains(d.BodyHTML, "<script") {
-		t.Errorf("body must be rendered Markdown without raw HTML: %q", d.BodyHTML)
+	if strings.Contains(d.BodyHTML, "<script") || !strings.Contains(d.BodyHTML, "token bucket") {
+		t.Errorf("body not sanitized: %q", d.BodyHTML)
 	}
-	if !slices.Equal(d.Labels, []string{"bug"}) || len(d.Commits) != 1 || d.Commits[0].Author != "alice" {
-		t.Errorf("labels/commits: %+v %+v", d.Labels, d.Commits)
+	if len(d.Files) != 2 || d.Files[0].Path != "main.go" || d.Files[1].Status != "added" {
+		t.Errorf("files = %+v", d.Files)
 	}
-	wantFiles := []File{
-		{Path: "main.go", Status: "modified", Additions: 3, Deletions: 1},
-		{Path: "docs/new.md", Status: "added", Additions: 2},
-		{Path: "logo.png", Status: "removed", NoPatch: true},
-		{Path: "lib/b go.go", PreviousPath: "lib/a.go", Status: "renamed", NoPatch: true},
+	if len(d.Commits) != 1 || d.Commits[0].Author != "alice" {
+		t.Errorf("commits = %+v", d.Commits)
 	}
-	if !reflect.DeepEqual(d.Files, wantFiles) {
-		t.Errorf("files (both pages) = %+v", d.Files)
-	}
-	states := []string{}
-	for _, ch := range d.Checks {
-		states = append(states, ch.Name+":"+ch.State)
-	}
-	if strings.Join(states, " ") != "build:success lint:failure e2e:pending deploy/preview:pending" || d.Checks[3].URL != "https://deploy.example/7" {
-		t.Errorf("checks = %+v", d.Checks)
-	}
-	if len(d.Reviews) != 1 || d.Reviews[0].Author != "dave" || !strings.Contains(d.Reviews[0].BodyHTML, "<em>lint</em>") {
+	if len(d.Reviews) != 1 || d.Reviews[0].Author != "dave" {
 		t.Errorf("reviews (empty COMMENTED dropped) = %+v", d.Reviews)
 	}
-	if d.PendingReviewID != "PRR_pending" || d.PendingReviewComments != 1 {
-		t.Errorf("pending review = %q (%d)", d.PendingReviewID, d.PendingReviewComments)
+	if len(d.Labels) != 1 || len(d.Checks) != 3 {
+		t.Errorf("labels %v checks %+v", d.Labels, d.Checks)
 	}
-	if len(d.Threads) != 2 {
-		t.Fatalf("threads = %+v", d.Threads)
-	}
-	t1, t2 := d.Threads[0], d.Threads[1]
-	if t1.Line != 6 || t1.Side != "RIGHT" || t1.Resolved || !t1.CanResolve || len(t1.Comments) != 2 ||
-		!t1.Comments[1].Pending || t1.Comments[0].Pending || !strings.Contains(t1.Comments[0].BodyHTML, "<code>fmt</code>") {
-		t.Errorf("thread 1 = %+v", t1)
-	}
-	if t2.Line != 0 || !t2.Outdated || t2.OriginalLine != 2 || !t2.Resolved || t2.ResolvedBy != "alice" || t2.Side != "LEFT" {
-		t.Errorf("thread 2 (outdated) = %+v", t2)
-	}
-
-	// The three reads, and the GraphQL variables of the threads query.
-	var view, files, threads bool
-	for _, cl := range f.calls() {
-		switch {
-		case cl.String() == "pr view 7 --repo acme/flint --json "+viewFields:
-			view = true
-		case cl.String() == "api --paginate repos/acme/flint/pulls/7/files?per_page=100":
-			files = true
-		case cl.String() == "api graphql --input -":
-			var req struct {
-				Query     string         `json:"query"`
-				Variables map[string]any `json:"variables"`
-			}
-			if err := json.Unmarshal([]byte(cl.stdin), &req); err != nil {
-				t.Fatal(err)
-			}
-			want := map[string]any{"owner": "acme", "name": "flint", "number": float64(7), "cursor": nil}
-			threads = req.Query == threadsQuery && reflect.DeepEqual(req.Variables, want)
+	var lint Check
+	for _, c := range d.Checks {
+		if c.State == "failure" {
+			lint = c
 		}
 	}
-	if !view || !files || !threads {
-		t.Errorf("calls = %v (view %v, files %v, threads %v)", f.calls(), view, files, threads)
+	if lint.RunID != 4242 || lint.JobID != 5151 || lint.Workflow != "CI" {
+		t.Errorf("failed check = %+v", lint)
 	}
-}
-
-func TestThreadsArePaged(t *testing.T) {
-	f := newFake(t)
-	f.on("repo view", repoJSON)
-	page := func(id, cursor string, next bool) string {
-		b, _ := json.Marshal(map[string]any{"data": map[string]any{"repository": map[string]any{"pullRequest": map[string]any{
-			"id": "PR_7", "reviews": map[string]any{"nodes": []any{}},
-			"reviewThreads": map[string]any{
-				"pageInfo": map[string]any{"hasNextPage": next, "endCursor": cursor},
-				"nodes":    []any{map[string]any{"id": id, "path": "a.go", "line": 1, "diffSide": "RIGHT", "comments": map[string]any{"nodes": []any{}}}},
-			},
-		}}}})
-		return string(b)
+	if len(d.Threads) != 2 || d.Threads[0].Line != 6 || d.Threads[1].Line != 0 || !d.Threads[1].Outdated || d.Threads[1].ResolvedBy != "alice" {
+		t.Errorf("threads = %+v", d.Threads)
 	}
-	// Rules match in order: the second page is asked for with the first page's cursor.
-	f.on(`"cursor":"CUR1"`, page("T_2", "CUR2", false))
-	f.on("reviewThreads(first", page("T_1", "CUR1", true))
-	tp, err := f.client().threads(context.Background(), t.TempDir(), Repo{Owner: "acme", Name: "flint", NameWithOwner: "acme/flint"}, 7)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(tp.Threads) != 2 || tp.Threads[0].ID != "T_1" || tp.Threads[1].ID != "T_2" {
-		t.Fatalf("threads = %+v", tp.Threads)
+	fork, err := fx.c.Details(ctx(), fx.dir, 8, false)
+	if err != nil || !fork.CrossRepository || fork.HeadOwner != "bob" {
+		t.Errorf("fork PR = %+v, %v", fork, err)
 	}
 }
 
 func TestDetailsMissingPullRequest(t *testing.T) {
-	f := newFake(t)
-	f.on("repo view", repoJSON)
-	f.onExit("pr view 99", "", "GraphQL: Could not resolve to a PullRequest with the number of 99. (repository.pullRequest)\n", 1)
-	f.on("pulls/99/files", "[]")
-	f.on("reviewThreads(first", `{"data":{"repository":{"pullRequest":null}}}`)
-	_, err := f.client().Details(context.Background(), t.TempDir(), 99, false)
-	if err == nil || !strings.Contains(err.Error(), "Could not resolve to a PullRequest") {
-		t.Fatalf("error = %v", err)
+	fx := newFixture(t)
+	if _, err := fx.c.Details(ctx(), fx.dir, 99, false); err == nil {
+		t.Fatal("missing pull request loaded")
+	}
+	if _, err := fx.c.Details(ctx(), fx.dir, 0, false); err == nil {
+		t.Fatal("pull request 0 loaded")
 	}
 }

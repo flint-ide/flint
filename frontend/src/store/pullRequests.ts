@@ -1,4 +1,4 @@
-// Pull request review through gh (Go: internal/github). Nothing here polls: the list
+// Pull request review through GitHub's API (Go: internal/github). Nothing here polls: the list
 // loads when the view opens or the window regains focus, a pull request when its tab
 // opens or regains focus, and both on Refresh. Go caches answers for ~30 s.
 import { createStore } from '../lib/store'
@@ -13,6 +13,8 @@ import {
 } from '../api/backend'
 import { BrowserOpenURL } from '../wails/runtime'
 import { confirmAction, showToast } from './dialog'
+import { requestGitHubSignIn } from './accounts'
+import { isSignInError } from '../lib/githubSettings'
 import { useEditor } from './editor'
 
 export type Who = 'all' | 'mine' | 'review'
@@ -59,7 +61,7 @@ const get = usePullRequests.getState
 
 let listSeq = 0
 
-/** Loads the list for root (checking gh first); force skips Go's cache. */
+/** Loads the list for root (checking the account and repository first); force skips Go's cache. */
 export async function loadPullRequests(root: string | null, force = false): Promise<void> {
   const seq = ++listSeq
   const switched = root !== get().root
@@ -143,7 +145,9 @@ async function act(root: string, number: number, what: string, run: () => Promis
     await loadDetails(root, number, true)
     return true
   } catch (err) {
-    showToast(errorMessage(err), 'error')
+    const msg = errorMessage(err)
+    if (isSignInError(msg)) requestGitHubSignIn()
+    else showToast(msg, 'error')
     return false
   } finally {
     set((s) => {

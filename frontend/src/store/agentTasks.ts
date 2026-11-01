@@ -10,6 +10,8 @@ import { failurePrompt, mergeTaskLists, pruneChanges, removeQuestions, tasksTouc
 import { isWithin } from '../lib/fileTree'
 import { askAgent } from '../lib/askAgent'
 import { confirmAction, showToast } from './dialog'
+import { requestGitHubSignIn } from './accounts'
+import { isSignInError } from '../lib/githubSettings'
 import { useWorkspace } from './workspace'
 import { useEditor } from './editor'
 import { chatTabId, useAgentChat } from './agentChat'
@@ -243,7 +245,8 @@ export async function createTaskPullRequest(t: TaskView): Promise<void> {
     showToast(`Pull request created: ${url}`)
   } catch (err) {
     const msg = errorMessage(err)
-    if (!msg.includes('cancelled')) showToast(msg, 'error')
+    if (isSignInError(msg)) requestGitHubSignIn()
+    else if (!msg.includes('cancelled')) showToast(msg, 'error')
   } finally {
     useTasks.setState((s) => ({ busy: { ...s.busy, [t.id]: false } }))
   }

@@ -4,7 +4,7 @@ This tour takes about ten minutes. It walks you through opening a project, findi
 
 ## Check your tools
 
-The first time Flint starts, it opens the **Tools** window: which of the tools Flint drives (Git, ripgrep, the GitHub CLI, Claude Code, Codex, language servers, Docker, kubectl, the AWS CLI) are installed, and what each one enables. A panel that stays empty usually means its tool is missing. Copy the install command of anything you need, run it in Terminal and click **Recheck**. Open the window again later with **Help ▸ Check Tools…**.
+The first time Flint starts, it opens the **Tools** window: which of the tools Flint drives (Git, ripgrep, Claude Code, Codex, language servers, Docker, kubectl, the AWS CLI) are installed, and what each one enables. A panel that stays empty usually means its tool is missing. Copy the install command of anything you need, run it in Terminal and click **Recheck**. Open the window again later with **Help ▸ Check Tools…**.
 
 ![The Tools window: installed tools with their versions, and the install command for one that isn't working](images/tool-check.png)
 

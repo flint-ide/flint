@@ -31,7 +31,8 @@ flowchart LR
     diff["textdiff (Myers): gutter · diff · +/−"]
     srch["search (ripgrep)"]
     git["git (git CLI)"]
-    gh["github (gh CLI): pull requests, review"]
+    gh["github (REST · GraphQL): pull requests, review, CI"]
+    acct["accounts: device flow · tokens in the keyring"]
     lsp["lsp (JSON-RPC)"]
     ag["agentsession: claude · codex · acp"]
     term["terminal (PTY · streams)"]
@@ -43,7 +44,8 @@ flowchart LR
 
   subgraph EXT["External processes and services"]
     direction TB
-    bins["rg · git · gh · gopls / rust-analyzer / …"]
+    bins["rg · git · gopls / rust-analyzer / …"]
+    ghapi[("GitHub API (github.com or Enterprise)")]
     agents["claude -p stream-json · codex app-server · ACP agents (stdio)"]
     shell["login shell (zsh)"]
     clis["docker compose · aws · kubectl"]
@@ -54,7 +56,8 @@ flowchart LR
 
   UI -- "method calls (Wails bindings)" --> GO
   GO -- "events: term:data · agent:event · run:event · debug:event · search:batch<br/>fs:changed · git:changed · lsp:diagnostics · tasks:changed" --> UI
-  srch & git & gh & lsp --> bins
+  srch & git & lsp --> bins
+  gh & acct --> ghapi
   ag --> agents
   term --> shell
   infra --> clis
@@ -103,13 +106,15 @@ flowchart LR
 
 ### Pull requests
 
-- `GitHubAPI` (`api_github.go` → `internal/github`) runs `gh` with timeouts (30 s for reads, 60 s for writes, 3 minutes for checkout), with no prompts, pager or colors.
-- CI of your pull requests (`api_ci.go`, `internal/cilog`, `frontend/src/store/ci.ts`): the frontend follows the current branch's and agent tasks' pull requests and polls only while a check runs (`settings.ci`). Fix with agent asks Go for a report: the run and its failed-steps log via `gh`, redacted (`internal/redact`) and cut to the failing step's tail plus error lines, with `file:line` references resolved to workspace files; `lib/ci.ts` turns it into the chat draft.
-- The project's repository is resolved with `gh repo view` (remotes, `gh repo set-default`, Enterprise hosts), and the login state with `gh auth status`. A missing `gh`, a missing login and a missing GitHub remote are distinct errors with a hint.
-- List: `gh pr list --json …` (check status counted in Go). Details, in parallel: `gh pr view --json …`, `gh api --paginate repos/…/pulls/N/files` (files with patches), and a GraphQL query for review threads (`gh api graphql --input -`, paginated).
-- File diff: the head comes from the local clone if it has the blob (`git cat-file`), otherwise from `gh api …/git/blobs/<sha>`. The base is reconstructed by reverse-applying GitHub's patch to the head (with a consistency check); for files without a patch (binary, huge) it comes from the merge base (`git merge-base` locally, or `gh api …/compare`).
-- Writes happen only on an explicit action: reply (`addPullRequestReviewThreadReply`), resolve / unresolve (`resolveReviewThread` / `unresolveReviewThread`), single comment (REST `POST …/pulls/N/comments`), review comment (`addPullRequestReview` without an event creates a pending review, then `addPullRequestReviewThread`), submit review (`submitPullRequestReview`, or `addPullRequestReview` with an event), discard (`deletePullRequestReview`).
-- User text reaches `gh` only through stdin (JSON), never as an argument.
+- `GitHubAPI` (`api_github.go`, `api_ci.go` → `internal/github`) talks to GitHub's REST and GraphQL APIs with `net/http` and the standard library: a bearer token, `User-Agent: Flint/<version>`, `X-GitHub-Api-Version`, timeouts (30 s for reads, 60 s for writes, 2 minutes for a job log, 3 minutes for checkout), a 32 MB cap per answer, `Link` pagination (at most 30 pages, only within the API's origin), `Retry-After` honoured for reads up to `github.maxRetryWaitSeconds` and a clear error for a used-up limit. The client asks `githubAuth` (`github_auth.go`) for the host and token on every call, so signing in or out applies at once.
+- Accounts (`api_accounts.go`, `accounts_registry.go`, `internal/accounts`): providers register a device flow and an `Identify` (GitHub: `GET /user` plus `X-OAuth-Scopes`). Sign in is RFC 8628 against `https://<host>/login/device/code` and `/login/oauth/access_token` (no client secret, no local server); the verification URL must be on the provider's host and is opened from Go. The GitHub CLI's token is imported only after a native confirmation (`gh auth token --hostname <host>`, once). Tokens are in the keyring (service `flint-accounts`, account `github:<host>`); `state.json` has the account metadata. Without an account, `GH_TOKEN` / `GITHUB_TOKEN` (`GH_ENTERPRISE_TOKEN` / `GITHUB_ENTERPRISE_TOKEN` for a server) is used and never stored.
+- Hosts: `github.host` (`settings.github`) is `github.com` (API `https://api.github.com`), `<name>.ghe.com` (`https://api.<name>.ghe.com`) or an Enterprise Server (`https://<host>/api/v3`, `/api/graphql`). A development `server` build can point at `cmd/fakegithub` instead (`FLINT_DEV_GITHUB`, loopback only, in-memory tokens, no environment or CLI tokens).
+- CI of your pull requests (`api_ci.go`, `internal/cilog`, `frontend/src/store/ci.ts`): the frontend follows the current branch's and agent tasks' pull requests and polls only while a check runs (`settings.ci`). Each poll is conditional (`If-None-Match`): the branch's pull request (`GET /pulls?head=<owner>:<branch>` for the repository's owner and the owners of the project's other remotes), its check runs, statuses and workflow runs (for workflow names); a 304 costs no rate limit. Fix with agent asks Go for a report: the run and its jobs, each failed job's log (`GET …/actions/jobs/{id}/logs` answers with a redirect; the log is downloaded from that URL without the token, tail-bounded to 8 MB), cut to the failed steps by the steps' start and end times and written in the `job\tstep\tline` shape `internal/cilog` parses, redacted (`internal/redact`) and cut to the failing step's tail plus error lines, with `file:line` references resolved to workspace files; `lib/ci.ts` turns it into the chat draft. Rerun is `POST …/rerun-failed-jobs` after a native confirmation.
+- The project's repository comes from its git remotes (`git config --get-regexp remote.*`): the remote marked by `gh repo set-default`, else `upstream`, `github`, `origin`, then the others, whose URL is on the configured host (https, ssh, scp-like); then `GET /repos/{owner}/{repo}` for the canonical name and default branch. No account, no remote on the host and an unknown repository are distinct states; the UI offers Sign in with GitHub for the first.
+- List: GraphQL `repository.pullRequests` (or `search` for "Created by me" and "Review requested"), with the head commit's `statusCheckRollup` (check status counted in Go). Details, in parallel: a GraphQL query for the pull request, `GET /pulls/N/files` (paginated, with patches), and a GraphQL query for review threads (paginated).
+- File diff: the head comes from the local clone if it has the blob (`git cat-file`), otherwise from `GET /git/blobs/<sha>` (raw, read up to 4 MB + 1 byte). The base is reconstructed by reverse-applying GitHub's patch to the head (with a consistency check); for files without a patch (binary, huge) it comes from the merge base (`git merge-base` locally, or `GET /compare`).
+- Writes happen only on an explicit action: reply (`addPullRequestReviewThreadReply`), resolve / unresolve (`resolveReviewThread` / `unresolveReviewThread`), single comment (REST `POST …/pulls/N/comments`), review comment (`addPullRequestReview` without an event creates a pending review, then `addPullRequestReviewThread`), submit review (`submitPullRequestReview`, or `addPullRequestReview` with an event), discard (`deletePullRequestReview`), checkout (`git fetch <remote> refs/pull/N/head`, then the branch created or fast-forwarded), create PR for an agent task (`POST /pulls`). Thread ids must belong to the pull request, paths must be among its files.
+- User text travels only in JSON request bodies, never in a URL or an argument.
 - Responses are cached in Go (list and PR for about 30 s, repository for 10 minutes), and every write invalidates the PR.
 - Frontend: `store/pullRequests.ts` and lazily loaded `components/github/*`. Threads in the diff are CodeMirror block widgets (`lib/prThreadWidgets.ts`) rendered through React portals; their positions and the spacers on the other side are computed by `lib/prReview.ts`.
 
@@ -258,19 +263,20 @@ Markdown files, PR descriptions and comments, HTTP responses and terminal output
 
 ### CLI argument validation
 
-Flint drives many CLIs (git, gh, docker compose, kubectl, aws, saml2aws, claude, codex). Names and identifiers that come from the UI or from external output (container names, contexts, namespaces, pod names) are validated before they are passed to a command, and user strings are never passed in a position where they could be read as a flag. User-written text for `gh` (comments, reviews) goes through stdin as JSON, never as an argument. Every kubectl call passes explicit `--context` and `--namespace`.
+Flint drives many CLIs (git, docker compose, kubectl, aws, saml2aws, claude, codex). Names and identifiers that come from the UI or from external output (container names, contexts, namespaces, pod names) are validated before they are passed to a command, and user strings are never passed in a position where they could be read as a flag. Text for GitHub (comments, reviews) goes in JSON request bodies; owners, repositories, numbers, run, job and thread ids from the web view are validated (and thread ids must belong to the pull request) before a URL is built, and every path segment is escaped. Every kubectl call passes explicit `--context` and `--namespace`.
 
 ### Secrets
 
 - Database passwords are stored only in the OS keyring (the macOS Keychain, or the Secret Service on Linux; service `flint-db`). Profile files hold no passwords.
 - AWS keys and tokens are read only in Go to check that they exist and never reach the UI.
-- GitHub authentication stays inside `gh`; Flint never sees the token.
+- GitHub tokens (Sign in with GitHub, or the GitHub CLI's token imported after a native confirmation) are stored only in the OS keyring (service `flint-accounts`). Only Go reads them: no binding returns one, and they never reach the log or an error message. A token is attached only to requests to the configured API origin; the API client follows redirects only within that origin, and a job log's redirect is downloaded by a separate client that never carries it. `GH_TOKEN` / `GITHUB_TOKEN` from the environment are used, never stored. Tests use a fake keyring.
+- Revoking a token at GitHub needs the OAuth App's client secret, which Flint doesn't have, so Sign Out deletes it locally and links to GitHub's authorized apps page.
 - Kubernetes terminals use an override kubeconfig that holds only `current-context` and the namespace; credentials are not copied.
 - Settings, connections, query history, sessions and the log file are written with mode `0600`.
 
 ### Network requests Flint makes on its own
 
-Every other connection is the result of a user action or of a CLI the user runs. The one exception is the update check (`internal/update`, `api_update.go`): an anonymous `GET https://api.github.com/repos/flint-ide/flint/releases/latest` (no token, no cookie jar, `User-Agent: Flint/<version>`, 10 s timeout, 1 MB body limit, redirects only within the same host), a few seconds after launch and then at most once per 24 hours, only in release builds and only while the `checkForUpdates` setting is on. The response is treated as untrusted: the tag must be a SemVer version, the title is stripped of control characters and capped, and the release link is opened only if it is an `https://github.com/flint-ide/flint/` URL (otherwise the releases page). The browser is opened from Go (`UpdateAPI.OpenRelease`), so the UI cannot pass it a URL. Flint never downloads or installs a release.
+Every other connection is the result of a user action or of a CLI the user runs, and GitHub's API is only called while a view needs it, plus CI polls (conditional requests) while a check of a followed pull request runs. The one exception is the update check (`internal/update`, `api_update.go`): an anonymous `GET https://api.github.com/repos/flint-ide/flint/releases/latest` (no token, no cookie jar, `User-Agent: Flint/<version>`, 10 s timeout, 1 MB body limit, redirects only within the same host), a few seconds after launch and then at most once per 24 hours, only in release builds and only while the `checkForUpdates` setting is on. The response is treated as untrusted: the tag must be a SemVer version, the title is stripped of control characters and capped, and the release link is opened only if it is an `https://github.com/flint-ide/flint/` URL (otherwise the releases page). The browser is opened from Go (`UpdateAPI.OpenRelease`), so the UI cannot pass it a URL. Flint never downloads or installs a release.
 
 ### Redaction
 
@@ -286,7 +292,7 @@ Paths are the macOS ones. On Linux, `~/Library/Application Support/flint` is `$X
 
 | What | Where | Notes |
 |---|---|---|
-| Recent folders, agent permission policy, trusted folders, whether the first-run tool check was shown, update check (last check time, the latest release found, the skipped version) | `~/Library/Application Support/flint/state.json` | the preferred agent stored here before `settings.json` existed is read from it until you pick a default in Settings |
+| Recent folders, agent permission policy, trusted folders, whether the first-run tool check was shown, update check (last check time, the latest release found, the skipped version), signed-in accounts (provider, host, login, name, avatar URL, scopes; no token) | `~/Library/Application Support/flint/state.json` | the preferred agent stored here before `settings.json` existed is read from it until you pick a default in Settings |
 | Settings: theme, editor and terminal fonts, default agent, autosave, shortcut overrides (`keymap`: command id → shortcut, `""` = none), agent CLIs (`agents`), custom ACP agents (`customAgents`: id, name, command, arguments), language servers (`languageServers`), panel refresh intervals (`refresh`) | `~/Library/Application Support/flint/settings.json` | has a schema version; missing keys get defaults, unknown keys are ignored, invalid values are replaced with defaults on load (writes validate strictly); `0600`; **no secrets**. A copy for the first render lives in `localStorage` (`flint.settings`) |
 | Database connection profiles (host, port, user, optional default database, TLS, read-only) | `~/Library/Application Support/flint/connections.json` | **no passwords**, mode `0600` |
 | Database passwords | OS keyring (Keychain / Secret Service), service `flint-db`, account = connection id | deleted together with the profile |
@@ -304,7 +310,7 @@ Paths are the macOS ones. On Linux, `~/Library/Application Support/flint` is `$X
 | Files deleted from the tree | the Trash (`~/.Trash` on macOS, `~/.local/share/Trash` on Linux) | "Put Back" in Finder, "Restore" in a Linux file manager |
 | LSP server caches | the servers' own directories, for example `~/Library/Caches/gopls` | |
 | HTTP client environments | `http-client.env.json` (commit it) and `http-client.private.env.json` (secrets; add to `.gitignore`) next to the `.http` file | the selected environment is remembered only until Flint quits |
-| GitHub login | `gh` itself (macOS keyring or `GH_TOKEN`) | Flint does not see the token; it only runs `gh` |
+| GitHub token | OS keyring, service `flint-accounts`, account `github:<host>` (`GH_TOKEN` from the environment is never stored) | deleted on Sign Out; the account's login, avatar, host and scopes are in `state.json` |
 | Pull requests, files, review threads | Go process memory only (list and PR about 30 s, file diffs 2 minutes, project repository 10 minutes) | nothing is written to disk; PR tabs are not part of the session |
 | HTTP client responses and cookies | Go process memory only: up to 5 responses per request, 50 requests and 256 MB of bodies; a separate cookie jar per `.http` file | nothing goes to disk or to logs; "Save to file" writes the body where you choose |
 | Flint's log | `~/Library/Logs/Flint/flint.log` (Linux: `~/.local/state/flint/flint.log`), and `flint.log.1` | rotated at 5 MB, one old file kept, secrets and home path redacted, `0600` |
@@ -354,8 +360,10 @@ internal/dap                Debug Adapter Protocol client, Delve (dlv dap) sessi
 internal/profiling          pprof profiles: call tree and top for the flame graph, fetching from net/http/pprof, temp dirs
 internal/restore            project session persistence (tabs, terminals, chats) across runs
 internal/git                status, commit, rollback, branches, worktrees, log, blame, file history, stash, objects and merge base (git CLI)
-internal/github             pull requests through gh: list, details, review threads (GraphQL), file diff, replies, resolve, review, checkout,
-                            a branch's checks, workflow runs, failed-step logs (tail-bounded) and rerunning failed jobs
+internal/accounts           signed-in accounts: provider registry, OAuth device flow (RFC 8628), tokens in the keyring, account metadata
+internal/github             GitHub REST/GraphQL client: repository from remotes, pull requests, details, review threads, file diff, replies,
+                            resolve, review, checkout, create, a branch's checks (conditional requests), runs, failed-step logs (tail-bounded),
+                            rerunning failed jobs, Identify and the GitHub CLI token import; githubtest is a fake GitHub for tests and cmd/fakegithub
 internal/cilog              CI logs for the agent: parse --log-failed output, excerpt the failing step, map file:line references to the workspace
 internal/docker             Docker Engine API (unix socket or TLS): endpoint discovery, version negotiation, containers, logs, exec shell, events; Compose via the CLI
 internal/awsprof            AWS CLI profiles, credential status, login and refresh
@@ -384,7 +392,7 @@ For data storage details see [Where Flint stores data](#where-flint-stores-data)
 ## Dependency hygiene
 
 - At runtime Flint downloads nothing from npm (no `npx`). Agents and LSP servers are your installed binaries.
-- GitHub is handled by your `gh` (no GitHub client libraries and no tokens inside Flint). Tests use a fake `gh` on `PATH` (a script that answers from `internal/github/testdata` and records its arguments and stdin), so they never connect to GitHub.
+- GitHub is called with the standard library (`net/http`, `encoding/json`), no GitHub client library and no `gh`. Tests use `internal/github/githubtest`, a fake GitHub on a loopback port, so they never connect to GitHub.
 - ClickHouse has no driver module: `internal/clickhouse` speaks its HTTP interface on `net/http` (the native-protocol driver pulled in 14 more modules: a production build now lists 14 dependencies, down from 28). The only Go database module left is `pgx`.
 - pprof profiles are read with `github.com/google/pprof/profile` (a Go module that uses only the standard library). The flame graph and its layout are Flint's own code, with no npm dependency.
 - Frontend: `frontend/.npmrc` disables install scripts (`ignore-scripts=true`) and enforces exact versions, and the build uses `npm ci --ignore-scripts`.

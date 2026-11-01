@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -67,17 +66,64 @@ type ghAuthor struct {
 	Login string `json:"login"`
 }
 
-// ghCheck is an item of gh's statusCheckRollup: a CheckRun or a StatusContext.
+// ghCheck is an item of a statusCheckRollup: a CheckRun or a StatusContext,
+// as GraphQL returns it (REST check runs and statuses are mapped to it).
 type ghCheck struct {
 	Typename     string `json:"__typename"`
 	Name         string `json:"name"`
-	WorkflowName string `json:"workflowName"`
+	WorkflowName string `json:"-"`
 	Status       string `json:"status"`
 	Conclusion   string `json:"conclusion"`
 	DetailsURL   string `json:"detailsUrl"`
 	Context      string `json:"context"`
 	State        string `json:"state"`
 	TargetURL    string `json:"targetUrl"`
+	CheckSuite   *struct {
+		WorkflowRun *struct {
+			Workflow struct {
+				Name string `json:"name"`
+			} `json:"workflow"`
+		} `json:"workflowRun"`
+	} `json:"checkSuite"`
+}
+
+// workflow is the name of the Actions workflow behind a check run ("" for other CI).
+func (g ghCheck) workflow() string {
+	if g.WorkflowName != "" {
+		return g.WorkflowName
+	}
+	if g.CheckSuite != nil && g.CheckSuite.WorkflowRun != nil {
+		return g.CheckSuite.WorkflowRun.Workflow.Name
+	}
+	return ""
+}
+
+// rollupField is the head commit's check rollup as a GraphQL selection on a
+// PullRequest (aliased: the details also select the commit list).
+const rollupField = `rollup: commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){nodes{
+  __typename
+  ... on CheckRun{name status conclusion detailsUrl checkSuite{workflowRun{workflow{name}}}}
+  ... on StatusContext{context state targetUrl}
+}}}}}}`
+
+// rollup decodes rollupField.
+type rollup struct {
+	Nodes []struct {
+		Commit struct {
+			StatusCheckRollup *struct {
+				Contexts struct {
+					Nodes []ghCheck `json:"nodes"`
+				} `json:"contexts"`
+			} `json:"statusCheckRollup"`
+		} `json:"commit"`
+	} `json:"nodes"`
+}
+
+func (r rollup) checks() []ghCheck {
+	if len(r.Nodes) == 0 || r.Nodes[0].Commit.StatusCheckRollup == nil {
+		return nil
+	}
+	return r.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
 }
 
 // check normalizes the item; repoURL (the repository's https URL) decides
@@ -89,7 +135,7 @@ func (g ghCheck) check(repoURL string) Check {
 	run, job := actionsIDs(repoURL, g.DetailsURL)
 	return Check{
 		Name:       g.Name,
-		Workflow:   g.WorkflowName,
+		Workflow:   g.workflow(),
 		State:      checkRunState(g.Status, g.Conclusion),
 		Status:     g.Status,
 		Conclusion: g.Conclusion,
@@ -149,67 +195,106 @@ func countChecks(raw []ghCheck) CheckCounts {
 	return n
 }
 
-// listArgs builds the gh pr list invocation for a filter.
-func listArgs(repo Repo, f ListFilter) ([]string, error) {
-	state := f.State
-	switch state {
-	case "":
-		state = "open"
-	case "open", "closed", "merged", "all":
+// listFields are what a row of the list needs.
+const listFields = `number title author{login} headRefName baseRefName isDraft state reviewDecision updatedAt url ` + rollupField
+
+const listQuery = `query($owner:String!,$name:String!,$states:[PullRequestState!],$first:Int!){
+  repository(owner:$owner,name:$name){
+    pullRequests(states:$states,first:$first,orderBy:{field:CREATED_AT,direction:DESC}){nodes{` + listFields + `}}
+  }
+}`
+
+const searchQuery = `query($q:String!,$first:Int!){
+  search(query:$q,type:ISSUE,first:$first){nodes{... on PullRequest{` + listFields + `}}}
+}`
+
+type listNode struct {
+	Number         int      `json:"number"`
+	Title          string   `json:"title"`
+	Author         ghAuthor `json:"author"`
+	HeadRefName    string   `json:"headRefName"`
+	BaseRefName    string   `json:"baseRefName"`
+	IsDraft        bool     `json:"isDraft"`
+	State          string   `json:"state"`
+	ReviewDecision string   `json:"reviewDecision"`
+	UpdatedAt      string   `json:"updatedAt"`
+	URL            string   `json:"url"`
+	Rollup         rollup   `json:"rollup"`
+}
+
+// listRequest picks the query for a filter, like the GitHub CLI: the
+// repository's pull requests for everyone's, a search for "mine" and "review".
+// "closed" includes merged pull requests, as on GitHub.
+func listRequest(repo Repo, f ListFilter) (string, map[string]any, error) {
+	var states []string
+	search := "repo:" + repo.NameWithOwner + " is:pr"
+	switch f.State {
+	case "", "open":
+		states, search = []string{"OPEN"}, search+" is:open"
+	case "closed":
+		states, search = []string{"CLOSED", "MERGED"}, search+" is:closed"
+	case "merged":
+		states, search = []string{"MERGED"}, search+" is:merged"
+	case "all":
+		states = []string{"OPEN", "CLOSED", "MERGED"}
 	default:
-		return nil, fmt.Errorf("unknown pull request state %q", f.State)
-	}
-	args := []string{
-		"pr", "list", "--repo", repo.NameWithOwner, "--state", state, "--limit", strconv.Itoa(listLimit),
-		"--json", "number,title,author,headRefName,baseRefName,isDraft,state,reviewDecision,statusCheckRollup,updatedAt,url",
+		return "", nil, fmt.Errorf("unknown pull request state %q", f.State)
 	}
 	switch f.Who {
 	case "", "all":
+		return listQuery, map[string]any{"owner": repo.Owner, "name": repo.Name, "states": states, "first": listLimit}, nil
 	case "mine":
-		args = append(args, "--author", "@me")
+		search += " author:@me"
 	case "review":
-		args = append(args, "--search", "review-requested:@me")
+		search += " review-requested:@me"
 	default:
-		return nil, fmt.Errorf("unknown pull request filter %q", f.Who)
+		return "", nil, fmt.Errorf("unknown pull request filter %q", f.Who)
 	}
-	return args, nil
+	return searchQuery, map[string]any{"q": search + " sort:created-desc", "first": listLimit}, nil
 }
 
 // List lists pull requests of the repository of dir.
 func (c *Client) List(ctx context.Context, dir string, f ListFilter, force bool) ([]PullRequest, error) {
-	repo, err := c.Repo(ctx, dir)
+	a, info, err := c.session(ctx, dir)
 	if err != nil {
 		return nil, err
 	}
-	args, err := listArgs(repo, f)
+	query, vars, err := listRequest(info.Repo, f)
 	if err != nil {
 		return nil, err
 	}
-	return c.lists.get(repo.NameWithOwner+"|"+f.Who+"|"+f.State, force, func() ([]PullRequest, error) {
+	return c.lists.get(a.Host+"|"+info.NameWithOwner+"|"+f.Who+"|"+f.State, force, func() ([]PullRequest, error) {
 		ctx, cancel := context.WithTimeout(ctx, readTimeout)
 		defer cancel()
-		var raw []struct {
-			Number            int       `json:"number"`
-			Title             string    `json:"title"`
-			Author            ghAuthor  `json:"author"`
-			HeadRefName       string    `json:"headRefName"`
-			BaseRefName       string    `json:"baseRefName"`
-			IsDraft           bool      `json:"isDraft"`
-			State             string    `json:"state"`
-			ReviewDecision    string    `json:"reviewDecision"`
-			StatusCheckRollup []ghCheck `json:"statusCheckRollup"`
-			UpdatedAt         string    `json:"updatedAt"`
-			URL               string    `json:"url"`
+		var data struct {
+			Repository *struct {
+				PullRequests struct {
+					Nodes []listNode `json:"nodes"`
+				} `json:"pullRequests"`
+			} `json:"repository"`
+			Search *struct {
+				Nodes []listNode `json:"nodes"`
+			} `json:"search"`
 		}
-		if err := c.runJSON(ctx, dir, nil, &raw, args...); err != nil {
+		if err := c.graphql(ctx, a, query, vars, &data); err != nil {
 			return nil, err
 		}
-		prs := make([]PullRequest, 0, len(raw))
-		for _, r := range raw {
+		var nodes []listNode
+		switch {
+		case data.Repository != nil:
+			nodes = data.Repository.PullRequests.Nodes
+		case data.Search != nil:
+			nodes = data.Search.Nodes
+		}
+		prs := make([]PullRequest, 0, len(nodes))
+		for _, r := range nodes {
+			if r.Number == 0 { // a search hit that isn't a pull request
+				continue
+			}
 			prs = append(prs, PullRequest{
 				Number: r.Number, Title: r.Title, Author: r.Author.Login,
 				HeadRef: r.HeadRefName, BaseRef: r.BaseRefName, Draft: r.IsDraft, State: r.State,
-				ReviewDecision: r.ReviewDecision, Checks: countChecks(r.StatusCheckRollup),
+				ReviewDecision: r.ReviewDecision, Checks: countChecks(r.Rollup.checks()),
 				UpdatedAt: r.UpdatedAt, URL: r.URL,
 			})
 		}
@@ -319,13 +404,23 @@ type prData struct {
 	files   map[string]restFile // by path
 }
 
-// viewFields are the gh pr view --json fields the tab needs.
-const viewFields = "number,title,body,author,baseRefName,headRefName,baseRefOid,headRefOid,isCrossRepository," +
-	"headRepositoryOwner,isDraft,state,reviewDecision,url,createdAt,updatedAt,additions,deletions,commits," +
-	"statusCheckRollup,reviews,labels"
+// viewQuery reads what the tab shows of a pull request (threads come apart:
+// they are paginated).
+const viewQuery = `query($owner:String!,$name:String!,$number:Int!){
+  repository(owner:$owner,name:$name){
+    pullRequest(number:$number){
+      number title body author{login} baseRefName headRefName baseRefOid headRefOid isCrossRepository
+      headRepositoryOwner{login} isDraft state reviewDecision url createdAt updatedAt additions deletions
+      commits(first:100){nodes{commit{oid messageHeadline committedDate authors(first:1){nodes{name user{login}}}}}}
+      reviews(first:100){nodes{author{login} state body submittedAt}}
+      labels(first:100){nodes{name}}
+      ` + rollupField + `
+    }
+  }
+}`
 
-// Details loads a pull request: gh pr view, the changed files (REST) and the review
-// threads (GraphQL), fetched in parallel.
+// Details loads a pull request: the view (GraphQL), the changed files (REST)
+// and the review threads (GraphQL), fetched in parallel.
 func (c *Client) Details(ctx context.Context, dir string, number int, force bool) (Details, error) {
 	data, err := c.prData(ctx, dir, number, force)
 	if err != nil {
@@ -335,10 +430,14 @@ func (c *Client) Details(ctx context.Context, dir string, number int, force bool
 }
 
 func (c *Client) prData(ctx context.Context, dir string, number int, force bool) (*prData, error) {
-	repo, err := c.Repo(ctx, dir)
+	if number <= 0 {
+		return nil, fmt.Errorf("invalid pull request number %d", number)
+	}
+	a, info, err := c.session(ctx, dir)
 	if err != nil {
 		return nil, err
 	}
+	repo := info.Repo
 	return c.details.get(prKey(repo, number), force, func() (*prData, error) {
 		ctx, cancel := context.WithTimeout(ctx, readTimeout)
 		defer cancel()
@@ -349,11 +448,9 @@ func (c *Client) prData(ctx context.Context, dir string, number int, force bool)
 			threads                       threadPage
 			errView, errFiles, errThreads error
 		)
-		wg.Go(func() {
-			errView = c.runJSON(ctx, dir, nil, &view, "pr", "view", strconv.Itoa(number), "--repo", repo.NameWithOwner, "--json", viewFields)
-		})
-		wg.Go(func() { files, errFiles = c.files(ctx, dir, repo, number) })
-		wg.Go(func() { threads, errThreads = c.threads(ctx, dir, repo, number) })
+		wg.Go(func() { view, errView = c.view(ctx, a, repo, number) })
+		wg.Go(func() { files, errFiles = c.files(ctx, a, repo, number) })
+		wg.Go(func() { threads, errThreads = c.threads(ctx, a, repo, number) })
 		wg.Wait()
 		for _, err := range []error{errView, errFiles, errThreads} {
 			if err != nil {
@@ -365,43 +462,69 @@ func (c *Client) prData(ctx context.Context, dir string, number int, force bool)
 }
 
 type prView struct {
-	Number              int       `json:"number"`
-	Title               string    `json:"title"`
-	Body                string    `json:"body"`
-	Author              ghAuthor  `json:"author"`
-	BaseRefName         string    `json:"baseRefName"`
-	HeadRefName         string    `json:"headRefName"`
-	BaseRefOid          string    `json:"baseRefOid"`
-	HeadRefOid          string    `json:"headRefOid"`
-	IsCrossRepository   bool      `json:"isCrossRepository"`
-	HeadRepositoryOwner ghAuthor  `json:"headRepositoryOwner"`
-	IsDraft             bool      `json:"isDraft"`
-	State               string    `json:"state"`
-	ReviewDecision      string    `json:"reviewDecision"`
-	URL                 string    `json:"url"`
-	CreatedAt           string    `json:"createdAt"`
-	UpdatedAt           string    `json:"updatedAt"`
-	Additions           int       `json:"additions"`
-	Deletions           int       `json:"deletions"`
-	StatusCheckRollup   []ghCheck `json:"statusCheckRollup"`
-	Commits             []struct {
-		Oid             string `json:"oid"`
-		MessageHeadline string `json:"messageHeadline"`
-		CommittedDate   string `json:"committedDate"`
-		Authors         []struct {
-			Login string `json:"login"`
-			Name  string `json:"name"`
-		} `json:"authors"`
+	Number              int      `json:"number"`
+	Title               string   `json:"title"`
+	Body                string   `json:"body"`
+	Author              ghAuthor `json:"author"`
+	BaseRefName         string   `json:"baseRefName"`
+	HeadRefName         string   `json:"headRefName"`
+	BaseRefOid          string   `json:"baseRefOid"`
+	HeadRefOid          string   `json:"headRefOid"`
+	IsCrossRepository   bool     `json:"isCrossRepository"`
+	HeadRepositoryOwner ghAuthor `json:"headRepositoryOwner"`
+	IsDraft             bool     `json:"isDraft"`
+	State               string   `json:"state"`
+	ReviewDecision      string   `json:"reviewDecision"`
+	URL                 string   `json:"url"`
+	CreatedAt           string   `json:"createdAt"`
+	UpdatedAt           string   `json:"updatedAt"`
+	Additions           int      `json:"additions"`
+	Deletions           int      `json:"deletions"`
+	Rollup              rollup   `json:"rollup"`
+	Commits             struct {
+		Nodes []struct {
+			Commit struct {
+				Oid             string `json:"oid"`
+				MessageHeadline string `json:"messageHeadline"`
+				CommittedDate   string `json:"committedDate"`
+				Authors         struct {
+					Nodes []struct {
+						Name string    `json:"name"`
+						User *ghAuthor `json:"user"`
+					} `json:"nodes"`
+				} `json:"authors"`
+			} `json:"commit"`
+		} `json:"nodes"`
 	} `json:"commits"`
-	Reviews []struct {
-		Author      ghAuthor `json:"author"`
-		State       string   `json:"state"`
-		Body        string   `json:"body"`
-		SubmittedAt string   `json:"submittedAt"`
+	Reviews struct {
+		Nodes []struct {
+			Author      ghAuthor `json:"author"`
+			State       string   `json:"state"`
+			Body        string   `json:"body"`
+			SubmittedAt string   `json:"submittedAt"`
+		} `json:"nodes"`
 	} `json:"reviews"`
-	Labels []struct {
-		Name string `json:"name"`
+	Labels struct {
+		Nodes []struct {
+			Name string `json:"name"`
+		} `json:"nodes"`
 	} `json:"labels"`
+}
+
+func (c *Client) view(ctx context.Context, a Auth, repo Repo, number int) (prView, error) {
+	var data struct {
+		Repository struct {
+			PullRequest *prView `json:"pullRequest"`
+		} `json:"repository"`
+	}
+	err := c.graphql(ctx, a, viewQuery, map[string]any{"owner": repo.Owner, "name": repo.Name, "number": number}, &data)
+	if err != nil {
+		return prView{}, err
+	}
+	if data.Repository.PullRequest == nil {
+		return prView{}, fmt.Errorf("pull request #%d not found in %s", number, repo.NameWithOwner)
+	}
+	return *data.Repository.PullRequest, nil
 }
 
 // restFile is an item of GET /repos/{owner}/{repo}/pulls/{number}/files.
@@ -415,23 +538,20 @@ type restFile struct {
 	SHA              string `json:"sha"`
 }
 
-// files lists the changed files with their patches (GitHub caps a PR at 3000 files).
-func (c *Client) files(ctx context.Context, dir string, repo Repo, number int) ([]restFile, error) {
-	out, err := c.run(ctx, dir, nil, "api", "--paginate", fmt.Sprintf("repos/%s/pulls/%d/files?per_page=100", repo.NameWithOwner, number))
-	if err != nil {
-		return nil, err
-	}
-	// --paginate prints one JSON array per page, back to back.
-	dec := json.NewDecoder(strings.NewReader(string(out)))
+// files lists the changed files with their patches (GitHub caps a PR at 3000
+// files: 30 pages of 100).
+func (c *Client) files(ctx context.Context, a Auth, repo Repo, number int) ([]restFile, error) {
 	var all []restFile
-	for dec.More() {
+	first := rest(a, "/repos/%s/%s/pulls/%d/files", repo.Owner, repo.Name, number) + "?per_page=100"
+	err := c.pages(ctx, a, first, maxPages, func(body []byte) error {
 		var page []restFile
-		if err := dec.Decode(&page); err != nil {
-			return nil, fmt.Errorf("gh api pulls/files: unexpected output: %w", err)
+		if err := json.Unmarshal(body, &page); err != nil {
+			return fmt.Errorf("unexpected answer from GitHub (pull request files): %w", err)
 		}
 		all = append(all, page...)
-	}
-	return all, nil
+		return nil
+	})
+	return all, err
 }
 
 func buildDetails(repo Repo, v prView, files []restFile, tp threadPage) *prData {
@@ -448,7 +568,7 @@ func buildDetails(repo Repo, v prView, files []restFile, tp threadPage) *prData 
 	if d.Threads == nil {
 		d.Threads = []Thread{}
 	}
-	for _, l := range v.Labels {
+	for _, l := range v.Labels.Nodes {
 		d.Labels = append(d.Labels, l.Name)
 	}
 	byPath := make(map[string]restFile, len(files))
@@ -459,22 +579,27 @@ func buildDetails(repo Repo, v prView, files []restFile, tp threadPage) *prData 
 		})
 		byPath[f.Filename] = f
 	}
-	for _, cm := range v.Commits {
+	for _, n := range v.Commits.Nodes {
+		cm := n.Commit
 		author := ""
-		if len(cm.Authors) > 0 {
-			author = cm.Authors[0].Login
+		if len(cm.Authors.Nodes) > 0 {
+			first := cm.Authors.Nodes[0]
+			if first.User != nil {
+				author = first.User.Login
+			}
 			if author == "" {
-				author = cm.Authors[0].Name
+				author = first.Name
 			}
 		}
 		d.Commits = append(d.Commits, Commit{OID: cm.Oid, Headline: cm.MessageHeadline, Author: author, Date: cm.CommittedDate})
 	}
-	for _, ch := range v.StatusCheckRollup {
+	for _, ch := range v.Rollup.checks() {
 		d.Checks = append(d.Checks, ch.check(repo.URL))
 	}
-	for _, r := range v.Reviews {
-		// Bare comments of a review show up in its threads; keep reviews that say something.
-		if r.State == "COMMENTED" && strings.TrimSpace(r.Body) == "" {
+	for _, r := range v.Reviews.Nodes {
+		// Bare comments of a review show up in its threads; keep reviews that say
+		// something. My pending review is shown through its threads.
+		if r.State == "PENDING" || (r.State == "COMMENTED" && strings.TrimSpace(r.Body) == "") {
 			continue
 		}
 		d.Reviews = append(d.Reviews, Review{Author: r.Author.Login, State: r.State, BodyHTML: markdown(r.Body), SubmittedAt: r.SubmittedAt})

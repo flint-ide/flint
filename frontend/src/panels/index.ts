@@ -39,7 +39,7 @@ export const PANELS = definePanels([
   },
   {
     id: 'pulls', title: 'Pull Requests', icon: 'updown', order: 40, component: PullRequestsPanel,
-    command: { id: 'github.pullRequests', title: 'Pull Requests…', category: 'GitHub', keywords: 'pr review gh github list' },
+    command: { id: 'github.pullRequests', title: 'Pull Requests…', category: 'GitHub', keywords: 'pr review github list' },
   },
   {
     id: 'database', title: 'Databases', icon: 'database', order: 50, component: DatabasePanel,

@@ -12,6 +12,7 @@ export {
     Docker,
     EditorSettings,
     Font,
+    GitHub,
     InlineEdit,
     LanguageServerSettings,
     MCPServer,

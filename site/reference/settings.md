@@ -86,6 +86,7 @@ The file is readable only by your user. It never contains secrets: database pass
   },
   "agentReview": { "scope": "selected", "maxDiffKB": 128, "agent": "", "timeoutSeconds": 300 },
   "ci": { "pollSeconds": 60, "logTailLines": 80, "logErrorLines": 40, "notify": true },
+  "github": { "host": "github.com", "clientId": "", "scopes": ["repo", "read:org", "workflow"], "maxRetryWaitSeconds": 60 },
   "docker": { "host": "", "logTailLines": 500 }
 }
 ```
@@ -117,6 +118,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `prompts` | object | see below | The prompt library of the agent chat (`/`). See [prompts](#prompts). |
 | `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
 | `ci` | object | see below | Following your pull requests' CI: poll interval, Fix with agent's log excerpt, notifications. See [ci](#ci). |
+| `github` | object | see below | The GitHub host, the OAuth App Sign in with GitHub uses, scopes and the retry wait. See [github](#github). |
 | `docker` | object | see below | How the Docker panel finds the engine and how much log it starts with. See [docker](#docker). |
 
 ### Font objects
@@ -336,6 +338,19 @@ Used by [When CI fails](../guides/git-and-github.md#when-ci-fails).
 
 Flint keeps at most the last 8 MB of each failed job's log (and says when it cut one), describes at most 4 failed jobs per run, cuts log lines at 2,000 characters and workflow, job and step names at 120, and the Log tab keeps the last 20,000 lines; these limits are not settings.
 
+### github
+
+Used by [Pull requests](../guides/git-and-github.md#pull-requests) and [When CI fails](../guides/git-and-github.md#when-ci-fails). Edited in **Settings ▸ Accounts**. The token is never here: it is in the system keyring.
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `host` | string | a host name, optional `:port` | `"github.com"` | `github.com`, a GitHub Enterprise Server (`ghe.example.com`: API at `https://<host>/api/v3` and `/api/graphql`) or `<name>.ghe.com`. Remotes are matched against it, and each host has its own account. |
+| `clientId` | string | letters, digits, `.`, `_`, `-` | `""` | Client ID of the OAuth App (with Device Flow enabled) that **Sign in with GitHub** uses. Empty: sign-in is unavailable, and the GitHub CLI's token or `GH_TOKEN` still work. |
+| `scopes` | array of strings | up to 20 | `["repo", "read:org", "workflow"]` | OAuth scopes asked for when signing in. |
+| `maxRetryWaitSeconds` | integer (s) | 0–300 | `60` | When GitHub answers "retry after" (a secondary rate limit), a read waits that long and tries once more if the wait is at most this; otherwise, and for writes, the limit is reported. |
+
+Flint caps a GitHub answer at 32 MB, a file side of a diff at 4 MB and the pages one listing follows at 30; these limits are not settings.
+
 ### docker
 
 Used by the [Docker panel](../guides/docker.md).
@@ -351,7 +366,8 @@ Response bodies from the engine are capped at 32 MiB; this limit is not a settin
 
 Some preferences are not in `settings.json`:
 
-- Recent folders, the agent approval policy, trusted folders, agent tasks and the update check's last result (including a skipped version) are in `state.json`.
+- Recent folders, the agent approval policy, trusted folders, agent tasks, the signed-in accounts (login, avatar, host, scopes; no token) and the update check's last result (including a skipped version) are in `state.json`.
+- Account tokens are in the system keyring (service `flint-accounts`).
 - The sidebar width is kept by the app's web view.
 - The selected HTTP environment is remembered only until Flint quits.
 

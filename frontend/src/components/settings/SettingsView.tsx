@@ -12,19 +12,21 @@ import { McpServerSection } from './McpServerSection'
 import { EditorAiSection } from './EditorAiSection'
 import { UsageSection } from './UsageSection'
 import { CISection } from './CISection'
+import { AccountsSection } from './AccountsSection'
 import { DockerSection } from './DockerSection'
 import { NumberField, Row, TextField } from './fields'
 import { openVSCodeImport } from '../../store/vscodeImport'
 import { isMac } from '../../lib/platform'
 
 type Section =
-  | 'appearance' | 'editor' | 'terminal' | 'agents' | 'agentContext' | 'usage' | 'editorAi' | 'lsp' | 'refresh' | 'docker' | 'ci' | 'todo'
+  | 'appearance' | 'editor' | 'terminal' | 'accounts' | 'agents' | 'agentContext' | 'usage' | 'editorAi' | 'lsp' | 'refresh' | 'docker' | 'ci' | 'todo'
   | 'keymap' | 'updates' | 'import'
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'editor', label: 'Editor' },
   { id: 'terminal', label: 'Terminal' },
+  { id: 'accounts', label: 'Accounts' },
   { id: 'agents', label: 'Agents' },
   { id: 'agentContext', label: 'Agent Context' },
   { id: 'usage', label: 'Usage' },
@@ -58,6 +60,7 @@ export function SettingsView({ active }: { active: boolean }) {
         {section === 'appearance' && <AppearanceSection />}
         {section === 'editor' && <EditorSection />}
         {section === 'terminal' && <TerminalSection />}
+        {section === 'accounts' && <AccountsSection />}
         {section === 'agents' && <AgentsSection />}
         {section === 'agentContext' && <McpServerSection />}
         {section === 'usage' && <UsageSection />}

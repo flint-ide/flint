@@ -43,7 +43,7 @@ The Commit panel, side-by-side diffs, blame, history and pull request review wit
 
 Flint drives the CLIs you already use, with the same `PATH` and logins as your terminal:
 
-- **Git and GitHub**: commits, diffs and pull request review (`git`, `gh`).
+- **Git and GitHub**: commits, diffs and pull request review (`git`, and GitHub's API with your account).
 - **Run, test, debug and profile**: run configurations, a test tree, the Go debugger (Delve) and flame graphs.
 - **Databases**: PostgreSQL and ClickHouse with a visual EXPLAIN.
 - **An HTTP client** for `.http` files.

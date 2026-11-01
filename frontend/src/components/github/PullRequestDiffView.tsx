@@ -13,6 +13,7 @@ import { ThreadLayout, commentGutter, setThreadAnchors, threadDecorations } from
 import { CommentComposer, ReviewThread } from './ReviewThread'
 import { ReviewBar } from './ReviewBar'
 import { useWindowFocus } from './useWindowFocus'
+import { GitHubError } from '../accounts/GitHubError'
 
 const COLLAPSE = { margin: 3, minSize: 6 }
 
@@ -88,7 +89,7 @@ export function PullRequestDiffView({ tab, active }: { tab: PullRequestDiffTab; 
         <button className="icon" title="Refresh comments" onClick={() => void loadDetails(tab.root, tab.number, true)}>↻</button>
         {details && <button className="link" onClick={() => openInBrowser(`${details.url}/files`)}>Open on GitHub ↗</button>}
       </div>
-      {(error || entry?.error) && <div className="placeholder error selectable">{error ?? entry?.error}</div>}
+      {(error || entry?.error) && <GitHubError message={(error ?? entry?.error)!} />}
       {note && <div className="placeholder muted">{note}</div>}
       {!sides && !error && !entry?.error && <div className="placeholder">Loading…</div>}
       {details && detached.length > 0 && <DetachedThreads root={tab.root} number={tab.number} threads={detached} />}

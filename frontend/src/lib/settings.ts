@@ -17,6 +17,7 @@ import { coerceUsage, DEFAULT_USAGE, type UsageSettings } from './usageSettings'
 import { coercePromptSettings, DEFAULT_PROMPT_SETTINGS, type PromptSettings } from './prompts'
 import { coerceAgentReview, DEFAULT_AGENT_REVIEW, type AgentReviewSettings } from './reviewSettings'
 import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
+import { coerceGitHub, DEFAULT_GITHUB, type GitHubSettings } from './githubSettings'
 
 import type { ResolvedTheme, ThemeMode } from './themeMode'
 
@@ -85,6 +86,8 @@ export interface AppSettings {
   agentReview: AgentReviewSettings
   /** Following your pull requests' CI: poll interval, log excerpt size, notifications. */
   ci: CISettings
+  /** GitHub host, the OAuth App Flint signs in with, scopes and the retry wait (lib/githubSettings.ts). */
+  github: GitHubSettings
 }
 
 /** Mirrors settings.Default() in Go (used until the backend answers). */
@@ -113,6 +116,7 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   prompts: DEFAULT_PROMPT_SETTINGS,
   agentReview: DEFAULT_AGENT_REVIEW,
   ci: DEFAULT_CI,
+  github: DEFAULT_GITHUB,
 }) as AppSettings
 
 /** Same limits as Go's settings.Validate, for the inputs. */
@@ -233,5 +237,6 @@ export function coerceSettings(v: unknown): AppSettings {
     prompts: coercePromptSettings(v.prompts),
     agentReview: coerceAgentReview(v.agentReview),
     ci: coerceCI(v.ci),
+    github: coerceGitHub(v.github),
   }
 }

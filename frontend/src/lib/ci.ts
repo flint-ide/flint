@@ -1,6 +1,6 @@
 // Pure parts of following CI on your pull requests (store/ci.ts): the state of
 // a branch's checks, when to look again, what changed, and the agent draft for
-// a failed run. Go reads gh and builds the redacted, bounded report.
+// a failed run. Go reads GitHub's API and builds the redacted, bounded report.
 
 /** The part of settings.json under "ci" (Go: internal/settings/ci.go). */
 export interface CISettings {

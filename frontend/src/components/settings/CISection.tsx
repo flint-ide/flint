@@ -29,7 +29,7 @@ export function CISection() {
     <section>
       <h2>CI</h2>
       <p className="muted settings-note">
-        Flint follows the checks of your current branch's pull request and of agent tasks' pull requests through the GitHub CLI. A failing check gets a
+        Flint follows the checks of your current branch's pull request and of agent tasks' pull requests through GitHub's API (Settings ▸ Accounts); polls are conditional requests, which cost no rate limit while nothing changes. A failing check gets a
         red CI badge in the status bar and Fix with agent, which puts the failed step's log (redacted) in the agent chat for you to review.
       </p>
       {NUMBERS.map((n) => (

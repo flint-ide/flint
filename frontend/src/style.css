@@ -5182,3 +5182,59 @@ body.file-drop-target-active::after {
   font-weight: 600;
   margin-top: 6px;
 }
+
+/* ---------- accounts (Settings ▸ Accounts, Sign in with GitHub) ---------- */
+
+.signin {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 520px;
+}
+.signin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.signin-code {
+  font-family: var(--editor-font);
+  font-size: 22px;
+  letter-spacing: 0.12em;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.signin-note {
+  font-size: 12px;
+}
+.signin-dialog {
+  max-width: 560px;
+}
+.account-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.account-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.account-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.account-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

@@ -106,7 +106,7 @@ function appCommands(): Command[] {
     { id: 'help.showLogs', title: `Show Logs in ${fileManagerName()}`, category: 'Help', keywords: 'log file debug', run: showLogs },
     {
       id: 'help.checkTools', title: 'Check Tools…', category: 'Help',
-      keywords: 'install setup missing path version git ripgrep gh claude codex kubectl docker aws delve language server',
+      keywords: 'install setup missing path version git ripgrep claude codex kubectl docker aws delve language server',
       run: openToolCheck,
     },
     { id: 'help.checkForUpdates', title: 'Check for Updates…', category: 'Help', keywords: 'update upgrade release version new download', run: () => void checkForUpdates() },

@@ -300,7 +300,9 @@ export class DiffStat {
     "files": FileStat[];
 
     /**
-     * Count, Added and Deleted cover every file, also those left out of Files.
+     * Count covers every file. Added and Deleted cover every tracked file but
+     * only the new files that are listed (their lines are counted by reading
+     * them, so the rest are left out).
      */
     "count": number;
     "added": number;

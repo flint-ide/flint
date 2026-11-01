@@ -115,11 +115,16 @@ describe('pruneChanges', () => {
 
 describe('removeQuestions', () => {
   it('asks about lost work only when there is some', () => {
-    assert.deepEqual(removeQuestions({ stale: false, changes: 0, unmerged: 0 }), { discard: null, branch: null })
-    const q = removeQuestions({ stale: false, changes: 2, unmerged: 3 })
+    assert.deepEqual(removeQuestions({ stale: false, changes: 0, ignored: 0, unmerged: 0 }), { discard: null, branch: null })
+    const q = removeQuestions({ stale: false, changes: 2, ignored: 0, unmerged: 3 })
     assert.match(q.discard ?? '', /2 uncommitted/)
     assert.match(q.branch ?? '', /3 commit/)
-    assert.match(removeQuestions({ stale: true, changes: 0, unmerged: -1 }).branch ?? '', /could not tell/)
+    assert.match(removeQuestions({ stale: true, changes: 0, ignored: 0, unmerged: -1 }).branch ?? '', /could not tell/)
+  })
+
+  it('counts ignored files (.env) as lost work', () => {
+    const q = removeQuestions({ stale: false, changes: 0, ignored: 1, unmerged: 0 })
+    assert.match(q.discard ?? '', /1 ignored/)
   })
 })
 

@@ -45,7 +45,7 @@ Every type also accepts:
 }
 ```
 
-Flint validates the file and reports unknown fields or wrong types as errors. You don't have to write it by hand: "Add Configuration…" and "Edit Configurations…" in the command palette open an editor for it.
+Flint validates the file and reports unknown fields or wrong types as errors. You don't have to write it by hand: "Add Configuration…" and "Edit Configurations…" in the command palette open an editor for it, and so does a right-click on the configuration selector in the title bar, whose menu also runs, debugs and stops the selected configuration.
 
 ### Detected configurations
 

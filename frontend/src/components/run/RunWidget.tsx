@@ -12,6 +12,8 @@ import { debugSelected, debugTestsInFile, useDebug } from '../../store/debug'
 import { cancelProfiling, profileSelected, profileTestsInFile, profileTestsInPackage, useProfile } from '../../store/profile'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 import { formatKeys, keyHint } from '../../lib/commands'
+import { openContextMenu } from '../../store/contextMenu'
+import { runWidgetMenu } from '../../lib/runMenu'
 
 /** Title bar run toolbar like IntelliJ: configuration selector, ▶ Run / ↻ Rerun, ■ Stop. */
 export function RunWidget() {
@@ -90,6 +92,21 @@ export function RunWidget() {
   ]
 
   const name = selected?.name ?? 'configuration'
+  // Right-click on the selector: the selected configuration's actions and Edit.
+  const onContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    openContextMenu(e.clientX, e.clientY, runWidgetMenu(
+      { name: selected?.name ?? null, running, debuggable, stoppable: !!stopKey },
+      {
+        run: () => void runSelected(),
+        debug: () => void debugSelected(),
+        stop: () => void stopRun(stopKey),
+        edit: () => editRunConfig(),
+        add: () => newRunConfig(),
+      },
+      { run: keyHint('run.selected'), debug: keyHint('debug.selected'), stop: formatKeys('Mod+F2') },
+    ))
+  }
   return (
     <div className="tb-run">
       <Dropdown
@@ -99,7 +116,7 @@ export function RunWidget() {
         onOpen={() => void loadRunConfigs()}
         items={items}
         trigger={(t) => (
-          <button {...t} className="tb-widget run-config" title={project ? `Run configurations of ${project}` : 'Run configurations'}>
+          <button {...t} className="tb-widget run-config" title={project ? `Run configurations of ${project}` : 'Run configurations'} onContextMenu={onContextMenu}>
             <TabKindIcon kind="run" busy={running} />
             <span className="tb-label">{selected?.name ?? 'Add Configuration…'}</span>
             {project && <span className="tb-extra">{project}</span>}

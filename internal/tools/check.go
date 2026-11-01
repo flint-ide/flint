@@ -25,7 +25,7 @@ const (
 	maxDetail      = 120
 )
 
-// Status is a tool as found on this Mac.
+// Status is a tool as found on this machine.
 type Status struct {
 	ID       string   `json:"id"`
 	Name     string   `json:"name"`

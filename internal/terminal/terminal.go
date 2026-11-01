@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+
+	"flint/internal/shellenv"
 )
 
 // maxEmit caps how many bytes are coalesced into one output event.
@@ -242,11 +244,7 @@ func winsize(cols, rows int) *pty.Winsize {
 // (claude, codex, brew, nvm...) match what a regular terminal sees — GUI apps on macOS
 // otherwise inherit a minimal launchd environment.
 func loginShell() (string, []string) {
-	shell := os.Getenv("SHELL")
-	if shell == "" {
-		shell = "/bin/zsh"
-	}
-	return shell, []string{"-l"}
+	return shellenv.UserShell(), []string{"-l"}
 }
 
 // Environ is the process environment plus what terminal programs expect (TERM,

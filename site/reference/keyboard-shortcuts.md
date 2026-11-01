@@ -45,6 +45,16 @@ These are Flint's default shortcuts. All of them, except the ones that belong to
 | `F8` | Next problem (when not debugging) |
 | `⇧⌘V` | Markdown preview |
 
+### Vim mode
+
+With [Vim mode](../how-to/customize-flint.md#use-vim-key-bindings) on, editors take Vim's keys. Flint's shortcuts above still come first.
+
+| Command | Action |
+|---|---|
+| `:w` | Save |
+| `:q` | Close the tab |
+| `:wq` / `:x` | Save and close the tab |
+
 ## Image preview
 
 | Shortcut | Action |

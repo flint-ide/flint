@@ -2,12 +2,46 @@
 
 Recipes for changing how Flint looks and behaves. All of these are in the Settings tab (`⌘,`), and every change applies immediately. For a description of each option, see [Settings](../guides/settings.md).
 
+## Import your settings from VS Code
+
+If you are coming from Visual Studio Code, Cursor or VSCodium, Flint can take over your fonts, auto-save, keyboard shortcuts, color theme and Vim extension.
+
+1. Run "Import from VS Code…" from the command palette (`⇧⌘P`), or press `⌘,`, open **Import** and click **Import from VS Code…**.
+2. If you have more than one of these editors, choose which one to import from.
+3. Review the preview. It lists everything Flint would change and, under **Skipped**, everything it leaves out and why (for example a setting Flint has no equivalent for, a shortcut with a `when` condition, or a theme built into VS Code). A shortcut that another Flint command already uses is marked with that command's name.
+4. Click **Import**. Nothing is written before you do.
+
+What is imported:
+
+| From VS Code | To Flint |
+|---|---|
+| `editor.fontFamily`, `editor.fontSize`, `editor.lineHeight` | Editor font. A line height in pixels is converted to a multiple of the font size. |
+| `terminal.integrated.fontFamily`, `fontSize`, `lineHeight` | Terminal font. |
+| `files.autoSave` (`onFocusChange`, `onWindowChange` or `off`) | **Save files when Flint loses focus**. Flint has no "after delay" mode. |
+| `workbench.colorTheme` | A **Custom** theme with the theme's colors, when the theme comes from an installed extension. For a theme built into VS Code, which Flint can't read, the Dark or Light theme. |
+| `window.autoDetectColorScheme` | The **System** theme. |
+| The Vim extension (`vscodevim.vim`) installed | **Vim mode**. |
+| `keybindings.json` | Shortcuts of the Flint commands that do the same thing, for example Go to File, Find in Files, Toggle Terminal, Push or Step Over. |
+
+Skipped shortcuts include multi-key chords (`⌘K ⌘S`), shortcuts with a `when` clause or arguments, removals of VS Code defaults (`-command`), and commands Flint doesn't have. Flint keeps one shortcut per command; when your file binds several, the last one wins. Everything you import can be changed afterwards in Settings.
+
+Flint reads the editor's `settings.json` and `keybindings.json` in `~/Library/Application Support/Code/User` (or `Cursor/User`, `VSCodium/User`) and the themes of installed extensions (`~/.vscode/extensions`, `~/.cursor/extensions`, `~/.vscode-oss/extensions`). It never changes those files.
+
 ## Change the theme
 
 1. Press `⌘,` and open **Appearance**.
-2. Choose **Dark**, **Light** or **System**.
+2. Choose **Dark**, **Light** or **System**, or **Custom** after you imported a theme.
 
-System follows the macOS appearance and switches with it.
+System follows the macOS appearance and switches with it. Custom lays the imported colors over the dark or light palette, whichever the theme was made for; colors the theme doesn't set keep Flint's. Terminals take the custom background, text, cursor and selection colors.
+
+## Use Vim key bindings
+
+1. Press `⌘,` and open **Editor**.
+2. Turn on **Vim mode**, or run "Toggle Vim Mode" from the command palette.
+
+Every open editor switches right away. The status bar shows the mode of the focused editor (`-- NORMAL --`, `-- INSERT --`, `-- VISUAL --`). `:w` saves, `:q` closes the tab, and `:wq` or `:x` do both.
+
+Flint's own shortcuts still come first, including `⌃R` (Run) and `⌃D` (Debug), which Vim uses for redo and half-page down. To get Vim's behaviour, remove or change those shortcuts in **Keymap**.
 
 ## Change the editor font
 

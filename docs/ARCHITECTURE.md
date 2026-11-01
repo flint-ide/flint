@@ -264,6 +264,7 @@ menu.go, wails_app.go       application menu, window and event wiring
 cmd/webbuild                frontend bundler (esbuild Go API), --watch, --test, CSP
 build/                      Wails config (config.yml), Info.plist, app icon
 scripts/flint               the `flint [folder]` command installed by `make install`
+packaging/homebrew          Homebrew cask template, rendered and pushed to the tap by the release workflow
 internal/workspace          tree, file read/write, file list, create/rename/Trash, workspace roots
 internal/fuzzy              ⌘P fuzzy matching and the file index of workspace folders
 internal/textdiff           line and word diffs (Myers) for the gutter, diff tab and chat
@@ -276,7 +277,9 @@ internal/db                 connection profiles, Keychain, pgx/clickhouse, type 
                             EXPLAIN (Postgres plan parser, warnings), row editing by primary key
 internal/scratch            persistent scratchpads
 internal/config             on-disk locations, atomic JSON writes
-internal/settings           settings.json: settings, defaults, validation, schema version
+internal/settings           settings.json: settings, defaults, validation, schema version, custom theme
+internal/vscodeimport       Import from VS Code / Cursor / VSCodium: JSONC, settings, keybindings and color theme
+                            mapped onto settings (read-only; ImportAPI previews, then saves through settings)
 internal/terminal           PTY, output coalescing, shell cwd (proc_pidinfo)
 internal/runconfig          .flint/run.json: schema, validation, save, detection (Go main, make, npm)
 internal/runner             configuration and test processes: steps, PTY or pipes, process group, Stop

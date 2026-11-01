@@ -8,11 +8,11 @@ Flint's settings open in a tab. Every change applies immediately, without a rest
 - **flint ▸ Settings…** in the menu bar
 - "Settings…" in the command palette
 
-The tab has nine sections: Appearance, Editor, Terminal, Agents, Language Servers, Refresh, TODO List, Keymap and Updates.
+The tab has ten sections: Appearance, Editor, Terminal, Agents, Language Servers, Refresh, TODO List, Keymap, Updates and Import.
 
 ## Appearance
 
-**Theme**: Dark, Light or System. System follows the macOS appearance and switches when macOS does. The title bar and window buttons follow the theme, and Flint starts in the theme you used last, so a light theme never flashes dark on launch.
+**Theme**: Dark, Light or System, and Custom once you have [imported a theme from VS Code](../how-to/customize-flint.md#import-your-settings-from-vs-code). System follows the macOS appearance and switches when macOS does. Custom lays the imported colors over the dark or light palette; the hint under the label names the theme. The title bar and window buttons follow the theme, and Flint starts in the theme you used last, so a light theme never flashes dark on launch.
 
 ## Editor
 
@@ -20,6 +20,7 @@ The tab has nine sections: Appearance, Editor, Terminal, Agents, Language Server
 - **Font size**: 8 to 32 px (default 13).
 - **Line height**: 1.0 to 2.5 times the font size (default 1.55).
 - **Save files when Flint loses focus**: writes modified files when you switch to another app. Off by default.
+- **Vim mode**: Vim key bindings in every editor, with the mode in the status bar; `:w` saves and `:q` closes the tab. Flint's own shortcuts still come first. Off by default. See [Use Vim key bindings](../how-to/customize-flint.md#use-vim-key-bindings).
 
 The font settings apply to all editors: files, diffs and scratchpads. **Reset to Defaults** restores the font settings.
 
@@ -80,6 +81,10 @@ The command palette uses your shortcuts too.
 - **Check Now**: checks right away, even when the daily check is off, and tells you if you are up to date. **Help ▸ Check for Updates…** does the same.
 
 Flint never downloads or installs updates itself. See [Update check](../reference/privacy-and-security.md#update-check) for exactly what is sent.
+
+## Import
+
+**Import from VS Code…** takes your fonts, auto-save, keyboard shortcuts, color theme and Vim extension from Visual Studio Code, Cursor or VSCodium, after showing what would change and what is skipped. See [Import your settings from VS Code](../how-to/customize-flint.md#import-your-settings-from-vs-code).
 
 ## Trusted folders
 

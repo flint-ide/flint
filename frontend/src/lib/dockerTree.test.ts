@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { dockerTree, logsCommand, shellCommand, statusOf, type ComposeProject, type Container } from './dockerTree'
+import { dockerTree, rowClass, logsCommand, shellCommand, statusOf, type ComposeProject, type Container } from './dockerTree'
 
 const c = (name: string, state: string, project = '', service = '', workingDir = ''): Container =>
   ({ id: name, name, image: 'x', state, status: '', ports: [], created: '', project, service, configFiles: '', workingDir }) as unknown as Container
@@ -28,5 +28,10 @@ describe('docker tree', () => {
       assert.equal(shellCommand(bad), null)
       assert.equal(logsCommand(bad), null)
     }
+  })
+
+  it('lays rows out in the sidebar flow, not absolutely over the title bar', () => {
+    assert.equal(rowClass('docker-container', 'indent'), 'tree-row static docker-container indent')
+    assert.equal(rowClass('docker-project', ''), 'tree-row static docker-project')
   })
 })

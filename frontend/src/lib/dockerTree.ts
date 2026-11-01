@@ -37,6 +37,13 @@ export function statusOf(c: Pick<Container, 'state' | 'status'>): 'running' | 'u
   return 'stopped'
 }
 
+/**
+ * Class of a panel row. `.tree-row` is position:absolute (the virtualized file
+ * tree places its rows itself); rows laid out in the sidebar flow need `static`,
+ * or they all stack at the window's top-left over the title bar.
+ */
+export const rowClass = (...extra: string[]): string => ['tree-row', 'static', ...extra.filter(Boolean)].join(' ')
+
 // Docker names and ids: [a-zA-Z0-9][a-zA-Z0-9_.-]* — anything else is refused
 // rather than quoted, so nothing typed into a shell can carry metacharacters.
 const NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/

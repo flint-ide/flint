@@ -11,17 +11,24 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 // The operations behind agent tasks (a branch in its own worktree): how far the
 // branch got, whether it merges cleanly, and merging it.
 
-// BranchExists reports whether the local branch name exists.
+// HeadRef is the full ref of a local branch. Task code always names branches
+// this way: a short name can resolve to a tag of the same name, and revision
+// syntax (main@{1}, main^) is not a branch.
+func HeadRef(branch string) string { return "refs/heads/" + branch }
+
+// BranchExists reports whether name is a valid branch name and that local
+// branch exists (no revision syntax, no tags).
 func (r *Repo) BranchExists(ctx context.Context, name string) bool {
-	if name == "" || strings.HasPrefix(name, "-") {
+	if name == "" || strings.HasPrefix(name, "-") || r.validBranchName(ctx, name) != nil {
 		return false
 	}
-	_, err := r.git(ctx, "rev-parse", "--verify", "--quiet", "refs/heads/"+name)
+	_, err := r.git(ctx, "show-ref", "--verify", "--quiet", HeadRef(name))
 	return err == nil
 }
 
@@ -43,12 +50,12 @@ func (r *Repo) Resolve(ctx context.Context, rev string) (string, error) {
 	return strings.TrimSpace(string(out)), err
 }
 
-// Ahead counts the commits of branch that base doesn't have.
+// Ahead counts the commits of local branch that local branch base doesn't have.
 func (r *Repo) Ahead(ctx context.Context, base, branch string) (int, error) {
-	if strings.HasPrefix(base, "-") || strings.HasPrefix(branch, "-") {
+	if base == "" || branch == "" || strings.HasPrefix(base, "-") || strings.HasPrefix(branch, "-") {
 		return 0, errors.New("invalid branch name")
 	}
-	out, err := r.git(ctx, "rev-list", "--count", base+".."+branch, "--")
+	out, err := r.git(ctx, "rev-list", "--count", HeadRef(base)+".."+HeadRef(branch), "--")
 	if err != nil {
 		return 0, err
 	}
@@ -91,20 +98,26 @@ type DiffStat struct {
 	// MergeBase is where the branch left base; diffs are taken against it.
 	MergeBase string     `json:"mergeBase"`
 	Files     []FileStat `json:"files"`
-	// Count, Added and Deleted cover every file, also those left out of Files.
+	// Count covers every file. Added and Deleted cover every tracked file but
+	// only the new files that are listed (their lines are counted by reading
+	// them, so the rest are left out).
 	Count     int  `json:"count"`
 	Added     int  `json:"added"`
 	Deleted   int  `json:"deleted"`
 	Truncated bool `json:"truncated"`
 }
 
-// untrackedReadLimit bounds how much of a new file is read to count its lines.
-const untrackedReadLimit = 1 << 20
+const (
+	// untrackedReadLimit bounds how much of one new file is read to count its lines.
+	untrackedReadLimit = 1 << 20
+	// untrackedReadBudget bounds the bytes read for all new files of one DiffStat.
+	untrackedReadBudget = 16 << 20
+)
 
 // DiffStat compares the work tree (commits, uncommitted edits and untracked
-// files) with its merge base with base. At most max files are listed.
+// files) with its merge base with base branch. At most max files are listed.
 func (r *Repo) DiffStat(ctx context.Context, base string, max int) (DiffStat, error) {
-	mb, ok := r.MergeBase(ctx, base, "HEAD")
+	mb, ok := r.MergeBase(ctx, HeadRef(base), "HEAD")
 	if !ok {
 		return DiffStat{}, fmt.Errorf("%s and HEAD have no common commit", base)
 	}
@@ -117,19 +130,31 @@ func (r *Repo) DiffStat(ctx context.Context, base string, max int) (DiffStat, er
 	if err != nil {
 		return DiffStat{}, err
 	}
-	for _, p := range splitNUL(out) {
-		f := FileStat{Path: p, Untracked: true}
-		f.Added, f.Binary = countLines(filepath.Join(r.Root, filepath.FromSlash(p)))
-		files = append(files, f)
-	}
-	st := DiffStat{MergeBase: mb, Files: []FileStat{}, Count: len(files)}
+	untracked := splitNUL(out)
+	st := DiffStat{MergeBase: mb, Files: []FileStat{}, Count: len(files) + len(untracked)}
 	for _, f := range files {
 		st.Added += f.Added
 		st.Deleted += f.Deleted
 	}
-	if len(files) > max {
-		files, st.Truncated = files[:max], true
+	budget := untrackedReadBudget
+	for _, p := range untracked {
+		if len(files) >= max {
+			break
+		}
+		if err := ctx.Err(); err != nil {
+			return DiffStat{}, err
+		}
+		f := FileStat{Path: p, Untracked: true}
+		var read int
+		f.Added, f.Binary, read = countLines(filepath.Join(r.Root, filepath.FromSlash(p)), min(budget, untrackedReadLimit))
+		budget -= read
+		st.Added += f.Added
+		files = append(files, f)
 	}
+	if len(files) > max {
+		files = files[:max]
+	}
+	st.Truncated = len(files) < st.Count
 	st.Files = append(st.Files, files...)
 	return st, nil
 }
@@ -160,26 +185,36 @@ func parseNumstat(out []byte) []FileStat {
 	return files
 }
 
-// countLines counts the lines of a new file (up to untrackedReadLimit); a file
-// with a NUL byte is binary.
-func countLines(path string) (int, bool) {
-	f, err := os.Open(path)
+// countLines counts the lines in the first limit bytes of a new regular file;
+// a file with a NUL byte is binary. Symlinks, FIFOs, devices and sockets are
+// never opened (a FIFO would block the reader forever). read is the number
+// of bytes read.
+func countLines(path string, limit int) (lines int, binary bool, read int) {
+	if info, err := os.Lstat(path); err != nil || !info.Mode().IsRegular() || limit <= 0 {
+		return 0, false, 0
+	}
+	// O_NONBLOCK: should the file be swapped for a FIFO after Lstat, open
+	// must not wait for a writer; the Stat below then refuses it.
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
 	if err != nil {
-		return 0, false
+		return 0, false, 0
 	}
 	defer f.Close()
-	b, err := io.ReadAll(io.LimitReader(f, untrackedReadLimit))
+	if info, err := f.Stat(); err != nil || !info.Mode().IsRegular() {
+		return 0, false, 0
+	}
+	b, err := io.ReadAll(io.LimitReader(f, int64(limit)))
 	if err != nil || len(b) == 0 {
-		return 0, false
+		return 0, false, len(b)
 	}
 	if bytes.IndexByte(b, 0) >= 0 {
-		return 0, true
+		return 0, true, len(b)
 	}
 	n := bytes.Count(b, []byte{'\n'})
 	if b[len(b)-1] != '\n' {
 		n++
 	}
-	return n, false
+	return n, false, len(b)
 }
 
 // MergeConflictError: merging would conflict (or did, and was backed out).
@@ -191,11 +226,11 @@ func (e *MergeConflictError) Error() string {
 	return fmt.Sprintf("the merge conflicts in %d file(s): %s", len(e.Files), strings.Join(e.Files, ", "))
 }
 
-// MergeConflicts lists the files that would conflict if branch were merged
-// into into, without touching any work tree (git merge-tree). An old git
+// MergeConflicts lists the files that would conflict if local branch were merged
+// into local branch into, without touching any work tree (git merge-tree). An old git
 // without --write-tree reports none; Merge still backs out of a conflict.
 func (r *Repo) MergeConflicts(ctx context.Context, into, branch string) ([]string, error) {
-	out, err := r.git(ctx, "merge-tree", "--write-tree", "--name-only", "--no-messages", "-z", into, branch)
+	out, err := r.git(ctx, "merge-tree", "--write-tree", "--name-only", "--no-messages", "-z", HeadRef(into), HeadRef(branch))
 	if err == nil {
 		return nil, nil
 	}
@@ -227,11 +262,11 @@ func exitCode(err error) int {
 	return -1
 }
 
-// Merge merges branch into the checked-out branch. A conflicting merge is
+// Merge merges local branch into the checked-out branch. A conflicting merge is
 // aborted, leaving the work tree as it was, and reported as a
 // *MergeConflictError.
 func (r *Repo) Merge(ctx context.Context, branch string) error {
-	_, err := r.git(ctx, "merge", "--no-edit", branch)
+	_, err := r.git(ctx, "merge", "--no-edit", HeadRef(branch))
 	if err == nil {
 		return nil
 	}
@@ -245,11 +280,13 @@ func (r *Repo) Merge(ctx context.Context, branch string) error {
 	return &MergeConflictError{Files: files}
 }
 
-// MergeInto merges base into the checked-out branch and, on conflicts, leaves
+// MergeInto merges local branch base into the checked-out branch, always with
+// a merge commit (a fast-forward would make a task without work of its own
+// look merged), and on conflicts leaves
 // the merge in progress for someone (an agent) to resolve; it returns the
 // conflicted files.
 func (r *Repo) MergeInto(ctx context.Context, base string) ([]string, error) {
-	_, err := r.git(ctx, "merge", "--no-edit", base)
+	_, err := r.git(ctx, "merge", "--no-ff", "--no-edit", HeadRef(base))
 	if err == nil {
 		return nil, nil
 	}
@@ -273,8 +310,74 @@ func (r *Repo) conflicted(ctx context.Context) []string {
 	return files
 }
 
-// PruneWorktrees forgets worktrees whose folder is gone.
-func (r *Repo) PruneWorktrees(ctx context.Context) error {
-	_, err := r.git(ctx, "worktree", "prune")
+// RemoveWorktreeEntry forgets the one linked worktree whose folder was path
+// (already deleted) by removing its admin dir in $GIT_COMMON_DIR/worktrees,
+// found by the gitdir file that points back at path/.git. Unlike
+// `git worktree prune` it leaves other missing worktrees alone (moved, or
+// on a volume that isn't mounted).
+func (r *Repo) RemoveWorktreeEntry(ctx context.Context, path string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	admin := filepath.Join(r.CommonDir, "worktrees")
+	entries, err := os.ReadDir(admin)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	want := filepath.Join(filepath.Clean(path), ".git")
+	for _, e := range entries {
+		b, err := os.ReadFile(filepath.Join(admin, e.Name(), "gitdir"))
+		if err != nil || !e.IsDir() {
+			continue
+		}
+		if got := filepath.Clean(strings.TrimSpace(string(b))); got == want || resolved(got) == resolved(want) {
+			return os.RemoveAll(filepath.Join(admin, e.Name()))
+		}
+	}
+	return fmt.Errorf("%w: %s", ErrNoWorktree, path)
+}
+
+// ErrNoWorktree: the repository records no worktree for that folder.
+var ErrNoWorktree = errors.New("not a worktree of this repository")
+
+// resolved resolves the symlinks of the longest existing prefix of p
+// (/var → /private/var on macOS) so recorded and given paths compare.
+func resolved(p string) string {
+	dir, rest := p, ""
+	for {
+		if real, err := filepath.EvalSymlinks(dir); err == nil {
+			return filepath.Join(real, rest)
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return p
+		}
+		rest = filepath.Join(filepath.Base(dir), rest)
+		dir = parent
+	}
+}
+
+// PushBranch pushes local branch to the default remote under the same name
+// and makes it the branch's upstream, whatever the work tree has checked out.
+func (r *Repo) PushBranch(ctx context.Context, branch string) error {
+	if !r.BranchExists(ctx, branch) {
+		return errors.New("no local branch " + branch)
+	}
+	remote, err := r.defaultRemote(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = r.git(ctx, "push", "--set-upstream", remote, HeadRef(branch)+":"+HeadRef(branch))
 	return err
+}
+
+// IgnoredFiles counts the ignored files and folders in the work tree (.env,
+// build output): git leaves them out of status, but deleting the worktree
+// deletes them too.
+func (r *Repo) IgnoredFiles(ctx context.Context) (int, error) {
+	out, err := r.git(ctx, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z")
+	if err != nil {
+		return 0, err
+	}
+	return len(splitNUL(out)), nil
 }

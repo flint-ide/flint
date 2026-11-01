@@ -105,12 +105,18 @@ export function pruneChanges<T>(changes: Record<string, T>, tasks: TaskView[]): 
 export interface RemoveInfo {
   stale: boolean
   changes: number
+  /** Ignored files and folders (.env, build output): deleted with the worktree too. */
+  ignored: number
   unmerged: number
 }
 
 /** The extra questions removing a task needs: null when nothing would be lost. */
 export function removeQuestions(info: RemoveInfo): { discard: string | null; branch: string | null } {
-  const discard = info.changes > 0 ? `Its worktree has ${info.changes} uncommitted change(s) or new file(s). Delete them with it?` : null
+  const lost = [
+    info.changes > 0 ? `${info.changes} uncommitted change(s) or new file(s)` : '',
+    info.ignored > 0 ? `${info.ignored} ignored file(s) or folder(s), such as .env or build output` : '',
+  ].filter(Boolean)
+  const discard = lost.length ? `Its worktree has ${lost.join(' and ')}. Delete them with it?` : null
   let branch: string | null = null
   if (info.unmerged > 0) branch = `The branch has ${info.unmerged} commit(s) that are not in its base. Delete the branch too?`
   if (info.unmerged < 0) branch = 'Flint could not tell whether the branch was merged (its base is gone). Delete the branch too?'

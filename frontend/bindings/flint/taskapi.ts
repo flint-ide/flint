@@ -60,6 +60,17 @@ export function List(dir: string): $CancellablePromise<$models.TaskView[]> {
 }
 
 /**
+ * ListAll returns the tasks of the repositories containing dirs (the
+ * workspace folders), each repository once however many of its worktrees
+ * are open. A task whose worktree vanished loses the trust Flint gave it.
+ */
+export function ListAll(dirs: string[]): $CancellablePromise<$models.TaskView[]> {
+    return $Call.ByID(2179020124, dirs).then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
+/**
  * Merge merges a task's branch into its base, in the checkout where base is
  * checked out. It refuses while the task or that checkout has uncommitted
  * changes, and reports conflicts without touching anything.

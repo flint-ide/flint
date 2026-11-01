@@ -39,12 +39,11 @@ export const useTasks = createStore<TasksState>(() => ({
   newTaskOpen: false,
 }))
 
-/** Lists the tasks of every repository open in the window. */
+/** Lists the tasks of every repository open in the window (Go reads each repository once). */
 export async function loadTasks(): Promise<void> {
   const roots = useWorkspace.getState().roots
   try {
-    const lists = await Promise.all(roots.map((r) => TaskAPI.List(r).then((l) => (l ?? []) as TaskView[])))
-    const tasks = mergeTaskLists(lists)
+    const tasks = mergeTaskLists([((await TaskAPI.ListAll(roots)) ?? []) as TaskView[]])
     useTasks.setState((s) => ({ tasks, changes: pruneChanges(s.changes, tasks), error: null }))
   } catch (err) {
     useTasks.setState({ error: errorMessage(err) })

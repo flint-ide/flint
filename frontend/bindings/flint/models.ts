@@ -316,6 +316,12 @@ export class RemoveInfo {
     "changes": number;
 
     /**
+     * Ignored counts ignored files and folders (.env, build output), which
+     * deleting the worktree deletes too.
+     */
+    "ignored": number;
+
+    /**
      * Unmerged counts the branch's commits base doesn't have.
      */
     "unmerged": number;
@@ -327,6 +333,9 @@ export class RemoveInfo {
         }
         if (!("changes" in $$source)) {
             this["changes"] = 0;
+        }
+        if (!("ignored" in $$source)) {
+            this["ignored"] = 0;
         }
         if (!("unmerged" in $$source)) {
             this["unmerged"] = 0;

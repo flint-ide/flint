@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -166,6 +167,9 @@ func TestCreateTaskValidates(t *testing.T) {
 		"missing base":      {Dir: f.repo, Description: "x", Agent: "fake", Base: "nope"},
 		"remote base":       {Dir: f.repo, Description: "x", Agent: "fake", Base: "origin/main"},
 		"option as base":    {Dir: f.repo, Description: "x", Agent: "fake", Base: "--all"},
+		"reflog as base":    {Dir: f.repo, Description: "x", Agent: "fake", Base: "main@{1}"},
+		"parent as base":    {Dir: f.repo, Description: "x", Agent: "fake", Base: "main^"},
+		"full ref as base":  {Dir: f.repo, Description: "x", Agent: "fake", Base: "refs/heads/main"},
 	} {
 		if _, err := f.api.Create(req); err == nil {
 			t.Errorf("%s: accepted", name)
@@ -385,5 +389,158 @@ func TestCreateTaskPullRequest(t *testing.T) {
 	}
 	if list, _ := f.api.List(f.repo); list[0].PullRequest != url {
 		t.Errorf("pull request not remembered: %+v", list[0])
+	}
+}
+
+// Review findings: regression tests.
+
+func TestCreateTaskCannotGainTrustByLocation(t *testing.T) {
+	f := newTaskFixture(t)
+	trusted := filepath.Join(filepath.Dir(f.repo), "work")
+	if err := os.MkdirAll(trusted, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.app.setTrust(trusted, true); err != nil {
+		t.Fatal(err)
+	}
+	// The repository itself is untrusted; its worktree must not land in a trusted folder.
+	f.app.settings.AgentTasks.WorktreeDir = filepath.Join(trusted, "wt")
+	if _, err := f.api.Create(NewTask{Dir: f.repo, Description: "sneak in", Agent: "fake"}); err == nil || !strings.Contains(err.Error(), "trusted") {
+		t.Fatalf("Create into a trusted folder from an untrusted repository = %v", err)
+	}
+	if out := gitT(t, f.repo, "branch", "--list", "agent/*"); out != "" {
+		t.Errorf("branch left behind: %q", out)
+	}
+	// Nor inside the checkout it starts from.
+	f.app.settings.AgentTasks.WorktreeDir = filepath.Join(f.repo, "nested")
+	if _, err := f.api.Create(NewTask{Dir: f.repo, Description: "nested", Agent: "fake"}); err == nil || !strings.Contains(err.Error(), "inside") {
+		t.Fatalf("Create inside the checkout = %v", err)
+	}
+	// A trusted repository may put worktrees there.
+	if err := f.app.setTrust(f.repo, true); err != nil {
+		t.Fatal(err)
+	}
+	f.app.settings.AgentTasks.WorktreeDir = filepath.Join(trusted, "wt")
+	if _, err := f.api.Create(NewTask{Dir: f.repo, Description: "fine", Agent: "fake"}); err != nil {
+		t.Fatalf("Create from a trusted repository = %v", err)
+	}
+}
+
+func TestRemoveStaleTaskKeepsOtherWorktrees(t *testing.T) {
+	f := newTaskFixture(t)
+	a, b := f.create("first"), f.create("second")
+	for _, v := range []TaskView{a, b} {
+		if err := os.RemoveAll(v.Worktree); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := f.api.Remove(a.ID, RemoveOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	list := gitT(t, f.repo, "worktree", "list", "--porcelain")
+	if strings.Contains(list, a.Worktree) || !strings.Contains(list, b.Worktree) {
+		t.Errorf("worktrees after removing one stale task:\n%s", list)
+	}
+}
+
+func TestRemoveCountsIgnoredFiles(t *testing.T) {
+	f := newTaskFixture(t)
+	v := f.create("ignored")
+	writeT(t, filepath.Join(f.repo, ".git", "info", "exclude"), ".env\n")
+	writeT(t, filepath.Join(v.Worktree, ".env"), "TOKEN=secret\n")
+	info, err := f.api.RemoveCheck(v.ID)
+	if err != nil || info.Ignored != 1 || info.Changes != 0 {
+		t.Fatalf("RemoveCheck = %+v, %v", info, err)
+	}
+	if _, err := f.api.Remove(v.ID, RemoveOptions{}); err == nil || !strings.Contains(err.Error(), "ignored") {
+		t.Fatalf("Remove with an ignored file = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(v.Worktree, ".env")); err != nil {
+		t.Fatal("ignored file deleted without asking")
+	}
+	if _, err := f.api.Remove(v.ID, RemoveOptions{DiscardChanges: true}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestListAllComputesEachRepositoryOnce(t *testing.T) {
+	f := newTaskFixture(t)
+	a, b := f.create("one"), f.create("two")
+	other := t.TempDir()
+	list, err := f.api.ListAll([]string{f.repo, a.Worktree, b.Worktree, other})
+	if err != nil || len(list) != 2 {
+		t.Fatalf("ListAll = %d tasks, %v", len(list), err)
+	}
+	if _, err := f.api.ListAll(make([]string, maxListDirs+1)); err == nil {
+		t.Error("ListAll accepted too many folders")
+	}
+}
+
+func TestSameNamedTagDoesNotHideUnmergedWork(t *testing.T) {
+	f := newTaskFixture(t)
+	v := f.create("tagged")
+	commitT(t, v.Worktree, "b.txt", "b\n", "work")
+	gitT(t, f.repo, "tag", v.Branch, "main") // a tag named like the branch, at base
+	info, err := f.api.RemoveCheck(v.ID)
+	if err != nil || info.Unmerged != 1 {
+		t.Fatalf("RemoveCheck = %+v, %v", info, err)
+	}
+	if list, _ := f.api.List(f.repo); list[0].Merged || list[0].Ahead != 1 {
+		t.Errorf("view = %+v", list[0])
+	}
+	res, err := f.api.Remove(v.ID, RemoveOptions{})
+	if err != nil || !res.BranchKept {
+		t.Fatalf("Remove = %+v, %v", res, err)
+	}
+	if gitT(t, f.repo, "branch", "--list", v.Branch) == "" {
+		t.Error("unmerged branch deleted")
+	}
+}
+
+func TestUpdateFromBaseDoesNotLookMerged(t *testing.T) {
+	f := newTaskFixture(t)
+	v := f.create("no work yet")
+	commitT(t, f.repo, "m.txt", "m\n", "base moved")
+	if _, err := f.api.UpdateFromBase(v.ID); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := f.api.List(f.repo); list[0].Merged {
+		t.Errorf("a task without work shows as merged: %+v", list[0])
+	}
+}
+
+func TestStaleTaskLosesTrust(t *testing.T) {
+	f := newTaskFixture(t)
+	if err := f.app.setTrust(f.repo, true); err != nil {
+		t.Fatal(err)
+	}
+	v := f.create("trusted then gone")
+	if err := os.RemoveAll(v.Worktree); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.api.List(f.repo); err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(f.app.trustedFolders(), v.Worktree) {
+		t.Error("a vanished worktree is still trusted")
+	}
+}
+
+func TestPullRequestPushesTheTaskBranchNotHEAD(t *testing.T) {
+	f := newTaskFixture(t)
+	bare := filepath.Join(t.TempDir(), "origin.git")
+	gitT(t, f.repo, "init", "-q", "--bare", "-b", "main", bare)
+	gitT(t, f.repo, "remote", "add", "origin", bare)
+	f.api.pr = &fakePR{}
+	f.app.ask = func(string, string, string) bool { return true }
+	v := f.create("push me")
+	commitT(t, v.Worktree, "b.txt", "b\n", "work")
+	gitT(t, v.Worktree, "switch", "-q", "-c", "scratch") // the agent switched branches
+	if _, err := f.api.CreatePullRequest(v.ID); err != nil {
+		t.Fatal(err)
+	}
+	refs := gitT(t, f.repo, "ls-remote", bare)
+	if !strings.Contains(refs, "refs/heads/"+v.Branch) || strings.Contains(refs, "scratch") {
+		t.Errorf("remote refs = %s", refs)
 	}
 }

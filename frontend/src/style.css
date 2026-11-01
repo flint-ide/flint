@@ -3733,6 +3733,33 @@ button.small {
   font-size: 12px;
   margin: 10px 0;
 }
+/* Settings ▸ Remote: the pairing QR code next to the address and code. */
+.remote-pairing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.remote-qr {
+  width: 200px;
+  height: 200px;
+  flex: none;
+}
+.remote-pairing-text {
+  flex: 1;
+  min-width: 220px;
+  font-size: 12px;
+}
+.remote-pairing-text code {
+  user-select: all;
+}
+.remote-secret {
+  font-size: 15px;
+  letter-spacing: 0.06em;
+}
 .settings-preview {
   margin: 4px 0 0;
   padding: 10px 12px;

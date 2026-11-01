@@ -8,7 +8,7 @@ import {
 } from './toolSettings'
 import { coerceCustomAgents, type CustomAgent } from './customAgents'
 
-export type ThemeMode = 'dark' | 'light' | 'system'
+export type ThemeMode = 'dark' | 'light' | 'system' | 'custom'
 export type ResolvedTheme = 'dark' | 'light'
 
 export interface FontSettings {
@@ -17,11 +17,25 @@ export interface FontSettings {
   lineHeight: number
 }
 
+export interface EditorSettings extends FontSettings {
+  /** Vim key bindings in every editor. */
+  vimMode: boolean
+}
+
+/** A palette laid over the dark or light one (Theme "custom"), e.g. imported from VS Code. */
+export interface CustomTheme {
+  name: string
+  base: ResolvedTheme
+  /** CSS variable ('--bg-editor') → hex color; Go allows only style.css's theme variables. */
+  colors: Record<string, string>
+}
+
 export interface AppSettings {
   version: number
   theme: ThemeMode
-  editor: FontSettings
+  editor: EditorSettings
   terminal: FontSettings
+  customTheme: CustomTheme
   /** Agent for new chats (a built-in or custom agent's id); '' = the first installed one. */
   defaultAgent: string
   /** Save modified files when the window loses focus. */
@@ -48,8 +62,9 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   version: 1,
   theme: 'dark',
-  editor: Object.freeze({ fontFamily: `'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace`, fontSize: 13, lineHeight: 1.55 }),
+  editor: Object.freeze({ fontFamily: `'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace`, fontSize: 13, lineHeight: 1.55, vimMode: false }),
   terminal: Object.freeze({ fontFamily: `"JetBrains Mono", "SF Mono", Menlo, monospace`, fontSize: 13, lineHeight: 1.2 }),
+  customTheme: Object.freeze({ name: '', base: 'dark', colors: Object.freeze({}) as Record<string, string> }) as CustomTheme,
   defaultAgent: '',
   autoSave: false,
   notifyInBackground: true,
@@ -84,10 +99,34 @@ export function parseExcludes(text: string): { patterns: string[]; invalid: stri
   return { patterns, invalid }
 }
 
-/** The palette to use: System follows macOS (prefers-color-scheme). */
-export function resolveTheme(mode: ThemeMode, systemDark: boolean): ResolvedTheme {
+/** The palette to use: System follows macOS (prefers-color-scheme), Custom its base palette. */
+export function resolveTheme(mode: ThemeMode, systemDark: boolean, customBase: ResolvedTheme = 'dark'): ResolvedTheme {
   if (mode === 'system') return systemDark ? 'dark' : 'light'
+  if (mode === 'custom') return customBase
   return mode
+}
+
+/** The custom theme's CSS variables, set on :root over the base palette (none unless Theme is Custom). */
+export function themeCssVars(s: AppSettings): Record<string, string> {
+  return s.theme === 'custom' ? s.customTheme.colors : {}
+}
+
+const HEX_COLOR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i
+const CSS_VAR = /^--[a-z0-9-]+$/
+
+function customTheme(v: unknown, def: CustomTheme): CustomTheme {
+  if (!isObject(v)) return def
+  const colors: Record<string, string> = {}
+  if (isObject(v.colors)) {
+    for (const [name, color] of Object.entries(v.colors)) {
+      if (CSS_VAR.test(name) && typeof color === 'string' && HEX_COLOR.test(color)) colors[name] = color
+    }
+  }
+  return {
+    name: typeof v.name === 'string' ? v.name : '',
+    base: v.base === 'light' ? 'light' : 'dark',
+    colors,
+  }
 }
 
 /** CSS custom properties on :root that the editors read (style.css, lib/editorSetup.ts). */
@@ -124,9 +163,13 @@ export function coerceSettings(v: unknown): AppSettings {
   }
   return {
     version: typeof v.version === 'number' ? v.version : d.version,
-    theme: v.theme === 'light' || v.theme === 'system' || v.theme === 'dark' ? v.theme : d.theme,
-    editor: font(v.editor, d.editor),
+    theme: v.theme === 'light' || v.theme === 'system' || v.theme === 'dark' || v.theme === 'custom' ? v.theme : d.theme,
+    editor: {
+      ...font(v.editor, d.editor),
+      vimMode: isObject(v.editor) && typeof v.editor.vimMode === 'boolean' ? v.editor.vimMode : d.editor.vimMode,
+    },
     terminal: font(v.terminal, d.terminal),
+    customTheme: customTheme(v.customTheme, d.customTheme),
     defaultAgent: typeof v.defaultAgent === 'string' ? v.defaultAgent : d.defaultAgent,
     autoSave: typeof v.autoSave === 'boolean' ? v.autoSave : d.autoSave,
     notifyInBackground: typeof v.notifyInBackground === 'boolean' ? v.notifyInBackground : d.notifyInBackground,

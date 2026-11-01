@@ -8,7 +8,7 @@
 import { createStore } from '../lib/store'
 import * as SettingsAPI from '../../bindings/flint/settingsapi'
 import { settings as models } from '../wails/models'
-import { coerceSettings, DEFAULT_SETTINGS, editorCssVars, resolveTheme, type AppSettings, type ResolvedTheme } from '../lib/settings'
+import { coerceSettings, DEFAULT_SETTINGS, editorCssVars, resolveTheme, themeCssVars, type AppSettings, type ResolvedTheme } from '../lib/settings'
 import { setKeyOverrides } from '../lib/commands'
 import { errorMessage } from '../api/backend'
 import { showToast } from './dialog'
@@ -37,15 +37,31 @@ export const useSettings = createStore<SettingsState>((set, get) => ({
   settings: initial,
   loaded: false,
   systemDark: initialDark,
-  theme: resolveTheme(initial.theme, initialDark),
+  theme: resolved(initial, initialDark),
 
   update: (change) => {
     const prev = get().settings
     const settings = { ...prev, ...(typeof change === 'function' ? change(prev) : change) }
-    set({ settings, theme: resolveTheme(settings.theme, get().systemDark) })
+    set({ settings, theme: resolved(settings, get().systemDark) })
     scheduleSave()
   },
 }))
+
+/** The palette in use for these settings. */
+function resolved(s: AppSettings, systemDark: boolean): ResolvedTheme {
+  return resolveTheme(s.theme, systemDark, s.customTheme.base)
+}
+
+/**
+ * Takes settings the backend just saved by another path (Import from VS Code):
+ * pending edits are written first by the caller (flushSettings).
+ */
+export function replaceSettings(saved: unknown): void {
+  const settings = coerceSettings(saved)
+  lastSaved = settings
+  writeCache(settings)
+  useSettings.setState((s) => ({ settings, theme: resolved(settings, s.systemDark) }))
+}
 
 /** Fetches the settings from the backend (once, at startup). */
 export async function loadSettings(): Promise<void> {
@@ -53,7 +69,7 @@ export async function loadSettings(): Promise<void> {
     const settings = coerceSettings(await SettingsAPI.Get())
     lastSaved = settings
     writeCache(settings)
-    useSettings.setState((s) => ({ settings, loaded: true, theme: resolveTheme(settings.theme, s.systemDark) }))
+    useSettings.setState((s) => ({ settings, loaded: true, theme: resolved(settings, s.systemDark) }))
   } catch (err) {
     useSettings.setState({ loaded: true })
     showToast(`Settings not loaded: ${errorMessage(err)}`, 'error')
@@ -86,7 +102,7 @@ export function flushSettings(): Promise<void> {
       showToast(`Settings not saved: ${errorMessage(err)}`, 'error')
       // Back to what is on disk, unless the user changed something meanwhile.
       if (useSettings.getState().settings === next) {
-        useSettings.setState((s) => ({ settings: lastSaved, theme: resolveTheme(lastSaved.theme, s.systemDark) }))
+        useSettings.setState((s) => ({ settings: lastSaved, theme: resolved(lastSaved, s.systemDark) }))
       }
     }
   })
@@ -112,10 +128,17 @@ function writeCache(s: AppSettings): void {
 
 // ---------- applying ----------
 
+// Custom theme variables set on :root, removed again when the theme changes.
+let customVars: string[] = []
+
 function applyToDocument(s: AppSettings, theme: ResolvedTheme): void {
   const root = document.documentElement
   root.dataset.theme = theme
   for (const [name, value] of Object.entries(editorCssVars(s))) root.style.setProperty(name, value)
+  const custom = themeCssVars(s)
+  for (const name of customVars) if (!(name in custom)) root.style.removeProperty(name)
+  for (const [name, value] of Object.entries(custom)) root.style.setProperty(name, value)
+  customVars = Object.keys(custom)
 }
 
 if (typeof document !== 'undefined') {
@@ -127,7 +150,7 @@ if (typeof document !== 'undefined') {
   })
   // NSApp's appearance drives prefers-color-scheme: the system's in System mode.
   darkQuery?.addEventListener('change', (e) =>
-    useSettings.setState((s) => ({ systemDark: e.matches, theme: resolveTheme(s.settings.theme, e.matches) })),
+    useSettings.setState((s) => ({ systemDark: e.matches, theme: resolved(s.settings, e.matches) })),
   )
 }
 

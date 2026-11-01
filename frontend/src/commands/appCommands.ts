@@ -24,6 +24,8 @@ import { trustFolder, untrustFolder } from '../store/trust'
 import { copyDiagnostics, reportIssue, showLogs } from '../store/diagnostics'
 import { openToolCheck } from '../store/toolCheck'
 import { checkForUpdates } from '../store/update'
+import { useSettings } from '../store/settings'
+import { openVSCodeImport } from '../store/vscodeImport'
 
 // Where a global shortcut belongs to the focused widget instead: ⌘B in an editor is
 // "go to declaration" (IntelliJ), ⌘K in a terminal clears the screen.
@@ -65,6 +67,20 @@ function appCommands(): Command[] {
       id: 'app.settings', title: 'Settings…', category: 'General', keys: 'Mod+,',
       keywords: 'preferences options theme dark light font size keymap shortcuts keyboard agent',
       run: () => useEditor.getState().openSettings(),
+    },
+    {
+      id: 'app.importVSCode', title: 'Import from VS Code…', category: 'General',
+      keywords: 'migrate switch cursor vscodium settings keybindings shortcuts theme colors',
+      run: () => void openVSCodeImport(),
+    },
+    {
+      id: 'editor.toggleVimMode', title: 'Toggle Vim Mode', category: 'Editor', keywords: 'vi keybindings modal normal insert',
+      run: () => {
+        const { settings, update } = useSettings.getState()
+        const vimMode = !settings.editor.vimMode
+        update({ editor: { ...settings.editor, vimMode } })
+        showToast(vimMode ? 'Vim mode on' : 'Vim mode off')
+      },
     },
     {
       id: 'workspace.trust', title: 'Trust Folder', category: 'Workspace', keywords: 'restricted mode security trust',

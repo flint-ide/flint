@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -150,12 +151,25 @@ func describeTool(id, name string, rawInput json.RawMessage, cwd string) agentse
 	default:
 		if server, tool, ok := splitMCPName(name); ok {
 			tc.Title = server + ": " + tool
-			if server == agentsession.MCPServerName {
-				// Flint's own server: read-only tools scoped to the project,
-				// so the reads policy decides about them.
-				tc.Kind, tc.Title, tc.Paths = agentsession.ToolRead, "Flint: "+tool, nonEmpty(cwd)
-			}
 		}
+	}
+	return tc
+}
+
+// flintTool reclassifies a call of Flint's own MCP server in a session that
+// was given it (flintMCP): the tools that only show the project's own state
+// (agentsession.MCPReadTools) become reads inside cwd, so the reads policy
+// decides about them; terminal output and cluster status keep asking. In a
+// session without Flint's server, a server named "flint" is someone else's
+// and nothing changes.
+func flintTool(tc agentsession.ToolCall, name, cwd string, flintMCP bool) agentsession.ToolCall {
+	server, tool, ok := splitMCPName(name)
+	if !flintMCP || !ok || server != agentsession.MCPServerName {
+		return tc
+	}
+	tc.Title = "Flint: " + tool
+	if slices.Contains(agentsession.MCPReadTools, tool) {
+		tc.Kind, tc.Paths = agentsession.ToolRead, nonEmpty(cwd)
 	}
 	return tc
 }

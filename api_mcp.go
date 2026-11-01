@@ -53,17 +53,38 @@ func (a *App) allowMCP(root string) bool {
 	return a.currentSettings().MCPServer.Enabled && a.isTrusted(root)
 }
 
-// offerMCP is the agents' MCPProvider: the server's URL and root's token.
+// offerMCP is the agents' MCPProvider: the server's URL and a token for one
+// session, which the driver revokes when the session's process ends.
 func (a *App) offerMCP(cwd string) (as.MCPServer, bool) {
 	if !filepath.IsAbs(cwd) || !a.allowMCP(cwd) {
 		return as.MCPServer{}, false
 	}
-	url, token, err := a.mcp.Endpoint(filepath.Clean(cwd))
+	url, token, revoke, err := a.mcp.Endpoint(filepath.Clean(cwd))
 	if err != nil {
 		a.logf("mcp server: %v", err)
 		return as.MCPServer{}, false
 	}
-	return as.MCPServer{URL: url, Token: token}, true
+	return as.MCPServer{URL: url, Token: token, Release: revoke}, true
+}
+
+// forgetMCPRoots revokes the tokens of closed project folders and drops what
+// the stores kept about them.
+func (a *App) forgetMCPRoots(roots []string) {
+	if a.mcp == nil {
+		return
+	}
+	for _, root := range roots {
+		a.mcp.RevokeRoot(root)
+		a.mcpSources.Diagnostics.ClearRoot(root)
+	}
+}
+
+// mcpSettingsChanged closes the listener when the server was switched off
+// (every token ends; the next chat after switching it on opens a new one).
+func (a *App) mcpSettingsChanged(prev, next settings.MCPServer) {
+	if prev.Enabled && !next.Enabled {
+		a.mcp.Stop()
+	}
 }
 
 // EditorContextAPI receives what the editor shows, for the agents' MCP tools.

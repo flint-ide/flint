@@ -95,7 +95,7 @@ func call(t *testing.T, url, token, body string) rpcReply {
 
 func TestInitializeNegotiatesVersion(t *testing.T) {
 	s := newTestServer(t, Options{Version: "1.2.3"})
-	url, token, err := s.Endpoint("/p")
+	url, token, _, err := s.Endpoint("/p")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestInitializeNegotiatesVersion(t *testing.T) {
 
 func TestToolsListAndCall(t *testing.T) {
 	s := newTestServer(t, Options{})
-	url, token, err := s.Endpoint("/proj")
+	url, token, _, err := s.Endpoint("/proj")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +197,7 @@ func TestToolOutputIsRedactedAndBounded(t *testing.T) {
 			{Name: "big", Call: func(context.Context, string, json.RawMessage) (string, error) { return big, nil }},
 		}
 	}})
-	url, token, _ := s.Endpoint("/p")
+	url, token, _, _ := s.Endpoint("/p")
 	text, _ := toolText(t, call(t, url, token, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"secret"}}`))
 	if strings.Contains(text, "AKIA") {
 		t.Fatalf("not redacted: %q", text)
@@ -210,7 +210,7 @@ func TestToolOutputIsRedactedAndBounded(t *testing.T) {
 
 func TestNotificationsAndResponsesAreAccepted(t *testing.T) {
 	s := newTestServer(t, Options{})
-	url, token, _ := s.Endpoint("/p")
+	url, token, _, _ := s.Endpoint("/p")
 	for _, body := range []string{
 		`{"jsonrpc":"2.0","method":"notifications/initialized"}`,
 		`{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":1}}`,
@@ -225,7 +225,7 @@ func TestNotificationsAndResponsesAreAccepted(t *testing.T) {
 
 func TestMalformedRequests(t *testing.T) {
 	s := newTestServer(t, Options{})
-	url, token, _ := s.Endpoint("/p")
+	url, token, _, _ := s.Endpoint("/p")
 	for _, tc := range []struct {
 		body string
 		code int
@@ -250,8 +250,8 @@ func TestAuthAndTransportChecks(t *testing.T) {
 	allowed := atomic.Bool{}
 	allowed.Store(true)
 	s := newTestServer(t, Options{Allow: func(root string) bool { return allowed.Load() && root == "/p" }})
-	url, token, _ := s.Endpoint("/p")
-	_, otherToken, _ := s.Endpoint("/other")
+	url, token, _, _ := s.Endpoint("/p")
+	_, otherToken, _, _ := s.Endpoint("/other")
 	ping := `{"jsonrpc":"2.0","id":1,"method":"ping"}`
 	port := strings.TrimSuffix(strings.TrimPrefix(url, "http://127.0.0.1:"), "/mcp")
 
@@ -306,28 +306,118 @@ func TestAuthAndTransportChecks(t *testing.T) {
 	}
 }
 
-func TestEndpointReusesTokenPerRoot(t *testing.T) {
+const pingBody = `{"jsonrpc":"2.0","id":1,"method":"ping"}`
+
+// Every agent session gets its own token, which works until it is revoked.
+func TestTokensArePerSessionAndRevocable(t *testing.T) {
 	s := newTestServer(t, Options{})
-	u1, t1, err := s.Endpoint("/a/b/../b")
+	u1, t1, revoke1, err := s.Endpoint("/a/b/../b")
 	if err != nil {
 		t.Fatal(err)
 	}
-	u2, t2, _ := s.Endpoint("/a/b")
-	_, t3, _ := s.Endpoint("/a/c")
-	if u1 != u2 || t1 != t2 || t1 == t3 || len(t1) < 40 {
-		t.Fatalf("tokens %q %q %q", t1, t2, t3)
+	u2, t2, revoke2, _ := s.Endpoint("/a/b")
+	if u1 != u2 || t1 == t2 || len(t1) < 40 || s.Live() != 2 {
+		t.Fatalf("tokens %q %q, %d live", t1, t2, s.Live())
 	}
 	if !strings.HasPrefix(u1, "http://127.0.0.1:") || !strings.HasSuffix(u1, "/mcp") {
 		t.Fatalf("url %q", u1)
 	}
-	if _, _, err := s.Endpoint("relative"); err == nil {
+	revoke1()
+	revoke1() // twice is fine
+	if resp, _ := post(t, u1, t1, pingBody, nil); resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("revoked token: %d", resp.StatusCode)
+	}
+	if resp, _ := post(t, u2, t2, pingBody, nil); resp.StatusCode != http.StatusOK {
+		t.Fatalf("other session's token: %d", resp.StatusCode)
+	}
+	revoke2()
+	if s.Live() != 0 {
+		t.Fatalf("%d tokens live", s.Live())
+	}
+	if _, _, _, err := s.Endpoint("relative"); err == nil {
 		t.Fatal("relative root accepted")
+	}
+}
+
+// Closing a project revokes its sessions' tokens, and only those.
+func TestRevokeRoot(t *testing.T) {
+	s := newTestServer(t, Options{})
+	url, ta, _, _ := s.Endpoint("/a")
+	_, tb, _, _ := s.Endpoint("/b")
+	s.RevokeRoot("/a/")
+	if resp, _ := post(t, url, ta, pingBody, nil); resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("closed project's token: %d", resp.StatusCode)
+	}
+	if resp, _ := post(t, url, tb, pingBody, nil); resp.StatusCode != http.StatusOK {
+		t.Fatalf("open project's token: %d", resp.StatusCode)
+	}
+}
+
+// Stop (the server switched off) closes the port and revokes every token;
+// the next Endpoint listens again.
+func TestStopAndListenAgain(t *testing.T) {
+	s := newTestServer(t, Options{})
+	url, token, _, _ := s.Endpoint("/p")
+	s.Stop()
+	if s.Listening() || s.Live() != 0 {
+		t.Fatal("still listening after Stop")
+	}
+	client := http.Client{Timeout: time.Second}
+	if resp, err := client.Post(url, "application/json", strings.NewReader("{}")); err == nil {
+		resp.Body.Close()
+		t.Fatal("old port still answers")
+	}
+	url2, token2, _, err := s.Endpoint("/p")
+	if err != nil || token2 == token {
+		t.Fatalf("restart: %v", err)
+	}
+	if resp, _ := post(t, url2, token2, pingBody, nil); resp.StatusCode != http.StatusOK {
+		t.Fatalf("after restart: %d", resp.StatusCode)
+	}
+}
+
+// The concurrency limit is per project: a project with all its slots busy
+// doesn't block another.
+func TestConcurrencyIsLimitedPerProject(t *testing.T) {
+	release := make(chan struct{})
+	started := make(chan struct{}, maxConcurrent)
+	s := newTestServer(t, Options{Tools: func() []Tool {
+		return []Tool{{Name: "block", Call: func(ctx context.Context, root string, _ json.RawMessage) (string, error) {
+			if root == "/busy" {
+				started <- struct{}{}
+				select {
+				case <-release:
+				case <-ctx.Done():
+				}
+			}
+			return "ok", nil
+		}}}
+	}})
+	url, busy, _, _ := s.Endpoint("/busy")
+	_, other, _, _ := s.Endpoint("/other")
+	callBody := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"block"}}`
+	done := make(chan struct{})
+	for range maxConcurrent {
+		go func() {
+			post(t, url, busy, callBody, nil)
+			done <- struct{}{}
+		}()
+	}
+	for range maxConcurrent {
+		<-started
+	}
+	if text, _ := toolText(t, call(t, url, other, callBody)); text != "ok" {
+		t.Fatalf("other project blocked: %q", text)
+	}
+	close(release)
+	for range maxConcurrent {
+		<-done
 	}
 }
 
 func TestCloseStopsListenerAndRefusesEndpoints(t *testing.T) {
 	s := New(Options{Tools: func() []Tool { return nil }})
-	url, _, err := s.Endpoint("/p")
+	url, _, _, err := s.Endpoint("/p")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,7 +429,7 @@ func TestCloseStopsListenerAndRefusesEndpoints(t *testing.T) {
 		resp.Body.Close()
 		t.Fatal("server still answers after Close")
 	}
-	if _, _, err := s.Endpoint("/p"); !errors.Is(err, ErrClosed) {
+	if _, _, _, err := s.Endpoint("/p"); !errors.Is(err, ErrClosed) {
 		t.Fatalf("endpoint after close: %v", err)
 	}
 	if err := s.Close(); err != nil {
@@ -360,7 +450,7 @@ func TestToolCallsAreCancelledOnClose(t *testing.T) {
 			return "", ctx.Err()
 		}}}
 	}})
-	url, token, _ := s.Endpoint("/p")
+	url, token, _, _ := s.Endpoint("/p")
 	done := make(chan struct{})
 	go func() {
 		defer close(done)

@@ -157,24 +157,31 @@ func (d *Driver) start(ctx context.Context, cwd, id string, resume bool, sink ag
 	if err != nil {
 		return agentsession.SessionInfo{}, err
 	}
-	var mcp *agentsession.MCPServer
-	if srv, ok := opts.MCP.Offer(cwd); ok {
-		mcp = &srv
-	}
-	args, err := buildArgs(id, resume, opts, opts.Untrusted != nil && opts.Untrusted(cwd), mcp)
-	if err != nil {
-		return agentsession.SessionInfo{}, fmt.Errorf("claude: %w", err)
-	}
 	d.mu.Lock()
 	_, taken := d.sessions[id]
 	d.mu.Unlock()
 	if taken {
 		return agentsession.SessionInfo{}, fmt.Errorf("claude: session %s is already open", id)
 	}
-	s, err := spawn(path, args, cwd, buildEnv(opts.Env, cwd, mcp), id, sink)
+	var mcp *agentsession.MCPServer
+	if srv, ok := opts.MCP.Offer(cwd); ok {
+		mcp = &srv
+	}
+	args, err := buildArgs(id, resume, opts, opts.Untrusted != nil && opts.Untrusted(cwd), mcp)
 	if err != nil {
+		mcp.Revoke()
+		return agentsession.SessionInfo{}, fmt.Errorf("claude: %w", err)
+	}
+	s, err := spawn(path, args, cwd, buildEnv(opts.Env, cwd, mcp), id, mcp != nil, sink)
+	if err != nil {
+		mcp.Revoke()
 		return agentsession.SessionInfo{}, err
 	}
+	// The session's token dies with its process, however it ends.
+	go func() {
+		<-s.done
+		mcp.Revoke()
+	}()
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, startTimeout)

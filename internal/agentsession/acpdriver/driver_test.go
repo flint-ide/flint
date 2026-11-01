@@ -2,13 +2,13 @@ package acpdriver
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -120,34 +120,62 @@ func TestChatTurnWithPermission(t *testing.T) {
 }
 
 // Flint's MCP server goes into session/new only for agents that can speak
-// HTTP MCP, and only when the provider offers one.
+// HTTP MCP, and only when the provider offers one; the token is revoked when
+// the agent process ends.
 func TestMCPServersInNewSession(t *testing.T) {
+	var revoked atomic.Int32
 	offer := as.MCPProvider(func(cwd string) (as.MCPServer, bool) {
-		return as.MCPServer{URL: "http://127.0.0.1:9/mcp", Token: "tok"}, cwd == "/p"
+		return as.MCPServer{URL: "http://127.0.0.1:9/mcp", Token: "tok", Release: func() { revoked.Add(1) }}, cwd == "/p"
 	})
-	got := mcpServers(acp.MCPCapabilities{HTTP: true}, offer, "/p")
+	got, revoke := mcpServers(acp.MCPCapabilities{HTTP: true}, offer, "/p")
 	want := `{"type":"http","name":"flint","url":"http://127.0.0.1:9/mcp","headers":[{"name":"Authorization","value":"Bearer tok"}]}`
 	if len(got) != 1 || string(got[0]) != want {
 		t.Fatalf("mcpServers = %s", got)
 	}
-	for name, servers := range map[string][]json.RawMessage{
-		"no http":     mcpServers(acp.MCPCapabilities{SSE: true}, offer, "/p"),
-		"not offered": mcpServers(acp.MCPCapabilities{HTTP: true}, offer, "/q"),
-		"no provider": mcpServers(acp.MCPCapabilities{HTTP: true}, nil, "/p"),
+	revoke()
+	if revoked.Load() != 1 {
+		t.Fatal("revoke did not release the token")
+	}
+	for _, tc := range []struct {
+		name string
+		caps acp.MCPCapabilities
+		p    as.MCPProvider
+		cwd  string
+	}{
+		{"no http", acp.MCPCapabilities{SSE: true}, offer, "/p"},
+		{"not offered", acp.MCPCapabilities{HTTP: true}, offer, "/q"},
+		{"no provider", acp.MCPCapabilities{HTTP: true}, nil, "/p"},
 	} {
+		servers, revoke := mcpServers(tc.caps, tc.p, tc.cwd)
+		revoke()
 		if servers == nil || len(servers) != 0 {
-			t.Errorf("%s: %s (must be an empty list, never null)", name, servers)
+			t.Errorf("%s: %s (must be an empty list, never null)", tc.name, servers)
 		}
 	}
+	if revoked.Load() != 1 {
+		t.Fatal("a token was issued for an agent that can't use it")
+	}
 	// The fake agent advertises HTTP MCP and accepts the server.
+	revoked.Store(0)
 	opts := fakeOpts(t, "")
 	opts.MCP = func(string) (as.MCPServer, bool) {
-		return as.MCPServer{URL: "http://127.0.0.1:9/mcp", Token: "tok"}, true
+		return as.MCPServer{URL: "http://127.0.0.1:9/mcp", Token: "tok", Release: func() { revoked.Add(1) }}, true
 	}
 	d := New(opts)
 	t.Cleanup(func() { _ = d.Close() })
-	if _, err := d.Start(testCtx(t), t.TempDir(), func(as.Event) {}); err != nil {
+	info, err := d.Start(testCtx(t), t.TempDir(), func(as.Event) {})
+	if err != nil {
 		t.Fatal(err)
+	}
+	if err := d.Stop(info.ID); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for revoked.Load() != 1 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if revoked.Load() != 1 {
+		t.Fatal("token not revoked when the agent stopped")
 	}
 }
 

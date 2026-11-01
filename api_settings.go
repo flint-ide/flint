@@ -42,6 +42,7 @@ func (s *SettingsAPI) Save(next settings.Settings) (settings.Settings, error) {
 	if err != nil {
 		return settings.Settings{}, err
 	}
+	a.mcpSettingsChanged(prev.MCPServer, saved.MCPServer)
 	for _, language := range settings.ChangedLanguageServers(prev, saved) {
 		a.lsp.Reconfigure(language)
 	}

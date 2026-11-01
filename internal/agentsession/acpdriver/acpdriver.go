@@ -50,14 +50,16 @@ type Options struct {
 
 // mcpServers is session/new's mcpServers: Flint's server as an HTTP McpServer
 // when the agent can connect to one, else none. The token travels over the
-// agent's stdin, never its command line.
-func mcpServers(caps acp.MCPCapabilities, provider as.MCPProvider, cwd string) []json.RawMessage {
+// agent's stdin, never its command line. revoke ends the token (a no-op when
+// none was issued).
+func mcpServers(caps acp.MCPCapabilities, provider as.MCPProvider, cwd string) (servers []json.RawMessage, revoke func()) {
+	none := func() {}
 	if !caps.HTTP {
-		return []json.RawMessage{}
+		return []json.RawMessage{}, none
 	}
 	srv, ok := provider.Offer(cwd)
 	if !ok {
-		return []json.RawMessage{}
+		return []json.RawMessage{}, none
 	}
 	type header struct {
 		Name  string `json:"name"`
@@ -70,9 +72,10 @@ func mcpServers(caps acp.MCPCapabilities, provider as.MCPProvider, cwd string) [
 		Headers []header `json:"headers"`
 	}{"http", as.MCPServerName, srv.URL, []header{{"Authorization", "Bearer " + srv.Token}}})
 	if err != nil {
-		return []json.RawMessage{}
+		srv.Revoke()
+		return []json.RawMessage{}, none
 	}
-	return []json.RawMessage{raw}
+	return []json.RawMessage{raw}, srv.Revoke
 }
 
 // Driver starts one ACP agent process per session.
@@ -126,7 +129,12 @@ func (d *Driver) Start(ctx context.Context, cwd string, sink as.Sink) (as.Sessio
 	if err != nil {
 		return as.SessionInfo{}, err
 	}
-	res, err := client.NewSession(ctx, cwd, mcpServers(client.Info().AgentCapabilities.MCPCapabilities, d.opts.MCP, cwd))
+	servers, revoke := mcpServers(client.Info().AgentCapabilities.MCPCapabilities, d.opts.MCP, cwd)
+	go func() {
+		<-client.Done() // the session's token dies with the agent process
+		revoke()
+	}()
+	res, err := client.NewSession(ctx, cwd, servers)
 	if err != nil {
 		_ = client.Close()
 		return as.SessionInfo{}, err

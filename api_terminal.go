@@ -87,10 +87,14 @@ func (t *TerminalAPI) Start(id, cwd string, cols, rows int, env map[string]strin
 	if err != nil {
 		return err
 	}
+	// Kept before the shell starts, so its first output is too.
+	opened := t.app.mcpSources.Terminals.OpenNew(id, mcptools.KindTerminal, "", cwd)
 	if err := t.app.terminals.Start(id, terminal.Options{Cwd: cwd, Cols: cols, Rows: rows, Env: vars}); err != nil {
+		if opened {
+			t.app.mcpSources.Terminals.Close(id)
+		}
 		return err
 	}
-	t.app.mcpSources.Terminals.Open(id, mcptools.KindTerminal, "", cwd)
 	return nil
 }
 

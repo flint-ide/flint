@@ -2,9 +2,12 @@ package codex
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"flint/internal/agent"
 	"flint/internal/agentsession"
@@ -50,6 +53,61 @@ func TestBuildArgsWithFlintMCPServer(t *testing.T) {
 	}
 	if env := buildEnv(nil, nil); lastValue(env, "FLINT_MCP_TOKEN") != "" {
 		t.Error("an inherited token reaches a session without the server")
+	}
+}
+
+// Only a codex whose `mcp add --help` lists --url and --bearer-token-env-var
+// gets Flint's server; the answer is cached per binary.
+func TestHTTPMCPSupport(t *testing.T) {
+	current := "Usage: codex mcp add [OPTIONS] <NAME> (--url <URL> | -- <COMMAND>...)\n      --url <URL>\n      --bearer-token-env-var <ENV_VAR>\n"
+	old := "Usage: codex mcp add [OPTIONS] <NAME> -- <COMMAND>...\n      --env <KEY=VALUE>\n"
+	urlOnly := "      --url <URL>\n"
+	if !helpSupportsHTTPMCP(current) || helpSupportsHTTPMCP(old) || helpSupportsHTTPMCP(urlOnly) || helpSupportsHTTPMCP("") {
+		t.Fatal("wrong decision")
+	}
+
+	dir := t.TempDir()
+	count := filepath.Join(dir, "count")
+	script := func(name, help string) string {
+		p := filepath.Join(dir, name)
+		body := "#!/bin/sh\necho x >> " + count + "\n[ \"$1 $2 $3\" = \"mcp add --help\" ] || exit 2\nprintf '%s' '" + help + "'\n"
+		if err := os.WriteFile(p, []byte(body), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	newer, older := script("codex-new", current), script("codex-old", old)
+	if !probeHTTPMCP(newer, os.Environ()) || probeHTTPMCP(older, os.Environ()) {
+		t.Fatal("probe decided wrongly")
+	}
+	if !probeHTTPMCP(newer, os.Environ()) {
+		t.Fatal("cached answer changed")
+	}
+	if data, _ := os.ReadFile(count); strings.Count(string(data), "x") != 2 {
+		t.Fatalf("binaries asked %d times, want once each", strings.Count(string(data), "x"))
+	}
+	if probeHTTPMCP(filepath.Join(dir, "missing"), os.Environ()) {
+		t.Fatal("missing binary supported")
+	}
+}
+
+// A codex without HTTP MCP support is never offered the server (and no
+// token is issued).
+func TestNoMCPOfferWithoutSupport(t *testing.T) {
+	prev := supportsHTTPMCP
+	supportsHTTPMCP = func(string, []string) bool { return false }
+	t.Cleanup(func() { supportsHTTPMCP = prev })
+	offered := false
+	d := New(Options{Binary: "/bin/sh", MCP: func(string) (agentsession.MCPServer, bool) {
+		offered = true
+		return agentsession.MCPServer{URL: "u", Token: "t"}, true
+	}})
+	defer d.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_, _ = d.Start(ctx, t.TempDir(), func(agentsession.Event) {}) // /bin/sh is no app-server
+	if offered {
+		t.Fatal("server offered to a codex without HTTP MCP support")
 	}
 }
 

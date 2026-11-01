@@ -38,7 +38,10 @@ export function NewTaskForm() {
     )
   }, [root])
 
-  const chosen = agent || (agents.includes(preferred) ? preferred : agents[0] ?? '')
+  // The default agent from settings is known at once; Agent.Info may still be loading.
+  const defaultAgent = useSettings((s) => s.settings.defaultAgent)
+  const fallback = [defaultAgent, preferred].find((a) => a && agents.includes(a)) ?? agents[0] ?? ''
+  const chosen = agent || fallback
 
   const submit = async () => {
     setBusy(true)

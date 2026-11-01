@@ -21,6 +21,7 @@ import { errorMessage } from '../../api/backend'
 import { focusSoon } from '../../lib/focusSoon'
 import { fitTerminal } from '../../lib/terminalFit'
 import { registerUrlLinks } from '../../lib/terminalLinks'
+import { terminalClipboardKey } from '../../lib/terminalKeys'
 import { sendTerminalSelectionToAgent } from '../../lib/agentContext'
 import type { DropdownItem } from '../ui/Dropdown'
 import { openContextMenu } from '../../store/contextMenu'
@@ -70,9 +71,10 @@ export function TerminalView({ tab, active }: Props) {
       }
       // Linux terminals copy and paste with Ctrl+Shift+C / V; Ctrl+C stays an interrupt.
       if (!isMac()) {
-        if (!e.ctrlKey || !e.shiftKey || e.altKey || (e.code !== 'KeyC' && e.code !== 'KeyV')) return true
-        if (e.code === 'KeyC') void ClipboardSetText(xterm.getSelection())
-        else void ClipboardGetText().then((text) => text && xterm.paste(text))
+        const action = terminalClipboardKey(e, xterm.hasSelection())
+        if (!action) return true
+        if (action === 'copy') void ClipboardSetText(xterm.getSelection())
+        if (action === 'paste') void ClipboardGetText().then((text) => text && xterm.paste(text))
         e.preventDefault()
         return false
       }

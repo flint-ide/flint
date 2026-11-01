@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  folderGlob, isWithin, withDraft, workspaceRows, nameError, rangeBetween, relativePath, remapKeys, remapPath, stemRange, toggleIn, topLevel, visibleRows,
+  folderGlob, isWithin, rescanPaths, withDraft, workspaceRows, nameError, rangeBetween, relativePath, remapKeys, remapPath, stemRange, toggleIn, topLevel, visibleRows,
   type TreeEntry,
 } from './fileTree'
 
@@ -121,5 +121,11 @@ describe('workspaceRows', () => {
     const rows = workspaceRows(['/p', '/q'], ['p', 'q'], tree, { '/p': false, '/q': true })
     const shape = withDraft(rows, '', { dir: '/q', isDir: false }).map((r) => (r.kind === 'draft' ? `+${r.depth}` : r.row.entry.path))
     assert.deepEqual(shape, ['/p', '/q', '+1', '/q/x.ts'])
+  })
+})
+
+describe('rescanPaths', () => {
+  it('lists the open files and loaded folders under the root', () => {
+    assert.deepEqual(rescanPaths('/p', ['/p/a.go', '/q/b.go', '/p/a.go'], ['/p', '/p/src', '/pp']), ['/p', '/p/src', '/p/a.go'])
   })
 })

@@ -9,15 +9,21 @@ import (
 	"strings"
 	"time"
 
+	"flint/internal/depdirs"
 	"flint/internal/desktop"
 	"flint/internal/fuzzy"
 	"flint/internal/git"
+	"flint/internal/settings"
 	"flint/internal/watcher"
 	"flint/internal/workspace"
 )
 
-// eventFSChanged carries batches of changed absolute paths under the open folder.
-const eventFSChanged = "fs:changed"
+// Events of the file watcher.
+const (
+	eventFSChanged = "fs:changed" // batches of changed absolute paths under the open folder
+	eventFSRescan  = "fs:rescan"  // the root whose changes were lost: reload what is shown of it
+	eventFSWarning = "fs:warning" // a message about watching (out of inotify watches)
+)
 
 // WorkspaceAPI exposes the opened project folder to the frontend.
 type WorkspaceAPI struct {
@@ -255,6 +261,7 @@ func (w *WorkspaceAPI) watchFolder(root string) (*watcher.Watcher, error) {
 			}
 		}
 	}
+	excludes := w.app.currentSettings().WatchExclude
 	return watcher.Watch(roots, func(paths []string) {
 		files, gitChanged := watcher.Classify(paths, gitDirs)
 		if len(files) > 0 {
@@ -263,6 +270,17 @@ func (w *WorkspaceAPI) watchFolder(root string) (*watcher.Watcher, error) {
 		if gitChanged {
 			w.app.emit(eventGitChanged, root)
 		}
+	}, watcher.Options{
+		// Dependency folders and the user's excludes (Settings, applied when a
+		// folder is opened) cost no inotify watches on Linux.
+		Skip: func(dir string) bool {
+			return settings.WatchExcluded(excludes, filepath.Base(dir)) || depdirs.Is(dir)
+		},
+		Lost: func() {
+			w.app.emit(eventFSRescan, root)
+			w.app.emit(eventGitChanged, root)
+		},
+		Limit: func(err error) { w.app.emit(eventFSWarning, err.Error()) },
 	})
 }
 

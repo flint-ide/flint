@@ -14,6 +14,34 @@ const (
 	maxDelay    = 500 * time.Millisecond // ...but never hold events longer than this
 )
 
+// Options tune a Watcher; the zero value works.
+type Options struct {
+	// Skip reports a directory below a root not to watch at all (Linux, where
+	// every directory costs a kernel watch): dependency folders and the
+	// user's excludes. nil skips node_modules, .idea and __pycache__.
+	Skip func(dir string) bool
+	// Lost is called when the system dropped events: anything under the roots
+	// may have changed unseen, so loaded folders and open files need a reload.
+	Lost func()
+	// Limit is called once when the kernel's watch limit is reached (Linux):
+	// folders from there on aren't watched. The error says how to raise it.
+	Limit func(err error)
+}
+
+// remap turns a resolved path into one under the caller's (unresolved) root.
+// FSEvents may leave out the leading slash.
+func remap(path string, mapping map[string]string) string {
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	for real, root := range mapping {
+		if rest, ok := strings.CutPrefix(path, real); ok && (rest == "" || rest[0] == '/') {
+			return root + rest
+		}
+	}
+	return path
+}
+
 // ignoredSegments are directories whose churn the UI never needs to see.
 var ignoredSegments = []string{"/.git/", "/node_modules/", "/.idea/", "/__pycache__/"}
 

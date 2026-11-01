@@ -626,6 +626,12 @@ export class Settings {
     "todoExclude": string[];
 
     /**
+     * WatchExclude are folder names (or globs over one) the file watcher
+     * doesn't watch on Linux, on top of the dependency folders (watch.go).
+     */
+    "watchExclude": string[];
+
+    /**
      * Agents configures the agent CLIs by name ("claude", "codex").
      */
     "agents": { [_ in string]?: AgentSettings };
@@ -700,6 +706,9 @@ export class Settings {
         if (!("todoExclude" in $$source)) {
             this["todoExclude"] = [];
         }
+        if (!("watchExclude" in $$source)) {
+            this["watchExclude"] = [];
+        }
         if (!("agents" in $$source)) {
             this["agents"] = {};
         }
@@ -737,14 +746,15 @@ export class Settings {
         const $$createField4_0 = $$createType5;
         const $$createField9_0 = $$createType1;
         const $$createField10_0 = $$createType0;
-        const $$createField11_0 = $$createType7;
-        const $$createField12_0 = $$createType9;
-        const $$createField13_0 = $$createType11;
-        const $$createField14_0 = $$createType12;
-        const $$createField15_0 = $$createType13;
-        const $$createField16_0 = $$createType14;
-        const $$createField17_0 = $$createType15;
-        const $$createField18_0 = $$createType16;
+        const $$createField11_0 = $$createType0;
+        const $$createField12_0 = $$createType7;
+        const $$createField13_0 = $$createType9;
+        const $$createField14_0 = $$createType11;
+        const $$createField15_0 = $$createType12;
+        const $$createField16_0 = $$createType13;
+        const $$createField17_0 = $$createType14;
+        const $$createField18_0 = $$createType15;
+        const $$createField19_0 = $$createType16;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -761,29 +771,32 @@ export class Settings {
         if ("todoExclude" in $$parsedSource) {
             $$parsedSource["todoExclude"] = $$createField10_0($$parsedSource["todoExclude"]);
         }
+        if ("watchExclude" in $$parsedSource) {
+            $$parsedSource["watchExclude"] = $$createField11_0($$parsedSource["watchExclude"]);
+        }
         if ("agents" in $$parsedSource) {
-            $$parsedSource["agents"] = $$createField11_0($$parsedSource["agents"]);
+            $$parsedSource["agents"] = $$createField12_0($$parsedSource["agents"]);
         }
         if ("customAgents" in $$parsedSource) {
-            $$parsedSource["customAgents"] = $$createField12_0($$parsedSource["customAgents"]);
+            $$parsedSource["customAgents"] = $$createField13_0($$parsedSource["customAgents"]);
         }
         if ("languageServers" in $$parsedSource) {
-            $$parsedSource["languageServers"] = $$createField13_0($$parsedSource["languageServers"]);
+            $$parsedSource["languageServers"] = $$createField14_0($$parsedSource["languageServers"]);
         }
         if ("refresh" in $$parsedSource) {
-            $$parsedSource["refresh"] = $$createField14_0($$parsedSource["refresh"]);
+            $$parsedSource["refresh"] = $$createField15_0($$parsedSource["refresh"]);
         }
         if ("mcpServer" in $$parsedSource) {
-            $$parsedSource["mcpServer"] = $$createField15_0($$parsedSource["mcpServer"]);
+            $$parsedSource["mcpServer"] = $$createField16_0($$parsedSource["mcpServer"]);
         }
         if ("completions" in $$parsedSource) {
-            $$parsedSource["completions"] = $$createField16_0($$parsedSource["completions"]);
+            $$parsedSource["completions"] = $$createField17_0($$parsedSource["completions"]);
         }
         if ("inlineEdit" in $$parsedSource) {
-            $$parsedSource["inlineEdit"] = $$createField17_0($$parsedSource["inlineEdit"]);
+            $$parsedSource["inlineEdit"] = $$createField18_0($$parsedSource["inlineEdit"]);
         }
         if ("agentTasks" in $$parsedSource) {
-            $$parsedSource["agentTasks"] = $$createField18_0($$parsedSource["agentTasks"]);
+            $$parsedSource["agentTasks"] = $$createField19_0($$parsedSource["agentTasks"]);
         }
         return new Settings($$parsedSource as Partial<Settings>);
     }

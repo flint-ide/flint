@@ -94,6 +94,9 @@ type Settings struct {
 	// TodoExclude are extra folders or globs the TODO list skips ("docs/legacy",
 	// "*.min.js"), on top of the dependency folders it recognises itself.
 	TodoExclude []string `json:"todoExclude"`
+	// WatchExclude are folder names (or globs over one) the file watcher
+	// doesn't watch on Linux, on top of the dependency folders (watch.go).
+	WatchExclude []string `json:"watchExclude"`
 	// Agents configures the agent CLIs by name ("claude", "codex").
 	Agents map[string]AgentSettings `json:"agents"`
 	// CustomAgents are ACP agents added by the user (see CustomAgent).
@@ -131,6 +134,7 @@ func Default() Settings {
 		CheckForUpdates:    true,
 		Keymap:             map[string]string{},
 		TodoExclude:        []string{},
+		WatchExclude:       defaultWatchExclude(),
 		Agents:             map[string]AgentSettings{},
 		CustomAgents:       []CustomAgent{},
 		LanguageServers:    map[string]LanguageServerSettings{},
@@ -200,6 +204,7 @@ func Normalize(s Settings) Settings {
 		}
 	}
 	out.TodoExclude = CleanExcludes(s.TodoExclude)
+	out.WatchExclude = cleanWatchExcludes(s.WatchExclude)
 	out.Agents = normalizeAgents(s.Agents)
 	out.LanguageServers = normalizeLanguageServers(s.LanguageServers)
 	out.Refresh = normalizeRefresh(s.Refresh)
@@ -275,6 +280,9 @@ func Validate(s Settings) error {
 		if err := validExclude(p); err != nil {
 			return err
 		}
+	}
+	if err := validateWatchExcludes(s.WatchExclude); err != nil {
+		return err
 	}
 	if err := validateAgents(s.Agents); err != nil {
 		return err

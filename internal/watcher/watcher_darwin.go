@@ -5,7 +5,6 @@ package watcher
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/fsnotify/fsevents"
@@ -21,8 +20,9 @@ type Watcher struct {
 
 // Watch reports changed absolute paths under any of roots to onChange (batched).
 // Callers typically pass the project folder plus its git dir, which for linked
-// worktrees lives outside the folder.
-func Watch(roots []string, onChange func(paths []string)) (*Watcher, error) {
+// worktrees lives outside the folder. FSEvents is one recursive stream, so
+// Options.Skip and Options.Limit don't apply; Options.Lost does.
+func Watch(roots []string, onChange func(paths []string), opts Options) (*Watcher, error) {
 	// FSEvents reports resolved paths (e.g. /private/var/...); map them back.
 	mapping := make(map[string]string, len(roots))
 	real := make([]string, 0, len(roots))
@@ -46,11 +46,14 @@ func Watch(roots []string, onChange func(paths []string)) (*Watcher, error) {
 	if err := w.stream.Start(); err != nil {
 		return nil, fmt.Errorf("watch %v: %w", roots, err)
 	}
-	go w.loop(mapping)
+	go w.loop(mapping, opts.Lost)
 	return w, nil
 }
 
-func (w *Watcher) loop(mapping map[string]string) {
+// dropped: FSEvents lost events or coalesced them into a folder to rescan.
+const dropped = fsevents.MustScanSubDirs | fsevents.KernelDropped | fsevents.UserDropped
+
+func (w *Watcher) loop(mapping map[string]string, lost func()) {
 	for {
 		select {
 		case <-w.done:
@@ -60,25 +63,17 @@ func (w *Watcher) loop(mapping map[string]string) {
 				return
 			}
 			paths := make([]string, 0, len(events))
+			rescan := false
 			for _, ev := range events {
 				paths = append(paths, remap(ev.Path, mapping))
+				rescan = rescan || ev.Flags&dropped != 0
+			}
+			if rescan && lost != nil {
+				lost()
 			}
 			w.deb.add(paths...)
 		}
 	}
-}
-
-// remap turns an FSEvents path into one under the caller's (unresolved) root.
-func remap(path string, mapping map[string]string) string {
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
-	}
-	for real, root := range mapping {
-		if rest, ok := strings.CutPrefix(path, real); ok && (rest == "" || rest[0] == '/') {
-			return root + rest
-		}
-	}
-	return path
 }
 
 // Close stops the stream. The loop keeps draining Events until Stop returns: the

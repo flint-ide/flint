@@ -224,6 +224,7 @@ func (s Settings) Clone() Settings {
 		out.Keymap[id] = keys
 	}
 	out.TodoExclude = cloneArgs(s.TodoExclude)
+	out.WatchExclude = cloneArgs(s.WatchExclude)
 	out.Agents = cloneAgents(s.Agents)
 	out.CustomAgents = cloneCustomAgents(s.CustomAgents)
 	out.LanguageServers = cloneLanguageServers(s.LanguageServers)

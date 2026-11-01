@@ -2706,13 +2706,6 @@ button.small {
   outline: none;
   overflow: hidden;
   font-size: 13px;
-  animation: dd-in 90ms ease-out;
-}
-@keyframes dd-in {
-  from {
-    opacity: 0;
-    transform: translateY(-3px);
-  }
 }
 .dd-search {
   margin: 6px;

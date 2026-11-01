@@ -206,6 +206,11 @@ func TestPolicyMatrix(t *testing.T) {
 		{"edit escaping with ..", ToolCall{Kind: ToolEdit, Paths: []string{cwd + "/../evil"}}, false},
 		{"edit git hook", ToolCall{Kind: ToolEdit, Paths: []string{cwd + "/.git/hooks/pre-commit"}}, false},
 		{"edit agent config", ToolCall{Kind: ToolEdit, Paths: []string{cwd + "/.claude/settings.json"}}, false},
+		{"edit nested git config", ToolCall{Kind: ToolEdit, Paths: []string{cwd + "/vendor/x/.git/config"}}, false},
+		{"create a repository", ToolCall{Kind: ToolEdit, Paths: []string{"x/.git/HEAD"}}, false},
+		{"edit upper-case git dir", ToolCall{Kind: ToolEdit, Paths: []string{cwd + "/.GIT/config"}}, false},
+		{"edit nested editor config", ToolCall{Kind: ToolEdit, Paths: []string{cwd + "/app/.VSCode/tasks.json"}}, false},
+		{"edit a .gitignore", ToolCall{Kind: ToolEdit, Paths: []string{cwd + "/app/.gitignore"}}, true},
 		{"one path outside", ToolCall{Kind: ToolEdit, Paths: []string{in, "/etc/hosts"}}, false},
 		{"read ssh key", ToolCall{Kind: ToolRead, Paths: []string{"/Users/me/.ssh/id_ed25519"}}, false},
 		{"execute", ToolCall{Kind: ToolExecute, Paths: []string{in}}, false},
@@ -232,6 +237,22 @@ func TestSymlinkOutsideProjectIsNotInside(t *testing.T) {
 	}
 	if allInside([]string{cwd + "/link/x.go"}, cwd) {
 		t.Error("a symlink pointing outside the project must not count as inside")
+	}
+}
+
+func TestSymlinkIntoGitDirIsProtected(t *testing.T) {
+	cwd := t.TempDir()
+	if err := os.MkdirAll(cwd+"/.git", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(cwd+"/.git", cwd+"/gitdir"); err != nil {
+		t.Fatal(err)
+	}
+	if got := ProtectedDir(cwd+"/gitdir/config", cwd); got != ".git" {
+		t.Errorf("ProtectedDir through a link into .git = %q", got)
+	}
+	if got := ProtectedDir(cwd+"/src/a.go", cwd); got != "" {
+		t.Errorf("ProtectedDir of a source file = %q", got)
 	}
 }
 
@@ -302,5 +323,191 @@ func TestResumeRegistersTheSession(t *testing.T) {
 	}
 	if _, err := m.Resume(context.Background(), "nope", "/w", "x"); err == nil {
 		t.Error("unknown agent should fail")
+	}
+}
+
+// slowStart blocks Start until release is closed.
+type slowStart struct {
+	*closeCounting
+	started, release chan struct{}
+}
+
+func (s *slowStart) Start(ctx context.Context, cwd string, sink Sink) (SessionInfo, error) {
+	close(s.started)
+	<-s.release
+	return s.closeCounting.Start(ctx, cwd, sink)
+}
+
+func TestDriverReplacedWhileStartingIsClosed(t *testing.T) {
+	m := NewManager(func(Event) {})
+	old := &slowStart{closeCounting: &closeCounting{fakeDriver: newFake("")}, started: make(chan struct{}), release: make(chan struct{})}
+	m.Register("gemini", old)
+	done := make(chan error, 1)
+	go func() {
+		_, err := m.Start(context.Background(), "gemini", t.TempDir())
+		done <- err
+	}()
+	<-old.started
+	m.Unregister("gemini") // settings saved while the chat starts
+	close(old.release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if old.closes != 1 {
+		t.Errorf("driver replaced during Start closed %d times on Close, want 1", old.closes)
+	}
+}
+
+// closeCounting records Close calls.
+type closeCounting struct {
+	*fakeDriver
+	closes int
+}
+
+func (c *closeCounting) Close() error {
+	c.closes++
+	return nil
+}
+
+func TestReplacedDriverKeepsItsSessions(t *testing.T) {
+	m := NewManager(func(Event) {})
+	old := &closeCounting{fakeDriver: newFake("")}
+	idle := &closeCounting{fakeDriver: newFake("")}
+	m.Register("gemini", old)
+	m.Register("other", idle)
+	if _, err := m.Start(context.Background(), "gemini", t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	next := &closeCounting{fakeDriver: newFake("")}
+	m.Register("gemini", next) // settings changed
+	m.Unregister("other")      // removed from settings
+	if got := m.Agents(); len(got) != 1 || got[0] != "gemini" {
+		t.Errorf("Agents() = %v, want [gemini]", got)
+	}
+	// The running session still talks to the driver that started it.
+	if err := m.Respond("s1", "p1", "yes"); err != nil {
+		t.Fatal(err)
+	}
+	if opt := <-old.answered; opt != "yes" {
+		t.Errorf("old driver got %q", opt)
+	}
+	if _, err := m.Start(context.Background(), "other", t.TempDir()); err == nil {
+		t.Error("an unregistered agent still starts")
+	}
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if old.closes != 1 || next.closes != 1 {
+		t.Errorf("Close: old closed %d times, new %d; want both once", old.closes, next.closes)
+	}
+	if idle.closes != 0 {
+		t.Errorf("a removed driver without sessions was kept and closed %d times", idle.closes)
+	}
+}
+
+// askingStart asks for permission while its session starts, under the id
+// the agent chose.
+type askingStart struct {
+	*fakeDriver
+	path string
+}
+
+func (a *askingStart) Start(ctx context.Context, cwd string, sink Sink) (SessionInfo, error) {
+	sink(Event{SessionID: "s1", Kind: KindPermission, Permission: &PermissionRequest{
+		ID: "p1", ToolCall: ToolCall{ID: "t1", Kind: ToolEdit, Paths: []string{a.path}},
+		Options: []PermissionOption{{ID: "no", Kind: RejectOnce}, {ID: "yes", Kind: AllowOnce}},
+	}})
+	return a.fakeDriver.Start(ctx, cwd, sink)
+}
+
+func (f *fakeDriver) stoppedIDs() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.stopped...)
+}
+
+func TestDuplicateSessionIDIsRefused(t *testing.T) {
+	rec := &recorder{}
+	m := NewManager(rec.emit)
+	first := newFake(ToolEdit)
+	// The second agent picks the same id and, while starting, asks to edit a
+	// file inside the first chat's folder but outside its own.
+	second := &askingStart{fakeDriver: newFake(""), path: "/first/src/a.go"}
+	m.Register("first", first)
+	m.Register("second", second)
+	if _, err := m.Start(context.Background(), "first", "/first"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Start(context.Background(), "second", "/second"); err == nil {
+		t.Fatal("a second chat under an open chat's id started")
+	}
+	if got := second.stoppedIDs(); len(got) != 1 || got[0] != "s1" {
+		t.Errorf("the refused session's driver stopped %v, want [s1]", got)
+	}
+	if got := first.stoppedIDs(); len(got) != 0 {
+		t.Errorf("the open chat was stopped: %v", got)
+	}
+	select {
+	case opt := <-second.answered:
+		t.Errorf("the colliding session's request was answered (%q) with the other chat's folder", opt)
+	case <-time.After(200 * time.Millisecond): // auto-approval answers on its own goroutine
+	}
+	if contains(rec.kinds(), KindPermission) {
+		t.Error("the colliding session's request reached the open chat")
+	}
+	// The open chat still answers to its own driver.
+	if err := m.Respond("s1", "p1", "yes"); err != nil {
+		t.Fatal(err)
+	}
+	if opt := <-first.answered; opt != "yes" {
+		t.Errorf("first driver got %q", opt)
+	}
+}
+
+func TestAutoApprovalUsesTheSessionsOwnFolder(t *testing.T) {
+	cwd := t.TempDir()
+	m := NewManager(func(Event) {})
+	// The request arrives before the session is registered; it is still
+	// judged against the folder the session was started in.
+	d := &askingStart{fakeDriver: newFake(""), path: cwd + "/src/a.go"}
+	m.Register("fake", d)
+	if _, err := m.Start(context.Background(), "fake", cwd); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case opt := <-d.answered:
+		if opt != "yes" {
+			t.Errorf("auto-approve picked %q", opt)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("an edit inside the session's folder was not auto-approved")
+	}
+}
+
+func TestSessionStartedDuringCloseIsStopped(t *testing.T) {
+	m := NewManager(func(Event) {})
+	d := &slowStart{closeCounting: &closeCounting{fakeDriver: newFake("")}, started: make(chan struct{}), release: make(chan struct{})}
+	m.Register("gemini", d)
+	done := make(chan error, 1)
+	go func() {
+		_, err := m.Start(context.Background(), "gemini", t.TempDir())
+		done <- err
+	}()
+	<-d.started
+	if err := m.Close(); err != nil { // quitting while the chat starts
+		t.Fatal(err)
+	}
+	close(d.release)
+	if err := <-done; !errors.Is(err, ErrClosed) {
+		t.Errorf("Start finishing after Close = %v, want ErrClosed", err)
+	}
+	if got := d.stoppedIDs(); len(got) != 1 || got[0] != "s1" {
+		t.Errorf("late session stopped %v, want [s1]", got)
+	}
+	if _, err := m.Start(context.Background(), "gemini", t.TempDir()); !errors.Is(err, ErrClosed) {
+		t.Errorf("Start after Close = %v, want ErrClosed", err)
 	}
 }

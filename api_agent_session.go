@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os/exec"
 	"time"
 
 	as "flint/internal/agentsession"
@@ -22,16 +23,18 @@ type AgentChatAPI struct {
 // newAgentManager builds the session manager with every installed driver.
 func newAgentManager(a *App) *as.Manager {
 	m := as.NewManager(func(e as.Event) { a.emit(eventAgentEvent, e) })
-	registerDrivers(m, func(cwd string) bool { return !a.isTrusted(cwd) }, a.agentConfig)
+	registerDrivers(m, a.untrusted, a.agentConfig)
+	syncCustomAgents(m, nil, a.currentSettings().CustomAgents, a.untrusted)
 	if p, ok := a.agentPolicy(); ok {
 		m.SetPolicy(p)
 	}
 	return m
 }
 
-// Agents lists the agents available for chat sessions.
+// Agents lists the agents available for chat sessions: the native CLIs found,
+// then the custom ACP agents whose command resolves.
 func (c *AgentChatAPI) Agents() []string {
-	return installedAgents(c.app.agents.Agents(), c.app.currentSettings().AgentConfigs())
+	return installedAgents(c.app.currentSettings(), exec.LookPath)
 }
 
 // Start opens a conversation with agent in cwd.
@@ -73,6 +76,9 @@ func (c *AgentChatAPI) SetPolicy(p as.Policy) error {
 	c.app.agents.SetPolicy(p)
 	return c.app.saveAgentPolicy(p)
 }
+
+// untrusted reports a folder in Restricted Mode, for the agent drivers.
+func (a *App) untrusted(cwd string) bool { return !a.isTrusted(cwd) }
 
 func (a *App) agentPolicy() (as.Policy, bool) {
 	a.stateMu.Lock()

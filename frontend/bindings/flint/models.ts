@@ -25,8 +25,19 @@ import * as testrun$0 from "./internal/testrun/models.js";
  * AgentInfo lists installed agents and the one Flint uses.
  */
 export class AgentInfo {
+    /**
+     * Available are the agents that can start: native CLIs first, then
+     * custom ACP agents.
+     */
     "available": string[];
     "preferred": string;
+
+    /**
+     * ConflictAgent resolves merge conflicts in a terminal: the preferred
+     * agent when it is a native CLI, else the first installed native one
+     * (custom ACP agents have no interactive terminal mode); "" when none.
+     */
+    "conflictAgent": string;
 
     /** Creates a new AgentInfo instance. */
     constructor($$source: Partial<AgentInfo> = {}) {
@@ -35,6 +46,9 @@ export class AgentInfo {
         }
         if (!("preferred" in $$source)) {
             this["preferred"] = "";
+        }
+        if (!("conflictAgent" in $$source)) {
+            this["conflictAgent"] = "";
         }
 
         Object.assign(this, $$source);

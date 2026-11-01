@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"flint/internal/acp/acptest"
 )
 
 type recordedUpdate struct {
@@ -117,7 +119,7 @@ func fakeOptions(t *testing.T, mode string) Options {
 	}
 	return Options{
 		Command:       exe,
-		Env:           []string{fakeAgentEnv + "=1", fakeModeEnv + "=" + mode},
+		Env:           append(acptest.Env(mode), acptest.ClientNameEnv("flint-test")),
 		ClientName:    "flint-test",
 		ClientVersion: "0.1.0",
 	}
@@ -565,4 +567,43 @@ func TestCallWithCancelledContext(t *testing.T) {
 	if err := c.SetMode(ctx, "sess_x", "plan"); !errors.Is(err, context.Canceled) {
 		t.Errorf("SetMode = %v", err)
 	}
+}
+
+// stuckReader is a handler whose file reads ignore cancellation, like one
+// blocked opening a FIFO.
+type stuckReader struct {
+	*testHandler
+	reading chan struct{}
+	release chan struct{}
+}
+
+func (h *stuckReader) ReadTextFile(context.Context, ReadTextFileRequest) (string, error) {
+	h.reading <- struct{}{}
+	<-h.release
+	return "", errors.New("released")
+}
+
+func TestCloseDoesNotWaitForAStuckHandler(t *testing.T) {
+	baseline := runtime.NumGoroutine()
+	h := &stuckReader{testHandler: newTestHandler(), reading: make(chan struct{}, 1), release: make(chan struct{})}
+	c, err := Start(testCtx(t), fakeOptions(t, ""), h)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	sid := newSession(t, c)
+	go func() {
+		_, _ = c.Prompt(context.Background(), sid, []ContentBlock{TextBlock("full"), ResourceLinkBlock("file:///x", "x")})
+	}()
+	select {
+	case <-h.reading:
+	case <-time.After(10 * time.Second):
+		t.Fatal("agent never read a file")
+	}
+	start := time.Now()
+	_ = c.Close()
+	if took := time.Since(start); took > killGrace+handlerGrace+time.Second {
+		t.Errorf("Close took %v with a stuck handler", took)
+	}
+	close(h.release)
+	assertNoLeaks(t, baseline)
 }

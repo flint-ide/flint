@@ -94,18 +94,11 @@ func CheckModel(model string) error {
 // values that never name a flag Flint sets itself, and never "--", which
 // would turn Flint's own flags after it into plain arguments.
 func CheckArgs(k Kind, args []string) error {
-	if len(args) > MaxArgs {
-		return fmt.Errorf("too many arguments (max %d)", MaxArgs)
+	if err := CheckPlainArgs(args); err != nil {
+		return err
 	}
 	for i, a := range args {
-		switch {
-		case a == "":
-			return errors.New("empty argument")
-		case len(a) > MaxArgLen:
-			return fmt.Errorf("argument longer than %d characters", MaxArgLen)
-		case strings.ContainsFunc(a, unicode.IsControl):
-			return fmt.Errorf("argument %q contains a newline or control character", a)
-		case a == "--":
+		if a == "--" {
 			return errors.New(`"--" is not allowed: Flint's own flags follow the extra arguments`)
 		}
 		if flag := reservedFlag(k, a); flag != "" {
@@ -115,6 +108,26 @@ func CheckArgs(k Kind, args []string) error {
 			if key := reservedConfigKey(configOverride(args, i)); key != "" {
 				return fmt.Errorf("-c %s is set by Flint and cannot be changed in the extra arguments", key)
 			}
+		}
+	}
+	return nil
+}
+
+// CheckPlainArgs validates the arguments of a command Flint adds no flags of
+// its own to (a custom ACP agent): a bounded list of non-empty, single-line
+// values.
+func CheckPlainArgs(args []string) error {
+	if len(args) > MaxArgs {
+		return fmt.Errorf("too many arguments (max %d)", MaxArgs)
+	}
+	for _, a := range args {
+		switch {
+		case a == "":
+			return errors.New("empty argument")
+		case len(a) > MaxArgLen:
+			return fmt.Errorf("argument longer than %d characters", MaxArgLen)
+		case strings.ContainsFunc(a, unicode.IsControl):
+			return fmt.Errorf("argument %q contains a newline or control character", a)
 		}
 	}
 	return nil

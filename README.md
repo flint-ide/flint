@@ -22,6 +22,7 @@ The full reference, with every detail and all keyboard shortcuts, is in [docs/FE
 
 **AI agents**
 - Native Claude Code and Codex chat drivers, no npm: streamed responses, tool calls with mini diffs, plan, changed files, token usage and cost
+- Any other agent with an Agent Client Protocol mode (Gemini CLI, OpenCode, …), added in Settings with no code
 - *Fix with agent* on any LSP problem, `⌘L` to send a selection or terminal output to the chat
 - Generated commit messages and agent-assisted merge conflict resolution
 

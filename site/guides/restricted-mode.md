@@ -22,6 +22,7 @@ In an untrusted folder, Flint:
 | Rust language server | Doesn't start | rust-analyzer runs build scripts, proc macros and tools from `.cargo/config` |
 | Python language servers | Don't start | They run the virtualenv interpreter the project points at |
 | Agents (chat and commit messages) | Run without the project's agent settings and hooks, and without your extra agent arguments from Settings | Claude Code gets `--setting-sources user`, because its non-interactive mode skips its own trust prompt; an argument such as `--mcp-config` with a relative path would load the project's files |
+| Custom ACP agents | Don't start; Flint asks you to trust the folder | Flint can't tell an arbitrary agent to ignore the project's configuration (its settings, MCP servers, hooks) |
 | Language servers set in Settings | A server Flint doesn't know doesn't start; extra arguments are left out | Flint can't tell what another server runs |
 | Git | Runs without hooks, even on commit and push | Hooks are programs from the repository |
 

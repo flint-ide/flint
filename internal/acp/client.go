@@ -26,6 +26,9 @@ const (
 	exitGrace = 2 * time.Second
 	// killGrace is how long Close waits after SIGTERM before SIGKILL.
 	killGrace = 3 * time.Second
+	// handlerGrace is how long the shutdown waits for request handlers that
+	// were cancelled but haven't returned (one stuck in a system call).
+	handlerGrace = 2 * time.Second
 )
 
 const (
@@ -111,11 +114,29 @@ func Start(ctx context.Context, opts Options, h Handler) (*Client, error) {
 		return nil, err
 	}
 	if err := c.initialize(ctx, opts); err != nil {
-		_ = c.Close()
-		return nil, err
+		// The agent has done nothing worth a graceful stop, and a hung one
+		// (it may ignore SIGTERM) must not add the grace period to the
+		// caller's timeout: kill the whole tree at once.
+		c.kill()
+		return nil, &HandshakeError{Err: err, Stderr: c.stderr.Tail(stderrInError)}
 	}
 	return c, nil
 }
+
+// HandshakeError is returned by Start when the `initialize` handshake fails.
+// Stderr is the tail of what the agent printed, which often says why (a
+// login prompt, an unknown flag); Error leaves it out so callers decide how
+// much of it to show.
+type HandshakeError struct {
+	Err    error
+	Stderr string
+}
+
+// Error implements error.
+func (e *HandshakeError) Error() string { return e.Err.Error() }
+
+// Unwrap exposes the cause (context.DeadlineExceeded for a timeout).
+func (e *HandshakeError) Unwrap() error { return e.Err }
 
 func spawn(path string, opts Options, env []string, h Handler) (*Client, error) {
 	cmd := exec.Command(path, opts.Args...)
@@ -211,7 +232,18 @@ func (c *Client) supervise() {
 
 	c.err = c.finalError(waitErr)
 	c.conn.shutdown(c.err)
-	c.conn.waitHandlers()
+	// Handlers are cancelled now. One that ignores that (blocked reading a
+	// FIFO, say) must not keep Close, a one-shot run or quitting Flint
+	// waiting; its late reply goes to a closed pipe.
+	handlersDone := make(chan struct{})
+	go func() {
+		c.conn.waitHandlers()
+		close(handlersDone)
+	}()
+	select {
+	case <-handlersDone:
+	case <-time.After(handlerGrace):
+	}
 	close(c.done)
 }
 
@@ -328,9 +360,7 @@ func (c *Client) Err() error {
 // goroutine has exited. It is safe to call more than once.
 func (c *Client) Close() error {
 	c.closeOnce.Do(func() {
-		c.closing.Store(true)
-		c.conn.shutdown(ErrClosed)
-		_ = c.stdin.Close()
+		c.beginClose()
 		_ = terminateTree(c.cmd.Process)
 		select {
 		case <-c.done:
@@ -340,6 +370,22 @@ func (c *Client) Close() error {
 	})
 	<-c.done
 	return nil
+}
+
+// kill is Close without the grace period: SIGKILL for the whole tree.
+func (c *Client) kill() {
+	c.closeOnce.Do(func() {
+		c.beginClose()
+		_ = killTree(c.cmd.Process)
+	})
+	<-c.done
+}
+
+// beginClose fails pending calls and closes the agent's stdin.
+func (c *Client) beginClose() {
+	c.closing.Store(true)
+	c.conn.shutdown(ErrClosed)
+	_ = c.stdin.Close()
 }
 
 func orDefault(v, def string) string {

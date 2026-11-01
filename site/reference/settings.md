@@ -52,6 +52,9 @@ The file is readable only by your user. It never contains secrets: database pass
     },
     "codex": { "path": "", "model": "", "args": ["-c", "model_reasoning_effort=high"] }
   },
+  "customAgents": [
+    { "id": "gemini", "name": "Gemini CLI", "command": "gemini", "args": ["--experimental-acp"] }
+  ],
   "languageServers": {
     "python": { "disabled": false, "command": "pylsp", "args": [] },
     "rust": { "disabled": true, "command": "", "args": [] }
@@ -68,13 +71,14 @@ The file is readable only by your user. It never contains secrets: database pass
 | `theme` | string | `"dark"` | `"dark"`, `"light"` or `"system"` (follows the macOS appearance). |
 | `editor` | object | see below | Font for all editors: files, diffs and scratchpads. |
 | `terminal` | object | see below | Font for terminals and run consoles. |
-| `defaultAgent` | string | `""` | Agent for new chats, commit messages and conflict resolution: `"claude"` or `"codex"`. Empty means the first installed agent. |
+| `defaultAgent` | string | `""` | Agent for new chats, commit messages and conflict resolution: `"claude"`, `"codex"` or the `id` of a custom agent. Empty means the first installed agent. Conflict resolution always uses Claude Code or Codex. |
 | `autoSave` | boolean | `false` | Save modified files when the Flint window loses focus. |
 | `notifyInBackground` | boolean | `true` | Show a macOS notification and a Dock badge when a run, a test run or an agent finishes while Flint is in the background. |
 | `checkForUpdates` | boolean | `true` | Once a day, ask GitHub whether a newer Flint release exists and show a notice in the status bar. When `false`, Flint makes no request on its own; **Help ▸ Check for Updates…** still works. See [Update check](privacy-and-security.md#update-check). |
 | `keymap` | object | `{}` | Shortcut overrides: command id → shortcut. See [keymap](#keymap). |
 | `todoExclude` | array of strings | `[]` | Extra folders or globs the TODO list skips. See [todoExclude](#todoexclude). |
 | `agents` | object | `{}` | Agent CLIs by name (`"claude"`, `"codex"`). See [agents](#agents). |
+| `customAgents` | array | `[]` | Other agents, spoken to over the Agent Client Protocol. See [customAgents](#customagents). |
 | `languageServers` | object | `{}` | Language servers by language (`"go"`, `"typescript"`, `"python"`, `"rust"`). See [languageServers](#languageservers). |
 | `refresh` | object | see below | How often polling panels re-read their data. See [refresh](#refresh). |
 
@@ -139,6 +143,21 @@ Extra arguments are placed before Flint's own flags, so where a CLI lets a repea
 - be more than 32 arguments or longer than 512 characters each.
 
 In [Restricted Mode](../guides/restricted-mode.md) the extra arguments are left out, because a flag such as `--mcp-config` or `--add-dir` with a relative path would load the project's files.
+
+### customAgents
+
+Each entry is an agent Flint starts and talks to over the [Agent Client Protocol](https://agentclientprotocol.com). See [Other agents (ACP)](../guides/ai-agents.md#other-agents-acp).
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `id` | string | required | Names the agent in menus and in `defaultAgent`. Lowercase letters, digits and dashes, starting with a letter, up to 32 characters; not `claude` or `codex`; unique. |
+| `name` | string | `""` | Shown in Settings. Empty shows the id. Up to 64 characters, no control characters or surrounding spaces. |
+| `command` | string | required | The executable: a command name looked up on your login shell's `PATH`, or an absolute path. A path relative to the project, or one starting with `-`, is refused. |
+| `args` | array of strings | `[]` | Arguments that start the CLI in its ACP mode, for example `["--experimental-acp"]` for `gemini` or `["acp"]` for `opencode`. At most 32, each non-empty, single-line and up to 512 characters. |
+
+At most 16 custom agents. When the file is loaded, an invalid entry is dropped as a whole (half an entry could start the wrong command), as is a second entry with the same id; a `defaultAgent` that pointed at a dropped entry falls back to the first installed agent.
+
+There is no key for environment variables: `settings.json` is plain text, so it must not hold API keys. Log in with the agent's own command instead. Custom agents start only in trusted folders.
 
 ### languageServers
 

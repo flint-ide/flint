@@ -90,6 +90,11 @@ type App struct {
 	closeMu      sync.Mutex
 	quitting     bool
 	closeAskedAt time.Time
+
+	confirmMu sync.Mutex      // one confirmation dialog at a time
+	confirmed map[string]bool // custom agent command lines the user allowed a Check of, this session
+	// ask replaces the native confirmation dialog (askNative) in tests.
+	ask func(title, message, ok string) bool
 }
 
 // NewApp wires services from the config directory.

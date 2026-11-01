@@ -43,7 +43,7 @@ flowchart LR
   subgraph EXT["External processes and services"]
     direction TB
     bins["rg · git · gh · gopls / rust-analyzer / …"]
-    agents["claude -p stream-json · codex app-server"]
+    agents["claude -p stream-json · codex app-server · ACP agents (stdio)"]
     shell["login shell (zsh)"]
     clis["docker · aws · kubectl"]
     dbs[("PostgreSQL · ClickHouse")]
@@ -80,6 +80,15 @@ flowchart LR
 - `fuzzy.Index` keeps a file list per root; with several roots it searches a combined `label/path` list (labels: `workspace.Labels`; in the UI, `lib/workspaceRoots.ts`).
 - `SearchAPI.Start` receives the list of roots (`search.RunRoots`, with a shared result limit), and every match carries its root. `git:changed` carries the root it concerns.
 - Run configurations, tests and the debugger receive the root from the frontend (`RunAPI.Configs(root)`, `Start(id, root, …)`), so Go has no notion of a "current" project.
+
+### Agents
+
+- `AgentChatAPI` runs chats through `agentsession.Manager`, which routes each session to a registered driver and applies the approval policy to its permission requests (`agents_registry.go`).
+- Native drivers (`agentsession/claude`, `agentsession/codex`) are registered once and read their settings on every start.
+- Custom agents (`customAgents` in settings.json) are ACP agents: each gets one `acpdriver.Driver`, registered at startup and again whenever settings are saved (`syncCustomAgents`). A replaced or removed driver keeps the sessions it runs until they stop, and is still closed on quit. Adding an agent CLI with an ACP mode needs no code.
+- The agent lists (chat menus, default-agent pickers, `AgentAPI.Info`) are the native CLIs found on the login PATH, then the custom agents whose command resolves.
+- One-shot work goes through `AgentAPI`: commit messages run `agent.Headless` (`claude -p`, `codex exec`) or, for a custom agent, `acpdriver.Headless` (a fresh ACP session that declines every permission request and refuses writes). Conflict resolution types an interactive command into a terminal, so it always uses a native agent (`AgentInfo.conflictAgent`).
+- `SettingsAPI.ProbeCustomAgent` runs only the ACP `initialize` handshake of a saved custom agent, in an empty temporary folder, for the Check button. Settings are written by the web view, so before a command line runs for the first time in a session Go shows a native dialog with that exact command line; the UI cannot answer or skip it.
 
 ### File operations
 
@@ -165,8 +174,17 @@ Flint is a local desktop app that opens arbitrary folders, runs CLIs on your beh
 
 A cloned repository can contain configuration that executes code: git filters and hooks, language-server settings, agent settings and hooks.
 
-- A folder opened for the first time is in **Restricted Mode** until the user trusts it. Trust is enforced in Go, not only in the UI: the LSP manager refuses code-running servers (rust-analyzer, Python) for untrusted roots, agent runs get `--setting-sources user`, and git calls in untrusted folders run with `core.hooksPath=/dev/null`; the frontend only adds the banner and holds back the automatic terminal. Trusted folders are stored in `state.json` and can be revoked from the command palette. See [FEATURES.md](FEATURES.md#restricted-mode-workspace-trust).
+- A folder opened for the first time is in **Restricted Mode** until the user trusts it. Trust is enforced in Go, not only in the UI: the LSP manager refuses code-running servers (rust-analyzer, Python) for untrusted roots, agent runs get `--setting-sources user`, custom ACP agents refuse to start (`acpdriver.ErrRestricted`: Flint can't make them ignore the project's configuration), and git calls in untrusted folders run with `core.hooksPath=/dev/null`; the frontend only adds the banner and holds back the automatic terminal. Trusted folders are stored in `state.json` and can be revoked from the command palette. See [FEATURES.md](FEATURES.md#restricted-mode-workspace-trust).
 - Regardless of trust, every git call Flint makes switches off the clean/smudge filters and textconv drivers defined in the repository's own config (including included files) with `-c key=` overrides, and disables fsmonitor (`internal/git`). typescript-language-server fails closed unless it can be pinned to its own TypeScript.
+
+### Agents over ACP
+
+A custom agent is a binary the user configured, so it runs with the user's rights like the native CLIs; Flint limits what it hands the agent on top of that:
+
+- It starts with Flint's environment (the login shell's `PATH`); settings have no environment field, so no keys are stored in `settings.json`.
+- The client offers file reads and writes (`fs/read_text_file`, `fs/write_text_file`) but no terminal. Paths must be absolute and stay inside the session folder after resolving symlinks (checked again right before the file is opened). Reads take regular files up to 10 MB. Writes into a `.git` directory or file at any depth are refused, writes into the other protected folders (`.claude`, `.codex`, `.vscode`, `.idea`) are shown to the user as a permission request, and every write goes through a temporary file and a rename, so a hard link never carries it out of the project.
+- Every `session/request_permission` goes through `agentsession.Manager`: the user's approval policy answers what it allows (by default edits and reads of known paths inside the project, outside `.git` and agent config folders) and the chat asks about the rest, exactly as for Claude Code and Codex. One-shot runs (commit messages) decline every request.
+- The agent runs in its own process group (`Setpgid`), which also holds the processes it starts (gemini-cli relaunches itself as a child that shares its stdio); stopping a chat, a one-shot run or Flint sends SIGTERM to the group and SIGKILL after a grace period. An agent that misses the `initialize` handshake gets SIGKILL at once, so the Check returns right after its timeout.
 
 ### Untrusted rendered content
 
@@ -198,14 +216,14 @@ Every other connection is the result of a user action or of a CLI the user runs.
 
 ### Dev-only server mode
 
-`make server` / `wails3 task server` builds Flint with the `server` tag and serves the UI to a browser over HTTP. It exposes every binding on localhost **with no authentication**. It is a development tool only and must never run on a shared machine. See [DEVELOPMENT.md](DEVELOPMENT.md#server-mode-dev-only).
+`make server` / `wails3 task server` builds Flint with the `server` tag and serves the UI to a browser over HTTP. It exposes every binding on localhost **with no authentication**. It is a development tool only and must never run on a shared machine. It has no native dialogs, so confirmations that guard a binding against the web view (the custom agent Check) are skipped there: anyone who can reach it can already open a terminal. See [DEVELOPMENT.md](DEVELOPMENT.md#server-mode-dev-only).
 
 ## Where Flint stores data
 
 | What | Where | Notes |
 |---|---|---|
 | Recent folders, agent permission policy, trusted folders, whether the first-run tool check was shown, update check (last check time, the latest release found, the skipped version) | `~/Library/Application Support/flint/state.json` | the preferred agent stored here before `settings.json` existed is read from it until you pick a default in Settings |
-| Settings: theme, editor and terminal fonts, default agent, autosave, shortcut overrides (`keymap`: command id → shortcut, `""` = none), agent CLIs (`agents`), language servers (`languageServers`), panel refresh intervals (`refresh`) | `~/Library/Application Support/flint/settings.json` | has a schema version; missing keys get defaults, unknown keys are ignored, invalid values are replaced with defaults on load (writes validate strictly); `0600`; **no secrets**. A copy for the first render lives in `localStorage` (`flint.settings`) |
+| Settings: theme, editor and terminal fonts, default agent, autosave, shortcut overrides (`keymap`: command id → shortcut, `""` = none), agent CLIs (`agents`), custom ACP agents (`customAgents`: id, name, command, arguments), language servers (`languageServers`), panel refresh intervals (`refresh`) | `~/Library/Application Support/flint/settings.json` | has a schema version; missing keys get defaults, unknown keys are ignored, invalid values are replaced with defaults on load (writes validate strictly); `0600`; **no secrets**. A copy for the first render lives in `localStorage` (`flint.settings`) |
 | Database connection profiles (host, port, user, optional default database, ClickHouse protocol `native`/`http`, TLS, read-only) | `~/Library/Application Support/flint/connections.json` | **no passwords**, mode `0600` |
 | Database passwords | macOS Keychain, service `flint-db`, account = connection id | deleted together with the profile |
 | Scratchpads (SQL consoles, notes) | `~/Library/Application Support/flint/scratch/`: `index.json` (including the selected connection `connId` and database `database`; empty = the profile default) plus `<id>.sql/.md/.txt` | autosaved |
@@ -279,9 +297,10 @@ internal/agent              claude / codex: headless runs and interactive comman
 internal/shellenv           PATH from the login shell (git hooks, brew, nvm inside a GUI app)
 internal/watcher            FSEvents + debounce
 internal/lsp                LSP client (JSON-RPC, Content-Length), server manager
-internal/acp                Agent Client Protocol client (newline-delimited JSON-RPC)
+internal/acp                Agent Client Protocol client (newline-delimited JSON-RPC); acptest: a fake agent for tests
 internal/agentsession       shared agent event model, approval policy, session manager
-  claude/ codex/ acpdriver/ native agent drivers
+  claude/ codex/            native agent drivers
+  acpdriver/                ACP agents from settings: chat sessions, one-shot runs, the Check handshake
 frontend/bindings           generated TypeScript bindings of the Go services (do not edit)
 frontend/src/wails          compatibility layer over the bindings and the Wails runtime
 frontend/src                React: store (createStore + event bus), components, lib, commands, panels (sidebar registry)

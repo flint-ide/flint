@@ -12,7 +12,7 @@ Apart from the update check, data leaves your Mac only when you do something tha
 
 | Action | What is sent | Where |
 |---|---|---|
-| Agent chat, Generate message, Resolve with agent, Diagnose with AI | Your messages, the context you attach, and whatever the agent reads | Your AI provider, through the `claude` or `codex` CLI and your own account |
+| Agent chat, Generate message, Resolve with agent, Diagnose with AI | Your messages, the context you attach, and whatever the agent reads | Your AI provider, through the `claude` or `codex` CLI or a custom ACP agent you added, and your own account |
 | Pull request review | Requests for pull requests, and your comments and reviews when you post them | GitHub, through the `gh` CLI |
 | Help ▸ Report an Issue… | A prefilled issue that you review in your browser before submitting | GitHub, only when you submit |
 | HTTP client | The request you send | The server in the request |

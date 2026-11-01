@@ -53,7 +53,7 @@ async function targetChat(root: string): Promise<string | null> {
   if (found) return found
   const agent = useAgent.getState().preferred || chat.agents[0]
   if (!agent) {
-    showToast('No agent installed (claude or codex)', 'error')
+    showToast('No agent installed: install claude or codex, or add one in Settings ▸ Agents', 'error')
     return null
   }
   return chat.start(agent, root)

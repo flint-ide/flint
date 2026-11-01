@@ -26,7 +26,8 @@ func (s *SettingsAPI) Defaults() settings.Settings { return settings.Default() }
 
 // Save validates and stores the settings, returning what was written. The native
 // window follows a theme change right away and changed language servers restart;
-// agent settings are read when a session starts.
+// agent settings are read when a session starts, and custom agents are
+// registered again (running chats keep theirs).
 func (s *SettingsAPI) Save(next settings.Settings) (settings.Settings, error) {
 	a := s.app
 	a.settingsMu.Lock()
@@ -34,6 +35,8 @@ func (s *SettingsAPI) Save(next settings.Settings) (settings.Settings, error) {
 	saved, err := settings.Save(settings.Path(a.configDir), next)
 	if err == nil {
 		a.settings = saved
+		// Under settingsMu, so two saves register in the order they were written.
+		syncCustomAgents(a.agents, prev.CustomAgents, saved.CustomAgents, a.untrusted)
 	}
 	a.settingsMu.Unlock()
 	if err != nil {
@@ -57,6 +60,12 @@ func (s *SettingsAPI) Save(next settings.Settings) (settings.Settings, error) {
 // would), so Settings can show the error next to the field.
 func (s *SettingsAPI) CheckAgent(name string, a settings.AgentSettings) string {
 	return errorText(settings.CheckAgent(name, a))
+}
+
+// CheckCustomAgents reports why a list of custom agents would not be saved
+// ("" when it would).
+func (s *SettingsAPI) CheckCustomAgents(list []settings.CustomAgent) string {
+	return errorText(settings.CheckCustomAgents(list))
 }
 
 // CheckLanguageServer reports why a language server's settings would not be

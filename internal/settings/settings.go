@@ -1,5 +1,6 @@
 // Package settings holds the user's preferences (settings.json in the config
 // directory): theme, editor and terminal fonts, the default agent, agent CLIs,
+// custom ACP agents,
 // language servers, refresh intervals, keyboard shortcut overrides and whether
 // to look for new releases. Loading is forgiving (a hand-edited file never stops Flint
 // from starting: bad values fall back to defaults, unknown keys are ignored);
@@ -65,8 +66,8 @@ type Settings struct {
 	Theme    string `json:"theme"`
 	Editor   Font   `json:"editor"`
 	Terminal Font   `json:"terminal"`
-	// DefaultAgent starts new agent chats ("claude" / "codex"); empty means the
-	// first installed one.
+	// DefaultAgent starts new agent chats ("claude", "codex" or a custom
+	// agent's id); empty means the first installed one.
 	DefaultAgent string `json:"defaultAgent"`
 	// AutoSave saves modified files when the window loses focus.
 	AutoSave bool `json:"autoSave"`
@@ -85,6 +86,8 @@ type Settings struct {
 	TodoExclude []string `json:"todoExclude"`
 	// Agents configures the agent CLIs by name ("claude", "codex").
 	Agents map[string]AgentSettings `json:"agents"`
+	// CustomAgents are ACP agents added by the user (see CustomAgent).
+	CustomAgents []CustomAgent `json:"customAgents"`
 	// LanguageServers configures language servers by language ("go", …).
 	LanguageServers map[string]LanguageServerSettings `json:"languageServers"`
 	// Refresh sets how often polling panels re-read their data.
@@ -111,6 +114,7 @@ func Default() Settings {
 		Keymap:             map[string]string{},
 		TodoExclude:        []string{},
 		Agents:             map[string]AgentSettings{},
+		CustomAgents:       []CustomAgent{},
 		LanguageServers:    map[string]LanguageServerSettings{},
 		Refresh:            defaultRefresh(),
 	}
@@ -158,7 +162,8 @@ func Normalize(s Settings) Settings {
 	}
 	out.Editor = normalizeFont(s.Editor, def.Editor)
 	out.Terminal = normalizeFont(s.Terminal, def.Terminal)
-	if !validAgent(s.DefaultAgent) {
+	out.CustomAgents = normalizeCustomAgents(s.CustomAgents)
+	if !validAgent(s.DefaultAgent, out.CustomAgents) {
 		out.DefaultAgent = ""
 	}
 	out.Keymap = make(map[string]string, len(s.Keymap))
@@ -218,7 +223,10 @@ func Validate(s Settings) error {
 			return fmt.Errorf("%s: %w", f.name, err)
 		}
 	}
-	if !validAgent(s.DefaultAgent) {
+	if err := validateCustomAgents(s.CustomAgents); err != nil {
+		return err
+	}
+	if !validAgent(s.DefaultAgent, s.CustomAgents) {
 		return fmt.Errorf("unsupported agent %q", s.DefaultAgent)
 	}
 	if len(s.Keymap) > maxKeymapEntries {
@@ -298,8 +306,10 @@ func validLineHeight(h float64) bool {
 	return !math.IsNaN(h) && h >= MinLineHeight && h <= MaxLineHeight
 }
 
-func validAgent(name string) bool {
-	return name == "" || agent.Valid(agent.Kind(name))
+// validAgent: empty (the first installed), a built-in agent or a custom one.
+func validAgent(name string, custom []CustomAgent) bool {
+	return name == "" || agent.Valid(agent.Kind(name)) ||
+		slices.ContainsFunc(custom, func(c CustomAgent) bool { return c.ID == name })
 }
 
 // keysPattern matches shortcuts in the frontend's notation ('Mod+Shift+P',

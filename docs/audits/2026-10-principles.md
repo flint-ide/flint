@@ -21,7 +21,7 @@ Recommendations: drive the macOS `security` tool directly instead of go-keyring,
 
 ## 2. Simplicity — 3/5
 
-- `internal/acp` (about 1,900 lines) and `agentsession/acpdriver` (381 lines) are not registered anywhere.
+- `internal/acp` (about 1,900 lines) and `agentsession/acpdriver` (381 lines) are not registered anywhere. *Settled since: ACP agents are added from settings (`customAgents`) and registered by `syncCustomAgents`.*
 - `ringbuffer.go`, `linereader.go` and `process_{unix,other}.go` exist three times (acp, claude, codex); LSP and DAP each implement the same Content-Length framing.
 - Agents are invoked three ways: chat drivers, `agent.Headless` (commit messages), and a command typed into a terminal (conflict resolution).
 - `style.css` is 4,371 lines; `log.Printf` and `slog` are mixed.

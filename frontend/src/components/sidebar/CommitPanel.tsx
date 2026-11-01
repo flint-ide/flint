@@ -6,6 +6,7 @@ import { rootLabels } from '../../lib/workspaceRoots'
 import { showToast } from '../../store/dialog'
 import { resolveConflictsWithAgent, suggestCommitMessage, useAgent } from '../../store/agent'
 import { errorMessage } from '../../api/backend'
+import { conflictHint } from '../../lib/customAgents'
 import { Select } from '../ui/Select'
 import { openStashDialog } from '../../store/stash'
 import { StashSection } from './StashSection'
@@ -113,8 +114,8 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
       {status?.operation && (
         <div className="git-banner">
           <span>{capitalize(status.operation)} in progress{conflicted.length ? ` · ${conflicted.length} conflict(s)` : ''}</span>
-          {conflicted.length > 0 && agents.preferred && (
-            <button className="link" onClick={resolveWithAgent}>Resolve with {agents.preferred}</button>
+          {conflicted.length > 0 && agents.conflictAgent && (
+            <button className="link" onClick={resolveWithAgent} title={conflictHint(agents.preferred, agents.conflictAgent)}>Resolve with {agents.conflictAgent}</button>
           )}
         </div>
       )}
@@ -139,13 +140,13 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
                   />
                 )}
                 <span className="group-title">{g.title}</span>
-                {g.key === 'conflicts' && agents.preferred && (
+                {g.key === 'conflicts' && agents.conflictAgent && (
                   <button
                     className="link agent-action"
-                    title={`Start ${agents.preferred} in a new terminal to resolve these conflicts`}
+                    title={conflictHint(agents.preferred, agents.conflictAgent)}
                     onClick={(e) => (e.stopPropagation(), resolveWithAgent())}
                   >
-                    ✦ Resolve with {agents.preferred}
+                    ✦ Resolve with {agents.conflictAgent}
                   </button>
                 )}
                 <span className="badge">{g.files.length}</span>

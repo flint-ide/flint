@@ -225,6 +225,7 @@ func (s Settings) Clone() Settings {
 	}
 	out.TodoExclude = cloneArgs(s.TodoExclude)
 	out.Agents = cloneAgents(s.Agents)
+	out.CustomAgents = cloneCustomAgents(s.CustomAgents)
 	out.LanguageServers = cloneLanguageServers(s.LanguageServers)
 	return out
 }

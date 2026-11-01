@@ -13,6 +13,8 @@ import { ROLLUP_GLYPH, checksSummary, countChecks, reviewStateLabel, rollup, sta
 import { HtmlBody } from './ReviewThread'
 import { ReviewBar } from './ReviewBar'
 import { useWindowFocus } from './useWindowFocus'
+import { FailedCheckActions, FixWithAgentButton } from './CIStatus'
+import type { FixTarget } from '../../store/ci'
 
 const STATUS_LETTER: Record<string, string> = { added: 'A', removed: 'D', modified: 'M', renamed: 'R', copied: 'C', changed: 'T' }
 const STATUS_KIND: Record<string, string> = { added: 'added', removed: 'deleted', modified: 'modified', renamed: 'renamed', copied: 'copied' }
@@ -75,7 +77,7 @@ export function PullRequestView({ tab, active }: { tab: PullRequestTab; active: 
           {entry.error && <div className="error selectable">{entry.error}</div>}
         </div>
 
-        <Checks checks={d.checks} />
+        <Checks root={tab.root} details={d} />
 
         <section className="pr-section">
           {d.bodyHtml ? <HtmlBody html={d.bodyHtml} className="pr-description" /> : <div className="muted">No description.</div>}
@@ -90,11 +92,13 @@ export function PullRequestView({ tab, active }: { tab: PullRequestTab; active: 
   )
 }
 
-function Checks({ checks }: { checks: PullRequestCheck[] }) {
+function Checks({ root, details }: { root: string; details: PullRequestDetails }) {
+  const checks: PullRequestCheck[] = details.checks
   const [open, setOpen] = useState(false)
   const counts = useMemo(() => countChecks(checks), [checks])
   const state = rollup(counts)
   if (checks.length === 0) return null
+  const target: FixTarget = { root, pr: { number: details.number, title: details.title, url: details.url }, checks }
   return (
     <section className="pr-section">
       <div className="pr-section-title clickable" onClick={() => setOpen(!open)}>
@@ -102,6 +106,12 @@ function Checks({ checks }: { checks: PullRequestCheck[] }) {
         <span className={`pr-ci ${state}`}>{ROLLUP_GLYPH[state]}</span>
         <span>Checks</span>
         <span className="muted">{checksSummary(counts)}</span>
+        {state === 'failure' && checks.some((c) => c.state === 'failure' && c.runId > 0) && (
+          <>
+            <span className="spacer" />
+            <FixWithAgentButton target={target} />
+          </>
+        )}
       </div>
       {open &&
         checks.map((c, i) => (
@@ -113,6 +123,7 @@ function Checks({ checks }: { checks: PullRequestCheck[] }) {
             </span>
             <span className="spacer" />
             <span className="muted">{(c.conclusion || c.status).toLowerCase().replace(/_/g, ' ')}</span>
+            <FailedCheckActions root={root} check={c} target={target} />
             {c.url && (
               <button className="link" onClick={() => openInBrowser(c.url)}>Details ↗</button>
             )}

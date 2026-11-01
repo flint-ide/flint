@@ -9,10 +9,11 @@ import { LanguageServersSection } from './LanguageServersSection'
 import { RefreshSection } from './RefreshSection'
 import { McpServerSection } from './McpServerSection'
 import { EditorAiSection } from './EditorAiSection'
+import { CISection } from './CISection'
 import { NumberField, Row, TextField } from './fields'
 import { openVSCodeImport } from '../../store/vscodeImport'
 
-type Section = 'appearance' | 'editor' | 'terminal' | 'agents' | 'agentContext' | 'editorAi' | 'lsp' | 'refresh' | 'todo' | 'keymap' | 'updates' | 'import'
+type Section = 'appearance' | 'editor' | 'terminal' | 'agents' | 'agentContext' | 'editorAi' | 'lsp' | 'refresh' | 'ci' | 'todo' | 'keymap' | 'updates' | 'import'
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
@@ -23,6 +24,7 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: 'editorAi', label: 'AI in the Editor' },
   { id: 'lsp', label: 'Language Servers' },
   { id: 'refresh', label: 'Refresh' },
+  { id: 'ci', label: 'CI' },
   { id: 'todo', label: 'TODO List' },
   { id: 'keymap', label: 'Keymap' },
   { id: 'updates', label: 'Updates' },
@@ -53,6 +55,7 @@ export function SettingsView({ active }: { active: boolean }) {
         {section === 'editorAi' && <EditorAiSection />}
         {section === 'lsp' && <LanguageServersSection />}
         {section === 'refresh' && <RefreshSection />}
+        {section === 'ci' && <CISection />}
         {section === 'todo' && <TodoSection />}
         {section === 'keymap' && <KeymapSection active={active} />}
         {section === 'updates' && <UpdatesSection />}

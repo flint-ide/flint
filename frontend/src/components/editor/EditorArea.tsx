@@ -34,6 +34,7 @@ const SettingsView = lazy(() => import('../settings/SettingsView').then((m) => (
 const HttpResponseView = lazy(() => import('../http/HttpResponseView').then((m) => ({ default: m.HttpResponseView })))
 const PullRequestView = lazy(() => import('../github/PullRequestView').then((m) => ({ default: m.PullRequestView })))
 const PullRequestDiffView = lazy(() => import('../github/PullRequestDiffView').then((m) => ({ default: m.PullRequestDiffView })))
+const CILogView = lazy(() => import('../github/CILogView').then((m) => ({ default: m.CILogView })))
 // xterm.js is the biggest dependency; output that arrives first waits in store/terminal.
 const TerminalView = lazy(() => import('../terminal/TerminalView').then((m) => ({ default: m.TerminalView })))
 
@@ -160,6 +161,7 @@ const TabPanel = memo(function TabPanel({ tab, active }: { tab: Tab; active: boo
           {tab.kind === 'settings' && <SettingsView active={active} />}
           {tab.kind === 'pr' && <PullRequestView tab={tab} active={active} />}
           {tab.kind === 'prdiff' && <PullRequestDiffView tab={tab} active={active} />}
+          {tab.kind === 'cilog' && <CILogView tab={tab} />}
         </Suspense>
       </ErrorBoundary>
     </div>
@@ -200,6 +202,8 @@ function TabIcon({ tab, debugActive }: { tab: Tab; debugActive: boolean }) {
     case 'pr':
     case 'prdiff':
       return <TabKindIcon kind={tab.kind === 'pr' ? 'pr' : 'diff'} />
+    case 'cilog':
+      return <TabKindIcon kind="run" />
     default:
       return <TabKindIcon kind={tab.kind} busy={false} />
   }

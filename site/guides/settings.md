@@ -28,6 +28,16 @@ The font settings apply to all editors: files, diffs and scratchpads. **Reset to
 
 Font family, size (default 13) and line height (default 1.2) for terminals and run consoles. Run consoles use a size one point smaller. Terminals resize immediately when you change these.
 
+## Accounts
+
+The GitHub account pull requests and CI use ([Signing in](git-and-github.md#signing-in)):
+
+- The signed-in account (avatar, login, host, scopes, and whether it came from Sign in with GitHub or the GitHub CLI), with **Sign Out**, which deletes the token from the keyring. Revoking it at GitHub is done on GitHub's authorized apps page (linked).
+- **Sign in with GitHub** and **Use the GitHub CLI's Token** when no account is signed in; a token from `GH_TOKEN` / `GITHUB_TOKEN` in Flint's environment is shown as such.
+- **Host**: `github.com` or your GitHub Enterprise Server.
+- **OAuth App client ID**: the app Sign in with GitHub uses (see the section's instructions for registering one with Device Flow enabled).
+- **Scopes** (default `repo, read:org, workflow`) and **Wait for GitHub's retry-after up to** (default 60 seconds).
+
 ## Agents
 
 - **Default agent**: the agent used for new chats, generated commit messages and conflict resolution. Agents that aren't installed are marked. When none is chosen, Flint uses the first installed agent.

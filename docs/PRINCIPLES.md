@@ -7,7 +7,7 @@ These five principles decide trade-offs in Flint. When a change conflicts with o
 Every dependency is code that runs with the user's privileges, on their source code and credentials. Fewer dependencies mean a smaller attack surface, fewer supply-chain risks and fewer updates to review.
 
 - Prefer the Go standard library and a small amount of our own code over a module that does more than we need.
-- Prefer driving an existing CLI (`git`, `gh`, `kubectl`, `docker`, `aws`, `rg`, `dlv`) over embedding its SDK: the user already has and trusts it, and its auth works unchanged.
+- Prefer driving an existing CLI (`git`, `kubectl`, `docker`, `aws`, `rg`, `dlv`) over embedding its SDK: the user already has and trusts it, and its auth works unchanged. GitHub is the exception: its API is plain HTTPS and JSON, so Flint calls it with the standard library (`internal/github`) instead of requiring `gh`, and imports `gh`'s token in one click for those who have it.
 - Runtime npm packages are limited to the editor, terminal and React. A new one needs a reason in the issue, and is installed with `npm ci --ignore-scripts`. Build tooling stays in Go (`cmd/webbuild` uses esbuild's Go API; no Node toolchain at runtime, no `npx`).
 - Pin what we depend on: Go modules via `go.sum`, npm via `package-lock.json`, GitHub Actions by commit SHA. Dependabot proposes updates; `govulncheck` and `npm audit` gate CI.
 

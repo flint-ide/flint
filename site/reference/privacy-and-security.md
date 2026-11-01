@@ -13,7 +13,10 @@ Apart from the update check, data leaves your Mac only when you do something tha
 | Action | What is sent | Where |
 |---|---|---|
 | Agent chat, Generate message, Review Changes with Agent, Resolve with agent, Diagnose with AI | Your messages, the context you attach, and whatever the agent reads | Your AI provider, through the `claude` or `codex` CLI or a custom ACP agent you added, and your own account |
-| Pull request review | Requests for pull requests, and your comments and reviews when you post them | GitHub, through the `gh` CLI |
+| Pull requests, reviews and CI (while a view needs them, and while a check of your pull request runs) | API requests with your GitHub token; your comments, reviews, pull requests and re-runs when you post them | GitHub's API of the configured host (`api.github.com`, or your Enterprise server) |
+| Sign in with GitHub | The OAuth App's client ID and scopes, then a poll for the token | The configured GitHub host (`github.com/login/…`) |
+| Downloading a failed job's log | A request to the short-lived URL GitHub redirects to, **without** your token | The host GitHub names (for example `*.actions.githubusercontent.com` or `*.blob.core.windows.net`) |
+| Settings ▸ Accounts | Your avatar, loaded by the window | `avatars.githubusercontent.com` |
 | Help ▸ Report an Issue… | A prefilled issue that you review in your browser before submitting | GitHub, only when you submit |
 | HTTP client | The request you send | The server in the request |
 | Databases, Kubernetes, AWS, Docker | The commands and queries you run | Your servers and cloud accounts, through your own credentials |
@@ -36,7 +39,8 @@ Flint looks for a newer release so it can tell you about it. It never downloads 
 
 - **Database passwords** are stored only in the macOS Keychain (service `flint-db`), never in files.
 - **AWS keys and tokens** are read only by Flint's native process to check that they exist and when they expire. They never reach the user interface.
-- **GitHub sign-in** stays inside `gh`. Flint never sees your token.
+- **GitHub tokens** (from Sign in with GitHub, or imported once from the GitHub CLI after you confirm) are stored only in the Keychain (service `flint-accounts`, account `github:<host>`). The token is used by Flint's native process only: it never reaches the user interface, the log or an error message, and it is sent only to the GitHub API of the configured host, never to a redirect on another host (job logs are downloaded from their redirect without it). `state.json` keeps the account's login, avatar, host and scopes, no token. **Sign Out** deletes the token; revoke it on GitHub's authorized apps page.
+- **`GH_TOKEN` / `GITHUB_TOKEN`** (or `GH_ENTERPRISE_TOKEN` for an Enterprise Server) in Flint's environment is used while no account is signed in and is never stored.
 - **Kubernetes terminals** use an override file with only the context and namespace; no credentials are copied.
 - **HTTP client** headers and variable values are never written to the log. Responses and cookies stay in memory.
 - **Terminal sessions** are saved with recognized credentials removed from the output.

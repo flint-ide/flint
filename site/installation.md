@@ -116,7 +116,6 @@ The check only runs each tool's version command, outside your projects, and inst
 |---|---|
 | `ripgrep` (`brew install ripgrep`) | Fast project search, the TODO list and `⌘P`. Without it, a slower built-in search is used. |
 | `git` (`xcode-select --install`) | The Commit panel, diffs, blame, history, branches, stash and worktrees. |
-| `gh` (GitHub CLI, `brew install gh`) | Pull request review. Sign in with `gh auth login`. |
 | `claude` (`brew install --cask claude-code`) and/or `codex` (`brew install --cask codex`) | Agent chat, generated commit messages and conflict resolution. |
 | `gopls` | Go language features (`go install golang.org/x/tools/gopls@latest`). |
 | `rust-analyzer` | Rust language features (`rustup component add rust-analyzer`). |

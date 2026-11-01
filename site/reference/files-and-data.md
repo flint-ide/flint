@@ -63,7 +63,7 @@ The log rotates at 5 MB, keeping one old file (`flint.log.1`). Secrets and your 
 | What | Where |
 |---|---|
 | Agent conversation history | The agent CLIs: `~/.claude/projects/…` and `~/.codex/sessions/…`. Flint resumes conversations from there after a restart. |
-| GitHub sign-in | `gh` (macOS keyring or `GH_TOKEN`). Flint never sees the token. |
+| GitHub token | The Keychain (service `flint-accounts`), written by Sign in with GitHub or the GitHub CLI import; `GH_TOKEN` is read from the environment and never stored. The account's login, avatar, host and scopes are in `state.json`. |
 | AWS credentials | `~/.aws/` and the AWS tools. Flint only checks that credentials exist and when they expire. |
 | Kubernetes credentials | Your kubeconfig. Flint's Kubernetes terminals add an override file with only the context and namespace. |
 | Language server caches | The servers' own folders, for example `~/Library/Caches/gopls`. |

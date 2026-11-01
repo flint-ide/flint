@@ -56,11 +56,12 @@ type Manager struct {
 
 	mu       sync.Mutex
 	sessions map[string]*session
+	streams  map[string]*streamSession
 }
 
 // NewManager creates a manager that reports output through events.
 func NewManager(events Events) *Manager {
-	return &Manager{events: events, sessions: map[string]*session{}}
+	return &Manager{events: events, sessions: map[string]*session{}, streams: map[string]*streamSession{}}
 }
 
 // Start launches a shell in a new PTY under the given id.
@@ -96,6 +97,13 @@ func (m *Manager) Start(id string, opts Options) error {
 
 // Write sends user input (keystrokes, pastes) to the shell.
 func (m *Manager) Write(id string, data []byte) error {
+	if st := m.stream(id); st != nil {
+		if st.Writer == nil {
+			return fmt.Errorf("terminal %q is read-only", id)
+		}
+		_, err := st.Writer.Write(data)
+		return err
+	}
 	s, err := m.get(id)
 	if err != nil {
 		return err
@@ -106,6 +114,12 @@ func (m *Manager) Write(id string, data []byte) error {
 
 // Resize updates the PTY window size; full-screen programs redraw on SIGWINCH.
 func (m *Manager) Resize(id string, cols, rows int) error {
+	if st := m.stream(id); st != nil {
+		if st.Resize == nil {
+			return nil
+		}
+		return st.Resize(cols, rows)
+	}
 	s, err := m.get(id)
 	if err != nil {
 		return err
@@ -126,6 +140,16 @@ func (m *Manager) Cwd(id string) (string, error) {
 // Close hangs up the shell and its children.
 func (m *Manager) Close(id string) {
 	m.mu.Lock()
+	st := m.streams[id]
+	delete(m.streams, id)
+	m.mu.Unlock()
+	if st != nil {
+		if st.Close != nil {
+			st.Close()
+		}
+		return
+	}
+	m.mu.Lock()
 	s := m.sessions[id]
 	delete(m.sessions, id)
 	m.mu.Unlock()
@@ -139,9 +163,16 @@ func (m *Manager) CloseAll() {
 	m.mu.Lock()
 	all := m.sessions
 	m.sessions = map[string]*session{}
+	streams := m.streams
+	m.streams = map[string]*streamSession{}
 	m.mu.Unlock()
 	for _, s := range all {
 		hangUp(s)
+	}
+	for _, st := range streams {
+		if st.Close != nil {
+			st.Close()
+		}
 	}
 }
 

@@ -15,11 +15,24 @@ Open it with `⌘K` or the `⎇` icon on the activity bar. (In a terminal, `⌘K
 
 The header has Refresh, Fetch, Update project (pull), Push (`⇧⌘K`) and Stash.
 
-A commit made during a merge includes the whole index. When there are merge conflicts, the panel lists them separately and offers **Resolve with** your default agent (see [AI agents](ai-agents.md#commit-messages-and-merge-conflicts)).
+A commit made during a merge includes the whole index. When there are merge conflicts, the panel lists them separately, with the number of conflicts left in each file. **Resolve…** (or a click on the file) opens it in the [merge editor](#merge-conflicts); **✦ Resolve with** hands them to your default agent instead (see [AI agents](ai-agents.md#commit-messages-and-merge-conflicts)).
 
 With several projects in the window, the panel shows the repository of the active tab's project. A switcher lets you pick another one and shows the number of changes in each.
 
 ![The Commit panel with two changed files and the side-by-side diff of one of them](../images/commit.png)
+
+## Merge conflicts
+
+A merge, rebase, cherry-pick or `git stash pop` that conflicts leaves the files with conflict markers. The merge editor resolves them one conflict at a time:
+
+- The file is shown as git left it: changes that didn't conflict are already merged. Each conflict is a block with the **current** side (green) above and the **incoming** side (blue) below, and the base in between when your `merge.conflictStyle` is `diff3` or `zdiff3`.
+- The header says what current and incoming are. In a merge, current is your branch (`HEAD`) and incoming is the branch being merged. **In a rebase they are the other way round**: current is the branch you are rebasing onto (with your commits replayed so far), and incoming is your own commit being replayed. In a cherry-pick, incoming is the picked commit; after `git stash pop`, it is the stashed changes.
+- Above each conflict: **Accept Current**, **Accept Incoming**, **Accept Both** (current first) and **Both, Incoming First**. Or edit the text yourself: delete the marker lines and the conflict is gone. `⌘Z` undoes an action.
+- **✦ Ask Agent** puts the conflict, both sides and the base (from the index) into the agent chat draft for you to review and send.
+- **‹ ›** move between conflicts; the header counts the ones left. **Δ Current** and **Δ Incoming** show what each side changed since the base.
+- Nothing is written until you click **Save** (`⌘S`) or **Mark as Resolved**. Mark as Resolved saves the file and stages it (`git add`); with conflict markers left it asks first. Then finish the operation as usual (commit the merge, `git rebase --continue`).
+
+Files deleted on one side and binary files can't be merged line by line; the editor says so, and you resolve them with `git add` or `git rm` in a terminal, or with the agent. Keyboard shortcuts are listed in [Keyboard shortcuts](../reference/keyboard-shortcuts.md#in-the-merge-editor).
 
 ## Gutter markers
 

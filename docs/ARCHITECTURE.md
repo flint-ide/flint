@@ -161,6 +161,7 @@ Virtualization of fixed-row-height lists (`src/lib/virtualList.ts`), fitting the
 
 - Diffs are computed by `internal/textdiff` (Myers in linear memory, with a time limit after which the whole region is replaced; changed words within a line are reported as UTF-16 offsets). Through `DiffAPI` they feed the editor gutter markers (`Marks`), the +/− stats and mini diffs in the agent chat (`Hunks`), and the diff tab (`Compare`).
 - The diff tab is drawn by two plain CodeMirror editors with custom decorations: changed-line backgrounds, changed words, spacers that align both sides, and collapsed unchanged regions.
+- The merge editor (`MergeView`) is one CodeMirror editor on the conflicted working file; conflict blocks are parsed from its markers on every change (`lib/mergeConflicts.ts`, same rules as `internal/git/markers.go`). `GitAPI.Conflict` adds the index stages, a `git merge-file --diff3` of them (where a block's base comes from) and what current and incoming are for the operation; `GitAPI.MarkResolved` writes and runs `git add`.
 - The `⌘P` file list lives in `fuzzy.Index` on the Go side (`WorkspaceAPI.IndexFiles` / `FindFiles`), so the WebView never receives the full list.
 
 ## Platforms

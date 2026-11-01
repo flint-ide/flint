@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -70,29 +71,38 @@ type Pairing struct {
 
 type device struct {
 	Device
-	hash      []byte // sha256 of the token's secret part; nil until read
-	savedSeen int64  // LastSeen as last written
+	hash      []byte    // sha256 of the token's secret part; nil until read
+	loadAt    time.Time // last Keychain read attempt (failed reads are retried slowly)
+	savedSeen int64     // LastSeen as last written
 }
 
 // Devices are the paired devices and the open pairing, if any. Safe for
-// concurrent use.
+// concurrent use. The Keychain and state.json are never touched with mu
+// held: a slow Keychain must not stall every request.
 type Devices struct {
 	secrets Secrets
 	save    func([]Device) error
 	now     func() time.Time
 
+	saveMu sync.Mutex // serializes saves; each writes the list as it is then
+
 	mu       sync.Mutex
 	devices  map[string]*device
-	pairHash []byte // sha256 of the open pairing secret; nil = none
+	revoked  map[string]bool // revocations whose Keychain delete and save both failed: retried
+	pairHash []byte          // sha256 of the open pairing secret; nil = none
 	pairEnds time.Time
 	attempts int
 }
 
+// keychainRetry spaces the Keychain reads of a device whose hash couldn't
+// be read, so bad requests can't make Flint start /usr/bin/security for each.
+const keychainRetry = 10 * time.Second
+
 // NewDevices loads the remembered devices; their token hashes are read from
-// secrets when first needed. save is called with the full list after every
-// change.
+// secrets by LoadHashes, or when first needed. save is called with the full
+// list after every change.
 func NewDevices(list []Device, secrets Secrets, save func([]Device) error) *Devices {
-	d := &Devices{secrets: secrets, save: save, now: time.Now, devices: map[string]*device{}}
+	d := &Devices{secrets: secrets, save: save, now: time.Now, devices: map[string]*device{}, revoked: map[string]bool{}}
 	for _, dev := range list {
 		if len(dev.ID) == deviceIDLen && isHex(dev.ID) && len(d.devices) < maxDevices {
 			dev.Scopes = slices.Clone(dev.Scopes)
@@ -152,7 +162,9 @@ func normalizeSecret(s string) string {
 	}, s))
 }
 
-// CheckDeviceName reports why name can't name a device.
+// CheckDeviceName reports why name can't name a device. Format characters
+// (bidi overrides, zero-width) are refused too: the name is shown in
+// Settings and in the log.
 func CheckDeviceName(name string) error {
 	name = strings.TrimSpace(name)
 	switch {
@@ -160,8 +172,8 @@ func CheckDeviceName(name string) error {
 		return errors.New("device name is empty")
 	case utf8.RuneCountInString(name) > maxDeviceName || !utf8.ValidString(name):
 		return fmt.Errorf("device name longer than %d characters", maxDeviceName)
-	case strings.ContainsFunc(name, unicode.IsControl):
-		return errors.New("device name contains control characters")
+	case strings.ContainsFunc(name, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) }):
+		return errors.New("device name contains control or format characters")
 	}
 	return nil
 }
@@ -170,23 +182,9 @@ func CheckDeviceName(name string) error {
 // works once; wrong secrets count, and too many cancel the pairing.
 func (d *Devices) Pair(secret, name string) (Device, string, error) {
 	sum := sha256.Sum256([]byte(normalizeSecret(secret)))
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.pairHash == nil || !d.now().Before(d.pairEnds) {
-		d.pairHash = nil
-		return Device{}, "", ErrPairing
+	if err := d.claimPairing(sum[:], name); err != nil {
+		return Device{}, "", err
 	}
-	if subtle.ConstantTimeCompare(sum[:], d.pairHash) != 1 {
-		d.attempts++
-		if d.attempts >= maxPairingAttempts {
-			d.pairHash = nil
-		}
-		return Device{}, "", ErrPairing
-	}
-	if err := CheckDeviceName(name); err != nil {
-		return Device{}, "", err // the secret stays valid for a corrected request
-	}
-	d.pairHash = nil
 	id, secretPart, err := newToken()
 	if err != nil {
 		return Device{}, "", err
@@ -200,13 +198,42 @@ func (d *Devices) Pair(secret, name string) (Device, string, error) {
 		Device: Device{ID: id, Name: strings.TrimSpace(name), Scopes: []string{ScopeRead}, Created: now, LastSeen: now},
 		hash:   tokenSum[:], savedSeen: now,
 	}
+	d.mu.Lock()
 	d.devices[id] = dev
-	if err := d.saveLocked(); err != nil {
+	d.mu.Unlock()
+	if err := d.persist(); err != nil {
+		d.mu.Lock()
 		delete(d.devices, id)
+		d.mu.Unlock()
 		_ = d.secrets.Delete(id)
 		return Device{}, "", err
 	}
-	return dev.copy(), id + "." + secretPart, nil
+	return dev.copyLocked(&d.mu), id + "." + secretPart, nil
+}
+
+// claimPairing checks a pairing secret's hash and consumes the pairing.
+func (d *Devices) claimPairing(sum []byte, name string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.pairHash == nil || !d.now().Before(d.pairEnds) {
+		d.pairHash = nil
+		return ErrPairing
+	}
+	if subtle.ConstantTimeCompare(sum, d.pairHash) != 1 {
+		d.attempts++
+		if d.attempts >= maxPairingAttempts {
+			d.pairHash = nil
+		}
+		return ErrPairing
+	}
+	if err := CheckDeviceName(name); err != nil {
+		return err // the secret stays valid for a corrected request
+	}
+	if len(d.devices) >= maxDevices {
+		return fmt.Errorf("at most %d paired devices", maxDevices)
+	}
+	d.pairHash = nil
+	return nil
 }
 
 // newToken returns a device id and the token's secret part (256 bits).
@@ -222,6 +249,61 @@ func newToken() (id, secret string, err error) {
 	return hex.EncodeToString(idb[:]), base64.RawURLEncoding.EncodeToString(sb[:]), nil
 }
 
+// TokenDevice returns the device id a token claims to belong to, if that
+// device is paired (nothing is verified: Authenticate does that).
+func (d *Devices) TokenDevice(token string) (string, bool) {
+	id, _, ok := strings.Cut(token, ".")
+	if !ok || len(id) != deviceIDLen || !isHex(id) {
+		return "", false
+	}
+	return id, d.Has(id)
+}
+
+// Has reports whether a device is paired (not revoked).
+func (d *Devices) Has(id string) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.devices[id] != nil
+}
+
+// LoadHashes reads the token hashes of the devices that don't have one yet
+// (when the server starts, so requests don't wait for the Keychain).
+func (d *Devices) LoadHashes() {
+	d.mu.Lock()
+	var ids []string
+	for id, dev := range d.devices {
+		if dev.hash == nil {
+			ids = append(ids, id)
+			dev.loadAt = d.now()
+		}
+	}
+	d.mu.Unlock()
+	for _, id := range ids {
+		d.storeHash(id, d.readHash(id))
+	}
+}
+
+// readHash reads a device's token hash from the Keychain (nil on failure).
+func (d *Devices) readHash(id string) []byte {
+	stored, err := d.secrets.Get(id)
+	raw, decErr := hex.DecodeString(stored)
+	if err != nil || decErr != nil || len(raw) != sha256.Size {
+		return nil
+	}
+	return raw
+}
+
+func (d *Devices) storeHash(id string, hash []byte) {
+	if hash == nil {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if dev := d.devices[id]; dev != nil {
+		dev.hash = hash
+	}
+}
+
 // Authenticate returns the device a token belongs to. The token's hash is
 // compared in constant time; the device's last-seen time is updated.
 func (d *Devices) Authenticate(token string) (Device, bool) {
@@ -231,63 +313,119 @@ func (d *Devices) Authenticate(token string) (Device, bool) {
 	}
 	sum := sha256.Sum256([]byte(secret))
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	dev := d.devices[id]
 	if dev == nil {
+		d.mu.Unlock()
 		return Device{}, false
 	}
-	if dev.hash == nil {
-		stored, err := d.secrets.Get(id)
-		raw, decErr := hex.DecodeString(stored)
-		if err != nil || decErr != nil || len(raw) != sha256.Size {
+	hash, load := dev.hash, false
+	if hash == nil && d.now().Sub(dev.loadAt) >= keychainRetry {
+		dev.loadAt, load = d.now(), true
+	}
+	d.mu.Unlock()
+	if hash == nil {
+		if !load {
 			return Device{}, false
 		}
-		dev.hash = raw
+		if hash = d.readHash(id); hash == nil {
+			return Device{}, false
+		}
+		d.storeHash(id, hash)
 	}
-	if subtle.ConstantTimeCompare(sum[:], dev.hash) != 1 {
+	if subtle.ConstantTimeCompare(sum[:], hash) != 1 {
+		return Device{}, false
+	}
+	d.mu.Lock()
+	if d.devices[id] != dev { // revoked meanwhile
+		d.mu.Unlock()
 		return Device{}, false
 	}
 	dev.LastSeen = d.now().UnixMilli()
-	if time.Duration(dev.LastSeen-dev.savedSeen)*time.Millisecond >= lastSeenSaveInterval {
+	save := time.Duration(dev.LastSeen-dev.savedSeen)*time.Millisecond >= lastSeenSaveInterval
+	if save {
 		dev.savedSeen = dev.LastSeen
-		_ = d.saveLocked() // only the last-seen time is lost
 	}
-	return dev.copy(), true
+	out := dev.copy()
+	d.mu.Unlock()
+	if save {
+		_ = d.persist() // only the last-seen time is lost
+	}
+	return out, true
 }
 
-// Revoke forgets a device and deletes its token hash.
+// Revoke forgets a device at once and deletes its token hash. If both the
+// Keychain delete and the save fail, the device could come back after a
+// restart: the revocation is kept, retried (RetryRevocations), and the
+// error returned.
 func (d *Devices) Revoke(id string) error {
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	if d.devices[id] == nil {
+		d.mu.Unlock()
 		return fmt.Errorf("no paired device %q", id)
 	}
 	delete(d.devices, id)
-	err := d.secrets.Delete(id)
-	return errors.Join(err, d.saveLocked())
+	d.revoked[id] = true
+	d.mu.Unlock()
+	return d.RetryRevocations()
 }
 
 // RevokeAll forgets every device.
 func (d *Devices) RevokeAll() error {
 	d.mu.Lock()
-	defer d.mu.Unlock()
-	var errs []error
 	for id := range d.devices {
-		errs = append(errs, d.secrets.Delete(id))
+		d.revoked[id] = true
 	}
 	d.devices = map[string]*device{}
 	d.pairHash = nil
-	return errors.Join(append(errs, d.saveLocked())...)
+	d.mu.Unlock()
+	return d.RetryRevocations()
+}
+
+// RetryRevocations finishes revocations: it deletes their Keychain entries
+// and saves the list. A revocation is done once either worked (without the
+// hash, or without the state entry, the device can't come back).
+func (d *Devices) RetryRevocations() error {
+	d.mu.Lock()
+	ids := slices.Collect(maps.Keys(d.revoked))
+	d.mu.Unlock()
+	if len(ids) == 0 {
+		return nil
+	}
+	deleted := map[string]bool{}
+	var errs []error
+	for _, id := range ids {
+		if err := d.secrets.Delete(id); err != nil {
+			errs = append(errs, fmt.Errorf("delete the device token from the Keychain: %w", err))
+		} else {
+			deleted[id] = true
+		}
+	}
+	saveErr := d.persist()
+	d.mu.Lock()
+	for _, id := range ids {
+		if deleted[id] || saveErr == nil {
+			delete(d.revoked, id)
+		}
+	}
+	pending := len(d.revoked)
+	d.mu.Unlock()
+	if pending == 0 {
+		return nil // done, even if one of the two steps failed
+	}
+	return errors.Join(append(errs, saveErr)...)
+}
+
+// PendingRevocations counts revocations not yet saved anywhere.
+func (d *Devices) PendingRevocations() int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return len(d.revoked)
 }
 
 // List returns the paired devices, oldest first (never nil).
 func (d *Devices) List() []Device {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	return d.listLocked()
-}
-
-func (d *Devices) listLocked() []Device {
 	out := make([]Device, 0, len(d.devices))
 	for _, dev := range d.devices {
 		out = append(out, dev.copy())
@@ -298,17 +436,28 @@ func (d *Devices) listLocked() []Device {
 	return out
 }
 
-func (d *Devices) saveLocked() error {
+// persist saves the current list. Saves are serialized and each takes the
+// list inside the serialization, so the last write is the latest state.
+func (d *Devices) persist() error {
 	if d.save == nil {
 		return nil
 	}
-	return d.save(d.listLocked())
+	d.saveMu.Lock()
+	defer d.saveMu.Unlock()
+	return d.save(d.List())
 }
 
 func (dev *device) copy() Device {
 	out := dev.Device
 	out.Scopes = slices.Clone(dev.Scopes)
 	return out
+}
+
+// copyLocked copies dev under mu.
+func (dev *device) copyLocked(mu *sync.Mutex) Device {
+	mu.Lock()
+	defer mu.Unlock()
+	return dev.copy()
 }
 
 // has reports whether a device holds scope.

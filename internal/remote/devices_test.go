@@ -10,15 +10,23 @@ import (
 
 // memSecrets stands in for the Keychain (tests never touch the real one).
 type memSecrets struct {
-	mu    sync.Mutex
-	v     map[string]string
-	reads int
-	fail  error
+	mu         sync.Mutex
+	v          map[string]string
+	reads      int
+	fail       error
+	failDelete error
+	block      chan struct{} // Get waits for it when set
 }
 
 func newMemSecrets() *memSecrets { return &memSecrets{v: map[string]string{}} }
 
 func (m *memSecrets) Get(account string) (string, error) {
+	m.mu.Lock()
+	block := m.block
+	m.mu.Unlock()
+	if block != nil {
+		<-block
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.reads++
@@ -41,6 +49,9 @@ func (m *memSecrets) Set(account, value string) error {
 func (m *memSecrets) Delete(account string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.failDelete != nil {
+		return m.failDelete
+	}
 	delete(m.v, account)
 	return nil
 }
@@ -76,11 +87,15 @@ type savedDevices struct {
 	mu   sync.Mutex
 	list []Device
 	n    int
+	fail error
 }
 
 func (s *savedDevices) save(list []Device) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.fail != nil {
+		return s.fail
+	}
 	s.list = append([]Device{}, list...)
 	s.n++
 	return nil
@@ -281,5 +296,135 @@ func TestDeviceLimit(t *testing.T) {
 	}
 	if _, err := d.BeginPairing(); err == nil {
 		t.Fatal("pairing past the device limit")
+	}
+}
+
+func TestRevocationSurvivesKeychainAndDiskFailures(t *testing.T) {
+	d, sec, _, saved := newTestDevices(t)
+	p, _ := d.BeginPairing()
+	dev, token, err := d.Pair(p.Secret, "phone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sec.failDelete = errors.New("keychain locked")
+	saved.mu.Lock()
+	saved.fail = errors.New("disk full")
+	saved.mu.Unlock()
+	if err := d.Revoke(dev.ID); err == nil {
+		t.Fatal("a revocation that wasn't saved anywhere reported success")
+	}
+	if _, ok := d.Authenticate(token); ok || d.Has(dev.ID) {
+		t.Fatal("revoked device still accepted")
+	}
+	if d.PendingRevocations() != 1 {
+		t.Fatalf("pending = %d", d.PendingRevocations())
+	}
+	// Still failing: the revocation stays pending.
+	if err := d.RetryRevocations(); err == nil || d.PendingRevocations() != 1 {
+		t.Fatalf("retry while failing: %v, pending %d", err, d.PendingRevocations())
+	}
+	// The Keychain works again: done (without the hash the device can't come back).
+	sec.mu.Lock()
+	sec.failDelete = nil
+	sec.mu.Unlock()
+	if err := d.RetryRevocations(); err != nil || d.PendingRevocations() != 0 || len(sec.values()) != 0 {
+		t.Fatalf("retry: %v, pending %d, keychain %v", err, d.PendingRevocations(), sec.values())
+	}
+}
+
+func TestRevocationIsDoneWhenOneStepWorks(t *testing.T) {
+	d, sec, _, _ := newTestDevices(t)
+	p, _ := d.BeginPairing()
+	dev, _, _ := d.Pair(p.Secret, "phone")
+	sec.failDelete = errors.New("keychain locked")
+	if err := d.Revoke(dev.ID); err != nil || d.PendingRevocations() != 0 {
+		t.Fatalf("saved without the device: %v, pending %d", err, d.PendingRevocations())
+	}
+}
+
+func TestKeychainIsReadOutsideTheLockAndRetriedSlowly(t *testing.T) {
+	d, sec, clk, saved := newTestDevices(t)
+	p, _ := d.BeginPairing()
+	_, token, _ := d.Pair(p.Secret, "phone")
+	again := NewDevices(saved.list, sec, saved.save)
+	again.now = clk.now
+	sec.mu.Lock()
+	sec.block = make(chan struct{})
+	sec.mu.Unlock()
+	authDone := make(chan bool)
+	go func() {
+		_, ok := again.Authenticate(token)
+		authDone <- ok
+	}()
+	// While the Keychain hangs, the device list still answers.
+	listed := make(chan int)
+	go func() { listed <- len(again.List()) }()
+	select {
+	case n := <-listed:
+		if n != 1 {
+			t.Fatalf("listed %d", n)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("List waited for the Keychain")
+	}
+	close(sec.block)
+	if !<-authDone {
+		t.Fatal("token refused after the Keychain answered")
+	}
+	sec.mu.Lock()
+	sec.block = nil
+	sec.mu.Unlock()
+
+	// A device whose hash can't be read is retried at most every keychainRetry.
+	broken := NewDevices(saved.list, sec, saved.save)
+	broken.now = clk.now
+	sec.mu.Lock()
+	sec.fail = errors.New("locked")
+	sec.mu.Unlock()
+	before := sec.reads
+	for range 5 {
+		broken.Authenticate(token)
+	}
+	if sec.reads-before != 1 {
+		t.Fatalf("Keychain read %d times for 5 requests", sec.reads-before)
+	}
+	clk.add(keychainRetry)
+	sec.mu.Lock()
+	sec.fail = nil
+	sec.mu.Unlock()
+	if _, ok := broken.Authenticate(token); !ok {
+		t.Fatal("not retried after keychainRetry")
+	}
+}
+
+func TestLoadHashesReadsEveryDeviceOnce(t *testing.T) {
+	d, sec, _, saved := newTestDevices(t)
+	var tokens []string
+	for _, name := range []string{"a", "b", "c"} {
+		p, _ := d.BeginPairing()
+		_, tok, _ := d.Pair(p.Secret, name)
+		tokens = append(tokens, tok)
+	}
+	again := NewDevices(saved.list, sec, saved.save)
+	before := sec.reads
+	again.LoadHashes()
+	for _, tok := range tokens {
+		if _, ok := again.Authenticate(tok); !ok {
+			t.Fatal("token refused")
+		}
+	}
+	if sec.reads-before != 3 {
+		t.Fatalf("Keychain read %d times", sec.reads-before)
+	}
+}
+
+func TestDeviceNamesRefuseFormatCharacters(t *testing.T) {
+	for _, name := range []string{"phone\u202Etxt.exe", "ph\u200Bone", "\uFEFFphone", "a\u2066b"} {
+		if CheckDeviceName(name) == nil {
+			t.Errorf("%q accepted", name)
+		}
+	}
+	if err := CheckDeviceName("Ola's iPhone 15 Pro – work 📱"); err != nil {
+		t.Fatal(err)
 	}
 }

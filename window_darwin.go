@@ -100,15 +100,6 @@ func setNativeAppearance(theme string) bool {
 // systemPrefersDark reports whether macOS uses the dark appearance.
 func systemPrefersDark() bool { return C.flintSystemPrefersDark() != 0 }
 
-// TitlebarMetrics describes where macOS draws the window buttons.
-type TitlebarMetrics struct {
-	Height       float64 `json:"height"`       // title bar height in points
-	ButtonsLeft  float64 `json:"buttonsLeft"`  // x of the close button
-	ButtonsTop   float64 `json:"buttonsTop"`   // y of the close button from the top
-	ButtonWidth  float64 `json:"buttonWidth"`  // size of one traffic light
-	ButtonHeight float64 `json:"buttonHeight"` //
-}
-
 func titlebarMetrics() TitlebarMetrics {
 	var h, x, y, w, bh C.double
 	C.flintTitlebarMetrics(&h, &x, &y, &w, &bh)

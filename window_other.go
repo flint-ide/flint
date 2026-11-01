@@ -15,17 +15,8 @@ import (
 // title bar to line up with and the window shows as soon as the app starts.
 // The browser-only server build uses this file on every system.
 
-//go:embed build/appicon.png
+//go:embed build/linux/icon-512.png
 var appIcon []byte
-
-// TitlebarMetrics describes where the OS draws window buttons (macOS only).
-type TitlebarMetrics struct {
-	Height       float64 `json:"height"`
-	ButtonsLeft  float64 `json:"buttonsLeft"`
-	ButtonsTop   float64 `json:"buttonsTop"`
-	ButtonWidth  float64 `json:"buttonWidth"`
-	ButtonHeight float64 `json:"buttonHeight"`
-}
 
 // setNativeAppearance reports whether theme ("dark", "light" or "system") is
 // dark. GTK draws the frame from the desktop's own theme, so nothing changes.

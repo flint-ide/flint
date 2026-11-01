@@ -17,6 +17,9 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+// linuxAppID is the GTK application id; the .desktop file and icon are named after it.
+const linuxAppID = "io.github.odudek.flint"
+
 func main() {
 	logger := diag.Setup()
 	slog.Info("start", "version", diag.Version(version))
@@ -44,6 +47,9 @@ func main() {
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
+		// Matches build/linux/io.github.odudek.flint.desktop, so desktops show the
+		// window under Flint's launcher and icon.
+		Linux:          application.LinuxOptions{ApplicationID: linuxAppID},
 		SingleInstance: singleInstance(flint),
 		// ⌘Q asks the frontend first, like closing the window (see beforeClose).
 		ShouldQuit: func() bool { return !flint.beforeClose() },

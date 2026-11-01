@@ -6,7 +6,7 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
- * Status is a tool as found on this Mac.
+ * Status is a tool as found on this machine.
  */
 export class Status {
     "id": string;

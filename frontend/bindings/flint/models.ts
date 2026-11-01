@@ -644,7 +644,9 @@ export class TaskView {
 }
 
 /**
- * TitlebarMetrics describes where macOS draws the window buttons.
+ * TitlebarMetrics describes where macOS draws the window buttons (all zero on
+ * other systems, which keep their own window frame). One definition for every
+ * system, so the generated bindings don't depend on where they are generated.
  */
 export class TitlebarMetrics {
     /**

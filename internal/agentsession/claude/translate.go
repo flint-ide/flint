@@ -132,7 +132,7 @@ func (s *session) onToolUse(b contentBlock) {
 	if st.hidden {
 		return
 	}
-	st.call = describeTool(b.ID, b.Name, b.Input, s.cwd)
+	st.call = flintTool(describeTool(b.ID, b.Name, b.Input, s.cwd), b.Name, s.cwd, s.flintMCP)
 	call := st.call
 	s.emit(agentsession.Event{Kind: agentsession.KindToolCall, ToolCall: &call})
 }
@@ -322,7 +322,7 @@ func (s *session) onControlRequest(m *inbound) {
 		}})
 		return
 	}
-	call := describeTool(req.ToolUseID, req.ToolName, req.Input, s.cwd)
+	call := flintTool(describeTool(req.ToolUseID, req.ToolName, req.Input, s.cwd), req.ToolName, s.cwd, s.flintMCP)
 	if st := s.tr.tools[req.ToolUseID]; st != nil && !st.hidden {
 		call = st.call
 	}

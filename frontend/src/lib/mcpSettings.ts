@@ -27,7 +27,7 @@ export const TERMINAL_LINES = { min: 10, max: 2000 }
 /** Mirrors Go's defaultMCPServer. */
 export const DEFAULT_MCP_SERVER: McpServerSettings = Object.freeze({
   enabled: true,
-  tools: Object.freeze({ diagnostics: true, editor: true, terminals: true, tests: true, kubernetes: true }),
+  tools: Object.freeze({ diagnostics: true, editor: true, terminals: false, tests: true, kubernetes: false }),
   terminalLines: 200,
 }) as McpServerSettings
 

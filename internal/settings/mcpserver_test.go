@@ -7,15 +7,16 @@ import (
 
 func TestMCPServerDefaultsAndPartialFiles(t *testing.T) {
 	def := Default().MCPServer
-	if !def.Enabled || !def.Tools.Diagnostics || !def.Tools.Editor || !def.Tools.Terminals || !def.Tools.Tests || !def.Tools.Kubernetes || def.TerminalLines != 200 {
+	// Terminal output and cluster status are opt-in (see MCPTools).
+	if !def.Enabled || !def.Tools.Diagnostics || !def.Tools.Editor || def.Tools.Terminals || !def.Tools.Tests || def.Tools.Kubernetes || def.TerminalLines != 200 {
 		t.Fatalf("defaults %+v", def)
 	}
-	got, err := Load(write(t, `{"mcpServer":{"tools":{"kubernetes":false},"terminalLines":5000}}`))
+	got, err := Load(write(t, `{"mcpServer":{"tools":{"terminals":true,"editor":false},"terminalLines":5000}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	m := got.MCPServer
-	if !m.Enabled || m.Tools.Kubernetes || !m.Tools.Terminals || m.TerminalLines != MaxTerminalLines {
+	if !m.Enabled || m.Tools.Kubernetes || !m.Tools.Terminals || m.Tools.Editor || !m.Tools.Diagnostics || m.TerminalLines != MaxTerminalLines {
 		t.Fatalf("partial file gave %+v", m)
 	}
 	got, _ = Load(write(t, `{"mcpServer":{"enabled":false,"terminalLines":"many"}}`))

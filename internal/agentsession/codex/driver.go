@@ -126,25 +126,34 @@ func (d *Driver) start(ctx context.Context, cwd, resumeID string, sink agentsess
 	}
 	shellenv.Wait()
 	opts := d.opts.current()
-	var mcp *agentsession.MCPServer
-	if srv, ok := opts.MCP.Offer(cwd); ok {
-		mcp = &srv
-	}
-	env := buildEnv(opts.Env, mcp)
-	path, err := resolveCommand(orDefault(opts.Binary, "codex"), env)
+	path, err := resolveCommand(orDefault(opts.Binary, "codex"), buildEnv(opts.Env, nil))
 	if err != nil {
 		return agentsession.SessionInfo{}, err
 	}
+	var mcp *agentsession.MCPServer
+	if opts.MCP != nil && supportsHTTPMCP(path, buildEnv(opts.Env, nil)) {
+		if srv, ok := opts.MCP.Offer(cwd); ok {
+			mcp = &srv
+		}
+	}
+	env := buildEnv(opts.Env, mcp)
 	args, err := buildArgs(opts, opts.Untrusted != nil && opts.Untrusted(cwd), mcp)
 	if err != nil {
+		mcp.Revoke()
 		return agentsession.SessionInfo{}, fmt.Errorf("codex: %w", err)
 	}
 	s := newSession(cwd, sink)
 	proc, err := startProcess(spawnSpec{path: path, args: args, dir: cwd, env: env}, s.handleRequest, s.handleNotification, s.onExit)
 	if err != nil {
+		mcp.Revoke()
 		s.events.close()
 		return agentsession.SessionInfo{}, err
 	}
+	// The session's token dies with its app-server, however it ends.
+	go func() {
+		<-proc.done
+		mcp.Revoke()
+	}()
 	s.mu.Lock()
 	s.proc = proc
 	s.mu.Unlock()

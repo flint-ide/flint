@@ -9,11 +9,17 @@ import (
 	"flint/internal/testrun"
 )
 
-// Bounds of the kept test runs.
+// Bounds of the kept test runs: how many, nodes per run, and bytes (names
+// and output) per run and in all.
 const (
 	maxRuns        = 16
 	maxNodesPerRun = 20000
+	maxRunBytes    = 4 << 20
+	maxTotalBytes  = 16 << 20
 )
+
+// droppedOutput replaces a test's output once its run is over its byte budget.
+const droppedOutput = "(output not kept: the run printed too much; see Flint's run console)"
 
 // Tests keeps the results of the latest test runs. It is safe for
 // concurrent use.
@@ -27,6 +33,7 @@ type testRunRec struct {
 	started        time.Time
 	nodes          map[string]testrun.Node
 	order          []string
+	bytes          int // of the kept nodes' strings
 	done           bool
 	code           int
 	stopped        bool
@@ -82,14 +89,49 @@ func (t *Tests) Update(id string, nodes []testrun.Node) {
 		return
 	}
 	for _, n := range nodes {
-		if _, known := r.nodes[n.ID]; !known {
+		prev, known := r.nodes[n.ID]
+		if !known {
 			if len(r.order) >= maxNodesPerRun {
 				continue
 			}
 			r.order = append(r.order, n.ID)
 		}
+		r.bytes -= nodeBytes(prev)
+		if r.bytes+nodeBytes(n) > maxRunBytes && n.Output != "" {
+			n.Output = droppedOutput
+		}
+		r.bytes += nodeBytes(n)
 		r.nodes[n.ID] = n
 	}
+	t.trimLocked(r)
+}
+
+// trimLocked forgets the oldest runs other than keep while all runs together
+// hold more than maxTotalBytes.
+func (t *Tests) trimLocked(keep *testRunRec) {
+	total := 0
+	for _, r := range t.runs {
+		total += r.bytes
+	}
+	for i := 0; total > maxTotalBytes && i < len(t.runs); {
+		if t.runs[i] == keep {
+			i++
+			continue
+		}
+		total -= t.runs[i].bytes
+		t.runs = slices.Delete(t.runs, i, i+1)
+	}
+}
+
+func nodeBytes(n testrun.Node) int {
+	return len(n.ID) + len(n.Parent) + len(n.Name) + len(n.Test) + len(n.Output) + len(n.Dir)
+}
+
+// Forget drops run id (it could not start).
+func (t *Tests) Forget(id string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.runs = slices.DeleteFunc(t.runs, func(r *testRunRec) bool { return r.id == id })
 }
 
 // Finish records how run id ended.

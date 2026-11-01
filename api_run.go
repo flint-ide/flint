@@ -201,10 +201,14 @@ func (r *RunAPI) Start(id, root string, cfg runconfig.Config, cols, rows int) er
 	if err != nil {
 		return err
 	}
-	r.app.mcpSources.Terminals.Open(id, mcptools.KindRun, cfg.Name, launch.Cwd)
-	return r.app.runs.Start(id, runner.Spec{
+	opened := r.app.mcpSources.Terminals.OpenNew(id, mcptools.KindRun, cfg.Name, launch.Cwd)
+	err = r.app.runs.Start(id, runner.Spec{
 		Steps: launch.Steps, Cwd: launch.Cwd, Env: launch.Env, PTY: true, Cols: cols, Rows: rows,
 	})
+	if err != nil && opened {
+		r.app.mcpSources.Terminals.Close(id)
+	}
+	return err
 }
 
 // StartTests runs tests under id and returns the run's title. Results stream
@@ -227,8 +231,10 @@ func (a *App) startTestPlan(id string, plan testrun.Plan) error {
 	a.runEvents.mu.Lock()
 	a.runEvents.tests[id] = sink
 	a.runEvents.mu.Unlock()
-	a.mcpSources.Terminals.Open(id, mcptools.KindRun, plan.Title, plan.Cwd)
-	a.mcpSources.Tests.Begin(id, plan.Title, plan.Cwd)
+	opened := a.mcpSources.Terminals.OpenNew(id, mcptools.KindRun, plan.Title, plan.Cwd)
+	if opened {
+		a.mcpSources.Tests.Begin(id, plan.Title, plan.Cwd)
+	}
 	err := a.runs.Start(id, runner.Spec{
 		Steps: plan.Steps, Cwd: plan.Cwd, Env: plan.Env,
 		Filter: func(line []byte) []byte {
@@ -244,6 +250,10 @@ func (a *App) startTestPlan(id string, plan testrun.Plan) error {
 		a.runEvents.mu.Lock()
 		delete(a.runEvents.tests, id)
 		a.runEvents.mu.Unlock()
+		if opened {
+			a.mcpSources.Terminals.Close(id)
+			a.mcpSources.Tests.Forget(id)
+		}
 	}
 	return err
 }

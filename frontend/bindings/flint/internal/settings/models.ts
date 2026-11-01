@@ -497,7 +497,11 @@ export class MCPServer {
 }
 
 /**
- * MCPTools switches the server's tools on and off.
+ * MCPTools switches the server's tools on and off. Diagnostics, the editor
+ * and test results show the project's own state and are on by default.
+ * Terminal output and cluster status can show anything the user saw
+ * (credentials printed outside the project, other clusters' names), so they
+ * are off by default and, when on, the agent asks before each call.
  */
 export class MCPTools {
     "diagnostics": boolean;

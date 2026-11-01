@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -181,6 +182,47 @@ func (h *harness) fakeLog(t *testing.T) []map[string]json.RawMessage {
 		out = append(out, m)
 	}
 	return out
+}
+
+// A session's MCP token is revoked when its process ends (Stop) and when
+// the session never starts.
+func TestMCPTokenIsRevokedWithTheSession(t *testing.T) {
+	var issued, revoked atomic.Int32
+	opts, _ := fakeOptions(t, "text")
+	opts.MCP = func(string) (agentsession.MCPServer, bool) {
+		issued.Add(1)
+		return agentsession.MCPServer{URL: "http://127.0.0.1:1/mcp", Token: "t", Release: func() { revoked.Add(1) }}, true
+	}
+	d := New(opts)
+	t.Cleanup(func() { _ = d.Close() })
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	info, err := d.Start(ctx, newWorkspace(t), (&recorder{}).sink)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revoked.Load() != 0 {
+		t.Fatal("revoked while the session runs")
+	}
+	if err := d.Stop(info.ID); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for revoked.Load() != 1 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if revoked.Load() != 1 {
+		t.Fatalf("token not revoked after Stop (%d)", revoked.Load())
+	}
+
+	bad := opts
+	bad.ExtraArgs = []string{"--permission-mode", "bypassPermissions"}
+	if _, err := New(bad).Start(ctx, newWorkspace(t), (&recorder{}).sink); err == nil {
+		t.Fatal("reserved argument accepted")
+	}
+	if issued.Load() != revoked.Load() {
+		t.Fatalf("issued %d, revoked %d", issued.Load(), revoked.Load())
+	}
 }
 
 func TestTextTurn(t *testing.T) {

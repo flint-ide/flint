@@ -15,7 +15,7 @@ import (
 // openProject makes root the only folder of the workspace, replacing all watchers.
 func (a *App) openProject(root string, w *watcher.Watcher) {
 	a.projMu.Lock()
-	prev := a.watchers
+	prev, prevRoots := a.watchers, a.roots
 	a.roots = []string{root}
 	a.watchers = map[string]*watcher.Watcher{}
 	if w != nil {
@@ -24,6 +24,7 @@ func (a *App) openProject(root string, w *watcher.Watcher) {
 	a.projMu.Unlock()
 	closeAll(prev)
 	a.files.Retain([]string{root})
+	a.forgetMCPRoots(slices.DeleteFunc(slices.Clone(prevRoots), func(r string) bool { return r == root }))
 }
 
 // addRoot attaches root to the workspace; nested or duplicate folders are rejected.
@@ -66,6 +67,7 @@ func (a *App) removeRoot(root string) error {
 		w.Close()
 	}
 	a.files.Retain(roots)
+	a.forgetMCPRoots([]string{root})
 	return nil
 }
 

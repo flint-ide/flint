@@ -39,8 +39,7 @@ func TestDescribeTool(t *testing.T) {
 		{"Skill", `{"skill":"pdf"}`, agentsession.ToolOther, "Skill: pdf", nil, "", ""},
 		{"mcp__bad", `{}`, agentsession.ToolOther, "mcp__bad", nil, "", ""},
 		{"mcp__github__create_issue", `{}`, agentsession.ToolOther, "github: create_issue", nil, "", ""},
-		// Flint's own MCP server only offers read-only tools about the project.
-		{"mcp__flint__get_diagnostics", `{}`, agentsession.ToolRead, "Flint: get_diagnostics", []string{cwd}, "", ""},
+		{"mcp__flint__get_diagnostics", `{}`, agentsession.ToolOther, "flint: get_diagnostics", nil, "", ""},
 		{"Mystery", `not json`, agentsession.ToolOther, "Mystery", nil, "not json", ""},
 	}
 	for _, tt := range tests {
@@ -256,6 +255,32 @@ func TestResolveBinary(t *testing.T) {
 	}
 	if _, err := resolveBinary("flint-no-such-binary"); err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Fatalf("missing = %v", err)
+	}
+}
+
+// Only a session given Flint's server treats "flint" tools as Flint's, and
+// only the project-state tools become reads; terminal output and cluster
+// status keep asking.
+func TestFlintToolClassification(t *testing.T) {
+	cwd := t.TempDir()
+	call := func(name string, flintMCP bool) agentsession.ToolCall {
+		return flintTool(describeTool("id", name, json.RawMessage(`{}`), cwd), name, cwd, flintMCP)
+	}
+	for _, tool := range []string{"get_diagnostics", "get_editor_state", "get_test_results"} {
+		if tc := call("mcp__flint__"+tool, true); tc.Kind != agentsession.ToolRead || tc.Title != "Flint: "+tool || len(tc.Paths) != 1 || tc.Paths[0] != cwd {
+			t.Errorf("%s: %+v", tool, tc)
+		}
+	}
+	for _, tool := range []string{"get_terminal_output", "get_kubernetes_status", "anything_else"} {
+		if tc := call("mcp__flint__"+tool, true); tc.Kind != agentsession.ToolOther || tc.Title != "Flint: "+tool {
+			t.Errorf("%s must ask: %+v", tool, tc)
+		}
+	}
+	if tc := call("mcp__flint__get_diagnostics", false); tc.Kind != agentsession.ToolOther || tc.Title != "flint: get_diagnostics" {
+		t.Errorf("someone else's flint server treated as Flint's: %+v", tc)
+	}
+	if tc := call("Read", true); tc.Kind != agentsession.ToolRead || tc.Title == "" {
+		t.Errorf("built-in tool changed: %+v", tc)
 	}
 }
 

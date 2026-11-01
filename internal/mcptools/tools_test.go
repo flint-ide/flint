@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"flint/internal/agentsession"
 	"flint/internal/kube"
 	"flint/internal/lsp"
 	"flint/internal/mcpserver"
@@ -56,6 +57,15 @@ func TestToolsFollowConfigAndHaveSchemas(t *testing.T) {
 	s.Kube = nil
 	if got := s.Tools(Config{Kubernetes: true}); len(got) != 0 {
 		t.Fatal("kubernetes offered without a reader")
+	}
+}
+
+// The tools agents may run without asking (agentsession.MCPReadTools) exist
+// and are only the ones showing the project's own state.
+func TestReadToolsAreProjectState(t *testing.T) {
+	want := []string{ToolDiagnostics, ToolEditor, ToolTests}
+	if !slices.Equal(agentsession.MCPReadTools, want) {
+		t.Fatalf("MCPReadTools = %v, want %v", agentsession.MCPReadTools, want)
 	}
 }
 

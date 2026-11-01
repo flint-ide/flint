@@ -214,9 +214,10 @@ func (s *Server) callTool(ctx context.Context, root string, params json.RawMessa
 	}
 	ctx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
+	sem := s.sem(root) // per project: one busy project doesn't stall another
 	select {
-	case s.calls <- struct{}{}:
-		defer func() { <-s.calls }()
+	case sem <- struct{}{}:
+		defer func() { <-sem }()
 	case <-ctx.Done():
 		return callResult{Content: []textContent{{Type: "text", Text: "Flint is busy; try again."}}, IsError: true}, nil
 	}

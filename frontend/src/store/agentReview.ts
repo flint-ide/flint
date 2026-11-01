@@ -7,7 +7,7 @@ import { Workspace, errorMessage } from '../api/backend'
 import { askAgent } from '../lib/askAgent'
 import { createStore } from '../lib/store'
 import {
-  countSummary, findingAttachments, findingPrompt, findingsPrompt, placed, reanchorPath, sortFindings, splitLines,
+  countSummary, findingAttachments, findingPrompt, findingsPrompt, fixAllSelection, placed, reanchorPaths, sortFindings, splitLines,
   type Finding, type PlacedFinding,
 } from '../lib/agentReview'
 import { showToast } from './dialog'
@@ -99,6 +99,8 @@ export async function reviewChanges(extraPath?: string): Promise<void> {
     const reviewed = res.files ?? []
     useAgentReview.setState({ root, agent: res.agent, files: reviewed, findings, notes: res.notes ?? [], error: '', doneAt: Date.now() })
     watchFiles()
+    // Files edited while the agent worked: place the findings on today's lines.
+    void replace(root, [...new Set(findings.map((f) => f.path))])
     if (findings.length === 0) showToast(`${res.agent}: no problems found in ${reviewed.length} file${reviewed.length === 1 ? '' : 's'}`)
   } catch (err) {
     if (run.cancelled) return
@@ -151,11 +153,11 @@ export async function fixFinding(id: string): Promise<void> {
   if (f) await handToChat([f], findingPrompt(f))
 }
 
-/** Puts every finding in one draft. */
+/** Puts the findings (the worst MAX_FIX_ALL) in one draft. */
 export async function fixAllFindings(): Promise<void> {
   const { findings } = useAgentReview.getState()
   if (findings.length === 0) return
-  await handToChat(findings, findingsPrompt(findings))
+  await handToChat(fixAllSelection(findings), findingsPrompt(findings))
 }
 
 async function handToChat(findings: PlacedFinding[], prompt: string): Promise<void> {
@@ -201,16 +203,17 @@ function watchFiles(): void {
   for (const path of wanted) {
     if (!watchers.has(path) && root) {
       const rel = path.slice(root.length + 1)
-      watchers.set(path, onFileChanged(path, () => void replace(root, rel)))
+      watchers.set(path, onFileChanged(path, () => void replace(root, [rel])))
     }
   }
 }
 
-async function replace(root: string, rel: string): Promise<void> {
-  const lines = await readLines(absPath(root, rel))
+/** Reads the files rels (repo-relative) and places their findings anew. */
+async function replace(root: string, rels: string[]): Promise<void> {
+  const read = await Promise.all(rels.map(async (rel) => [rel, await readLines(absPath(root, rel))] as const))
   const s = useAgentReview.getState()
   if (s.root !== root) return // cleared or reviewed again meanwhile
-  const findings = reanchorPath(s.findings, rel, lines)
+  const findings = reanchorPaths(s.findings, new Map(read))
   if (findings.some((f, i) => f !== s.findings[i])) useAgentReview.setState({ findings: sortFindings(findings) })
 }
 

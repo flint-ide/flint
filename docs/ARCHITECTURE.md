@@ -359,6 +359,7 @@ internal/diag               Flint's log file, bug report and diagnostics
 internal/tools              external tools Flint drives: one table (feature, install command, docs) and the installed-version check
 internal/update             new-release check: GitHub's latest-release API (net/http), SemVer compare, link allow-list
 internal/redact             removes credentials and the home path from logs, reports and agent context
+internal/prompts            prompt library: Markdown prompts (project, personal, built-in), front matter, placeholders
 internal/agent              claude / codex: headless runs and interactive commands
 internal/shellenv           PATH from the login shell (git hooks, brew, nvm inside a GUI app)
 internal/watcher            FSEvents (macOS) / inotify (Linux) + debounce

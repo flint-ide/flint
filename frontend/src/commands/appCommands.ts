@@ -5,6 +5,7 @@ import { parseKeys, registerCommands, type Command } from '../lib/commands'
 import { attachSelectionToAgent } from '../lib/agentContext'
 import { registerFeatureCommands } from './featureCommands'
 import { registerTaskCommands } from './taskCommands'
+import { registerPromptCommands } from './promptCommands'
 import { registerReviewCommands } from './reviewCommands'
 import { requestCloseTab } from '../components/editor/EditorArea'
 import { useWorkspace } from '../store/workspace'
@@ -53,8 +54,10 @@ export function registerAppCommands(): () => void {
   const offFeatures = registerFeatureCommands()
   const offRoots = registerWorkspaceRootCommands()
   const offTasks = registerTaskCommands()
+  const offPrompts = registerPromptCommands()
   const offReview = registerReviewCommands()
   return () => {
+    offPrompts()
     offReview()
     offTasks()
     offStatic()

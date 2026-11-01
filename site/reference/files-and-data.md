@@ -18,6 +18,7 @@ Most of Flint's data lives in:
 | `sessions/` | One file per project: open tabs, terminals, agent conversations, attached projects, the selected run configuration and breakpoints. |
 | `scratch/` | Scratchpads: SQL consoles and notes, with the connection and database each console uses. |
 | `history/` | Query history, one file per database connection. |
+| `prompts/` | Your personal [prompts](../guides/ai-agents.md#prompt-library), one Markdown file each. Project prompts live in the repository's `.flint/prompts`. |
 
 ### Project sessions
 

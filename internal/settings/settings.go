@@ -110,6 +110,8 @@ type Settings struct {
 	InlineEdit InlineEdit `json:"inlineEdit"`
 	// AgentTasks configures agent tasks (worktree folder, branch prefix).
 	AgentTasks AgentTasks `json:"agentTasks"`
+	// Prompts configures the prompt library (prompts.go).
+	Prompts Prompts `json:"prompts"`
 	// AgentReview configures Review Changes with Agent (review.go).
 	AgentReview AgentReview `json:"agentReview"`
 	// CI configures following your pull requests' checks (ci.go).
@@ -143,6 +145,7 @@ func Default() Settings {
 		Completions:        defaultCompletions(),
 		InlineEdit:         defaultInlineEdit(),
 		AgentTasks:         defaultAgentTasks(),
+		Prompts:            defaultPrompts(),
 		AgentReview:        defaultAgentReview(),
 		CI:                 defaultCI(),
 		CustomTheme:        defaultCustomTheme(),

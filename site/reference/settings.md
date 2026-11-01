@@ -105,6 +105,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `completions` | object | see below | Inline suggestions from a code model (off by default). See [completions](#completions). |
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
 | `agentTasks` | object | see below | Where agent task worktrees go and how their branches are named. See [agentTasks](#agenttasks). |
+| `prompts` | object | see below | The prompt library of the agent chat (`/`). See [prompts](#prompts). |
 | `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
 | `ci` | object | see below | Following your pull requests' CI: poll interval, Fix with agent's log excerpt, notifications. See [ci](#ci). |
 
@@ -278,6 +279,15 @@ Used by [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel).
 
 Slashes in a branch name become dashes in the folder name. The tasks themselves are kept in `state.json`.
 
+### prompts
+
+Used by the [prompt library](../guides/ai-agents.md#prompt-library).
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `builtins` | boolean | `true` | Offer the prompts that ship with Flint (`/review`, `/test`, `/explain`, `/fix`). |
+
+The prompts themselves are Markdown files, not settings: personal ones in the `prompts` folder next to `settings.json`, project ones in the repository's `.flint/prompts`.
 ### agentReview
 
 Used by [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-agent). Settings ▸ Agents ▸ Review.

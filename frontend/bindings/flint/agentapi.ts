@@ -12,6 +12,10 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as agent$0 from "./internal/agent/models.js";
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
 /**
@@ -21,6 +25,19 @@ export function Info(): $CancellablePromise<$models.AgentInfo> {
     return $Call.ByID(2711631089).then(($result: any) => {
         return $$createType0($result);
     });
+}
+
+/**
+ * InlineEdit asks the default agent to rewrite req.Selection of the file at
+ * req.Path (absolute, inside an open folder) as req.Instruction says and
+ * returns the replacement text; the editor applies it. The run is headless,
+ * in the file's folder, like commit messages: in Restricted Mode Claude
+ * loads only the user's settings and extra arguments are dropped, and a
+ * custom agent refuses to start. Cancelling the call (Esc in the editor)
+ * stops the agent.
+ */
+export function InlineEdit(req: agent$0.EditRequest): $CancellablePromise<string> {
+    return $Call.ByID(1195511356, req);
 }
 
 /**

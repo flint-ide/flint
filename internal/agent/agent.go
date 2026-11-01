@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"flint/internal/shellenv"
 )
@@ -63,6 +64,9 @@ func Headless(ctx context.Context, k Kind, cfg Config, dir, prompt, input string
 		cmd.Stdin = strings.NewReader(input)
 	}
 	cmd.Dir = dir
+	killTreeOnCancel(cmd)
+	// A child that keeps the output pipes open must not hold the run open.
+	cmd.WaitDelay = 2 * time.Second
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {

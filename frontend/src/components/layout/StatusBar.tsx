@@ -12,6 +12,8 @@ import { useGit } from '../../store/git'
 import { showFileHistory, toggleBlame, useGitHistory } from '../../store/gitHistory'
 import { dismissUpdate, downloadUpdate, skipUpdate, useUpdate } from '../../store/update'
 import { offerText } from '../../lib/update'
+import { useSettings } from '../../store/settings'
+import { useCompletionStatus } from '../../store/editorAi'
 
 export function StatusBar() {
   const root = useWorkspace((s) => s.root)
@@ -30,6 +32,7 @@ export function StatusBar() {
       {root && <span>{files.toLocaleString()} files</span>}
       <span>{terminals} {terminals === 1 ? 'terminal' : 'terminals'}</span>
       <AgentUsageWidget roots={roots} />
+      <CompletionsWidget />
       <LspWidget path={active?.kind === 'file' ? active.path : null} />
       <UpdateWidget />
     </footer>
@@ -105,6 +108,23 @@ function AgentUsageWidget({ roots }: { roots: string[] }) {
 function usageLabel(t: UsageTotals): string {
   const cost = t.costUsd > 0 ? ` · ${formatCost(t.costUsd)}` : ''
   return `${formatTokens(t.inputTokens + t.outputTokens)} tokens${cost}`
+}
+
+/** Inline completions: shown while they are on, with the last error (e.g. Ollama not running). */
+function CompletionsWidget() {
+  const on = useSettings((s) => s.settings.completions.enabled)
+  const model = useSettings((s) => s.settings.completions.model)
+  const error = useCompletionStatus((s) => s.error)
+  if (!on) return null
+  return (
+    <button
+      className={`status-completions${error ? ' error' : ''}`}
+      title={error ? `Completions: ${error}` : `Inline completions from ${model} (Tab accepts, Esc dismisses)`}
+      onClick={() => error && showToast(`Completions: ${error}`, 'error')}
+    >
+      {error ? '⚠' : '✦'} Completions
+    </button>
+  )
 }
 
 const LANG_BY_EXT: Record<string, string> = {

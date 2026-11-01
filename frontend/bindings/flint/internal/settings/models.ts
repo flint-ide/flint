@@ -56,6 +56,83 @@ export class AgentSettings {
 }
 
 /**
+ * Completions configures inline suggestions from a code model ("completions").
+ * The API key, when the endpoint needs one, is in the Keychain, never here.
+ */
+export class Completions {
+    /**
+     * Enabled turns suggestions on (off by default: they send code to Endpoint).
+     */
+    "enabled": boolean;
+
+    /**
+     * Provider is "ollama" (/api/generate) or "openai" (an OpenAI-compatible
+     * /v1/completions).
+     */
+    "provider": string;
+
+    /**
+     * Endpoint is the server's base URL; http only for localhost.
+     */
+    "endpoint": string;
+
+    /**
+     * Model is a fill-in-the-middle capable code model.
+     */
+    "model": string;
+
+    /**
+     * DebounceMs is the typing pause before a suggestion is asked for.
+     */
+    "debounceMs": number;
+
+    /**
+     * MaxTokens bounds the length of a suggestion.
+     */
+    "maxTokens": number;
+
+    /**
+     * ContextLines is how many lines before and after the cursor are sent.
+     */
+    "contextLines": number;
+
+    /** Creates a new Completions instance. */
+    constructor($$source: Partial<Completions> = {}) {
+        if (!("enabled" in $$source)) {
+            this["enabled"] = false;
+        }
+        if (!("provider" in $$source)) {
+            this["provider"] = "";
+        }
+        if (!("endpoint" in $$source)) {
+            this["endpoint"] = "";
+        }
+        if (!("model" in $$source)) {
+            this["model"] = "";
+        }
+        if (!("debounceMs" in $$source)) {
+            this["debounceMs"] = 0;
+        }
+        if (!("maxTokens" in $$source)) {
+            this["maxTokens"] = 0;
+        }
+        if (!("contextLines" in $$source)) {
+            this["contextLines"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Completions instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Completions {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Completions($$parsedSource as Partial<Completions>);
+    }
+}
+
+/**
  * CustomAgent is an agent Flint talks to over the Agent Client Protocol
  * ("customAgents"): any CLI with an ACP mode, added without code. There is no
  * environment field on purpose: settings.json is plain text, so API keys
@@ -156,6 +233,33 @@ export class Font {
     static createFrom($$source: any = {}): Font {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new Font($$parsedSource as Partial<Font>);
+    }
+}
+
+/**
+ * InlineEdit configures "Edit with Agent" on the selection.
+ */
+export class InlineEdit {
+    /**
+     * ContextLines is how many lines before and after the selection the agent sees.
+     */
+    "contextLines": number;
+
+    /** Creates a new InlineEdit instance. */
+    constructor($$source: Partial<InlineEdit> = {}) {
+        if (!("contextLines" in $$source)) {
+            this["contextLines"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new InlineEdit instance from a string or object.
+     */
+    static createFrom($$source: any = {}): InlineEdit {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new InlineEdit($$parsedSource as Partial<InlineEdit>);
     }
 }
 
@@ -398,6 +502,16 @@ export class Settings {
      */
     "mcpServer": MCPServer;
 
+    /**
+     * Completions configures inline suggestions from a code model (editorai.go).
+     */
+    "completions": Completions;
+
+    /**
+     * InlineEdit configures "Edit with Agent" on the selection (editorai.go).
+     */
+    "inlineEdit": InlineEdit;
+
     /** Creates a new Settings instance. */
     constructor($$source: Partial<Settings> = {}) {
         if (!("version" in $$source)) {
@@ -445,6 +559,12 @@ export class Settings {
         if (!("mcpServer" in $$source)) {
             this["mcpServer"] = (new MCPServer());
         }
+        if (!("completions" in $$source)) {
+            this["completions"] = (new Completions());
+        }
+        if (!("inlineEdit" in $$source)) {
+            this["inlineEdit"] = (new InlineEdit());
+        }
 
         Object.assign(this, $$source);
     }
@@ -462,6 +582,8 @@ export class Settings {
         const $$createField12_0 = $$createType9;
         const $$createField13_0 = $$createType10;
         const $$createField14_0 = $$createType11;
+        const $$createField15_0 = $$createType12;
+        const $$createField16_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -490,6 +612,12 @@ export class Settings {
         if ("mcpServer" in $$parsedSource) {
             $$parsedSource["mcpServer"] = $$createField14_0($$parsedSource["mcpServer"]);
         }
+        if ("completions" in $$parsedSource) {
+            $$parsedSource["completions"] = $$createField15_0($$parsedSource["completions"]);
+        }
+        if ("inlineEdit" in $$parsedSource) {
+            $$parsedSource["inlineEdit"] = $$createField16_0($$parsedSource["inlineEdit"]);
+        }
         return new Settings($$parsedSource as Partial<Settings>);
     }
 }
@@ -507,3 +635,5 @@ const $$createType8 = LanguageServerSettings.createFrom;
 const $$createType9 = $Create.Map($Create.Any, $$createType8);
 const $$createType10 = Refresh.createFrom;
 const $$createType11 = MCPServer.createFrom;
+const $$createType12 = Completions.createFrom;
+const $$createType13 = InlineEdit.createFrom;

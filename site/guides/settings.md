@@ -8,7 +8,7 @@ Flint's settings open in a tab. Every change applies immediately, without a rest
 - **flint ▸ Settings…** in the menu bar
 - "Settings…" in the command palette
 
-The tab has ten sections: Appearance, Editor, Terminal, Agents, Agent Context, Language Servers, Refresh, TODO List, Keymap and Updates.
+The tab has eleven sections: Appearance, Editor, Terminal, Agents, Agent Context, AI in the Editor, Language Servers, Refresh, TODO List, Keymap and Updates.
 
 ## Appearance
 
@@ -46,6 +46,17 @@ What agent chats can read from Flint through its own MCP server (see [What agent
 - **Share Flint's context with agents**: offer the server to agent chats. On by default. Turning it off cuts running chats off at once.
 - **Tools**: diagnostics, open editors and selection, terminal output, test results and Kubernetes status, each on or off. Changes apply to running chats too.
 - **Terminal lines**: the most lines of one terminal's output an agent gets, 10 to 2000 (default 200).
+## AI in the Editor
+
+- **Edit with Agent (⌘I) ▸ Context lines**: lines above and below the selection the agent sees (0 to 500, default 60).
+- **Suggest code as I type**: inline completions from a code model. Off by default.
+- **Provider**: Ollama, or an OpenAI-compatible server with `/v1/completions`.
+- **Endpoint**: the server's base URL; plain `http` only for `localhost`.
+- **Model**: a fill-in-the-middle code model (default `qwen2.5-coder:1.5b-base`).
+- **Typing pause** (default 300 ms), **Longest suggestion** (default 64 tokens) and **Context lines** (default 100).
+- **API key**: only if the endpoint needs one. It is stored in the macOS Keychain, never in `settings.json`; **Remove** deletes it.
+
+See [AI in the editor](editor-and-navigation.md#ai-in-the-editor).
 
 ## Language Servers
 

@@ -94,6 +94,10 @@ type Settings struct {
 	Refresh Refresh `json:"refresh"`
 	// MCPServer configures what Flint's own MCP server tells agents.
 	MCPServer MCPServer `json:"mcpServer"`
+	// Completions configures inline suggestions from a code model (editorai.go).
+	Completions Completions `json:"completions"`
+	// InlineEdit configures "Edit with Agent" on the selection (editorai.go).
+	InlineEdit InlineEdit `json:"inlineEdit"`
 }
 
 // Default returns the settings Flint uses when nothing is configured.
@@ -120,6 +124,8 @@ func Default() Settings {
 		LanguageServers:    map[string]LanguageServerSettings{},
 		Refresh:            defaultRefresh(),
 		MCPServer:          defaultMCPServer(),
+		Completions:        defaultCompletions(),
+		InlineEdit:         defaultInlineEdit(),
 	}
 }
 
@@ -183,6 +189,8 @@ func Normalize(s Settings) Settings {
 	out.LanguageServers = normalizeLanguageServers(s.LanguageServers)
 	out.Refresh = normalizeRefresh(s.Refresh)
 	out.MCPServer = normalizeMCPServer(s.MCPServer)
+	out.Completions = normalizeCompletions(s.Completions)
+	out.InlineEdit = normalizeInlineEdit(s.InlineEdit)
 	return out
 }
 
@@ -256,6 +264,12 @@ func Validate(s Settings) error {
 		return err
 	}
 	if err := validateMCPServer(s.MCPServer); err != nil {
+		return err
+	}
+	if err := validateCompletions(s.Completions); err != nil {
+		return err
+	}
+	if err := validateInlineEdit(s.InlineEdit); err != nil {
 		return err
 	}
 	return validateRefresh(s.Refresh)

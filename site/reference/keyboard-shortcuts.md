@@ -59,6 +59,9 @@ These are Flint's default shortcuts. All of them, except the ones that belong to
 |---|---|
 | `⌘L` | Send to agent (selection in the editor or terminal) |
 | `⌥⇧⌘L` | Fix all problems in file with the agent |
+| `⌘I` | Edit the selection (or the current line) with the agent; `Esc` closes the prompt or stops the agent |
+| `⇥` | Accept an inline completion (when one is shown; otherwise indent) |
+| `Esc` | Dismiss an inline completion |
 | `↵` | Send the message (in the chat) |
 | `⇧↵` | New line (in the chat) |
 | `Esc` | Stop the agent while it works |

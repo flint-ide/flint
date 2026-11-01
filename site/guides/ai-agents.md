@@ -129,6 +129,18 @@ You never have to accept diffs one by one. Edits are applied directly, show up i
 - **✦ Generate message** in the Commit panel gives the agent the diff of the ticked files and your recent commit messages. The result lands in the message field for you to edit.
 - **Resolve with claude** (or your default agent, when it is Claude Code or Codex) appears when there are merge conflicts. It opens an interactive agent session in a new terminal. The agent runs `git add` on resolved files but doesn't commit.
 
+## Edit with Agent in the editor
+
+Select code (or put the cursor on a line) and press `⌘I` ("Edit Selection with Agent…"). A small prompt opens above it; type what to change, for example "add error handling", and press `↵`.
+
+- The default agent runs once, headless, like **Generate message**. It gets the file's path, its language, the selection and the lines around it (Settings ▸ AI in the Editor ▸ Context lines, 60 by default), and is asked for the replacement text only. Secrets in the surrounding lines are redacted; a selection that contains something that looks like a credential is not sent.
+- The answer replaces the selection directly, as one change: one `⌘Z` takes it back. There is no accept or reject step.
+- If you edit the selected code while the agent works, its answer is not applied and the prompt says so. Typing elsewhere in the file is fine.
+- `Esc` closes the prompt; while the agent works, it also stops the agent. Errors (no agent installed, a timeout) appear in the prompt.
+- In Restricted Mode the run follows the rules below: Claude Code without the project's settings, no extra arguments, and custom ACP agents don't start.
+
+Change the shortcut in Settings ▸ Keymap.
+
 ## Notifications
 
 When an agent turn finishes while Flint isn't the active app, you get a macOS notification (click it to jump to the chat) and a badge on the Dock icon. Turn this off in Settings ▸ Agents.

@@ -76,6 +76,7 @@ func main() {
 			application.NewService(&KubeAPI{app: flint}),
 			application.NewService(&DiagnosticsAPI{app: flint}),
 			application.NewService(&UpdateAPI{app: flint}),
+			application.NewService(newCompletionsAPI(flint)),
 		},
 	})
 	flint.wails = app

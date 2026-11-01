@@ -84,6 +84,13 @@ On any error or warning, **Fix with agent** sends the problem (file, position, s
 
 > **Note:** In [Restricted Mode](restricted-mode.md), rust-analyzer and the Python servers don't start, because they run code from the project. They start as soon as you trust the folder.
 
+## AI in the editor
+
+- **Edit with Agent** (`⌘I`): type an instruction for the selection or the current line; the default agent's answer replaces it in place, and one `⌘Z` undoes it. See [Edit with Agent in the editor](ai-agents.md#edit-with-agent-in-the-editor).
+- **Inline completions** (off by default): after a short typing pause, a local code model suggests the code at the cursor as faint ghost text. `Tab` accepts it (without a suggestion, `Tab` indents as usual); `Esc`, moving the cursor or typing something else dismisses it, and typing its next characters keeps the rest. Suggestions are not asked for with a selection, with several cursors, or in the middle of a word.
+
+To turn completions on, install [Ollama](https://ollama.com), pull a small fill-in-the-middle model (for example `ollama pull qwen2.5-coder:1.5b-base`), and tick **Suggest code as I type** in Settings ▸ AI in the Editor (or run "Toggle Inline Completions"). An OpenAI-compatible server with `/v1/completions` (llama.cpp, vLLM, LM Studio or a hosted one) works too. Plain `http` is allowed only for `localhost`; any other endpoint needs `https`, and secrets in the code are redacted before they are sent there. An API key, if the endpoint needs one, is kept in the macOS Keychain. While completions are on, the status bar shows **✦ Completions**, or **⚠ Completions** with the last error (for example "Ollama is not running") in its tooltip. See [Settings](../reference/settings.md#completions) for the options.
+
 ## Several projects in one window
 
 You can attach more folders to the window, like "Attach project" in IntelliJ.

@@ -8,9 +8,10 @@ import { AgentsSection } from './AgentsSection'
 import { LanguageServersSection } from './LanguageServersSection'
 import { RefreshSection } from './RefreshSection'
 import { McpServerSection } from './McpServerSection'
+import { EditorAiSection } from './EditorAiSection'
 import { NumberField, Row, TextField } from './fields'
 
-type Section = 'appearance' | 'editor' | 'terminal' | 'agents' | 'agentContext' | 'lsp' | 'refresh' | 'todo' | 'keymap' | 'updates'
+type Section = 'appearance' | 'editor' | 'terminal' | 'agents' | 'agentContext' | 'editorAi' | 'lsp' | 'refresh' | 'todo' | 'keymap' | 'updates'
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
@@ -18,6 +19,7 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: 'terminal', label: 'Terminal' },
   { id: 'agents', label: 'Agents' },
   { id: 'agentContext', label: 'Agent Context' },
+  { id: 'editorAi', label: 'AI in the Editor' },
   { id: 'lsp', label: 'Language Servers' },
   { id: 'refresh', label: 'Refresh' },
   { id: 'todo', label: 'TODO List' },
@@ -46,6 +48,7 @@ export function SettingsView({ active }: { active: boolean }) {
         {section === 'terminal' && <TerminalSection />}
         {section === 'agents' && <AgentsSection />}
         {section === 'agentContext' && <McpServerSection />}
+        {section === 'editorAi' && <EditorAiSection />}
         {section === 'lsp' && <LanguageServersSection />}
         {section === 'refresh' && <RefreshSection />}
         {section === 'todo' && <TodoSection />}

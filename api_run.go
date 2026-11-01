@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"flint/internal/mcptools"
 	"flint/internal/runconfig"
 	"flint/internal/runner"
 	"flint/internal/testrun"
@@ -78,6 +79,8 @@ func (e *runEvents) Output(id string, data []byte) {
 	if len(data) == 0 && len(tests) == 0 {
 		return
 	}
+	e.app.mcpSources.Terminals.Write(id, data)
+	e.app.mcpSources.Tests.Update(id, tests)
 	e.emit(RunEvent{ID: id, Data: data, Tests: tests})
 }
 
@@ -87,6 +90,9 @@ func (e *runEvents) Exited(id string, res runner.Result) {
 		// The process is gone, so the parser is no longer used by the runner.
 		tests = append(s.take(), s.parser.Finish(res.Code, res.Stopped)...)
 	}
+	e.app.mcpSources.Tests.Update(id, tests)
+	e.app.mcpSources.Tests.Finish(id, res.Code, res.Stopped, res.ElapsedMs, res.Error)
+	e.app.mcpSources.Terminals.Exit(id, res.Code)
 	e.emit(RunEvent{ID: id, Tests: tests, Exit: &res})
 	e.mu.Lock()
 	delete(e.seq, id)
@@ -195,6 +201,7 @@ func (r *RunAPI) Start(id, root string, cfg runconfig.Config, cols, rows int) er
 	if err != nil {
 		return err
 	}
+	r.app.mcpSources.Terminals.Open(id, mcptools.KindRun, cfg.Name, launch.Cwd)
 	return r.app.runs.Start(id, runner.Spec{
 		Steps: launch.Steps, Cwd: launch.Cwd, Env: launch.Env, PTY: true, Cols: cols, Rows: rows,
 	})
@@ -220,6 +227,8 @@ func (a *App) startTestPlan(id string, plan testrun.Plan) error {
 	a.runEvents.mu.Lock()
 	a.runEvents.tests[id] = sink
 	a.runEvents.mu.Unlock()
+	a.mcpSources.Terminals.Open(id, mcptools.KindRun, plan.Title, plan.Cwd)
+	a.mcpSources.Tests.Begin(id, plan.Title, plan.Cwd)
 	err := a.runs.Start(id, runner.Spec{
 		Steps: plan.Steps, Cwd: plan.Cwd, Env: plan.Env,
 		Filter: func(line []byte) []byte {

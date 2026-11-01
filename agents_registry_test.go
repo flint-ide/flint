@@ -43,17 +43,17 @@ func TestSyncCustomAgents(t *testing.T) {
 	opencode := settings.CustomAgent{ID: "opencode", Command: "opencode", Args: []string{"acp"}}
 	never := func(string) bool { return false }
 
-	syncCustomAgents(m, nil, []settings.CustomAgent{gemini, opencode}, never)
+	syncCustomAgents(m, nil, []settings.CustomAgent{gemini, opencode}, never, nil)
 	if got := m.Agents(); !slices.Equal(got, []string{"gemini", "opencode"}) {
 		t.Fatalf("Agents() = %v", got)
 	}
 	changed := opencode
 	changed.Args = []string{"acp", "--pure"}
-	syncCustomAgents(m, []settings.CustomAgent{gemini, opencode}, []settings.CustomAgent{changed}, never)
+	syncCustomAgents(m, []settings.CustomAgent{gemini, opencode}, []settings.CustomAgent{changed}, never, nil)
 	if got := m.Agents(); !slices.Equal(got, []string{"opencode"}) {
 		t.Fatalf("after removing gemini: Agents() = %v", got)
 	}
-	syncCustomAgents(m, []settings.CustomAgent{changed}, nil, never)
+	syncCustomAgents(m, []settings.CustomAgent{changed}, nil, never, nil)
 	if got := m.Agents(); len(got) != 0 {
 		t.Fatalf("after removing all: Agents() = %v", got)
 	}
@@ -66,7 +66,7 @@ func TestCustomAgentNeedsTrustedFolder(t *testing.T) {
 	untrusted := func(string) bool { return !trusted }
 	m := as.NewManager(func(as.Event) {})
 	t.Cleanup(func() { _ = m.Close() })
-	syncCustomAgents(m, nil, []settings.CustomAgent{{ID: "fake", Command: cmd}}, untrusted)
+	syncCustomAgents(m, nil, []settings.CustomAgent{{ID: "fake", Command: cmd}}, untrusted, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()

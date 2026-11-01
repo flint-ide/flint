@@ -23,8 +23,8 @@ type AgentChatAPI struct {
 // newAgentManager builds the session manager with every installed driver.
 func newAgentManager(a *App) *as.Manager {
 	m := as.NewManager(func(e as.Event) { a.emit(eventAgentEvent, e) })
-	registerDrivers(m, a.untrusted, a.agentConfig)
-	syncCustomAgents(m, nil, a.currentSettings().CustomAgents, a.untrusted)
+	registerDrivers(m, a.untrusted, a.agentConfig, a.offerMCP)
+	syncCustomAgents(m, nil, a.currentSettings().CustomAgents, a.untrusted, a.offerMCP)
 	if p, ok := a.agentPolicy(); ok {
 		m.SetPolicy(p)
 	}

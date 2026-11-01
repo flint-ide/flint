@@ -11,6 +11,7 @@ import * as DebugAPI from "./debugapi.js";
 import * as DiagnosticsAPI from "./diagnosticsapi.js";
 import * as DiffAPI from "./diffapi.js";
 import * as DockerAPI from "./dockerapi.js";
+import * as EditorContextAPI from "./editorcontextapi.js";
 import * as GitAPI from "./gitapi.js";
 import * as GitHubAPI from "./githubapi.js";
 import * as HTTPAPI from "./httpapi.js";
@@ -38,6 +39,7 @@ export {
     DiagnosticsAPI,
     DiffAPI,
     DockerAPI,
+    EditorContextAPI,
     GitAPI,
     GitHubAPI,
     HTTPAPI,

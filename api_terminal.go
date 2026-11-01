@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"flint/internal/mcptools"
 	"flint/internal/terminal"
 )
 
@@ -49,9 +50,11 @@ func (e *terminalEvents) Output(id string, data []byte) {
 	defer e.mu.Unlock() // stamp and emit together so sequence order equals send order
 	e.seq[id]++
 	e.app.emit(eventTermData, TermData{ID: id, Seq: e.seq[id], Data: data})
+	e.app.mcpSources.Terminals.Write(id, data)
 }
 
 func (e *terminalEvents) Exited(id string, code int) {
+	e.app.mcpSources.Terminals.Exit(id, code)
 	e.app.emit(eventTermExit, TermExit{ID: id, Code: code})
 	e.mu.Lock()
 	delete(e.seq, id)
@@ -65,6 +68,7 @@ type TermTitle struct {
 }
 
 func (e *terminalEvents) Title(id string, info terminal.Info) {
+	e.app.mcpSources.Terminals.SetInfo(id, info.Command, info.Cwd)
 	e.app.emit(eventTermTitle, TermTitle{ID: id, Info: info})
 }
 
@@ -83,7 +87,11 @@ func (t *TerminalAPI) Start(id, cwd string, cols, rows int, env map[string]strin
 	if err != nil {
 		return err
 	}
-	return t.app.terminals.Start(id, terminal.Options{Cwd: cwd, Cols: cols, Rows: rows, Env: vars})
+	if err := t.app.terminals.Start(id, terminal.Options{Cwd: cwd, Cols: cols, Rows: rows, Env: vars}); err != nil {
+		return err
+	}
+	t.app.mcpSources.Terminals.Open(id, mcptools.KindTerminal, "", cwd)
+	return nil
 }
 
 var envNameRe = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
@@ -124,4 +132,5 @@ func (t *TerminalAPI) Cwd(id string) string {
 // Close terminates the terminal's shell.
 func (t *TerminalAPI) Close(id string) {
 	t.app.terminals.Close(id)
+	t.app.mcpSources.Terminals.Close(id)
 }

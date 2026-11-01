@@ -29,7 +29,7 @@ Optional tools, used by the features that need them:
 ## First setup
 
 ```bash
-git clone https://github.com/ODudek/flint.git
+git clone https://github.com/flint-ide/flint.git
 cd flint
 cd frontend && npm ci --ignore-scripts && cd ..
 make dev
@@ -117,7 +117,7 @@ wails3 task package:linux    # build/bin/flint-dev-linux-<arch>.tar.gz
 build/bin/flint .
 ```
 
-`package:linux` packs a prefix layout: `bin/flint`, `share/applications/io.github.odudek.flint.desktop` and the icon in `share/icons/hicolor/512x512/apps`. `tar -xzf build/bin/flint-dev-linux-amd64.tar.gz -C ~/.local` installs it for the current user (the launcher appears in the desktop's app list; `~/.local/bin` must be on `PATH`). The binary is the `flint` command: a second `flint <folder>` hands the folder to the running Flint, as on macOS.
+`package:linux` packs a prefix layout: `bin/flint`, `share/applications/io.github.flint_ide.flint.desktop` and the icon in `share/icons/hicolor/512x512/apps`. `tar -xzf build/bin/flint-dev-linux-amd64.tar.gz -C ~/.local` installs it for the current user (the launcher appears in the desktop's app list; `~/.local/bin` must be on `PATH`). The binary is the `flint` command: a second `flint <folder>` hands the folder to the running Flint, as on macOS.
 
 `make dev`, `make server` and `make test` work as on macOS; `make build` and `make install` build the macOS app bundle, so use the tasks above.
 
@@ -192,13 +192,13 @@ CI (`.github/workflows/ci.yml`) runs on every pull request and on pushes to `mai
 
 The `homebrew` job does nothing (it logs a notice) until this is done. It also needs notarized releases, so the Apple signing secrets listed above must be set first.
 
-1. Create a public repository for the tap. Homebrew requires the name to start with `homebrew-`; the default is `ODudek/homebrew-tap`, which users install from with `brew install --cask odudek/tap/flint`.
+1. Create a public repository for the tap. Homebrew requires the name to start with `homebrew-`; the default is `flint-ide/homebrew-tap`, which users install from with `brew install --cask flint-ide/tap/flint`.
 2. Create a fine-grained personal access token with access to that repository only and the **Contents: Read and write** permission.
 3. In this repository's **Settings ▸ Secrets and variables ▸ Actions**, add the token as the secret `HOMEBREW_TAP_TOKEN`.
 4. If the tap has another name, add the repository variable `HOMEBREW_TAP` (`owner/homebrew-name`) and update the `brew install` command in `site/installation.md`.
 5. Publish a release (or re-run the `homebrew` job of the last release's workflow run) and check that `Casks/flint.rb` appears in the tap, then remove the "not published yet" note from `site/installation.md`.
 
-To check the cask locally after a release: `brew install --cask odudek/tap/flint`, `brew audit --cask --online odudek/tap/flint` and `brew uninstall --zap --cask flint`.
+To check the cask locally after a release: `brew install --cask flint-ide/tap/flint`, `brew audit --cask --online flint-ide/tap/flint` and `brew uninstall --zap --cask flint`.
 
 The version is embedded with `-ldflags -X main.version=…` and written into `Info.plist`; local builds report `dev`. To build a universal app locally, run `wails3 task package:universal`.
 

@@ -4,7 +4,7 @@ import { coerceUpdate, offerable, offerText, upToDateText, type UpdateResult } f
 
 const result = (over: Partial<UpdateResult> = {}): UpdateResult => ({
   current: 'v1.2.0',
-  latest: { tag: 'v1.3.0', name: 'Flint 1.3', url: 'https://github.com/ODudek/flint/releases/tag/v1.3.0', publishedAt: '2026-10-30T09:15:00Z' },
+  latest: { tag: 'v1.3.0', name: 'Flint 1.3', url: 'https://github.com/flint-ide/flint/releases/tag/v1.3.0', publishedAt: '2026-10-30T09:15:00Z' },
   available: true,
   dev: false,
   skipped: false,

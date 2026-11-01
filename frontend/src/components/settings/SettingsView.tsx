@@ -160,7 +160,7 @@ function UpdatesSection() {
         <button disabled={checking} onClick={() => void checkForUpdates()}>{checking ? 'Checking…' : 'Check Now'}</button>
       </div>
       <p className="muted settings-note">
-        The check is one anonymous request to api.github.com for the latest release of ODudek/flint, with Flint's version in the User-Agent and no
+        The check is one anonymous request to api.github.com for the latest release of flint-ide/flint, with Flint's version in the User-Agent and no
         account, token, cookie or identifier. Flint never downloads or installs anything itself: Download opens the release page in your browser.
         With the check off, GitHub is asked only when you choose Check Now or Help ▸ Check for Updates….
       </p>

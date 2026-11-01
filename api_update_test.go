@@ -20,7 +20,7 @@ func newUpdateTestApp(t *testing.T, tag string) (*App, *atomic.Int32) {
 	var requests atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
-		_, _ = w.Write([]byte(`{"tag_name": "` + tag + `", "html_url": "https://github.com/ODudek/flint/releases/tag/` + tag + `"}`))
+		_, _ = w.Write([]byte(`{"tag_name": "` + tag + `", "html_url": "https://github.com/flint-ide/flint/releases/tag/` + tag + `"}`))
 	}))
 	t.Cleanup(srv.Close)
 	c := update.New("v1.0.0")

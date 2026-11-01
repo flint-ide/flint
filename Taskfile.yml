@@ -77,7 +77,7 @@ tasks:
     deps: [build]
     vars:
       PKG: '{{.BIN_DIR}}/linux-package'
-      ID: io.github.odudek.flint
+      ID: io.github.flint_ide.flint
       ARCHIVE: '{{.BIN_DIR}}/{{.APP_NAME}}-{{.VERSION}}-linux-{{ARCH}}.tar.gz'
     preconditions:
       - sh: '[ "{{OS}}" = linux ]'

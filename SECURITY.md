@@ -10,7 +10,7 @@ Only the latest release of Flint receives security fixes. Please check that you 
 
 Use GitHub private vulnerability reporting:
 
-1. Go to the [Security tab](https://github.com/ODudek/flint/security) of the repository.
+1. Go to the [Security tab](https://github.com/flint-ide/flint/security) of the repository.
 2. Click **Report a vulnerability**.
 3. Fill in the form.
 

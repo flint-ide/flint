@@ -110,6 +110,7 @@ func main() {
 			},
 			Appearance: appearance,
 		},
+		Linux: linuxWindow(),
 	})
 	win.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		if flint.beforeClose() {
@@ -120,16 +121,15 @@ func main() {
 		flint.emit(eventFilesDropped, droppedPaths(e.Context().DroppedFiles()))
 	})
 	flint.window = win
-	app.Event.OnApplicationEvent(events.Mac.ApplicationDidFinishLaunching, func(*application.ApplicationEvent) {
+	// Show the window as soon as the app has launched, then import the
+	// login-shell PATH (git hooks, rg, brew) in the background: the login shell
+	// runs the user's startup files, and while it ran during launch the window
+	// appeared about 70 ms later. Whatever needs the PATH earlier starts the
+	// import itself (shellenv.Wait). The launch and page-load events are
+	// platform-specific (window_darwin.go, window_other.go).
+	flint.onLaunched(app, win, func() {
 		flint.showWindowEarly()
-		// Import the login-shell PATH (git hooks, rg, brew) in the background,
-		// only now: the login shell runs the user's startup files, and while it
-		// ran during launch the window appeared about 70 ms later. Whatever
-		// needs the PATH earlier starts the import itself (shellenv.Wait).
 		shellenv.Load()
-	})
-	win.OnWindowEvent(events.Mac.WebViewDidFinishNavigation, func(*application.WindowEvent) {
-		flint.onPageLoaded()
 	})
 
 	if err := app.Run(); err != nil {

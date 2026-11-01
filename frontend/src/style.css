@@ -1990,6 +1990,96 @@ button.small {
   color: var(--fg);
 }
 
+/* Merge editor: the result with inline conflict blocks (MergeView). */
+.merge-header {
+  flex-wrap: nowrap;
+}
+.merge-side {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border-left: 3px solid;
+}
+.merge-side.current,
+.cm-merge-tag-current {
+  border-color: var(--git-added);
+  background: color-mix(in srgb, var(--git-added) 16%, transparent);
+}
+.merge-side.incoming,
+.cm-merge-tag-incoming {
+  border-color: var(--git-modified);
+  background: color-mix(in srgb, var(--git-modified) 18%, transparent);
+}
+.merge-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.merge-legend {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 4px 12px;
+  font-size: 11px;
+  border-bottom: 1px solid var(--border);
+}
+.merge-host {
+  flex: 1;
+  min-height: 0;
+}
+.merge-host .cm-editor {
+  height: 100%;
+}
+.cm-merge-current {
+  background: color-mix(in srgb, var(--git-added) 12%, transparent);
+}
+.cm-merge-incoming {
+  background: color-mix(in srgb, var(--git-modified) 14%, transparent);
+}
+.cm-merge-base {
+  background: var(--bg-raised);
+}
+.cm-merge-marker {
+  color: var(--fg-muted);
+  background: var(--bg-raised);
+}
+.cm-merge-tag {
+  margin-left: 10px;
+  padding: 0 6px;
+  border-radius: 4px;
+  border-left: 3px solid;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--fg);
+}
+.cm-merge-tag-base {
+  border-color: var(--fg-muted);
+}
+.cm-merge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 3px 12px;
+  margin-top: 6px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  background: var(--bg-raised);
+  border-top: 1px solid var(--border);
+}
+.cm-merge-count {
+  color: var(--fg-muted);
+}
+.conflict-count {
+  flex: none;
+  font-size: 10px;
+  padding: 0 5px;
+  border-radius: 8px;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--git-deleted) 30%, transparent);
+}
+
 .cm-git-gutter {
   width: 4px;
 }
@@ -3129,7 +3219,7 @@ button.small {
 }
 .debug-scope {
   color: var(--fg-muted);
-  font-family: var(--font-ui, inherit);
+  font-family: var(--font-ui);
 }
 .debug-name {
   color: var(--syn-property);
@@ -4824,6 +4914,61 @@ body.file-drop-target-active::after {
   min-width: 0;
 }
 
+/* ---------- prompt library (/ picker, Run Prompt…) ---------- */
+
+.prompt-picker {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  overflow: hidden;
+}
+.prompt-picker .quick-list {
+  max-height: 220px;
+}
+.prompt-list .quick-item {
+  overflow: hidden;
+}
+.prompt-list .path-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prompt-list .badge.untrusted,
+.prompt-picker-note .untrusted {
+  color: var(--warn);
+}
+.prompt-picker-note {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-top: 1px solid var(--border);
+}
+.prompt-picker-note:first-child {
+  border-top: none;
+}
+.prompt-args {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+}
+.prompt-args label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.prompt-args label span {
+  min-width: 90px;
+  color: var(--fg-muted);
+}
+.prompt-args label input {
+  flex: 1;
+}
+.prompt-args-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
 /* ---------- Review Changes with Agent (components/review) ---------- */
 
 /* Review and Generate message share the row; it wraps rather than breaking a label. */

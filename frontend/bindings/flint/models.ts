@@ -16,6 +16,9 @@ import * as docker$0 from "./internal/docker/models.js";
 import * as git$0 from "./internal/git/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as prompts$0 from "./internal/prompts/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as review$0 from "./internal/review/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -70,6 +73,42 @@ export class AgentInfo {
             $$parsedSource["available"] = $$createField0_0($$parsedSource["available"]);
         }
         return new AgentInfo($$parsedSource as Partial<AgentInfo>);
+    }
+}
+
+/**
+ * AgentText is text from a file on its way to an agent's chat draft.
+ */
+export class AgentText {
+    /**
+     * SecretFile: the file holds credentials as a whole (.env, keys…), so Texts is
+     * empty and the hand-off leaves its contents out.
+     */
+    "secretFile": boolean;
+    "texts": string[];
+
+    /** Creates a new AgentText instance. */
+    constructor($$source: Partial<AgentText> = {}) {
+        if (!("secretFile" in $$source)) {
+            this["secretFile"] = false;
+        }
+        if (!("texts" in $$source)) {
+            this["texts"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AgentText instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AgentText {
+        const $$createField1_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("texts" in $$parsedSource) {
+            $$parsedSource["texts"] = $$createField1_0($$parsedSource["texts"]);
+        }
+        return new AgentText($$parsedSource as Partial<AgentText>);
     }
 }
 
@@ -586,6 +625,129 @@ export class ProfiledTests {
 }
 
 /**
+ * PromptInput is the editor context a prompt's placeholders can use.
+ */
+export class PromptInput {
+    /**
+     * Selection is the selected text of the active editor ({{selection}}).
+     */
+    "selection": string;
+
+    /**
+     * File is the absolute path of the active editor's file ({{file}}).
+     */
+    "file": string;
+
+    /**
+     * Problems lists the file's diagnostics, one per line ({{problems}}).
+     */
+    "problems": string;
+
+    /**
+     * Args are the values of the prompt's own args, by name.
+     */
+    "args": { [_ in string]?: string };
+
+    /** Creates a new PromptInput instance. */
+    constructor($$source: Partial<PromptInput> = {}) {
+        if (!("selection" in $$source)) {
+            this["selection"] = "";
+        }
+        if (!("file" in $$source)) {
+            this["file"] = "";
+        }
+        if (!("problems" in $$source)) {
+            this["problems"] = "";
+        }
+        if (!("args" in $$source)) {
+            this["args"] = {};
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PromptInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): PromptInput {
+        const $$createField3_0 = $$createType5;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("args" in $$parsedSource) {
+            $$parsedSource["args"] = $$createField3_0($$parsedSource["args"]);
+        }
+        return new PromptInput($$parsedSource as Partial<PromptInput>);
+    }
+}
+
+/**
+ * PromptLibrary is what the agent chat's "/" picker lists.
+ */
+export class PromptLibrary {
+    /**
+     * Prompts are merged and sorted by name (see prompts.Merge).
+     */
+    "prompts": prompts$0.Prompt[];
+
+    /**
+     * Problems are files that could not be used ("name.md: reason").
+     */
+    "problems": string[];
+
+    /**
+     * PersonalDir holds the user's own prompts.
+     */
+    "personalDir": string;
+
+    /**
+     * ProjectDir holds the project's prompts ("" with no folder).
+     */
+    "projectDir": string;
+
+    /**
+     * Trusted is false in Restricted Mode: project prompts are marked and
+     * can't replace a built-in or personal prompt.
+     */
+    "trusted": boolean;
+
+    /** Creates a new PromptLibrary instance. */
+    constructor($$source: Partial<PromptLibrary> = {}) {
+        if (!("prompts" in $$source)) {
+            this["prompts"] = [];
+        }
+        if (!("problems" in $$source)) {
+            this["problems"] = [];
+        }
+        if (!("personalDir" in $$source)) {
+            this["personalDir"] = "";
+        }
+        if (!("projectDir" in $$source)) {
+            this["projectDir"] = "";
+        }
+        if (!("trusted" in $$source)) {
+            this["trusted"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PromptLibrary instance from a string or object.
+     */
+    static createFrom($$source: any = {}): PromptLibrary {
+        const $$createField0_0 = $$createType16;
+        const $$createField1_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("prompts" in $$parsedSource) {
+            $$parsedSource["prompts"] = $$createField0_0($$parsedSource["prompts"]);
+        }
+        if ("problems" in $$parsedSource) {
+            $$parsedSource["problems"] = $$createField1_0($$parsedSource["problems"]);
+        }
+        return new PromptLibrary($$parsedSource as Partial<PromptLibrary>);
+    }
+}
+
+/**
  * RemoveInfo is what removing a task would lose, for the confirmation.
  */
 export class RemoveInfo {
@@ -796,7 +958,7 @@ export class ReviewRequest {
      * Creates a new ReviewRequest instance from a string or object.
      */
     static createFrom($$source: any = {}): ReviewRequest {
-        const $$createField1_0 = $$createType16;
+        const $$createField1_0 = $$createType18;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
@@ -838,7 +1000,7 @@ export class ReviewResult {
      */
     static createFrom($$source: any = {}): ReviewResult {
         const $$createField1_0 = $$createType0;
-        const $$createField2_0 = $$createType18;
+        const $$createField2_0 = $$createType20;
         const $$createField3_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
@@ -904,9 +1066,9 @@ export class RunConfigs {
      * Creates a new RunConfigs instance from a string or object.
      */
     static createFrom($$source: any = {}): RunConfigs {
-        const $$createField0_0 = $$createType20;
-        const $$createField1_0 = $$createType20;
-        const $$createField2_0 = $$createType22;
+        const $$createField0_0 = $$createType22;
+        const $$createField1_0 = $$createType22;
+        const $$createField2_0 = $$createType24;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("saved" in $$parsedSource) {
             $$parsedSource["saved"] = $$createField0_0($$parsedSource["saved"]);
@@ -1165,7 +1327,7 @@ export class UsageView {
      * Creates a new UsageView instance from a string or object.
      */
     static createFrom($$source: any = {}): UsageView {
-        const $$createField0_0 = $$createType23;
+        const $$createField0_0 = $$createType25;
         const $$createField1_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("summary" in $$parsedSource) {
@@ -1194,12 +1356,14 @@ const $$createType11 = $Create.Array($$createType10);
 const $$createType12 = git$0.FileCommit.createFrom;
 const $$createType13 = $Create.Array($$createType12);
 const $$createType14 = testrun$0.Profiles.createFrom;
-const $$createType15 = ReviewFile.createFrom;
+const $$createType15 = prompts$0.Prompt.createFrom;
 const $$createType16 = $Create.Array($$createType15);
-const $$createType17 = review$0.Finding.createFrom;
+const $$createType17 = ReviewFile.createFrom;
 const $$createType18 = $Create.Array($$createType17);
-const $$createType19 = runconfig$0.Config.createFrom;
+const $$createType19 = review$0.Finding.createFrom;
 const $$createType20 = $Create.Array($$createType19);
-const $$createType21 = runconfig$0.Capabilities.createFrom;
-const $$createType22 = $Create.Map($Create.Any, $$createType21);
-const $$createType23 = usage$0.Summary.createFrom;
+const $$createType21 = runconfig$0.Config.createFrom;
+const $$createType22 = $Create.Array($$createType21);
+const $$createType23 = runconfig$0.Capabilities.createFrom;
+const $$createType24 = $Create.Map($Create.Any, $$createType23);
+const $$createType25 = usage$0.Summary.createFrom;

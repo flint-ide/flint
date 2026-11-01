@@ -94,6 +94,8 @@ async function captureTab(t: Tab, roots: string[]): Promise<SavedTab | null> {
     case 'prdiff':
     case 'cilog':
       return null // pull requests and CI logs are fetched from GitHub when opened
+    case 'merge':
+      return null // conflicts are reopened from the Commit panel
   }
 }
 

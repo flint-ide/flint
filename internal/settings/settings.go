@@ -112,6 +112,8 @@ type Settings struct {
 	AgentTasks AgentTasks `json:"agentTasks"`
 	// Usage configures the usage dashboard: retention, budgets, prices (usage.go).
 	Usage Usage `json:"usage"`
+	// Prompts configures the prompt library (prompts.go).
+	Prompts Prompts `json:"prompts"`
 	// AgentReview configures Review Changes with Agent (review.go).
 	AgentReview AgentReview `json:"agentReview"`
 	// CI configures following your pull requests' checks (ci.go).
@@ -146,6 +148,7 @@ func Default() Settings {
 		InlineEdit:         defaultInlineEdit(),
 		AgentTasks:         defaultAgentTasks(),
 		Usage:              defaultUsage(),
+		Prompts:            defaultPrompts(),
 		AgentReview:        defaultAgentReview(),
 		CI:                 defaultCI(),
 		CustomTheme:        defaultCustomTheme(),

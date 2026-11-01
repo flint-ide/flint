@@ -250,7 +250,7 @@ func TestStatusMergeConflict(t *testing.T) {
 	if st.Operation != "merging" {
 		t.Errorf("Operation = %q, want merging", st.Operation)
 	}
-	want := FileChange{Path: "f.txt", Kind: Conflicted, Index: "U", Worktree: "U"}
+	want := FileChange{Path: "f.txt", Kind: Conflicted, Index: "U", Worktree: "U", Conflicts: 1}
 	if got := statusFile(t, st, "f.txt"); got != want {
 		t.Errorf("entry = %+v, want %+v", got, want)
 	}

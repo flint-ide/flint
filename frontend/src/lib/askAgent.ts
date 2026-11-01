@@ -21,6 +21,8 @@ export interface AskAgentOptions {
    * folder of the first attachment, else the active tab's folder.
    */
   root?: string
+  /** Only a chat with this agent will do (a prompt limited to one agent); a new one is started if needed. */
+  agent?: string
 }
 
 /**
@@ -29,8 +31,8 @@ export interface AskAgentOptions {
  * attachments, then focuses the chat. Returns the chat session id, or null when
  * no chat could be opened.
  */
-export async function askAgent({ prompt, attachments = [], send = false, root }: AskAgentOptions): Promise<string | null> {
-  const id = await targetChat(root ?? (attachments.length ? rootFor(attachments[0].path) : activeRoot()))
+export async function askAgent({ prompt, attachments = [], send = false, root, agent }: AskAgentOptions): Promise<string | null> {
+  const id = await targetChat(root ?? (attachments.length ? rootFor(attachments[0].path) : activeRoot()), agent)
   if (!id) return null
   const store = useAgentChat.getState()
   const session = store.sessions[id]
@@ -45,13 +47,18 @@ export async function askAgent({ prompt, attachments = [], send = false, root }:
 }
 
 /** The chat askAgent writes to, started with the preferred agent when none fits. */
-async function targetChat(root: string): Promise<string | null> {
+async function targetChat(root: string, only?: string): Promise<string | null> {
   const chat = useAgentChat.getState()
   const { activeId, backStack } = useEditor.getState()
-  const cwds = Object.fromEntries(Object.values(chat.sessions).map((s) => [s.id, s.cwd]))
+  const sessions = Object.values(chat.sessions).filter((s) => !only || s.agent === only)
+  const cwds = Object.fromEntries(sessions.map((s) => [s.id, s.cwd]))
   const found = pickChat({ activeId, backStack, order: chat.order, cwds, root })
   if (found) return found
-  const agent = useAgent.getState().preferred || chat.agents[0]
+  if (only && !chat.agents.includes(only)) {
+    showToast(`This is for ${only}, which isn't installed`, 'error')
+    return null
+  }
+  const agent = only || useAgent.getState().preferred || chat.agents[0]
   if (!agent) {
     showToast('No agent installed: install claude or codex, or add one in Settings ▸ Agents', 'error')
     return null

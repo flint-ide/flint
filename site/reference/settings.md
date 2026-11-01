@@ -113,6 +113,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
 | `agentTasks` | object | see below | Where agent task worktrees go and how their branches are named. See [agentTasks](#agenttasks). |
 | `usage` | object | see below | How long agent usage is kept, budgets, and prices for estimates. See [usage](#usage). |
+| `prompts` | object | see below | The prompt library of the agent chat (`/`). See [prompts](#prompts). |
 | `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
 | `ci` | object | see below | Following your pull requests' CI: poll interval, Fix with agent's log excerpt, notifications. See [ci](#ci). |
 
@@ -301,6 +302,15 @@ Used by the [Usage panel and budgets](../guides/ai-agents.md#usage-and-budgets).
 | `pauseOverBudget` | boolean | | `false` | Refuse new turns while a budget is reached, until **Continue anyway** in the chat's warning. |
 | `prices` | object | up to 200 models | `{}` | Model name (exactly as the Usage panel shows it, case ignored) → `{ "in": …, "out": …, "cacheRead": … }` in USD per million tokens, 0–10,000; `cacheRead` is optional (without it, cached input is left out of estimates). Used only for turns whose agent reported no cost; the result is shown as an estimate. |
 
+### prompts
+
+Used by the [prompt library](../guides/ai-agents.md#prompt-library).
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `builtins` | boolean | `true` | Offer the prompts that ship with Flint (`/review`, `/test`, `/explain`, `/fix`). |
+
+The prompts themselves are Markdown files, not settings: personal ones in the `prompts` folder next to `settings.json`, project ones in the repository's `.flint/prompts`.
 ### agentReview
 
 Used by [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-agent). Settings ▸ Agents ▸ Review.

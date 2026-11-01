@@ -75,6 +75,70 @@ Open chats are part of the project session. After a restart you see the transcri
 
 Context goes to the chat of the project it belongs to: the active or most recently used chat there, or a new chat with the default agent if there is none. It lands in the draft so you can add your own words before sending. `⌥`-click sends it immediately.
 
+## Prompt library
+
+Prompts you use again and again live in Markdown files, and every agent chat offers them the same way: type `/` in the chat box and a list opens with each prompt's name, description and where it comes from (**project**, **personal** or **built-in**). Keep typing to filter it; `↑`/`↓` move, `↵` or `Tab` chooses. The chosen prompt replaces the draft with its text, placeholders filled in, so you can read and change it before you press `↵` to send. Nothing is sent on its own.
+
+"Run Prompt…" in the command palette does the same from anywhere: it puts the prompt into the current chat's draft, or opens a chat with your default agent.
+
+### Built-in prompts
+
+| Prompt | Asks the agent to |
+|---|---|
+| `/review` | Review the uncommitted changes (the diff is included) without changing files |
+| `/test` | Write tests for the selection or the current file and run them |
+| `/explain` | Explain the selection or the current file without changing files |
+| `/fix` | Fix the problems the language server reports in the current file |
+
+Commit messages already have their own button in the Commit panel, so there is no prompt for them. Turn the built-ins off in Settings ▸ Agents ▸ Prompts. A personal or project prompt with the same name replaces a built-in one.
+
+### Your own prompts
+
+"New Prompt…" asks for a name and a place and opens the new file from a template:
+
+- **Project**: `.flint/prompts/<name>.md` in the repository, shared with your team when you commit it.
+- **Personal**: `prompts/<name>.md` in Flint's configuration folder (`~/Library/Application Support/flint/prompts`, shown in Settings ▸ Agents ▸ Prompts); yours only, in every project.
+
+A project prompt replaces a personal one with the same name, which replaces a built-in one. The name is the file name: letters, digits, `-` and `_`. Files are read each time the list opens, so an edit shows up right away.
+
+```markdown
+---
+description: Review the changes against our API guidelines
+agent: claude
+args: ticket
+---
+Review my uncommitted changes on {{branch}} for ticket {{ticket}}.
+Check them against docs/api-guidelines.md.
+
+{{diff}}
+```
+
+The front matter between the `---` lines is optional, one `key: value` per line (`#` starts a comment):
+
+- `description`: the line shown in the list.
+- `agent`: only offer the prompt in chats with this agent (`claude`, `codex` or a custom agent's id). "Run Prompt…" opens a chat with that agent if needed.
+- `args`: names you are asked for when you choose the prompt (comma-separated, up to 8), used as `{{name}}` in the text.
+
+Flint fills these placeholders:
+
+| Placeholder | Becomes |
+|---|---|
+| `{{selection}}` | The selected text of the editor you used last, as a code block with secrets redacted (empty when nothing is selected; only a note for a credentials file such as `.env`) |
+| `{{file}}` | That editor's file, relative to the project |
+| `{{problems}}` | The language server's problems in that file, one per line, secrets redacted |
+| `{{diff}}` | The uncommitted changes, including new files, as a `diff` code block (at most 60 KB, secrets redacted). Credentials files (`.env`, keys, kubeconfig, …) are left out and only named |
+| `{{branch}}` | The current branch |
+
+Placeholders are filled once: text that a value brings in (a selection containing `{{diff}}`) is left as it is, and an unknown `{{name}}` stays in the draft for you to see.
+
+### The agent's own slash commands
+
+Claude Code and other agents have slash commands of their own (`/compact`, …). When what you typed doesn't match a Flint prompt, the list says so and `↵` sends it to the agent unchanged. To send a command that has the same name as a Flint prompt (Claude Code's `/review`, say), press `Esc` to close the list, then `↵`. Anything after a space (`/compact keep the API notes`) also goes to the agent as typed.
+
+### Prompts in Restricted Mode
+
+A prompt is only text for the draft: it never runs anything, in any folder. In a folder you haven't trusted, the project's prompts are still listed, marked **untrusted repo**, so read them before you send them. They can't replace a built-in or personal prompt: with a hostile `.flint/prompts/review.md`, `/review` stays Flint's own, and the list says that a file was skipped. Prompt files must be regular files of at most 64 KB inside `.flint/prompts`; links that lead out of the folder are ignored.
+
 ## What agents can see in Flint
 
 An agent chat in Flint can also look things up by itself. Flint runs a small [MCP](https://modelcontextprotocol.io) server and offers it to every chat, so the agent can read what Flint knows and a terminal doesn't:
@@ -133,6 +197,7 @@ You never have to accept diffs one by one. Edits are applied directly, show up i
 
 - **✦ Generate message** in the Commit panel gives the agent the diff of the ticked files and your recent commit messages. The result lands in the message field for you to edit.
 - **Resolve with claude** (or your default agent, when it is Claude Code or Codex) appears when there are merge conflicts. It opens an interactive agent session in a new terminal. The agent runs `git add` on resolved files but doesn't commit.
+- **✦ Ask Agent** on one conflict in the [merge editor](git-and-github.md#merge-conflicts) puts that conflict, both sides and the base into the chat draft; the agent edits only that block, and you mark the file resolved yourself.
 
 ## Review Changes with Agent
 
@@ -225,7 +290,7 @@ When an agent turn finishes while Flint isn't the active app, you get a macOS no
 
 ## Agents in Restricted Mode
 
-In a folder you haven't trusted, agents run without the project's own agent settings and hooks (Claude Code is started with `--setting-sources user`). Trust the folder to let them apply. Custom ACP agents don't start there at all, and chats there don't get [Flint's MCP server](#what-agents-can-see-in-flint): a hostile repository could otherwise steer the agent into reading your terminals or cluster without a prompt. See [Restricted Mode](restricted-mode.md).
+In a folder you haven't trusted, agents run without the project's own agent settings and hooks (Claude Code is started with `--setting-sources user`). Trust the folder to let them apply. Custom ACP agents don't start there at all, and chats there don't get [Flint's MCP server](#what-agents-can-see-in-flint): a hostile repository could otherwise steer the agent into reading your terminals or cluster without a prompt. The repository's [prompts](#prompts-in-restricted-mode) are marked and can't replace yours. See [Restricted Mode](restricted-mode.md).
 
 ## Related
 

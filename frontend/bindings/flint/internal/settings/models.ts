@@ -655,6 +655,35 @@ export class MCPTools {
 }
 
 /**
+ * Prompts configures the prompt library (internal/prompts): the "/" picker
+ * in the agent chat. The personal prompts live in the config directory's
+ * prompts folder; that location is fixed, so it is not a setting.
+ */
+export class Prompts {
+    /**
+     * Builtins offers the prompts shipped with Flint (/review, /test, …).
+     */
+    "builtins": boolean;
+
+    /** Creates a new Prompts instance. */
+    constructor($$source: Partial<Prompts> = {}) {
+        if (!("builtins" in $$source)) {
+            this["builtins"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Prompts instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Prompts {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Prompts($$parsedSource as Partial<Prompts>);
+    }
+}
+
+/**
  * Refresh holds how often panels that poll re-read their data while shown.
  */
 export class Refresh {
@@ -785,6 +814,11 @@ export class Settings {
     "usage": Usage;
 
     /**
+     * Prompts configures the prompt library (prompts.go).
+     */
+    "prompts": Prompts;
+
+    /**
      * AgentReview configures Review Changes with Agent (review.go).
      */
     "agentReview": AgentReview;
@@ -856,6 +890,9 @@ export class Settings {
         if (!("usage" in $$source)) {
             this["usage"] = (new Usage());
         }
+        if (!("prompts" in $$source)) {
+            this["prompts"] = (new Prompts());
+        }
         if (!("agentReview" in $$source)) {
             this["agentReview"] = (new AgentReview());
         }
@@ -886,6 +923,7 @@ export class Settings {
         const $$createField19_0 = $$createType17;
         const $$createField20_0 = $$createType18;
         const $$createField21_0 = $$createType19;
+        const $$createField22_0 = $$createType20;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -929,11 +967,14 @@ export class Settings {
         if ("usage" in $$parsedSource) {
             $$parsedSource["usage"] = $$createField19_0($$parsedSource["usage"]);
         }
+        if ("prompts" in $$parsedSource) {
+            $$parsedSource["prompts"] = $$createField20_0($$parsedSource["prompts"]);
+        }
         if ("agentReview" in $$parsedSource) {
-            $$parsedSource["agentReview"] = $$createField20_0($$parsedSource["agentReview"]);
+            $$parsedSource["agentReview"] = $$createField21_0($$parsedSource["agentReview"]);
         }
         if ("ci" in $$parsedSource) {
-            $$parsedSource["ci"] = $$createField21_0($$parsedSource["ci"]);
+            $$parsedSource["ci"] = $$createField22_0($$parsedSource["ci"]);
         }
         return new Settings($$parsedSource as Partial<Settings>);
     }
@@ -1010,7 +1051,7 @@ export class Usage {
      * Creates a new Usage instance from a string or object.
      */
     static createFrom($$source: any = {}): Usage {
-        const $$createField1_0 = $$createType21;
+        const $$createField1_0 = $$createType22;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("prices" in $$parsedSource) {
             $$parsedSource["prices"] = $$createField1_0($$parsedSource["prices"]);
@@ -1038,7 +1079,8 @@ const $$createType14 = Completions.createFrom;
 const $$createType15 = InlineEdit.createFrom;
 const $$createType16 = AgentTasks.createFrom;
 const $$createType17 = Usage.createFrom;
-const $$createType18 = AgentReview.createFrom;
-const $$createType19 = CI.createFrom;
-const $$createType20 = usage$0.Price.createFrom;
-const $$createType21 = $Create.Map($Create.Any, $$createType20);
+const $$createType18 = Prompts.createFrom;
+const $$createType19 = AgentReview.createFrom;
+const $$createType20 = CI.createFrom;
+const $$createType21 = usage$0.Price.createFrom;
+const $$createType22 = $Create.Map($Create.Any, $$createType21);

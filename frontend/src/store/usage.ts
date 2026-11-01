@@ -38,7 +38,7 @@ export async function refreshBudget(chatId: string): Promise<void> {
     const next: ChatBudget = { alerts: (b.alerts ?? []) as BudgetAlert[], pause: b.pause }
     useUsage.setState((s) => {
       const cur = s.budgets[chatId]
-      if (cur && cur.pause === next.pause && alertsKey(cur.alerts) === alertsKey(next.alerts)) return {}
+      if (cur && JSON.stringify(cur) === JSON.stringify(next)) return {}
       return { budgets: { ...s.budgets, [chatId]: next } }
     })
   } catch {

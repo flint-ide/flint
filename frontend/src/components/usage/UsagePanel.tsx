@@ -6,7 +6,7 @@ import {
   barHeights, chartMetric, costLabel, metricLabel, metricValue, projectName, shortDay, spentOf, tokensOf, totalsLabel, totalsTooltip,
   type ChartMetric, type UsageTotals,
 } from '../../lib/usageView'
-import { formatTokens } from '../../lib/usage'
+import { formatCost, formatTokens } from '../../lib/usage'
 import { chatTabId, useAgentChat } from '../../store/agentChat'
 import { showToast } from '../../store/dialog'
 import { useEditor } from '../../store/editor'
@@ -139,13 +139,15 @@ export function UsagePanel() {
   )
 }
 
+/** A total in a narrow tile: the money spent ("~" when part is estimated), else tokens. */
 function Tile({ label, t }: { label: string; t: UsageTotals }) {
-  const cost = costLabel(t)
+  const spent = spentOf(t)
+  const estimated = (t.estimatedUsd ?? 0) > 0
   return (
     <div className="usage-tile" title={totalsTooltip(t)}>
       <span className="muted">{label}</span>
-      <strong>{cost || formatTokens(tokensOf(t))}</strong>
-      <span className="muted">{cost ? `${formatTokens(tokensOf(t))} tokens` : 'tokens'}</span>
+      <strong>{spent > 0 ? `${estimated ? '~' : ''}${formatCost(spent)}` : formatTokens(tokensOf(t))}</strong>
+      <span className="muted">{spent > 0 ? `${formatTokens(tokensOf(t))} tokens${estimated ? ' · est.' : ''}` : 'tokens'}</span>
     </div>
   )
 }

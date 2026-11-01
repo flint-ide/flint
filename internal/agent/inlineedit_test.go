@@ -46,6 +46,8 @@ func TestInlineEditPromptBounds(t *testing.T) {
 		{"large context", func(r *EditRequest) { r.Before = strings.Repeat("a", MaxEditContext+1) }, "context"},
 		{"long language", func(r *EditRequest) { r.Language = strings.Repeat("a", 65) }, "language"},
 		{"secret in selection", func(r *EditRequest) { r.Selection = `token = "ghp_abcdefghijklmnopqrstuvwxyz0123"` }, "credential"},
+		{"quoted password in selection", func(r *EditRequest) { r.Selection = `const dbPassword = "hunter2"` }, "credential"},
+		{"env line in selection", func(r *EditRequest) { r.Selection = "DB_PASSWORD=hunter2\n" }, "credential"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -55,6 +57,15 @@ func TestInlineEditPromptBounds(t *testing.T) {
 				t.Errorf("err = %v, want containing %q", err, tt.want)
 			}
 		})
+	}
+	if _, _, err := InlineEditPrompt(EditRequest{Path: "config/.env.local", Instruction: "x", Selection: "PORT=1"}); err == nil || !strings.Contains(err.Error(), "credentials") {
+		t.Errorf("secret file: err = %v", err)
+	}
+	// Names alone are not secrets.
+	for _, sel := range []string{"token: string", "apiKey: process.env.API_KEY", `password = os.Getenv("PW")`, "password = pw"} {
+		if _, _, err := InlineEditPrompt(EditRequest{Path: "a.ts", Instruction: "x", Selection: sel}); err != nil {
+			t.Errorf("selection %q refused: %v", sel, err)
+		}
 	}
 	// An empty selection asks for code to insert.
 	if _, _, err := InlineEditPrompt(EditRequest{Path: "a.go", Instruction: "write a loop"}); err != nil {

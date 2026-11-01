@@ -42,3 +42,90 @@ func TestSecretsKeepsPaths(t *testing.T) {
 		t.Fatalf("Secrets = %q", got)
 	}
 }
+
+func TestSecretsKeyNames(t *testing.T) {
+	for _, in := range []string{
+		"DB_PASSWORD=hunter2",
+		"export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY",
+		`const dbPassword = "hunter2"`,
+		`apiKey: 'hunter2'`,
+		"GITHUB_TOKEN: hunter2",
+		`password := "hunter2"`,
+		`client_secret = "hunter2"`,
+		"mySessionToken=`hunter2`",
+		`"password": "my hunter2 phrase"`,
+	} {
+		if out := Secrets(in); strings.Contains(out, "hunter2") || strings.Contains(out, "wJalrXUtnFEMI") {
+			t.Errorf("Secrets(%q) = %q", in, out)
+		}
+	}
+}
+
+func TestSecretsKeepsOrdinaryCode(t *testing.T) {
+	for _, in := range []string{
+		"token: string",
+		"password: str",
+		"apiKey: process.env.API_KEY,",
+		`password = os.Getenv("PW")`,
+		`secret := cfg.Secret()`,
+		`if token == "" {`,
+		"tokens := strings.Fields(line)",
+		"const onToken = (t) => t",
+		`password: ""`,
+		"API_KEY=${API_KEY}",
+	} {
+		if out := Secrets(in); out != in {
+			t.Errorf("Secrets(%q) = %q, want it unchanged", in, out)
+		}
+	}
+}
+
+func TestSecretsUnterminatedPrivateKey(t *testing.T) {
+	head := "x := 1\n-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\nabcdef"
+	if out := Secrets(head); strings.Contains(out, "MIIEow") || strings.Contains(out, "abcdef") || !strings.HasPrefix(out, "x := 1\n") {
+		t.Errorf("unterminated key: %q", out)
+	}
+	tail := "MIIEowIBAAKCAQEA\nabcdef\n-----END RSA PRIVATE KEY-----\nnext := 2"
+	if out := Secrets(tail); strings.Contains(out, "MIIEow") || strings.Contains(out, "abcdef") || !strings.HasSuffix(out, "next := 2") {
+		t.Errorf("key whose BEGIN is cut off: %q", out)
+	}
+}
+
+func TestHasSecretValue(t *testing.T) {
+	for _, in := range []string{
+		`password = "hunter2"`,
+		"DB_PASSWORD=hunter2",
+		"token ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+		"-----BEGIN PRIVATE KEY-----\nMIIE",
+		"postgres://admin:s3cret@db:5432/app",
+	} {
+		if !HasSecretValue(in) {
+			t.Errorf("HasSecretValue(%q) = false", in)
+		}
+	}
+	for _, in := range []string{
+		"token: string",
+		"apiKey: process.env.API_KEY",
+		`password = os.Getenv("PW")`,
+		"password = pw",
+		"token: Token",
+		`password: ""`,
+	} {
+		if HasSecretValue(in) {
+			t.Errorf("HasSecretValue(%q) = true", in)
+		}
+	}
+}
+
+func TestSecretFile(t *testing.T) {
+	for _, p := range []string{".env", "/p/.env.local", "certs/server.pem", "tls.key", "/home/u/.ssh/id_ed25519", "/home/u/.aws/credentials", ".npmrc", "/u/.netrc", "/u/.kube/config", "kubeconfig", "prod.kubeconfig", "secrets.p12"} {
+		if !SecretFile(p) {
+			t.Errorf("SecretFile(%q) = false", p)
+		}
+	}
+	for _, p := range []string{"main.go", "env.go", "src/keys.ts", "config.yaml", "id.go", "README.md", "/p/.config/app/config"} {
+		if SecretFile(p) {
+			t.Errorf("SecretFile(%q) = true", p)
+		}
+	}
+}

@@ -39,7 +39,7 @@ export function editorAi(path: string): Extension {
     }),
     inlineCompletion({
       options: () => useSettings.getState().settings.completions,
-      complete: (editor, prefix, suffix) => Completions.Complete(editor, CompletionRequest.createFrom({ prefix, suffix })),
+      complete: (editor, prefix, suffix) => Completions.Complete(editor, CompletionRequest.createFrom({ path, prefix, suffix })),
       cancel: (editor) => void Completions.Cancel(editor).catch(() => undefined),
       onSuccess: () => setError(''),
       onError: (err) => {

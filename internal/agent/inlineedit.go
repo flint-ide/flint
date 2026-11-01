@@ -39,8 +39,9 @@ type EditRequest struct {
 
 // InlineEditPrompt checks r's sizes and returns the prompt and the input (the
 // file context with the selection marked) of a headless run. The context
-// around the selection is redacted; a selection that contains a credential is
-// refused, since its replacement would be written back into the file.
+// around the selection is redacted; a selection that contains a credential
+// value, or a file that holds credentials (.env, keys), is refused: the
+// replacement would be written back into the file.
 func InlineEditPrompt(r EditRequest) (prompt, input string, err error) {
 	instruction := strings.TrimSpace(r.Instruction)
 	switch {
@@ -57,7 +58,10 @@ func InlineEditPrompt(r EditRequest) (prompt, input string, err error) {
 	case len(r.Path) > maxEditPath || strings.ContainsAny(r.Path, "\r\n"):
 		return "", "", errors.New("invalid path")
 	}
-	if redact.Secrets(r.Selection) != r.Selection {
+	if redact.SecretFile(r.Path) {
+		return "", "", errors.New("this file holds credentials; Flint does not send it to the agent")
+	}
+	if redact.HasSecretValue(r.Selection) {
 		return "", "", errors.New("the selection contains what looks like a credential; Flint does not send it to the agent")
 	}
 

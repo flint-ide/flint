@@ -11,6 +11,7 @@ export function activeContextPath(): string | null {
   switch (tab?.kind) {
     case 'file':
     case 'diff':
+    case 'merge':
     case 'history':
     case 'http':
       return tab.path

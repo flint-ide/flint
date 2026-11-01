@@ -12,6 +12,7 @@ import { openStashDialog } from '../../store/stash'
 import { StashSection } from './StashSection'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
+import { openMergeEditor } from '../../store/mergeEditor'
 
 const KIND_LETTER: Record<string, string> = {
   modified: 'M', added: 'A', deleted: 'D', renamed: 'R', copied: 'C',
@@ -159,7 +160,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
                     key={g.key + f.path}
                     className="tree-row static change-row"
                     title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}
-                    onClick={() => (f.kind === 'conflicted' ? openFile(abs(f)) : openDiff(root, abs(f), f.origPath ? `${root}/${f.origPath}` : abs(f)))}
+                    onClick={() => (f.kind === 'conflicted' ? openMergeEditor(root, abs(f)) : openDiff(root, abs(f), f.origPath ? `${root}/${f.origPath}` : abs(f)))}
                     onDoubleClick={() => openFile(abs(f))}
                   >
                     {g.key !== 'conflicts' && (
@@ -168,7 +169,22 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
                     <span className={`change-kind ${f.kind}`}>{KIND_LETTER[f.kind] ?? '?'}</span>
                     <span className={`file-name change-${f.kind}`}>{f.path.split('/').pop()}</span>
                     <span className="muted path-hint">{dirOf(f.path)}</span>
+                    {!!f.conflicts && <span className="conflict-count" title="Conflicts left in the file">{f.conflicts}</span>}
                     <span className="row-actions" onClick={(e) => e.stopPropagation()}>
+                      {f.kind === 'conflicted' && (
+                        <>
+                          <button className="link" title="Resolve in the merge editor" onClick={() => openMergeEditor(root, abs(f))}>Resolve…</button>
+                          {agents.conflictAgent && (
+                            <button
+                              className="icon"
+                              title={`Resolve with ${agents.conflictAgent} in a terminal`}
+                              onClick={() => void resolveConflictsWithAgent(root, status?.operation ?? '', [f.path])}
+                            >
+                              ✦
+                            </button>
+                          )}
+                        </>
+                      )}
                       <button className="icon" title="Open file" onClick={() => openFile(abs(f))}>↗</button>
                       {f.kind !== 'conflicted' && (
                         <button className="icon" title="Rollback" onClick={() => void confirmRollback([f])}>↶</button>

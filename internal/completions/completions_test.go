@@ -63,6 +63,21 @@ func TestIsLocal(t *testing.T) {
 	}
 }
 
+func TestOrigin(t *testing.T) {
+	for e, want := range map[string]string{
+		"https://API.example.com/v1":   "https://api.example.com",
+		"https://api.example.com:8443": "https://api.example.com:8443",
+		"http://localhost:11434/":      "http://localhost:11434",
+	} {
+		if got, err := Origin(e); err != nil || got != want {
+			t.Errorf("Origin(%q) = %q, %v; want %q", e, got, err, want)
+		}
+	}
+	if _, err := Origin("http://example.com"); err == nil {
+		t.Error("Origin accepted an invalid endpoint")
+	}
+}
+
 func TestCheckModel(t *testing.T) {
 	for _, m := range []string{"qwen2.5-coder:1.5b-base", "gpt-3.5-turbo-instruct", "org/model@v1"} {
 		if err := CheckModel(m); err != nil {

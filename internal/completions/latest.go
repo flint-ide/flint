@@ -47,16 +47,6 @@ func (l *Latest) Start(parent context.Context, key string) (context.Context, fun
 	}
 }
 
-// Cancel ends key's request, if any (the editor closed or the user moved on).
-func (l *Latest) Cancel(key string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if e, ok := l.inflight[key]; ok {
-		e.cancel()
-		delete(l.inflight, key)
-	}
-}
-
 // Len is the number of requests in flight.
 func (l *Latest) Len() int {
 	l.mu.Lock()

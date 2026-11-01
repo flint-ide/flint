@@ -207,7 +207,7 @@ Ghost-text suggestions in file editors from a fill-in-the-middle code model. See
 | `maxTokens` | integer | 1–512 | `64` | Longest suggestion. |
 | `contextLines` | integer | 1–1000 | `100` | Lines before and after the cursor that are sent (at most about 20,000 characters each way). |
 
-An API key, if the endpoint needs one, is set in Settings ▸ AI in the Editor and stored in the macOS Keychain (service `flint-completions`), never in this file. It is sent as a bearer token. Code sent to an endpoint that isn't on this machine has secrets redacted first. Each request has a 30-second timeout and a 1 MB answer limit, and redirects are not followed. Each new request cancels the editor's previous one.
+An API key, if the endpoint needs one, is set in Settings ▸ AI in the Editor and stored in the macOS Keychain (service `flint-completions`, one entry per endpoint origin), never in this file. It is sent as a bearer token, and only to the endpoint it was stored for: after you change `endpoint` to another server, set its key again. Completions are never asked for in files that hold credentials (`.env*`, `*.pem`, `*.key`, SSH keys, `credentials`, `.npmrc`, `.netrc`, kubeconfig). Code sent to an endpoint that isn't on this machine has secrets redacted first. Each request has a 30-second timeout and a 1 MB answer limit, and redirects are not followed. Each new request cancels the editor's previous one.
 
 ### inlineEdit
 

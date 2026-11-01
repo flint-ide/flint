@@ -17,13 +17,6 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as completions$0 from "./internal/completions/models.js";
 
 /**
- * Cancel stops editor's request, if any (the user moved the cursor or closed it).
- */
-export function Cancel(editor: string): $CancellablePromise<void> {
-    return $Call.ByID(2322770025, editor);
-}
-
-/**
  * Complete returns the suggestion for the cursor of editor (an id the
  * frontend picks per editor) or "" when there is none. It fails when
  * completions are off.
@@ -33,14 +26,15 @@ export function Complete(editor: string, req: completions$0.Request): $Cancellab
 }
 
 /**
- * HasAPIKey reports whether an API key is stored for the completion endpoint.
+ * HasAPIKey reports whether an API key is stored for the configured endpoint.
  */
 export function HasAPIKey(): $CancellablePromise<boolean> {
     return $Call.ByID(3189260662);
 }
 
 /**
- * SetAPIKey stores the completion endpoint's API key in the Keychain ("" removes it).
+ * SetAPIKey stores the API key of the configured endpoint in the Keychain
+ * ("" removes it). It is sent only to that endpoint's origin.
  */
 export function SetAPIKey(key: string): $CancellablePromise<void> {
     return $Call.ByID(3412433518, key);

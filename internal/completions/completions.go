@@ -100,6 +100,16 @@ func CheckEndpoint(raw string) error {
 	return nil
 }
 
+// Origin is endpoint's scheme://host[:port] in lower case: what an API key
+// is stored for.
+func Origin(endpoint string) (string, error) {
+	if err := CheckEndpoint(endpoint); err != nil {
+		return "", err
+	}
+	u, _ := url.Parse(endpoint)
+	return strings.ToLower(u.Scheme + "://" + u.Host), nil
+}
+
 // IsLocal reports whether endpoint is on this machine.
 func IsLocal(endpoint string) bool {
 	u, err := url.Parse(endpoint)

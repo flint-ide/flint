@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,10 +14,29 @@ import (
 	"flint/internal/settings"
 )
 
-type memSecrets struct{ v string }
+// memSecrets stands in for the Keychain and counts reads.
+type memSecrets struct {
+	mu    sync.Mutex
+	v     map[string]string
+	reads int
+}
 
-func (m *memSecrets) Get() (string, error) { return m.v, nil }
-func (m *memSecrets) Set(v string) error   { m.v = v; return nil }
+func (m *memSecrets) Get(account string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.reads++
+	return m.v[account], nil
+}
+
+func (m *memSecrets) Set(account, v string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.v == nil {
+		m.v = map[string]string{}
+	}
+	m.v[account] = v
+	return nil
+}
 
 func completionsApp(endpoint string, enabled bool) *CompletionsAPI {
 	s := settings.Default()
@@ -86,5 +106,67 @@ func TestCompletionsNewRequestCancelsTheEditorsPrevious(t *testing.T) {
 		t.Fatal("the editor's previous request was not cancelled")
 	}
 	<-started
-	api.Cancel("tab-1")
+}
+
+func TestCompletionsAPIKeyBelongsToItsEndpoint(t *testing.T) {
+	var mu sync.Mutex
+	auth := map[string]string{}
+	handler := func(name string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
+			auth[name] = r.Header.Get("Authorization")
+			mu.Unlock()
+			_, _ = io.WriteString(w, `{"choices":[{"text":"x"}]}`)
+		}
+	}
+	a := httptest.NewServer(handler("a"))
+	defer a.Close()
+	b := httptest.NewServer(handler("b"))
+	defer b.Close()
+
+	api := completionsApp(a.URL, true)
+	if err := api.SetAPIKey("sk-for-a"); err != nil {
+		t.Fatal(err)
+	}
+	// Another endpoint (another origin) doesn't get a's key.
+	api.app.settings.Completions.Endpoint = b.URL + "/v1"
+	if ok, _ := api.HasAPIKey(); ok {
+		t.Error("HasAPIKey = true for an endpoint without a key")
+	}
+	if _, err := api.Complete(context.Background(), "tab-1", completions.Request{Prefix: "p"}); err != nil {
+		t.Fatal(err)
+	}
+	api.app.settings.Completions.Endpoint = a.URL + "/"
+	if _, err := api.Complete(context.Background(), "tab-1", completions.Request{Prefix: "p"}); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if auth["b"] != "" || auth["a"] != "Bearer sk-for-a" {
+		t.Errorf("Authorization: a %q, b %q", auth["a"], auth["b"])
+	}
+}
+
+func TestCompletionsReadTheKeychainOncePerOrigin(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"choices":[{"text":"x"}]}`)
+	}))
+	defer srv.Close()
+	api := completionsApp(srv.URL, true)
+	secrets := api.secrets.(*memSecrets)
+	for range 5 {
+		if _, err := api.Complete(context.Background(), "tab-1", completions.Request{Prefix: "p"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if secrets.reads != 1 {
+		t.Errorf("%d Keychain reads for 5 requests, want 1", secrets.reads)
+	}
+	// Setting a key refreshes the cache without another read.
+	if err := api.SetAPIKey("sk-new"); err != nil {
+		t.Fatal(err)
+	}
+	if ok, _ := api.HasAPIKey(); !ok || secrets.reads != 1 {
+		t.Errorf("after SetAPIKey: has key %v, %d reads", ok, secrets.reads)
+	}
 }

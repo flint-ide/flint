@@ -74,7 +74,7 @@ export function EditorAiSection() {
       <Row label="Context lines" hint="Lines above and below the cursor sent with each request.">
         <NumberField value={c.contextLines} {...COMPLETION_LIMITS.contextLines} step={10} onCommit={(v) => set({ contextLines: Math.round(v) })} />
       </Row>
-      <ApiKeyRow />
+      <ApiKeyRow endpoint={c.endpoint} />
       <div className="settings-actions">
         <button disabled={isDefault} onClick={() => set({ ...DEFAULT_COMPLETIONS, enabled: c.enabled })}>Reset to Defaults</button>
       </div>
@@ -82,13 +82,20 @@ export function EditorAiSection() {
   )
 }
 
-/** The endpoint's API key, kept in the macOS Keychain (never in settings.json). */
-function ApiKeyRow() {
+/**
+ * The endpoint's API key, kept in the macOS Keychain (never in settings.json)
+ * for that endpoint's origin: another endpoint never gets it.
+ */
+function ApiKeyRow({ endpoint }: { endpoint: string }) {
   const [stored, setStored] = useState<boolean | null>(null)
   const [draft, setDraft] = useState('')
   useEffect(() => {
-    Completions.HasAPIKey().then(setStored, () => setStored(false))
-  }, [])
+    let cancelled = false
+    Completions.HasAPIKey().then((has) => !cancelled && setStored(has), () => !cancelled && setStored(false))
+    return () => {
+      cancelled = true
+    }
+  }, [endpoint])
   const save = async (key: string) => {
     try {
       await Completions.SetAPIKey(key)
@@ -99,7 +106,12 @@ function ApiKeyRow() {
     }
   }
   return (
-    <Row label="API key" hint={stored ? 'A key is stored in the Keychain and sent as a bearer token.' : 'Only if the endpoint needs one. Stored in the macOS Keychain.'}>
+    <Row
+      label="API key"
+      hint={stored
+        ? 'A key for this endpoint is stored in the Keychain and sent to it as a bearer token.'
+        : 'Only if the endpoint needs one. Stored in the macOS Keychain for this endpoint only.'}
+    >
       <span className="settings-control">
         <input
           type="password"

@@ -24,6 +24,8 @@ import { trustFolder, untrustFolder } from '../store/trust'
 import { copyDiagnostics, reportIssue, showLogs } from '../store/diagnostics'
 import { openToolCheck } from '../store/toolCheck'
 import { checkForUpdates } from '../store/update'
+import { openInlineEditInActiveEditor } from '../store/editorAi'
+import { useSettings } from '../store/settings'
 
 // Where a global shortcut belongs to the focused widget instead: ⌘B in an editor is
 // "go to declaration" (IntelliJ), ⌘K in a terminal clears the screen.
@@ -132,6 +134,16 @@ function appCommands(): Command[] {
     {
       id: 'agent.sendSelection', title: 'Send Selection to Agent', category: 'Agent', keys: 'Mod+L',
       keywords: 'attach file context chat claude codex', run: () => attachSelectionToAgent(),
+    },
+    {
+      id: 'agent.inlineEdit', title: 'Edit Selection with Agent…', category: 'Agent', keys: 'Mod+I', keysIgnoredIn: IN_TERMINAL,
+      keywords: 'inline edit rewrite refactor ai prompt claude codex', when: () => activeTab()?.kind === 'file' && hasEditor(),
+      run: openInlineEditInActiveEditor,
+    },
+    {
+      id: 'editor.toggleCompletions', title: 'Toggle Inline Completions', category: 'Editor',
+      keywords: 'ai suggestions ghost text ollama local model autocomplete copilot',
+      run: () => useSettings.getState().update((s) => ({ completions: { ...s.completions, enabled: !s.completions.enabled } })),
     },
     ...policyToggles(),
 

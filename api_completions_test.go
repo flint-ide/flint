@@ -16,7 +16,7 @@ import (
 type memSecrets struct{ v string }
 
 func (m *memSecrets) Get() (string, error) { return m.v, nil }
-func (m *memSecrets) Set(v string) error  { m.v = v; return nil }
+func (m *memSecrets) Set(v string) error   { m.v = v; return nil }
 
 func completionsApp(endpoint string, enabled bool) *CompletionsAPI {
 	s := settings.Default()

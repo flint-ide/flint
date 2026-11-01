@@ -2144,6 +2144,18 @@ button.small {
 .status-lsp.unavailable {
   color: var(--accent);
 }
+.status-completions {
+  background: none;
+  border: none;
+  padding: 0 6px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  height: 18px;
+}
+.status-completions.error {
+  color: var(--danger);
+  cursor: pointer;
+}
 .usages-title {
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);

@@ -7,6 +7,10 @@ import {
   type AgentSettings, type LanguageServerSettings, type RefreshSettings,
 } from './toolSettings'
 import { coerceCustomAgents, type CustomAgent } from './customAgents'
+import {
+  coerceCompletions, coerceInlineEdit, DEFAULT_COMPLETIONS, DEFAULT_INLINE_EDIT,
+  type CompletionSettings, type InlineEditSettings,
+} from './editorAiSettings'
 
 export type ThemeMode = 'dark' | 'light' | 'system'
 export type ResolvedTheme = 'dark' | 'light'
@@ -42,6 +46,10 @@ export interface AppSettings {
   languageServers: Record<string, LanguageServerSettings>
   /** Polling intervals of the Kubernetes and AWS panels. */
   refresh: RefreshSettings
+  /** Inline suggestions from a code model (lib/editorAiSettings.ts). */
+  completions: CompletionSettings
+  /** Edit with Agent on the selection. */
+  inlineEdit: InlineEditSettings
 }
 
 /** Mirrors settings.Default() in Go (used until the backend answers). */
@@ -60,6 +68,8 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   customAgents: Object.freeze([]) as unknown as CustomAgent[],
   languageServers: Object.freeze({}) as Record<string, LanguageServerSettings>,
   refresh: DEFAULT_REFRESH,
+  completions: DEFAULT_COMPLETIONS,
+  inlineEdit: DEFAULT_INLINE_EDIT,
 }) as AppSettings
 
 /** Same limits as Go's settings.Validate, for the inputs. */
@@ -137,5 +147,7 @@ export function coerceSettings(v: unknown): AppSettings {
     customAgents: coerceCustomAgents(v.customAgents),
     languageServers: coerceServers(v.languageServers),
     refresh: coerceRefresh(v.refresh),
+    completions: coerceCompletions(v.completions),
+    inlineEdit: coerceInlineEdit(v.inlineEdit),
   }
 }

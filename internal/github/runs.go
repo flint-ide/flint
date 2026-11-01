@@ -27,13 +27,21 @@ func checkID(id int64) error {
 	return nil
 }
 
-// actionsRE matches a check run's details URL on GitHub Actions.
-var actionsRE = regexp.MustCompile(`/actions/runs/(\d{1,16})(?:/job/(\d{1,16}))?(?:[/?#]|$)`)
+// actionsRE matches the rest of a details URL after "<repo URL>/actions/runs/".
+var actionsRE = regexp.MustCompile(`^(\d{1,16})(?:/job/(\d{1,16}))?(?:[/?#]|$)`)
 
-// actionsIDs reads the run and job ids from a check's details URL (0, 0 when it
-// isn't a GitHub Actions URL).
-func actionsIDs(url string) (run, job int64) {
-	m := actionsRE.FindStringSubmatch(url)
+// actionsIDs reads the run and job ids from a check's details URL, only when it
+// is a run of this repository's GitHub Actions (0, 0 otherwise: another CI, or
+// a URL a check from elsewhere chose).
+func actionsIDs(repoURL, url string) (run, job int64) {
+	if repoURL == "" {
+		return 0, 0
+	}
+	rest, ok := strings.CutPrefix(url, strings.TrimSuffix(repoURL, "/")+"/actions/runs/")
+	if !ok {
+		return 0, 0
+	}
+	m := actionsRE.FindStringSubmatch(rest)
 	if m == nil {
 		return 0, 0
 	}
@@ -58,6 +66,9 @@ type PullRequestRef struct {
 	State   string `json:"state"` // OPEN, CLOSED, MERGED
 	HeadRef string `json:"headRef"`
 	HeadSHA string `json:"headSha"`
+	// CrossRepository: the head is in a fork, whose author wrote the workflow
+	// names and the commands the log shows.
+	CrossRepository bool `json:"crossRepository"`
 }
 
 // BranchChecks is the CI state of a branch's pull request; PR is nil when the
@@ -102,10 +113,11 @@ func (c *Client) BranchChecks(ctx context.Context, dir, branch string) (BranchCh
 		State             string    `json:"state"`
 		HeadRefName       string    `json:"headRefName"`
 		HeadRefOid        string    `json:"headRefOid"`
+		IsCrossRepository bool      `json:"isCrossRepository"`
 		StatusCheckRollup []ghCheck `json:"statusCheckRollup"`
 	}
 	err = c.runJSON(ctx, dir, nil, &v, "pr", "view", "--repo="+repo.NameWithOwner,
-		"--json=number,title,url,state,headRefName,headRefOid,statusCheckRollup", "--", branch)
+		"--json=number,title,url,state,headRefName,headRefOid,isCrossRepository,statusCheckRollup", "--", branch)
 	if err != nil {
 		var ghErr *Error
 		if errors.As(err, &ghErr) && strings.Contains(strings.ToLower(ghErr.Msg), "no pull requests found") {
@@ -113,15 +125,20 @@ func (c *Client) BranchChecks(ctx context.Context, dir, branch string) (BranchCh
 		}
 		return BranchChecks{}, err
 	}
+	if v.HeadRefName != branch {
+		// gh read a numeric branch name ("123") as pull request #123, or a URL.
+		return BranchChecks{Checks: []Check{}}, nil
+	}
 	out := BranchChecks{
 		PR: &PullRequestRef{
 			Number: v.Number, Title: v.Title, URL: v.URL, State: v.State, HeadRef: v.HeadRefName, HeadSHA: v.HeadRefOid,
+			CrossRepository: v.IsCrossRepository,
 		},
 		Checks: make([]Check, 0, len(v.StatusCheckRollup)),
 		Counts: countChecks(v.StatusCheckRollup),
 	}
 	for _, ch := range v.StatusCheckRollup {
-		out.Checks = append(out.Checks, ch.check())
+		out.Checks = append(out.Checks, ch.check(repo.URL))
 	}
 	return out, nil
 }
@@ -232,19 +249,20 @@ func (c *Client) Run(ctx context.Context, dir string, runID int64) (Run, error) 
 }
 
 // FailedLog returns the log of a run's failed steps (gh run view --log-failed),
-// of one job when jobID is set. Only the last maxLogBytes are kept.
-func (c *Client) FailedLog(ctx context.Context, dir string, runID, jobID int64) (string, error) {
+// of one job when jobID is set. Only the last maxLogBytes are kept; cut tells
+// that the start is missing (the partial first line is dropped then).
+func (c *Client) FailedLog(ctx context.Context, dir string, runID, jobID int64) (log string, cut bool, err error) {
 	if err := checkID(runID); err != nil {
-		return "", err
+		return "", false, err
 	}
 	if jobID != 0 {
 		if err := checkID(jobID); err != nil {
-			return "", err
+			return "", false, err
 		}
 	}
 	repo, err := c.Repo(ctx, dir)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, writeTimeout) // logs are downloaded as a zip
 	defer cancel()
@@ -257,18 +275,26 @@ func (c *Client) FailedLog(ctx context.Context, dir string, runID, jobID int64) 
 	stderr, err := c.execTo(ctx, dir, nil, out, args...)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return "", fmt.Errorf("gh %s timed out", firstArgs(args))
+			return "", false, fmt.Errorf("gh %s timed out", firstArgs(args))
 		}
 		if errors.Is(err, ErrNotInstalled) {
-			return "", err
+			return "", false, err
 		}
 		msg := strings.TrimSpace(stderr)
 		if msg == "" {
 			msg = err.Error()
 		}
-		return "", classify(args, msg, err)
+		return "", false, classify(args, msg, err)
 	}
-	return out.String(), nil
+	text := out.String()
+	if out.cut {
+		if i := strings.IndexByte(text, '\n'); i >= 0 {
+			text = text[i+1:]
+		} else {
+			text = ""
+		}
+	}
+	return text, out.cut, nil
 }
 
 // RerunFailed re-runs the failed jobs of a run (and the jobs they need). It acts

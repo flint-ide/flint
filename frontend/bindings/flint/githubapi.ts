@@ -115,7 +115,9 @@ export function Reply(dir: string, $number: number, threadID: string, body: stri
 }
 
 /**
- * RerunFailed re-runs a run's failed jobs on GitHub (the UI confirms first).
+ * RerunFailed re-runs a run's failed jobs on GitHub, after a native
+ * confirmation naming the repository and the workflow (the web view can't
+ * answer it).
  */
 export function RerunFailed(dir: string, runID: number): $CancellablePromise<void> {
     return $Call.ByID(1554732258, dir, runID);

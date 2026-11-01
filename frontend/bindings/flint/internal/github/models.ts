@@ -752,6 +752,12 @@ export class PullRequestRef {
     "headRef": string;
     "headSha": string;
 
+    /**
+     * CrossRepository: the head is in a fork, whose author wrote the workflow
+     * names and the commands the log shows.
+     */
+    "crossRepository": boolean;
+
     /** Creates a new PullRequestRef instance. */
     constructor($$source: Partial<PullRequestRef> = {}) {
         if (!("number" in $$source)) {
@@ -771,6 +777,9 @@ export class PullRequestRef {
         }
         if (!("headSha" in $$source)) {
             this["headSha"] = "";
+        }
+        if (!("crossRepository" in $$source)) {
+            this["crossRepository"] = false;
         }
 
         Object.assign(this, $$source);

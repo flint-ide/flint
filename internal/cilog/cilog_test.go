@@ -1,6 +1,7 @@
 package cilog
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"slices"
@@ -183,7 +184,8 @@ func TestResolver(t *testing.T) {
 		t.Fatal(err)
 	}
 	log := []string{"--- FAIL: TestStop (4.62s)", "    review_test.go:316: x", "FAIL\tflint/internal/remote\t5.546s", "FAIL\tflint/internal/ratelimit [build failed]"}
-	r := NewResolver(root, log)
+	r := NewResolver(context.Background(), root, log)
+	defer r.Close()
 	tests := map[string]string{
 		"internal/ratelimit/bucket.go":                "internal/ratelimit/bucket.go",
 		"./internal/ratelimit/bucket.go":              "internal/ratelimit/bucket.go",
@@ -208,7 +210,8 @@ func TestResolver(t *testing.T) {
 
 func TestResolverWithoutGoModule(t *testing.T) {
 	root := repo(t, "lib/a.py")
-	r := NewResolver(root, []string{"FAIL\tsomething/else"})
+	r := NewResolver(context.Background(), root, []string{"FAIL\tsomething/else"})
+	defer r.Close()
 	if got, ok := r.Resolve("lib/a.py"); !ok || got != "lib/a.py" {
 		t.Errorf("Resolve = %q, %v", got, ok)
 	}

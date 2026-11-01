@@ -133,6 +133,11 @@ export class CIJob {
      */
     "noLog": boolean;
 
+    /**
+     * LogCut: the log was longer than Flint keeps; only its end was read.
+     */
+    "logCut": boolean;
+
     /** Creates a new CIJob instance. */
     constructor($$source: Partial<CIJob> = {}) {
         if (!("id" in $$source)) {
@@ -161,6 +166,9 @@ export class CIJob {
         }
         if (!("noLog" in $$source)) {
             this["noLog"] = false;
+        }
+        if (!("logCut" in $$source)) {
+            this["logCut"] = false;
         }
 
         Object.assign(this, $$source);
@@ -194,6 +202,10 @@ export class CILog {
      * the folder asked about), for the tab's file:line links.
      */
     "files": { [_ in string]?: string };
+
+    /**
+     * Truncated: the start is missing (the log was longer than Flint keeps).
+     */
     "truncated": boolean;
 
     /** Creates a new CILog instance. */
@@ -226,7 +238,9 @@ export class CILog {
 
 /**
  * CIReport is what Fix with agent puts in the chat draft: redacted, bounded by
- * settings.CI, with references mapped to the workspace.
+ * settings.CI, with references mapped to the workspace. Names come from the
+ * workflow file (a fork's author, for cross-repository pull requests): they
+ * are one line each, without control characters, and cut to maxCINameRunes.
  */
 export class CIReport {
     "runId": number;
@@ -238,6 +252,11 @@ export class CIReport {
     "event": string;
     "attempt": number;
     "jobs": CIJob[];
+
+    /**
+     * More: failed jobs beyond maxCIJobs that the report leaves out.
+     */
+    "more": number;
 
     /** Creates a new CIReport instance. */
     constructor($$source: Partial<CIReport> = {}) {
@@ -267,6 +286,9 @@ export class CIReport {
         }
         if (!("jobs" in $$source)) {
             this["jobs"] = [];
+        }
+        if (!("more" in $$source)) {
+            this["more"] = 0;
         }
 
         Object.assign(this, $$source);

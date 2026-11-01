@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -44,7 +45,7 @@ func ciFixtures(t *testing.T) (github.Run, string, string) {
 func TestBuildCIReport(t *testing.T) {
 	run, raw, root := ciFixtures(t)
 	cfg := settings.CI{LogTailLines: 6, LogErrorLines: 10}
-	r := buildCIReport(run, raw, root, nil, cfg)
+	r := buildCIReport(context.Background(), run, []jobLog{{text: raw}}, root, nil, cfg)
 	if r.Workflow != "CI" || r.Branch != "feat/rate-limit" || r.RunID != 41307693761 || r.SHA == "" || len(r.Jobs) != 1 {
 		t.Fatalf("report = %+v", r)
 	}
@@ -87,7 +88,7 @@ func TestBuildCIReport(t *testing.T) {
 
 func TestBuildCIReportSecretsNeverLeave(t *testing.T) {
 	run, raw, root := ciFixtures(t)
-	r := buildCIReport(run, raw, root, nil, settings.CI{LogTailLines: settings.MaxCILogTailLines, LogErrorLines: 10})
+	r := buildCIReport(context.Background(), run, []jobLog{{text: raw}}, root, nil, settings.CI{LogTailLines: settings.MaxCILogTailLines, LogErrorLines: 10})
 	b, _ := json.Marshal(r)
 	if strings.Contains(string(b), "ghp_0123456789") {
 		t.Errorf("the token reached the report: %s", b)
@@ -96,16 +97,16 @@ func TestBuildCIReportSecretsNeverLeave(t *testing.T) {
 
 func TestBuildCIReportJobFilter(t *testing.T) {
 	run, raw, root := ciFixtures(t)
-	r := buildCIReport(run, raw, root, []int64{999}, settings.CI{LogTailLines: 10})
+	r := buildCIReport(context.Background(), run, []jobLog{{text: raw}}, root, []int64{999}, settings.CI{LogTailLines: 10})
 	if len(r.Jobs) != 0 {
 		t.Errorf("jobs = %+v, want none for an unknown job", r.Jobs)
 	}
-	r = buildCIReport(run, raw, root, []int64{124851367741}, settings.CI{LogTailLines: 10})
+	r = buildCIReport(context.Background(), run, []jobLog{{text: raw}}, root, []int64{124851367741}, settings.CI{LogTailLines: 10})
 	if len(r.Jobs) != 1 {
 		t.Errorf("jobs = %d", len(r.Jobs))
 	}
 	// A failed job whose log is missing still says what failed.
-	r = buildCIReport(run, "", root, nil, settings.CI{LogTailLines: 10})
+	r = buildCIReport(context.Background(), run, []jobLog{{}}, root, nil, settings.CI{LogTailLines: 10})
 	if len(r.Jobs) != 1 || !r.Jobs[0].NoLog || len(r.Jobs[0].Lines) != 0 {
 		t.Errorf("no log = %+v", r.Jobs)
 	}
@@ -113,7 +114,7 @@ func TestBuildCIReportJobFilter(t *testing.T) {
 
 func TestBuildCILog(t *testing.T) {
 	_, raw, root := ciFixtures(t)
-	l := buildCILog(raw, root)
+	l := buildCILog(context.Background(), raw, false, root)
 	if !strings.HasPrefix(l.Text, "── Build and test (macOS) › go test ──\n") {
 		t.Errorf("text starts %q", l.Text[:min(80, len(l.Text))])
 	}
@@ -129,7 +130,7 @@ func TestBuildCILog(t *testing.T) {
 }
 
 func TestCIJobIDsValidated(t *testing.T) {
-	if err := checkJobIDs(slices.Repeat([]int64{1}, maxCIJobs+1)); err == nil {
+	if err := checkJobIDs(slices.Repeat([]int64{1}, maxCIJobs*2+1)); err == nil {
 		t.Error("too many job ids accepted")
 	}
 	if err := checkJobIDs([]int64{1, 0}); err == nil {

@@ -110,6 +110,8 @@ type Settings struct {
 	InlineEdit InlineEdit `json:"inlineEdit"`
 	// AgentTasks configures agent tasks (worktree folder, branch prefix).
 	AgentTasks AgentTasks `json:"agentTasks"`
+	// Prompts configures the prompt library (prompts.go).
+	Prompts Prompts `json:"prompts"`
 }
 
 // Default returns the settings Flint uses when nothing is configured.
@@ -139,6 +141,7 @@ func Default() Settings {
 		Completions:        defaultCompletions(),
 		InlineEdit:         defaultInlineEdit(),
 		AgentTasks:         defaultAgentTasks(),
+		Prompts:            defaultPrompts(),
 		CustomTheme:        defaultCustomTheme(),
 	}
 }

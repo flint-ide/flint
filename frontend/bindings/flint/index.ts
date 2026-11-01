@@ -21,6 +21,7 @@ import * as KubeAPI from "./kubeapi.js";
 import * as LSPAPI from "./lspapi.js";
 import * as PreviewAPI from "./previewapi.js";
 import * as ProfileAPI from "./profileapi.js";
+import * as PromptsAPI from "./promptsapi.js";
 import * as RunAPI from "./runapi.js";
 import * as ScratchAPI from "./scratchapi.js";
 import * as SearchAPI from "./searchapi.js";
@@ -52,6 +53,7 @@ export {
     LSPAPI,
     PreviewAPI,
     ProfileAPI,
+    PromptsAPI,
     RunAPI,
     ScratchAPI,
     SearchAPI,
@@ -72,6 +74,8 @@ export {
     MergeResult,
     NewTask,
     ProfiledTests,
+    PromptInput,
+    PromptLibrary,
     RemoveInfo,
     RemoveOptions,
     RemoveResult,

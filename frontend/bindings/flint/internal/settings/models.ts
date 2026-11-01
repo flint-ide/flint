@@ -541,6 +541,35 @@ export class MCPTools {
 }
 
 /**
+ * Prompts configures the prompt library (internal/prompts): the "/" picker
+ * in the agent chat. The personal prompts live in the config directory's
+ * prompts folder; that location is fixed, so it is not a setting.
+ */
+export class Prompts {
+    /**
+     * Builtins offers the prompts shipped with Flint (/review, /test, …).
+     */
+    "builtins": boolean;
+
+    /** Creates a new Prompts instance. */
+    constructor($$source: Partial<Prompts> = {}) {
+        if (!("builtins" in $$source)) {
+            this["builtins"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Prompts instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Prompts {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Prompts($$parsedSource as Partial<Prompts>);
+    }
+}
+
+/**
  * Refresh holds how often panels that poll re-read their data while shown.
  */
 export class Refresh {
@@ -665,6 +694,11 @@ export class Settings {
      */
     "agentTasks": AgentTasks;
 
+    /**
+     * Prompts configures the prompt library (prompts.go).
+     */
+    "prompts": Prompts;
+
     /** Creates a new Settings instance. */
     constructor($$source: Partial<Settings> = {}) {
         if (!("version" in $$source)) {
@@ -724,6 +758,9 @@ export class Settings {
         if (!("agentTasks" in $$source)) {
             this["agentTasks"] = (new AgentTasks());
         }
+        if (!("prompts" in $$source)) {
+            this["prompts"] = (new Prompts());
+        }
 
         Object.assign(this, $$source);
     }
@@ -745,6 +782,7 @@ export class Settings {
         const $$createField16_0 = $$createType14;
         const $$createField17_0 = $$createType15;
         const $$createField18_0 = $$createType16;
+        const $$createField19_0 = $$createType17;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -785,6 +823,9 @@ export class Settings {
         if ("agentTasks" in $$parsedSource) {
             $$parsedSource["agentTasks"] = $$createField18_0($$parsedSource["agentTasks"]);
         }
+        if ("prompts" in $$parsedSource) {
+            $$parsedSource["prompts"] = $$createField19_0($$parsedSource["prompts"]);
+        }
         return new Settings($$parsedSource as Partial<Settings>);
     }
 }
@@ -807,3 +848,4 @@ const $$createType13 = MCPServer.createFrom;
 const $$createType14 = Completions.createFrom;
 const $$createType15 = InlineEdit.createFrom;
 const $$createType16 = AgentTasks.createFrom;
+const $$createType17 = Prompts.createFrom;

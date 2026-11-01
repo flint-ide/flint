@@ -69,6 +69,17 @@ export function CommitFiles(dir: string, hash: string): $CancellablePromise<git$
 }
 
 /**
+ * Conflict loads a conflicted file (absolute path) for the merge editor: the index
+ * stages, the working-tree file and what "current" and "incoming" are. Like HeadFile,
+ * the repository is found from the file's own directory.
+ */
+export function Conflict(path: string): $CancellablePromise<git$0.ConflictFile> {
+    return $Call.ByID(2321390922, path).then(($result: any) => {
+        return $$createType5($result);
+    });
+}
+
+/**
  * CreateBranch creates a branch, optionally switching to it.
  */
 export function CreateBranch(dir: string, name: string, startPoint: string, checkout: boolean): $CancellablePromise<void> {
@@ -101,7 +112,7 @@ export function Fetch(dir: string): $CancellablePromise<void> {
  */
 export function FileAt(dir: string, rev: string, path: string): $CancellablePromise<git$0.Revision> {
     return $Call.ByID(4154549723, dir, rev, path).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType6($result);
     });
 }
 
@@ -111,7 +122,7 @@ export function FileAt(dir: string, rev: string, path: string): $CancellableProm
  */
 export function FileHistory(path: string, limit: number): $CancellablePromise<$models.FileHistory> {
     return $Call.ByID(4263513302, path, limit).then(($result: any) => {
-        return $$createType6($result);
+        return $$createType7($result);
     });
 }
 
@@ -123,7 +134,7 @@ export function FileHistory(path: string, limit: number): $CancellablePromise<$m
  */
 export function HeadFile(path: string): $CancellablePromise<git$0.Revision> {
     return $Call.ByID(165416220, path).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType6($result);
     });
 }
 
@@ -132,7 +143,7 @@ export function HeadFile(path: string): $CancellablePromise<git$0.Revision> {
  */
 export function Info(dir: string): $CancellablePromise<$models.RepoInfo> {
     return $Call.ByID(4185228692, dir).then(($result: any) => {
-        return $$createType7($result);
+        return $$createType8($result);
     });
 }
 
@@ -148,8 +159,19 @@ export function LastCommitMessage(dir: string): $CancellablePromise<string> {
  */
 export function Log(dir: string, opts: git$0.LogOptions): $CancellablePromise<git$0.Commit[]> {
     return $Call.ByID(3223051098, dir, opts).then(($result: any) => {
-        return $$createType9($result);
+        return $$createType10($result);
     });
+}
+
+/**
+ * MarkResolved saves the merge editor's result to a conflicted file (absolute path
+ * inside an open folder) and stages it. With conflict markers left in content it
+ * fails with git.ErrConflictMarkers unless the user confirmed (allowMarkers).
+ * expected is the file as the editor loaded or last wrote it; when the file holds
+ * something else now, it fails with git.ErrChangedOnDisk unless overwrite.
+ */
+export function MarkResolved(path: string, content: string, expected: string, allowMarkers: boolean, overwrite: boolean): $CancellablePromise<void> {
+    return $Call.ByID(675205401, path, content, expected, allowMarkers, overwrite);
 }
 
 /**
@@ -175,6 +197,17 @@ export function Push(dir: string): $CancellablePromise<void> {
 }
 
 /**
+ * RedactForAgent prepares parts of a file (path) for an agent hand-off, such as a
+ * merge conflict's sides: credentials and the home directory are redacted, and
+ * nothing of a secret file is passed on.
+ */
+export function RedactForAgent(path: string, texts: string[]): $CancellablePromise<$models.AgentText> {
+    return $Call.ByID(738674073, path, texts).then(($result: any) => {
+        return $$createType11($result);
+    });
+}
+
+/**
  * RemoveWorktree deletes a linked worktree.
  */
 export function RemoveWorktree(dir: string, path: string, force: boolean): $CancellablePromise<void> {
@@ -186,6 +219,14 @@ export function RemoveWorktree(dir: string, path: string, force: boolean): $Canc
  */
 export function Rollback(dir: string, paths: string[]): $CancellablePromise<void> {
     return $Call.ByID(2220857500, dir, paths);
+}
+
+/**
+ * SaveMergeResult writes the merge editor's result without staging it, with the
+ * same check as MarkResolved against changes made on disk since it was loaded.
+ */
+export function SaveMergeResult(path: string, content: string, expected: string, overwrite: boolean): $CancellablePromise<void> {
+    return $Call.ByID(4193741150, path, content, expected, overwrite);
 }
 
 /**
@@ -230,7 +271,7 @@ export function StashPush(dir: string, message: string, includeUntracked: boolea
  */
 export function Stashes(dir: string): $CancellablePromise<git$0.Stash[]> {
     return $Call.ByID(2331718005, dir).then(($result: any) => {
-        return $$createType11($result);
+        return $$createType13($result);
     });
 }
 
@@ -239,7 +280,7 @@ export function Stashes(dir: string): $CancellablePromise<git$0.Stash[]> {
  */
 export function Status(dir: string): $CancellablePromise<git$0.Status> {
     return $Call.ByID(1922995402, dir).then(($result: any) => {
-        return $$createType12($result);
+        return $$createType14($result);
     });
 }
 
@@ -248,7 +289,7 @@ export function Status(dir: string): $CancellablePromise<git$0.Status> {
  */
 export function Worktrees(dir: string): $CancellablePromise<git$0.Worktree[]> {
     return $Call.ByID(1851555234, dir).then(($result: any) => {
-        return $$createType14($result);
+        return $$createType16($result);
     });
 }
 
@@ -258,13 +299,15 @@ const $$createType1 = git$0.Branch.createFrom;
 const $$createType2 = $Create.Array($$createType1);
 const $$createType3 = git$0.FileChange.createFrom;
 const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = git$0.Revision.createFrom;
-const $$createType6 = $models.FileHistory.createFrom;
-const $$createType7 = $models.RepoInfo.createFrom;
-const $$createType8 = git$0.Commit.createFrom;
-const $$createType9 = $Create.Array($$createType8);
-const $$createType10 = git$0.Stash.createFrom;
-const $$createType11 = $Create.Array($$createType10);
-const $$createType12 = git$0.Status.createFrom;
-const $$createType13 = git$0.Worktree.createFrom;
-const $$createType14 = $Create.Array($$createType13);
+const $$createType5 = git$0.ConflictFile.createFrom;
+const $$createType6 = git$0.Revision.createFrom;
+const $$createType7 = $models.FileHistory.createFrom;
+const $$createType8 = $models.RepoInfo.createFrom;
+const $$createType9 = git$0.Commit.createFrom;
+const $$createType10 = $Create.Array($$createType9);
+const $$createType11 = $models.AgentText.createFrom;
+const $$createType12 = git$0.Stash.createFrom;
+const $$createType13 = $Create.Array($$createType12);
+const $$createType14 = git$0.Status.createFrom;
+const $$createType15 = git$0.Worktree.createFrom;
+const $$createType16 = $Create.Array($$createType15);

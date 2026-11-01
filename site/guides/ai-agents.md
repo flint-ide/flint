@@ -54,7 +54,7 @@ Type in the box at the bottom. `↵` sends, `⇧↵` adds a new line. While the 
 
 ### Usage and cost
 
-The chat header shows cumulative input and output tokens, the cost in USD when the agent reports it, and a context bar (for example "42% context") with details in a tooltip. The status bar shows the total for the project, or for the whole workspace when several projects are open.
+The chat header shows cumulative input and output tokens, the cost in USD when the agent reports it, and a context bar (for example "42% context") with details in a tooltip. The status bar shows the total for the project, or for the whole workspace when several projects are open. For totals over days, budgets and an export, see [Usage and budgets](#usage-and-budgets).
 
 ### Chats after a restart
 
@@ -74,6 +74,70 @@ Open chats are part of the project session. After a restart you see the transcri
 | **Diagnose with AI** in the Kubernetes panel | Rollout state, problems, events and recent logs, with secrets redacted |
 
 Context goes to the chat of the project it belongs to: the active or most recently used chat there, or a new chat with the default agent if there is none. It lands in the draft so you can add your own words before sending. `⌥`-click sends it immediately.
+
+## Prompt library
+
+Prompts you use again and again live in Markdown files, and every agent chat offers them the same way: type `/` in the chat box and a list opens with each prompt's name, description and where it comes from (**project**, **personal** or **built-in**). Keep typing to filter it; `↑`/`↓` move, `↵` or `Tab` chooses. The chosen prompt replaces the draft with its text, placeholders filled in, so you can read and change it before you press `↵` to send. Nothing is sent on its own.
+
+"Run Prompt…" in the command palette does the same from anywhere: it puts the prompt into the current chat's draft, or opens a chat with your default agent.
+
+### Built-in prompts
+
+| Prompt | Asks the agent to |
+|---|---|
+| `/review` | Review the uncommitted changes (the diff is included) without changing files |
+| `/test` | Write tests for the selection or the current file and run them |
+| `/explain` | Explain the selection or the current file without changing files |
+| `/fix` | Fix the problems the language server reports in the current file |
+
+Commit messages already have their own button in the Commit panel, so there is no prompt for them. Turn the built-ins off in Settings ▸ Agents ▸ Prompts. A personal or project prompt with the same name replaces a built-in one.
+
+### Your own prompts
+
+"New Prompt…" asks for a name and a place and opens the new file from a template:
+
+- **Project**: `.flint/prompts/<name>.md` in the repository, shared with your team when you commit it.
+- **Personal**: `prompts/<name>.md` in Flint's configuration folder (`~/Library/Application Support/flint/prompts`, shown in Settings ▸ Agents ▸ Prompts); yours only, in every project.
+
+A project prompt replaces a personal one with the same name, which replaces a built-in one. The name is the file name: letters, digits, `-` and `_`. Files are read each time the list opens, so an edit shows up right away.
+
+```markdown
+---
+description: Review the changes against our API guidelines
+agent: claude
+args: ticket
+---
+Review my uncommitted changes on {{branch}} for ticket {{ticket}}.
+Check them against docs/api-guidelines.md.
+
+{{diff}}
+```
+
+The front matter between the `---` lines is optional, one `key: value` per line (`#` starts a comment):
+
+- `description`: the line shown in the list.
+- `agent`: only offer the prompt in chats with this agent (`claude`, `codex` or a custom agent's id). "Run Prompt…" opens a chat with that agent if needed.
+- `args`: names you are asked for when you choose the prompt (comma-separated, up to 8), used as `{{name}}` in the text.
+
+Flint fills these placeholders:
+
+| Placeholder | Becomes |
+|---|---|
+| `{{selection}}` | The selected text of the editor you used last, as a code block with secrets redacted (empty when nothing is selected; only a note for a credentials file such as `.env`) |
+| `{{file}}` | That editor's file, relative to the project |
+| `{{problems}}` | The language server's problems in that file, one per line, secrets redacted |
+| `{{diff}}` | The uncommitted changes, including new files, as a `diff` code block (at most 60 KB, secrets redacted). Credentials files (`.env`, keys, kubeconfig, …) are left out and only named |
+| `{{branch}}` | The current branch |
+
+Placeholders are filled once: text that a value brings in (a selection containing `{{diff}}`) is left as it is, and an unknown `{{name}}` stays in the draft for you to see.
+
+### The agent's own slash commands
+
+Claude Code and other agents have slash commands of their own (`/compact`, …). When what you typed doesn't match a Flint prompt, the list says so and `↵` sends it to the agent unchanged. To send a command that has the same name as a Flint prompt (Claude Code's `/review`, say), press `Esc` to close the list, then `↵`. Anything after a space (`/compact keep the API notes`) also goes to the agent as typed.
+
+### Prompts in Restricted Mode
+
+A prompt is only text for the draft: it never runs anything, in any folder. In a folder you haven't trusted, the project's prompts are still listed, marked **untrusted repo**, so read them before you send them. They can't replace a built-in or personal prompt: with a hostile `.flint/prompts/review.md`, `/review` stays Flint's own, and the list says that a file was skipped. Prompt files must be regular files of at most 64 KB inside `.flint/prompts`; links that lead out of the folder are ignored.
 
 ## What agents can see in Flint
 
@@ -133,13 +197,32 @@ You never have to accept diffs one by one. Edits are applied directly, show up i
 
 - **✦ Generate message** in the Commit panel gives the agent the diff of the ticked files and your recent commit messages. The result lands in the message field for you to edit.
 - **Resolve with claude** (or your default agent, when it is Claude Code or Codex) appears when there are merge conflicts. It opens an interactive agent session in a new terminal. The agent runs `git add` on resolved files but doesn't commit.
+- **✦ Ask Agent** on one conflict in the [merge editor](git-and-github.md#merge-conflicts) puts that conflict, both sides and the base into the chat draft; the agent edits only that block, and you mark the file resolved yourself.
+
+## Review Changes with Agent
+
+Before you commit, let an agent look over what you changed: **✦ Review** in the Commit panel, **✦ Review** in a diff tab, or "Review Changes with Agent" in the palette.
+
+- It reviews the changes ticked in the Commit panel, as the panel shows them (the last commit against your working tree, staged or not). Settings ▸ Agents ▸ Review can make it review every change instead, and a review started from a diff tab always includes that tab's file.
+- The reviewing agent (the default agent unless you pick another in Settings ▸ Agents ▸ Review) runs once, headless, like **Generate message**. It gets each file's diff with the line numbers of the new version and may read other files to check how the code is used. Only files `git status` reports as changed are reviewed.
+- What the agent can read on its own depends on the agent:
+  - **Claude Code** gets only Read, Grep and Glob, no MCP servers, and deny rules for credential files: the files Flint treats as credentials (`.env*`, `.envrc`, keys and certificates, `credentials`, kubeconfig, Terraform variables and state, `secrets.yaml` and the like) anywhere in the project, and `~/.ssh`, `~/.aws`, `~/.kube`, `~/.gnupg`, `~/.config/gcloud`, `~/.azure`, `~/.docker/config.json`, `~/.netrc`.
+  - **Codex** runs in its read-only sandbox: it can't change files, but it can read any file you can, including credentials outside the project.
+  - **A custom agent** gets a one-shot session in which Flint declines every permission request and refuses writes sent through Flint. Its own tools and configuration are outside Flint's control: an agent started with an auto-approve flag (such as `--yolo`) runs them without asking, so its reviews are not read-only. Settings ▸ Agents ▸ Review and the review's notes warn about such flags.
+- Flint never sends the content of credential files itself: they are left out of the diff (the panel says which), secrets elsewhere in the diff are redacted, and so are secrets in the agent's findings. The size limit (128 KB by default) is strict: small diffs go in whole, larger ones are shortened per file, files with no room left are listed in a note, and the panel says so.
+- While it works, the panel shows the agent and the elapsed time; **Cancel** stops the agent and everything it started.
+- Findings appear in the Commit panel, with counts per severity (error, warning, info), and under their lines in the diff tab, drawn like pull request comments. Click a finding in the panel to open the diff at its line.
+- **✦ Fix it** puts that finding in the agent chat's draft, with the file, the line, the explanation, the suggested replacement and the code around it; **Fix all** puts the findings (the 20 worst; the draft says how many wait) in one draft. The findings are quoted and marked as the reviewer's output to check, not instructions. Nothing is sent until you press Send, and the fix goes through the chat as usual: there is no accept or reject step. **Dismiss** removes a finding.
+- Findings follow their code: when the review finishes and whenever the file changes, a finding moves with its line. When the line itself changed, the finding is marked **Stale** and shown above the diff, with the line it was on.
+- The agent's answer is expected as JSON; Flint reads it even with prose or code fences around it, and keeps the complete findings of an answer that was cut off. Findings about files outside the review are dropped.
+- In Restricted Mode the run follows the rules below: Claude Code without the project's settings, no extra arguments, and custom ACP agents don't start.
 
 ## Edit with Agent in the editor
 
 Select code (or put the cursor on a line) and press `⌘I` ("Edit Selection with Agent…"). A small prompt opens above it; type what to change, for example "add error handling", and press `↵`.
 
 - The default agent runs once, headless, like **Generate message**. It gets the file's path, its language, the selection and the lines around it (Settings ▸ AI in the Editor ▸ Context lines, 60 by default), and is asked for the replacement text only. Secrets in the surrounding lines are redacted; a selection that contains something that looks like a credential is not sent.
-- Claude Code runs with read-only tools (Read, Grep, Glob) and without MCP servers, and Codex in its read-only sandbox, so text in the file can't make the agent change files or run commands. Files that hold credentials (`.env*`, keys, kubeconfig) are refused.
+- Claude Code runs with read-only tools (Read, Grep, Glob), without MCP servers and kept out of credential files, and Codex in its read-only sandbox, so text in the file can't make the agent change files or run commands. Files that hold credentials (`.env*`, keys, kubeconfig) are refused.
 - The answer replaces the selection directly, as one change: one `⌘Z` takes it back. There is no accept or reject step.
 - If you edit the selected code while the agent works, its answer is not applied and the prompt says so. Typing elsewhere in the file is fine.
 - `Esc` closes the prompt; while the agent works, it also stops the agent. Errors (no agent installed, a timeout) appear in the prompt.
@@ -179,13 +262,35 @@ In [Restricted Mode](restricted-mode.md), a task's worktree is trusted when the 
 
 The worktree folder and the branch prefix are settings (Settings ▸ Agents ▸ Agent tasks; [`agentTasks`](../reference/settings.md#agenttasks) in `settings.json`).
 
+## Usage and budgets
+
+Flint records what every agent turn of Claude Code and Codex used, as it happens: input tokens (with the cached part, when the agent reports it), output tokens, and the cost in USD when the agent reports one. Claude Code reports a cost; Codex usually doesn't, so its turns count as tokens only. Flint never makes up a price: if you want a cost for those turns, give the model a price in Settings ▸ Usage (USD per million input, output and, optionally, cached input tokens), and every cost computed from it is marked as an estimate (`~$0.40 est.`). Without a cached-input price, cached tokens are left out of the estimate (the panel says so) rather than priced as fresh input. When Claude Code reports a turn per model (a sub-agent on another model), each model's share is counted under that model. Custom ACP agents don't report usage, so their chats aren't recorded.
+
+The **Usage** panel (∑ in the activity bar, or **Show Agent Usage** in the palette) shows:
+
+- totals for today, the last 7 days and the last 30 days;
+- a bar per day for the last 7 or 30 days (cost when any is known, tokens otherwise; today is highlighted);
+- the same range broken down by project, agent task, agent and model. Click a project or a task to show only its usage; the chip at the top clears the filter;
+- the chats that used the most in the range, with the first message as their name. Click an open one to show it;
+- **⇩** exports the daily totals (with the current filter) as CSV: one row per day, project, agent, model and task, with tokens, the reported cost and the estimated cost in separate columns.
+
+A chat in an [agent task](#agent-tasks-agents-in-parallel) counts for the task and for the repository it was started from.
+
+### Budgets
+
+In Settings ▸ Usage you can set a daily budget (in USD, tokens or both, for all chats of the day) and a budget per agent task (everything the task's chats used). When a turn reaches one, the chat shows a warning under its header and Flint tells you once: a short message when Flint is in front, a macOS notification when it isn't (if notifications are on). Each budget is reported once per day or per task; raising it arms it again.
+
+The warning never stops you typing. If you turn on **Pause new turns over budget**, a chat over budget doesn't send new messages and says why; **Continue anyway** in the warning lets that day (and that task) go on for another budget's worth, after which it pauses again. Raising a budget also starts it over. Token budgets count input and output but leave out input read from the prompt cache, which a long Claude Code chat re-reads on every call; turn on **Count cached input in token budgets** to include it.
+
+Usage is kept for 90 days by default (Settings ▸ Usage ▸ Keep daily totals for) in `usage.json` in Flint's data folder, on your Mac only. It is written a couple of seconds after each turn and when Flint quits. See [Files and data](../reference/files-and-data.md).
+
 ## Notifications
 
 When an agent turn finishes while Flint isn't the active app, you get a macOS notification (click it to jump to the chat) and a badge on the Dock icon. Turn this off in Settings ▸ Agents.
 
 ## Agents in Restricted Mode
 
-In a folder you haven't trusted, agents run without the project's own agent settings and hooks (Claude Code is started with `--setting-sources user`). Trust the folder to let them apply. Custom ACP agents don't start there at all, and chats there don't get [Flint's MCP server](#what-agents-can-see-in-flint): a hostile repository could otherwise steer the agent into reading your terminals or cluster without a prompt. See [Restricted Mode](restricted-mode.md).
+In a folder you haven't trusted, agents run without the project's own agent settings and hooks (Claude Code is started with `--setting-sources user`). Trust the folder to let them apply. Custom ACP agents don't start there at all, and chats there don't get [Flint's MCP server](#what-agents-can-see-in-flint): a hostile repository could otherwise steer the agent into reading your terminals or cluster without a prompt. The repository's [prompts](#prompts-in-restricted-mode) are marked and can't replace yours. See [Restricted Mode](restricted-mode.md).
 
 ## Related
 

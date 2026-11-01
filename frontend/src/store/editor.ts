@@ -54,6 +54,18 @@ export interface DiffTab {
 export type RevisionDiff = Required<Pick<DiffTab, 'repoRoot' | 'path' | 'basePath' | 'baseRev'>> &
   Pick<DiffTab, 'rev' | 'baseLabel' | 'label'>
 
+/** The merge editor for a conflicted file (components/editor/MergeView.tsx). */
+export interface MergeTab {
+  id: string
+  kind: 'merge'
+  /** Absolute path of the conflicted file. */
+  path: string
+  /** Work-tree root used for git calls. */
+  repoRoot: string
+  title: string
+  dirty: boolean
+}
+
 /** Commits that touched a file (git log --follow). */
 export interface HistoryTab {
   id: string
@@ -166,6 +178,7 @@ export type Tab =
   | FileTab
   | ScratchTab
   | DiffTab
+  | MergeTab
   | HistoryTab
   | TerminalTab
   | ChatTab
@@ -202,6 +215,7 @@ interface EditorState {
   openScratch: (sc: ScratchPad) => void
   openDiff: (repoRoot: string, path: string, basePath?: string) => void
   openRevisionDiff: (d: RevisionDiff) => void
+  openMerge: (repoRoot: string, path: string) => void
   openHistory: (path: string) => void
   /** Opens the response tab of a .http file, right after the file's own tab. */
   openHttpResponse: (path: string) => void
@@ -227,6 +241,7 @@ export const scratchTabId = (id: string) => `scratch:${id}`
 export const diffTabId = (path: string) => `diff:${path}`
 export const revisionDiffTabId = (d: Pick<DiffTab, 'path' | 'baseRev' | 'rev'>) =>
   `diff:${d.baseRev ?? 'HEAD'}..${d.rev ?? ''}:${d.path}`
+export const mergeTabId = (path: string) => `merge:${path}`
 export const historyTabId = (path: string) => `history:${path}`
 export const profileTabId = (profileId: string) => `profile:${profileId}`
 export const httpTabId = (path: string) => `http:${path}`
@@ -372,6 +387,14 @@ export const useEditor = createStore<EditorState>((set) => ({
       return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
     }),
 
+  openMerge: (repoRoot, path) =>
+    set((s) => {
+      const id = mergeTabId(path)
+      if (s.tabs.some((t) => t.id === id)) return activate(s, id)
+      const tab: MergeTab = { id, kind: 'merge', path, repoRoot, title: `Merge ${baseName(path)}`, dirty: false }
+      return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
+    }),
+
   openHistory: (path) =>
     set((s) => {
       const id = historyTabId(path)
@@ -455,7 +478,7 @@ export const useEditor = createStore<EditorState>((set) => ({
     set((s) => {
       const gone = s.tabs.filter(
         (t) =>
-          ((t.kind === 'file' || t.kind === 'diff' || t.kind === 'history' || t.kind === 'http') && paths.some((p) => isWithin(p, t.path))) ||
+          ((t.kind === 'file' || t.kind === 'diff' || t.kind === 'merge' || t.kind === 'history' || t.kind === 'http') && paths.some((p) => isWithin(p, t.path))) ||
           // Pull requests belong to a project: they go when it leaves the workspace.
           ((t.kind === 'pr' || t.kind === 'prdiff' || t.kind === 'cilog') && paths.some((p) => isWithin(p, t.root))),
       )

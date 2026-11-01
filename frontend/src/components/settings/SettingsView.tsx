@@ -10,12 +10,15 @@ import { RefreshSection } from './RefreshSection'
 import { WatchSection } from './WatchSection'
 import { McpServerSection } from './McpServerSection'
 import { EditorAiSection } from './EditorAiSection'
+import { UsageSection } from './UsageSection'
 import { CISection } from './CISection'
 import { NumberField, Row, TextField } from './fields'
 import { openVSCodeImport } from '../../store/vscodeImport'
 import { isMac } from '../../lib/platform'
 
-type Section = 'appearance' | 'editor' | 'terminal' | 'agents' | 'agentContext' | 'editorAi' | 'lsp' | 'refresh' | 'ci' | 'todo' | 'keymap' | 'updates' | 'import'
+type Section =
+  | 'appearance' | 'editor' | 'terminal' | 'agents' | 'agentContext' | 'usage' | 'editorAi' | 'lsp' | 'refresh' | 'ci' | 'todo'
+  | 'keymap' | 'updates' | 'import'
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
@@ -23,6 +26,7 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: 'terminal', label: 'Terminal' },
   { id: 'agents', label: 'Agents' },
   { id: 'agentContext', label: 'Agent Context' },
+  { id: 'usage', label: 'Usage' },
   { id: 'editorAi', label: 'AI in the Editor' },
   { id: 'lsp', label: 'Language Servers' },
   { id: 'refresh', label: 'Refresh' },
@@ -54,6 +58,7 @@ export function SettingsView({ active }: { active: boolean }) {
         {section === 'terminal' && <TerminalSection />}
         {section === 'agents' && <AgentsSection />}
         {section === 'agentContext' && <McpServerSection />}
+        {section === 'usage' && <UsageSection />}
         {section === 'editorAi' && <EditorAiSection />}
         {section === 'lsp' && <LanguageServersSection />}
         {section === 'refresh' && (
@@ -166,7 +171,7 @@ function UpdatesSection() {
         <button disabled={checking} onClick={() => void checkForUpdates()}>{checking ? 'Checking…' : 'Check Now'}</button>
       </div>
       <p className="muted settings-note">
-        The check is one anonymous request to api.github.com for the latest release of ODudek/flint, with Flint's version in the User-Agent and no
+        The check is one anonymous request to api.github.com for the latest release of flint-ide/flint, with Flint's version in the User-Agent and no
         account, token, cookie or identifier. Flint never downloads or installs anything itself: Download opens the release page in your browser.
         With the check off, GitHub is asked only when you choose Check Now or Help ▸ Check for Updates….
       </p>

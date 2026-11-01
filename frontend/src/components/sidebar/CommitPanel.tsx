@@ -10,9 +10,12 @@ import { conflictHint } from '../../lib/customAgents'
 import { Select } from '../ui/Select'
 import { openStashDialog } from '../../store/stash'
 import { StashSection } from './StashSection'
+import { ReviewSection } from '../review/ReviewSection'
+import { reviewChanges, useAgentReview } from '../../store/agentReview'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
 import { Icon } from '../ui/Icon'
+import { openMergeEditor } from '../../store/mergeEditor'
 
 const KIND_LETTER: Record<string, string> = {
   modified: 'M', added: 'A', deleted: 'D', renamed: 'R', copied: 'C',
@@ -44,6 +47,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
   const [generating, setGenerating] = useState(false)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const agents = useAgent()
+  const reviewing = useAgentReview((s) => !!s.running)
   useFocus(textarea, focusToken)
   useEffect(() => {
     if (!agents.loaded) void agents.load()
@@ -160,7 +164,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
                     key={g.key + f.path}
                     className="tree-row static change-row"
                     title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}
-                    onClick={() => (f.kind === 'conflicted' ? openFile(abs(f)) : openDiff(root, abs(f), f.origPath ? `${root}/${f.origPath}` : abs(f)))}
+                    onClick={() => (f.kind === 'conflicted' ? openMergeEditor(root, abs(f)) : openDiff(root, abs(f), f.origPath ? `${root}/${f.origPath}` : abs(f)))}
                     onDoubleClick={() => openFile(abs(f))}
                   >
                     {g.key !== 'conflicts' && (
@@ -169,7 +173,22 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
                     <span className={`change-kind ${f.kind}`}>{KIND_LETTER[f.kind] ?? '?'}</span>
                     <span className={`file-name change-${f.kind}`}>{f.path.split('/').pop()}</span>
                     <span className="muted path-hint">{dirOf(f.path)}</span>
+                    {!!f.conflicts && <span className="conflict-count" title="Conflicts left in the file">{f.conflicts}</span>}
                     <span className="row-actions" onClick={(e) => e.stopPropagation()}>
+                      {f.kind === 'conflicted' && (
+                        <>
+                          <button className="link" title="Resolve in the merge editor" onClick={() => openMergeEditor(root, abs(f))}>Resolve…</button>
+                          {agents.conflictAgent && (
+                            <button
+                              className="icon"
+                              title={`Resolve with ${agents.conflictAgent} in a terminal`}
+                              onClick={() => void resolveConflictsWithAgent(root, status?.operation ?? '', [f.path])}
+                            >
+                              ✦
+                            </button>
+                          )}
+                        </>
+                      )}
                       <button className="icon" title="Open file" onClick={() => openFile(abs(f))}>↗</button>
                       {f.kind !== 'conflicted' && (
                         <button className="icon" title="Rollback" onClick={() => void confirmRollback([f])}>↶</button>
@@ -180,6 +199,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
             </div>
           )
         })}
+        <ReviewSection root={root} />
         <StashSection />
       </div>
 
@@ -197,6 +217,14 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
             <span className="muted">{agents.preferred || 'no agent installed'}</span>
           )}
           <span className="spacer" />
+          <button
+            className="link"
+            disabled={!agents.preferred || reviewing || (status?.files ?? []).length === 0}
+            onClick={() => void reviewChanges()}
+            title="Let the agent review the ticked changes (or all of them: Settings ▸ Agents ▸ Review) before you commit"
+          >
+            {reviewing ? 'Reviewing…' : '✦ Review'}
+          </button>
           <button
             className="link"
             disabled={!agents.preferred || generating || selected.length === 0}

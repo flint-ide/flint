@@ -47,6 +47,7 @@ func missingObject(msg string) bool {
 	for _, s := range []string{
 		"does not exist",
 		"exists on disk, but not in", // new file: on disk, not in HEAD / the index
+		"but not at stage",           // a conflict side that is missing (added or deleted on one side)
 		"invalid object name",        // HEAD before the first commit
 		"not a valid object",
 		"bad file",

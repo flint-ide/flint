@@ -12,7 +12,7 @@ Apart from the update check, data leaves your Mac only when you do something tha
 
 | Action | What is sent | Where |
 |---|---|---|
-| Agent chat, Generate message, Resolve with agent, Diagnose with AI | Your messages, the context you attach, and whatever the agent reads | Your AI provider, through the `claude` or `codex` CLI or a custom ACP agent you added, and your own account |
+| Agent chat, Generate message, Review Changes with Agent, Resolve with agent, Diagnose with AI | Your messages, the context you attach, and whatever the agent reads | Your AI provider, through the `claude` or `codex` CLI or a custom ACP agent you added, and your own account |
 | Pull request review | Requests for pull requests, and your comments and reviews when you post them | GitHub, through the `gh` CLI |
 | Help ▸ Report an Issue… | A prefilled issue that you review in your browser before submitting | GitHub, only when you submit |
 | HTTP client | The request you send | The server in the request |
@@ -26,10 +26,10 @@ Agents decide what they read and send to their provider. The [approval policy](.
 
 Flint looks for a newer release so it can tell you about it. It never downloads or installs anything itself.
 
-- **What is requested**: `GET https://api.github.com/repos/ODudek/flint/releases/latest`, GitHub's public endpoint for the latest published release (drafts and pre-releases are left out).
+- **What is requested**: `GET https://api.github.com/repos/flint-ide/flint/releases/latest`, GitHub's public endpoint for the latest published release (drafts and pre-releases are left out).
 - **What is sent**: only the request itself, with the headers `Accept: application/vnd.github+json`, `X-GitHub-Api-Version` and `User-Agent: Flint/<version>` (for example `Flint/v1.3.0`). No account, token, cookie, machine identifier or information about your projects. Like any web request, it shows your IP address to GitHub.
 - **When**: a few seconds after Flint starts and then once a day while it runs, at most once every 24 hours. The time of the last check, the release it found and a version you skipped are kept in `state.json`. Development builds (version `dev`) never check on their own.
-- **What you see**: when a newer release exists, a notice in the status bar with **Download**, which opens the release page on `github.com/ODudek/flint` in your browser, **Skip This Version** and **✕** (hide until the next launch). If the check fails, for example when you are offline, Flint only writes a line to its log.
+- **What you see**: when a newer release exists, a notice in the status bar with **Download**, which opens the release page on `github.com/flint-ide/flint` in your browser, **Skip This Version** and **✕** (hide until the next launch). If the check fails, for example when you are offline, Flint only writes a line to its log.
 - **Turning it off**: untick **Settings ▸ Updates ▸ Check for new releases**, or set `"checkForUpdates": false` in [`settings.json`](settings.md). Flint then makes no request on its own; **Help ▸ Check for Updates…** (also in the command palette) still checks when you ask.
 
 ## Secrets
@@ -61,11 +61,11 @@ Query history masks passwords in `CREATE/ALTER ROLE … PASSWORD` and ClickHouse
 
 Don't open a public issue for security problems. Use GitHub's private reporting instead:
 
-1. Go to the [Security tab](https://github.com/ODudek/flint/security) of the repository.
+1. Go to the [Security tab](https://github.com/flint-ide/flint/security) of the repository.
 2. Click **Report a vulnerability** and fill in the form.
 
 Include the Flint and macOS versions (**Help ▸ Copy Diagnostics** gives you a redacted report), a description of the issue and its impact, and steps to reproduce. Don't include real secrets.
 
 You can expect an acknowledgement within 3 days and a fix, or a plan with a timeline, within 30 days. Only the latest release receives security fixes, so check that the issue reproduces there first.
 
-The full policy, including what is in scope, is in [SECURITY.md](https://github.com/ODudek/flint/blob/main/SECURITY.md).
+The full policy, including what is in scope, is in [SECURITY.md](https://github.com/flint-ide/flint/blob/main/SECURITY.md).

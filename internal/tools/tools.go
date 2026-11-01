@@ -25,7 +25,7 @@ func installFor(goos, mac, linux string) string {
 }
 
 // DocsBase is the user documentation site; Tool.Docs is a page relative to it.
-const DocsBase = "https://odudek.github.io/flint/"
+const DocsBase = "https://flint-ide.github.io/flint/"
 
 // Groups, in the order the tool check shows them.
 const (

@@ -29,6 +29,7 @@ export const ICONS = {
   cloud: ['M4.75 12.5h6.5a2.75 2.75 0 0 0 .4-5.47A3.75 3.75 0 0 0 4.4 7.6 2.5 2.5 0 0 0 4.75 12.5z'], // ☁
   helm: [circle(8, 8, 4.5), circle(8, 8, 1.25), spokes], // ☸
   terminal: ['M3 4.5 6.5 8 3 11.5', 'M8 12.25h5'], // ❯_
+  sum: ['M12 3.5H4L8.5 8 4 12.5h8'], // ∑
 } as const satisfies Record<string, readonly string[]>
 
 export type IconName = keyof typeof ICONS

@@ -21,6 +21,7 @@ import * as KubeAPI from "./kubeapi.js";
 import * as LSPAPI from "./lspapi.js";
 import * as PreviewAPI from "./previewapi.js";
 import * as ProfileAPI from "./profileapi.js";
+import * as PromptsAPI from "./promptsapi.js";
 import * as RunAPI from "./runapi.js";
 import * as ScratchAPI from "./scratchapi.js";
 import * as SearchAPI from "./searchapi.js";
@@ -30,6 +31,7 @@ import * as TaskAPI from "./taskapi.js";
 import * as TerminalAPI from "./terminalapi.js";
 import * as TodoAPI from "./todoapi.js";
 import * as UpdateAPI from "./updateapi.js";
+import * as UsageAPI from "./usageapi.js";
 import * as WorkspaceAPI from "./workspaceapi.js";
 export {
     AWSAPI,
@@ -52,6 +54,7 @@ export {
     LSPAPI,
     PreviewAPI,
     ProfileAPI,
+    PromptsAPI,
     RunAPI,
     ScratchAPI,
     SearchAPI,
@@ -61,11 +64,14 @@ export {
     TerminalAPI,
     TodoAPI,
     UpdateAPI,
+    UsageAPI,
     WorkspaceAPI
 };
 
 export {
     AgentInfo,
+    AgentText,
+    BudgetStatus,
     CIFileRef,
     CIJob,
     CILog,
@@ -76,15 +82,21 @@ export {
     MergeResult,
     NewTask,
     ProfiledTests,
+    PromptInput,
+    PromptLibrary,
     RemoveInfo,
     RemoveOptions,
     RemoveResult,
     RepoInfo,
+    ReviewFile,
+    ReviewRequest,
+    ReviewResult,
     RunConfigs,
     SendOptions,
     TaskView,
     TitlebarMetrics,
-    UndoResult
+    UndoResult,
+    UsageView
 } from "./models.js";
 
 export type {

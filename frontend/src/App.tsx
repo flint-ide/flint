@@ -12,6 +12,7 @@ import { subscribeSessionAutosave } from './store/session'
 import { subscribeGitEvents } from './store/git'
 import { subscribeLspEvents } from './store/lsp'
 import { subscribeAgentChatEvents } from './store/agentChat'
+import { subscribeUsageEvents } from './store/usage'
 import { subscribeRunEvents, useRun } from './store/run'
 import { subscribeDebugEvents } from './store/debug'
 import { subscribeAutoSave } from './store/settings'
@@ -25,6 +26,7 @@ import { subscribeAlerts } from './store/alerts'
 import { openToolCheck, openToolCheckOnFirstRun, useToolCheck } from './store/toolCheck'
 import { checkForUpdates, subscribeUpdates } from './store/update'
 import { useVSCodeImport } from './store/vscodeImport'
+import { usePrompts } from './store/prompts'
 import type { DroppedPath } from './lib/drop'
 import { UsagesModal } from './components/lsp/UsagesModal'
 import { showToast } from './store/dialog'
@@ -49,6 +51,7 @@ const QuickOpen = lazy(() => import('./components/QuickOpen').then((m) => ({ def
 const RunConfigDialog = lazy(() => import('./components/run/RunConfigDialog').then((m) => ({ default: m.RunConfigDialog })))
 const CommandPalette = lazy(() => import('./components/CommandPalette').then((m) => ({ default: m.CommandPalette })))
 const ToolCheck = lazy(() => import('./components/layout/ToolCheck').then((m) => ({ default: m.ToolCheck })))
+const PromptDialog = lazy(() => import('./components/agent/PromptDialog').then((m) => ({ default: m.PromptDialog })))
 const ImportVSCodeDialog = lazy(() => import('./components/settings/ImportVSCodeDialog').then((m) => ({ default: m.ImportVSCodeDialog })))
 
 export default function App() {
@@ -62,6 +65,7 @@ export default function App() {
   const paletteOpen = useWorkspace((s) => s.paletteOpen)
   const toolCheckOpen = useToolCheck((s) => s.open)
   const importOpen = useVSCodeImport((s) => s.open)
+  const promptDialog = usePrompts((s) => s.dialog)
   const root = useWorkspace((s) => s.root)
   const error = useWorkspace((s) => s.error)
   const editingRun = useRun((s) => s.editing)
@@ -77,6 +81,7 @@ export default function App() {
     subscribeGitEvents()
     subscribeLspEvents()
     subscribeAgentChatEvents()
+subscribeUsageEvents()
     subscribeRunEvents()
     subscribeDebugEvents()
     subscribeSessionAutosave()
@@ -172,6 +177,11 @@ export default function App() {
       {paletteOpen && (
         <Suspense fallback={null}>
           <CommandPalette />
+        </Suspense>
+      )}
+      {promptDialog && (
+        <Suspense fallback={null}>
+          <PromptDialog />
         </Suspense>
       )}
       {toolCheckOpen && (

@@ -20,7 +20,7 @@ export class Release {
     "name": string;
 
     /**
-     * release page, always under https://github.com/ODudek/flint/
+     * release page, always under https://github.com/flint-ide/flint/
      */
     "url": string;
 

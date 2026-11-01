@@ -32,6 +32,7 @@ import (
 	"flint/internal/settings"
 	"flint/internal/terminal"
 	"flint/internal/update"
+	"flint/internal/usage"
 	"flint/internal/watcher"
 )
 
@@ -81,6 +82,8 @@ type App struct {
 	mcpSources  *mcptools.Sources  // what the MCP server's tools read
 	tasks       *agenttask.Tracker // state of agent tasks from their chats
 	sessions    *restore.Store
+	usage       *usage.Store // agent usage per day (usage_state.go)
+	usageChats  usageChats
 	files       fuzzy.Index      // quick-open file list of the open folder
 	http        *httpfile.Client // requests of .http files, sent only on demand
 
@@ -155,6 +158,7 @@ func NewApp() (*App, error) {
 	if err != nil {
 		log.Printf("flint: %v (using default settings)", err)
 	}
+	a.openUsage()
 	a.mcp, a.mcpSources = newMCP(a)
 	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
 	a.agents = newAgentManager(a)
@@ -182,6 +186,7 @@ func (a *App) shutdown() {
 		a.db.CloseAll,
 		a.profiles.closeAll,
 		a.closeProject,
+		a.closeUsage,
 	} {
 		wg.Add(1)
 		go func(stop func()) {

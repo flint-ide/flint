@@ -71,11 +71,27 @@ func WriteFileAtomic(path string, data []byte, perm fs.FileMode) error {
 		tmp.Close()
 		return fmt.Errorf("chmod %s: %w", path, err)
 	}
+	// On disk before the rename, so a power loss can't leave an empty file
+	// under the old name.
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return fmt.Errorf("sync %s: %w", path, err)
+	}
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("close %s: %w", path, err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
 		return fmt.Errorf("replace %s: %w", path, err)
 	}
+	syncDir(dir)
 	return nil
+}
+
+// syncDir makes a rename in dir durable; best effort (not every file system
+// can sync a directory, and the data itself is already on disk).
+func syncDir(dir string) {
+	if d, err := os.Open(dir); err == nil {
+		_ = d.Sync()
+		_ = d.Close()
+	}
 }

@@ -82,7 +82,7 @@ func (s *session) handleStatusNotification(method string, params json.RawMessage
 	case notifTokenUsage:
 		var n tokenUsageNotification
 		if decode(params, &n) {
-			s.onTokenUsage(n.TokenUsage.Total, n.TokenUsage.Last.InputTokens, n.TokenUsage.ModelContextWindow)
+			s.onTokenUsage(n.TokenUsage.Total, n.TokenUsage.Last, n.TokenUsage.ModelContextWindow)
 		}
 	case notifError:
 		var n errorNotification
@@ -254,12 +254,18 @@ func (s *session) patchUpdated(itemID string, changes []fileUpdateChange) {
 	s.emit(agentsession.Event{Kind: agentsession.KindToolCallUpdate, ToolCall: &tc})
 }
 
-func (s *session) onTokenUsage(total tokenBreakdown, ctxLast, ctxWin int) {
+// onTokenUsage takes the thread's total and the last model call. A turn
+// whose starting total is unknown (the first turn after a resume, where the
+// total includes the history) starts from the total before that call.
+func (s *session) onTokenUsage(total, last tokenBreakdown, ctxWin int) {
 	s.mu.Lock()
-	s.usage = total
-	s.ctxLast, s.ctxWin = ctxLast, ctxWin
-	if s.turn != nil {
-		s.turn.usageSeen = true
+	s.usage, s.usageKnown = total, true
+	s.ctxLast, s.ctxWin = last.InputTokens, ctxWin
+	if t := s.turn; t != nil {
+		if !t.baseKnown {
+			t.usageBase, t.baseKnown = total.minus(last), true
+		}
+		t.usageSeen = true
 	}
 	s.mu.Unlock()
 }

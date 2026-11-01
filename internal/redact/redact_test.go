@@ -117,13 +117,29 @@ func TestHasSecretValue(t *testing.T) {
 	}
 }
 
+// Every glob names files SecretFile recognises (a sample per glob: * → "x").
+func TestSecretFileGlobsMatchSecretFile(t *testing.T) {
+	for _, g := range SecretFileGlobs() {
+		sample := strings.ReplaceAll(g, "*", "x")
+		if !SecretFile(sample) {
+			t.Errorf("glob %q: SecretFile(%q) = false", g, sample)
+		}
+		if strings.HasPrefix(g, "-") || strings.ContainsAny(g, ",() ") {
+			t.Errorf("glob %q can't be a rule argument", g)
+		}
+	}
+}
+
 func TestSecretFile(t *testing.T) {
-	for _, p := range []string{".env", "/p/.env.local", "certs/server.pem", "tls.key", "/home/u/.ssh/id_ed25519", "/home/u/.aws/credentials", ".npmrc", "/u/.netrc", "/u/.kube/config", "kubeconfig", "prod.kubeconfig", "secrets.p12"} {
+	for _, p := range []string{".env", "/p/.env.local", "certs/server.pem", "tls.key", "/home/u/.ssh/id_ed25519", "/home/u/.aws/credentials", ".npmrc", "/u/.netrc", "/u/.kube/config", "kubeconfig", "prod.kubeconfig", "secrets.p12",
+		".envrc", "app/.dev.vars", "/u/.git-credentials", "infra/prod.tfvars", "vars.auto.tfvars.json", "terraform.tfstate",
+		"terraform.tfstate.backup", "config/secrets.yaml", "secrets.yml", "secrets.json", "secrets.toml"} {
 		if !SecretFile(p) {
 			t.Errorf("SecretFile(%q) = false", p)
 		}
 	}
-	for _, p := range []string{"main.go", "env.go", "src/keys.ts", "config.yaml", "id.go", "README.md", "/p/.config/app/config"} {
+	for _, p := range []string{"main.go", "env.go", "src/keys.ts", "config.yaml", "id.go", "README.md", "/p/.config/app/config",
+		"secrets.go", "secrets_test.go", "pkg/secrets/store.go", "secrets.md", "main.tf", "variables.tf", "envrc.go", "tfstate.go", "credentials.go"} {
 		if SecretFile(p) {
 			t.Errorf("SecretFile(%q) = true", p)
 		}

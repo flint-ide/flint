@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -151,7 +152,7 @@ func spawn(path string, args []string, cwd string, env []string, id string, flin
 		events:     newEventQueue(sink),
 		perms:      map[string]*pendingPerm{},
 		ctlWait:    map[string]chan controlResponseBody{},
-		tr:         newTranslator(),
+		tr:         newTranslator(slices.Contains(args, "--resume")),
 		readerDone: make(chan struct{}),
 		done:       make(chan struct{}),
 		flintMCP:   flintMCP,

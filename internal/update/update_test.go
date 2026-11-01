@@ -68,22 +68,22 @@ func TestSafeURL(t *testing.T) {
 		link string
 		want string
 	}{
-		{"https://github.com/ODudek/flint/releases/tag/v1.3.0", "https://github.com/ODudek/flint/releases/tag/v1.3.0"},
-		{"https://github.com/ODudek/flint/releases/latest", "https://github.com/ODudek/flint/releases/latest"},
+		{"https://github.com/flint-ide/flint/releases/tag/v1.3.0", "https://github.com/flint-ide/flint/releases/tag/v1.3.0"},
+		{"https://github.com/flint-ide/flint/releases/latest", "https://github.com/flint-ide/flint/releases/latest"},
 		{"", ReleasesURL},
-		{"http://github.com/ODudek/flint/releases/tag/v1.3.0", ReleasesURL},
-		{"https://github.com/ODudek/flint-evil/releases/tag/v1.3.0", ReleasesURL},
-		{"https://github.com/ODudek/flint", ReleasesURL},
+		{"http://github.com/flint-ide/flint/releases/tag/v1.3.0", ReleasesURL},
+		{"https://github.com/flint-ide/flint-evil/releases/tag/v1.3.0", ReleasesURL},
+		{"https://github.com/flint-ide/flint", ReleasesURL},
 		{"https://github.com/other/flint/releases/tag/v1.3.0", ReleasesURL},
-		{"https://github.com.evil.example/ODudek/flint/releases", ReleasesURL},
-		{"https://evil.example/https://github.com/ODudek/flint/", ReleasesURL},
-		{"https://github.com/ODudek/flint/../../evil/repo", ReleasesURL},
-		{"https://github.com/ODudek/flint/%2e%2e/%2e%2e/evil", ReleasesURL},
-		{`https://github.com/ODudek/flint/..\..\evil`, ReleasesURL},
-		{"https://user@github.com/ODudek/flint/releases", ReleasesURL},
-		{"https://github.com:8443/ODudek/flint/releases", ReleasesURL},
-		{"javascript:alert(1)//https://github.com/ODudek/flint/", ReleasesURL},
-		{"https://github.com/ODudek/flint/releases/tag/v1.3.0\n", ReleasesURL},
+		{"https://github.com.evil.example/flint-ide/flint/releases", ReleasesURL},
+		{"https://evil.example/https://github.com/flint-ide/flint/", ReleasesURL},
+		{"https://github.com/flint-ide/flint/../../evil/repo", ReleasesURL},
+		{"https://github.com/flint-ide/flint/%2e%2e/%2e%2e/evil", ReleasesURL},
+		{`https://github.com/flint-ide/flint/..\..\evil`, ReleasesURL},
+		{"https://user@github.com/flint-ide/flint/releases", ReleasesURL},
+		{"https://github.com:8443/flint-ide/flint/releases", ReleasesURL},
+		{"javascript:alert(1)//https://github.com/flint-ide/flint/", ReleasesURL},
+		{"https://github.com/flint-ide/flint/releases/tag/v1.3.0\n", ReleasesURL},
 	}
 	for _, tt := range tests {
 		t.Run(tt.link, func(t *testing.T) {
@@ -114,7 +114,7 @@ func TestLatest(t *testing.T) {
 	const release = `{
 		"tag_name": "v1.3.0",
 		"name": "Flint 1.3\u0007",
-		"html_url": "https://github.com/ODudek/flint/releases/tag/v1.3.0",
+		"html_url": "https://github.com/flint-ide/flint/releases/tag/v1.3.0",
 		"published_at": "2026-10-30T09:15:00Z",
 		"draft": false,
 		"prerelease": false,
@@ -130,7 +130,7 @@ func TestLatest(t *testing.T) {
 	}{
 		{
 			name: "release", status: 200, body: release,
-			want: Release{Tag: "v1.3.0", Name: "Flint 1.3", URL: "https://github.com/ODudek/flint/releases/tag/v1.3.0",
+			want: Release{Tag: "v1.3.0", Name: "Flint 1.3", URL: "https://github.com/flint-ide/flint/releases/tag/v1.3.0",
 				PublishedAt: time.Date(2026, 10, 30, 9, 15, 0, 0, time.UTC)},
 		},
 		{

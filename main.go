@@ -18,7 +18,7 @@ import (
 var assets embed.FS
 
 // linuxAppID is the GTK application id; the .desktop file and icon are named after it.
-const linuxAppID = "io.github.odudek.flint"
+const linuxAppID = "io.github.flint_ide.flint"
 
 func main() {
 	logger := diag.Setup()
@@ -47,7 +47,7 @@ func main() {
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
-		// Matches build/linux/io.github.odudek.flint.desktop, so desktops show the
+		// Matches build/linux/io.github.flint_ide.flint.desktop, so desktops show the
 		// window under Flint's launcher and icon.
 		Linux:          application.LinuxOptions{ApplicationID: linuxAppID},
 		SingleInstance: singleInstance(flint),
@@ -69,6 +69,7 @@ func main() {
 			application.NewService(&AgentAPI{app: flint, git: gitAPI}),
 			application.NewService(lspAPI),
 			application.NewService(&AgentChatAPI{app: flint}),
+			application.NewService(&PromptsAPI{app: flint, git: gitAPI}),
 			application.NewService(&EditorContextAPI{app: flint}),
 			application.NewService(&DiffAPI{}),
 			application.NewService(&TodoAPI{app: flint}),
@@ -78,6 +79,7 @@ func main() {
 			application.NewService(&SettingsAPI{app: flint}),
 			application.NewService(&GitHubAPI{app: flint, git: gitAPI, gh: gh}),
 			application.NewService(&TaskAPI{app: flint, git: gitAPI, pr: gh}),
+			application.NewService(&UsageAPI{app: flint}),
 			application.NewService(&ImportAPI{app: flint}),
 			application.NewService(newAlertsAPI(flint)),
 			application.NewService(newAWSAPI(flint)),

@@ -77,6 +77,14 @@ The file is readable only by your user. It never contains secrets: database pass
   },
   "inlineEdit": { "contextLines": 60 },
   "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/" },
+  "usage": {
+    "retentionDays": 90,
+    "dailyBudgetUsd": 20,
+    "taskBudgetTokens": 5000000,
+    "pauseOverBudget": false,
+    "prices": { "gpt-5-codex": { "in": 1.25, "out": 10, "cacheRead": 0.125 } }
+  },
+  "agentReview": { "scope": "selected", "maxDiffKB": 128, "agent": "", "timeoutSeconds": 300 },
   "ci": { "pollSeconds": 60, "logTailLines": 80, "logErrorLines": 40, "notify": true }
 }
 ```
@@ -104,6 +112,9 @@ The file is readable only by your user. It never contains secrets: database pass
 | `completions` | object | see below | Inline suggestions from a code model (off by default). See [completions](#completions). |
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
 | `agentTasks` | object | see below | Where agent task worktrees go and how their branches are named. See [agentTasks](#agenttasks). |
+| `usage` | object | see below | How long agent usage is kept, budgets, and prices for estimates. See [usage](#usage). |
+| `prompts` | object | see below | The prompt library of the agent chat (`/`). See [prompts](#prompts). |
+| `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
 | `ci` | object | see below | Following your pull requests' CI: poll interval, Fix with agent's log excerpt, notifications. See [ci](#ci). |
 
 ### Font objects
@@ -276,6 +287,40 @@ Used by [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel).
 
 Slashes in a branch name become dashes in the folder name. The tasks themselves are kept in `state.json`.
 
+### usage
+
+Used by the [Usage panel and budgets](../guides/ai-agents.md#usage-and-budgets). A budget of `0` is off.
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `retentionDays` | integer | 7–3650 | `90` | Days of daily totals kept in `usage.json`; older days are dropped. |
+| `dailyBudgetUsd` | number | 0–1,000,000 | `0` | Money all agent chats of a day may use: reported costs plus estimates. |
+| `dailyBudgetTokens` | integer | 0–10¹² | `0` | Tokens (input plus output; cached input only with `countCacheReads`) all chats of a day may use. |
+| `taskBudgetUsd` | number | 0–1,000,000 | `0` | Money one agent task's chats may use, over the days kept. |
+| `taskBudgetTokens` | integer | 0–10¹² | `0` | Tokens one agent task's chats may use. |
+| `countCacheReads` | boolean | | `false` | Token budgets also count input read from the prompt cache. |
+| `pauseOverBudget` | boolean | | `false` | Refuse new turns while a budget is reached, until **Continue anyway** in the chat's warning. |
+| `prices` | object | up to 200 models | `{}` | Model name (exactly as the Usage panel shows it, case ignored) → `{ "in": …, "out": …, "cacheRead": … }` in USD per million tokens, 0–10,000; `cacheRead` is optional (without it, cached input is left out of estimates). Used only for turns whose agent reported no cost; the result is shown as an estimate. |
+
+### prompts
+
+Used by the [prompt library](../guides/ai-agents.md#prompt-library).
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `builtins` | boolean | `true` | Offer the prompts that ship with Flint (`/review`, `/test`, `/explain`, `/fix`). |
+
+The prompts themselves are Markdown files, not settings: personal ones in the `prompts` folder next to `settings.json`, project ones in the repository's `.flint/prompts`.
+### agentReview
+
+Used by [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-agent). Settings ▸ Agents ▸ Review.
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `scope` | string | `"selected"`, `"all"` | `"selected"` | What a review covers: the changes ticked in the Commit panel, or every change. A review started from a diff tab always includes that tab's file. |
+| `maxDiffKB` | integer | 8–512 | `128` | Largest diff sent to the agent, in KB; never exceeded. Above it, small files still go in whole and the larger ones share the rest: each keeps its first hunks, or is summarized in one line, with a note that tells the agent to read the file. Files with no room left at all are left out and listed in a note. Untracked files are read only as far as their share. |
+| `agent` | string | | `""` | The reviewing agent: `"claude"`, `"codex"` or the `id` of a custom agent. Empty uses `defaultAgent`. An agent that isn't configured falls back to empty. What each agent can read on its own is described in [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-agent): Codex can read any file you can, and a custom agent started with an auto-approve flag is not read-only. |
+| `timeoutSeconds` | integer | 30–1800 | `300` | A review that takes longer is stopped, with the agent and everything it started. |
 ### ci
 
 Used by [When CI fails](../guides/git-and-github.md#when-ci-fails).

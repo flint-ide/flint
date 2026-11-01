@@ -88,7 +88,7 @@ flowchart LR
 - Native drivers (`agentsession/claude`, `agentsession/codex`) are registered once and read their settings on every start.
 - Custom agents (`customAgents` in settings.json) are ACP agents: each gets one `acpdriver.Driver`, registered at startup and again whenever settings are saved (`syncCustomAgents`). A replaced or removed driver keeps the sessions it runs until they stop, and is still closed on quit. Adding an agent CLI with an ACP mode needs no code.
 - The agent lists (chat menus, default-agent pickers, `AgentAPI.Info`) are the native CLIs found on the login PATH, then the custom agents whose command resolves.
-- One-shot work goes through `AgentAPI`: commit messages run `agent.Headless` (`claude -p`, `codex exec`) or, for a custom agent, `acpdriver.Headless` (a fresh ACP session that declines every permission request and refuses writes). Conflict resolution types an interactive command into a terminal, so it always uses a native agent (`AgentInfo.conflictAgent`).
+- One-shot work goes through `AgentAPI`: commit messages, reviews (`ReviewChanges`: `internal/review` builds the bounded, redacted input and parses the JSON findings) and inline edits run `agent.Headless` (`claude -p`, `codex exec`) or, for a custom agent, `acpdriver.Headless` (a fresh ACP session that declines every permission request and refuses writes). Conflict resolution types an interactive command into a terminal, so it always uses a native agent (`AgentInfo.conflictAgent`).
 - Flint's own MCP server (`api_mcp.go` → `internal/mcpserver`, `internal/mcptools`) gives chat agents read-only tools: LSP diagnostics, the editor snapshot, terminal and run output, the last test run and the Kubernetes status. `mcpserver` is MCP's Streamable HTTP transport on the standard library (JSON-RPC over POST, protocol 2025-06-18, no SSE, stateless), listening on `127.0.0.1` from the first session that gets it until it is switched off or Flint quits. `mcptools` keeps bounded stores fed by events (`LSPAPI.wire`, `terminalEvents`, `runEvents`, and `EditorContextAPI.Update`, which the frontend calls debounced and only on change); nothing polls. Drivers receive an `agentsession.MCPProvider`: Claude Code gets an inline `--mcp-config` whose header expands `${FLINT_MCP_TOKEN}` from its environment, Codex `-c mcp_servers.flint.*` with `bearer_token_env_var`, ACP agents an `http` McpServer in `session/new` when they advertise `mcpCapabilities.http`.
 - `SettingsAPI.ProbeCustomAgent` runs only the ACP `initialize` handshake of a saved custom agent, in an empty temporary folder, for the Check button. Settings are written by the web view, so before a command line runs for the first time in a session Go shows a native dialog with that exact command line; the UI cannot answer or skip it.
 
@@ -161,6 +161,7 @@ Virtualization of fixed-row-height lists (`src/lib/virtualList.ts`), fitting the
 
 - Diffs are computed by `internal/textdiff` (Myers in linear memory, with a time limit after which the whole region is replaced; changed words within a line are reported as UTF-16 offsets). Through `DiffAPI` they feed the editor gutter markers (`Marks`), the +/− stats and mini diffs in the agent chat (`Hunks`), and the diff tab (`Compare`).
 - The diff tab is drawn by two plain CodeMirror editors with custom decorations: changed-line backgrounds, changed words, spacers that align both sides, and collapsed unchanged regions.
+- The merge editor (`MergeView`) is one CodeMirror editor on the conflicted working file; conflict blocks are parsed from its markers on every change (`lib/mergeConflicts.ts`, same rules as `internal/git/markers.go`). `GitAPI.Conflict` adds the index stages, a `git merge-file --diff3` of them (where a block's base comes from) and what current and incoming are for the operation; `GitAPI.MarkResolved` writes and runs `git add`.
 - The `⌘P` file list lives in `fuzzy.Index` on the Go side (`WorkspaceAPI.IndexFiles` / `FindFiles`), so the WebView never receives the full list.
 
 ## Platforms
@@ -267,7 +268,7 @@ Flint drives many CLIs (git, gh, docker, kubectl, aws, saml2aws, claude, codex).
 
 ### Network requests Flint makes on its own
 
-Every other connection is the result of a user action or of a CLI the user runs. The one exception is the update check (`internal/update`, `api_update.go`): an anonymous `GET https://api.github.com/repos/ODudek/flint/releases/latest` (no token, no cookie jar, `User-Agent: Flint/<version>`, 10 s timeout, 1 MB body limit, redirects only within the same host), a few seconds after launch and then at most once per 24 hours, only in release builds and only while the `checkForUpdates` setting is on. The response is treated as untrusted: the tag must be a SemVer version, the title is stripped of control characters and capped, and the release link is opened only if it is an `https://github.com/ODudek/flint/` URL (otherwise the releases page). The browser is opened from Go (`UpdateAPI.OpenRelease`), so the UI cannot pass it a URL. Flint never downloads or installs a release.
+Every other connection is the result of a user action or of a CLI the user runs. The one exception is the update check (`internal/update`, `api_update.go`): an anonymous `GET https://api.github.com/repos/flint-ide/flint/releases/latest` (no token, no cookie jar, `User-Agent: Flint/<version>`, 10 s timeout, 1 MB body limit, redirects only within the same host), a few seconds after launch and then at most once per 24 hours, only in release builds and only while the `checkForUpdates` setting is on. The response is treated as untrusted: the tag must be a SemVer version, the title is stripped of control characters and capped, and the release link is opened only if it is an `https://github.com/flint-ide/flint/` URL (otherwise the releases page). The browser is opened from Go (`UpdateAPI.OpenRelease`), so the UI cannot pass it a URL. Flint never downloads or installs a release.
 
 ### Redaction
 
@@ -289,6 +290,7 @@ Paths are the macOS ones. On Linux, `~/Library/Application Support/flint` is `$X
 | Database passwords | OS keyring (Keychain / Secret Service), service `flint-db`, account = connection id | deleted together with the profile |
 | Scratchpads (SQL consoles, notes) | `~/Library/Application Support/flint/scratch/`: `index.json` (including the selected connection `connId` and database `database`; empty = the profile default) plus `<id>.sql/.md/.txt` | autosaved |
 | Query history | `~/Library/Application Support/flint/history/<connection id>.jsonl`: one JSON line per statement (database, SQL, time, duration, rows, error, kind: query / explain / edit) | last 5000 per connection, `0600`. Appended with a single `write` using `O_APPEND`; when the file grows 25% past the limit, Go rewrites it atomically without the oldest entries (a truncated last line is skipped on load). No connection profiles or passwords; passwords in statements are masked. Deleted with the profile or with "Clear History…" |
+| Agent usage | `~/Library/Application Support/flint/usage.json`: daily rows per project, agent, model, agent task and chat (tokens, cache tokens, reported cost, unpriced tokens, turns), chat names from their first message (redacted), fired budget alerts and overrides | `0600`, written atomically about 2 s after changes and on quit (`internal/usage`); kept `usage.retentionDays` days (default 90), at most 20,000 rows and 500 chats; an undecodable file is moved to `usage.json.bad-<time>`, an unreadable or newer one is never overwritten |
 | Sidebar width | WebView `localStorage` | appearance settings only |
 | Open tabs, terminals, agent conversations and attached projects (project session) | `~/Library/Application Support/flint/sessions/<hash of the main project path>.json`, one file per project | written after changes (debounced) and on exit, `0600`, max 4 MB |
 | Agent conversation history | the agent CLI itself: `~/.claude/projects/…`, `~/.codex/sessions/…` | Flint resumes them after a restart (`claude --resume`, codex `thread/resume`) |
@@ -359,6 +361,7 @@ internal/diag               Flint's log file, bug report and diagnostics
 internal/tools              external tools Flint drives: one table (feature, install command, docs) and the installed-version check
 internal/update             new-release check: GitHub's latest-release API (net/http), SemVer compare, link allow-list
 internal/redact             removes credentials and the home path from logs, reports and agent context
+internal/prompts            prompt library: Markdown prompts (project, personal, built-in), front matter, placeholders
 internal/agent              claude / codex: headless runs and interactive commands
 internal/shellenv           PATH from the login shell (git hooks, brew, nvm inside a GUI app)
 internal/watcher            FSEvents (macOS) / inotify (Linux) + debounce
@@ -367,6 +370,7 @@ internal/acp                Agent Client Protocol client (newline-delimited JSON
 internal/agentsession       shared agent event model, approval policy, session manager
   claude/ codex/            native agent drivers
   acpdriver/                ACP agents from settings: chat sessions, one-shot runs, the Check handshake
+internal/usage              agent usage per day × project × agent × model × task (usage.json), budgets, CSV
 frontend/bindings           generated TypeScript bindings of the Go services (do not edit)
 frontend/src/wails          compatibility layer over the bindings and the Wails runtime
 frontend/src                React: store (createStore + event bus), components, lib, commands, panels (sidebar registry)

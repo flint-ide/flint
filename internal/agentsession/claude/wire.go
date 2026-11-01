@@ -139,8 +139,12 @@ type resultMsg struct {
 
 // modelUsage is one model's entry in a result's modelUsage maps.
 type modelUsage struct {
-	CostUSD       float64 `json:"costUSD"`
-	ContextWindow int     `json:"contextWindow"`
+	InputTokens              int     `json:"inputTokens"`
+	OutputTokens             int     `json:"outputTokens"`
+	CacheReadInputTokens     int     `json:"cacheReadInputTokens"`
+	CacheCreationInputTokens int     `json:"cacheCreationInputTokens"`
+	CostUSD                  float64 `json:"costUSD"`
+	ContextWindow            int     `json:"contextWindow"`
 }
 
 // errorText summarises why a failed result failed.

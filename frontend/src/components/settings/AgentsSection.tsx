@@ -8,6 +8,8 @@ import { Select } from '../ui/Select'
 import { CheckedField, Row } from './fields'
 import { CustomAgentsSection, reloadAgents } from './CustomAgentsSection'
 import { AgentTasksSection } from './AgentTasksSection'
+import { PromptsSection } from './PromptsSection'
+import { AgentReviewSection } from './AgentReviewSection'
 import { isMac } from '../../lib/platform'
 
 // The agent CLIs Flint drives (Go: agent.known).
@@ -53,6 +55,8 @@ export function AgentsSection() {
       </p>
       <CustomAgentsSection />
       <AgentTasksSection />
+      <PromptsSection />
+      <AgentReviewSection />
       <h3>Notifications</h3>
       <Row label="Tell me when work finishes in the background" hint={`${isMac() ? 'A macOS notification and a count on the Dock icon' : 'A desktop notification'} when a run, tests or an agent finish while Flint isn't the active app.`}>
         <input type="checkbox" checked={notify} onChange={(e) => update({ notifyInBackground: e.target.checked })} />

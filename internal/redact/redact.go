@@ -136,6 +136,23 @@ func secretValue(value, quote string) bool {
 	return !typeNames[strings.ToLower(value)]
 }
 
+// SecretFileGlobs are gitignore-style name patterns for the files SecretFile
+// recognises, for tools that take patterns (an agent's deny rules). SSH keys
+// are listed by their usual names: "id_*" would also deny id_test.go.
+func SecretFileGlobs() []string {
+	return []string{
+		".env", ".env.*", ".envrc", ".dev.vars", ".npmrc", ".netrc", "_netrc", ".pypirc", ".pgpass", ".git-credentials",
+		"credentials", "kubeconfig", "*.kubeconfig", ".kube/config",
+		"id_rsa", "id_dsa", "id_ecdsa", "id_ed25519", "id_ecdsa_sk", "id_ed25519_sk",
+		"*.tfvars", "*.tfvars.json", "*.tfstate", "*.tfstate.backup",
+		"secrets.yaml", "secrets.yml", "secrets.json", "secrets.toml", "secrets.env",
+		"*.pem", "*.key", "*.p12", "*.pfx", "*.jks", "*.keystore", "*.gpg", "*.asc",
+	}
+}
+
+// secretsExt are the data formats of a "secrets.<ext>" file (secrets.go is code).
+var secretsExt = map[string]bool{"yaml": true, "yml": true, "json": true, "toml": true, "env": true}
+
 // SecretFile reports whether path names a file that holds credentials as a
 // whole (.env files, keys, certificates, SSH keys, cloud and package-manager
 // credentials, kubeconfig): its content is never sent to a model.
@@ -143,10 +160,15 @@ func SecretFile(path string) bool {
 	slashed := filepath.ToSlash(path)
 	base := strings.ToLower(filepath.Base(path))
 	switch {
-	case base == ".env" || strings.HasPrefix(base, ".env."),
+	case base == ".env" || strings.HasPrefix(base, ".env."), base == ".envrc", base == ".dev.vars",
 		base == ".npmrc", base == ".netrc", base == "_netrc", base == ".pypirc", base == ".pgpass",
-		base == "credentials", base == "kubeconfig", strings.HasSuffix(base, ".kubeconfig"),
+		base == ".git-credentials", base == "credentials", base == "kubeconfig", strings.HasSuffix(base, ".kubeconfig"),
 		strings.HasPrefix(base, "id_") && !strings.Contains(base, "."):
+		return true
+	case strings.HasSuffix(base, ".tfvars"), strings.HasSuffix(base, ".tfvars.json"),
+		strings.HasSuffix(base, ".tfstate"), strings.HasSuffix(base, ".tfstate.backup"):
+		return true // Terraform variables and state hold provider keys and resource secrets
+	case strings.HasPrefix(base, "secrets.") && secretsExt[strings.TrimPrefix(base, "secrets.")]:
 		return true
 	case strings.HasSuffix(slashed, "/.kube/config") || slashed == ".kube/config":
 		return true

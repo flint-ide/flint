@@ -63,6 +63,10 @@ const remoteIds = new Map<string, string>()
 const localIds = new Map<string, string>()
 const remoteId = (id: string) => remoteIds.get(id) ?? id
 const localId = (id: string) => localIds.get(id) ?? id
+/** The agent's session id of a chat, for Go calls about it (store/usage.ts). */
+export const chatRemoteId = remoteId
+/** The chat a Go event about an agent session belongs to. */
+export const chatLocalId = localId
 
 function link(local: string, remote: string): void {
   if (local === remote) return

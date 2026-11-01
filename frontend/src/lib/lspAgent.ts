@@ -3,7 +3,7 @@ import { forEachDiagnostic, type Action, type Diagnostic } from '@codemirror/lin
 import { rootFor } from '../store/activeRoot'
 import { showToast } from '../store/dialog'
 import { askAgent } from './askAgent'
-import { fileProblemsPrompt, problemAttachments, problemPrompt, type Problem } from './agentPrompt'
+import { fileProblemsPrompt, problemAttachments, problemLine, problemPrompt, type Problem } from './agentPrompt'
 
 // "Fix with agent" for language-server diagnostics. Lives with the editor chunk
 // (CodeMirror is loaded lazily), not in the app-wide agentContext.
@@ -37,6 +37,13 @@ export function fixFileProblemsWithAgent(view: EditorView, path: string, send = 
   const root = rootFor(path)
   void askAgent({ prompt: fileProblemsPrompt(path, root, problems), attachments: problemAttachments(path, view.state.doc, problems), send })
   return true
+}
+
+/** The view's diagnostics as "- line:col severity: message" lines (the {{problems}} of a prompt). */
+export function problemsText(view: EditorView): string {
+  const lines: string[] = []
+  forEachDiagnostic(view.state, (d, from, to) => lines.push(`- ${problemLine(toProblem(view, d, from, to))}`))
+  return lines.join('\n')
 }
 
 function toProblem(view: EditorView, d: Diagnostic, from: number, to: number): Problem {

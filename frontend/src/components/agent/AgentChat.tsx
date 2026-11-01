@@ -8,6 +8,8 @@ import { useWorkspace } from '../../store/workspace'
 import { rootOf } from '../../lib/workspaceRoots'
 import { FileLink, MessageText, PermissionCard, PlanView, ToolCallRow, UsageLine, ChatUsage } from './ChatItems'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
+import { BudgetWarning } from './BudgetWarning'
+import { usePromptPicker } from './PromptPicker'
 import { formatKeys } from '../../lib/commands'
 import { isMac } from '../../lib/platform'
 
@@ -27,6 +29,7 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
   const input = useRef<HTMLTextAreaElement>(null)
   const stick = useRef(true)
   const frame = useRef(0)
+  const picker = usePromptPicker(session, input)
   const { chat } = session
 
   // Follow the stream unless the user scrolled up to read. Scrolling (which reads the
@@ -66,6 +69,7 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
         </label>
         <PolicyToggle />
       </div>
+      <BudgetWarning chatId={session.id} />
       <PlanView plan={chat.plan} />
       <div
         className="chat-log"
@@ -137,13 +141,15 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
             ))}
           </div>
         )}
+        {picker.element}
         <textarea
           ref={input}
           value={session.draft}
-          placeholder={chat.busy ? `${session.agent} is working… (Esc to stop)` : `Message ${session.agent} (Enter to send, ${isMac() ? '⇧Enter' : 'Shift+Enter'} newline)`}
+          placeholder={chat.busy ? `${session.agent} is working… (Esc to stop)` : `Message ${session.agent} (Enter to send, ${isMac() ? '⇧Enter' : 'Shift+Enter'} newline, / for prompts)`}
           spellCheck={false}
           onChange={(e) => setDraft(session.id, e.target.value)}
           onKeyDown={(e) => {
+            if (picker.onKeyDown(e)) return
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault()
               void send(session.id)

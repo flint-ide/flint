@@ -13,6 +13,9 @@ import {
   type CompletionSettings, type InlineEditSettings,
 } from './editorAiSettings'
 import { coerceAgentTasks, DEFAULT_AGENT_TASKS, type AgentTaskSettings } from './agentTasks'
+import { coerceUsage, DEFAULT_USAGE, type UsageSettings } from './usageSettings'
+import { coercePromptSettings, DEFAULT_PROMPT_SETTINGS, type PromptSettings } from './prompts'
+import { coerceAgentReview, DEFAULT_AGENT_REVIEW, type AgentReviewSettings } from './reviewSettings'
 import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
 
 import type { ResolvedTheme, ThemeMode } from './themeMode'
@@ -74,6 +77,12 @@ export interface AppSettings {
   inlineEdit: InlineEditSettings
   /** Where agent task worktrees go and how their branches start. */
   agentTasks: AgentTaskSettings
+  /** Usage dashboard: retention, budgets and prices for estimates. */
+  usage: UsageSettings
+  /** The prompt library: whether Flint's own prompts are offered. */
+  prompts: PromptSettings
+  /** Review Changes with Agent (lib/reviewSettings.ts). */
+  agentReview: AgentReviewSettings
   /** Following your pull requests' CI: poll interval, log excerpt size, notifications. */
   ci: CISettings
 }
@@ -100,6 +109,9 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   completions: DEFAULT_COMPLETIONS,
   inlineEdit: DEFAULT_INLINE_EDIT,
   agentTasks: DEFAULT_AGENT_TASKS,
+  usage: DEFAULT_USAGE,
+  prompts: DEFAULT_PROMPT_SETTINGS,
+  agentReview: DEFAULT_AGENT_REVIEW,
   ci: DEFAULT_CI,
 }) as AppSettings
 
@@ -217,6 +229,9 @@ export function coerceSettings(v: unknown): AppSettings {
     completions: coerceCompletions(v.completions),
     inlineEdit: coerceInlineEdit(v.inlineEdit),
     agentTasks: coerceAgentTasks(v.agentTasks),
+    usage: coerceUsage(v.usage),
+    prompts: coercePromptSettings(v.prompts),
+    agentReview: coerceAgentReview(v.agentReview),
     ci: coerceCI(v.ci),
   }
 }

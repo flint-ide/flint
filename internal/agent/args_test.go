@@ -116,11 +116,20 @@ func TestComposeArgsKeepsFlintFlagsLast(t *testing.T) {
 // the repository, which could try to make the agent edit files or run
 // commands. It also starts no MCP servers.
 func TestHeadlessClaudeIsReadOnly(t *testing.T) {
-	got, err := headlessArgs(Claude, Config{}, "p", "", false)
+	got, _, err := headlessArgs(Claude, Config{}, "p", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	joined := strings.Join(got, " ")
+	for _, rule := range []string{"Read(**/.env)", "Read(**/.env.*)", "Read(**/*.pem)", "Read(**/*.tfstate)", "Read(~/.aws/**)", "Read(~/.ssh/**)"} {
+		if !strings.Contains(joined, " "+rule+" ") {
+			t.Errorf("headless claude args lack deny rule %s: %q", rule, got)
+		}
+	}
+	// The rule list ends at a flag, so nothing after it is read as a rule.
+	if i := slices.Index(got, "--disallowedTools"); i < 0 || got[i+len(HeadlessDenyRules())+1] != "--strict-mcp-config" {
+		t.Errorf("deny rules not followed by a flag: %q", got)
+	}
 	if !strings.Contains(joined, "--tools "+headlessTools) || !strings.Contains(joined, "--strict-mcp-config") {
 		t.Errorf("headless claude args = %q", got)
 	}
@@ -133,21 +142,24 @@ func TestHeadlessClaudeIsReadOnly(t *testing.T) {
 
 func TestHeadlessArgs(t *testing.T) {
 	cfg := Config{Model: "haiku", Args: []string{"--append-system-prompt", "Be terse."}}
-	got, err := headlessArgs(Claude, cfg, "describe", "diff", true)
+	got, stdin, err := headlessArgs(Claude, cfg, "describe", "diff\x00", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"-p", "describe", "--tools", headlessTools, "--strict-mcp-config", "--model", "haiku", "--setting-sources", "user"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("untrusted claude args = %q, want %q", got, want)
+	want := append([]string{"-p", "describe", "--tools", headlessTools, "--disallowedTools"}, HeadlessDenyRules()...)
+	want = append(want, "--strict-mcp-config", "--model", "haiku", "--setting-sources", "user")
+	if !reflect.DeepEqual(got, want) || stdin != "diff" {
+		t.Errorf("untrusted claude args = %q, stdin %q, want %q", got, stdin, want)
 	}
-	got, err = headlessArgs(Codex, Config{Model: "o3", Args: []string{"-c", "model_reasoning_effort=low"}}, "describe", "diff", false)
+	// Codex reads the prompt and the input from stdin ("-"), never from argv.
+	got, stdin, err = headlessArgs(Codex, Config{Model: "o3", Args: []string{"-c", "model_reasoning_effort=low"}}, "describe", "diff", false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"-c", "model_reasoning_effort=low", "exec", "--sandbox", "read-only", "--model", "o3", "describe\n\ndiff"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("codex args = %q, want %q", got, want)
+	if want := []string{"-c", "model_reasoning_effort=low", "exec", "--sandbox", "read-only", "--model", "o3", "-"}; !reflect.DeepEqual(got, want) || stdin != "describe\n\ndiff" {
+		t.Errorf("codex args = %q, stdin %q, want %q", got, stdin, want)
 	}
-	if _, err := headlessArgs(Claude, Config{Model: "-x"}, "p", "", false); err == nil {
+	if _, _, err := headlessArgs(Claude, Config{Model: "-x"}, "p", "", false); err == nil {
 		t.Error("invalid model accepted")
 	}
 }

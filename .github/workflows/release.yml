@@ -104,7 +104,7 @@ jobs:
 
   # Runs when the draft is published (its assets are public only then): renders
   # packaging/homebrew/flint.rb with the version and the zip's SHA-256 and pushes
-  # it to the tap (repository variable HOMEBREW_TAP, default ODudek/homebrew-tap)
+  # it to the tap (repository variable HOMEBREW_TAP, default flint-ide/homebrew-tap)
   # with the HOMEBREW_TAP_TOKEN secret. Without the secret every step is skipped.
   # Only a notarized app (stapled ticket, valid signature) is published: an
   # ad-hoc signed one would be blocked by Gatekeeper after `brew install`.
@@ -117,7 +117,7 @@ jobs:
     env:
       # Only whether the secret exists; the token itself is given to the push step alone.
       HAS_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
-      TAP: ${{ vars.HOMEBREW_TAP || 'ODudek/homebrew-tap' }}
+      TAP: ${{ vars.HOMEBREW_TAP || 'flint-ide/homebrew-tap' }}
       TAG: ${{ github.event.release.tag_name }}
     steps:
       - name: Check configuration

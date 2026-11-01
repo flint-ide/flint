@@ -18,7 +18,7 @@ import (
 )
 
 // IssuesURL is where bug reports go.
-const IssuesURL = "https://github.com/ODudek/flint/issues/new"
+const IssuesURL = "https://github.com/flint-ide/flint/issues/new"
 
 // Limits: a GitHub new-issue link stays well under browser URL limits; the
 // full report is also copied to the clipboard.

@@ -35,10 +35,13 @@ type session struct {
 	items   map[string]*itemState
 	pending map[string]*pendingRequest
 	usage   tokenBreakdown // latest cumulative thread total
-	ctxLast int            // input tokens of the latest model call (context fill)
-	ctxWin  int            // model context window, 0 when not reported
-	exited  bool
-	exitErr error
+	// usageKnown: this process has seen a total. A resumed thread's first
+	// total covers its whole history, so it can't be a turn's base.
+	usageKnown bool
+	ctxLast    int // input tokens of the latest model call (context fill)
+	ctxWin     int // model context window, 0 when not reported
+	exited     bool
+	exitErr    error
 }
 
 // turn is the state of the running prompt turn.
@@ -51,6 +54,7 @@ type turn struct {
 	cancelRequested bool
 	interruptSent   bool
 	usageBase       tokenBreakdown
+	baseKnown       bool // usageBase is the thread total when the turn began
 	usageSeen       bool
 	lastError       string
 	lastTextItem    string // agent message item that last produced text
@@ -169,7 +173,7 @@ func (s *session) beginTurn() (*turn, error) {
 	case s.turn != nil:
 		return nil, errTurnActive
 	}
-	t := &turn{done: make(chan struct{}), usageBase: s.usage}
+	t := &turn{done: make(chan struct{}), usageBase: s.usage, baseKnown: s.usageKnown}
 	s.turn = t
 	s.items = map[string]*itemState{}
 	return t, nil
@@ -284,9 +288,12 @@ func (s *session) turnUsage(t *turn) *agentsession.Usage {
 	if !t.usageSeen {
 		return nil
 	}
+	d := s.usage.minus(t.usageBase)
 	return &agentsession.Usage{
-		InputTokens:  s.usage.InputTokens - t.usageBase.InputTokens,
-		OutputTokens: s.usage.OutputTokens - t.usageBase.OutputTokens,
+		InputTokens:      d.InputTokens,
+		OutputTokens:     d.OutputTokens,
+		CacheReadTokens:  d.CachedInputTokens,
+		CacheWriteTokens: d.CacheWriteInputTokens,
 
 		ContextTokens: s.ctxLast,
 		ContextWindow: s.ctxWin,

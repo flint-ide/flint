@@ -134,6 +134,20 @@ You never have to accept diffs one by one. Edits are applied directly, show up i
 - **✦ Generate message** in the Commit panel gives the agent the diff of the ticked files and your recent commit messages. The result lands in the message field for you to edit.
 - **Resolve with claude** (or your default agent, when it is Claude Code or Codex) appears when there are merge conflicts. It opens an interactive agent session in a new terminal. The agent runs `git add` on resolved files but doesn't commit.
 
+## Review Changes with Agent
+
+Before you commit, let an agent look over what you changed: **✦ Review** in the Commit panel, **✦ Review** in a diff tab, or "Review Changes with Agent" in the palette.
+
+- It reviews the changes ticked in the Commit panel, as the panel shows them (the last commit against your working tree, staged or not). Settings ▸ Agents ▸ Review can make it review every change instead, and a review started from a diff tab always includes that tab's file.
+- The reviewing agent (the default agent unless you pick another in Settings ▸ Agents ▸ Review) runs once, headless and read-only, like **Generate message**: Claude Code with only Read, Grep and Glob and no MCP servers, Codex in its read-only sandbox, a custom agent in a one-shot session that refuses writes. It gets each file's diff with the line numbers of the new version and may read other files to check how the code is used.
+- Secrets in the diff are redacted, and files that hold credentials (`.env*`, keys, kubeconfig) are not sent at all; the panel says which were left out. A diff over the size limit (128 KB by default) is shortened per file, and the panel says so.
+- While it works, the panel shows the agent and the elapsed time; **Cancel** stops the agent and everything it started.
+- Findings appear in the Commit panel, with counts per severity (error, warning, info), and under their lines in the diff tab, drawn like pull request comments. Click a finding in the panel to open the diff at its line.
+- **✦ Fix it** puts that finding in the agent chat's draft, with the file, the line, the explanation, the suggested replacement and the code around it; **Fix all** puts every finding in one draft. Nothing is sent until you press Send, and the fix goes through the chat as usual: there is no accept or reject step. **Dismiss** removes a finding.
+- Findings follow their code: when the file changes, a finding moves with its line. When the line itself changed, the finding is marked **Stale** and shown above the diff, with the line it was on.
+- The agent's answer is expected as JSON; Flint reads it even with prose or code fences around it, and keeps the complete findings of an answer that was cut off. Findings about files outside the review are dropped.
+- In Restricted Mode the run follows the rules below: Claude Code without the project's settings, no extra arguments, and custom ACP agents don't start.
+
 ## Edit with Agent in the editor
 
 Select code (or put the cursor on a line) and press `⌘I` ("Edit Selection with Agent…"). A small prompt opens above it; type what to change, for example "add error handling", and press `↵`.

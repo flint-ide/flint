@@ -76,7 +76,8 @@ The file is readable only by your user. It never contains secrets: database pass
     "contextLines": 100
   },
   "inlineEdit": { "contextLines": 60 },
-  "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/" }
+  "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/" },
+  "agentReview": { "scope": "selected", "maxDiffKB": 128, "agent": "", "timeoutSeconds": 300 }
 }
 ```
 
@@ -103,6 +104,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `completions` | object | see below | Inline suggestions from a code model (off by default). See [completions](#completions). |
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
 | `agentTasks` | object | see below | Where agent task worktrees go and how their branches are named. See [agentTasks](#agenttasks). |
+| `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
 
 ### Font objects
 
@@ -273,6 +275,17 @@ Used by [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel).
 | `branchPrefix` | string | `"agent/"` | Starts every task branch, followed by a name made from the task's first line. Letters, digits, `.`, `_`, `-` and `/`, up to 40 characters; may be empty. It may not start with `-`, `/` or `.`, or contain `..`, `//` or `/.`. |
 
 Slashes in a branch name become dashes in the folder name. The tasks themselves are kept in `state.json`.
+
+### agentReview
+
+Used by [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-agent). Settings ▸ Agents ▸ Review.
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `scope` | string | `"selected"`, `"all"` | `"selected"` | What a review covers: the changes ticked in the Commit panel, or every change. A review started from a diff tab always includes that tab's file. |
+| `maxDiffKB` | integer | 8–512 | `128` | Largest diff sent to the agent, in KB. Above it, small files still go in whole and the larger ones share the rest: each keeps its first hunks, or is summarized in one line, with a note that tells the agent to read the file. |
+| `agent` | string | | `""` | The reviewing agent: `"claude"`, `"codex"` or the `id` of a custom agent. Empty uses `defaultAgent`. An agent that isn't configured falls back to empty. |
+| `timeoutSeconds` | integer | 30–1800 | `300` | A review that takes longer is stopped, with the agent and everything it started. |
 
 ## Related settings stored elsewhere
 

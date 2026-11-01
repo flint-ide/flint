@@ -322,6 +322,19 @@ func (c *wsConn) readLoop(onMessage func([]byte)) error {
 	}
 }
 
+// validCloseCode reports a code a peer may send (RFC 6455 section 7.4):
+// the defined codes except 1004 and the never-sent 1005, 1006 and 1015, and
+// the ranges for libraries and applications.
+func validCloseCode(code int) bool {
+	switch {
+	case code >= 1000 && code <= 1003, code >= 1007 && code <= 1014:
+		return true
+	case code >= 3000 && code <= 4999:
+		return true
+	}
+	return false
+}
+
 // peerClosed answers a close frame and returns the code it carried.
 func (c *wsConn) peerClosed(payload []byte) error {
 	switch {
@@ -329,6 +342,9 @@ func (c *wsConn) peerClosed(payload []byte) error {
 		return c.fail(closeProtocolError, "invalid close frame")
 	case len(payload) >= 2:
 		code := int(binary.BigEndian.Uint16(payload))
+		if !validCloseCode(code) {
+			return c.fail(closeProtocolError, "invalid close code")
+		}
 		if !utf8.Valid(payload[2:]) {
 			return c.fail(closeInvalidData, "invalid close reason")
 		}

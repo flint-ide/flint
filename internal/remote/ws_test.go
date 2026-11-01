@@ -174,6 +174,13 @@ func TestMalformedFramesCloseTheConnection(t *testing.T) {
 		{"too big", clientFrame(true, opText, big, testMask), closeTooBig},
 		{"invalid utf-8", clientFrame(true, opText, []byte{0xff, 0xfe}, testMask), closeInvalidData},
 		{"close with one byte", clientFrame(true, opClose, []byte{1}, testMask), closeProtocolError},
+		{"close code 1005 (never sent)", clientFrame(true, opClose, []byte{0x03, 0xed}, testMask), closeProtocolError},
+		{"close code 1006 (never sent)", clientFrame(true, opClose, []byte{0x03, 0xee}, testMask), closeProtocolError},
+		{"close code 1015 (never sent)", clientFrame(true, opClose, []byte{0x03, 0xf7}, testMask), closeProtocolError},
+		{"close code 1004 (reserved)", clientFrame(true, opClose, []byte{0x03, 0xec}, testMask), closeProtocolError},
+		{"close code 999", clientFrame(true, opClose, []byte{0x03, 0xe7}, testMask), closeProtocolError},
+		{"close code 2000", clientFrame(true, opClose, []byte{0x07, 0xd0}, testMask), closeProtocolError},
+		{"close code 5000", clientFrame(true, opClose, []byte{0x13, 0x88}, testMask), closeProtocolError},
 		{"new message inside a fragmented one", append(clientFrame(false, opText, []byte("a"), testMask), clientFrame(true, opText, []byte("b"), testMask)...), closeProtocolError},
 	}
 	for _, tc := range cases {
@@ -249,6 +256,20 @@ func TestPingPongFragmentsAndClose(t *testing.T) {
 	}
 	if code := closeCode(t, <-done); code != closeNormal {
 		t.Fatalf("code %d", code)
+	}
+}
+
+func TestApplicationCloseCodesAreAccepted(t *testing.T) {
+	for _, code := range []int{1000, 1001, 1011, 3000, 4999} {
+		c, client, r := pipeConn(t)
+		done := readResult(c)
+		go func() { _, _ = client.Write(clientFrame(true, opClose, []byte{byte(code >> 8), byte(code)}, testMask)) }()
+		if op, p := serverFrame(t, r); op != opClose || binary.BigEndian.Uint16(p) != closeNormal {
+			t.Fatalf("code %d answered with %d %v", code, op, p)
+		}
+		if got := closeCode(t, <-done); got != code {
+			t.Fatalf("code %d read as %d", code, got)
+		}
 	}
 }
 

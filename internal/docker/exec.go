@@ -86,7 +86,9 @@ func (d *Docker) OpenShell(ctx context.Context, id string, cols, rows int) (*She
 	if err != nil {
 		return nil, err
 	}
-	var created struct{ ID string `json:"Id"` }
+	var created struct {
+		ID string `json:"Id"`
+	}
 	err = decodeCapped(resp.Body, &created)
 	_ = resp.Body.Close()
 	if err != nil {

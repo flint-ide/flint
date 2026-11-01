@@ -12,7 +12,8 @@ import (
 // ThemeCustom uses CustomTheme: its colors laid over the dark or light palette.
 const ThemeCustom = "custom"
 
-const maxThemeNameLen = 100
+// MaxThemeNameLen is the longest custom theme name, in bytes.
+const MaxThemeNameLen = 100
 
 // CustomTheme is a user palette, for example one imported from VS Code: CSS
 // variables of style.css overridden on top of a built-in palette.
@@ -73,7 +74,7 @@ func validateCustomTheme(c CustomTheme) error {
 }
 
 func validThemeName(name string) error {
-	if len(name) > maxThemeNameLen || strings.ContainsFunc(name, unicode.IsControl) {
+	if len(name) > MaxThemeNameLen || strings.ContainsFunc(name, unicode.IsControl) {
 		return fmt.Errorf("invalid custom theme name %q", name)
 	}
 	return nil

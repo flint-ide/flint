@@ -41,23 +41,13 @@ type packageJSON struct {
 }
 
 // findTheme looks for the theme named name (its label or id, as
-// workbench.colorTheme stores it) in the extensions directories. Unreadable
-// extensions are skipped; a later version of an extension wins.
+// workbench.colorTheme stores it) in the installed extensions (the newest
+// version of each, obsolete ones left out). Unreadable extensions are skipped.
 func findTheme(extDirs []string, name string) (themeRef, error) {
 	var found themeRef
 	for _, dir := range extDirs {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			continue
-		}
-		for i, e := range entries {
-			if i >= maxExtensions {
-				break
-			}
-			if !e.IsDir() {
-				continue
-			}
-			if ref, ok := themeIn(filepath.Join(dir, e.Name()), name); ok {
+		for _, ext := range installedExtensions(dir) {
+			if ref, ok := themeIn(ext.dir, name); ok {
 				found = ref
 			}
 		}
@@ -120,14 +110,15 @@ func loadTheme(path, root string, depth int) (vsTheme, []string, error) {
 	if depth > maxIncludeDepth {
 		return vsTheme{}, nil, errors.New("theme includes nest too deeply")
 	}
-	if err := inside(root, path); err != nil {
-		return vsTheme{}, nil, err
-	}
 	if strings.EqualFold(filepath.Ext(path), ".tmTheme") {
 		return vsTheme{}, nil, fmt.Errorf("%s is a TextMate theme, which Flint can't read", filepath.Base(path))
 	}
+	resolved, err := inside(root, path)
+	if err != nil {
+		return vsTheme{}, nil, err
+	}
 	var t vsTheme
-	if err := readJSONC(path, maxFileSize, &t); err != nil {
+	if err := readJSONC(resolved, maxFileSize, &t); err != nil {
 		return vsTheme{}, nil, err
 	}
 	merged := vsTheme{Name: t.Name, Type: t.Type, colors: map[string]string{}}
@@ -176,13 +167,22 @@ func tokenRules(raw json.RawMessage, path, root string, depth int) ([]tokenRule,
 	return ref.rules, nil
 }
 
-// inside refuses paths that leave root (an include like "../../x.json").
-func inside(root, path string) error {
-	rel, err := filepath.Rel(root, path)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
-		return fmt.Errorf("%s is outside the extension", filepath.Base(path))
+// inside returns path with symlinks resolved, refusing paths that leave root
+// (an include like "../../x.json", or a symlink pointing elsewhere).
+func inside(root, path string) (string, error) {
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", fmt.Errorf("extension folder: %w", err)
 	}
-	return nil
+	realPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", filepath.Base(path), err)
+	}
+	rel, err := filepath.Rel(realRoot, realPath)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return "", fmt.Errorf("%s is outside the extension", filepath.Base(path))
+	}
+	return realPath, nil
 }
 
 // colorSources lists, per Flint CSS variable, the VS Code colors to take it
@@ -345,9 +345,22 @@ func withAlpha(c, aa string) string {
 	return c
 }
 
-// readJSONC decodes a JSON-with-comments file of at most limit bytes.
+// readJSONC decodes a JSON-with-comments file of at most limit bytes. Symlinks
+// are followed (dotfile setups link settings.json), but only to a regular file:
+// opening a FIFO or a device would block or read forever.
 func readJSONC(path string, limit int64, v any) error {
-	f, err := os.Open(path)
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return err // keeps fs.ErrNotExist for a missing file
+	}
+	info, err := os.Lstat(resolved)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", filepath.Base(path))
+	}
+	f, err := os.Open(resolved)
 	if err != nil {
 		return err
 	}

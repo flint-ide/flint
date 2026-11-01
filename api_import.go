@@ -55,17 +55,21 @@ func (i *ImportAPI) Preview(sourceID string) (vscodeimport.Plan, error) {
 }
 
 // Apply saves the previewed plan with this id onto the current settings and
-// returns what was written. A plan is applied at most once.
+// returns what was written. A plan is applied at most once; when saving fails
+// it stays, so the user can fix the cause and click Import again.
 func (i *ImportAPI) Apply(planID string) (settings.Settings, error) {
 	i.mu.Lock()
+	defer i.mu.Unlock()
 	plan := i.plan
 	if plan == nil || planID == "" || plan.ID != planID {
-		i.mu.Unlock()
 		return settings.Settings{}, errors.New("this import preview has expired; open Import from VS Code again")
 	}
+	saved, err := i.app.updateSettings(plan.Apply)
+	if err != nil {
+		return settings.Settings{}, err
+	}
 	i.plan = nil
-	i.mu.Unlock()
-	return i.app.updateSettings(plan.Apply)
+	return saved, nil
 }
 
 func randomID() string {

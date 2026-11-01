@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"flint/internal/settings"
 )
@@ -53,8 +54,8 @@ type Plan struct {
 // Apply returns s with the plan's changes.
 func (p Plan) Apply(s settings.Settings) settings.Settings { return p.changes.apply(s) }
 
-// vimExtension is the VS Code Vim extension's folder prefix.
-const vimExtension = "vscodevim.vim-"
+// vimExtension is the VS Code Vim extension's id.
+const vimExtension = "vscodevim.vim"
 
 // BuildPlan reads src's settings, keybindings and color theme and maps them
 // onto current. Unreadable files are reported as skipped, not as errors.
@@ -72,7 +73,7 @@ func BuildPlan(src Source, current settings.Settings) Plan {
 	plan.Items = append(plan.Items, items...)
 	plan.Skipped = append(plan.Skipped, skipped...)
 
-	if hasExtension(src.ExtensionsDir, vimExtension) && !current.Editor.VimMode {
+	if !current.Editor.VimMode && hasExtension(src.ExtensionsDir, vimExtension) {
 		on := true
 		c.vimMode = &on
 		plan.Items = append(plan.Items, Item{Kind: KindSetting, Name: "Vim extension (vscodevim.vim)", Value: "on", Target: "Editor ▸ Vim mode"})
@@ -131,7 +132,7 @@ func mapTheme(raw map[string]json.RawMessage, src Source, c *changes) ([]Item, [
 	if err != nil {
 		return fallback(ref.base, err.Error())
 	}
-	custom := convertTheme(t, truncate(name, 90), ref.base)
+	custom := convertTheme(t, themeName(name), ref.base)
 	if len(custom.Colors) == 0 {
 		return fallback(ref.base, "the theme has no colors Flint can use")
 	}
@@ -145,18 +146,24 @@ func mapTheme(raw map[string]json.RawMessage, src Source, c *changes) ([]Item, [
 	return []Item{{Kind: KindTheme, Name: name, Value: value, Target: "Appearance ▸ Custom"}}, skipped
 }
 
-// hasExtension reports whether an extension folder starts with prefix.
-func hasExtension(dir, prefix string) bool {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return false
-	}
-	for _, e := range entries {
-		if e.IsDir() && strings.HasPrefix(e.Name(), prefix) {
-			return true
+// themeName makes a theme's name fit Flint's custom theme name: no control
+// characters and at most settings.MaxThemeNameLen bytes, cut on a rune boundary.
+func themeName(name string) string {
+	name = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1
 		}
+		return r
+	}, name)
+	if len(name) <= settings.MaxThemeNameLen {
+		return name
 	}
-	return false
+	const ellipsis = "…"
+	cut := settings.MaxThemeNameLen - len(ellipsis)
+	for cut > 0 && !utf8.RuneStart(name[cut]) {
+		cut--
+	}
+	return name[:cut] + ellipsis
 }
 
 // String summarises a plan for logs.

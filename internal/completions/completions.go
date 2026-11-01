@@ -48,8 +48,9 @@ type Config struct {
 	MaxTokens int
 }
 
-// Request is the code around the cursor.
+// Request is the code around the cursor in the file at Path.
 type Request struct {
+	Path   string `json:"path"`
 	Prefix string `json:"prefix"`
 	Suffix string `json:"suffix"`
 }
@@ -99,6 +100,16 @@ func CheckEndpoint(raw string) error {
 	return nil
 }
 
+// Origin is endpoint's scheme://host[:port] in lower case: what an API key
+// is stored for.
+func Origin(endpoint string) (string, error) {
+	if err := CheckEndpoint(endpoint); err != nil {
+		return "", err
+	}
+	u, _ := url.Parse(endpoint)
+	return strings.ToLower(u.Scheme + "://" + u.Host), nil
+}
+
 // IsLocal reports whether endpoint is on this machine.
 func IsLocal(endpoint string) bool {
 	u, err := url.Parse(endpoint)
@@ -132,18 +143,22 @@ func (c Config) check() error {
 	return CheckModel(c.Model)
 }
 
-// Complete returns the model's text for the cursor ("" when it has none).
+// Complete returns the model's text for the cursor ("" when it has none, and
+// without asking for a file that holds credentials).
 // Cancelling ctx (the user typed on) aborts the request. apiKey, when set, is
 // sent as a bearer token.
 func (c *Client) Complete(ctx context.Context, cfg Config, apiKey string, r Request) (string, error) {
 	if err := cfg.check(); err != nil {
 		return "", err
 	}
+	if redact.SecretFile(r.Path) {
+		return "", nil // .env, keys, kubeconfig: never sent anywhere
+	}
 	if len(r.Prefix) > MaxContextBytes || len(r.Suffix) > MaxContextBytes {
 		return "", fmt.Errorf("the code around the cursor is larger than %d KB", MaxContextBytes>>10)
 	}
 	if !IsLocal(cfg.Endpoint) {
-		r = Request{Prefix: redact.Secrets(r.Prefix), Suffix: redact.Secrets(r.Suffix)}
+		r = Request{Path: r.Path, Prefix: redact.Secrets(r.Prefix), Suffix: redact.Secrets(r.Suffix)}
 	}
 	req, err := buildRequest(ctx, cfg, apiKey, r)
 	if err != nil {

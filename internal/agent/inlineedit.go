@@ -39,8 +39,9 @@ type EditRequest struct {
 
 // InlineEditPrompt checks r's sizes and returns the prompt and the input (the
 // file context with the selection marked) of a headless run. The context
-// around the selection is redacted; a selection that contains a credential is
-// refused, since its replacement would be written back into the file.
+// around the selection is redacted; a selection that contains a credential
+// value, or a file that holds credentials (.env, keys), is refused: the
+// replacement would be written back into the file.
 func InlineEditPrompt(r EditRequest) (prompt, input string, err error) {
 	instruction := strings.TrimSpace(r.Instruction)
 	switch {
@@ -57,7 +58,10 @@ func InlineEditPrompt(r EditRequest) (prompt, input string, err error) {
 	case len(r.Path) > maxEditPath || strings.ContainsAny(r.Path, "\r\n"):
 		return "", "", errors.New("invalid path")
 	}
-	if redact.Secrets(r.Selection) != r.Selection {
+	if redact.SecretFile(r.Path) {
+		return "", "", errors.New("this file holds credentials; Flint does not send it to the agent")
+	}
+	if redact.HasSecretValue(r.Selection) {
 		return "", "", errors.New("the selection contains what looks like a credential; Flint does not send it to the agent")
 	}
 
@@ -91,15 +95,20 @@ func InlineEditPrompt(r EditRequest) (prompt, input string, err error) {
 }
 
 // CleanReplacement takes the replacement text out of an agent's answer: it
-// unwraps a code fence around the answer (or the first fenced block after a
-// preamble, unless the selection itself holds fences, as in Markdown), drops
+// unwraps a code fence around the answer (unless the selection itself starts
+// with a fence and the answer's is not a longer, outer one) or the first fenced
+// block after a preamble (unless the selection holds fences), drops
 // echoed selection markers and blank lines at both ends, and keeps the
 // indentation of the first line. Line breaks come back as \n.
 func CleanReplacement(answer, selection string) string {
 	lines := strings.Split(strings.ReplaceAll(answer, "\r\n", "\n"), "\n")
 	lines = trimBlank(lines)
 	if len(lines) > 0 && isFence(lines[0]) {
-		lines = unfence(lines)
+		// A selection that starts with a fence (Markdown) comes back starting
+		// with one too: unwrap only an outer fence longer than the selection's.
+		if own := leadingFence(selection); own == "" || len(fenceRun(lines[0])) > len(own) {
+			lines = unfence(lines)
+		}
 	} else if !strings.Contains(selection, "```") && !strings.Contains(selection, "~~~") {
 		if i := firstFence(lines); i >= 0 {
 			lines = unfence(lines[i:])
@@ -126,6 +135,15 @@ func unfence(lines []string) []string {
 		}
 	}
 	return lines[1:]
+}
+
+// leadingFence is the fence run that opens text (after blank lines), or "".
+func leadingFence(text string) string {
+	lines := trimBlank(strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n"))
+	if len(lines) == 0 {
+		return ""
+	}
+	return fenceRun(lines[0])
 }
 
 func firstFence(lines []string) int {

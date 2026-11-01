@@ -6,14 +6,18 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
- * Request is the code around the cursor.
+ * Request is the code around the cursor in the file at Path.
  */
 export class Request {
+    "path": string;
     "prefix": string;
     "suffix": string;
 
     /** Creates a new Request instance. */
     constructor($$source: Partial<Request> = {}) {
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
         if (!("prefix" in $$source)) {
             this["prefix"] = "";
         }

@@ -44,6 +44,8 @@ func TestCheckArgs(t *testing.T) {
 		{"codex profile", Codex, []string{"-p", "x"}, "-p"},
 		{"codex profile config", Codex, []string{"-c", `profiles.x.sandbox_mode="danger-full-access"`}, "profiles"},
 		{"claude allowed tools", Claude, []string{"--allowedTools", "Bash"}, "--allowedTools"},
+		{"claude tools", Claude, []string{"--tools", "Bash,Edit"}, "--tools"},
+		{"claude tools inline", Claude, []string{"--tools=default"}, "--tools"},
 		{"claude allowed tools kebab", Claude, []string{"--allowed-tools=Bash"}, "--allowed-tools"},
 	}
 	for _, tt := range tests {
@@ -105,13 +107,32 @@ func TestComposeArgsKeepsFlintFlagsLast(t *testing.T) {
 	}
 }
 
+// A headless Claude run may only read: the prompt carries file context from
+// the repository, which could try to make the agent edit files or run
+// commands. It also starts no MCP servers.
+func TestHeadlessClaudeIsReadOnly(t *testing.T) {
+	got, err := headlessArgs(Claude, Config{}, "p", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(got, " ")
+	if !strings.Contains(joined, "--tools "+headlessTools) || !strings.Contains(joined, "--strict-mcp-config") {
+		t.Errorf("headless claude args = %q", got)
+	}
+	for _, tool := range []string{"Bash", "Edit", "Write", "MultiEdit", "NotebookEdit", "WebFetch", "WebSearch", "Task"} {
+		if strings.Contains(","+headlessTools+",", ","+tool+",") {
+			t.Errorf("headless tools include %s", tool)
+		}
+	}
+}
+
 func TestHeadlessArgs(t *testing.T) {
 	cfg := Config{Model: "haiku", Args: []string{"--append-system-prompt", "Be terse."}}
 	got, err := headlessArgs(Claude, cfg, "describe", "diff", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"-p", "describe", "--model", "haiku", "--setting-sources", "user"}; !reflect.DeepEqual(got, want) {
+	if want := []string{"-p", "describe", "--tools", headlessTools, "--strict-mcp-config", "--model", "haiku", "--setting-sources", "user"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("untrusted claude args = %q, want %q", got, want)
 	}
 	got, err = headlessArgs(Codex, Config{Model: "o3", Args: []string{"-c", "model_reasoning_effort=low"}}, "describe", "diff", false)

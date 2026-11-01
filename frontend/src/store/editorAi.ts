@@ -2,15 +2,17 @@
 // selection) and inline suggestions from a code model (settings: completions).
 // Wires lib/inlineEditWidget.ts and lib/inlineCompletion.ts to Go and keeps
 // the completion status the status bar shows.
-import type { Extension } from '@codemirror/state'
+import { Prec, type Extension } from '@codemirror/state'
+import { keymap } from '@codemirror/view'
 import * as Agent from '../../bindings/flint/agentapi'
 import * as Completions from '../../bindings/flint/completionsapi'
 import { EditRequest } from '../../bindings/flint/internal/agent/models'
 import { Request as CompletionRequest } from '../../bindings/flint/internal/completions/models'
 import { errorMessage } from '../api/backend'
 import { createStore } from '../lib/store'
-import { inlineEdit, openInlineEdit } from '../lib/inlineEditWidget'
-import { inlineCompletion } from '../lib/inlineCompletion'
+import { closeInlineEdit, inlineEdit, openInlineEdit } from '../lib/inlineEditWidget'
+import { dismissSuggestion, inlineCompletion } from '../lib/inlineCompletion'
+import { escapeKey } from '../lib/editorAiKeys'
 import { useEditor, viewFor } from './editor'
 import { useSettings } from './settings'
 
@@ -39,14 +41,14 @@ export function editorAi(path: string): Extension {
     }),
     inlineCompletion({
       options: () => useSettings.getState().settings.completions,
-      complete: (editor, prefix, suffix) => Completions.Complete(editor, CompletionRequest.createFrom({ prefix, suffix })),
-      cancel: (editor) => void Completions.Cancel(editor).catch(() => undefined),
+      complete: (editor, prefix, suffix) => Completions.Complete(editor, CompletionRequest.createFrom({ path, prefix, suffix })),
       onSuccess: () => setError(''),
       onError: (err) => {
         // Turned off meanwhile: not an error worth showing.
         if (useSettings.getState().settings.completions.enabled) setError(firstLine(err))
       },
     }),
+    Prec.highest(keymap.of([{ key: 'Escape', run: escapeKey(dismissSuggestion, closeInlineEdit) }])),
   ]
 }
 

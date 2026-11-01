@@ -63,6 +63,21 @@ func TestIsLocal(t *testing.T) {
 	}
 }
 
+func TestOrigin(t *testing.T) {
+	for e, want := range map[string]string{
+		"https://API.example.com/v1":   "https://api.example.com",
+		"https://api.example.com:8443": "https://api.example.com:8443",
+		"http://localhost:11434/":      "http://localhost:11434",
+	} {
+		if got, err := Origin(e); err != nil || got != want {
+			t.Errorf("Origin(%q) = %q, %v; want %q", e, got, err, want)
+		}
+	}
+	if _, err := Origin("http://example.com"); err == nil {
+		t.Error("Origin accepted an invalid endpoint")
+	}
+}
+
 func TestCheckModel(t *testing.T) {
 	for _, m := range []string{"qwen2.5-coder:1.5b-base", "gpt-3.5-turbo-instruct", "org/model@v1"} {
 		if err := CheckModel(m); err != nil {
@@ -332,6 +347,49 @@ func TestRedactsForRemoteEndpoints(t *testing.T) {
 	}
 	if got["prompt"] != secret {
 		t.Errorf("local prompt = %v", got["prompt"])
+	}
+}
+
+func TestSecretFilesAreNotSent(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		_, _ = io.WriteString(w, `{"response":"x"}`)
+	}))
+	defer srv.Close()
+	cfg := Config{Provider: Ollama, Endpoint: srv.URL, Model: "m", MaxTokens: 8}
+	for _, p := range []string{"/p/.env", "/p/certs/tls.key", "/u/.kube/config"} {
+		if text, err := New().Complete(context.Background(), cfg, "", Request{Path: p, Prefix: "A="}); text != "" || err != nil {
+			t.Errorf("%s: %q, %v", p, text, err)
+		}
+	}
+	if calls.Load() != 0 {
+		t.Errorf("%d requests for secret files", calls.Load())
+	}
+	if text, _ := New().Complete(context.Background(), cfg, "", Request{Path: "/p/main.go", Prefix: "a"}); text != "x" {
+		t.Errorf("ordinary file: %q", text)
+	}
+}
+
+func TestRedactsKeyNamesForRemoteEndpoints(t *testing.T) {
+	var got map[string]any
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = decode(t, r)
+		_, _ = io.WriteString(w, `{"choices":[{"text":"x"}]}`)
+	}))
+	defer srv.Close()
+	transport := srv.Client().Transport.(*http.Transport).Clone()
+	transport.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, network, srv.Listener.Addr().String())
+	}
+	c := &Client{HTTP: &http.Client{Transport: transport}}
+	prefix := "DB_PASSWORD=hunter2\nconst dbPassword = \"hunter2\"\n-----BEGIN RSA PRIVATE KEY-----\nMIIEow"
+	cfg := Config{Provider: OpenAI, Endpoint: "https://example.com", Model: "m", MaxTokens: 8}
+	if _, err := c.Complete(context.Background(), cfg, "", Request{Path: "/p/db.ts", Prefix: prefix}); err != nil {
+		t.Fatal(err)
+	}
+	if p := got["prompt"].(string); strings.Contains(p, "hunter2") || strings.Contains(p, "MIIEow") {
+		t.Errorf("secret sent to a remote endpoint: %q", p)
 	}
 }
 

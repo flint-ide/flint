@@ -19,8 +19,6 @@ export interface InlineCompletionConfig {
   /** Read on every keystroke, so a settings change applies right away. */
   options: () => CompletionOptions
   complete: (editor: string, prefix: string, suffix: string) => Cancellable<string>
-  /** The request was given up (cursor moved, editor closed). */
-  cancel: (editor: string) => void
   onSuccess: () => void
   onError: (err: unknown) => void
 }
@@ -133,10 +131,7 @@ class Controller {
     this.timer = undefined
     const call = this.inflight
     this.inflight = null
-    if (call) {
-      call.cancel()
-      this.config.cancel(this.id)
-    }
+    call?.cancel() // cancels the Go call's context, which aborts the HTTP request
   }
 
   destroy(): void {
@@ -158,7 +153,8 @@ function accept(view: EditorView): boolean {
   return true
 }
 
-function dismiss(view: EditorView): boolean {
+/** Hides a shown suggestion (Esc, bound in store/editorAi.ts); false when none is shown. */
+export function dismissSuggestion(view: EditorView): boolean {
   if (!view.state.field(ghostField, false)) return false
   view.dispatch({ effects: setGhost.of(null) })
   return true
@@ -169,10 +165,7 @@ export function inlineCompletion(config: InlineCompletionConfig): Extension {
   return [
     ghostField,
     ViewPlugin.define((view) => new Controller(view, config)),
-    Prec.highest(keymap.of([
-      { key: 'Tab', run: accept },
-      { key: 'Escape', run: dismiss },
-    ])),
+    Prec.highest(keymap.of([{ key: 'Tab', run: accept }])),
     EditorView.baseTheme({
       '.cm-ghost-text': { color: 'var(--fg-faint)', fontStyle: 'italic', whiteSpace: 'pre', pointerEvents: 'none' },
     }),

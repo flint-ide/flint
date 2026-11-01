@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"flint/internal/proctree"
 	"flint/internal/shellenv"
 )
 
@@ -64,12 +65,21 @@ func Headless(ctx context.Context, k Kind, cfg Config, dir, prompt, input string
 		cmd.Stdin = strings.NewReader(input)
 	}
 	cmd.Dir = dir
-	killTreeOnCancel(cmd)
+	// The run gets its own process group: cancelling kills the CLI and what
+	// it started (Claude Code's MCP servers, shells), and so does the end of
+	// a run, so nothing outlives it.
+	proctree.Isolate(cmd)
+	cmd.Cancel = func() error { return proctree.Kill(cmd.Process) }
 	// A child that keeps the output pipes open must not hold the run open.
 	cmd.WaitDelay = 2 * time.Second
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := cmd.Run(); err != nil {
+	err = cmd.Run()
+	_ = proctree.Kill(cmd.Process)
+	if errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState != nil && cmd.ProcessState.Success() {
+		err = nil // the CLI answered; only a leftover child held the pipes
+	}
+	if err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return "", fmt.Errorf("%s did not answer in time", k)
 		}
@@ -82,13 +92,19 @@ func Headless(ctx context.Context, k Kind, cfg Config, dir, prompt, input string
 	return strings.TrimSpace(stdout.String()), nil
 }
 
+// headlessTools are the only built-in tools of a headless Claude run.
+const headlessTools = "Read,Grep,Glob"
+
 // headlessArgs is the command line of a headless run.
 func headlessArgs(k Kind, cfg Config, prompt, input string, untrusted bool) ([]string, error) {
 	var flint []string
 	switch k {
 	case Claude:
 		// `claude -p` prints only the final response; stdin becomes context.
-		flint = []string{"-p", prompt}
+		// The prompt carries repository content that could try to steer the
+		// agent, so it gets read-only tools whatever the user's settings
+		// allow, and no MCP servers.
+		flint = []string{"-p", prompt, "--tools", headlessTools, "--strict-mcp-config"}
 		if cfg.Model != "" {
 			flint = append(flint, "--model", cfg.Model)
 		}

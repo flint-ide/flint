@@ -47,6 +47,8 @@ var reservedFlags = map[Kind][]string{
 		"--setting-sources", "--settings", "--model",
 		// Pre-approved tools would skip Flint's permission prompt.
 		"--allowedTools", "--allowed-tools", "--disallowedTools", "--disallowed-tools",
+		// Headless runs limit the built-in tools to reading.
+		"--tools",
 	},
 	Codex: {
 		"-m", "--model", "-a", "--ask-for-approval", "-s", "--sandbox", "--full-auto",

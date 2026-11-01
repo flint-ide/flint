@@ -46,6 +46,8 @@ func TestInlineEditPromptBounds(t *testing.T) {
 		{"large context", func(r *EditRequest) { r.Before = strings.Repeat("a", MaxEditContext+1) }, "context"},
 		{"long language", func(r *EditRequest) { r.Language = strings.Repeat("a", 65) }, "language"},
 		{"secret in selection", func(r *EditRequest) { r.Selection = `token = "ghp_abcdefghijklmnopqrstuvwxyz0123"` }, "credential"},
+		{"quoted password in selection", func(r *EditRequest) { r.Selection = `const dbPassword = "hunter2"` }, "credential"},
+		{"env line in selection", func(r *EditRequest) { r.Selection = "DB_PASSWORD=hunter2\n" }, "credential"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -55,6 +57,15 @@ func TestInlineEditPromptBounds(t *testing.T) {
 				t.Errorf("err = %v, want containing %q", err, tt.want)
 			}
 		})
+	}
+	if _, _, err := InlineEditPrompt(EditRequest{Path: "config/.env.local", Instruction: "x", Selection: "PORT=1"}); err == nil || !strings.Contains(err.Error(), "credentials") {
+		t.Errorf("secret file: err = %v", err)
+	}
+	// Names alone are not secrets.
+	for _, sel := range []string{"token: string", "apiKey: process.env.API_KEY", `password = os.Getenv("PW")`, "password = pw"} {
+		if _, _, err := InlineEditPrompt(EditRequest{Path: "a.ts", Instruction: "x", Selection: sel}); err != nil {
+			t.Errorf("selection %q refused: %v", sel, err)
+		}
 	}
 	// An empty selection asks for code to insert.
 	if _, _, err := InlineEditPrompt(EditRequest{Path: "a.go", Instruction: "write a loop"}); err != nil {
@@ -89,6 +100,8 @@ func TestCleanReplacement(t *testing.T) {
 		{"unclosed fence", "```go\nreturn nil", "x", "return nil"},
 		{"longer fence around inner fence", "````md\n```go\nx\n```\n````", "x", "```go\nx\n```"},
 		{"markdown selection keeps inner fences", "Intro\n\n```go\nx\n```", "Intro\n\n```sh\ny\n```", "Intro\n\n```go\nx\n```"},
+		{"selection starting with a fence keeps the prose after it", "```go\ny()\n```\n\nSome prose.", "```go\nx()\n```\n\nProse.", "```go\ny()\n```\n\nSome prose."},
+		{"selection starting with a fence, answer wrapped in a longer one", "````md\n```go\ny()\n```\nprose\n````", "```go\nx()\n```\nprose", "```go\ny()\n```\nprose"},
 		{"markers echoed", selectionStart + "\nfoo()\n" + selectionEnd, "x", "foo()"},
 		{"crlf", "```go\r\na\r\nb\r\n```\r\n", "x", "a\nb"},
 		{"empty", "  \n", "x", ""},

@@ -5,45 +5,47 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/zalando/go-keyring"
 
 	"flint/internal/completions"
 )
 
-// Keychain entry of the completion endpoint's API key.
+// Keychain entries of completion API keys: one per endpoint origin
+// (scheme://host:port), so a key is only ever sent to the server it was
+// stored for.
 const (
 	completionsKeyService = "flint-completions"
-	completionsKeyAccount = "api-key"
 	maxAPIKeyLen          = 4096
 	maxEditorKeyLen       = 128
 )
 
 // secretStore is the Keychain (keyringSecrets), replaced in tests.
 type secretStore interface {
-	Get() (string, error)
-	Set(value string) error
+	Get(account string) (string, error)
+	Set(account, value string) error
 }
 
 type keyringSecrets struct{}
 
-func (keyringSecrets) Get() (string, error) {
-	v, err := keyring.Get(completionsKeyService, completionsKeyAccount)
+func (keyringSecrets) Get(account string) (string, error) {
+	v, err := keyring.Get(completionsKeyService, account)
 	if errors.Is(err, keyring.ErrNotFound) {
 		return "", nil
 	}
 	return v, err
 }
 
-func (keyringSecrets) Set(value string) error {
+func (keyringSecrets) Set(account, value string) error {
 	if value == "" {
-		err := keyring.Delete(completionsKeyService, completionsKeyAccount)
+		err := keyring.Delete(completionsKeyService, account)
 		if errors.Is(err, keyring.ErrNotFound) {
 			return nil
 		}
 		return err
 	}
-	return keyring.Set(completionsKeyService, completionsKeyAccount, value)
+	return keyring.Set(completionsKeyService, account, value)
 }
 
 // CompletionsAPI asks the configured code model for inline suggestions
@@ -54,6 +56,9 @@ type CompletionsAPI struct {
 	client  *completions.Client
 	secrets secretStore
 	latest  completions.Latest
+
+	keysMu sync.Mutex
+	keys   map[string]string // origin → API key ("" = none), read from the Keychain once
 }
 
 func newCompletionsAPI(app *App) *CompletionsAPI {
@@ -66,7 +71,7 @@ func newCompletionsAPI(app *App) *CompletionsAPI {
 func (c *CompletionsAPI) Complete(ctx context.Context, editor string, req completions.Request) (string, error) {
 	s := c.app.currentSettings()
 	if !s.Completions.Enabled {
-		return "", errors.New("completions are off (Settings ▸ Completions)")
+		return "", errors.New("completions are off (Settings ▸ AI in the Editor)")
 	}
 	if editor == "" || len(editor) > maxEditorKeyLen {
 		return "", errors.New("invalid editor id")
@@ -77,27 +82,61 @@ func (c *CompletionsAPI) Complete(ctx context.Context, editor string, req comple
 		stop := context.AfterFunc(c.app.ctx, done) // Flint quits
 		defer stop()
 	}
-	key, err := c.secrets.Get()
+	key, err := c.apiKey(s.Completions.Endpoint)
 	if err != nil {
-		return "", fmt.Errorf("read the completion API key from the Keychain: %w", err)
+		return "", err
 	}
 	return c.client.Complete(ctx, s.CompletionConfig(), key, req)
 }
 
-// Cancel stops editor's request, if any (the user moved the cursor or closed it).
-func (c *CompletionsAPI) Cancel(editor string) { c.latest.Cancel(editor) }
-
-// HasAPIKey reports whether an API key is stored for the completion endpoint.
-func (c *CompletionsAPI) HasAPIKey() (bool, error) {
-	v, err := c.secrets.Get()
-	return v != "", err
+// apiKey is the key stored for endpoint's origin, cached after the first
+// Keychain read (each read starts /usr/bin/security).
+func (c *CompletionsAPI) apiKey(endpoint string) (string, error) {
+	origin, err := completions.Origin(endpoint)
+	if err != nil {
+		return "", err
+	}
+	c.keysMu.Lock()
+	defer c.keysMu.Unlock()
+	if key, ok := c.keys[origin]; ok {
+		return key, nil
+	}
+	key, err := c.secrets.Get(origin)
+	if err != nil {
+		return "", fmt.Errorf("read the completion API key from the Keychain: %w", err)
+	}
+	if c.keys == nil {
+		c.keys = map[string]string{}
+	}
+	c.keys[origin] = key
+	return key, nil
 }
 
-// SetAPIKey stores the completion endpoint's API key in the Keychain ("" removes it).
+// HasAPIKey reports whether an API key is stored for the configured endpoint.
+func (c *CompletionsAPI) HasAPIKey() (bool, error) {
+	key, err := c.apiKey(c.app.currentSettings().Completions.Endpoint)
+	return key != "", err
+}
+
+// SetAPIKey stores the API key of the configured endpoint in the Keychain
+// ("" removes it). It is sent only to that endpoint's origin.
 func (c *CompletionsAPI) SetAPIKey(key string) error {
 	key = strings.TrimSpace(key)
 	if len(key) > maxAPIKeyLen || strings.ContainsFunc(key, func(r rune) bool { return r < 0x20 || r == 0x7f }) {
 		return errors.New("invalid API key")
 	}
-	return c.secrets.Set(key)
+	origin, err := completions.Origin(c.app.currentSettings().Completions.Endpoint)
+	if err != nil {
+		return err
+	}
+	c.keysMu.Lock()
+	defer c.keysMu.Unlock()
+	if err := c.secrets.Set(origin, key); err != nil {
+		return err
+	}
+	if c.keys == nil {
+		c.keys = map[string]string{}
+	}
+	c.keys[origin] = key
+	return nil
 }

@@ -3,8 +3,10 @@
 
 export {
     AgentSettings,
+    Completions,
     CustomAgent,
     Font,
+    InlineEdit,
     LanguageServerSettings,
     Refresh,
     Settings

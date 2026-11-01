@@ -92,6 +92,10 @@ type Settings struct {
 	LanguageServers map[string]LanguageServerSettings `json:"languageServers"`
 	// Refresh sets how often polling panels re-read their data.
 	Refresh Refresh `json:"refresh"`
+	// Completions configures inline suggestions from a code model (editorai.go).
+	Completions Completions `json:"completions"`
+	// InlineEdit configures "Edit with Agent" on the selection (editorai.go).
+	InlineEdit InlineEdit `json:"inlineEdit"`
 }
 
 // Default returns the settings Flint uses when nothing is configured.
@@ -117,6 +121,8 @@ func Default() Settings {
 		CustomAgents:       []CustomAgent{},
 		LanguageServers:    map[string]LanguageServerSettings{},
 		Refresh:            defaultRefresh(),
+		Completions:        defaultCompletions(),
+		InlineEdit:         defaultInlineEdit(),
 	}
 }
 
@@ -179,6 +185,8 @@ func Normalize(s Settings) Settings {
 	out.Agents = normalizeAgents(s.Agents)
 	out.LanguageServers = normalizeLanguageServers(s.LanguageServers)
 	out.Refresh = normalizeRefresh(s.Refresh)
+	out.Completions = normalizeCompletions(s.Completions)
+	out.InlineEdit = normalizeInlineEdit(s.InlineEdit)
 	return out
 }
 
@@ -249,6 +257,12 @@ func Validate(s Settings) error {
 		return err
 	}
 	if err := validateLanguageServers(s.LanguageServers); err != nil {
+		return err
+	}
+	if err := validateCompletions(s.Completions); err != nil {
+		return err
+	}
+	if err := validateInlineEdit(s.InlineEdit); err != nil {
 		return err
 	}
 	return validateRefresh(s.Refresh)

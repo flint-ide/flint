@@ -6,6 +6,7 @@ import * as AgentAPI from "./agentapi.js";
 import * as AgentChatAPI from "./agentchatapi.js";
 import * as AlertsAPI from "./alertsapi.js";
 import * as AppAPI from "./appapi.js";
+import * as CompletionsAPI from "./completionsapi.js";
 import * as DatabaseAPI from "./databaseapi.js";
 import * as DebugAPI from "./debugapi.js";
 import * as DiagnosticsAPI from "./diagnosticsapi.js";
@@ -33,6 +34,7 @@ export {
     AgentChatAPI,
     AlertsAPI,
     AppAPI,
+    CompletionsAPI,
     DatabaseAPI,
     DebugAPI,
     DiagnosticsAPI,

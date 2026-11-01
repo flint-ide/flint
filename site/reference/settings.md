@@ -82,7 +82,7 @@ The file is readable only by your user. It never contains secrets: database pass
     "dailyBudgetUsd": 20,
     "taskBudgetTokens": 5000000,
     "pauseOverBudget": false,
-    "prices": { "gpt-5-codex": { "in": 1.25, "out": 10 } }
+    "prices": { "gpt-5-codex": { "in": 1.25, "out": 10, "cacheRead": 0.125 } }
   }
 }
 ```
@@ -290,11 +290,12 @@ Used by the [Usage panel and budgets](../guides/ai-agents.md#usage-and-budgets).
 |---|---|---|---|---|
 | `retentionDays` | integer | 7–3650 | `90` | Days of daily totals kept in `usage.json`; older days are dropped. |
 | `dailyBudgetUsd` | number | 0–1,000,000 | `0` | Money all agent chats of a day may use: reported costs plus estimates. |
-| `dailyBudgetTokens` | integer | 0–10¹² | `0` | Tokens (input with cache, plus output) all chats of a day may use. |
+| `dailyBudgetTokens` | integer | 0–10¹² | `0` | Tokens (input plus output; cached input only with `countCacheReads`) all chats of a day may use. |
 | `taskBudgetUsd` | number | 0–1,000,000 | `0` | Money one agent task's chats may use, over the days kept. |
 | `taskBudgetTokens` | integer | 0–10¹² | `0` | Tokens one agent task's chats may use. |
+| `countCacheReads` | boolean | | `false` | Token budgets also count input read from the prompt cache. |
 | `pauseOverBudget` | boolean | | `false` | Refuse new turns while a budget is reached, until **Continue anyway** in the chat's warning. |
-| `prices` | object | up to 200 models | `{}` | Model name (exactly as the Usage panel shows it, case ignored) → `{ "in": …, "out": … }` in USD per million tokens, 0–10,000. Used only for turns whose agent reported no cost; the result is shown as an estimate. |
+| `prices` | object | up to 200 models | `{}` | Model name (exactly as the Usage panel shows it, case ignored) → `{ "in": …, "out": …, "cacheRead": … }` in USD per million tokens, 0–10,000; `cacheRead` is optional (without it, cached input is left out of estimates). Used only for turns whose agent reported no cost; the result is shown as an estimate. |
 
 ## Related settings stored elsewhere
 

@@ -57,8 +57,9 @@ Agent usage and budgets (see [Usage and budgets](ai-agents.md#usage-and-budgets)
 - **Keep daily totals for**: how many days `usage.json` keeps, 7 to 3650 (default 90).
 - **Daily budget** and **Daily token budget**: for all agent chats of the day; 0 turns a budget off.
 - **Budget per agent task** and **Token budget per agent task**: for everything one agent task's chats used.
+- **Count cached input in token budgets**: off by default, so token budgets leave out input read from the prompt cache.
 - **Pause new turns over budget**: a chat over budget sends no new messages until you choose **Continue anyway** in its warning. Off by default.
-- **Model prices**: one `model input output` per line, in USD per million tokens, for agents that report no cost (Codex). Costs computed from them are marked as estimates.
+- **Model prices**: one `model input output [cached]` per line, in USD per million tokens, for agents that report no cost (Codex). Without a cached-input price, cached tokens are left out of estimates. Costs computed from them are marked as estimates.
 
 ## AI in the Editor
 

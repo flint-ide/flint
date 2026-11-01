@@ -18,7 +18,7 @@ Most of Flint's data lives in:
 | `sessions/` | One file per project: open tabs, terminals, agent conversations, attached projects, the selected run configuration and breakpoints. |
 | `scratch/` | Scratchpads: SQL consoles and notes, with the connection and database each console uses. |
 | `history/` | Query history, one file per database connection. |
-| `usage.json` | [Agent usage](../guides/ai-agents.md#usage-and-budgets): totals per day, project, agent, model and agent task (tokens, cache tokens, reported cost, turns); the chats that used the most, named after their first message (with recognized credentials removed); and which budget warnings were already shown. Kept for `usage.retentionDays` days (default 90), at most 20,000 daily rows and 500 chats. A file that can't be read is renamed `usage.json.bad` and Flint starts a new one. |
+| `usage.json` | [Agent usage](../guides/ai-agents.md#usage-and-budgets): totals per day, project, agent, model, agent task and chat (tokens, cache tokens, reported cost, turns); each chat's name, made from its first message with recognized credentials removed; which budget warnings were already shown; and the budgets you chose to continue past. Written a couple of seconds after each turn and when Flint quits. Kept for `usage.retentionDays` days (default 90), at most 20,000 rows and 500 chats. A file that can't be decoded is renamed `usage.json.bad-<date-time>` and Flint starts a new one; a file that can't be read, or that a newer Flint wrote, is left alone and nothing new is saved until that is fixed (the Usage panel says so). |
 
 ### Project sessions
 

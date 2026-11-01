@@ -12,6 +12,8 @@ A folder you open for the first time is untrusted. A **Restricted Mode** banner 
 
 Trust covers the folder and all its subfolders. With several projects in the window, each one is trusted separately.
 
+A worktree you create from the branch widget is a new folder and starts untrusted, even when its repository is trusted. The worktree of an [agent task](ai-agents.md#agent-tasks-agents-in-parallel) is the exception: it is trusted when the checkout the task started from is trusted.
+
 ## What is restricted
 
 In an untrusted folder, Flint:

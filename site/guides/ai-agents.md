@@ -121,13 +121,13 @@ The actions:
 - **Open** shows the task's folder and its chat (a new chat if you closed it).
 - **Show diff** lists the changed files; click one for a side-by-side diff against the point where the branch started.
 - **✦ Ask agent** (failed tasks) puts the error into the task's chat draft, so you can add a hint and send it.
-- **Merge** merges the branch into its base, in the checkout where the base is checked out. Flint refuses while the task or that checkout has uncommitted changes, or while the agent is working. When the merge would conflict, nothing is changed: Flint offers to merge the base into the task's branch instead and let an agent resolve the conflicts there, in a terminal (as **Resolve with claude** does); then merge again.
-- **Create PR** pushes the branch and creates a pull request into its base with `gh`, titled with the task's first line and described by its text. Flint asks first, because it publishes the branch. **PR ↗** opens it afterwards.
-- **✕** removes the task: it stops the task's chats, closes its folder and deletes the worktree. Uncommitted work and a branch with commits its base doesn't have are deleted only if you confirm; otherwise the branch is kept.
+- **Merge** merges the branch into its base, in the checkout where the base is checked out. Flint refuses while the task or that checkout has uncommitted changes, or while the agent is working. When the merge would conflict, nothing is changed: Flint offers to merge the base into the task's branch instead (always with a merge commit) and let an agent resolve the conflicts there, in a terminal (as **Resolve with claude** does); then merge again.
+- **Create PR** pushes the task's branch (whatever the worktree has checked out at the moment) and creates a pull request into its base with `gh`, titled with the task's first line and described by its text. Flint asks first, because it publishes the branch. **PR ↗** opens it afterwards.
+- **✕** removes the task: it stops the task's chats, closes its folder and deletes the worktree. Uncommitted work, new files, ignored files such as `.env` or build output, and a branch with commits its base doesn't have are deleted only if you confirm; otherwise the branch is kept.
 
-Tasks are remembered per repository in `state.json`, so they survive a restart. A task whose worktree folder was deleted outside Flint shows as **stale** and can only be removed.
+Tasks are remembered per repository in `state.json`, so they survive a restart. A task whose worktree folder was deleted outside Flint shows as **stale** and can only be removed; removing it forgets only that worktree, not other missing ones (for example on a disk that isn't connected).
 
-In [Restricted Mode](restricted-mode.md), a task's worktree is trusted when the checkout it started from is trusted (it holds the same repository's commits); otherwise it stays restricted like any new folder. Removing the task removes that trust again.
+In [Restricted Mode](restricted-mode.md), a task's worktree is trusted when the checkout it started from is trusted (it holds the same repository's commits); otherwise it stays restricted like any new folder. Removing the task, or the worktree folder disappearing, removes that trust again. Because trust follows folders, a task from an untrusted checkout can't put its worktree inside a trusted folder, and no task worktree may lie inside the checkout itself; Flint refuses and asks you to pick another worktree folder. Worktrees you create by hand with **New Worktree…** don't inherit trust: trust them like any other folder.
 
 The worktree folder and the branch prefix are settings (Settings ▸ Agents ▸ Agent tasks; [`agentTasks`](../reference/settings.md#agenttasks) in `settings.json`).
 

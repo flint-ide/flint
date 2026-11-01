@@ -5,5 +5,6 @@ import type { FeatureModule } from '../lib/features'
 import docker from './docker'
 import todo from './todo'
 import update from './update'
+import extensions from './extensions'
 
-export const FEATURES: readonly FeatureModule[] = [docker, todo, update]
+export const FEATURES: readonly FeatureModule[] = [docker, todo, update, extensions]

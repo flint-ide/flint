@@ -83,11 +83,19 @@ func (w *WorkspaceAPI) TrustFolder(path string) error {
 			w.app.lsp.Retrust(root)
 		}
 	}
+	w.app.features.RootsChanged()
 	return nil
 }
 
-// UntrustFolder revokes trust (servers already running keep running until restart).
-func (w *WorkspaceAPI) UntrustFolder(path string) error { return w.app.setTrust(path, false) }
+// UntrustFolder revokes trust (servers already running keep running until
+// restart; extensions are told the folder is gone).
+func (w *WorkspaceAPI) UntrustFolder(path string) error {
+	if err := w.app.setTrust(path, false); err != nil {
+		return err
+	}
+	w.app.features.RootsChanged()
+	return nil
+}
 
 // TrustedFolders lists the trusted folders, for Settings.
 func (w *WorkspaceAPI) TrustedFolders() []string { return w.app.trustedFolders() }

@@ -63,6 +63,12 @@ type Instance struct {
 	Start func(ctx context.Context)
 	// Close runs on quit, in parallel with the other features and services.
 	Close func()
+	// SettingsChanged runs after settings.json was saved, with the settings
+	// before and after; it must return quickly.
+	SettingsChanged func(prev, next settings.Settings)
+	// RootsChanged runs after a project folder was opened, attached or
+	// removed, or trusted or untrusted; it must return quickly.
+	RootsChanged func()
 }
 
 // Host is what Flint gives a feature: the parts of the app it may use. New
@@ -74,6 +80,17 @@ type Host interface {
 	Settings() settings.Settings
 	// Roots are the open project folders, the primary one first.
 	Roots() []string
+	// Trusted reports whether the user trusts the folder (Restricted Mode is
+	// off there).
+	Trusted(path string) bool
+	// ConfigDir is Flint's configuration folder (settings.json lives there).
+	ConfigDir() string
+	// Confirm asks the user in a native dialog that the web view can't
+	// answer or skip; Cancel is the default button. False when dismissed.
+	Confirm(title, message, ok string) bool
+	// Choose asks a native question with these buttons (at most three) and
+	// returns the one chosen, "" when dismissed.
+	Choose(title, message string, buttons []string) string
 	// Emit sends an event to the frontend (dropped before launch).
 	Emit(event string, data ...any)
 	// OpenURL opens an http(s) link in the default browser.
@@ -177,6 +194,30 @@ func (s *Set) Start(ctx context.Context) {
 	for _, p := range s.parts {
 		if p.Start != nil {
 			p.Start(ctx)
+		}
+	}
+}
+
+// SettingsChanged runs the SettingsChanged hooks.
+func (s *Set) SettingsChanged(prev, next settings.Settings) {
+	if s == nil {
+		return
+	}
+	for _, p := range s.parts {
+		if p.SettingsChanged != nil {
+			p.SettingsChanged(prev, next)
+		}
+	}
+}
+
+// RootsChanged runs the RootsChanged hooks.
+func (s *Set) RootsChanged() {
+	if s == nil {
+		return
+	}
+	for _, p := range s.parts {
+		if p.RootsChanged != nil {
+			p.RootsChanged()
 		}
 	}
 }

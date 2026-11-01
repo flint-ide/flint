@@ -15,6 +15,7 @@ import (
 	"flint/internal/diag"
 	"flint/internal/feature"
 	"flint/internal/features/docker"
+	"flint/internal/features/extensions"
 	"flint/internal/features/todo"
 	"flint/internal/features/update"
 	"flint/internal/mcptools"
@@ -29,6 +30,7 @@ var features = []feature.Module{
 	docker.Module,
 	todo.Module,
 	update.Module,
+	extensions.Module,
 }
 
 // registerFeatures registers the modules' settings sections and tools, once
@@ -46,9 +48,17 @@ type featureHost struct{ a *App }
 
 var _ feature.Host = featureHost{}
 
-func (h featureHost) Context() context.Context          { return h.a.ctx }
-func (h featureHost) Settings() settings.Settings       { return h.a.currentSettings() }
-func (h featureHost) Roots() []string                   { return h.a.projectRoots() }
+func (h featureHost) Context() context.Context    { return h.a.ctx }
+func (h featureHost) Settings() settings.Settings { return h.a.currentSettings() }
+func (h featureHost) Roots() []string             { return h.a.projectRoots() }
+func (h featureHost) Trusted(path string) bool    { return h.a.isTrusted(path) }
+func (h featureHost) ConfigDir() string           { return h.a.configDir }
+func (h featureHost) Confirm(title, msg, ok string) bool {
+	return h.a.askUser(title, msg, ok)
+}
+func (h featureHost) Choose(title, msg string, buttons []string) string {
+	return h.a.chooseUser(title, msg, buttons)
+}
 func (h featureHost) Emit(event string, data ...any)    { h.a.emit(event, data...) }
 func (h featureHost) OpenURL(link string) error         { return h.a.openURL(link) }
 func (h featureHost) Version() string                   { return diag.Version(version) }

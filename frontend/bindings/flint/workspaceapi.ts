@@ -167,7 +167,8 @@ export function TrustedFolders(): $CancellablePromise<string[]> {
 }
 
 /**
- * UntrustFolder revokes trust (servers already running keep running until restart).
+ * UntrustFolder revokes trust (servers already running keep running until
+ * restart; extensions are told the folder is gone).
  */
 export function UntrustFolder(path: string): $CancellablePromise<void> {
     return $Call.ByID(743511924, path);

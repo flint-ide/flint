@@ -151,13 +151,13 @@ What differs per system is listed in [ARCHITECTURE.md](ARCHITECTURE.md#platforms
 
 ```bash
 make test                                  # Go (race) + frontend (tsc + node --test)
-make test-db-up && make test-integration   # Postgres + ClickHouse (TCP and HTTP) in Docker
+make test-db-up && make test-integration   # Postgres + ClickHouse in Docker
 make test-db-down
 ```
 
 - `make test-go`: `go test ./internal/... -race -cover`.
 - `make test-web`: `npm run typecheck` (`tsc --noEmit`) and `npm test` (`go run ../cmd/webbuild --test`, which compiles `src/**/*.test.ts(x)` to a temporary directory and runs `node --test`). Tests use `node:test` and `node:assert`; there is no jest or vitest.
-- `make test-integration`: Go tests with the `integration` build tag against throwaway Postgres 16 and ClickHouse 24.8 containers started by `make test-db-up`. Ports default to 55432 (Postgres), 59000 (ClickHouse native) and 58123 (ClickHouse HTTP) and can be changed with `PG_PORT`, `CH_PORT` and `CH_HTTP_PORT`.
+- `make test-integration`: Go tests with the `integration` build tag against throwaway Postgres 16 and ClickHouse 24.8 containers started by `make test-db-up`. Ports default to 55432 (Postgres) and 58123 (ClickHouse HTTP, the only ClickHouse port Flint uses) and can be changed with `PG_PORT` and `CH_HTTP_PORT`. The ClickHouse tests read `FLINT_TEST_CH_HTTP`. They cover exact 64-bit and Decimal values, per-console sessions, cancellation (checked in `system.processes`) and errors in the middle of a stream.
 - GitHub tests use a fake `gh` on `PATH` (answers from `internal/github/testdata`), so they never contact GitHub.
 
 ## Benchmark

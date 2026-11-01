@@ -1641,6 +1641,7 @@ button.small {
 }
 .modal.confirm p {
   margin: 0 0 16px;
+  white-space: pre-line;
 }
 .modal.quick-open {
   width: min(640px, 92vw);

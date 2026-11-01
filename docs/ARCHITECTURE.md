@@ -35,7 +35,7 @@ flowchart LR
     lsp["lsp (JSON-RPC)"]
     ag["agentsession: claude · codex · acp"]
     term["terminal (PTY)"]
-    db["db: pgx · clickhouse-go"]
+    db["db: pgx · clickhouse (HTTP, net/http)"]
     http["httpfile: .http files · net/http"]
     infra["docker · awsprof · kube"]
     cfg["config · scratch · OS keyring · diag (log)"]
@@ -286,7 +286,7 @@ Paths are the macOS ones. On Linux, `~/Library/Application Support/flint` is `$X
 |---|---|---|
 | Recent folders, agent permission policy, trusted folders, whether the first-run tool check was shown, update check (last check time, the latest release found, the skipped version) | `~/Library/Application Support/flint/state.json` | the preferred agent stored here before `settings.json` existed is read from it until you pick a default in Settings |
 | Settings: theme, editor and terminal fonts, default agent, autosave, shortcut overrides (`keymap`: command id → shortcut, `""` = none), agent CLIs (`agents`), custom ACP agents (`customAgents`: id, name, command, arguments), language servers (`languageServers`), panel refresh intervals (`refresh`) | `~/Library/Application Support/flint/settings.json` | has a schema version; missing keys get defaults, unknown keys are ignored, invalid values are replaced with defaults on load (writes validate strictly); `0600`; **no secrets**. A copy for the first render lives in `localStorage` (`flint.settings`) |
-| Database connection profiles (host, port, user, optional default database, ClickHouse protocol `native`/`http`, TLS, read-only) | `~/Library/Application Support/flint/connections.json` | **no passwords**, mode `0600` |
+| Database connection profiles (host, port, user, optional default database, TLS, read-only) | `~/Library/Application Support/flint/connections.json` | **no passwords**, mode `0600` |
 | Database passwords | OS keyring (Keychain / Secret Service), service `flint-db`, account = connection id | deleted together with the profile |
 | Scratchpads (SQL consoles, notes) | `~/Library/Application Support/flint/scratch/`: `index.json` (including the selected connection `connId` and database `database`; empty = the profile default) plus `<id>.sql/.md/.txt` | autosaved |
 | Query history | `~/Library/Application Support/flint/history/<connection id>.jsonl`: one JSON line per statement (database, SQL, time, duration, rows, error, kind: query / explain / edit) | last 5000 per connection, `0600`. Appended with a single `write` using `O_APPEND`; when the file grows 25% past the limit, Go rewrites it atomically without the oldest entries (a truncated last line is skipped on load). No connection profiles or passwords; passwords in statements are masked. Deleted with the profile or with "Clear History…" |
@@ -336,6 +336,7 @@ internal/ripgrep            locating the rg binary
 internal/preview            Markdown rendering (goldmark) and image reading for preview tabs
 internal/todo               TODO / FIXME / HACK / XXX / BUG markers
 internal/httpfile           .http files: parser, variables and environments, sending (net/http), response history, curl
+internal/clickhouse         ClickHouse HTTP client on net/http: streaming rows, exact types, errors, KILL QUERY
 internal/db                 connection profiles, Keychain, pgx/clickhouse, type normalization, query history,
                             EXPLAIN (Postgres plan parser, warnings), row editing by primary key
 internal/scratch            persistent scratchpads
@@ -382,6 +383,7 @@ For data storage details see [Where Flint stores data](#where-flint-stores-data)
 
 - At runtime Flint downloads nothing from npm (no `npx`). Agents and LSP servers are your installed binaries.
 - GitHub is handled by your `gh` (no GitHub client libraries and no tokens inside Flint). Tests use a fake `gh` on `PATH` (a script that answers from `internal/github/testdata` and records its arguments and stdin), so they never connect to GitHub.
+- ClickHouse has no driver module: `internal/clickhouse` speaks its HTTP interface on `net/http` (the native-protocol driver pulled in 14 more modules: a production build now lists 14 dependencies, down from 28). The only Go database module left is `pgx`.
 - pprof profiles are read with `github.com/google/pprof/profile` (a Go module that uses only the standard library). The flame graph and its layout are Flint's own code, with no npm dependency.
 - Frontend: `frontend/.npmrc` disables install scripts (`ignore-scripts=true`) and enforces exact versions, and the build uses `npm ci --ignore-scripts`.
 - Frontend dependencies are limited to React, CodeMirror (single author, no `@codemirror/merge`), xterm.js (core + WebGL renderer), the Wails runtime, and TypeScript plus React types for type checking: 43 packages in `node_modules` in total (down from 145). The bundler (esbuild through its Go API) and the test runner (`node --test`) do not come from npm. State management, list virtualization, terminal fitting, terminal links, diffs and fuzzy matching are Flint's own code.

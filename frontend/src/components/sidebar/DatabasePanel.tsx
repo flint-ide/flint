@@ -54,14 +54,12 @@ function ConnectionNode({ conn, onEdit }: { conn: Connection; onEdit: () => void
     }
   }
 
-  const protocol = conn.driver === 'clickhouse' && conn.protocol === 'http' ? ' (HTTP)' : ''
-
   return (
     <div className="conn-node">
       <div className="tree-row static conn-row" onClick={toggle}>
         <span className="twisty">{open ? '▾' : '▸'}</span>
         <span className={`driver-badge ${conn.driver}`}>{conn.driver === 'clickhouse' ? 'CH' : 'PG'}</span>
-        <span className="conn-name" title={`${conn.user}@${conn.host}:${conn.port}/${defaultDatabase(conn)}${protocol}`}>{conn.name}</span>
+        <span className="conn-name" title={`${conn.user}@${conn.host}:${conn.port}/${defaultDatabase(conn)}`}>{conn.name}</span>
         {conn.readOnly && <span className="badge" title="Read-only">RO</span>}
         <span className="row-actions" onClick={(e) => e.stopPropagation()}>
           <button className="icon" title="New SQL console" onClick={() => void createScratch('sql', conn.id)}>⌨</button>

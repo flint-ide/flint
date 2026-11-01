@@ -67,6 +67,8 @@ export function useQueryRunner(connId: string, database: string): QueryRunner {
   const [state, setState] = useState<RunState>(idle)
   const [limit, setLimit] = useState(1000)
   const queryId = useRef('')
+  // One id per console: ClickHouse keeps SET and temporary tables per session.
+  const consoleId = useRef(crypto.randomUUID())
   // Refs keep the callbacks stable so the editor keymap isn't rebuilt on every run.
   const latest = useRef({ connId, database, limit })
   latest.current = { connId, database, limit }
@@ -96,7 +98,7 @@ export function useQueryRunner(connId: string, database: string): QueryRunner {
       const { connId: conn, database: db, limit: max } = latest.current
       const id = begin(sql, 'query', false)
       if (!id) return
-      Database.RunQuery(conn, db, id, sql, max)
+      Database.RunQuery(conn, db, id, consoleId.current, sql, max)
         .then((result) => settle(id, { result }))
         .catch((err) => settle(id, { error: errorMessage(err) }))
     },

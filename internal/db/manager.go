@@ -133,6 +133,7 @@ func (m *Manager) track(ctx context.Context, queryID string) (context.Context, f
 	if queryID == "" {
 		return ctx, cancel
 	}
+	ctx = withQueryID(ctx, queryID)
 	m.mu.Lock()
 	m.running[queryID] = cancel
 	m.mu.Unlock()

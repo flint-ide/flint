@@ -83,6 +83,14 @@ export function ListConnections(): $CancellablePromise<db$0.Connection[]> {
 }
 
 /**
+ * MigrationNotice returns, once, the message about connections Flint moved from
+ * ClickHouse's native protocol to HTTP ("" when there is none).
+ */
+export function MigrationNotice(): $CancellablePromise<string> {
+    return $Call.ByID(2177159871);
+}
+
+/**
  * PreviewEdits returns the SQL a batch of staged row changes would run.
  */
 export function PreviewEdits(connID: string, database: string, batch: db$0.EditBatch): $CancellablePromise<string> {
@@ -100,10 +108,11 @@ export function QueryHistory(connID: string, q: db$0.HistoryFilter): $Cancellabl
 
 /**
  * RunQuery executes one statement on a database of the connection ("" = the profile's
- * default) and returns at most limit rows.
+ * default) and returns at most limit rows. consoleID names the SQL console: its statements
+ * share one ClickHouse session, so SET and temporary tables carry over between them.
  */
-export function RunQuery(connID: string, database: string, queryID: string, sql: string, limit: number): $CancellablePromise<db$0.QueryResult | null> {
-    return $Call.ByID(3543571186, connID, database, queryID, sql, limit).then(($result: any) => {
+export function RunQuery(connID: string, database: string, queryID: string, consoleID: string, sql: string, limit: number): $CancellablePromise<db$0.QueryResult | null> {
+    return $Call.ByID(3543571186, connID, database, queryID, consoleID, sql, limit).then(($result: any) => {
         return $$createType13($result);
     });
 }

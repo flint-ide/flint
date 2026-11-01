@@ -155,9 +155,9 @@ func TestPostgresDatabasesIntegration(t *testing.T) {
 	})
 }
 
-func clickHouseDatabasesSuite(t *testing.T, env string, protocol string) {
+func clickHouseDatabasesSuite(t *testing.T, env string) {
 	m, conn := integrationManager(t, env, Connection{
-		Driver: ClickHouse, User: "flint", Protocol: protocol, // no database: falls back to "default"
+		Driver: ClickHouse, User: "flint", // no database: falls back to "default"
 	})
 	queryIn(t, m, conn.ID, "", "CREATE DATABASE IF NOT EXISTS flint_it_db")
 	t.Cleanup(func() { queryIn(t, m, conn.ID, "", "DROP DATABASE IF EXISTS flint_it_db") })
@@ -192,18 +192,13 @@ func clickHouseDatabasesSuite(t *testing.T, env string, protocol string) {
 }
 
 func TestClickHouseDatabasesIntegration(t *testing.T) {
-	clickHouseDatabasesSuite(t, "FLINT_TEST_CH", ProtocolNative)
+	clickHouseDatabasesSuite(t, "FLINT_TEST_CH_HTTP")
 }
 
-// TestClickHouseHTTPIntegration talks to the same server over HTTP (port 8123).
 func TestClickHouseHTTPIntegration(t *testing.T) {
-	t.Run("databases", func(t *testing.T) {
-		clickHouseDatabasesSuite(t, "FLINT_TEST_CH_HTTP", ProtocolHTTP)
-	})
-
 	t.Run("types, limit and read-only guard", func(t *testing.T) {
 		m, conn := integrationManager(t, "FLINT_TEST_CH_HTTP", Connection{
-			Driver: ClickHouse, User: "flint", Protocol: ProtocolHTTP, ReadOnly: true,
+			Driver: ClickHouse, User: "flint", ReadOnly: true,
 		})
 		if err := m.Test(context.Background(), conn, nil); err != nil {
 			t.Fatalf("Test() over HTTP = %v", err)

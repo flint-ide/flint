@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 
 	"flint/internal/agent"
@@ -47,6 +48,9 @@ type Options struct {
 	// Untrusted reports a folder the user hasn't trusted (Restricted Mode).
 	// Nil trusts every folder.
 	Untrusted func(cwd string) bool
+	// MCP offers Flint's own read-only MCP server to the session. Nil offers
+	// none.
+	MCP agentsession.MCPProvider
 	// Settings, when set, is read on every Start and Resume and replaces
 	// Binary, Model and ExtraArgs, so settings changes apply to new sessions.
 	Settings func() agent.Config
@@ -122,12 +126,16 @@ func (d *Driver) start(ctx context.Context, cwd, resumeID string, sink agentsess
 	}
 	shellenv.Wait()
 	opts := d.opts.current()
-	env := buildEnv(opts.Env)
+	var mcp *agentsession.MCPServer
+	if srv, ok := opts.MCP.Offer(cwd); ok {
+		mcp = &srv
+	}
+	env := buildEnv(opts.Env, mcp)
 	path, err := resolveCommand(orDefault(opts.Binary, "codex"), env)
 	if err != nil {
 		return agentsession.SessionInfo{}, err
 	}
-	args, err := buildArgs(opts, opts.Untrusted != nil && opts.Untrusted(cwd))
+	args, err := buildArgs(opts, opts.Untrusted != nil && opts.Untrusted(cwd), mcp)
 	if err != nil {
 		return agentsession.SessionInfo{}, fmt.Errorf("codex: %w", err)
 	}
@@ -154,11 +162,19 @@ func (d *Driver) start(ctx context.Context, cwd, resumeID string, sink agentsess
 
 // buildArgs is the app-server command line. The user's extra arguments come
 // first (top-level options such as -c or --enable); the approval policy and
-// sandbox travel in thread/start, which overrides any configuration.
-func buildArgs(opts Options, untrusted bool) ([]string, error) {
+// sandbox travel in thread/start, which overrides any configuration. mcp,
+// when set, adds Flint's MCP server (Streamable HTTP; the bearer token is
+// read from the environment).
+func buildArgs(opts Options, untrusted bool, mcp *agentsession.MCPServer) ([]string, error) {
 	args := []string{"app-server"}
 	for _, kv := range opts.Config {
 		args = append(args, "-c", kv)
+	}
+	if mcp != nil {
+		prefix := "mcp_servers." + agentsession.MCPServerName + "."
+		args = append(args,
+			"-c", prefix+"url="+strconv.Quote(mcp.URL),
+			"-c", prefix+"bearer_token_env_var="+strconv.Quote(agentsession.MCPTokenEnv))
 	}
 	return agent.ComposeArgs(agent.Codex, opts.ExtraArgs, args, untrusted)
 }

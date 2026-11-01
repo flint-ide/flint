@@ -59,7 +59,12 @@ The file is readable only by your user. It never contains secrets: database pass
     "python": { "disabled": false, "command": "pylsp", "args": [] },
     "rust": { "disabled": true, "command": "", "args": [] }
   },
-  "refresh": { "kubernetesSeconds": 10, "awsSeconds": 60 }
+  "refresh": { "kubernetesSeconds": 10, "awsSeconds": 60 },
+  "mcpServer": {
+    "enabled": true,
+    "tools": { "diagnostics": true, "editor": true, "terminals": true, "tests": true, "kubernetes": false },
+    "terminalLines": 200
+  }
 }
 ```
 
@@ -81,6 +86,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `customAgents` | array | `[]` | Other agents, spoken to over the Agent Client Protocol. See [customAgents](#customagents). |
 | `languageServers` | object | `{}` | Language servers by language (`"go"`, `"typescript"`, `"python"`, `"rust"`). See [languageServers](#languageservers). |
 | `refresh` | object | see below | How often polling panels re-read their data. See [refresh](#refresh). |
+| `mcpServer` | object | see below | What Flint's own MCP server tells the agents Flint starts. See [mcpServer](#mcpserver). |
 
 ### Font objects
 
@@ -138,7 +144,7 @@ Each entry configures one agent CLI. A missing entry or key uses the default.
 
 Extra arguments are placed before Flint's own flags, so where a CLI lets a repeated flag override an earlier one, Flint's flag wins. They also may not:
 
-- name a flag Flint sets. For Claude Code: `-p`/`--print`, `--input-format`, `--output-format`, `--include-partial-messages`, `--replay-user-messages`, `--permission-prompt-tool`, `--permission-mode`, `--dangerously-skip-permissions`, `--allow-dangerously-skip-permissions`, `--session-id`, `-r`/`--resume`, `-c`/`--continue`, `--fork-session`, `--setting-sources`, `--settings`, `--allowedTools`/`--allowed-tools`, `--disallowedTools`/`--disallowed-tools` and `--model` (use `model`). For Codex: `-m`/`--model`, `-a`/`--ask-for-approval`, `-s`/`--sandbox`, `--full-auto`, `--dangerously-bypass-approvals-and-sandbox`, `--yolo`, `-C`/`--cd`, `--listen`, `-p`/`--profile`, and `-c` overrides of `approval_policy`, `sandbox*`, `projects*`, `profile*` or `dangerously*`. Commit messages from Codex always run with `--sandbox read-only`. Short flags are checked in any combination (`-dp` counts as `-p`);
+- name a flag Flint sets (your own `--mcp-config` for Claude Code and `-c mcp_servers.<name>…` for Codex are fine: Flint adds its server next to yours). For Claude Code: `-p`/`--print`, `--input-format`, `--output-format`, `--include-partial-messages`, `--replay-user-messages`, `--permission-prompt-tool`, `--permission-mode`, `--dangerously-skip-permissions`, `--allow-dangerously-skip-permissions`, `--session-id`, `-r`/`--resume`, `-c`/`--continue`, `--fork-session`, `--setting-sources`, `--settings`, `--allowedTools`/`--allowed-tools`, `--disallowedTools`/`--disallowed-tools` and `--model` (use `model`). For Codex: `-m`/`--model`, `-a`/`--ask-for-approval`, `-s`/`--sandbox`, `--full-auto`, `--dangerously-bypass-approvals-and-sandbox`, `--yolo`, `-C`/`--cd`, `--listen`, `-p`/`--profile`, and `-c` overrides of `approval_policy`, `sandbox*`, `projects*`, `profile*`, `dangerously*` or `mcp_servers.flint*`. Commit messages from Codex always run with `--sandbox read-only`. Short flags are checked in any combination (`-dp` counts as `-p`);
 - be `--`, empty, or contain a newline or another control character;
 - be more than 32 arguments or longer than 512 characters each.
 
@@ -179,6 +185,22 @@ A change made in the Settings tab restarts that language's servers. Servers that
 | `awsSeconds` | integer (s) | 5–3600 | `30` | How often the AWS panel re-reads profiles and credential expiry while it is shown. |
 
 Git status, Docker and pull requests don't poll: they follow change events, and pull requests reload when the window regains focus.
+
+### mcpServer
+
+Flint's own read-only MCP server for agent chats. See [What agents can see in Flint](../guides/ai-agents.md#what-agents-can-see-in-flint).
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `enabled` | boolean | | `true` | Offer the server to new agent chats. When `false`, new chats don't get it and existing ones lose access. |
+| `tools.diagnostics` | boolean | | `true` | `get_diagnostics`: language-server errors and warnings. |
+| `tools.editor` | boolean | | `true` | `get_editor_state`: open files, the active file and the selection. When `false`, Flint also stops sending the editor state to its backend. |
+| `tools.terminals` | boolean | | `true` | `get_terminal_output`: recent output of terminals and run consoles. |
+| `tools.tests` | boolean | | `true` | `get_test_results`: the last test run. |
+| `tools.kubernetes` | boolean | | `true` | `get_kubernetes_status`: what is failing in the current Kubernetes context. |
+| `terminalLines` | integer | 10–2000 | `200` | The most lines of one terminal's output an agent gets (clamped into the range). |
+
+Tool switches apply right away, also to running chats.
 
 ## Related settings stored elsewhere
 

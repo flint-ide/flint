@@ -13,6 +13,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"flint/internal/agentsession"
 )
 
 const (
@@ -181,9 +183,18 @@ func (p *process) Close() {
 	<-p.done
 }
 
-// buildEnv returns Flint's environment with extra appended (later entries win).
-func buildEnv(extra []string) []string {
-	return slices.Concat(os.Environ(), extra)
+// buildEnv returns Flint's environment (without an inherited MCP token) with
+// extra appended (later entries win), then the token of Flint's MCP server
+// when mcp is set.
+func buildEnv(extra []string, mcp *agentsession.MCPServer) []string {
+	env := slices.DeleteFunc(os.Environ(), func(kv string) bool {
+		return strings.HasPrefix(kv, agentsession.MCPTokenEnv+"=")
+	})
+	var token []string
+	if mcp != nil {
+		token = []string{agentsession.MCPTokenEnv + "=" + mcp.Token}
+	}
+	return slices.Concat(env, extra, token)
 }
 
 func lookupEnv(env []string, key string) string {

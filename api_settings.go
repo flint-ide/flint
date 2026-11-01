@@ -36,7 +36,7 @@ func (s *SettingsAPI) Save(next settings.Settings) (settings.Settings, error) {
 	if err == nil {
 		a.settings = saved
 		// Under settingsMu, so two saves register in the order they were written.
-		syncCustomAgents(a.agents, prev.CustomAgents, saved.CustomAgents, a.untrusted)
+		syncCustomAgents(a.agents, prev.CustomAgents, saved.CustomAgents, a.untrusted, a.offerMCP)
 	}
 	a.settingsMu.Unlock()
 	if err != nil {

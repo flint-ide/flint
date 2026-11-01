@@ -57,8 +57,9 @@ var reservedFlags = map[Kind][]string{
 }
 
 // reservedCodexConfig are `-c key=value` keys that would change Codex's
-// approvals, sandbox or which projects it trusts.
-var reservedCodexConfig = []string{"approval_policy", "sandbox", "projects", "profile", "dangerously"}
+// approvals, sandbox or which projects it trusts, or replace Flint's own MCP
+// server (mcp_servers.flint; the user's other MCP servers are fine).
+var reservedCodexConfig = []string{"approval_policy", "sandbox", "projects", "profile", "dangerously", "mcp_servers.flint"}
 
 // CheckPath validates a Config.Path.
 func CheckPath(path string) error {

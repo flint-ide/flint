@@ -150,6 +150,11 @@ func describeTool(id, name string, rawInput json.RawMessage, cwd string) agentse
 	default:
 		if server, tool, ok := splitMCPName(name); ok {
 			tc.Title = server + ": " + tool
+			if server == agentsession.MCPServerName {
+				// Flint's own server: read-only tools scoped to the project,
+				// so the reads policy decides about them.
+				tc.Kind, tc.Title, tc.Paths = agentsession.ToolRead, "Flint: "+tool, nonEmpty(cwd)
+			}
 		}
 	}
 	return tc

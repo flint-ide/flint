@@ -287,7 +287,7 @@ Used by [When CI fails](../guides/git-and-github.md#when-ci-fails).
 | `logErrorLines` | integer | 0–500 | `40` | Error lines (test failures, compiler errors, `file:line` references) picked from the rest of the failed step. |
 | `notify` | boolean | | `true` | A notification when your pull request's CI fails or turns green while Flint is in the background. Also needs `notifyInBackground`. |
 
-Flint keeps at most the last 8 MB of a failed log, and the Log tab shows its last 20,000 lines; these limits are not settings.
+Flint keeps at most the last 8 MB of each failed job's log (and says when it cut one), describes at most 4 failed jobs per run, cuts log lines at 2,000 characters and workflow, job and step names at 120, and the Log tab keeps the last 20,000 lines; these limits are not settings.
 
 ## Related settings stored elsewhere
 

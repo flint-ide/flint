@@ -283,8 +283,8 @@ Used by [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-a
 | Key | Type | Range | Default | Meaning |
 |---|---|---|---|---|
 | `scope` | string | `"selected"`, `"all"` | `"selected"` | What a review covers: the changes ticked in the Commit panel, or every change. A review started from a diff tab always includes that tab's file. |
-| `maxDiffKB` | integer | 8–512 | `128` | Largest diff sent to the agent, in KB. Above it, small files still go in whole and the larger ones share the rest: each keeps its first hunks, or is summarized in one line, with a note that tells the agent to read the file. |
-| `agent` | string | | `""` | The reviewing agent: `"claude"`, `"codex"` or the `id` of a custom agent. Empty uses `defaultAgent`. An agent that isn't configured falls back to empty. |
+| `maxDiffKB` | integer | 8–512 | `128` | Largest diff sent to the agent, in KB; never exceeded. Above it, small files still go in whole and the larger ones share the rest: each keeps its first hunks, or is summarized in one line, with a note that tells the agent to read the file. Files with no room left at all are left out and listed in a note. Untracked files are read only as far as their share. |
+| `agent` | string | | `""` | The reviewing agent: `"claude"`, `"codex"` or the `id` of a custom agent. Empty uses `defaultAgent`. An agent that isn't configured falls back to empty. What each agent can read on its own is described in [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-agent): Codex can read any file you can, and a custom agent started with an auto-approve flag is not read-only. |
 | `timeoutSeconds` | integer | 30–1800 | `300` | A review that takes longer is stopped, with the agent and everything it started. |
 
 ## Related settings stored elsewhere

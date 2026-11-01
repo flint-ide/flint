@@ -106,21 +106,24 @@ jobs:
   # packaging/homebrew/flint.rb with the version and the zip's SHA-256 and pushes
   # it to the tap (repository variable HOMEBREW_TAP, default ODudek/homebrew-tap)
   # with the HOMEBREW_TAP_TOKEN secret. Without the secret every step is skipped.
+  # Only a notarized app (stapled ticket, valid signature) is published: an
+  # ad-hoc signed one would be blocked by Gatekeeper after `brew install`.
   homebrew:
     if: github.event_name == 'release' && !github.event.release.prerelease
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    runs-on: macos-latest # stapler and codesign check the notarization
+    timeout-minutes: 15
     permissions:
       contents: read # read the release assets
     env:
-      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      # Only whether the secret exists; the token itself is given to the push step alone.
+      HAS_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
       TAP: ${{ vars.HOMEBREW_TAP || 'ODudek/homebrew-tap' }}
       TAG: ${{ github.event.release.tag_name }}
     steps:
       - name: Check configuration
         id: config
         run: |
-          if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
+          if [ "$HAS_TAP_TOKEN" != "true" ]; then
             echo "::notice::HOMEBREW_TAP_TOKEN is not set; the Homebrew cask is not updated."
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -141,18 +144,37 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Render the cask
+      - name: Download and check the release
+        id: verify
         if: steps.config.outputs.enabled == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version="${TAG#v}"
           zip="Flint-$TAG-macos-universal.zip"
-          mkdir -p "$RUNNER_TEMP/release"
+          mkdir -p "$RUNNER_TEMP/release" "$RUNNER_TEMP/app"
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/release" --pattern "$zip" --pattern SHA256SUMS.txt
-          (cd "$RUNNER_TEMP/release" && grep -F "./$zip" SHA256SUMS.txt | sha256sum -c -)
-          sha="$(sha256sum "$RUNNER_TEMP/release/$zip" | cut -d' ' -f1)"
-          sed -e "s/{{VERSION}}/$version/g" -e "s/{{SHA256}}/$sha/g" packaging/homebrew/flint.rb > "$RUNNER_TEMP/flint.rb"
+          (cd "$RUNNER_TEMP/release" && grep -F "./$zip" SHA256SUMS.txt | shasum -a 256 -c -)
+          ditto -x -k "$RUNNER_TEMP/release/$zip" "$RUNNER_TEMP/app"
+          app="$RUNNER_TEMP/app/flint.app"
+          if ! codesign --verify --deep --strict "$app" || ! xcrun stapler validate "$app"; then
+            echo "::warning::$TAG is not notarized (the Apple signing secrets were not set); the Homebrew cask is not updated."
+            echo "notarized=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "notarized=true" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(shasum -a 256 "$RUNNER_TEMP/release/$zip" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Render the cask
+        if: steps.verify.outputs.notarized == 'true'
+        env:
+          SHA256: ${{ steps.verify.outputs.sha256 }}
+        run: |
+          version="${TAG#v}"
+          if ! printf '%s' "$SHA256" | grep -Eq '^[0-9a-f]{64}$'; then
+            echo "::error::bad SHA-256 '$SHA256'"
+            exit 1
+          fi
+          sed -e "s/{{VERSION}}/$version/g" -e "s/{{SHA256}}/$SHA256/g" packaging/homebrew/flint.rb > "$RUNNER_TEMP/flint.rb"
           if grep -q '{{' "$RUNNER_TEMP/flint.rb"; then
             echo "::error::unrendered placeholder in the cask"
             exit 1
@@ -160,9 +182,9 @@ jobs:
           ruby -c "$RUNNER_TEMP/flint.rb"
 
       - name: Push the cask to the tap
-        if: steps.config.outputs.enabled == 'true'
+        if: steps.verify.outputs.notarized == 'true'
         env:
-          GH_TOKEN: ${{ env.HOMEBREW_TAP_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           gh auth setup-git
           gh repo clone "$TAP" "$RUNNER_TEMP/tap" -- --depth 1

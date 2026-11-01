@@ -139,11 +139,11 @@ CI (`.github/workflows/ci.yml`, macOS) runs on every pull request and on pushes 
 2. Tag the release: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 3. The release workflow (`.github/workflows/release.yml`) runs the tests, builds a universal (Apple silicon + Intel) `Flint.app` with `wails3 task package:universal VERSION=vX.Y.Z`, packs it as `.zip` and `.dmg` with SHA-256 checksums and build provenance, and drafts a GitHub release.
 4. Review the draft and publish it.
-5. Publishing runs the workflow's `homebrew` job: it downloads the release's `.zip`, checks it against `SHA256SUMS.txt`, renders `packaging/homebrew/flint.rb` with the version and SHA-256, and pushes it to the tap as `Casks/flint.rb`. Prereleases and tags that aren't `vX.Y.Z` are skipped.
+5. Publishing runs the workflow's `homebrew` job (on macOS): it downloads the release's `.zip`, checks it against `SHA256SUMS.txt`, checks that the app is notarized (a valid signature and a stapled ticket: `codesign --verify` and `xcrun stapler validate`), renders `packaging/homebrew/flint.rb` with the version and SHA-256, and pushes it to the tap as `Casks/flint.rb`. Prereleases, tags that aren't `vX.Y.Z` and releases that aren't notarized are skipped with a notice: an ad-hoc signed app installed by Homebrew would be blocked by Gatekeeper. The tap token is passed to the push step only.
 
 ### Homebrew tap: one-time setup
 
-The `homebrew` job does nothing (it logs a notice) until this is done:
+The `homebrew` job does nothing (it logs a notice) until this is done. It also needs notarized releases, so the Apple signing secrets listed above must be set first.
 
 1. Create a public repository for the tap. Homebrew requires the name to start with `homebrew-`; the default is `ODudek/homebrew-tap`, which users install from with `brew install --cask odudek/tap/flint`.
 2. Create a fine-grained personal access token with access to that repository only and the **Contents: Read and write** permission.

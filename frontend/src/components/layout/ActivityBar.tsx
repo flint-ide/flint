@@ -3,6 +3,7 @@ import { useEditor } from '../../store/editor'
 import { effectiveKeys, getCommand, formatKeys } from '../../lib/commands'
 import { PANELS } from '../../panels'
 import { isPanelAvailable, panelTooltip, type PanelSpec } from '../../panels/registry'
+import { Icon } from '../ui/Icon'
 
 /** The tooltip with the panel's current shortcut (commands register after the first render and can be rebound). */
 function tooltip(spec: PanelSpec): string {
@@ -30,12 +31,12 @@ export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {
           }}
           onClick={() => (visible && sidebar === v.id ? toggleSidebar() : setSidebar(v.id))}
         >
-          {v.icon}
+          <Icon name={v.icon} />
         </button>
       ))}
       <span className="spacer" />
       <button className={`activity${terminalActive ? ' active' : ''}`} title={`Terminal (${formatKeys('Mod+J')})`} onClick={onTerminal}>
-        ❯_
+        <Icon name="terminal" />
       </button>
     </nav>
   )

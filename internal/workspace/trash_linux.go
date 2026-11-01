@@ -14,6 +14,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 // MoveToTrash moves path to the user's trash as the freedesktop.org Trash
@@ -30,21 +32,31 @@ func MoveToTrash(path string) error {
 	if _, err := os.Lstat(abs); err != nil {
 		return err
 	}
-	err = trashHome(abs, homeTrash(), time.Now())
+	trash, err := homeTrash(os.Getenv("XDG_DATA_HOME"), os.UserHomeDir)
+	if err != nil {
+		return err
+	}
+	err = trashHome(abs, trash, time.Now())
 	if errors.Is(err, syscall.EXDEV) {
 		return gioTrash(abs)
 	}
 	return err
 }
 
-// homeTrash is the user's trash directory ($XDG_DATA_HOME/Trash).
-func homeTrash() string {
-	data := os.Getenv("XDG_DATA_HOME")
-	if !filepath.IsAbs(data) {
-		home, _ := os.UserHomeDir()
-		data = filepath.Join(home, ".local", "share")
+// homeTrash is the user's trash directory ($XDG_DATA_HOME/Trash). Without a
+// home directory there is none: a relative path would trash into the cwd.
+func homeTrash(dataHome string, home func() (string, error)) (string, error) {
+	if !filepath.IsAbs(dataHome) {
+		dir, err := home()
+		if err != nil {
+			return "", fmt.Errorf("find the trash: %w", err)
+		}
+		if !filepath.IsAbs(dir) {
+			return "", fmt.Errorf("find the trash: home directory %q is not absolute", dir)
+		}
+		dataHome = filepath.Join(dir, ".local", "share")
 	}
-	return filepath.Join(data, "Trash")
+	return filepath.Join(dataHome, "Trash"), nil
 }
 
 // trashHome moves abs into trash. The .trashinfo is created first with
@@ -65,6 +77,10 @@ func trashHome(abs, trash string, now time.Time) error {
 			ext := filepath.Ext(base)
 			name = strings.TrimSuffix(base, ext) + "." + strconv.Itoa(i) + ext
 		}
+		target := filepath.Join(files, name)
+		if _, err := os.Lstat(target); err == nil {
+			continue // a file without its .trashinfo (another tool, a crash) keeps its name
+		}
 		infoPath := filepath.Join(info, name+".trashinfo")
 		f, err := os.OpenFile(infoPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 		if errors.Is(err, fs.ErrExist) {
@@ -78,7 +94,11 @@ func trashHome(abs, trash string, now time.Time) error {
 			werr = cerr
 		}
 		if werr == nil {
-			werr = os.Rename(abs, filepath.Join(files, name))
+			werr = renameNoReplace(abs, target)
+		}
+		if errors.Is(werr, fs.ErrExist) { // taken between the Lstat and the rename
+			_ = os.Remove(infoPath)
+			continue
 		}
 		if werr != nil {
 			_ = os.Remove(infoPath)
@@ -86,6 +106,25 @@ func trashHome(abs, trash string, now time.Time) error {
 		return werr
 	}
 	return fmt.Errorf("no free name in %s for %s", files, base)
+}
+
+// renameNoReplace renames from to to unless to exists (fs.ErrExist then).
+// File systems without RENAME_NOREPLACE fall back to a check and a plain
+// rename, which the caller's Lstat already narrowed to a tiny window.
+func renameNoReplace(from, to string) error {
+	err := unix.Renameat2(unix.AT_FDCWD, from, unix.AT_FDCWD, to, unix.RENAME_NOREPLACE)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, unix.EEXIST):
+		return fs.ErrExist
+	case errors.Is(err, unix.EINVAL), errors.Is(err, unix.ENOSYS):
+		if _, err := os.Lstat(to); err == nil {
+			return fs.ErrExist
+		}
+		return os.Rename(from, to)
+	}
+	return &os.LinkError{Op: "rename", Old: from, New: to, Err: err}
 }
 
 // gioTrash trashes abs with GLib's `gio trash`.

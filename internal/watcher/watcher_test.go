@@ -97,7 +97,7 @@ func TestDebouncerClosedDropsEvents(t *testing.T) {
 func TestWatchReportsFileChanges(t *testing.T) {
 	root := t.TempDir()
 	c := &collector{}
-	w, err := Watch([]string{root}, c.flush)
+	w, err := Watch([]string{root}, c.flush, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,5 +141,21 @@ func TestClassify(t *testing.T) {
 	_, gitChanged = Classify([]string{"/other/.git/refs/heads/main"}, nil)
 	if !gitChanged {
 		t.Error("paths inside a .git directory are git changes even without explicit dirs")
+	}
+}
+
+func TestRemap(t *testing.T) {
+	mapping := map[string]string{"/private/var/x": "/var/x", "/Users/me/repo/.git": "/Users/me/repo/.git"}
+	tests := map[string]string{
+		"private/var/x/a.go":       "/var/x/a.go",
+		"/private/var/x":           "/var/x",
+		"/private/var/xy/a.go":     "/private/var/xy/a.go", // prefix of another dir, not a child
+		"/Users/me/repo/.git/HEAD": "/Users/me/repo/.git/HEAD",
+		"/elsewhere/file.txt":      "/elsewhere/file.txt",
+	}
+	for in, want := range tests {
+		if got := remap(in, mapping); got != want {
+			t.Errorf("remap(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

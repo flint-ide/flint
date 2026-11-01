@@ -15,6 +15,7 @@ import {
 } from '../../store/agentTasks'
 import { BrowserOpenURL } from '../../wails/runtime'
 import { NewTaskForm } from './NewTaskForm'
+import { Icon } from '../ui/Icon'
 import { TaskCI, TaskCIFix } from './TaskCI'
 
 const basename = (p: string) => p.slice(p.lastIndexOf('/') + 1)
@@ -68,7 +69,7 @@ function TaskRow({ t, changes, open, busy }: RowProps) {
         <span className="file-name">{t.title}</span>
       </div>
       <div className="task-meta muted">
-        <span title={`${t.branch} from ${t.base} · ${t.agent}`}>⎇ {t.branch}</span>
+        <span title={`${t.branch} from ${t.base} · ${t.agent}`}><Icon name="branch" size={12} /> {t.branch}</span>
         <span>{status}</span>
         {t.ahead > 0 && !t.merged && <span title={`Commits not in ${t.base}`}>↑{t.ahead}</span>}
         <TaskCI t={t} />

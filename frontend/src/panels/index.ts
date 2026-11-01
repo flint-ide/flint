@@ -20,49 +20,49 @@ const UsagePanel = lazy(() => import('../components/usage/UsagePanel').then((m) 
 
 // Command ids and titles predating the registry are kept: keymap overrides are stored by id.
 export const PANELS = definePanels([
-  { id: 'files', title: 'Files', icon: '▤', order: 10, component: FileTree, command: { keywords: 'project tree explorer' } },
+  { id: 'files', title: 'Files', icon: 'files', order: 10, component: FileTree, command: { keywords: 'project tree explorer' } },
   {
-    id: 'search', title: 'Search', icon: '⌕', order: 20, component: SearchPanel, shortcutCommand: 'nav.findInFiles',
+    id: 'search', title: 'Search', icon: 'search', order: 20, component: SearchPanel, shortcutCommand: 'nav.findInFiles',
     command: { keywords: 'find grep' },
   },
   {
-    id: 'git', title: 'Commit', icon: '⎇', order: 30, component: CommitPanel, shortcutCommand: 'git.commit',
+    id: 'git', title: 'Commit', icon: 'branch', order: 30, component: CommitPanel, shortcutCommand: 'git.commit',
     command: { keywords: 'git changes' },
   },
   {
-    id: 'tasks', title: 'Agent Tasks', icon: '⑂', order: 35, component: TasksPanel,
+    id: 'tasks', title: 'Agent Tasks', icon: 'fork', order: 35, component: TasksPanel,
     command: { id: 'view.agentTasks', category: 'Agent', keywords: 'worktree parallel agents branch claude codex' },
   },
   {
-    id: 'usage', title: 'Usage', icon: '∑', order: 37, component: UsagePanel,
+    id: 'usage', title: 'Usage', icon: 'sum', order: 37, component: UsagePanel,
     command: { id: 'view.agentUsage', title: 'Show Agent Usage', category: 'Agent', keywords: 'cost tokens budget spend dollars claude codex csv' },
   },
   {
-    id: 'pulls', title: 'Pull Requests', icon: '⇅', order: 40, component: PullRequestsPanel,
+    id: 'pulls', title: 'Pull Requests', icon: 'updown', order: 40, component: PullRequestsPanel,
     command: { id: 'github.pullRequests', title: 'Pull Requests…', category: 'GitHub', keywords: 'pr review gh github list' },
   },
   {
-    id: 'database', title: 'Databases', icon: '⛁', order: 50, component: DatabasePanel,
+    id: 'database', title: 'Databases', icon: 'database', order: 50, component: DatabasePanel,
     command: { id: 'view.databases', keywords: 'sql postgres clickhouse' },
   },
   {
-    id: 'scratch', title: 'Scratchpads', icon: '✎', order: 60, component: ScratchPanel,
+    id: 'scratch', title: 'Scratchpads', icon: 'pencil', order: 60, component: ScratchPanel,
     command: { id: 'view.scratchpads', keywords: 'notes sql consoles' },
   },
   {
-    id: 'todo', title: 'TODO', icon: '☑', order: 70, component: TodoPanel,
+    id: 'todo', title: 'TODO', icon: 'checkbox', order: 70, component: TodoPanel,
     command: { title: 'TODO List', keywords: 'fixme hack xxx bug notes comments' },
   },
   {
-    id: 'docker', title: 'Docker', icon: '⛴', order: 80, component: DockerPanel,
+    id: 'docker', title: 'Docker', icon: 'ship', order: 80, component: DockerPanel,
     command: { title: 'Docker', keywords: 'containers compose logs' },
   },
   {
-    id: 'aws', title: 'AWS Profiles', icon: '☁', order: 90, component: AwsPanel,
+    id: 'aws', title: 'AWS Profiles', icon: 'cloud', order: 90, component: AwsPanel,
     command: { title: 'AWS Profiles', keywords: 'amazon sso login credentials terminal' },
   },
   {
-    id: 'kube', title: 'Kubernetes', icon: '☸', order: 100, component: KubePanel,
+    id: 'kube', title: 'Kubernetes', icon: 'helm', order: 100, component: KubePanel,
     command: { title: 'Kubernetes', keywords: 'k8s kubectl cluster pods context namespace' },
   },
 ])

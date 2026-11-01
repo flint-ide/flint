@@ -1,6 +1,8 @@
 import { EventsOn } from '../wails/runtime'
 import { Workspace, type Entry } from '../api/backend'
+import { rescanPaths } from '../lib/fileTree'
 import { useWorkspace } from './workspace'
+import { showToast } from './dialog'
 
 type FileListener = () => void
 
@@ -63,4 +65,9 @@ export function subscribeFsEvents(): void {
   if (subscribed) return
   subscribed = true
   EventsOn('fs:changed', (paths: string[]) => void applyChanges(paths))
+  // The system dropped events under root: reload every loaded folder and open file there.
+  EventsOn('fs:rescan', (root: string) =>
+    void applyChanges(rescanPaths(root, [...fileListeners.keys()], Object.keys(useWorkspace.getState().children))),
+  )
+  EventsOn('fs:warning', (message: string) => showToast(message, 'error'))
 }

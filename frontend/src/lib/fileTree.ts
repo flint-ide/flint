@@ -132,3 +132,11 @@ export function withDraft(rows: Row[], root: string, draft: { dir: string; isDir
   const depth = at < 0 ? 0 : rows[at].depth + 1
   return [...out.slice(0, at + 1), { kind: 'draft', dir: draft.dir, depth, isDir: draft.isDir }, ...out.slice(at + 1)]
 }
+
+/**
+ * What to reload after the file watcher lost events under root: every open
+ * file and every loaded folder there (applyChanges refreshes both).
+ */
+export function rescanPaths(root: string, openFiles: readonly string[], loadedDirs: readonly string[]): string[] {
+  return [...new Set([...loadedDirs, ...openFiles])].filter((p) => isWithin(root, p))
+}

@@ -4,7 +4,7 @@ import { definePanels, isPanelAvailable, panelCommands, panelTooltip, resolvePan
 
 const Empty = () => null
 const spec = (id: string, order: number, extra: Partial<PanelSpec> = {}): PanelSpec => ({
-  id, title: id.toUpperCase(), icon: '•', order, component: Empty, ...extra,
+  id, title: id.toUpperCase(), icon: 'files', order, component: Empty, ...extra,
 })
 
 describe('definePanels', () => {

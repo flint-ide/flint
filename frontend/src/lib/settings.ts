@@ -59,6 +59,8 @@ export interface AppSettings {
   keymap: Record<string, string>
   /** Extra folders / globs the TODO list skips, gitignore-style. */
   todoExclude: string[]
+  /** Folder names (or globs over one) the Linux file watcher skips, on top of dependency folders. */
+  watchExclude: string[]
   /** Agent CLIs by name ('claude', 'codex'); missing = defaults. */
   agents: Record<string, AgentSettings>
   /** Agents added by the user, spoken to over ACP. */
@@ -98,6 +100,7 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   checkForUpdates: true,
   keymap: Object.freeze({}) as Record<string, string>,
   todoExclude: Object.freeze([]) as unknown as string[],
+  watchExclude: Object.freeze(['dist', '.cache']) as unknown as string[],
   agents: Object.freeze({}) as Record<string, AgentSettings>,
   customAgents: Object.freeze([]) as unknown as CustomAgent[],
   languageServers: Object.freeze({}) as Record<string, LanguageServerSettings>,
@@ -120,14 +123,17 @@ export const MAX_EXCLUDES = 100
 /** Mirrors Go's validExclude: rg reads a leading "!" as "include" and excludes travel comma-separated. */
 export const validExclude = (p: string) => p !== '' && p.length <= 200 && !p.startsWith('!') && !/[,\x00-\x1f]/.test(p)
 
+/** Mirrors Go's validWatchExclude: a folder name or a glob over one, so no slashes. */
+export const validWatchExclude = (p: string) => validExclude(p) && !/[/\\]/.test(p)
+
 /** One pattern per line → the patterns to save (trimmed, unique) and the lines that are not valid. */
-export function parseExcludes(text: string): { patterns: string[]; invalid: string[] } {
+export function parseExcludes(text: string, valid: (p: string) => boolean = validExclude): { patterns: string[]; invalid: string[] } {
   const patterns: string[] = []
   const invalid: string[] = []
   for (const line of text.split('\n')) {
     const p = line.trim()
     if (!p || patterns.includes(p)) continue
-    if (validExclude(p)) patterns.push(p)
+    if (valid(p)) patterns.push(p)
     else invalid.push(p)
   }
   if (patterns.length > MAX_EXCLUDES) invalid.push(...patterns.splice(MAX_EXCLUDES))
@@ -214,6 +220,7 @@ export function coerceSettings(v: unknown): AppSettings {
     checkForUpdates: typeof v.checkForUpdates === 'boolean' ? v.checkForUpdates : d.checkForUpdates,
     keymap,
     todoExclude: Array.isArray(v.todoExclude) ? v.todoExclude.filter((p): p is string => typeof p === 'string' && validExclude(p)) : [],
+    watchExclude: Array.isArray(v.watchExclude) ? v.watchExclude.filter((p): p is string => typeof p === 'string' && validWatchExclude(p)) : d.watchExclude,
     agents: coerceAgents(v.agents),
     customAgents: coerceCustomAgents(v.customAgents),
     languageServers: coerceServers(v.languageServers),

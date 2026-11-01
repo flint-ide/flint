@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { coerceSettings, DEFAULT_SETTINGS, editorCssVars, parseExcludes, resolveTheme, themeCssVars } from './settings'
+import { coerceSettings, DEFAULT_SETTINGS, editorCssVars, parseExcludes, resolveTheme, themeCssVars, validWatchExclude } from './settings'
 import { TERMINAL_THEMES, terminalOptions } from './terminalTheme'
 
 describe('theme resolution', () => {
@@ -120,5 +120,12 @@ describe('TODO excludes', () => {
   it('drops invalid patterns from untrusted settings', () => {
     assert.deepEqual(coerceSettings({ todoExclude: ['ok', '!no', 3] }).todoExclude, ['ok'])
     assert.deepEqual(coerceSettings({}).todoExclude, [])
+  })
+
+  it('keeps watch excludes to folder names, defaulting like Go', () => {
+    assert.deepEqual(coerceSettings({}).watchExclude, ['dist', '.cache'])
+    assert.deepEqual(coerceSettings({ watchExclude: [] }).watchExclude, [])
+    assert.deepEqual(coerceSettings({ watchExclude: ['out', 'a/b', '!x'] }).watchExclude, ['out'])
+    assert.deepEqual(parseExcludes('dist\nsrc/gen', validWatchExclude).invalid, ['src/gen'])
   })
 })

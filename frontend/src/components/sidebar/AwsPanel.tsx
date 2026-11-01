@@ -7,6 +7,7 @@ import { kindLabel, profileStatus, shellCommand, type AwsProfile } from '../../l
 import type { DropdownItem } from '../ui/Dropdown'
 import { useSettings } from '../../store/settings'
 import { refreshMs } from '../../lib/toolSettings'
+import { Icon } from '../ui/Icon'
 
 /** AWS CLI profiles with the state of their credentials; terminals and logins per profile. */
 export function AwsPanel() {
@@ -93,7 +94,7 @@ export function AwsPanel() {
                   {p.login?.length ? (
                     <button className="icon" title={`Log in: ${shellCommand(p.login)}`} onClick={(e) => (e.stopPropagation(), loginProfile(p))}>⇥</button>
                   ) : null}
-                  <button className="icon" title={`Terminal as ${p.name}`} onClick={(e) => (e.stopPropagation(), openProfileTerminal(p))}>❯_</button>
+                  <button className="icon" title={`Terminal as ${p.name}`} onClick={(e) => (e.stopPropagation(), openProfileTerminal(p))}><Icon name="terminal" size={14} /></button>
                 </span>
               </div>
               {refresh && refresh !== 'running' && (

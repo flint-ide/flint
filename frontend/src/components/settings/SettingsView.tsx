@@ -7,6 +7,7 @@ import { checkForUpdates, useUpdate } from '../../store/update'
 import { AgentsSection } from './AgentsSection'
 import { LanguageServersSection } from './LanguageServersSection'
 import { RefreshSection } from './RefreshSection'
+import { WatchSection } from './WatchSection'
 import { McpServerSection } from './McpServerSection'
 import { EditorAiSection } from './EditorAiSection'
 import { UsageSection } from './UsageSection'
@@ -60,7 +61,12 @@ export function SettingsView({ active }: { active: boolean }) {
         {section === 'usage' && <UsageSection />}
         {section === 'editorAi' && <EditorAiSection />}
         {section === 'lsp' && <LanguageServersSection />}
-        {section === 'refresh' && <RefreshSection />}
+        {section === 'refresh' && (
+          <>
+            <RefreshSection />
+            <WatchSection />
+          </>
+        )}
         {section === 'ci' && <CISection />}
         {section === 'todo' && <TodoSection />}
         {section === 'keymap' && <KeymapSection active={active} />}

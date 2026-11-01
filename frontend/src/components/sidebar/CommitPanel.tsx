@@ -14,6 +14,7 @@ import { ReviewSection } from '../review/ReviewSection'
 import { reviewChanges, useAgentReview } from '../../store/agentReview'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
+import { Icon } from '../ui/Icon'
 import { openMergeEditor } from '../../store/mergeEditor'
 
 const KIND_LETTER: Record<string, string> = {
@@ -111,7 +112,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
         <button className="icon" title="Stash changes…" disabled={!!busy} onClick={openStashDialog}>⊟</button>
       </div>
       <div className="git-branch-line muted">
-        ⎇ {status?.branch || `detached ${status?.head.slice(0, 7) ?? ''}`}
+        <Icon name="branch" size={12} /> {status?.branch || `detached ${status?.head.slice(0, 7) ?? ''}`}
         {status?.upstream && <span> → {status.upstream}</span>}
         {!!status?.ahead && <span className="ahead"> ↑{status.ahead}</span>}
         {!!status?.behind && <span className="behind"> ↓{status.behind}</span>}

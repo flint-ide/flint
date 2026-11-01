@@ -55,3 +55,52 @@ func TestTrashHomeMissingFileLeavesNoInfo(t *testing.T) {
 		t.Errorf("left %d .trashinfo files behind", len(entries))
 	}
 }
+
+// A file in files/ without its .trashinfo (left by another tool or a crash)
+// must not be overwritten: the new one takes the next name.
+func TestTrashHomeKeepsOrphanedTrashFiles(t *testing.T) {
+	dir := t.TempDir()
+	trash := filepath.Join(dir, "Trash")
+	orphan := filepath.Join(trash, "files", "a.txt")
+	mustWrite(t, orphan, []byte("old"), 0o644)
+	path := filepath.Join(dir, "a.txt")
+	mustWrite(t, path, []byte("new"), 0o644)
+
+	if err := trashHome(path, trash, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(orphan); string(got) != "old" {
+		t.Errorf("orphaned trash file overwritten: %q", got)
+	}
+	if got, _ := os.ReadFile(filepath.Join(trash, "files", "a.2.txt")); string(got) != "new" {
+		t.Errorf("trashed file not at a.2.txt: %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(trash, "info", "a.txt.trashinfo")); err == nil {
+		t.Error("an info file was written for the orphan's name")
+	}
+}
+
+func TestRenameNoReplace(t *testing.T) {
+	dir := t.TempDir()
+	from, to := filepath.Join(dir, "from"), filepath.Join(dir, "to")
+	mustWrite(t, from, []byte("a"), 0o644)
+	mustWrite(t, to, []byte("b"), 0o644)
+	if err := renameNoReplace(from, to); !errors.Is(err, fs.ErrExist) {
+		t.Fatalf("renameNoReplace onto a file = %v, want fs.ErrExist", err)
+	}
+	if got, _ := os.ReadFile(to); string(got) != "b" {
+		t.Errorf("target replaced: %q", got)
+	}
+}
+
+func TestHomeTrash(t *testing.T) {
+	if got, err := homeTrash("/data", nil); err != nil || got != "/data/Trash" {
+		t.Errorf("XDG_DATA_HOME: %q, %v", got, err)
+	}
+	if got, err := homeTrash("", func() (string, error) { return "/home/me", nil }); err != nil || got != "/home/me/.local/share/Trash" {
+		t.Errorf("default: %q, %v", got, err)
+	}
+	if _, err := homeTrash("relative", func() (string, error) { return "", errors.New("no home") }); err == nil {
+		t.Error("no home directory must be an error, not a relative trash path")
+	}
+}

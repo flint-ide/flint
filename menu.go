@@ -71,7 +71,9 @@ func (a *App) buildMenu() *application.Menu {
 		file.AddSeparator()
 		file.Add("Settings…").OnClick(settings)
 		file.AddSeparator()
-		file.AddRole(application.Quit)
+		// Not the Quit role: on Linux it registers Ctrl+Q app-wide. App.Quit
+		// still asks ShouldQuit (unsaved files) first.
+		file.Add("Quit").OnClick(func(*application.Context) { a.quitApp() })
 	}
 
 	if isMac {
@@ -88,10 +90,24 @@ func (a *App) buildMenu() *application.Menu {
 	help.Add(showLogsLabel()).OnClick(func(*application.Context) { a.emit(eventMenuShowLogs) })
 	help.AddSeparator()
 	help.Add("Check for Updates…").OnClick(func(*application.Context) { a.emit(eventMenuCheckUpdates) })
-	if !isMac {
-		help.AddRole(application.About)
+	if !isMac { // own item: roles may carry accelerators
+		help.Add("About Flint").OnClick(func(*application.Context) { a.showAbout() })
 	}
 	return m
+}
+
+// quitApp quits through Wails, which asks ShouldQuit first.
+func (a *App) quitApp() {
+	if a.wails != nil {
+		a.wails.Quit()
+	}
+}
+
+// showAbout shows Wails' About dialog.
+func (a *App) showAbout() {
+	if a.wails != nil {
+		a.wails.Menu.ShowAbout()
+	}
 }
 
 func showLogsLabel() string {

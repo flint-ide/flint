@@ -230,6 +230,7 @@ func (s Settings) Clone() Settings {
 	out.LanguageServers = cloneLanguageServers(s.LanguageServers)
 	out.CustomTheme = s.CustomTheme.clone()
 	out.Usage = s.Usage.clone()
+	out.GitHub.Scopes = cloneArgs(s.GitHub.Scopes)
 	return out
 }
 

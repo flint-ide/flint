@@ -81,8 +81,9 @@ Remote access to Flint is remote access to the laptop: agents run commands, and 
   - On the laptop, only a hash of the token is kept, in the Keychain.
   - Tokens can be revoked one by one; revoking all is one click. Revoking closes the device's open stream at once.
 - **Scopes per device:** `read` (default), `respond` (answer permissions, prompt, cancel), `tasks` (create, PR, merge). The pairing screen asks which (phase 2; phase 1 grants only `read`).
-- **Each request:** token check (constant time), Host and Origin checks (DNS rebinding; native clients send no Origin, a present one must be allowed), body caps, rate limit, and an audit line in Flint's log (device, operation, never content).
-- **Content:** what leaves the laptop is redacted with `internal/redact`, like everything sent to an agent. Diffs of secret files (`redact.SecretFile`) are refused.
+- **Each request:** token check (constant time), Host check (DNS rebinding), body caps, rate limits (per device, bad tokens, pairing), and an audit line in Flint's log (device, operation, never content).
+- **No browsers, ever.** Requests with an `Origin` or `Sec-Fetch-*` header are refused, because any web page can make a browser call a loopback port. So the phone apps (phase 2) call the API from their Go side, never from the WebView's JavaScript, and the API never adds CORS headers or accepts a token from a cookie or the query string. The Go client refuses plain http to anything but a loopback address.
+- **Content:** what leaves the laptop is redacted with `internal/redact`, like everything sent to an agent. Tool calls that touch a credentials file (`redact.SecretFile`) have their input, output and diffs withheld.
 - **Trust:** chats in untrusted folders are listed but read-only from the phone.
 
 The threat model and the phase 1 details are in [ARCHITECTURE.md](../ARCHITECTURE.md#flint-remote).

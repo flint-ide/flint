@@ -9,7 +9,8 @@ Flint Remote lets you follow Flint from your phone while it keeps running on you
 - Flint serves a small API on `127.0.0.1` (port 7419 by default) while **Settings ▸ Remote ▸ Allow paired devices** is on. It is off by default, and nothing listens while it is off.
 - Flint never opens a public port and runs no server or relay of its own. Your phone reaches the Mac through **your own tunnel**: Tailscale, WireGuard or SSH.
 - Only **paired** devices get in. Pairing uses a one-time code that is valid for two minutes and for one device.
-- What a device sees is **redacted** like everything Flint sends to an agent: credentials are removed and your home folder is shown as `~`. Diffs of files that hold credentials (`.env`, keys) are not shown.
+- What a device sees is **redacted** like everything Flint sends to an agent: credentials are removed and your home folder is shown as `~`. What an agent reads from or writes to a file that holds credentials (`.env`, keys, kubeconfig) is not shown at all.
+- **Browsers can't use it.** Any web page can make your browser send requests to `127.0.0.1`, so Flint refuses every request a browser marks as its own. The phone app talks to Flint from native code.
 - **The Mac must be awake.** Flint Remote works while the Mac is on and awake (on power, or with `caffeinate`); a sleeping Mac can't answer.
 
 ## Switch it on
@@ -65,8 +66,8 @@ Flint keeps only a hash of each device's token, in the macOS Keychain (service `
 Until the phone app exists, `remotecheck` in Flint's source tree does what the app will do:
 
 ```bash
-# Pair with the code Flint shows (prints the token to export).
-go run ./cmd/remotecheck -url http://127.0.0.1:7419 pair ABCD-EFGH-IJKL-MNOP
+# Pair: type the code Flint shows when asked (prints the token to export).
+go run ./cmd/remotecheck -url http://127.0.0.1:7419 pair
 export FLINT_REMOTE_TOKEN=…
 
 go run ./cmd/remotecheck -url http://127.0.0.1:7419 chats    # open chats
@@ -74,7 +75,7 @@ go run ./cmd/remotecheck -url http://127.0.0.1:7419 tasks    # agent tasks
 go run ./cmd/remotecheck -url http://127.0.0.1:7419 follow   # replay, then live events, one JSON line each
 ```
 
-`follow <chatId>:<seq>` continues after an event you already have. Or with `curl`:
+`follow <chatId>:<seq>` continues after an event you already have. The code and the token never go on the command line (other users can read process arguments), and `remotecheck` refuses plain `http` to any host but this machine: use the `https` address of `tailscale serve`, or an SSH tunnel. Or with `curl`:
 
 ```bash
 curl -H "Authorization: Bearer $FLINT_REMOTE_TOKEN" http://127.0.0.1:7419/api/chats
@@ -91,7 +92,7 @@ All requests need `Authorization: Bearer <token>`, except pairing.
 | GET | `/api/tasks` | `{"tasks": [{id, title, agent, branch, base, state, ahead, merged, pullRequest, changes: {files, added, deleted}}]}` |
 | GET | `/api/stream?since=<chatId>:<seq>,…` | WebSocket. JSON messages: `hello` (the open chats), `gap` (events no longer kept), `agent` (an event), `replayed` (what follows is live), `chat` and `chatClosed` (state changes), `tasks` (the task list changed). |
 
-Answers: `401` without a valid token or pairing code, `403` when the request is addressed to a host that isn't allowed (protection against DNS rebinding), `429` past the device's rate, `413` for a body over 4 KB. A stream that falls behind is closed with code 1013; reconnect with `since`. A revoked device's stream is closed with 1008.
+Answers: `401` without a valid token or pairing code, `403` when the request is addressed to a host that isn't allowed (protection against DNS rebinding) or comes from a browser (it has an `Origin` or `Sec-Fetch-*` header), `429` past the device's rate or too many pairing attempts, `413` for a body over 4 KB. A stream that falls behind is closed with code 1013; reconnect with `since`. A revoked device's stream is closed with 1008.
 
 ## Related
 

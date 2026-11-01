@@ -26,6 +26,7 @@ const FileView = lazy(() => import('./FileView').then((m) => ({ default: m.FileV
 const ImageView = lazy(() => import('../preview/ImageView').then((m) => ({ default: m.ImageView })))
 const ScratchView = lazy(() => import('./ScratchView').then((m) => ({ default: m.ScratchView })))
 const DiffView = lazy(() => import('./DiffView').then((m) => ({ default: m.DiffView })))
+const MergeView = lazy(() => import('./MergeView').then((m) => ({ default: m.MergeView })))
 const HistoryView = lazy(() => import('./HistoryView').then((m) => ({ default: m.HistoryView })))
 const AgentChat = lazy(() => import('../agent/AgentChat').then((m) => ({ default: m.AgentChat })))
 const RunView = lazy(() => import('../run/RunView').then((m) => ({ default: m.RunView })))
@@ -43,7 +44,8 @@ const TerminalView = lazy(() => import('../terminal/TerminalView').then((m) => (
 export async function requestCloseTab(tab: Tab): Promise<void> {
   switch (tab.kind) {
     case 'file':
-      // Scratchpads autosave, so only file tabs can lose unsaved edits.
+    case 'merge':
+      // Scratchpads autosave, so only file and merge tabs can lose unsaved edits.
       if (tab.dirty && !(await confirmAction(`Discard unsaved changes in ${tab.title}?`, 'Discard'))) return
       break
     case 'terminal': {
@@ -152,6 +154,7 @@ const TabPanel = memo(function TabPanel({ tab, active }: { tab: Tab; active: boo
           {tab.kind === 'file' && <FileOrImage tab={tab} active={active} />}
           {tab.kind === 'scratch' && <ScratchView tab={tab} active={active} />}
           {tab.kind === 'diff' && <DiffView tab={tab} />}
+          {tab.kind === 'merge' && <MergeView tab={tab} active={active} />}
           {tab.kind === 'history' && <HistoryView tab={tab} active={active} />}
           {tab.kind === 'terminal' && <TerminalTabView termId={tab.termId} active={active} />}
           {tab.kind === 'chat' && <ChatTabView sessionId={tab.sessionId} active={active} />}
@@ -202,6 +205,7 @@ function TabIcon({ tab, debugActive }: { tab: Tab; debugActive: boolean }) {
       return <HttpTabIcon path={tab.path} />
     case 'pr':
     case 'prdiff':
+    case 'merge':
       return <TabKindIcon kind={tab.kind === 'pr' ? 'pr' : 'diff'} />
     case 'cilog':
       return <TabKindIcon kind="run" />

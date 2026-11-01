@@ -68,6 +68,7 @@ export {
 
 export {
     AgentInfo,
+    AgentText,
     CIFileRef,
     CIJob,
     CILog,

@@ -9,6 +9,7 @@ import { useEditor, viewFor } from '../store/editor'
 import { useGit } from '../store/git'
 import { activeFilePath, showFileHistory, toggleBlame, useGitHistory } from '../store/gitHistory'
 import { openStashDialog } from '../store/stash'
+import { mergeCommands } from '../store/mergeEditor'
 import { showToast } from '../store/dialog'
 import { useWorkspace } from '../store/workspace'
 import { checkoutPullRequest, detailsKey, loadDetails, loadPullRequests, openInBrowser, usePullRequests } from '../store/pullRequests'
@@ -78,6 +79,7 @@ export function registerFeatureCommands(): () => void {
     ...runCommands(),
     ...profileCommands(),
     ...gitCommands(),
+    ...mergeCommands(),
     ...githubCommands(),
     ...agentCommands(),
     ...httpCommands(),

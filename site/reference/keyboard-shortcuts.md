@@ -88,6 +88,20 @@ With [Vim mode](../how-to/customize-flint.md#use-vim-key-bindings) on, editors t
 | `⌥⌘↵` | Commit and push (in the commit message field) |
 | `⌘↵` | Post a reply (in a pull request review thread) |
 
+### In the merge editor
+
+| Shortcut | Action |
+|---|---|
+| `⌥⌘N` / `⌥⌘P` | Next / previous conflict |
+| `⌥⌘1` | Accept current |
+| `⌥⌘2` | Accept incoming |
+| `⌥⌘3` | Accept both, current first |
+| `⌥⌘4` | Accept both, incoming first |
+| `⌘S` | Save the result without staging it |
+| `⇧⌘↵` | Mark as resolved (save and `git add`) |
+
+The accept actions work on the conflict at the cursor, or the next one. "Ask Agent about Conflict" has no default shortcut; like the others, it can get one in Settings ▸ Keymap.
+
 ## Terminal and scratchpads
 
 | Shortcut | Action |

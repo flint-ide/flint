@@ -197,6 +197,7 @@ You never have to accept diffs one by one. Edits are applied directly, show up i
 
 - **✦ Generate message** in the Commit panel gives the agent the diff of the ticked files and your recent commit messages. The result lands in the message field for you to edit.
 - **Resolve with claude** (or your default agent, when it is Claude Code or Codex) appears when there are merge conflicts. It opens an interactive agent session in a new terminal. The agent runs `git add` on resolved files but doesn't commit.
+- **✦ Ask Agent** on one conflict in the [merge editor](git-and-github.md#merge-conflicts) puts that conflict, both sides and the base into the chat draft; the agent edits only that block, and you mark the file resolved yourself.
 
 ## Review Changes with Agent
 

@@ -176,7 +176,7 @@ CI (`.github/workflows/ci.yml`) runs on every pull request and on pushes to `mai
 ## npm policy
 
 - Keep runtime dependencies minimal. The frontend depends on React, CodeMirror, xterm.js and the Wails runtime; TypeScript and React types are dev dependencies for type checking. Do not add a new npm dependency without discussing it in an issue first.
-- `@replit/codemirror-vim` (MIT) provides Vim mode; writing a Vim emulation ourselves is not a reasonable alternative. It is pinned at 6.3.0, the last version without runtime dependencies (6.4.0 adds `@replit/codemirror-vim-core`), has no install scripts, and only peer-depends on `@codemirror/*`. `lib/editorSetup.ts` imports it lazily, so it is a separate chunk (about 120 KB minified) that is fetched only when Vim mode is switched on.
+- `@replit/codemirror-vim` (MIT) provides Vim mode; writing a Vim emulation ourselves is not a reasonable alternative. It is pinned at 6.3.0, the last version without runtime dependencies (6.4.0 adds `@replit/codemirror-vim-core`; Dependabot ignores 6.4 and later, see `.github/dependabot.yml`), has no install scripts, and only peer-depends on `@codemirror/*`. `lib/editorSetup.ts` imports it lazily, so it is a separate chunk (about 120 KB minified) that is fetched only when Vim mode is switched on.
 - Install with `npm ci --ignore-scripts`. `frontend/.npmrc` disables lifecycle scripts and enforces exact versions.
 - No `npx`, at build time or at runtime. The bundler and test runner are Go (`cmd/webbuild`).
 

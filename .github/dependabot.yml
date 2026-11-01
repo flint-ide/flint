@@ -12,6 +12,11 @@ updates:
     groups:
       npm-minor:
         update-types: [minor, patch]
+    ignore:
+      # 6.4 adds a runtime dependency (@replit/codemirror-vim-core 0.x); Vim mode
+      # stays on 6.3 until that is worth it (docs/PRINCIPLES.md, minimal deps).
+      - dependency-name: "@replit/codemirror-vim"
+        versions: [">=6.4.0"]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }

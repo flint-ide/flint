@@ -382,6 +382,13 @@ export class RemoteStatus {
     "devices": remote$0.Device[];
     "streams": number;
 
+    /**
+     * RevokeError: a revocation is saved neither in the Keychain nor in
+     * state.json yet (the device is cut off now, but could come back after a
+     * restart). Status retries it.
+     */
+    "revokeError": string;
+
     /** Creates a new RemoteStatus instance. */
     constructor($$source: Partial<RemoteStatus> = {}) {
         if (!("enabled" in $$source)) {
@@ -401,6 +408,9 @@ export class RemoteStatus {
         }
         if (!("streams" in $$source)) {
             this["streams"] = 0;
+        }
+        if (!("revokeError" in $$source)) {
+            this["revokeError"] = "";
         }
 
         Object.assign(this, $$source);

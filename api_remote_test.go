@@ -65,8 +65,9 @@ func (f *scriptedAgent) Close() error                         { return nil }
 
 // fakeKeychain stands in for the Keychain (tests never touch the real one).
 type fakeKeychain struct {
-	mu sync.Mutex
-	v  map[string]string
+	mu         sync.Mutex
+	v          map[string]string
+	failDelete error
 }
 
 func (k *fakeKeychain) Get(a string) (string, error) {
@@ -85,6 +86,9 @@ func (k *fakeKeychain) Set(a, v string) error {
 func (k *fakeKeychain) Delete(a string) error {
 	k.mu.Lock()
 	defer k.mu.Unlock()
+	if k.failDelete != nil {
+		return k.failDelete
+	}
 	delete(k.v, a)
 	return nil
 }
@@ -337,6 +341,41 @@ func TestRemoteDevicesAreStoredAsHashesAndRevoked(t *testing.T) {
 	}
 	if len(f.keys.v) != 0 || len(f.api.Status().Devices) != 0 {
 		t.Fatal("revoke left the device")
+	}
+}
+
+// A revocation saved neither in the Keychain nor in state.json is shown in
+// Settings and retried, so the device can't come back after a restart.
+func TestRemoteUnsavedRevocationIsShownAndRetried(t *testing.T) {
+	f := newRemoteFixture(t)
+	f.enable(t, true)
+	c := f.pair(t)
+	id := f.api.Status().Devices[0].ID
+	f.keys.mu.Lock()
+	f.keys.failDelete = errors.New("keychain locked")
+	f.keys.mu.Unlock()
+	if err := os.Chmod(f.app.configDir, 0o500); err != nil { // state.json can't be replaced
+		t.Fatal(err)
+	}
+	defer os.Chmod(f.app.configDir, 0o700)
+	if err := f.api.Revoke(id); err == nil {
+		t.Fatal("an unsaved revocation reported success")
+	}
+	if _, err := c.Chats(context.Background()); err == nil {
+		t.Fatal("the device kept access")
+	}
+	if st := f.api.Status(); st.RevokeError == "" || len(st.Devices) != 0 {
+		t.Fatalf("status %+v", st)
+	}
+	_ = os.Chmod(f.app.configDir, 0o700)
+	if st := f.api.Status(); st.RevokeError != "" {
+		t.Fatalf("retry after the disk works again: %q", st.RevokeError)
+	}
+	f.app.stateMu.Lock()
+	n := len(f.app.state.RemoteDevices)
+	f.app.stateMu.Unlock()
+	if n != 0 {
+		t.Fatal("the device is still in state.json")
 	}
 }
 

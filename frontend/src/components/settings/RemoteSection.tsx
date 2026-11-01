@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSettings } from '../../store/settings'
 import { confirmAction, showToast } from '../../store/dialog'
 import { errorMessage } from '../../api/backend'
-import { ClipboardSetText, EventsOn } from '../../wails/runtime'
+import { EventsOn } from '../../wails/runtime'
 import * as RemoteAPI from '../../../bindings/flint/remoteapi'
 import type { PairingView, RemoteStatus } from '../../../bindings/flint/models'
 import { DEFAULT_REMOTE, formatCountdown, parseHosts, REMOTE_LIMITS, type RemoteSettings } from '../../lib/remoteSettings'
@@ -135,6 +135,12 @@ function Devices({ status, hosts }: { status: RemoteStatus | null; hosts: string
   return (
     <>
       <h3>Paired devices</h3>
+      {status?.revokeError && (
+        <p className="error settings-note">
+          A revoked device is cut off, but its revocation couldn't be saved yet ({status.revokeError}). Flint retries each time this page
+          updates; until then it could come back after a restart.
+        </p>
+      )}
       {devices.length === 0 && <p className="muted settings-note">None yet.</p>}
       {devices.map((d) => (
         <Row key={d.id} label={d.name} hint={`Paired ${when(d.created)} · last seen ${when(d.lastSeen)} · ${d.scopes.join(', ')}`}>
@@ -168,7 +174,8 @@ function PairingPanel({ pairing, onClose }: { pairing: PairingView; onClose: () 
     if (left <= 0) onClose()
   }, [left <= 0]) // eslint-disable-line react-hooks/exhaustive-deps
   const size = pairing.qrSize + 8
-  const copy = (text: string, what: string) => void ClipboardSetText(text).then((ok) => ok && showToast(`Copied the ${what}`))
+  // No "copy link": the secret would linger in the clipboard (and in
+  // clipboard managers) after the pairing; it is shown, typed or scanned.
   return (
     <div className="remote-pairing">
       <svg className="remote-qr" viewBox={`-4 -4 ${size} ${size}`} role="img" aria-label="Pairing QR code" shapeRendering="crispEdges">
@@ -180,7 +187,6 @@ function PairingPanel({ pairing, onClose }: { pairing: PairingView; onClose: () 
         <p>Address: <code>{pairing.url}</code></p>
         <p>Code: <code className="remote-secret">{pairing.secret}</code></p>
         <div className="settings-actions">
-          <button onClick={() => copy(pairing.link, 'pairing link')}>Copy Link</button>
           <button onClick={onClose}>Cancel</button>
         </div>
       </div>

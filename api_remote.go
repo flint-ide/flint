@@ -249,18 +249,29 @@ type RemoteStatus struct {
 	Error     string          `json:"error"`
 	Devices   []remote.Device `json:"devices"`
 	Streams   int             `json:"streams"`
+	// RevokeError: a revocation is saved neither in the Keychain nor in
+	// state.json yet (the device is cut off now, but could come back after a
+	// restart). Status retries it.
+	RevokeError string `json:"revokeError"`
 }
 
-// Status reports the server and the paired devices.
+// Status reports the server and the paired devices, and retries
+// revocations a Keychain or disk failure left unsaved.
 func (r *RemoteAPI) Status() RemoteStatus {
 	a := r.app
 	a.remoteErr.mu.Lock()
 	errText := a.remoteErr.err
 	a.remoteErr.mu.Unlock()
+	revokeErr := ""
+	if a.remoteDevices.PendingRevocations() > 0 {
+		if err := a.remoteDevices.RetryRevocations(); err != nil {
+			revokeErr = err.Error()
+		}
+	}
 	addr := a.remote.Addr()
 	return RemoteStatus{
 		Enabled: a.currentSettings().Remote.Enabled, Listening: addr != "", Address: addr, Error: errText,
-		Devices: a.remoteDevices.List(), Streams: a.remote.Streams(),
+		Devices: a.remoteDevices.List(), Streams: a.remote.Streams(), RevokeError: revokeErr,
 	}
 }
 

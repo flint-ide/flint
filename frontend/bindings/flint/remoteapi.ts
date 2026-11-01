@@ -48,7 +48,8 @@ export function RevokeAll(): $CancellablePromise<void> {
 }
 
 /**
- * Status reports the server and the paired devices.
+ * Status reports the server and the paired devices, and retries
+ * revocations a Keychain or disk failure left unsaved.
  */
 export function Status(): $CancellablePromise<$models.RemoteStatus> {
     return $Call.ByID(3555519116).then(($result: any) => {

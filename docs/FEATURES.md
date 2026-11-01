@@ -242,7 +242,9 @@ PR review inside the IDE through the GitHub CLI (`gh`), with no token handling o
 
 ### Connections and browsing
 
-- PostgreSQL (`pgx`) and ClickHouse (native TCP or HTTP, chosen per profile).
+- PostgreSQL (`pgx`) and ClickHouse (over its HTTP interface, `internal/clickhouse`, standard library only; default port 8123, or 8443 with TLS).
+- ClickHouse: queries are POSTed and rows stream back as `JSONCompactEachRowWithNamesAndTypes`, decoded one row at a time, so the row limit stops the transfer. 64-bit integers beyond JS's exact range and all Decimals are exact strings (Decimals keep their scale), date-times carry their zone offset, arrays, maps and tuples are shown as JSON. The user and password go in `X-ClickHouse-User` / `X-ClickHouse-Key` headers and the database in `X-ClickHouse-Database`, never in the URL. Each SQL console has a `session_id` (so `SET` and temporary tables persist; one hour idle timeout) and each run a `query_id`: Cancel, and the row limit, run `KILL QUERY` and close the request. A read-only connection also sends `readonly=1`. Errors (`Code: N. DB::Exception: …`) are parsed, including those that arrive after the first rows. Responses are gzip-compressed except on loopback.
+- Native ClickHouse profiles from older versions are moved to the HTTP port on first start (9000 → 8123, 9440 → 8443; a custom native port becomes the default HTTP port). The old `connections.json` is kept as `connections.json.native-backup` and a one-time notice lists the changes.
 - Passwords are stored in the macOS Keychain, not in files.
 - Under each connection, a "Databases (N)" node lists all databases on the server, as in pgAdmin. Postgres excludes templates, and databases without the `CONNECT` privilege get a red cross. ClickHouse shows what `SHOW DATABASES` returns.
 - Expanding a database opens a separate pool to it (same host, user and password) and shows its schemas and tables.

@@ -9,9 +9,8 @@ Open the Databases view (`⛁` on the activity bar) and add a connection, or run
 | Field | Meaning |
 |---|---|
 | Driver | PostgreSQL or ClickHouse |
-| Protocol | ClickHouse only: Native TCP (port 9000, or 9440 with TLS) or HTTP (port 8123, or 8443 with TLS) |
 | Name | A label for the connection |
-| Host, Port | The server; the port defaults to the driver's usual port |
+| Host, Port | The server. The port defaults to the driver's usual port: 5432 for PostgreSQL, 8123 for ClickHouse (8443 with TLS). ClickHouse is reached over its HTTP interface, so enter the HTTP port, which is also the one to change behind a proxy or a custom setup |
 | Database | Optional default database. Without it, Flint uses `postgres` (ClickHouse: `default`) |
 | User, Password | The password is stored in the macOS Keychain, never in a file |
 | TLS | Encrypts the connection and verifies the server certificate and host name |
@@ -19,6 +18,8 @@ Open the Databases view (`⛁` on the activity bar) and add a connection, or run
 | Read-only | Flint refuses statements that modify data |
 
 **Test** checks the connection before you save it.
+
+Older versions could also reach ClickHouse over the native protocol (ports 9000 and 9440). Flint now uses HTTP only. Saved native connections move to the HTTP port (8123, or 8443 with TLS) the first time Flint starts, and a notice lists what changed. A native connection on a custom port moves to the default HTTP port: edit it if your HTTP port differs. Flint keeps the old file as `connections.json.native-backup` next to `connections.json`.
 
 > **Warning:** "Don't verify certificate (insecure)" means anyone between you and the server can read the traffic. Use it only for self-signed certificates or private certificate authorities.
 
@@ -70,6 +71,20 @@ Analyze always runs the statement inside a transaction that is rolled back after
 ### ClickHouse
 
 Explain runs `EXPLAIN PLAN indexes = 1`, and Analyze runs `EXPLAIN PIPELINE`. Neither executes the query. The tree is built from the indentation of ClickHouse's output, on a best-effort basis.
+
+## ClickHouse specifics
+
+Flint talks to ClickHouse over HTTP and streams rows as they arrive, so the row limit also stops the transfer.
+
+- **Exact values.** `UInt64`, `Int64` and larger integers beyond JavaScript's safe range, and all `Decimal` columns, are shown as exact text, never rounded. Decimals keep their scale (`1.50`, not `1.5`).
+- **Dates and times** show their zone: `DateTime('Europe/Warsaw')` as `2024-01-02 03:04:05 +01:00`; columns without a zone use the server's.
+- **Arrays, maps and tuples** are shown as JSON. `NULL` is `NULL`.
+- **Consoles keep a session.** `SET` and temporary tables carry over between the statements of one console, and are separate per console. The server forgets an idle session after an hour.
+- **Cancel** stops the query on the server (`KILL QUERY`), not just in Flint. The same happens when the row limit cuts a result short.
+- **Read-only connections** also ask the server to refuse writes and setting changes (`readonly=1`).
+- **Errors** show the server's code and message, including errors that happen after the first rows arrived.
+- A statement with its own `FORMAT` clause can't be shown; remove the clause.
+- The password is sent in a request header, never in the URL. With TLS, Flint uses the system's root certificates.
 
 ## Editing results (PostgreSQL)
 

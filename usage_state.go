@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	as "flint/internal/agentsession"
+	"flint/internal/redact"
 	"flint/internal/usage"
 )
 
@@ -18,6 +19,7 @@ import (
 const (
 	eventUsageChanged = "usage:changed"
 	eventUsageAlert   = "usage:alert"
+	maxLabelSource    = 2000 // bytes of a first message a chat's name is made from
 )
 
 // UsageAlert tells the UI that a budget was spent by a turn of a chat.
@@ -59,12 +61,16 @@ func (u *usageChats) get(sessionID string) (usageChat, bool) {
 	return c, ok
 }
 
-// prompted names a chat after its first message.
+// prompted names a chat after its first message (its start, with
+// credentials removed: the name is kept in usage.json).
 func (u *usageChats) prompted(sessionID, text string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	if c, ok := u.chats[sessionID]; ok && c.label == "" {
-		c.label = text
+		if len(text) > maxLabelSource {
+			text = text[:maxLabelSource]
+		}
+		c.label = redact.Secrets(text)
 		u.chats[sessionID] = c
 	}
 }

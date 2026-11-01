@@ -25,6 +25,11 @@ func TestRecordUsageCountsChatsPerProjectAndTask(t *testing.T) {
 	a.usageChats.bind("s1", usageChat{chat: "s1", agent: "claude", cwd: "/work/repo/sub", model: "opus"})
 	a.usageChats.prompted("s1", "Explain the parser")
 	a.usageChats.prompted("s1", "and then this")
+	a.usageChats.bind("s3", usageChat{chat: "s3", agent: "claude", cwd: "/work/repo"})
+	a.usageChats.prompted("s3", "use token ghp_0123456789abcdefghijklmnopqrstuvwxyzAB please")
+	if c, _ := a.usageChats.get("s3"); strings.Contains(c.label, "ghp_0123") {
+		t.Errorf("credentials must not reach usage.json: %q", c.label)
+	}
 	a.usageChats.bind("s2", usageChat{chat: "s2", agent: "codex", cwd: "/wt/rate", model: "gpt-5"})
 
 	a.recordUsage("s1", mustChat(t, a, "s1"), &as.Usage{InputTokens: 100, OutputTokens: 10, CostUSD: 0.2, Model: "opus-4"})

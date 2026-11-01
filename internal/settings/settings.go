@@ -110,6 +110,8 @@ type Settings struct {
 	InlineEdit InlineEdit `json:"inlineEdit"`
 	// AgentTasks configures agent tasks (worktree folder, branch prefix).
 	AgentTasks AgentTasks `json:"agentTasks"`
+	// Usage configures the usage dashboard: retention, budgets, prices (usage.go).
+	Usage Usage `json:"usage"`
 }
 
 // Default returns the settings Flint uses when nothing is configured.
@@ -139,6 +141,7 @@ func Default() Settings {
 		Completions:        defaultCompletions(),
 		InlineEdit:         defaultInlineEdit(),
 		AgentTasks:         defaultAgentTasks(),
+		Usage:              defaultUsage(),
 		CustomTheme:        defaultCustomTheme(),
 	}
 }
@@ -207,6 +210,7 @@ func Normalize(s Settings) Settings {
 	out.Completions = normalizeCompletions(s.Completions)
 	out.InlineEdit = normalizeInlineEdit(s.InlineEdit)
 	out.AgentTasks = normalizeAgentTasks(s.AgentTasks)
+	out.Usage = normalizeUsage(s.Usage)
 	return out
 }
 
@@ -292,6 +296,9 @@ func Validate(s Settings) error {
 		return err
 	}
 	if err := CheckAgentTasks(s.AgentTasks); err != nil {
+		return err
+	}
+	if err := CheckUsage(s.Usage); err != nil {
 		return err
 	}
 	return validateRefresh(s.Refresh)

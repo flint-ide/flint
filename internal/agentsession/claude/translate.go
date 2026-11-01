@@ -208,6 +208,9 @@ func (s *session) onResult(line []byte) {
 		return
 	}
 	usage := s.tr.usage(&r)
+	if usage != nil {
+		usage.Model = s.currentModel()
+	}
 	s.tr.streamed = map[string]bool{}
 
 	s.mu.Lock()
@@ -273,6 +276,8 @@ func (tr *translator) usage(r *resultMsg) *agentsession.Usage {
 	if r.Usage != nil {
 		u.InputTokens = r.Usage.InputTokens + r.Usage.CacheCreationInputTokens + r.Usage.CacheReadInputTokens
 		u.OutputTokens = r.Usage.OutputTokens
+		u.CacheReadTokens = r.Usage.CacheReadInputTokens
+		u.CacheWriteTokens = r.Usage.CacheCreationInputTokens
 		u.ContextTokens = u.InputTokens
 		if n := len(r.Usage.Iterations); n > 0 {
 			it := r.Usage.Iterations[n-1]

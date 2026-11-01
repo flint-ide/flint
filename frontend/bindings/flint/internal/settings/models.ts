@@ -5,6 +5,10 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as usage$0 from "../usage/models.js";
+
 /**
  * AgentSettings configures one agent CLI ("agents" → "claude" / "codex").
  * Changes apply to sessions started afterwards.
@@ -665,6 +669,11 @@ export class Settings {
      */
     "agentTasks": AgentTasks;
 
+    /**
+     * Usage configures the usage dashboard: retention, budgets, prices (usage.go).
+     */
+    "usage": Usage;
+
     /** Creates a new Settings instance. */
     constructor($$source: Partial<Settings> = {}) {
         if (!("version" in $$source)) {
@@ -724,6 +733,9 @@ export class Settings {
         if (!("agentTasks" in $$source)) {
             this["agentTasks"] = (new AgentTasks());
         }
+        if (!("usage" in $$source)) {
+            this["usage"] = (new Usage());
+        }
 
         Object.assign(this, $$source);
     }
@@ -745,6 +757,7 @@ export class Settings {
         const $$createField16_0 = $$createType14;
         const $$createField17_0 = $$createType15;
         const $$createField18_0 = $$createType16;
+        const $$createField19_0 = $$createType17;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -785,7 +798,81 @@ export class Settings {
         if ("agentTasks" in $$parsedSource) {
             $$parsedSource["agentTasks"] = $$createField18_0($$parsedSource["agentTasks"]);
         }
+        if ("usage" in $$parsedSource) {
+            $$parsedSource["usage"] = $$createField19_0($$parsedSource["usage"]);
+        }
         return new Settings($$parsedSource as Partial<Settings>);
+    }
+}
+
+/**
+ * Usage configures the usage dashboard: how long daily aggregates are kept,
+ * the budgets and the prices used to estimate costs agents don't report.
+ */
+export class Usage {
+    /**
+     * RetentionDays is how many days of daily aggregates usage.json keeps.
+     */
+    "retentionDays": number;
+
+    /**
+     * Prices are per-model prices in USD per million tokens, used only for
+     * turns whose agent reported no cost; the result is labelled estimated.
+     */
+    "prices": { [_ in string]?: usage$0.Price };
+
+    /**
+     * Budgets; zero turns one off. Daily covers all chats of the day, task
+     * one agent task's chats.
+     */
+    "dailyBudgetUsd": number;
+    "dailyBudgetTokens": number;
+    "taskBudgetUsd": number;
+    "taskBudgetTokens": number;
+
+    /**
+     * PauseOverBudget refuses new turns while a budget is spent, until the
+     * user continues from the warning.
+     */
+    "pauseOverBudget": boolean;
+
+    /** Creates a new Usage instance. */
+    constructor($$source: Partial<Usage> = {}) {
+        if (!("retentionDays" in $$source)) {
+            this["retentionDays"] = 0;
+        }
+        if (!("prices" in $$source)) {
+            this["prices"] = {};
+        }
+        if (!("dailyBudgetUsd" in $$source)) {
+            this["dailyBudgetUsd"] = 0;
+        }
+        if (!("dailyBudgetTokens" in $$source)) {
+            this["dailyBudgetTokens"] = 0;
+        }
+        if (!("taskBudgetUsd" in $$source)) {
+            this["taskBudgetUsd"] = 0;
+        }
+        if (!("taskBudgetTokens" in $$source)) {
+            this["taskBudgetTokens"] = 0;
+        }
+        if (!("pauseOverBudget" in $$source)) {
+            this["pauseOverBudget"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Usage instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Usage {
+        const $$createField1_0 = $$createType19;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("prices" in $$parsedSource) {
+            $$parsedSource["prices"] = $$createField1_0($$parsedSource["prices"]);
+        }
+        return new Usage($$parsedSource as Partial<Usage>);
     }
 }
 
@@ -807,3 +894,6 @@ const $$createType13 = MCPServer.createFrom;
 const $$createType14 = Completions.createFrom;
 const $$createType15 = InlineEdit.createFrom;
 const $$createType16 = AgentTasks.createFrom;
+const $$createType17 = Usage.createFrom;
+const $$createType18 = usage$0.Price.createFrom;
+const $$createType19 = $Create.Map($Create.Any, $$createType18);

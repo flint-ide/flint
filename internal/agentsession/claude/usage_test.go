@@ -22,6 +22,9 @@ func TestUsageContextFromLastIteration(t *testing.T) {
 	if u.InputTokens != 1030 || u.OutputTokens != 50 {
 		t.Errorf("tokens = %+v", u)
 	}
+	if u.CacheReadTokens != 900 || u.CacheWriteTokens != 100 {
+		t.Errorf("cache tokens = %+v", u)
+	}
 	if u.ContextTokens != 920 || u.ContextWindow != 200000 {
 		t.Errorf("context = %+v (want last iteration 920 of 200000)", u)
 	}

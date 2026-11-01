@@ -20,6 +20,9 @@ import * as runconfig$0 from "./internal/runconfig/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as testrun$0 from "./internal/testrun/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as usage$0 from "./internal/usage/models.js";
 
 /**
  * AgentInfo lists installed agents and the one Flint uses.
@@ -71,6 +74,46 @@ export class AgentInfo {
  * Breakpoints are the breakpoints to set at launch, by absolute file path.
  */
 export type Breakpoints = { [_ in string]?: dap$0.SourceBreakpoint[] };
+
+/**
+ * BudgetStatus is what a chat's header warns about.
+ */
+export class BudgetStatus {
+    /**
+     * Alerts are the spent budgets that concern the chat: today's, and its
+     * task's when it runs in one.
+     */
+    "alerts": usage$0.Alert[];
+
+    /**
+     * Pause: new turns are refused while a not-overridden alert is listed.
+     */
+    "pause": boolean;
+
+    /** Creates a new BudgetStatus instance. */
+    constructor($$source: Partial<BudgetStatus> = {}) {
+        if (!("alerts" in $$source)) {
+            this["alerts"] = [];
+        }
+        if (!("pause" in $$source)) {
+            this["pause"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new BudgetStatus instance from a string or object.
+     */
+    static createFrom($$source: any = {}): BudgetStatus {
+        const $$createField0_0 = $$createType2;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("alerts" in $$parsedSource) {
+            $$parsedSource["alerts"] = $$createField0_0($$parsedSource["alerts"]);
+        }
+        return new BudgetStatus($$parsedSource as Partial<BudgetStatus>);
+    }
+}
 
 /**
  * Collected is a profile recorded from a running program.
@@ -136,8 +179,8 @@ export class DockerOverview {
      * Creates a new DockerOverview instance from a string or object.
      */
     static createFrom($$source: any = {}): DockerOverview {
-        const $$createField0_0 = $$createType2;
-        const $$createField1_0 = $$createType4;
+        const $$createField0_0 = $$createType4;
+        const $$createField1_0 = $$createType6;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("containers" in $$parsedSource) {
             $$parsedSource["containers"] = $$createField0_0($$parsedSource["containers"]);
@@ -172,7 +215,7 @@ export class FileHistory {
      * Creates a new FileHistory instance from a string or object.
      */
     static createFrom($$source: any = {}): FileHistory {
-        const $$createField1_0 = $$createType6;
+        const $$createField1_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("commits" in $$parsedSource) {
             $$parsedSource["commits"] = $$createField1_0($$parsedSource["commits"]);
@@ -295,7 +338,7 @@ export class ProfiledTests {
      * Creates a new ProfiledTests instance from a string or object.
      */
     static createFrom($$source: any = {}): ProfiledTests {
-        const $$createField2_0 = $$createType7;
+        const $$createField2_0 = $$createType9;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField2_0($$parsedSource["files"]);
@@ -498,9 +541,9 @@ export class RunConfigs {
      * Creates a new RunConfigs instance from a string or object.
      */
     static createFrom($$source: any = {}): RunConfigs {
-        const $$createField0_0 = $$createType9;
-        const $$createField1_0 = $$createType9;
-        const $$createField2_0 = $$createType11;
+        const $$createField0_0 = $$createType11;
+        const $$createField1_0 = $$createType11;
+        const $$createField2_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("saved" in $$parsedSource) {
             $$parsedSource["saved"] = $$createField0_0($$parsedSource["saved"]);
@@ -730,16 +773,60 @@ export class UndoResult {
     }
 }
 
+/**
+ * UsageView is the panel's data plus the task titles it shows.
+ */
+export class UsageView {
+    "summary": usage$0.Summary;
+
+    /**
+     * TaskTitles names the tasks in the summary (id → title) that still exist.
+     */
+    "taskTitles": { [_ in string]?: string };
+
+    /** Creates a new UsageView instance. */
+    constructor($$source: Partial<UsageView> = {}) {
+        if (!("summary" in $$source)) {
+            this["summary"] = (new usage$0.Summary());
+        }
+        if (!("taskTitles" in $$source)) {
+            this["taskTitles"] = {};
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new UsageView instance from a string or object.
+     */
+    static createFrom($$source: any = {}): UsageView {
+        const $$createField0_0 = $$createType14;
+        const $$createField1_0 = $$createType15;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("summary" in $$parsedSource) {
+            $$parsedSource["summary"] = $$createField0_0($$parsedSource["summary"]);
+        }
+        if ("taskTitles" in $$parsedSource) {
+            $$parsedSource["taskTitles"] = $$createField1_0($$parsedSource["taskTitles"]);
+        }
+        return new UsageView($$parsedSource as Partial<UsageView>);
+    }
+}
+
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = docker$0.Container.createFrom;
+const $$createType1 = usage$0.Alert.createFrom;
 const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = docker$0.ComposeProject.createFrom;
+const $$createType3 = docker$0.Container.createFrom;
 const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = git$0.FileCommit.createFrom;
+const $$createType5 = docker$0.ComposeProject.createFrom;
 const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = testrun$0.Profiles.createFrom;
-const $$createType8 = runconfig$0.Config.createFrom;
-const $$createType9 = $Create.Array($$createType8);
-const $$createType10 = runconfig$0.Capabilities.createFrom;
-const $$createType11 = $Create.Map($Create.Any, $$createType10);
+const $$createType7 = git$0.FileCommit.createFrom;
+const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = testrun$0.Profiles.createFrom;
+const $$createType10 = runconfig$0.Config.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = runconfig$0.Capabilities.createFrom;
+const $$createType13 = $Create.Map($Create.Any, $$createType12);
+const $$createType14 = usage$0.Summary.createFrom;
+const $$createType15 = $Create.Map($Create.Any, $Create.Any);

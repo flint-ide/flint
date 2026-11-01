@@ -129,6 +129,12 @@ type Usage struct {
 	// input incl. cache) and ContextWindow the model's limit; zero when unknown.
 	ContextTokens int `json:"contextTokens,omitempty"`
 	ContextWindow int `json:"contextWindow,omitempty"`
+	// CacheReadTokens and CacheWriteTokens are the part of InputTokens read
+	// from or written to the prompt cache, when the agent reports them.
+	CacheReadTokens  int `json:"cacheReadTokens,omitempty"`
+	CacheWriteTokens int `json:"cacheWriteTokens,omitempty"`
+	// Model is the model that answered the turn, when the agent says.
+	Model string `json:"model,omitempty"`
 }
 
 // Attachment is extra context sent with a prompt (a file or a selection).

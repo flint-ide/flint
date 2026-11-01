@@ -30,6 +30,7 @@ import * as TaskAPI from "./taskapi.js";
 import * as TerminalAPI from "./terminalapi.js";
 import * as TodoAPI from "./todoapi.js";
 import * as UpdateAPI from "./updateapi.js";
+import * as UsageAPI from "./usageapi.js";
 import * as WorkspaceAPI from "./workspaceapi.js";
 export {
     AWSAPI,
@@ -61,11 +62,13 @@ export {
     TerminalAPI,
     TodoAPI,
     UpdateAPI,
+    UsageAPI,
     WorkspaceAPI
 };
 
 export {
     AgentInfo,
+    BudgetStatus,
     Collected,
     DockerOverview,
     FileHistory,
@@ -80,7 +83,8 @@ export {
     SendOptions,
     TaskView,
     TitlebarMetrics,
-    UndoResult
+    UndoResult,
+    UsageView
 } from "./models.js";
 
 export type {

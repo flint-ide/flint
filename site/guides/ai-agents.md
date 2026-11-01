@@ -103,6 +103,7 @@ You never have to accept diffs one by one. Edits are applied directly, show up i
 Select code (or put the cursor on a line) and press `⌘I` ("Edit Selection with Agent…"). A small prompt opens above it; type what to change, for example "add error handling", and press `↵`.
 
 - The default agent runs once, headless, like **Generate message**. It gets the file's path, its language, the selection and the lines around it (Settings ▸ AI in the Editor ▸ Context lines, 60 by default), and is asked for the replacement text only. Secrets in the surrounding lines are redacted; a selection that contains something that looks like a credential is not sent.
+- Claude Code runs with read-only tools (Read, Grep, Glob) and without MCP servers, and Codex in its read-only sandbox, so text in the file can't make the agent change files or run commands. Files that hold credentials (`.env*`, keys, kubeconfig) are refused.
 - The answer replaces the selection directly, as one change: one `⌘Z` takes it back. There is no accept or reject step.
 - If you edit the selected code while the agent works, its answer is not applied and the prompt says so. Typing elsewhere in the file is fine.
 - `Esc` closes the prompt; while the agent works, it also stops the agent. Errors (no agent installed, a timeout) appear in the prompt.

@@ -92,13 +92,19 @@ func Headless(ctx context.Context, k Kind, cfg Config, dir, prompt, input string
 	return strings.TrimSpace(stdout.String()), nil
 }
 
+// headlessTools are the only built-in tools of a headless Claude run.
+const headlessTools = "Read,Grep,Glob"
+
 // headlessArgs is the command line of a headless run.
 func headlessArgs(k Kind, cfg Config, prompt, input string, untrusted bool) ([]string, error) {
 	var flint []string
 	switch k {
 	case Claude:
 		// `claude -p` prints only the final response; stdin becomes context.
-		flint = []string{"-p", prompt}
+		// The prompt carries repository content that could try to steer the
+		// agent, so it gets read-only tools whatever the user's settings
+		// allow, and no MCP servers.
+		flint = []string{"-p", prompt, "--tools", headlessTools, "--strict-mcp-config"}
 		if cfg.Model != "" {
 			flint = append(flint, "--model", cfg.Model)
 		}

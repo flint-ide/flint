@@ -4,6 +4,7 @@ import { useEditor } from '../../store/editor'
 import { useDatabase } from '../../store/database'
 import { confirmAction } from '../../store/dialog'
 import type { ScratchKind, ScratchPad } from '../../api/backend'
+import { formatKeys } from '../../lib/commands'
 
 const KIND_LABEL: Record<ScratchKind, string> = { sql: 'SQL', markdown: 'MD', text: 'TXT' }
 
@@ -21,7 +22,7 @@ export function ScratchPanel() {
         <button className="icon" title="New text note" onClick={() => void create('text')}>TXT</button>
       </div>
       <div className="tree scroll">
-        {items.length === 0 && <div className="placeholder muted">No scratchpads yet. ⌘N creates an SQL console.</div>}
+        {items.length === 0 && <div className="placeholder muted">No scratchpads yet. {formatKeys('Mod+N')} creates an SQL console.</div>}
         {items.map((sc) => (
           <ScratchRow key={sc.id} sc={sc} />
         ))}

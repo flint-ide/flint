@@ -1,8 +1,8 @@
-//go:build !darwin
+//go:build !darwin && !linux
 
 package watcher
 
-// Watcher is a no-op outside macOS for now; the UI still refreshes on demand.
+// Watcher is a no-op where neither FSEvents nor inotify exist (Windows: TODO, ReadDirectoryChangesW); the UI still refreshes on demand.
 type Watcher struct{}
 
 // Watch is not implemented on this platform yet.

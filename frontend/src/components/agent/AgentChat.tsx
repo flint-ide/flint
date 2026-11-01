@@ -9,6 +9,8 @@ import { rootOf } from '../../lib/workspaceRoots'
 import { FileLink, MessageText, PermissionCard, PlanView, ToolCallRow, UsageLine, ChatUsage } from './ChatItems'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 import { usePromptPicker } from './PromptPicker'
+import { formatKeys } from '../../lib/commands'
+import { isMac } from '../../lib/platform'
 
 /** Conversation with a coding agent: streamed replies, tool calls, plan and questions. */
 // memo: chunks for one session must not re-render the others (actions are stable).
@@ -77,7 +79,7 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
       >
         {chat.items.length === 0 && (
           <div className="placeholder muted">
-            Ask {session.agent} anything about {root.split('/').pop()}. Edits are applied directly; review them in the Commit panel (⌘K).
+            Ask {session.agent} anything about {root.split('/').pop()}. Edits are applied directly; review them in the Commit panel ({formatKeys('Mod+K')}).
           </div>
         )}
         {chat.items.map((it, i) => {
@@ -141,7 +143,7 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
         <textarea
           ref={input}
           value={session.draft}
-          placeholder={chat.busy ? `${session.agent} is working… (Esc to stop)` : `Message ${session.agent} (Enter to send, ⇧Enter newline, / for prompts)`}
+          placeholder={chat.busy ? `${session.agent} is working… (Esc to stop)` : `Message ${session.agent} (Enter to send, ${isMac() ? '⇧Enter' : 'Shift+Enter'} newline, / for prompts)`}
           spellCheck={false}
           onChange={(e) => setDraft(session.id, e.target.value)}
           onKeyDown={(e) => {
@@ -156,7 +158,7 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
           }}
         />
         <div className="composer-actions">
-          <button className="link" onClick={attachActiveFile} title="Attach the file open in the editor (⌘L attaches the selection)">
+          <button className="link" onClick={attachActiveFile} title={`Attach the file open in the editor (${formatKeys('Mod+L')} attaches the selection)`}>
             ＋ current file
           </button>
           <span className="spacer" />

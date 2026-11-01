@@ -76,7 +76,8 @@ The file is readable only by your user. It never contains secrets: database pass
     "contextLines": 100
   },
   "inlineEdit": { "contextLines": 60 },
-  "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/" }
+  "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/" },
+  "ci": { "pollSeconds": 60, "logTailLines": 80, "logErrorLines": 40, "notify": true }
 }
 ```
 
@@ -104,6 +105,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
 | `agentTasks` | object | see below | Where agent task worktrees go and how their branches are named. See [agentTasks](#agenttasks). |
 | `prompts` | object | see below | The prompt library of the agent chat (`/`). See [prompts](#prompts). |
+| `ci` | object | see below | Following your pull requests' CI: poll interval, Fix with agent's log excerpt, notifications. See [ci](#ci). |
 
 ### Font objects
 
@@ -224,7 +226,7 @@ A change made in the Settings tab restarts that language's servers. Servers that
 | `kubernetesSeconds` | integer (s) | 2–600 | `5` | How often the Kubernetes panel re-reads the namespace while it is shown and the window is visible. |
 | `awsSeconds` | integer (s) | 5–3600 | `30` | How often the AWS panel re-reads profiles and credential expiry while it is shown. |
 
-Git status, Docker and pull requests don't poll: they follow change events, and pull requests reload when the window regains focus.
+Git status, Docker and pull requests don't poll: they follow change events, and pull requests reload when the window regains focus. Running CI checks are polled at [`ci.pollSeconds`](#ci).
 
 ### mcpServer
 
@@ -284,6 +286,18 @@ Used by the [prompt library](../guides/ai-agents.md#prompt-library).
 | `builtins` | boolean | `true` | Offer the prompts that ship with Flint (`/review`, `/test`, `/explain`, `/fix`). |
 
 The prompts themselves are Markdown files, not settings: personal ones in the `prompts` folder next to `settings.json`, project ones in the repository's `.flint/prompts`.
+### ci
+
+Used by [When CI fails](../guides/git-and-github.md#when-ci-fails).
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `pollSeconds` | integer (s) | 10–3600 | `30` | How often a pull request's checks are re-read while some are still running; the wait grows by half each time nothing changed (up to 8×, at most 30 minutes) and doubles while Flint is in the background. Nothing is polled while no check runs. |
+| `logTailLines` | integer | 5–1000 | `60` | Lines from the end of the failed step that **Fix with agent** puts in the draft. |
+| `logErrorLines` | integer | 0–500 | `40` | Error lines (test failures, compiler errors, `file:line` references) picked from the rest of the failed step. |
+| `notify` | boolean | | `true` | A notification when your pull request's CI fails or turns green while Flint is in the background. Also needs `notifyInBackground`. |
+
+Flint keeps at most the last 8 MB of each failed job's log (and says when it cut one), describes at most 4 failed jobs per run, cuts log lines at 2,000 characters and workflow, job and step names at 120, and the Log tab keeps the last 20,000 lines; these limits are not settings.
 
 ## Related settings stored elsewhere
 

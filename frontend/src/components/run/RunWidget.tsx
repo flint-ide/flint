@@ -11,6 +11,7 @@ import { TabKindIcon } from '../icons/FileIcon'
 import { debugSelected, debugTestsInFile, useDebug } from '../../store/debug'
 import { cancelProfiling, profileSelected, profileTestsInFile, profileTestsInPackage, useProfile } from '../../store/profile'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
+import { formatKeys, keyHint } from '../../lib/commands'
 
 /** Title bar run toolbar like IntelliJ: configuration selector, ▶ Run / ↻ Rerun, ■ Stop. */
 export function RunWidget() {
@@ -74,7 +75,7 @@ export function RunWidget() {
     ...(testFile
       ? [
           { type: 'section', label: 'Tests' } as DropdownItem,
-          { label: `Run Tests in ${testFile.split('/').pop()}`, kbd: '⌃⇧R', onSelect: () => void runTestsInFile(testFile) },
+          { label: `Run Tests in ${testFile.split('/').pop()}`, kbd: keyHint('run.context'), onSelect: () => void runTestsInFile(testFile) },
           { label: testLang(testFile) === 'go' ? 'Run Package Tests' : 'Run All Tests', onSelect: () => void runTestsInPackage(testFile) },
           ...(testLang(testFile) === 'go'
             ? [
@@ -106,18 +107,18 @@ export function RunWidget() {
           </button>
         )}
       />
-      <button className="tb-icon run-start" title={`${running ? 'Rerun' : 'Run'} '${name}' (⌃R)`} onClick={() => void runSelected()}>
+      <button className="tb-icon run-start" title={`${running ? 'Rerun' : 'Run'} '${name}' (${keyHint('run.selected')})`} onClick={() => void runSelected()}>
         {running ? <RerunIcon /> : <PlayIcon />}
       </button>
       <button
         className="tb-icon run-debug"
-        title={debuggable ? `Debug '${name}' (⌃D)` : 'Debugging needs a Go configuration'}
+        title={debuggable ? `Debug '${name}' (${keyHint('debug.selected')})` : 'Debugging needs a Go configuration'}
         disabled={!debuggable}
         onClick={() => void debugSelected()}
       >
         <DebugIcon active={debugging} />
       </button>
-      <button className="tb-icon run-stop" title="Stop (⌘F2)" disabled={!stopKey} onClick={() => void stopRun(stopKey)}>
+      <button className="tb-icon run-stop" title={`Stop (${formatKeys('Mod+F2')})`} disabled={!stopKey} onClick={() => void stopRun(stopKey)}>
         <StopIcon />
       </button>
     </div>

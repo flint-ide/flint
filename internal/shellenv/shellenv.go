@@ -1,12 +1,16 @@
 // Package shellenv imports PATH from the user's login shell. macOS GUI apps inherit a
 // minimal launchd environment, so without this git hooks (husky, pre-commit), rg and
-// tools installed via brew/nvm/asdf wouldn't be found.
+// tools installed via brew/nvm/asdf wouldn't be found. Linux desktop sessions
+// usually start from a login shell, but a launcher (a .desktop file, an AppImage)
+// still misses what .bashrc / .zshrc add (nvm, asdf, ~/.local/bin), so the
+// import runs there too.
 package shellenv
 
 import (
 	"context"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -42,11 +46,30 @@ func Wait() {
 	<-done
 }
 
-func loginPath() string {
-	shell := os.Getenv("SHELL")
-	if shell == "" {
-		shell = "/bin/zsh"
+// UserShell is the user's shell ($SHELL), else the system's default: zsh on
+// macOS, bash (or sh) on Linux.
+func UserShell() string {
+	if shell := os.Getenv("SHELL"); shell != "" {
+		return shell
 	}
+	return defaultShell(runtime.GOOS, func(path string) bool {
+		_, err := os.Stat(path)
+		return err == nil
+	})
+}
+
+func defaultShell(goos string, exists func(string) bool) string {
+	if goos == "darwin" {
+		return "/bin/zsh"
+	}
+	if exists("/bin/bash") {
+		return "/bin/bash"
+	}
+	return "/bin/sh"
+}
+
+func loginPath() string {
+	shell := UserShell()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	// -i loads .zshrc/.bashrc too, where nvm & co. usually extend PATH.

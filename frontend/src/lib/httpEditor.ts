@@ -8,6 +8,7 @@ import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
 import * as HTTP from '../../bindings/flint/httpapi'
 import type { httpfile } from '../wails/models'
 import { envOf, pickEnvironment, sendRequest, setFollowRedirects, useHttpClient } from '../store/httpClient'
+import { formatKeys } from './commands'
 
 type Mark = httpfile.Mark
 
@@ -40,7 +41,7 @@ class SendMarker extends GutterMarker {
     const el = document.createElement('span')
     el.className = 'cm-test-run idle'
     el.textContent = '▶'
-    el.title = `Send ${labelOf(this.mark)} (⌘↵)`
+    el.title = `Send ${labelOf(this.mark)} (${formatKeys('Mod+Enter')})`
     return el
   }
 }
@@ -132,12 +133,12 @@ function settingsPanel(path: string): (view: EditorView) => Panel {
     sendButton.type = 'button'
     sendButton.className = 'primary'
     sendButton.textContent = '▶ Send'
-    sendButton.title = 'Send the request under the cursor (⌘↵)'
+    sendButton.title = `Send the request under the cursor (${formatKeys('Mod+Enter')})`
     sendButton.onclick = () => sendAtCursor(view, path)
 
     const hint = document.createElement('span')
     hint.className = 'muted hint'
-    hint.textContent = '⌘↵ sends the request under the cursor'
+    hint.textContent = `${formatKeys('Mod+Enter')} sends the request under the cursor`
 
     const spacer = document.createElement('span')
     spacer.className = 'spacer'

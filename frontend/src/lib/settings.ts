@@ -14,6 +14,7 @@ import {
 } from './editorAiSettings'
 import { coerceAgentTasks, DEFAULT_AGENT_TASKS, type AgentTaskSettings } from './agentTasks'
 import { coercePromptSettings, DEFAULT_PROMPT_SETTINGS, type PromptSettings } from './prompts'
+import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
 
 import type { ResolvedTheme, ThemeMode } from './themeMode'
 
@@ -74,6 +75,8 @@ export interface AppSettings {
   agentTasks: AgentTaskSettings
   /** The prompt library: whether Flint's own prompts are offered. */
   prompts: PromptSettings
+  /** Following your pull requests' CI: poll interval, log excerpt size, notifications. */
+  ci: CISettings
 }
 
 /** Mirrors settings.Default() in Go (used until the backend answers). */
@@ -98,6 +101,7 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   inlineEdit: DEFAULT_INLINE_EDIT,
   agentTasks: DEFAULT_AGENT_TASKS,
   prompts: DEFAULT_PROMPT_SETTINGS,
+  ci: DEFAULT_CI,
 }) as AppSettings
 
 /** Same limits as Go's settings.Validate, for the inputs. */
@@ -211,5 +215,6 @@ export function coerceSettings(v: unknown): AppSettings {
     inlineEdit: coerceInlineEdit(v.inlineEdit),
     agentTasks: coerceAgentTasks(v.agentTasks),
     prompts: coercePromptSettings(v.prompts),
+    ci: coerceCI(v.ci),
   }
 }

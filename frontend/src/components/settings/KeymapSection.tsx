@@ -13,6 +13,7 @@ import {
   type Command,
 } from '../../lib/commands'
 import { useSettings } from '../../store/settings'
+import { isMac } from '../../lib/platform'
 
 /** Every command with its shortcut: search, record a new chord, reset or remove it. */
 export function KeymapSection({ active }: { active: boolean }) {
@@ -63,7 +64,7 @@ export function KeymapSection({ active }: { active: boolean }) {
       <div className="keymap-toolbar">
         <input
           className="settings-text"
-          placeholder="Search actions or shortcuts (e.g. push, ⌘K)…"
+          placeholder={`Search actions or shortcuts (e.g. push, ${formatKeys('Mod+K')})…`}
           value={query}
           spellCheck={false}
           onChange={(e) => setQuery(e.target.value)}
@@ -73,7 +74,7 @@ export function KeymapSection({ active }: { active: boolean }) {
         </button>
       </div>
       <p className="muted settings-note">
-        Click a shortcut and press the new keys; Esc cancels. Keys of the macOS menu (⌘Q, ⌘C, ⌘V, ⌘O, ⌘,) stay with the menu.
+        Click a shortcut and press the new keys; Esc cancels. {isMac() ? 'Keys of the macOS menu (⌘Q, ⌘C, ⌘V, ⌘O, ⌘,) stay with the menu.' : 'Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z and Ctrl+A stay with text fields, and plain Ctrl+letter keys in a terminal go to the shell.'}
       </p>
       <div className="keymap-list">
         {rows.map((cmd) => {

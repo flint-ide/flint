@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 
 	"flint/internal/redact"
@@ -14,13 +15,25 @@ import (
 // maxLogBytes: past this the log is moved to flint.log.1 (one generation kept).
 const maxLogBytes = 5 << 20
 
-// LogDir is where macOS apps keep logs (Console.app shows them).
+// LogDir is where the system expects an app's logs: ~/Library/Logs/Flint on
+// macOS (Console.app shows them), $XDG_STATE_HOME/flint (~/.local/state/flint)
+// elsewhere.
 func LogDir() string {
+	return logDir(runtime.GOOS, os.Getenv("XDG_STATE_HOME"))
+}
+
+func logDir(goos, stateHome string) string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return os.TempDir()
 	}
-	return filepath.Join(home, "Library", "Logs", "Flint")
+	if goos == "darwin" {
+		return filepath.Join(home, "Library", "Logs", "Flint")
+	}
+	if !filepath.IsAbs(stateHome) { // the XDG spec ignores relative paths
+		stateHome = filepath.Join(home, ".local", "state")
+	}
+	return filepath.Join(stateHome, "flint")
 }
 
 // LogPath is the current log file.

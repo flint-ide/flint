@@ -125,7 +125,7 @@ export function closeNewTask(): void {
 }
 
 /** Shows a task's folder in the window: attached as a project unless a project already holds it. */
-async function showFolder(path: string): Promise<boolean> {
+export async function showFolder(path: string): Promise<boolean> {
   const { roots, addRoot } = useWorkspace.getState()
   if (roots.some((r) => isWithin(r, path))) return true
   return (await addRoot(path)) !== null

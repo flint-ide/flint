@@ -8,6 +8,7 @@ import { Dropdown } from '../ui/Dropdown'
 import { Select } from '../ui/Select'
 import { FlameGraph } from './FlameGraph'
 import { TopTable } from './TopTable'
+import { fileManagerName } from '../../lib/platform'
 
 interface Props {
   profileId: string
@@ -100,7 +101,7 @@ export function ProfileView({ profileId }: Props) {
             align="end"
             items={[
               { label: 'Copy Path', hint: file.path, onSelect: () => void copyPath(file.path) },
-              { label: 'Reveal in Finder', onSelect: () => void revealProfile(file.path) },
+              { label: `Reveal in ${fileManagerName()}`, onSelect: () => void revealProfile(file.path) },
             ]}
             trigger={(t) => (
               <button {...t} className="icon" title={`Raw profile: ${file.path} (go tool pprof)`}>

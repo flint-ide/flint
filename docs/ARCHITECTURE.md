@@ -1,12 +1,13 @@
 # Flint architecture
 
-Flint is a single Go process with the system WebView (Wails v3; on macOS that is WKWebView). All the logic (files, git, databases, terminals, agents, LSP) runs in Go. The frontend (React + TypeScript) only renders and sends commands.
+Flint is a single Go process with the system WebView (Wails v3; WKWebView on macOS, WebKitGTK 6 with GTK 4 on Linux). All the logic (files, git, databases, terminals, agents, LSP) runs in Go. The frontend (React + TypeScript) only renders and sends commands.
 
 Contents:
 
 - [Overview](#overview)
 - [UI and Go communication](#ui-and-go-communication)
 - [Frontend without an npm toolchain](#frontend-without-an-npm-toolchain)
+- [Platforms](#platforms)
 - [Design principles](#design-principles)
 - [Security model](#security-model)
 - [Where Flint stores data](#where-flint-stores-data)
@@ -26,7 +27,7 @@ flowchart LR
 
   subgraph GO["Go process · api_*.go → internal/*"]
     direction TB
-    ws["workspace: files · Trash (NSFileManager) · watcher (FSEvents) · fuzzy (⌘P)"]
+    ws["workspace: files · Trash · watcher (FSEvents / inotify) · fuzzy (⌘P)"]
     diff["textdiff (Myers): gutter · diff · +/−"]
     srch["search (ripgrep)"]
     git["git (git CLI)"]
@@ -37,7 +38,7 @@ flowchart LR
     db["db: pgx · clickhouse-go"]
     http["httpfile: .http files · net/http"]
     infra["docker · awsprof · kube"]
-    cfg["config · scratch · Keychain · diag (log)"]
+    cfg["config · scratch · OS keyring · diag (log)"]
   end
 
   subgraph EXT["External processes and services"]
@@ -95,12 +96,13 @@ flowchart LR
 
 - Go creates, renames and deletes files from the tree (`internal/workspace/fileops.go`; `WorkspaceAPI.CreateFile` / `CreateFolder` / `RenamePath` / `TrashPaths` / `RevealInFinder`).
 - Every path must be inside an open folder (the project folder itself cannot be deleted or renamed), and a rename never overwrites another file.
-- Deleting moves items to the macOS Trash through `NSFileManager trashItemAtURL` (cgo, `trash_darwin.go`), so files can be restored from Finder.
+- Deleting moves items to the Trash, so they can be restored from the file manager: on macOS through `NSFileManager trashItemAtURL` (cgo, `trash_darwin.go`), on Linux by the freedesktop.org Trash specification (`trash_linux.go`: `~/.local/share/Trash/files` plus a `.trashinfo`, and `gio trash` for other file systems).
 - The frontend (`store/fileOps.ts`) moves tabs to the new path (`useEditor.renamePath`) or closes them (`closePaths`); unsaved changes in a file being renamed are saved first.
 
 ### Pull requests
 
 - `GitHubAPI` (`api_github.go` → `internal/github`) runs `gh` with timeouts (30 s for reads, 60 s for writes, 3 minutes for checkout), with no prompts, pager or colors.
+- CI of your pull requests (`api_ci.go`, `internal/cilog`, `frontend/src/store/ci.ts`): the frontend follows the current branch's and agent tasks' pull requests and polls only while a check runs (`settings.ci`). Fix with agent asks Go for a report: the run and its failed-steps log via `gh`, redacted (`internal/redact`) and cut to the failing step's tail plus error lines, with `file:line` references resolved to workspace files; `lib/ci.ts` turns it into the chat draft.
 - The project's repository is resolved with `gh repo view` (remotes, `gh repo set-default`, Enterprise hosts), and the login state with `gh auth status`. A missing `gh`, a missing login and a missing GitHub remote are distinct errors with a hint.
 - List: `gh pr list --json …` (check status counted in Go). Details, in parallel: `gh pr view --json …`, `gh api --paginate repos/…/pulls/N/files` (files with patches), and a GraphQL query for review threads (`gh api graphql --input -`, paginated).
 - File diff: the head comes from the local clone if it has the blob (`git cat-file`), otherwise from `gh api …/git/blobs/<sha>`. The base is reconstructed by reverse-applying GitHub's patch to the head (with a consistency check); for files without a patch (binary, huge) it comes from the merge base (`git merge-base` locally, or `gh api …/compare`).
@@ -160,6 +162,40 @@ Virtualization of fixed-row-height lists (`src/lib/virtualList.ts`), fitting the
 - Diffs are computed by `internal/textdiff` (Myers in linear memory, with a time limit after which the whole region is replaced; changed words within a line are reported as UTF-16 offsets). Through `DiffAPI` they feed the editor gutter markers (`Marks`), the +/− stats and mini diffs in the agent chat (`Hunks`), and the diff tab (`Compare`).
 - The diff tab is drawn by two plain CodeMirror editors with custom decorations: changed-line backgrounds, changed words, spacers that align both sides, and collapsed unchanged regions.
 - The `⌘P` file list lives in `fuzzy.Index` on the Go side (`WorkspaceAPI.IndexFiles` / `FindFiles`), so the WebView never receives the full list.
+
+## Platforms
+
+Flint runs on macOS and Linux (x86_64 and arm64). Almost everything is portable Go driving portable CLIs; what differs per system lives in a few small files, so a port adds files rather than branches:
+
+- **Build tags, one file per system.** `foo_darwin.go` and `foo_linux.go` implement the same functions, and `foo_other.go` (`!darwin && !linux`) is the honest fallback for the rest: a no-op, a default or a "not supported on this system yet" error. Tests of system-specific code carry the same tag. Small differences that need no cgo or system package (a log directory, an install command, the default shell) are a `runtime.GOOS` switch in a pure function with a test for each system.
+- **Frontend.** `lib/platform.ts` tells the conventions apart by the web view's user agent (so server mode follows the browser's system): `Mod` is ⌘ on macOS and Ctrl elsewhere, `formatKeys` shows `⇧⌘P` or `Ctrl+Shift+P`, and `modKey(e)` replaces `e.metaKey` for ⌘-click style gestures. UI text never hard-codes a glyph: it formats a shortcut (`formatKeys('Mod+K')`, or `keyHint(id)` for a command's current keys). Where Ctrl is the modifier, a focused terminal keeps plain Ctrl+letter (and Ctrl+Shift+C / V) for the shell, a Vim editor keeps only Vim's essential Ctrl keys, and Run / Debug default to Shift+F10 / Shift+F9.
+
+On the Go side:
+
+| Piece | macOS | Linux |
+|---|---|---|
+| Window (`window_darwin.go` / `window_other.go`) | cgo/AppKit: native appearance, title bar metrics for the traffic lights, window shown before the page loads | GTK's own frame and a header bar with the menu button, window icon, shown on `ApplicationStarted`; appearance from `gsettings` |
+| Menu (`menu.go`) | app menu, Edit and Window menus, accelerators | File and Help only, no accelerators (GTK would take Ctrl keys from terminals; the frontend keymap runs them) |
+| File watching (`internal/watcher`) | FSEvents, one recursive stream | inotify, one watch per directory, new directories followed |
+| Trash (`internal/workspace`) | `NSFileManager` | freedesktop.org Trash specification, `gio trash` across file systems |
+| Reveal, colour scheme (`internal/desktop`) | `open -R` | FileManager1 over D-Bus, else `xdg-open`; `gsettings` |
+| Secrets (`go-keyring`) | Keychain | Secret Service (GNOME Keyring, KWallet) |
+| Notifications (`AlertsAPI`) | notifications and Dock badge | D-Bus notifications; no badge |
+| Logs (`internal/diag`) | `~/Library/Logs/Flint` | `$XDG_STATE_HOME/flint` |
+| Config (`internal/config`) | `~/Library/Application Support/flint` | `$XDG_CONFIG_HOME/flint` |
+
+Single instance, dialogs and confirmations, terminals (PTY, process groups, `/proc` for a shell's directory), the login-shell `PATH` import, git, LSP, agents and run/debug are the same code on both.
+
+### Windows: what's missing
+
+Windows is not supported yet. The layers above are where it would go:
+
+- a `_windows.go` file watcher (`ReadDirectoryChangesW`), Trash (the Recycle Bin, `SHFileOperation` / `IFileOperation`) and reveal (`explorer /select,`), instead of the `_other.go` fallbacks;
+- terminals: `creack/pty` has no ConPTY support, so `internal/terminal` needs a ConPTY backend; process groups (`internal/proctree`, agent and run process trees) need Job Objects;
+- the login-shell `PATH` import and default shell (`internal/shellenv`) assume a POSIX shell; Windows would read the environment as is and default to PowerShell;
+- paths: code and tests that split on `/` or build `/proc` paths, VS Code's `%APPDATA%` location for the settings import, and the install hints in the tool check (`winget`);
+- packaging (an NSIS installer or MSIX from `build/windows`), a CI job, and the WebView2 runtime as a documented requirement;
+- `lib/platform.ts` already treats Windows like Linux (Ctrl, spelled-out shortcuts); the names it shows (`File Manager`, `system keyring`) would become Explorer and Credential Manager.
 
 ## Design principles
 
@@ -223,7 +259,7 @@ Flint drives many CLIs (git, gh, docker, kubectl, aws, saml2aws, claude, codex).
 
 ### Secrets
 
-- Database passwords are stored only in the macOS Keychain (service `flint-db`). Profile files hold no passwords.
+- Database passwords are stored only in the OS keyring (the macOS Keychain, or the Secret Service on Linux; service `flint-db`). Profile files hold no passwords.
 - AWS keys and tokens are read only in Go to check that they exist and never reach the UI.
 - GitHub authentication stays inside `gh`; Flint never sees the token.
 - Kubernetes terminals use an override kubeconfig that holds only `current-context` and the namespace; credentials are not copied.
@@ -243,12 +279,14 @@ Every other connection is the result of a user action or of a CLI the user runs.
 
 ## Where Flint stores data
 
+Paths are the macOS ones. On Linux, `~/Library/Application Support/flint` is `$XDG_CONFIG_HOME/flint` (`~/.config/flint`) and the log is in `$XDG_STATE_HOME/flint` (`~/.local/state/flint`); see [Platforms](#platforms).
+
 | What | Where | Notes |
 |---|---|---|
 | Recent folders, agent permission policy, trusted folders, whether the first-run tool check was shown, update check (last check time, the latest release found, the skipped version) | `~/Library/Application Support/flint/state.json` | the preferred agent stored here before `settings.json` existed is read from it until you pick a default in Settings |
 | Settings: theme, editor and terminal fonts, default agent, autosave, shortcut overrides (`keymap`: command id → shortcut, `""` = none), agent CLIs (`agents`), custom ACP agents (`customAgents`: id, name, command, arguments), language servers (`languageServers`), panel refresh intervals (`refresh`) | `~/Library/Application Support/flint/settings.json` | has a schema version; missing keys get defaults, unknown keys are ignored, invalid values are replaced with defaults on load (writes validate strictly); `0600`; **no secrets**. A copy for the first render lives in `localStorage` (`flint.settings`) |
 | Database connection profiles (host, port, user, optional default database, ClickHouse protocol `native`/`http`, TLS, read-only) | `~/Library/Application Support/flint/connections.json` | **no passwords**, mode `0600` |
-| Database passwords | macOS Keychain, service `flint-db`, account = connection id | deleted together with the profile |
+| Database passwords | OS keyring (Keychain / Secret Service), service `flint-db`, account = connection id | deleted together with the profile |
 | Scratchpads (SQL consoles, notes) | `~/Library/Application Support/flint/scratch/`: `index.json` (including the selected connection `connId` and database `database`; empty = the profile default) plus `<id>.sql/.md/.txt` | autosaved |
 | Query history | `~/Library/Application Support/flint/history/<connection id>.jsonl`: one JSON line per statement (database, SQL, time, duration, rows, error, kind: query / explain / edit) | last 5000 per connection, `0600`. Appended with a single `write` using `O_APPEND`; when the file grows 25% past the limit, Go rewrites it atomically without the oldest entries (a truncated last line is skipped on load). No connection profiles or passwords; passwords in statements are masked. Deleted with the profile or with "Clear History…" |
 | Sidebar width | WebView `localStorage` | appearance settings only |
@@ -259,13 +297,13 @@ Every other connection is the result of a user action or of a CLI the user runs.
 | Selected run configuration (separately for each workspace project) | the project session (`sessions/<path hash>.json`) | running processes are not restored |
 | Binaries of `go` configurations | `$TMPDIR/flint-run/<hash>/` | overwritten on every run |
 | Profiles (CPU, memory) and profiled test binaries | `$TMPDIR/flint-profile-*/` | removed when the profile tab closes and on exit; directories older than a day (after a crash) are removed on the next profiling run. Files opened from disk are left alone |
-| Files deleted from the tree | macOS Trash (`~/.Trash`) | "Put Back" in Finder restores them |
+| Files deleted from the tree | the Trash (`~/.Trash` on macOS, `~/.local/share/Trash` on Linux) | "Put Back" in Finder, "Restore" in a Linux file manager |
 | LSP server caches | the servers' own directories, for example `~/Library/Caches/gopls` | |
 | HTTP client environments | `http-client.env.json` (commit it) and `http-client.private.env.json` (secrets; add to `.gitignore`) next to the `.http` file | the selected environment is remembered only until Flint quits |
 | GitHub login | `gh` itself (macOS keyring or `GH_TOKEN`) | Flint does not see the token; it only runs `gh` |
 | Pull requests, files, review threads | Go process memory only (list and PR about 30 s, file diffs 2 minutes, project repository 10 minutes) | nothing is written to disk; PR tabs are not part of the session |
 | HTTP client responses and cookies | Go process memory only: up to 5 responses per request, 50 requests and 256 MB of bodies; a separate cookie jar per `.http` file | nothing goes to disk or to logs; "Save to file" writes the body where you choose |
-| Flint's log | `~/Library/Logs/Flint/flint.log` (and `flint.log.1`) | rotated at 5 MB, one old file kept, secrets and home path redacted, `0600` |
+| Flint's log | `~/Library/Logs/Flint/flint.log` (Linux: `~/.local/state/flint/flint.log`), and `flint.log.1` | rotated at 5 MB, one old file kept, secrets and home path redacted, `0600` |
 
 A project session contains:
 
@@ -311,7 +349,9 @@ internal/dap                Debug Adapter Protocol client, Delve (dlv dap) sessi
 internal/profiling          pprof profiles: call tree and top for the flame graph, fetching from net/http/pprof, temp dirs
 internal/restore            project session persistence (tabs, terminals, chats) across runs
 internal/git                status, commit, rollback, branches, worktrees, log, blame, file history, stash, objects and merge base (git CLI)
-internal/github             pull requests through gh: list, details, review threads (GraphQL), file diff, replies, resolve, review, checkout
+internal/github             pull requests through gh: list, details, review threads (GraphQL), file diff, replies, resolve, review, checkout,
+                            a branch's checks, workflow runs, failed-step logs (tail-bounded) and rerunning failed jobs
+internal/cilog              CI logs for the agent: parse --log-failed output, excerpt the failing step, map file:line references to the workspace
 internal/docker             docker CLI: Compose projects, containers, events
 internal/awsprof            AWS CLI profiles, credential status, login and refresh
 internal/kube               kubectl: contexts, namespaces, resources, apps, rollout state, diagnosis
@@ -322,7 +362,7 @@ internal/redact             removes credentials and the home path from logs, rep
 internal/prompts            prompt library: Markdown prompts (project, personal, built-in), front matter, placeholders
 internal/agent              claude / codex: headless runs and interactive commands
 internal/shellenv           PATH from the login shell (git hooks, brew, nvm inside a GUI app)
-internal/watcher            FSEvents + debounce
+internal/watcher            FSEvents (macOS) / inotify (Linux) + debounce
 internal/lsp                LSP client (JSON-RPC, Content-Length), server manager
 internal/acp                Agent Client Protocol client (newline-delimited JSON-RPC); acptest: a fake agent for tests
 internal/agentsession       shared agent event model, approval policy, session manager

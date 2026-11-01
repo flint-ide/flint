@@ -18,6 +18,7 @@ import { Welcome } from '../layout/Welcome'
 import { ErrorBoundary } from '../layout/ErrorBoundary'
 import { FileIcon, TabKindIcon } from '../icons/FileIcon'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
+import { formatKeys } from '../../lib/commands'
 
 // CodeMirror, the SQL console and the agent chat load on first use, keeping startup
 // to the layout plus the terminal.
@@ -34,6 +35,7 @@ const SettingsView = lazy(() => import('../settings/SettingsView').then((m) => (
 const HttpResponseView = lazy(() => import('../http/HttpResponseView').then((m) => ({ default: m.HttpResponseView })))
 const PullRequestView = lazy(() => import('../github/PullRequestView').then((m) => ({ default: m.PullRequestView })))
 const PullRequestDiffView = lazy(() => import('../github/PullRequestDiffView').then((m) => ({ default: m.PullRequestDiffView })))
+const CILogView = lazy(() => import('../github/CILogView').then((m) => ({ default: m.CILogView })))
 // xterm.js is the biggest dependency; output that arrives first waits in store/terminal.
 const TerminalView = lazy(() => import('../terminal/TerminalView').then((m) => ({ default: m.TerminalView })))
 
@@ -160,6 +162,7 @@ const TabPanel = memo(function TabPanel({ tab, active }: { tab: Tab; active: boo
           {tab.kind === 'settings' && <SettingsView active={active} />}
           {tab.kind === 'pr' && <PullRequestView tab={tab} active={active} />}
           {tab.kind === 'prdiff' && <PullRequestDiffView tab={tab} active={active} />}
+          {tab.kind === 'cilog' && <CILogView tab={tab} />}
         </Suspense>
       </ErrorBoundary>
     </div>
@@ -200,6 +203,8 @@ function TabIcon({ tab, debugActive }: { tab: Tab; debugActive: boolean }) {
     case 'pr':
     case 'prdiff':
       return <TabKindIcon kind={tab.kind === 'pr' ? 'pr' : 'diff'} />
+    case 'cilog':
+      return <TabKindIcon kind="run" />
     default:
       return <TabKindIcon kind={tab.kind} busy={false} />
   }
@@ -240,7 +245,7 @@ function NewTabMenu() {
   ]
   const items = (): DropdownItem[] => {
     const here = activeRoot()
-    const head = forRoot(here).map((it, i) => (i === 0 && 'onSelect' in it ? { ...it, kbd: '⇧⌘T' } : it))
+    const head = forRoot(here).map((it, i) => (i === 0 && 'onSelect' in it ? { ...it, kbd: formatKeys('Mod+Shift+T') } : it))
     if (roots.length < 2) return [...head, ...tail]
     const labels = rootLabels(roots)
     return [
@@ -252,7 +257,7 @@ function NewTabMenu() {
   }
   const tail: DropdownItem[] = [
     { type: 'separator' },
-    { label: 'SQL console', kbd: '⌘N', icon: <TabKindIcon kind="sql" />, onSelect: () => void useScratch.getState().create('sql') },
+    { label: 'SQL console', kbd: formatKeys('Mod+N'), icon: <TabKindIcon kind="sql" />, onSelect: () => void useScratch.getState().create('sql') },
     { label: 'Markdown note', icon: <TabKindIcon kind="markdown" />, onSelect: () => void useScratch.getState().create('markdown') },
   ]
   return (
@@ -261,7 +266,7 @@ function NewTabMenu() {
         align="end"
         items={items}
         trigger={(t) => (
-          <button {...t} className="icon new-tab" title="New terminal (⇧⌘T), agent chat or SQL console">＋</button>
+          <button {...t} className="icon new-tab" title={`New terminal (${formatKeys('Mod+Shift+T')}), agent chat or SQL console`}>＋</button>
         )}
       />
       {starting && <span className="muted starting">starting {starting}…</span>}

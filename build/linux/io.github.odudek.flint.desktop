@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Flint
+GenericName=Code Editor
+Comment=A fast scratchpad IDE for code, SQL and data
+Exec=flint %f
+Icon=io.github.odudek.flint
+Terminal=false
+Categories=Development;IDE;TextEditor;
+Keywords=editor;ide;git;sql;terminal;
+StartupNotify=true
+StartupWMClass=io.github.odudek.flint

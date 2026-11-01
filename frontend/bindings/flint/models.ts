@@ -76,6 +76,241 @@ export class AgentInfo {
 export type Breakpoints = { [_ in string]?: dap$0.SourceBreakpoint[] };
 
 /**
+ * CIFileRef is a file:line reference from a CI log that exists in the workspace.
+ */
+export class CIFileRef {
+    /**
+     * Text is the reference as the log writes it.
+     */
+    "text": string;
+
+    /**
+     * Path is relative to the folder the report was made for.
+     */
+    "path": string;
+    "line": number;
+    "column": number;
+
+    /** Creates a new CIFileRef instance. */
+    constructor($$source: Partial<CIFileRef> = {}) {
+        if (!("text" in $$source)) {
+            this["text"] = "";
+        }
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("line" in $$source)) {
+            this["line"] = 0;
+        }
+        if (!("column" in $$source)) {
+            this["column"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CIFileRef instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CIFileRef {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CIFileRef($$parsedSource as Partial<CIFileRef>);
+    }
+}
+
+/**
+ * CIJob is one failed job of a run: its failed step and the relevant lines.
+ */
+export class CIJob {
+    "id": number;
+    "name": string;
+    "url": string;
+    "step": string;
+    "stepNumber": number;
+    "lines": string[];
+    "omitted": number;
+    "files": CIFileRef[];
+
+    /**
+     * NoLog: GitHub returned no log for the job (expired, or still uploading).
+     */
+    "noLog": boolean;
+
+    /**
+     * LogCut: the log was longer than Flint keeps; only its end was read.
+     */
+    "logCut": boolean;
+
+    /** Creates a new CIJob instance. */
+    constructor($$source: Partial<CIJob> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("url" in $$source)) {
+            this["url"] = "";
+        }
+        if (!("step" in $$source)) {
+            this["step"] = "";
+        }
+        if (!("stepNumber" in $$source)) {
+            this["stepNumber"] = 0;
+        }
+        if (!("lines" in $$source)) {
+            this["lines"] = [];
+        }
+        if (!("omitted" in $$source)) {
+            this["omitted"] = 0;
+        }
+        if (!("files" in $$source)) {
+            this["files"] = [];
+        }
+        if (!("noLog" in $$source)) {
+            this["noLog"] = false;
+        }
+        if (!("logCut" in $$source)) {
+            this["logCut"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CIJob instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CIJob {
+        const $$createField5_0 = $$createType0;
+        const $$createField7_0 = $$createType2;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("lines" in $$parsedSource) {
+            $$parsedSource["lines"] = $$createField5_0($$parsedSource["lines"]);
+        }
+        if ("files" in $$parsedSource) {
+            $$parsedSource["files"] = $$createField7_0($$parsedSource["files"]);
+        }
+        return new CIJob($$parsedSource as Partial<CIJob>);
+    }
+}
+
+/**
+ * CILog is a run's failed-steps log for the Open log tab.
+ */
+export class CILog {
+    "text": string;
+
+    /**
+     * Files maps paths as the log writes them to workspace paths (relative to
+     * the folder asked about), for the tab's file:line links.
+     */
+    "files": { [_ in string]?: string };
+
+    /**
+     * Truncated: the start is missing (the log was longer than Flint keeps).
+     */
+    "truncated": boolean;
+
+    /** Creates a new CILog instance. */
+    constructor($$source: Partial<CILog> = {}) {
+        if (!("text" in $$source)) {
+            this["text"] = "";
+        }
+        if (!("files" in $$source)) {
+            this["files"] = {};
+        }
+        if (!("truncated" in $$source)) {
+            this["truncated"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CILog instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CILog {
+        const $$createField1_0 = $$createType3;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("files" in $$parsedSource) {
+            $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
+        }
+        return new CILog($$parsedSource as Partial<CILog>);
+    }
+}
+
+/**
+ * CIReport is what Fix with agent puts in the chat draft: redacted, bounded by
+ * settings.CI, with references mapped to the workspace. Names come from the
+ * workflow file (a fork's author, for cross-repository pull requests): they
+ * are one line each, without control characters, and cut to maxCINameRunes.
+ */
+export class CIReport {
+    "runId": number;
+    "workflow": string;
+    "title": string;
+    "url": string;
+    "branch": string;
+    "sha": string;
+    "event": string;
+    "attempt": number;
+    "jobs": CIJob[];
+
+    /**
+     * More: failed jobs beyond maxCIJobs that the report leaves out.
+     */
+    "more": number;
+
+    /** Creates a new CIReport instance. */
+    constructor($$source: Partial<CIReport> = {}) {
+        if (!("runId" in $$source)) {
+            this["runId"] = 0;
+        }
+        if (!("workflow" in $$source)) {
+            this["workflow"] = "";
+        }
+        if (!("title" in $$source)) {
+            this["title"] = "";
+        }
+        if (!("url" in $$source)) {
+            this["url"] = "";
+        }
+        if (!("branch" in $$source)) {
+            this["branch"] = "";
+        }
+        if (!("sha" in $$source)) {
+            this["sha"] = "";
+        }
+        if (!("event" in $$source)) {
+            this["event"] = "";
+        }
+        if (!("attempt" in $$source)) {
+            this["attempt"] = 0;
+        }
+        if (!("jobs" in $$source)) {
+            this["jobs"] = [];
+        }
+        if (!("more" in $$source)) {
+            this["more"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CIReport instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CIReport {
+        const $$createField8_0 = $$createType5;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("jobs" in $$parsedSource) {
+            $$parsedSource["jobs"] = $$createField8_0($$parsedSource["jobs"]);
+        }
+        return new CIReport($$parsedSource as Partial<CIReport>);
+    }
+}
+
+/**
  * Collected is a profile recorded from a running program.
  */
 export class Collected {
@@ -139,8 +374,8 @@ export class DockerOverview {
      * Creates a new DockerOverview instance from a string or object.
      */
     static createFrom($$source: any = {}): DockerOverview {
-        const $$createField0_0 = $$createType2;
-        const $$createField1_0 = $$createType4;
+        const $$createField0_0 = $$createType7;
+        const $$createField1_0 = $$createType9;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("containers" in $$parsedSource) {
             $$parsedSource["containers"] = $$createField0_0($$parsedSource["containers"]);
@@ -175,7 +410,7 @@ export class FileHistory {
      * Creates a new FileHistory instance from a string or object.
      */
     static createFrom($$source: any = {}): FileHistory {
-        const $$createField1_0 = $$createType6;
+        const $$createField1_0 = $$createType11;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("commits" in $$parsedSource) {
             $$parsedSource["commits"] = $$createField1_0($$parsedSource["commits"]);
@@ -298,7 +533,7 @@ export class ProfiledTests {
      * Creates a new ProfiledTests instance from a string or object.
      */
     static createFrom($$source: any = {}): ProfiledTests {
-        const $$createField2_0 = $$createType7;
+        const $$createField2_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField2_0($$parsedSource["files"]);
@@ -353,7 +588,7 @@ export class PromptInput {
      * Creates a new PromptInput instance from a string or object.
      */
     static createFrom($$source: any = {}): PromptInput {
-        const $$createField3_0 = $$createType8;
+        const $$createField3_0 = $$createType3;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("args" in $$parsedSource) {
             $$parsedSource["args"] = $$createField3_0($$parsedSource["args"]);
@@ -417,7 +652,7 @@ export class PromptLibrary {
      * Creates a new PromptLibrary instance from a string or object.
      */
     static createFrom($$source: any = {}): PromptLibrary {
-        const $$createField0_0 = $$createType10;
+        const $$createField0_0 = $$createType14;
         const $$createField1_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("prompts" in $$parsedSource) {
@@ -624,9 +859,9 @@ export class RunConfigs {
      * Creates a new RunConfigs instance from a string or object.
      */
     static createFrom($$source: any = {}): RunConfigs {
-        const $$createField0_0 = $$createType12;
-        const $$createField1_0 = $$createType12;
-        const $$createField2_0 = $$createType14;
+        const $$createField0_0 = $$createType16;
+        const $$createField1_0 = $$createType16;
+        const $$createField2_0 = $$createType18;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("saved" in $$parsedSource) {
             $$parsedSource["saved"] = $$createField0_0($$parsedSource["saved"]);
@@ -770,7 +1005,9 @@ export class TaskView {
 }
 
 /**
- * TitlebarMetrics describes where macOS draws the window buttons.
+ * TitlebarMetrics describes where macOS draws the window buttons (all zero on
+ * other systems, which keep their own window frame). One definition for every
+ * system, so the generated bindings don't depend on where they are generated.
  */
 export class TitlebarMetrics {
     /**
@@ -858,17 +1095,21 @@ export class UndoResult {
 
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = docker$0.Container.createFrom;
+const $$createType1 = CIFileRef.createFrom;
 const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = docker$0.ComposeProject.createFrom;
-const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = git$0.FileCommit.createFrom;
-const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = testrun$0.Profiles.createFrom;
-const $$createType8 = $Create.Map($Create.Any, $Create.Any);
-const $$createType9 = prompts$0.Prompt.createFrom;
-const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = runconfig$0.Config.createFrom;
-const $$createType12 = $Create.Array($$createType11);
-const $$createType13 = runconfig$0.Capabilities.createFrom;
-const $$createType14 = $Create.Map($Create.Any, $$createType13);
+const $$createType3 = $Create.Map($Create.Any, $Create.Any);
+const $$createType4 = CIJob.createFrom;
+const $$createType5 = $Create.Array($$createType4);
+const $$createType6 = docker$0.Container.createFrom;
+const $$createType7 = $Create.Array($$createType6);
+const $$createType8 = docker$0.ComposeProject.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = git$0.FileCommit.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = testrun$0.Profiles.createFrom;
+const $$createType13 = prompts$0.Prompt.createFrom;
+const $$createType14 = $Create.Array($$createType13);
+const $$createType15 = runconfig$0.Config.createFrom;
+const $$createType16 = $Create.Array($$createType15);
+const $$createType17 = runconfig$0.Capabilities.createFrom;
+const $$createType18 = $Create.Map($Create.Any, $$createType17);

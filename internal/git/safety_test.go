@@ -56,6 +56,12 @@ func TestRepoConfigCannotRunFiltersOrTextconv(t *testing.T) {
 	}
 	writeFile(t, r.Root, "README.md", "changed\n")
 	writeFile(t, r.Root, "notes.txt", "new\n")
+	// newRepo's own git calls cached "no drivers" for this folder moments ago
+	// (driverTTL). On macOS they cached it under the resolved /private/var
+	// path, so only Linux noticed.
+	driverMu.Lock()
+	clear(driverCache)
+	driverMu.Unlock()
 	ctx := context.Background()
 	if _, err := r.Status(ctx); err != nil {
 		t.Fatal(err)

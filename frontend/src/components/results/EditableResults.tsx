@@ -4,6 +4,7 @@ import { addRow, buildBatch, changeCount, editability, noEdits, toggleDelete, ty
 import { confirmAction, showToast } from '../../store/dialog'
 import { Modal } from '../layout/Modal'
 import { ResultsGrid } from './ResultsGrid'
+import { formatKeys } from '../../lib/commands'
 
 interface Props {
   result: QueryResult
@@ -68,7 +69,7 @@ export function EditableResults({ result, summary, connId, database, driver, rea
     const deleted = selectedRow !== null && !!edits.deleted[selectedRow]
     return (
       <>
-        <span className="edit-target" title={`Double-click a cell (or ↵) to edit ${target.schema}.${target.table}; ⌘⌫ deletes the selected row`}>
+        <span className="edit-target" title={`Double-click a cell (or ↵) to edit ${target.schema}.${target.table}; ${formatKeys('Mod+Backspace')} deletes the selected row`}>
           ✎ {target.table}
         </span>
         <button className="link" onClick={() => setEdits((e) => addRow(e))} title="Add a row">+ Row</button>
@@ -76,7 +77,7 @@ export function EditableResults({ result, summary, connId, database, driver, rea
           className="link"
           disabled={selectedRow === null}
           onClick={() => selectedRow !== null && setEdits((e) => toggleDelete(result, e, selectedRow))}
-          title="Delete the selected row (⌘⌫)"
+          title={`Delete the selected row (${formatKeys('Mod+Backspace')})`}
         >
           {deleted ? 'Restore Row' : '− Row'}
         </button>

@@ -112,6 +112,8 @@ type Settings struct {
 	AgentTasks AgentTasks `json:"agentTasks"`
 	// Prompts configures the prompt library (prompts.go).
 	Prompts Prompts `json:"prompts"`
+	// CI configures following your pull requests' checks (ci.go).
+	CI CI `json:"ci"`
 }
 
 // Default returns the settings Flint uses when nothing is configured.
@@ -142,6 +144,7 @@ func Default() Settings {
 		InlineEdit:         defaultInlineEdit(),
 		AgentTasks:         defaultAgentTasks(),
 		Prompts:            defaultPrompts(),
+		CI:                 defaultCI(),
 		CustomTheme:        defaultCustomTheme(),
 	}
 }
@@ -210,6 +213,7 @@ func Normalize(s Settings) Settings {
 	out.Completions = normalizeCompletions(s.Completions)
 	out.InlineEdit = normalizeInlineEdit(s.InlineEdit)
 	out.AgentTasks = normalizeAgentTasks(s.AgentTasks)
+	out.CI = normalizeCI(s.CI)
 	return out
 }
 
@@ -295,6 +299,9 @@ func Validate(s Settings) error {
 		return err
 	}
 	if err := CheckAgentTasks(s.AgentTasks); err != nil {
+		return err
+	}
+	if err := CheckCI(s.CI); err != nil {
 		return err
 	}
 	return validateRefresh(s.Refresh)

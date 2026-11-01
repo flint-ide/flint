@@ -77,3 +77,64 @@ jobs:
       - name: npm audit (runtime dependencies)
         working-directory: frontend
         run: npm audit --omit=dev --audit-level=high
+
+  # The Linux build (GTK 4 / WebKitGTK 6) on x86_64 and arm64. Bindings, gofmt,
+  # govulncheck and npm audit don't depend on the system and run in the macOS job.
+  linux:
+    name: Build and test (Linux ${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install the GTK 4 and WebKitGTK 6 headers (and ripgrep)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgtk-4-dev libwebkitgtk-6.0-dev libx11-dev pkg-config ripgrep
+
+      - name: Install frontend dependencies (no install scripts)
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+
+      - name: Install wails3
+        run: go install "github.com/wailsapp/wails/v3/cmd/wails3@${WAILS_VERSION}"
+
+      - name: Frontend tests and build
+        working-directory: frontend
+        run: |
+          go run ../cmd/webbuild --test
+          go run ../cmd/webbuild
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test -race ./...
+
+      - name: Build the server tag
+        run: go build -tags server -o /dev/null .
+
+      - name: Package (tar.gz with the binary, .desktop file and icon)
+        run: |
+          wails3 task package:linux
+          tar -tzf build/bin/flint-dev-linux-*.tar.gz

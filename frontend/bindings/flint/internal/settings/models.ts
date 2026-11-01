@@ -56,6 +56,45 @@ export class AgentSettings {
 }
 
 /**
+ * AgentTasks configures agent tasks (an agent on its own branch in its own
+ * worktree, see internal/agenttask).
+ */
+export class AgentTasks {
+    /**
+     * WorktreeDir is where task worktrees go: an absolute path or one starting
+     * with "~/", holding "<repo>/<branch>". Empty follows the branch widget:
+     * "<repo>.worktrees/<branch>" next to the main checkout.
+     */
+    "worktreeDir": string;
+
+    /**
+     * BranchPrefix starts every task branch, e.g. "agent/" gives
+     * "agent/add-rate-limiting". May be empty.
+     */
+    "branchPrefix": string;
+
+    /** Creates a new AgentTasks instance. */
+    constructor($$source: Partial<AgentTasks> = {}) {
+        if (!("worktreeDir" in $$source)) {
+            this["worktreeDir"] = "";
+        }
+        if (!("branchPrefix" in $$source)) {
+            this["branchPrefix"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AgentTasks instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AgentTasks {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AgentTasks($$parsedSource as Partial<AgentTasks>);
+    }
+}
+
+/**
  * CustomAgent is an agent Flint talks to over the Agent Client Protocol
  * ("customAgents"): any CLI with an ACP mode, added without code. There is no
  * environment field on purpose: settings.json is plain text, so API keys
@@ -309,6 +348,11 @@ export class Settings {
      */
     "refresh": Refresh;
 
+    /**
+     * AgentTasks configures agent tasks (worktree folder, branch prefix).
+     */
+    "agentTasks": AgentTasks;
+
     /** Creates a new Settings instance. */
     constructor($$source: Partial<Settings> = {}) {
         if (!("version" in $$source)) {
@@ -353,6 +397,9 @@ export class Settings {
         if (!("refresh" in $$source)) {
             this["refresh"] = (new Refresh());
         }
+        if (!("agentTasks" in $$source)) {
+            this["agentTasks"] = (new AgentTasks());
+        }
 
         Object.assign(this, $$source);
     }
@@ -369,6 +416,7 @@ export class Settings {
         const $$createField11_0 = $$createType6;
         const $$createField12_0 = $$createType8;
         const $$createField13_0 = $$createType9;
+        const $$createField14_0 = $$createType10;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -394,6 +442,9 @@ export class Settings {
         if ("refresh" in $$parsedSource) {
             $$parsedSource["refresh"] = $$createField13_0($$parsedSource["refresh"]);
         }
+        if ("agentTasks" in $$parsedSource) {
+            $$parsedSource["agentTasks"] = $$createField14_0($$parsedSource["agentTasks"]);
+        }
         return new Settings($$parsedSource as Partial<Settings>);
     }
 }
@@ -409,3 +460,4 @@ const $$createType6 = $Create.Array($$createType5);
 const $$createType7 = LanguageServerSettings.createFrom;
 const $$createType8 = $Create.Map($Create.Any, $$createType7);
 const $$createType9 = Refresh.createFrom;
+const $$createType10 = AgentTasks.createFrom;

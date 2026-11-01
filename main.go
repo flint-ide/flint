@@ -31,6 +31,7 @@ func main() {
 	}
 
 	gitAPI := &GitAPI{app: flint}
+	gh := github.New()
 	lspAPI := &LSPAPI{app: flint}
 	lspAPI.wire()
 	app := application.New(application.Options{
@@ -69,7 +70,8 @@ func main() {
 			application.NewService(&HTTPAPI{app: flint}),
 			application.NewService(&PreviewAPI{app: flint}),
 			application.NewService(&SettingsAPI{app: flint}),
-			application.NewService(&GitHubAPI{app: flint, git: gitAPI, gh: github.New()}),
+			application.NewService(&GitHubAPI{app: flint, git: gitAPI, gh: gh}),
+			application.NewService(&TaskAPI{app: flint, git: gitAPI, pr: gh}),
 			application.NewService(newAlertsAPI(flint)),
 			application.NewService(newAWSAPI(flint)),
 			application.NewService(&KubeAPI{app: flint}),

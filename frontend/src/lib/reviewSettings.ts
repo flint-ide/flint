@@ -29,6 +29,32 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 const num = (v: unknown, lim: { min: number; max: number }, d: number) =>
   typeof v === 'number' && Number.isFinite(v) && v >= lim.min && v <= lim.max ? Math.round(v) : d
 
+/** Flags that make an agent run its own tools without asking (Go: settings.autoApproveFlags). */
+const AUTO_APPROVE_FLAGS = [
+  '--yolo', '-y', '--dangerously-skip-permissions', '--dangerously-bypass-approvals-and-sandbox',
+  '--auto-approve', '--approve-all', '--allow-all-tools', '--trust-all-tools', '--full-auto', '--no-confirm',
+]
+const AUTO_APPROVE_MODES = ['yolo', 'auto_edit', 'auto-edit', 'bypasspermissions', 'never']
+
+/**
+ * The arguments that let a custom agent run its own tools without asking
+ * (Go: settings.AutoApproveArgs). Such an agent never asks Flint, so a review
+ * with it is not read-only.
+ */
+export function autoApproveArgs(args: readonly string[]): string[] {
+  const out: string[] = []
+  args.forEach((a, i) => {
+    const eq = a.indexOf('=')
+    const name = eq < 0 ? a : a.slice(0, eq)
+    if (AUTO_APPROVE_FLAGS.includes(name)) out.push(a)
+    else if (name === '--approval-mode' || name === '--permission-mode') {
+      const value = eq < 0 ? (args[i + 1] ?? '') : a.slice(eq + 1)
+      if (AUTO_APPROVE_MODES.includes(value.toLowerCase())) out.push(`${name} ${value}`)
+    }
+  })
+  return out
+}
+
 export function coerceAgentReview(v: unknown): AgentReviewSettings {
   const d = DEFAULT_AGENT_REVIEW
   if (!isObject(v)) return d

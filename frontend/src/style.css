@@ -4768,6 +4768,9 @@ body.file-drop-target-active::after {
   color: var(--danger);
   flex-wrap: wrap;
 }
+.review-warning {
+  color: var(--warn);
+}
 .review-pulse {
   flex: none;
   width: 8px;

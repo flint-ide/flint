@@ -10,6 +10,8 @@ import { conflictHint } from '../../lib/customAgents'
 import { Select } from '../ui/Select'
 import { openStashDialog } from '../../store/stash'
 import { StashSection } from './StashSection'
+import { ReviewSection } from '../review/ReviewSection'
+import { reviewChanges, useAgentReview } from '../../store/agentReview'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
 
@@ -43,6 +45,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
   const [generating, setGenerating] = useState(false)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const agents = useAgent()
+  const reviewing = useAgentReview((s) => !!s.running)
   useFocus(textarea, focusToken)
   useEffect(() => {
     if (!agents.loaded) void agents.load()
@@ -179,6 +182,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
             </div>
           )
         })}
+        <ReviewSection root={root} />
         <StashSection />
       </div>
 
@@ -196,6 +200,14 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
             <span className="muted">{agents.preferred || 'no agent installed'}</span>
           )}
           <span className="spacer" />
+          <button
+            className="link"
+            disabled={!agents.preferred || reviewing || (status?.files ?? []).length === 0}
+            onClick={() => void reviewChanges()}
+            title="Let the agent review the ticked changes (or all of them: Settings ▸ Agents ▸ Review) before you commit"
+          >
+            {reviewing ? 'Reviewing…' : '✦ Review'}
+          </button>
           <button
             className="link"
             disabled={!agents.preferred || generating || selected.length === 0}

@@ -10,6 +10,7 @@ Open it with `⌘K` or the `⎇` icon on the activity bar. (In a terminal, `⌘K
 - Click a file to open a side-by-side diff in a tab; double-click to open the file itself.
 - **↶ Rollback** on a file discards its changes.
 - Write a message, or click **✦ Generate message** to let your agent write one from the ticked changes.
+- **✦ Review** lets an agent review the ticked changes before you commit; its findings appear in the panel and under their lines in the diff. See [Review Changes with Agent](ai-agents.md#review-changes-with-agent).
 - **Amend** changes the last commit instead of creating a new one.
 - **Commit** (`⌘↵` in the message field) or **Commit and Push** (`⌥⌘↵`).
 

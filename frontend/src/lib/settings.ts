@@ -13,6 +13,7 @@ import {
   type CompletionSettings, type InlineEditSettings,
 } from './editorAiSettings'
 import { coerceAgentTasks, DEFAULT_AGENT_TASKS, type AgentTaskSettings } from './agentTasks'
+import { coerceAgentReview, DEFAULT_AGENT_REVIEW, type AgentReviewSettings } from './reviewSettings'
 import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
 
 import type { ResolvedTheme, ThemeMode } from './themeMode'
@@ -72,6 +73,8 @@ export interface AppSettings {
   inlineEdit: InlineEditSettings
   /** Where agent task worktrees go and how their branches start. */
   agentTasks: AgentTaskSettings
+  /** Review Changes with Agent (lib/reviewSettings.ts). */
+  agentReview: AgentReviewSettings
   /** Following your pull requests' CI: poll interval, log excerpt size, notifications. */
   ci: CISettings
 }
@@ -97,6 +100,7 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   completions: DEFAULT_COMPLETIONS,
   inlineEdit: DEFAULT_INLINE_EDIT,
   agentTasks: DEFAULT_AGENT_TASKS,
+  agentReview: DEFAULT_AGENT_REVIEW,
   ci: DEFAULT_CI,
 }) as AppSettings
 
@@ -210,6 +214,7 @@ export function coerceSettings(v: unknown): AppSettings {
     completions: coerceCompletions(v.completions),
     inlineEdit: coerceInlineEdit(v.inlineEdit),
     agentTasks: coerceAgentTasks(v.agentTasks),
+    agentReview: coerceAgentReview(v.agentReview),
     ci: coerceCI(v.ci),
   }
 }

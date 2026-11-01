@@ -16,6 +16,9 @@ import * as docker$0 from "./internal/docker/models.js";
 import * as git$0 from "./internal/git/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as review$0 from "./internal/review/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as runconfig$0 from "./internal/runconfig/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -684,6 +687,131 @@ export class RepoInfo {
 }
 
 /**
+ * ReviewFile is one change to review, as the Commit panel lists it. Go takes
+ * only the path from it: the kind and a rename's source come from git status.
+ */
+export class ReviewFile {
+    /**
+     * relative to the repository root
+     */
+    "path": string;
+
+    /**
+     * a rename's source
+     */
+    "origPath": string;
+
+    /**
+     * git.FileChange kind
+     */
+    "kind": string;
+
+    /** Creates a new ReviewFile instance. */
+    constructor($$source: Partial<ReviewFile> = {}) {
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("origPath" in $$source)) {
+            this["origPath"] = "";
+        }
+        if (!("kind" in $$source)) {
+            this["kind"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ReviewFile instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ReviewFile {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ReviewFile($$parsedSource as Partial<ReviewFile>);
+    }
+}
+
+/**
+ * ReviewRequest asks for a review of files in the repository at Root.
+ */
+export class ReviewRequest {
+    "root": string;
+    "files": ReviewFile[];
+
+    /** Creates a new ReviewRequest instance. */
+    constructor($$source: Partial<ReviewRequest> = {}) {
+        if (!("root" in $$source)) {
+            this["root"] = "";
+        }
+        if (!("files" in $$source)) {
+            this["files"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ReviewRequest instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ReviewRequest {
+        const $$createField1_0 = $$createType14;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("files" in $$parsedSource) {
+            $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
+        }
+        return new ReviewRequest($$parsedSource as Partial<ReviewRequest>);
+    }
+}
+
+/**
+ * ReviewResult is the agent's findings and what the user should know about
+ * the run (files left out, a shortened diff, a cut-off answer).
+ */
+export class ReviewResult {
+    "agent": string;
+    "files": string[];
+    "findings": review$0.Finding[];
+    "notes": string[];
+
+    /** Creates a new ReviewResult instance. */
+    constructor($$source: Partial<ReviewResult> = {}) {
+        if (!("agent" in $$source)) {
+            this["agent"] = "";
+        }
+        if (!("files" in $$source)) {
+            this["files"] = [];
+        }
+        if (!("findings" in $$source)) {
+            this["findings"] = [];
+        }
+        if (!("notes" in $$source)) {
+            this["notes"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ReviewResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ReviewResult {
+        const $$createField1_0 = $$createType0;
+        const $$createField2_0 = $$createType16;
+        const $$createField3_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("files" in $$parsedSource) {
+            $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
+        }
+        if ("findings" in $$parsedSource) {
+            $$parsedSource["findings"] = $$createField2_0($$parsedSource["findings"]);
+        }
+        if ("notes" in $$parsedSource) {
+            $$parsedSource["notes"] = $$createField3_0($$parsedSource["notes"]);
+        }
+        return new ReviewResult($$parsedSource as Partial<ReviewResult>);
+    }
+}
+
+/**
  * RunConfigs lists a project's run configurations.
  */
 export class RunConfigs {
@@ -733,9 +861,9 @@ export class RunConfigs {
      * Creates a new RunConfigs instance from a string or object.
      */
     static createFrom($$source: any = {}): RunConfigs {
-        const $$createField0_0 = $$createType14;
-        const $$createField1_0 = $$createType14;
-        const $$createField2_0 = $$createType16;
+        const $$createField0_0 = $$createType18;
+        const $$createField1_0 = $$createType18;
+        const $$createField2_0 = $$createType20;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("saved" in $$parsedSource) {
             $$parsedSource["saved"] = $$createField0_0($$parsedSource["saved"]);
@@ -981,7 +1109,11 @@ const $$createType9 = $Create.Array($$createType8);
 const $$createType10 = git$0.FileCommit.createFrom;
 const $$createType11 = $Create.Array($$createType10);
 const $$createType12 = testrun$0.Profiles.createFrom;
-const $$createType13 = runconfig$0.Config.createFrom;
+const $$createType13 = ReviewFile.createFrom;
 const $$createType14 = $Create.Array($$createType13);
-const $$createType15 = runconfig$0.Capabilities.createFrom;
-const $$createType16 = $Create.Map($Create.Any, $$createType15);
+const $$createType15 = review$0.Finding.createFrom;
+const $$createType16 = $Create.Array($$createType15);
+const $$createType17 = runconfig$0.Config.createFrom;
+const $$createType18 = $Create.Array($$createType17);
+const $$createType19 = runconfig$0.Capabilities.createFrom;
+const $$createType20 = $Create.Map($Create.Any, $$createType19);

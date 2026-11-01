@@ -5,18 +5,24 @@ import { errorMessage } from '../api/backend'
 import { confirmAction, showToast } from './dialog'
 import { useTerminal } from './terminal'
 import { activeRoot } from './activeRoot'
-import { logsCommand, shellCommand, type ComposeProject, type Container } from '../lib/dockerTree'
+import { validContainerRef, type ComposeProject, type Container } from '../lib/dockerTree'
 
 interface DockerState {
   containers: Container[]
   projects: ComposeProject[]
   loading: boolean
   error: string | null
+  /** The docker CLI is installed: Compose up, down and pull need it. */
+  composeAvailable: boolean
+  /** Where the engine was found. */
+  endpoint: string
+  /** The connection is not protected (plain tcp://). */
+  warning: string
   /** Container ids / project dirs with an action in flight. */
   busy: ReadonlySet<string>
 }
 
-export const useDocker = createStore<DockerState>(() => ({ containers: [], projects: [], loading: false, error: null, busy: new Set() }))
+export const useDocker = createStore<DockerState>(() => ({ containers: [], projects: [], loading: false, error: null, composeAvailable: true, endpoint: '', warning: '', busy: new Set() }))
 
 let pending: Promise<void> | null = null
 
@@ -25,7 +31,10 @@ export function refreshDocker(): Promise<void> {
     useDocker.setState({ loading: true })
     try {
       const o = await DockerAPI.Overview()
-      useDocker.setState({ containers: o.containers ?? [], projects: o.projects ?? [], error: null })
+      useDocker.setState({
+        containers: o.containers ?? [], projects: o.projects ?? [], error: null,
+        composeAvailable: o.composeAvailable, endpoint: o.endpoint, warning: o.warning,
+      })
     } catch (err) {
       useDocker.setState({ error: errorMessage(err), containers: [], projects: [] })
     } finally {
@@ -62,14 +71,15 @@ export async function composeAction(p: ComposeProject, action: 'up' | 'down' | '
   return withBusy(p.dir, () => DockerAPI.Compose(docker.ComposeProject.createFrom(p), action))
 }
 
-/** Opens a terminal running `command` (docker logs / exec), named after the container. */
-function runInTerminal(title: string, command: string | null): void {
-  if (!command) {
+/** Opens a terminal tab attached to a container's log or a shell in it (Engine API streams). */
+function openStream(c: Container, kind: 'logs' | 'shell'): void {
+  if (!validContainerRef(c.name)) {
     showToast('Unexpected container name', 'error')
     return
   }
-  useTerminal.getState().create(activeRoot(), { title, input: `${command}\n` })
+  const title = kind === 'logs' ? `Logs ${c.name}` : `Shell ${c.name}`
+  useTerminal.getState().create(activeRoot(), { title, docker: { kind, container: c.name } })
 }
 
-export const openLogs = (c: Container) => runInTerminal(`docker logs ${c.name}`, logsCommand(c.name))
-export const openShell = (c: Container) => runInTerminal(`docker exec ${c.name}`, shellCommand(c.name))
+export const openLogs = (c: Container) => openStream(c, 'logs')
+export const openShell = (c: Container) => openStream(c, 'shell')

@@ -440,6 +440,22 @@ export class DockerOverview {
      */
     "projects": docker$0.ComposeProject[];
 
+    /**
+     * ComposeAvailable: the docker CLI is installed, which Compose up / down /
+     * pull need. Everything else works through the Engine API.
+     */
+    "composeAvailable": boolean;
+
+    /**
+     * Endpoint is where the engine was found ("unix:///var/run/docker.sock").
+     */
+    "endpoint": string;
+
+    /**
+     * Warning is set when the connection is not protected (plain tcp://).
+     */
+    "warning": string;
+
     /** Creates a new DockerOverview instance. */
     constructor($$source: Partial<DockerOverview> = {}) {
         if (!("containers" in $$source)) {
@@ -447,6 +463,15 @@ export class DockerOverview {
         }
         if (!("projects" in $$source)) {
             this["projects"] = [];
+        }
+        if (!("composeAvailable" in $$source)) {
+            this["composeAvailable"] = false;
+        }
+        if (!("endpoint" in $$source)) {
+            this["endpoint"] = "";
+        }
+        if (!("warning" in $$source)) {
+            this["warning"] = "";
         }
 
         Object.assign(this, $$source);

@@ -34,7 +34,7 @@ flowchart LR
     gh["github (gh CLI): pull requests, review"]
     lsp["lsp (JSON-RPC)"]
     ag["agentsession: claude · codex · acp"]
-    term["terminal (PTY)"]
+    term["terminal (PTY · streams)"]
     db["db: pgx · clickhouse (HTTP, net/http)"]
     http["httpfile: .http files · net/http"]
     infra["docker · awsprof · kube"]
@@ -46,7 +46,8 @@ flowchart LR
     bins["rg · git · gh · gopls / rust-analyzer / …"]
     agents["claude -p stream-json · codex app-server · ACP agents (stdio)"]
     shell["login shell (zsh)"]
-    clis["docker · aws · kubectl"]
+    clis["docker compose · aws · kubectl"]
+    sock["Docker Engine API socket"]
     dbs[("PostgreSQL · ClickHouse")]
     apis[("Your APIs (HTTP)")]
   end
@@ -57,6 +58,7 @@ flowchart LR
   ag --> agents
   term --> shell
   infra --> clis
+  infra --> sock
   db --> dbs
   http --> apis
 ```
@@ -256,7 +258,7 @@ Markdown files, PR descriptions and comments, HTTP responses and terminal output
 
 ### CLI argument validation
 
-Flint drives many CLIs (git, gh, docker, kubectl, aws, saml2aws, claude, codex). Names and identifiers that come from the UI or from external output (container names, contexts, namespaces, pod names) are validated before they are passed to a command, and user strings are never passed in a position where they could be read as a flag. User-written text for `gh` (comments, reviews) goes through stdin as JSON, never as an argument. Every kubectl call passes explicit `--context` and `--namespace`.
+Flint drives many CLIs (git, gh, docker compose, kubectl, aws, saml2aws, claude, codex). Names and identifiers that come from the UI or from external output (container names, contexts, namespaces, pod names) are validated before they are passed to a command, and user strings are never passed in a position where they could be read as a flag. User-written text for `gh` (comments, reviews) goes through stdin as JSON, never as an argument. Every kubectl call passes explicit `--context` and `--namespace`.
 
 ### Secrets
 
@@ -344,7 +346,7 @@ internal/config             on-disk locations, atomic JSON writes
 internal/settings           settings.json: settings, defaults, validation, schema version, custom theme
 internal/vscodeimport       Import from VS Code / Cursor / VSCodium: JSONC, settings, keybindings and color theme
                             mapped onto settings (read-only; ImportAPI previews, then saves through settings)
-internal/terminal           PTY, output coalescing, shell cwd (proc_pidinfo)
+internal/terminal           PTY, output coalescing, shell cwd (proc_pidinfo); stream-backed sessions (Docker logs and container shells)
 internal/runconfig          .flint/run.json: schema, validation, save, detection (Go main, make, npm)
 internal/runner             configuration and test processes: steps, PTY or pipes, process group, Stop
 internal/testrun            test run plans, go test -json and TAP parsers, tests in a file (gutter)
@@ -355,7 +357,7 @@ internal/git                status, commit, rollback, branches, worktrees, log, 
 internal/github             pull requests through gh: list, details, review threads (GraphQL), file diff, replies, resolve, review, checkout,
                             a branch's checks, workflow runs, failed-step logs (tail-bounded) and rerunning failed jobs
 internal/cilog              CI logs for the agent: parse --log-failed output, excerpt the failing step, map file:line references to the workspace
-internal/docker             docker CLI: Compose projects, containers, events
+internal/docker             Docker Engine API (unix socket or TLS): endpoint discovery, version negotiation, containers, logs, exec shell, events; Compose via the CLI
 internal/awsprof            AWS CLI profiles, credential status, login and refresh
 internal/kube               kubectl: contexts, namespaces, resources, apps, rollout state, diagnosis
 internal/diag               Flint's log file, bug report and diagnostics

@@ -9,6 +9,7 @@ export {
     Completions,
     CustomAgent,
     CustomTheme,
+    Docker,
     EditorSettings,
     Font,
     InlineEdit,

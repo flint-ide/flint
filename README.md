@@ -129,7 +129,7 @@ Optional tools, used by the features that need them:
 - `ripgrep` (`brew install ripgrep`): fast search and `⌘P` (a slower Go fallback is used without it)
 - `gh`: pull request review
 - `kubectl`: Kubernetes panel
-- `docker`: Docker / Compose panel
+- `docker`: optional, only Compose up/down/pull (the Docker panel uses the Engine API)
 - `aws` (and `saml2aws` if you use it): AWS profiles panel
 - `dlv`, language servers, `claude` / `codex`: debugging, LSP and agents
 

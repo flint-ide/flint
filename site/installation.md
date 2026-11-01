@@ -124,7 +124,7 @@ The check only runs each tool's version command, outside your projects, and inst
 | `basedpyright` or `pyright` | Python language features (`pipx install basedpyright`, or `npm i -g pyright`). |
 | `dlv` (Delve) | The Go debugger (`go install github.com/go-delve/delve/cmd/dlv@latest`). |
 | `kubectl` (`brew install kubectl`) | The Kubernetes panel. |
-| `docker` | The Docker / Compose panel (Docker Desktop, Colima or OrbStack; `brew install --cask docker-desktop` installs Docker Desktop). |
+| `docker` | Optional. Only Compose `up`, `down` and `pull` in the Docker panel need it; listing, logs, shell, start, stop and restart talk to the Docker Engine directly (Docker Desktop, Colima, OrbStack or a plain daemon). `brew install --cask docker-desktop` installs Docker Desktop. |
 | `aws` (`brew install awscli`), and `saml2aws` if you use it | The AWS profiles panel and credential refresh. |
 | `node` (`brew install node`) | Only needed for the language servers installed with `npm`. |
 

@@ -85,7 +85,8 @@ The file is readable only by your user. It never contains secrets: database pass
     "prices": { "gpt-5-codex": { "in": 1.25, "out": 10, "cacheRead": 0.125 } }
   },
   "agentReview": { "scope": "selected", "maxDiffKB": 128, "agent": "", "timeoutSeconds": 300 },
-  "ci": { "pollSeconds": 60, "logTailLines": 80, "logErrorLines": 40, "notify": true }
+  "ci": { "pollSeconds": 60, "logTailLines": 80, "logErrorLines": 40, "notify": true },
+  "docker": { "host": "", "logTailLines": 500 }
 }
 ```
 
@@ -116,6 +117,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `prompts` | object | see below | The prompt library of the agent chat (`/`). See [prompts](#prompts). |
 | `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
 | `ci` | object | see below | Following your pull requests' CI: poll interval, Fix with agent's log excerpt, notifications. See [ci](#ci). |
+| `docker` | object | see below | How the Docker panel finds the engine and how much log it starts with. See [docker](#docker). |
 
 ### Font objects
 
@@ -333,6 +335,17 @@ Used by [When CI fails](../guides/git-and-github.md#when-ci-fails).
 | `notify` | boolean | | `true` | A notification when your pull request's CI fails or turns green while Flint is in the background. Also needs `notifyInBackground`. |
 
 Flint keeps at most the last 8 MB of each failed job's log (and says when it cut one), describes at most 4 failed jobs per run, cuts log lines at 2,000 characters and workflow, job and step names at 120, and the Log tab keeps the last 20,000 lines; these limits are not settings.
+
+### docker
+
+Used by the [Docker panel](../guides/docker.md).
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `host` | string | | `""` | Where the Docker Engine is: `unix:///path/docker.sock`, `tcp://host:2376` or `https://host:2376`. Empty finds it like the docker CLI: `DOCKER_HOST`, then the current docker context, then the default sockets (Docker Desktop, Colima, OrbStack, Rancher Desktop, `/var/run/docker.sock`). With `DOCKER_TLS_VERIFY` set, `tcp://` uses TLS with the certificates in `DOCKER_CERT_PATH` (default `~/.docker`). Plain `tcp://` without TLS works but Flint warns in the panel. `ssh://` hosts are not supported. |
+| `logTailLines` | integer | 1–10000 | `500` | Past lines a container's log tab starts with before it follows new output. |
+
+Response bodies from the engine are capped at 32 MiB; this limit is not a setting.
 
 ## Related settings stored elsewhere
 

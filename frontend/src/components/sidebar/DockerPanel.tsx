@@ -8,9 +8,12 @@ import { dockerTree, rowClass, statusOf, type ComposeProject, type Container } f
 import type { DropdownItem } from '../ui/Dropdown'
 import { Icon } from '../ui/Icon'
 
+/** Compose up, down and pull are implemented by the docker CLI's Compose plugin; the rest uses the Engine API. */
+const NEEDS_CLI = 'Needs the docker CLI with Compose (install Docker Desktop or docker-compose-plugin)'
+
 /** Containers grouped by Compose project; live while shown (docker events), idle when hidden. */
 export function DockerPanel() {
-  const { containers, projects, loading, error, busy } = useDocker()
+  const { containers, projects, loading, error, busy, composeAvailable, warning } = useDocker()
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
   const tree = useMemo(() => dockerTree(containers, projects), [containers, projects])
 
@@ -39,6 +42,7 @@ export function DockerPanel() {
       </div>
       <div className="tree scroll">
         {error && <div className="placeholder error">{error}</div>}
+        {warning && <div className="placeholder error">{warning}</div>}
         {tree.projects.map(({ project, containers: cs, running }) => (
           <div key={project.dir}>
             <div
@@ -47,7 +51,7 @@ export function DockerPanel() {
               onClick={() => toggle(project.dir)}
               onContextMenu={(e) => {
                 e.preventDefault()
-                openContextMenu(e.clientX, e.clientY, projectMenu(project))
+                openContextMenu(e.clientX, e.clientY, projectMenu(project, composeAvailable))
               }}
             >
               <span className="twisty">{collapsed.has(project.dir) ? '▸' : '▾'}</span>
@@ -55,8 +59,8 @@ export function DockerPanel() {
               <span className="file-name">{project.name || project.dir.split('/').pop()}</span>
               <span className="muted path-hint">{cs.length ? `${running}/${cs.length} running` : 'not started'}</span>
               <span className="docker-actions">
-                <button className="icon" title="Up (docker compose up -d)" disabled={busy.has(project.dir)} onClick={(e) => (e.stopPropagation(), void composeAction(project, 'up'))}>▶</button>
-                <button className="icon" title="Down" disabled={busy.has(project.dir) || cs.length === 0} onClick={(e) => (e.stopPropagation(), void composeAction(project, 'down'))}>■</button>
+                <button className="icon" title={composeAvailable ? 'Up (docker compose up -d)' : NEEDS_CLI} disabled={busy.has(project.dir) || !composeAvailable} onClick={(e) => (e.stopPropagation(), void composeAction(project, 'up'))}>▶</button>
+                <button className="icon" title={composeAvailable ? 'Down' : NEEDS_CLI} disabled={busy.has(project.dir) || cs.length === 0 || !composeAvailable} onClick={(e) => (e.stopPropagation(), void composeAction(project, 'down'))}>■</button>
               </span>
             </div>
             {!collapsed.has(project.dir) && cs.map((c) => <ContainerRow key={c.id} c={c} busy={busy.has(c.id)} indent label={c.service} />)}
@@ -71,6 +75,7 @@ export function DockerPanel() {
             {!collapsed.has('') && tree.others.map((c) => <ContainerRow key={c.id} c={c} busy={busy.has(c.id)} indent label={c.name} />)}
           </>
         )}
+        {!error && !composeAvailable && tree.projects.length > 0 && <div className="placeholder muted">{NEEDS_CLI}</div>}
         {!error && !loading && containers.length === 0 && projects.length === 0 && <div className="placeholder muted">No containers or compose files.</div>}
       </div>
     </div>
@@ -126,13 +131,13 @@ function containerMenu(c: Container): DropdownItem[] {
   ]
 }
 
-function projectMenu(p: ComposeProject): DropdownItem[] {
+function projectMenu(p: ComposeProject, composeAvailable: boolean): DropdownItem[] {
   return [
-    { label: 'Up', hint: 'compose up -d', onSelect: () => void composeAction(p, 'up') },
+    { label: 'Up', hint: composeAvailable ? 'compose up -d' : NEEDS_CLI, disabled: !composeAvailable, onSelect: () => void composeAction(p, 'up') },
     { label: 'Restart', onSelect: () => void composeAction(p, 'restart') },
     { label: 'Stop', onSelect: () => void composeAction(p, 'stop') },
-    { label: 'Down…', danger: true, onSelect: () => void composeAction(p, 'down') },
-    { label: 'Pull Images', onSelect: () => void composeAction(p, 'pull') },
+    { label: 'Down…', danger: true, hint: composeAvailable ? undefined : NEEDS_CLI, disabled: !composeAvailable, onSelect: () => void composeAction(p, 'down') },
+    { label: 'Pull Images', hint: composeAvailable ? undefined : NEEDS_CLI, disabled: !composeAvailable, onSelect: () => void composeAction(p, 'pull') },
     { type: 'separator' },
     ...p.files.map((f) => ({ label: `Open ${f.split('/').pop()}`, onSelect: () => useEditor.getState().openFile(f) })),
   ]

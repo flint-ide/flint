@@ -1,4 +1,4 @@
-// The Docker panel's tree and the shell commands it types into terminals; pure.
+// The Docker panel's tree and container-name check; pure.
 import type { docker } from '../wails/models'
 
 export type Container = docker.Container
@@ -37,6 +37,10 @@ export function statusOf(c: Pick<Container, 'state' | 'status'>): 'running' | 'u
   return 'stopped'
 }
 
+// Docker names and ids: [a-zA-Z0-9][a-zA-Z0-9_.-]* — anything else is refused before it
+// reaches Go (which checks again), so nothing odd ends up in a request path.
+const NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,254}$/
+
 /**
  * Class of a panel row. `.tree-row` is position:absolute (the virtualized file
  * tree places its rows itself); rows laid out in the sidebar flow need `static`,
@@ -44,18 +48,5 @@ export function statusOf(c: Pick<Container, 'state' | 'status'>): 'running' | 'u
  */
 export const rowClass = (...extra: string[]): string => ['tree-row', 'static', ...extra.filter(Boolean)].join(' ')
 
-// Docker names and ids: [a-zA-Z0-9][a-zA-Z0-9_.-]* — anything else is refused
-// rather than quoted, so nothing typed into a shell can carry metacharacters.
-const NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/
-
-/** `docker exec` into a container with bash when it has it, else sh. */
-export function shellCommand(name: string): string | null {
-  if (!NAME.test(name)) return null
-  return `docker exec -it ${name} sh -c 'command -v bash >/dev/null && exec bash || exec sh'`
-}
-
-/** Follows a container's log from its last lines. */
-export function logsCommand(name: string, tail = 500): string | null {
-  if (!NAME.test(name)) return null
-  return `docker logs -f --tail ${Math.max(0, Math.floor(tail))} ${name}`
-}
+/** Whether name is a container id or name the engine requests accept. */
+export const validContainerRef = (name: string): boolean => NAME.test(name)

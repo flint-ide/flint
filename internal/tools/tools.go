@@ -157,7 +157,7 @@ func All() []Tool {
 		},
 		{
 			ID: "docker", Name: "Docker", Group: GroupInfra,
-			Feature: "Docker and Compose panel",
+			Feature: "Compose up, down and pull (the Docker panel itself talks to the Engine API)",
 			Install: install("brew install --cask docker-desktop", "sudo apt install docker.io"), Docs: "guides/docker.md",
 			candidates: one("docker", "--version"),
 		},

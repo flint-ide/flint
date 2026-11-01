@@ -17,6 +17,7 @@ import { coerceUsage, DEFAULT_USAGE, type UsageSettings } from './usageSettings'
 import { coercePromptSettings, DEFAULT_PROMPT_SETTINGS, type PromptSettings } from './prompts'
 import { coerceAgentReview, DEFAULT_AGENT_REVIEW, type AgentReviewSettings } from './reviewSettings'
 import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
+import { coerceDocker, DEFAULT_DOCKER, type DockerSettings } from './dockerSettings'
 
 import type { ResolvedTheme, ThemeMode } from './themeMode'
 
@@ -85,6 +86,8 @@ export interface AppSettings {
   agentReview: AgentReviewSettings
   /** Following your pull requests' CI: poll interval, log excerpt size, notifications. */
   ci: CISettings
+  /** How the Docker panel reaches the engine (lib/dockerSettings.ts). */
+  docker: DockerSettings
 }
 
 /** Mirrors settings.Default() in Go (used until the backend answers). */
@@ -113,6 +116,7 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   prompts: DEFAULT_PROMPT_SETTINGS,
   agentReview: DEFAULT_AGENT_REVIEW,
   ci: DEFAULT_CI,
+  docker: DEFAULT_DOCKER,
 }) as AppSettings
 
 /** Same limits as Go's settings.Validate, for the inputs. */
@@ -233,5 +237,6 @@ export function coerceSettings(v: unknown): AppSettings {
     prompts: coercePromptSettings(v.prompts),
     agentReview: coerceAgentReview(v.agentReview),
     ci: coerceCI(v.ci),
+    docker: coerceDocker(v.docker),
   }
 }

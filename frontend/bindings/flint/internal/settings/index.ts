@@ -3,6 +3,7 @@
 
 export {
     AgentSettings,
+    AgentTasks,
     Completions,
     CustomAgent,
     Font,

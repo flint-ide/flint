@@ -12,6 +12,7 @@ import {
   coerceCompletions, coerceInlineEdit, DEFAULT_COMPLETIONS, DEFAULT_INLINE_EDIT,
   type CompletionSettings, type InlineEditSettings,
 } from './editorAiSettings'
+import { coerceAgentTasks, DEFAULT_AGENT_TASKS, type AgentTaskSettings } from './agentTasks'
 
 export type ThemeMode = 'dark' | 'light' | 'system'
 export type ResolvedTheme = 'dark' | 'light'
@@ -53,6 +54,8 @@ export interface AppSettings {
   completions: CompletionSettings
   /** Edit with Agent on the selection. */
   inlineEdit: InlineEditSettings
+  /** Where agent task worktrees go and how their branches start. */
+  agentTasks: AgentTaskSettings
 }
 
 /** Mirrors settings.Default() in Go (used until the backend answers). */
@@ -74,6 +77,7 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   mcpServer: DEFAULT_MCP_SERVER,
   completions: DEFAULT_COMPLETIONS,
   inlineEdit: DEFAULT_INLINE_EDIT,
+  agentTasks: DEFAULT_AGENT_TASKS,
 }) as AppSettings
 
 /** Same limits as Go's settings.Validate, for the inputs. */
@@ -154,5 +158,6 @@ export function coerceSettings(v: unknown): AppSettings {
     mcpServer: coerceMcpServer(v.mcpServer),
     completions: coerceCompletions(v.completions),
     inlineEdit: coerceInlineEdit(v.inlineEdit),
+    agentTasks: coerceAgentTasks(v.agentTasks),
   }
 }

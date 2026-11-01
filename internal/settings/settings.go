@@ -98,6 +98,8 @@ type Settings struct {
 	Completions Completions `json:"completions"`
 	// InlineEdit configures "Edit with Agent" on the selection (editorai.go).
 	InlineEdit InlineEdit `json:"inlineEdit"`
+	// AgentTasks configures agent tasks (worktree folder, branch prefix).
+	AgentTasks AgentTasks `json:"agentTasks"`
 }
 
 // Default returns the settings Flint uses when nothing is configured.
@@ -126,6 +128,7 @@ func Default() Settings {
 		MCPServer:          defaultMCPServer(),
 		Completions:        defaultCompletions(),
 		InlineEdit:         defaultInlineEdit(),
+		AgentTasks:         defaultAgentTasks(),
 	}
 }
 
@@ -191,6 +194,7 @@ func Normalize(s Settings) Settings {
 	out.MCPServer = normalizeMCPServer(s.MCPServer)
 	out.Completions = normalizeCompletions(s.Completions)
 	out.InlineEdit = normalizeInlineEdit(s.InlineEdit)
+	out.AgentTasks = normalizeAgentTasks(s.AgentTasks)
 	return out
 }
 
@@ -270,6 +274,9 @@ func Validate(s Settings) error {
 		return err
 	}
 	if err := validateInlineEdit(s.InlineEdit); err != nil {
+		return err
+	}
+	if err := CheckAgentTasks(s.AgentTasks); err != nil {
 		return err
 	}
 	return validateRefresh(s.Refresh)

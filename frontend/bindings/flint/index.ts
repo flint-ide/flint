@@ -25,6 +25,7 @@ import * as ScratchAPI from "./scratchapi.js";
 import * as SearchAPI from "./searchapi.js";
 import * as SessionAPI from "./sessionapi.js";
 import * as SettingsAPI from "./settingsapi.js";
+import * as TaskAPI from "./taskapi.js";
 import * as TerminalAPI from "./terminalapi.js";
 import * as TodoAPI from "./todoapi.js";
 import * as UpdateAPI from "./updateapi.js";
@@ -54,6 +55,7 @@ export {
     SearchAPI,
     SessionAPI,
     SettingsAPI,
+    TaskAPI,
     TerminalAPI,
     TodoAPI,
     UpdateAPI,
@@ -65,10 +67,16 @@ export {
     Collected,
     DockerOverview,
     FileHistory,
+    MergeResult,
+    NewTask,
     ProfiledTests,
+    RemoveInfo,
+    RemoveOptions,
+    RemoveResult,
     RepoInfo,
     RunConfigs,
     SendOptions,
+    TaskView,
     TitlebarMetrics,
     UndoResult
 } from "./models.js";

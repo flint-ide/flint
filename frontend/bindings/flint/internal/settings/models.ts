@@ -56,6 +56,45 @@ export class AgentSettings {
 }
 
 /**
+ * AgentTasks configures agent tasks (an agent on its own branch in its own
+ * worktree, see internal/agenttask).
+ */
+export class AgentTasks {
+    /**
+     * WorktreeDir is where task worktrees go: an absolute path or one starting
+     * with "~/", holding "<repo>/<branch>". Empty follows the branch widget:
+     * "<repo>.worktrees/<branch>" next to the main checkout.
+     */
+    "worktreeDir": string;
+
+    /**
+     * BranchPrefix starts every task branch, e.g. "agent/" gives
+     * "agent/add-rate-limiting". May be empty.
+     */
+    "branchPrefix": string;
+
+    /** Creates a new AgentTasks instance. */
+    constructor($$source: Partial<AgentTasks> = {}) {
+        if (!("worktreeDir" in $$source)) {
+            this["worktreeDir"] = "";
+        }
+        if (!("branchPrefix" in $$source)) {
+            this["branchPrefix"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AgentTasks instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AgentTasks {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AgentTasks($$parsedSource as Partial<AgentTasks>);
+    }
+}
+
+/**
  * Completions configures inline suggestions from a code model ("completions").
  * The API key, when the endpoint needs one, is in the Keychain, never here.
  */
@@ -512,6 +551,11 @@ export class Settings {
      */
     "inlineEdit": InlineEdit;
 
+    /**
+     * AgentTasks configures agent tasks (worktree folder, branch prefix).
+     */
+    "agentTasks": AgentTasks;
+
     /** Creates a new Settings instance. */
     constructor($$source: Partial<Settings> = {}) {
         if (!("version" in $$source)) {
@@ -565,6 +609,9 @@ export class Settings {
         if (!("inlineEdit" in $$source)) {
             this["inlineEdit"] = (new InlineEdit());
         }
+        if (!("agentTasks" in $$source)) {
+            this["agentTasks"] = (new AgentTasks());
+        }
 
         Object.assign(this, $$source);
     }
@@ -584,6 +631,7 @@ export class Settings {
         const $$createField14_0 = $$createType11;
         const $$createField15_0 = $$createType12;
         const $$createField16_0 = $$createType13;
+        const $$createField17_0 = $$createType14;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -618,6 +666,9 @@ export class Settings {
         if ("inlineEdit" in $$parsedSource) {
             $$parsedSource["inlineEdit"] = $$createField16_0($$parsedSource["inlineEdit"]);
         }
+        if ("agentTasks" in $$parsedSource) {
+            $$parsedSource["agentTasks"] = $$createField17_0($$parsedSource["agentTasks"]);
+        }
         return new Settings($$parsedSource as Partial<Settings>);
     }
 }
@@ -637,3 +688,4 @@ const $$createType10 = Refresh.createFrom;
 const $$createType11 = MCPServer.createFrom;
 const $$createType12 = Completions.createFrom;
 const $$createType13 = InlineEdit.createFrom;
+const $$createType14 = AgentTasks.createFrom;

@@ -74,7 +74,8 @@ The file is readable only by your user. It never contains secrets: database pass
     "maxTokens": 64,
     "contextLines": 100
   },
-  "inlineEdit": { "contextLines": 60 }
+  "inlineEdit": { "contextLines": 60 },
+  "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/" }
 }
 ```
 
@@ -99,6 +100,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `mcpServer` | object | see below | What Flint's own MCP server tells the agents Flint starts. See [mcpServer](#mcpserver). |
 | `completions` | object | see below | Inline suggestions from a code model (off by default). See [completions](#completions). |
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
+| `agentTasks` | object | see below | Where agent task worktrees go and how their branches are named. See [agentTasks](#agenttasks). |
 
 ### Font objects
 
@@ -237,12 +239,22 @@ An API key, if the endpoint needs one, is set in Settings ▸ AI in the Editor a
 | `contextLines` | integer | 0–500 | `60` | Lines above and below the selection the agent sees with your instruction (at most about 10,000 characters each way). |
 
 See [Edit with Agent in the editor](../guides/ai-agents.md#edit-with-agent-in-the-editor).
+### agentTasks
+
+Used by [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel).
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `worktreeDir` | string | `""` | Folder for task worktrees, which go to `<worktreeDir>/<repository>/<branch>`. An absolute path or one starting with `~/`, up to 1024 characters. Empty puts them in `<repository>.worktrees/<branch>` next to the main checkout, like **New Worktree…** in the branch widget. |
+| `branchPrefix` | string | `"agent/"` | Starts every task branch, followed by a name made from the task's first line. Letters, digits, `.`, `_`, `-` and `/`, up to 40 characters; may be empty. It may not start with `-`, `/` or `.`, or contain `..`, `//` or `/.`. |
+
+Slashes in a branch name become dashes in the folder name. The tasks themselves are kept in `state.json`.
 
 ## Related settings stored elsewhere
 
 Some preferences are not in `settings.json`:
 
-- Recent folders, the agent approval policy, trusted folders and the update check's last result (including a skipped version) are in `state.json`.
+- Recent folders, the agent approval policy, trusted folders, agent tasks and the update check's last result (including a skipped version) are in `state.json`.
 - The sidebar width is kept by the app's web view.
 - The selected HTTP environment is remembered only until Flint quits.
 

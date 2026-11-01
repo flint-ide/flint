@@ -37,6 +37,9 @@ Font family, size (default 13) and line height (default 1.2) for terminals and r
   - **Reset to Defaults** appears once something is set.
 
   Agent settings apply to chats, commit messages and conflict resolution started afterwards; running chats keep theirs.
+- **Agent tasks** (see [Agent tasks](ai-agents.md#agent-tasks-agents-in-parallel)):
+  - **Worktree folder**: where new task worktrees go, as `<folder>/<repository>/<branch>`. An absolute path or `~/…`; empty puts them in `<repository>.worktrees` next to the main checkout.
+  - **Branch prefix**: starts every task branch (default `agent/`); may be empty.
 - **Tell me when work finishes in the background**: shows a macOS notification and a count on the Dock icon when a run, a test run or an agent turn finishes while Flint isn't the active app. On by default.
 
 ## Agent Context

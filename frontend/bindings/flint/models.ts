@@ -182,6 +182,89 @@ export class FileHistory {
 }
 
 /**
+ * MergeResult tells whether a task was merged or which files conflict.
+ */
+export class MergeResult {
+    "merged": boolean;
+    "conflicts": string[];
+
+    /**
+     * Into is the checkout of the base branch the merge ran (or would run) in.
+     */
+    "into": string;
+
+    /** Creates a new MergeResult instance. */
+    constructor($$source: Partial<MergeResult> = {}) {
+        if (!("merged" in $$source)) {
+            this["merged"] = false;
+        }
+        if (!("conflicts" in $$source)) {
+            this["conflicts"] = [];
+        }
+        if (!("into" in $$source)) {
+            this["into"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MergeResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MergeResult {
+        const $$createField1_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("conflicts" in $$parsedSource) {
+            $$parsedSource["conflicts"] = $$createField1_0($$parsedSource["conflicts"]);
+        }
+        return new MergeResult($$parsedSource as Partial<MergeResult>);
+    }
+}
+
+/**
+ * NewTask is what the New Agent Task form sends.
+ */
+export class NewTask {
+    /**
+     * a folder of the workspace inside the repository
+     */
+    "dir": string;
+    "description": string;
+    "agent": string;
+
+    /**
+     * local branch to start from; "" = Dir's current branch
+     */
+    "base": string;
+
+    /** Creates a new NewTask instance. */
+    constructor($$source: Partial<NewTask> = {}) {
+        if (!("dir" in $$source)) {
+            this["dir"] = "";
+        }
+        if (!("description" in $$source)) {
+            this["description"] = "";
+        }
+        if (!("agent" in $$source)) {
+            this["agent"] = "";
+        }
+        if (!("base" in $$source)) {
+            this["base"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new NewTask instance from a string or object.
+     */
+    static createFrom($$source: any = {}): NewTask {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new NewTask($$parsedSource as Partial<NewTask>);
+    }
+}
+
+/**
  * ProfiledTests is a started profiling test run.
  */
 export class ProfiledTests {
@@ -218,6 +301,105 @@ export class ProfiledTests {
             $$parsedSource["files"] = $$createField2_0($$parsedSource["files"]);
         }
         return new ProfiledTests($$parsedSource as Partial<ProfiledTests>);
+    }
+}
+
+/**
+ * RemoveInfo is what removing a task would lose, for the confirmation.
+ */
+export class RemoveInfo {
+    "stale": boolean;
+
+    /**
+     * Changes counts uncommitted changes and new files in the worktree.
+     */
+    "changes": number;
+
+    /**
+     * Unmerged counts the branch's commits base doesn't have.
+     */
+    "unmerged": number;
+
+    /** Creates a new RemoveInfo instance. */
+    constructor($$source: Partial<RemoveInfo> = {}) {
+        if (!("stale" in $$source)) {
+            this["stale"] = false;
+        }
+        if (!("changes" in $$source)) {
+            this["changes"] = 0;
+        }
+        if (!("unmerged" in $$source)) {
+            this["unmerged"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new RemoveInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): RemoveInfo {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new RemoveInfo($$parsedSource as Partial<RemoveInfo>);
+    }
+}
+
+/**
+ * RemoveOptions are the user's answers to the questions Remove may need.
+ */
+export class RemoveOptions {
+    /**
+     * DiscardChanges deletes a worktree with uncommitted changes or new files.
+     */
+    "discardChanges": boolean;
+
+    /**
+     * DeleteBranch deletes the branch although base lacks some of its commits.
+     */
+    "deleteBranch": boolean;
+
+    /** Creates a new RemoveOptions instance. */
+    constructor($$source: Partial<RemoveOptions> = {}) {
+        if (!("discardChanges" in $$source)) {
+            this["discardChanges"] = false;
+        }
+        if (!("deleteBranch" in $$source)) {
+            this["deleteBranch"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new RemoveOptions instance from a string or object.
+     */
+    static createFrom($$source: any = {}): RemoveOptions {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new RemoveOptions($$parsedSource as Partial<RemoveOptions>);
+    }
+}
+
+/**
+ * RemoveResult reports what Remove kept.
+ */
+export class RemoveResult {
+    "branchKept": boolean;
+
+    /** Creates a new RemoveResult instance. */
+    constructor($$source: Partial<RemoveResult> = {}) {
+        if (!("branchKept" in $$source)) {
+            this["branchKept"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new RemoveResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): RemoveResult {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new RemoveResult($$parsedSource as Partial<RemoveResult>);
     }
 }
 
@@ -353,6 +535,102 @@ export class SendOptions {
     static createFrom($$source: any = {}): SendOptions {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new SendOptions($$parsedSource as Partial<SendOptions>);
+    }
+}
+
+/**
+ * TaskView is a task as the panel shows it.
+ */
+export class TaskView {
+    "id": string;
+    "title": string;
+    "prompt": string;
+    "agent": string;
+    "branch": string;
+    "base": string;
+    "worktree": string;
+    "checkout": string;
+    "createdAt": number;
+    "pullRequest": string;
+
+    /**
+     * State: idle, working, waiting, finished or failed (agenttask).
+     */
+    "state": string;
+    "error": string;
+
+    /**
+     * Stale: the worktree folder is gone; the task can only be removed.
+     */
+    "stale": boolean;
+
+    /**
+     * Ahead counts the branch's commits that base doesn't have.
+     */
+    "ahead": number;
+
+    /**
+     * Merged: the branch has commits and all of them are in base.
+     */
+    "merged": boolean;
+
+    /** Creates a new TaskView instance. */
+    constructor($$source: Partial<TaskView> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("title" in $$source)) {
+            this["title"] = "";
+        }
+        if (!("prompt" in $$source)) {
+            this["prompt"] = "";
+        }
+        if (!("agent" in $$source)) {
+            this["agent"] = "";
+        }
+        if (!("branch" in $$source)) {
+            this["branch"] = "";
+        }
+        if (!("base" in $$source)) {
+            this["base"] = "";
+        }
+        if (!("worktree" in $$source)) {
+            this["worktree"] = "";
+        }
+        if (!("checkout" in $$source)) {
+            this["checkout"] = "";
+        }
+        if (!("createdAt" in $$source)) {
+            this["createdAt"] = 0;
+        }
+        if (!("pullRequest" in $$source)) {
+            this["pullRequest"] = "";
+        }
+        if (!("state" in $$source)) {
+            this["state"] = "";
+        }
+        if (!("error" in $$source)) {
+            this["error"] = "";
+        }
+        if (!("stale" in $$source)) {
+            this["stale"] = false;
+        }
+        if (!("ahead" in $$source)) {
+            this["ahead"] = 0;
+        }
+        if (!("merged" in $$source)) {
+            this["merged"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TaskView instance from a string or object.
+     */
+    static createFrom($$source: any = {}): TaskView {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new TaskView($$parsedSource as Partial<TaskView>);
     }
 }
 

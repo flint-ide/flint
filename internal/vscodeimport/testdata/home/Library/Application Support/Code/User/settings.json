@@ -1,0 +1,22 @@
+// VS Code user settings (fixture)
+{
+	"editor.fontFamily": "'Fira Code', Menlo, monospace",
+	"editor.fontSize": 14.4,
+	"editor.lineHeight": 21, // pixels: 1.5 × 14
+	"editor.tabSize": 4,
+	"editor.wordWrap": "on",
+	"editor.formatOnSave": true,
+	"terminal.integrated.fontFamily": "MesloLGS NF",
+	"terminal.integrated.fontSize": 12,
+	"terminal.integrated.lineHeight": 1.1,
+	"files.autoSave": "onFocusChange",
+	"files.exclude": {
+		"**/.git": true,
+	},
+	/* the theme lives in an installed extension */
+	"workbench.colorTheme": "Acme Night",
+	"[go]": {
+		"editor.formatOnSave": false,
+	},
+	"telemetry.telemetryLevel": "off",
+}

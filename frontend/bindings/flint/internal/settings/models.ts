@@ -117,6 +117,106 @@ export class CustomAgent {
 }
 
 /**
+ * CustomTheme is a user palette, for example one imported from VS Code: CSS
+ * variables of style.css overridden on top of a built-in palette.
+ */
+export class CustomTheme {
+    /**
+     * Name is shown in Settings ▸ Appearance.
+     */
+    "name": string;
+
+    /**
+     * Base is the palette ("dark" or "light") the colors are laid over; it also
+     * picks the native window appearance and the terminal's ANSI colors.
+     */
+    "base": string;
+
+    /**
+     * Colors maps a CSS variable ("--bg-editor") to a hex color ("#1e1e1e").
+     */
+    "colors": { [_ in string]?: string };
+
+    /** Creates a new CustomTheme instance. */
+    constructor($$source: Partial<CustomTheme> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("base" in $$source)) {
+            this["base"] = "";
+        }
+        if (!("colors" in $$source)) {
+            this["colors"] = {};
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CustomTheme instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CustomTheme {
+        const $$createField2_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("colors" in $$parsedSource) {
+            $$parsedSource["colors"] = $$createField2_0($$parsedSource["colors"]);
+        }
+        return new CustomTheme($$parsedSource as Partial<CustomTheme>);
+    }
+}
+
+/**
+ * EditorSettings is the editor's font plus editing behaviour.
+ */
+export class EditorSettings {
+    /**
+     * CSS font-family list
+     */
+    "fontFamily": string;
+
+    /**
+     * px
+     */
+    "fontSize": number;
+
+    /**
+     * multiple of the font size
+     */
+    "lineHeight": number;
+
+    /**
+     * VimMode turns on Vim key bindings in every editor.
+     */
+    "vimMode": boolean;
+
+    /** Creates a new EditorSettings instance. */
+    constructor($$source: Partial<EditorSettings> = {}) {
+        if (!("fontFamily" in $$source)) {
+            this["fontFamily"] = "";
+        }
+        if (!("fontSize" in $$source)) {
+            this["fontSize"] = 0;
+        }
+        if (!("lineHeight" in $$source)) {
+            this["lineHeight"] = 0;
+        }
+        if (!("vimMode" in $$source)) {
+            this["vimMode"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new EditorSettings instance from a string or object.
+     */
+    static createFrom($$source: any = {}): EditorSettings {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new EditorSettings($$parsedSource as Partial<EditorSettings>);
+    }
+}
+
+/**
  * Font is a monospace font setup shared by the editor and terminal sections.
  */
 export class Font {
@@ -250,8 +350,13 @@ export class Refresh {
 export class Settings {
     "version": number;
     "theme": string;
-    "editor": Font;
+    "editor": EditorSettings;
     "terminal": Font;
+
+    /**
+     * CustomTheme is the palette used when Theme is "custom".
+     */
+    "customTheme": CustomTheme;
 
     /**
      * DefaultAgent starts new agent chats ("claude", "codex" or a custom
@@ -318,10 +423,13 @@ export class Settings {
             this["theme"] = "";
         }
         if (!("editor" in $$source)) {
-            this["editor"] = (new Font());
+            this["editor"] = (new EditorSettings());
         }
         if (!("terminal" in $$source)) {
             this["terminal"] = (new Font());
+        }
+        if (!("customTheme" in $$source)) {
+            this["customTheme"] = (new CustomTheme());
         }
         if (!("defaultAgent" in $$source)) {
             this["defaultAgent"] = "";
@@ -361,14 +469,15 @@ export class Settings {
      * Creates a new Settings instance from a string or object.
      */
     static createFrom($$source: any = {}): Settings {
-        const $$createField2_0 = $$createType1;
-        const $$createField3_0 = $$createType1;
-        const $$createField8_0 = $$createType2;
-        const $$createField9_0 = $$createType0;
-        const $$createField10_0 = $$createType4;
+        const $$createField2_0 = $$createType2;
+        const $$createField3_0 = $$createType3;
+        const $$createField4_0 = $$createType4;
+        const $$createField9_0 = $$createType1;
+        const $$createField10_0 = $$createType0;
         const $$createField11_0 = $$createType6;
         const $$createField12_0 = $$createType8;
-        const $$createField13_0 = $$createType9;
+        const $$createField13_0 = $$createType10;
+        const $$createField14_0 = $$createType11;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -376,23 +485,26 @@ export class Settings {
         if ("terminal" in $$parsedSource) {
             $$parsedSource["terminal"] = $$createField3_0($$parsedSource["terminal"]);
         }
+        if ("customTheme" in $$parsedSource) {
+            $$parsedSource["customTheme"] = $$createField4_0($$parsedSource["customTheme"]);
+        }
         if ("keymap" in $$parsedSource) {
-            $$parsedSource["keymap"] = $$createField8_0($$parsedSource["keymap"]);
+            $$parsedSource["keymap"] = $$createField9_0($$parsedSource["keymap"]);
         }
         if ("todoExclude" in $$parsedSource) {
-            $$parsedSource["todoExclude"] = $$createField9_0($$parsedSource["todoExclude"]);
+            $$parsedSource["todoExclude"] = $$createField10_0($$parsedSource["todoExclude"]);
         }
         if ("agents" in $$parsedSource) {
-            $$parsedSource["agents"] = $$createField10_0($$parsedSource["agents"]);
+            $$parsedSource["agents"] = $$createField11_0($$parsedSource["agents"]);
         }
         if ("customAgents" in $$parsedSource) {
-            $$parsedSource["customAgents"] = $$createField11_0($$parsedSource["customAgents"]);
+            $$parsedSource["customAgents"] = $$createField12_0($$parsedSource["customAgents"]);
         }
         if ("languageServers" in $$parsedSource) {
-            $$parsedSource["languageServers"] = $$createField12_0($$parsedSource["languageServers"]);
+            $$parsedSource["languageServers"] = $$createField13_0($$parsedSource["languageServers"]);
         }
         if ("refresh" in $$parsedSource) {
-            $$parsedSource["refresh"] = $$createField13_0($$parsedSource["refresh"]);
+            $$parsedSource["refresh"] = $$createField14_0($$parsedSource["refresh"]);
         }
         return new Settings($$parsedSource as Partial<Settings>);
     }
@@ -400,12 +512,14 @@ export class Settings {
 
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = Font.createFrom;
-const $$createType2 = $Create.Map($Create.Any, $Create.Any);
-const $$createType3 = AgentSettings.createFrom;
-const $$createType4 = $Create.Map($Create.Any, $$createType3);
-const $$createType5 = CustomAgent.createFrom;
-const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = LanguageServerSettings.createFrom;
-const $$createType8 = $Create.Map($Create.Any, $$createType7);
-const $$createType9 = Refresh.createFrom;
+const $$createType1 = $Create.Map($Create.Any, $Create.Any);
+const $$createType2 = EditorSettings.createFrom;
+const $$createType3 = Font.createFrom;
+const $$createType4 = CustomTheme.createFrom;
+const $$createType5 = AgentSettings.createFrom;
+const $$createType6 = $Create.Map($Create.Any, $$createType5);
+const $$createType7 = CustomAgent.createFrom;
+const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = LanguageServerSettings.createFrom;
+const $$createType10 = $Create.Map($Create.Any, $$createType9);
+const $$createType11 = Refresh.createFrom;

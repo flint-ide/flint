@@ -1,5 +1,6 @@
 // Package settings holds the user's preferences (settings.json in the config
-// directory): theme, editor and terminal fonts, the default agent, agent CLIs,
+// directory): theme (and a custom palette), editor fonts and Vim mode, terminal
+// fonts, the default agent, agent CLIs,
 // custom ACP agents,
 // language servers, refresh intervals, keyboard shortcut overrides and whether
 // to look for new releases. Loading is forgiving (a hand-edited file never stops Flint
@@ -60,12 +61,21 @@ type Font struct {
 	LineHeight float64 `json:"lineHeight"` // multiple of the font size
 }
 
+// EditorSettings is the editor's font plus editing behaviour.
+type EditorSettings struct {
+	Font
+	// VimMode turns on Vim key bindings in every editor.
+	VimMode bool `json:"vimMode"`
+}
+
 // Settings is the whole settings.json document.
 type Settings struct {
-	Version  int    `json:"version"`
-	Theme    string `json:"theme"`
-	Editor   Font   `json:"editor"`
-	Terminal Font   `json:"terminal"`
+	Version  int            `json:"version"`
+	Theme    string         `json:"theme"`
+	Editor   EditorSettings `json:"editor"`
+	Terminal Font           `json:"terminal"`
+	// CustomTheme is the palette used when Theme is "custom".
+	CustomTheme CustomTheme `json:"customTheme"`
 	// DefaultAgent starts new agent chats ("claude", "codex" or a custom
 	// agent's id); empty means the first installed one.
 	DefaultAgent string `json:"defaultAgent"`
@@ -99,11 +109,11 @@ func Default() Settings {
 	return Settings{
 		Version: Version,
 		Theme:   ThemeDark,
-		Editor: Font{
+		Editor: EditorSettings{Font: Font{
 			FontFamily: `'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace`,
 			FontSize:   13,
 			LineHeight: 1.55,
-		},
+		}},
 		Terminal: Font{
 			FontFamily: `"JetBrains Mono", "SF Mono", Menlo, monospace`,
 			FontSize:   13,
@@ -117,6 +127,7 @@ func Default() Settings {
 		CustomAgents:       []CustomAgent{},
 		LanguageServers:    map[string]LanguageServerSettings{},
 		Refresh:            defaultRefresh(),
+		CustomTheme:        defaultCustomTheme(),
 	}
 }
 
@@ -160,7 +171,8 @@ func Normalize(s Settings) Settings {
 	if !validTheme(s.Theme) {
 		out.Theme = def.Theme
 	}
-	out.Editor = normalizeFont(s.Editor, def.Editor)
+	out.Editor.Font = normalizeFont(s.Editor.Font, def.Editor.Font)
+	out.CustomTheme = normalizeCustomTheme(s.CustomTheme)
 	out.Terminal = normalizeFont(s.Terminal, def.Terminal)
 	out.CustomAgents = normalizeCustomAgents(s.CustomAgents)
 	if !validAgent(s.DefaultAgent, out.CustomAgents) {
@@ -218,10 +230,13 @@ func Validate(s Settings) error {
 	for _, f := range []struct {
 		name string
 		font Font
-	}{{"editor", s.Editor}, {"terminal", s.Terminal}} {
+	}{{"editor", s.Editor.Font}, {"terminal", s.Terminal}} {
 		if err := validateFont(f.font); err != nil {
 			return fmt.Errorf("%s: %w", f.name, err)
 		}
+	}
+	if err := validateCustomTheme(s.CustomTheme); err != nil {
+		return err
 	}
 	if err := validateCustomAgents(s.CustomAgents); err != nil {
 		return err
@@ -285,6 +300,15 @@ func validateFont(f Font) error {
 	return nil
 }
 
+// CheckFontFamily reports why a font family would not be saved (nil when it would).
+func CheckFontFamily(family string) error {
+	family, err := cleanFontFamily(family)
+	if err == nil && family == "" {
+		err = errors.New("font family is empty")
+	}
+	return err
+}
+
 // cleanFontFamily trims a CSS font-family list and rejects characters that could
 // end the declaration it is put in.
 func cleanFontFamily(family string) (string, error) {
@@ -299,7 +323,7 @@ func cleanFontFamily(family string) (string, error) {
 }
 
 func validTheme(t string) bool {
-	return t == ThemeDark || t == ThemeLight || t == ThemeSystem
+	return t == ThemeDark || t == ThemeLight || t == ThemeSystem || t == ThemeCustom
 }
 
 func validLineHeight(h float64) bool {

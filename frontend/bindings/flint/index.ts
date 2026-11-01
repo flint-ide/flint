@@ -14,6 +14,7 @@ import * as DockerAPI from "./dockerapi.js";
 import * as GitAPI from "./gitapi.js";
 import * as GitHubAPI from "./githubapi.js";
 import * as HTTPAPI from "./httpapi.js";
+import * as ImportAPI from "./importapi.js";
 import * as KubeAPI from "./kubeapi.js";
 import * as LSPAPI from "./lspapi.js";
 import * as PreviewAPI from "./previewapi.js";
@@ -41,6 +42,7 @@ export {
     GitAPI,
     GitHubAPI,
     HTTPAPI,
+    ImportAPI,
     KubeAPI,
     LSPAPI,
     PreviewAPI,

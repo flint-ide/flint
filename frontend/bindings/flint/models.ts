@@ -7,6 +7,9 @@ import { Create as $Create } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as accounts$0 from "./internal/accounts/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as dap$0 from "./internal/dap/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -748,6 +751,67 @@ export class PromptLibrary {
 }
 
 /**
+ * ProviderInfo is what Settings ▸ Accounts shows about a provider.
+ */
+export class ProviderInfo {
+    "id": string;
+    "name": string;
+    "host": string;
+
+    /**
+     * Account is the signed-in account on Host (null when none).
+     */
+    "account": accounts$0.Account | null;
+
+    /**
+     * EnvToken names the environment variable whose token is used while no
+     * account is signed in ("" when none is set).
+     */
+    "envToken": string;
+
+    /**
+     * SignIn is "" when "Sign in" can start, else why not (no OAuth client…).
+     */
+    "signIn": string;
+
+    /** Creates a new ProviderInfo instance. */
+    constructor($$source: Partial<ProviderInfo> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("host" in $$source)) {
+            this["host"] = "";
+        }
+        if (!("account" in $$source)) {
+            this["account"] = null;
+        }
+        if (!("envToken" in $$source)) {
+            this["envToken"] = "";
+        }
+        if (!("signIn" in $$source)) {
+            this["signIn"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ProviderInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ProviderInfo {
+        const $$createField3_0 = $$createType18;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("account" in $$parsedSource) {
+            $$parsedSource["account"] = $$createField3_0($$parsedSource["account"]);
+        }
+        return new ProviderInfo($$parsedSource as Partial<ProviderInfo>);
+    }
+}
+
+/**
  * RemoveInfo is what removing a task would lose, for the confirmation.
  */
 export class RemoveInfo {
@@ -958,7 +1022,7 @@ export class ReviewRequest {
      * Creates a new ReviewRequest instance from a string or object.
      */
     static createFrom($$source: any = {}): ReviewRequest {
-        const $$createField1_0 = $$createType18;
+        const $$createField1_0 = $$createType20;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
@@ -1000,7 +1064,7 @@ export class ReviewResult {
      */
     static createFrom($$source: any = {}): ReviewResult {
         const $$createField1_0 = $$createType0;
-        const $$createField2_0 = $$createType20;
+        const $$createField2_0 = $$createType22;
         const $$createField3_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
@@ -1066,9 +1130,9 @@ export class RunConfigs {
      * Creates a new RunConfigs instance from a string or object.
      */
     static createFrom($$source: any = {}): RunConfigs {
-        const $$createField0_0 = $$createType22;
-        const $$createField1_0 = $$createType22;
-        const $$createField2_0 = $$createType24;
+        const $$createField0_0 = $$createType24;
+        const $$createField1_0 = $$createType24;
+        const $$createField2_0 = $$createType26;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("saved" in $$parsedSource) {
             $$parsedSource["saved"] = $$createField0_0($$parsedSource["saved"]);
@@ -1112,6 +1176,46 @@ export class SendOptions {
     static createFrom($$source: any = {}): SendOptions {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new SendOptions($$parsedSource as Partial<SendOptions>);
+    }
+}
+
+/**
+ * SignInCode is a started sign-in: the code to enter on the page.
+ */
+export class SignInCode {
+    "id": string;
+    "userCode": string;
+    "verificationUri": string;
+
+    /**
+     * seconds
+     */
+    "expiresIn": number;
+
+    /** Creates a new SignInCode instance. */
+    constructor($$source: Partial<SignInCode> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("userCode" in $$source)) {
+            this["userCode"] = "";
+        }
+        if (!("verificationUri" in $$source)) {
+            this["verificationUri"] = "";
+        }
+        if (!("expiresIn" in $$source)) {
+            this["expiresIn"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SignInCode instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SignInCode {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SignInCode($$parsedSource as Partial<SignInCode>);
     }
 }
 
@@ -1327,7 +1431,7 @@ export class UsageView {
      * Creates a new UsageView instance from a string or object.
      */
     static createFrom($$source: any = {}): UsageView {
-        const $$createField0_0 = $$createType25;
+        const $$createField0_0 = $$createType27;
         const $$createField1_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("summary" in $$parsedSource) {
@@ -1358,12 +1462,14 @@ const $$createType13 = $Create.Array($$createType12);
 const $$createType14 = testrun$0.Profiles.createFrom;
 const $$createType15 = prompts$0.Prompt.createFrom;
 const $$createType16 = $Create.Array($$createType15);
-const $$createType17 = ReviewFile.createFrom;
-const $$createType18 = $Create.Array($$createType17);
-const $$createType19 = review$0.Finding.createFrom;
+const $$createType17 = accounts$0.Account.createFrom;
+const $$createType18 = $Create.Nullable($$createType17);
+const $$createType19 = ReviewFile.createFrom;
 const $$createType20 = $Create.Array($$createType19);
-const $$createType21 = runconfig$0.Config.createFrom;
+const $$createType21 = review$0.Finding.createFrom;
 const $$createType22 = $Create.Array($$createType21);
-const $$createType23 = runconfig$0.Capabilities.createFrom;
-const $$createType24 = $Create.Map($Create.Any, $$createType23);
-const $$createType25 = usage$0.Summary.createFrom;
+const $$createType23 = runconfig$0.Config.createFrom;
+const $$createType24 = $Create.Array($$createType23);
+const $$createType25 = runconfig$0.Capabilities.createFrom;
+const $$createType26 = $Create.Map($Create.Any, $$createType25);
+const $$createType27 = usage$0.Summary.createFrom;

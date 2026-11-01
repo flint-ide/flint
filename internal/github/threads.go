@@ -2,46 +2,11 @@ package github
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"strings"
 )
 
 // maxThreadPages bounds the review-thread pages fetched (100 threads each).
 const maxThreadPages = 10
-
-// graphql posts a query through `gh api graphql`, the request JSON on stdin.
-func (c *Client) graphql(ctx context.Context, dir, query string, vars map[string]any, out any) error {
-	body, err := json.Marshal(map[string]any{"query": query, "variables": vars})
-	if err != nil {
-		return err
-	}
-	raw, err := c.run(ctx, dir, body, "api", "graphql", "--input", "-")
-	if err != nil {
-		return err
-	}
-	var resp struct {
-		Data   json.RawMessage `json:"data"`
-		Errors []struct {
-			Message string `json:"message"`
-		} `json:"errors"`
-	}
-	if err := json.Unmarshal(raw, &resp); err != nil {
-		return fmt.Errorf("gh api graphql: unexpected output: %w", err)
-	}
-	if len(resp.Errors) > 0 {
-		msgs := make([]string, 0, len(resp.Errors))
-		for _, e := range resp.Errors {
-			msgs = append(msgs, e.Message)
-		}
-		return errors.New(strings.Join(msgs, "; "))
-	}
-	if out == nil {
-		return nil
-	}
-	return json.Unmarshal(resp.Data, out)
-}
 
 const threadsQuery = `query($owner:String!,$name:String!,$number:Int!,$cursor:String){
   repository(owner:$owner,name:$name){
@@ -98,7 +63,7 @@ type gqlComment struct {
 }
 
 // threads loads every review thread of a pull request, page by page.
-func (c *Client) threads(ctx context.Context, dir string, repo Repo, number int) (threadPage, error) {
+func (c *Client) threads(ctx context.Context, a Auth, repo Repo, number int) (threadPage, error) {
 	var page threadPage
 	var cursor any // JSON null on the first page
 	for range maxThreadPages {
@@ -125,7 +90,7 @@ func (c *Client) threads(ctx context.Context, dir string, repo Repo, number int)
 			} `json:"repository"`
 		}
 		vars := map[string]any{"owner": repo.Owner, "name": repo.Name, "number": number, "cursor": cursor}
-		if err := c.graphql(ctx, dir, threadsQuery, vars, &data); err != nil {
+		if err := c.graphql(ctx, a, threadsQuery, vars, &data); err != nil {
 			return threadPage{}, err
 		}
 		pr := data.Repository.PullRequest

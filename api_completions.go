@@ -27,25 +27,27 @@ type secretStore interface {
 	Set(account, value string) error
 }
 
-type keyringSecrets struct{}
+// keyringSecrets is one service of the OS keyring (Keychain, Secret
+// Service); Set with "" deletes the entry.
+type keyringSecrets struct{ service string }
 
-func (keyringSecrets) Get(account string) (string, error) {
-	v, err := keyring.Get(completionsKeyService, account)
+func (k keyringSecrets) Get(account string) (string, error) {
+	v, err := keyring.Get(k.service, account)
 	if errors.Is(err, keyring.ErrNotFound) {
 		return "", nil
 	}
 	return v, err
 }
 
-func (keyringSecrets) Set(account, value string) error {
+func (k keyringSecrets) Set(account, value string) error {
 	if value == "" {
-		err := keyring.Delete(completionsKeyService, account)
+		err := keyring.Delete(k.service, account)
 		if errors.Is(err, keyring.ErrNotFound) {
 			return nil
 		}
 		return err
 	}
-	return keyring.Set(completionsKeyService, account, value)
+	return keyring.Set(k.service, account, value)
 }
 
 // CompletionsAPI asks the configured code model for inline suggestions
@@ -62,7 +64,7 @@ type CompletionsAPI struct {
 }
 
 func newCompletionsAPI(app *App) *CompletionsAPI {
-	return &CompletionsAPI{app: app, client: completions.New(), secrets: keyringSecrets{}}
+	return &CompletionsAPI{app: app, client: completions.New(), secrets: keyringSecrets{service: completionsKeyService}}
 }
 
 // Complete returns the suggestion for the cursor of editor (an id the

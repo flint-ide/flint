@@ -15,11 +15,11 @@ import (
 
 func ciFixtures(t *testing.T) (github.Run, string, string) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("internal", "github", "testdata", "log_failed.txt"))
+	raw, err := os.ReadFile(filepath.Join("internal", "cilog", "testdata", "log_failed.txt"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The run as github.Client.Run returns it for testdata/run_view.json.
+	// The run as github.Client.Run returns it for the run the log is from.
 	steps := []github.Step{{Number: 11, Name: "go vet", Conclusion: "success"}, {Number: 12, Name: "go test", Conclusion: "failure"}}
 	run := github.Run{
 		ID: 41307693761, Workflow: "CI", Title: "feat: rate limiting", Branch: "feat/rate-limit",

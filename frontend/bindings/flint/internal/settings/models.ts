@@ -490,6 +490,66 @@ export class Font {
 }
 
 /**
+ * GitHub configures how Flint talks to GitHub (pull requests, CI, signing in).
+ */
+export class GitHub {
+    /**
+     * Host is github.com or a GitHub Enterprise Server host (ghe.example.com):
+     * the API is https://<host>/api/v3 and /api/graphql there.
+     */
+    "host": string;
+
+    /**
+     * ClientID is the OAuth App Flint signs in with (Device Flow enabled).
+     * Empty until one is configured: "Sign in with GitHub" explains how to
+     * register one, and the token of the GitHub CLI or GH_TOKEN still work.
+     */
+    "clientId": string;
+
+    /**
+     * Scopes asked for when signing in.
+     */
+    "scopes": string[];
+
+    /**
+     * MaxRetryWaitSeconds is how long a read waits when GitHub says "retry
+     * after" (secondary rate limit) before trying once more; a longer wait,
+     * or 0, reports the limit instead.
+     */
+    "maxRetryWaitSeconds": number;
+
+    /** Creates a new GitHub instance. */
+    constructor($$source: Partial<GitHub> = {}) {
+        if (!("host" in $$source)) {
+            this["host"] = "";
+        }
+        if (!("clientId" in $$source)) {
+            this["clientId"] = "";
+        }
+        if (!("scopes" in $$source)) {
+            this["scopes"] = [];
+        }
+        if (!("maxRetryWaitSeconds" in $$source)) {
+            this["maxRetryWaitSeconds"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new GitHub instance from a string or object.
+     */
+    static createFrom($$source: any = {}): GitHub {
+        const $$createField2_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("scopes" in $$parsedSource) {
+            $$parsedSource["scopes"] = $$createField2_0($$parsedSource["scopes"]);
+        }
+        return new GitHub($$parsedSource as Partial<GitHub>);
+    }
+}
+
+/**
  * InlineEdit configures "Edit with Agent" on the selection.
  */
 export class InlineEdit {
@@ -834,6 +894,11 @@ export class Settings {
      */
     "ci": CI;
 
+    /**
+     * GitHub configures the GitHub host, sign-in and API limits (github.go).
+     */
+    "github": GitHub;
+
     /** Creates a new Settings instance. */
     constructor($$source: Partial<Settings> = {}) {
         if (!("version" in $$source)) {
@@ -908,6 +973,9 @@ export class Settings {
         if (!("ci" in $$source)) {
             this["ci"] = (new CI());
         }
+        if (!("github" in $$source)) {
+            this["github"] = (new GitHub());
+        }
 
         Object.assign(this, $$source);
     }
@@ -934,6 +1002,7 @@ export class Settings {
         const $$createField21_0 = $$createType18;
         const $$createField22_0 = $$createType19;
         const $$createField23_0 = $$createType20;
+        const $$createField24_0 = $$createType21;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -988,6 +1057,9 @@ export class Settings {
         }
         if ("ci" in $$parsedSource) {
             $$parsedSource["ci"] = $$createField23_0($$parsedSource["ci"]);
+        }
+        if ("github" in $$parsedSource) {
+            $$parsedSource["github"] = $$createField24_0($$parsedSource["github"]);
         }
         return new Settings($$parsedSource as Partial<Settings>);
     }
@@ -1064,7 +1136,7 @@ export class Usage {
      * Creates a new Usage instance from a string or object.
      */
     static createFrom($$source: any = {}): Usage {
-        const $$createField1_0 = $$createType22;
+        const $$createField1_0 = $$createType23;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("prices" in $$parsedSource) {
             $$parsedSource["prices"] = $$createField1_0($$parsedSource["prices"]);
@@ -1095,5 +1167,6 @@ const $$createType17 = Usage.createFrom;
 const $$createType18 = Prompts.createFrom;
 const $$createType19 = AgentReview.createFrom;
 const $$createType20 = CI.createFrom;
-const $$createType21 = usage$0.Price.createFrom;
-const $$createType22 = $Create.Map($Create.Any, $$createType21);
+const $$createType21 = GitHub.createFrom;
+const $$createType22 = usage$0.Price.createFrom;
+const $$createType23 = $Create.Map($Create.Any, $$createType22);

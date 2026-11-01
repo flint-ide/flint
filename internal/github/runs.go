@@ -2,11 +2,15 @@ package github
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 )
 
@@ -14,7 +18,7 @@ import (
 var ErrBadID = errors.New("invalid GitHub Actions run or job id")
 
 // maxLogBytes bounds what Flint keeps of a failed log: the tail, where the
-// failure is. A security limit, not a setting: gh could print gigabytes.
+// failure is. A security limit, not a setting: a log can be gigabytes.
 const maxLogBytes = 8 << 20
 
 // maxID: ids pass through JavaScript numbers, which are exact up to 2^53.
@@ -79,7 +83,7 @@ type BranchChecks struct {
 	Counts CheckCounts     `json:"counts"`
 }
 
-// checkBranch accepts a branch name git allows that gh can't read as a flag.
+// checkBranch accepts a branch name git allows that can't be read as a flag.
 func checkBranch(b string) error {
 	switch {
 	case b == "" || len(b) > 250:
@@ -94,53 +98,170 @@ func checkBranch(b string) error {
 	return nil
 }
 
-// BranchChecks reads the checks of the pull request whose head is branch. It is
-// not cached: callers decide how often to ask (see settings.CI).
+// restPull is an item of GET /repos/{owner}/{repo}/pulls.
+type restPull struct {
+	Number    int     `json:"number"`
+	Title     string  `json:"title"`
+	HTMLURL   string  `json:"html_url"`
+	State     string  `json:"state"` // open, closed
+	MergedAt  *string `json:"merged_at"`
+	UpdatedAt string  `json:"updated_at"`
+	Head      struct {
+		Ref  string `json:"ref"`
+		SHA  string `json:"sha"`
+		Repo *struct {
+			FullName string `json:"full_name"`
+		} `json:"repo"`
+	} `json:"head"`
+}
+
+// BranchChecks reads the checks of the pull request whose head is branch (an
+// open one first, else the latest). It is polled while checks run, so every
+// request is conditional: when nothing changed GitHub answers 304, which
+// costs no rate limit. Not cached otherwise: callers decide how often to ask
+// (see settings.CI).
 func (c *Client) BranchChecks(ctx context.Context, dir, branch string) (BranchChecks, error) {
 	if err := checkBranch(branch); err != nil {
 		return BranchChecks{}, err
 	}
-	repo, err := c.Repo(ctx, dir)
+	a, info, err := c.session(ctx, dir)
 	if err != nil {
 		return BranchChecks{}, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, readTimeout)
 	defer cancel()
-	var v struct {
-		Number            int       `json:"number"`
-		Title             string    `json:"title"`
-		URL               string    `json:"url"`
-		State             string    `json:"state"`
-		HeadRefName       string    `json:"headRefName"`
-		HeadRefOid        string    `json:"headRefOid"`
-		IsCrossRepository bool      `json:"isCrossRepository"`
-		StatusCheckRollup []ghCheck `json:"statusCheckRollup"`
+	pr, err := c.branchPull(ctx, a, info, branch)
+	if err != nil || pr == nil {
+		return BranchChecks{Checks: []Check{}}, err
 	}
-	err = c.runJSON(ctx, dir, nil, &v, "pr", "view", "--repo="+repo.NameWithOwner,
-		"--json=number,title,url,state,headRefName,headRefOid,isCrossRepository,statusCheckRollup", "--", branch)
+	if !shaRE.MatchString(pr.Head.SHA) {
+		return BranchChecks{}, fmt.Errorf("unexpected head commit of #%d: %q", pr.Number, pr.Head.SHA)
+	}
+	raw, err := c.commitChecks(ctx, a, info.Repo, pr.Head.SHA)
 	if err != nil {
-		var ghErr *Error
-		if errors.As(err, &ghErr) && strings.Contains(strings.ToLower(ghErr.Msg), "no pull requests found") {
-			return BranchChecks{Checks: []Check{}}, nil
-		}
 		return BranchChecks{}, err
 	}
-	if v.HeadRefName != branch {
-		// gh read a numeric branch name ("123") as pull request #123, or a URL.
-		return BranchChecks{Checks: []Check{}}, nil
+	state := strings.ToUpper(pr.State)
+	if pr.MergedAt != nil && *pr.MergedAt != "" {
+		state = "MERGED"
 	}
 	out := BranchChecks{
 		PR: &PullRequestRef{
-			Number: v.Number, Title: v.Title, URL: v.URL, State: v.State, HeadRef: v.HeadRefName, HeadSHA: v.HeadRefOid,
-			CrossRepository: v.IsCrossRepository,
+			Number: pr.Number, Title: pr.Title, URL: pr.HTMLURL, State: state, HeadRef: pr.Head.Ref, HeadSHA: pr.Head.SHA,
+			CrossRepository: pr.Head.Repo == nil || !strings.EqualFold(pr.Head.Repo.FullName, info.NameWithOwner),
 		},
-		Checks: make([]Check, 0, len(v.StatusCheckRollup)),
-		Counts: countChecks(v.StatusCheckRollup),
+		Checks: make([]Check, 0, len(raw)),
+		Counts: countChecks(raw),
 	}
-	for _, ch := range v.StatusCheckRollup {
-		out.Checks = append(out.Checks, ch.check(repo.URL))
+	for _, ch := range raw {
+		out.Checks = append(out.Checks, ch.check(info.URL))
 	}
 	return out, nil
+}
+
+// branchPull finds the pull request of branch: pushed to this repository or
+// to one of the forks the project's remotes point to.
+func (c *Client) branchPull(ctx context.Context, a Auth, info repoInfo, branch string) (*restPull, error) {
+	owners := append([]string{info.Owner}, info.owners...)
+	var best *restPull
+	seen := map[string]bool{}
+	for _, owner := range owners {
+		if seen[strings.ToLower(owner)] {
+			continue
+		}
+		seen[strings.ToLower(owner)] = true
+		q := url.Values{"head": {owner + ":" + branch}, "state": {"all"}, "per_page": {"10"}, "sort": {"updated"}, "direction": {"desc"}}
+		var pulls []restPull
+		u := rest(a, "/repos/%s/%s/pulls", info.Owner, info.Name) + "?" + q.Encode()
+		if err := c.getJSON(ctx, a, call{url: u, conditional: true}, &pulls); err != nil {
+			return nil, err
+		}
+		for i := range pulls {
+			p := &pulls[i]
+			if p.Head.Ref != branch {
+				continue
+			}
+			switch {
+			case best == nil,
+				p.State == "open" && best.State != "open",
+				p.State == best.State && p.UpdatedAt > best.UpdatedAt:
+				best = p
+			}
+		}
+	}
+	return best, nil
+}
+
+// commitChecks reads a commit's check runs and statuses (REST, conditional)
+// in the shape of GraphQL's statusCheckRollup.
+func (c *Client) commitChecks(ctx context.Context, a Auth, repo Repo, sha string) ([]ghCheck, error) {
+	var (
+		wg                 sync.WaitGroup
+		runs               restCheckRuns
+		status             restStatus
+		workflows          restWorkflowRuns
+		errR, errS, errW   error
+		base               = rest(a, "/repos/%s/%s", repo.Owner, repo.Name)
+		runsURL, statusURL = base + "/commits/" + sha + "/check-runs?per_page=100", base + "/commits/" + sha + "/status?per_page=100"
+		workflowsURL       = base + "/actions/runs?per_page=100&head_sha=" + sha
+	)
+	wg.Go(func() { errR = c.getJSON(ctx, a, call{url: runsURL, conditional: true}, &runs) })
+	wg.Go(func() { errS = c.getJSON(ctx, a, call{url: statusURL, conditional: true}, &status) })
+	wg.Go(func() { errW = c.getJSON(ctx, a, call{url: workflowsURL, conditional: true}, &workflows) })
+	wg.Wait()
+	if err := errors.Join(errR, errS); err != nil {
+		return nil, err
+	}
+	names := map[int64]string{} // check suite id → workflow name (best effort: errW only loses names)
+	if errW == nil {
+		for _, w := range workflows.WorkflowRuns {
+			names[w.CheckSuiteID] = w.Name
+		}
+	}
+	out := make([]ghCheck, 0, len(runs.CheckRuns)+len(status.Statuses))
+	for _, r := range runs.CheckRuns {
+		url := r.DetailsURL
+		if url == "" {
+			url = r.HTMLURL
+		}
+		out = append(out, ghCheck{
+			Typename: "CheckRun", Name: r.Name, Status: strings.ToUpper(r.Status), Conclusion: strings.ToUpper(r.Conclusion),
+			DetailsURL: url, WorkflowName: names[r.CheckSuite.ID],
+		})
+	}
+	for _, s := range status.Statuses {
+		out = append(out, ghCheck{Typename: "StatusContext", Context: s.Context, State: strings.ToUpper(s.State), TargetURL: s.TargetURL})
+	}
+	return out, nil
+}
+
+type restCheckRuns struct {
+	CheckRuns []struct {
+		Name       string `json:"name"`
+		Status     string `json:"status"`
+		Conclusion string `json:"conclusion"`
+		DetailsURL string `json:"details_url"`
+		HTMLURL    string `json:"html_url"`
+		CheckSuite struct {
+			ID int64 `json:"id"`
+		} `json:"check_suite"`
+	} `json:"check_runs"`
+}
+
+type restStatus struct {
+	Statuses []struct {
+		Context   string `json:"context"`
+		State     string `json:"state"`
+		TargetURL string `json:"target_url"`
+	} `json:"statuses"`
+}
+
+type restWorkflowRuns struct {
+	WorkflowRuns []struct {
+		ID           int64  `json:"id"`
+		Name         string `json:"name"`
+		CheckSuiteID int64  `json:"check_suite_id"`
+	} `json:"workflow_runs"`
 }
 
 // Run is a GitHub Actions workflow run with its jobs.
@@ -174,9 +295,12 @@ type Step struct {
 	Name       string `json:"name"`
 	Status     string `json:"status"`
 	Conclusion string `json:"conclusion"`
+	// StartedAt and CompletedAt (RFC 3339) place the step's lines in the job's log.
+	StartedAt   string `json:"startedAt"`
+	CompletedAt string `json:"completedAt"`
 }
 
-// Failed reports whether the job (or step) did not succeed.
+// failed reports whether a job or step did not succeed.
 func failed(conclusion string) bool {
 	switch strings.ToLower(conclusion) {
 	case "failure", "timed_out", "cancelled", "startup_failure":
@@ -198,59 +322,95 @@ func (j Job) FailedStep() *Step {
 	return nil
 }
 
-// Run reads a workflow run and its jobs.
+// restJob is a job as the REST API returns it.
+type restJob struct {
+	ID         int64  `json:"id"`
+	RunID      int64  `json:"run_id"`
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+	Conclusion string `json:"conclusion"`
+	HTMLURL    string `json:"html_url"`
+	Steps      []struct {
+		Number      int    `json:"number"`
+		Name        string `json:"name"`
+		Status      string `json:"status"`
+		Conclusion  string `json:"conclusion"`
+		StartedAt   string `json:"started_at"`
+		CompletedAt string `json:"completed_at"`
+	} `json:"steps"`
+}
+
+func (j restJob) job() Job {
+	out := Job{ID: j.ID, Name: j.Name, Status: j.Status, Conclusion: j.Conclusion, URL: j.HTMLURL, Steps: []Step{}}
+	for _, s := range j.Steps {
+		out.Steps = append(out.Steps, Step{
+			Number: s.Number, Name: s.Name, Status: s.Status, Conclusion: s.Conclusion,
+			StartedAt: s.StartedAt, CompletedAt: s.CompletedAt,
+		})
+	}
+	return out
+}
+
+// Run reads a workflow run and its (latest attempt's) jobs.
 func (c *Client) Run(ctx context.Context, dir string, runID int64) (Run, error) {
 	if err := checkID(runID); err != nil {
 		return Run{}, err
 	}
-	repo, err := c.Repo(ctx, dir)
+	a, info, err := c.session(ctx, dir)
 	if err != nil {
 		return Run{}, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, readTimeout)
 	defer cancel()
 	var v struct {
-		DatabaseID   int64  `json:"databaseId"`
-		WorkflowName string `json:"workflowName"`
-		DisplayTitle string `json:"displayTitle"`
-		HeadBranch   string `json:"headBranch"`
-		HeadSha      string `json:"headSha"`
+		ID           int64  `json:"id"`
+		Name         string `json:"name"`
+		DisplayTitle string `json:"display_title"`
+		HeadBranch   string `json:"head_branch"`
+		HeadSHA      string `json:"head_sha"`
 		Event        string `json:"event"`
 		Status       string `json:"status"`
 		Conclusion   string `json:"conclusion"`
-		URL          string `json:"url"`
-		Attempt      int    `json:"attempt"`
-		Jobs         []struct {
-			DatabaseID int64  `json:"databaseId"`
-			Name       string `json:"name"`
-			Status     string `json:"status"`
-			Conclusion string `json:"conclusion"`
-			URL        string `json:"url"`
-			Steps      []Step `json:"steps"`
-		} `json:"jobs"`
+		HTMLURL      string `json:"html_url"`
+		RunAttempt   int    `json:"run_attempt"`
 	}
-	err = c.runJSON(ctx, dir, nil, &v, "run", "view", strconv.FormatInt(runID, 10), "--repo="+repo.NameWithOwner,
-		"--json=databaseId,workflowName,displayTitle,headBranch,headSha,event,status,conclusion,url,attempt,jobs")
+	if err := c.getJSON(ctx, a, call{url: rest(a, "/repos/%s/%s/actions/runs/%d", info.Owner, info.Name, runID)}, &v); err != nil {
+		return Run{}, err
+	}
+	jobs, err := c.runJobs(ctx, a, info.Repo, runID)
 	if err != nil {
 		return Run{}, err
 	}
 	run := Run{
-		ID: v.DatabaseID, Workflow: v.WorkflowName, Title: v.DisplayTitle, Branch: v.HeadBranch, SHA: v.HeadSha,
-		Event: v.Event, Status: v.Status, Conclusion: v.Conclusion, URL: v.URL, Attempt: v.Attempt, Jobs: []Job{},
+		ID: v.ID, Workflow: v.Name, Title: v.DisplayTitle, Branch: v.HeadBranch, SHA: v.HeadSHA,
+		Event: v.Event, Status: v.Status, Conclusion: v.Conclusion, URL: v.HTMLURL, Attempt: v.RunAttempt, Jobs: []Job{},
 	}
-	for _, j := range v.Jobs {
-		steps := j.Steps
-		if steps == nil {
-			steps = []Step{}
-		}
-		run.Jobs = append(run.Jobs, Job{ID: j.DatabaseID, Name: j.Name, Status: j.Status, Conclusion: j.Conclusion, URL: j.URL, Steps: steps})
+	for _, j := range jobs {
+		run.Jobs = append(run.Jobs, j.job())
 	}
 	return run, nil
 }
 
-// FailedLog returns the log of a run's failed steps (gh run view --log-failed),
-// of one job when jobID is set. Only the last maxLogBytes are kept; cut tells
-// that the start is missing (the partial first line is dropped then).
+func (c *Client) runJobs(ctx context.Context, a Auth, repo Repo, runID int64) ([]restJob, error) {
+	var jobs []restJob
+	first := rest(a, "/repos/%s/%s/actions/runs/%d/jobs", repo.Owner, repo.Name, runID) + "?filter=latest&per_page=100"
+	err := c.pages(ctx, a, first, 10, func(body []byte) error {
+		var page struct {
+			Jobs []restJob `json:"jobs"`
+		}
+		if err := json.Unmarshal(body, &page); err != nil {
+			return fmt.Errorf("unexpected answer from GitHub (run jobs): %w", err)
+		}
+		jobs = append(jobs, page.Jobs...)
+		return nil
+	})
+	return jobs, err
+}
+
+// FailedLog returns the log of a run's failed steps, of one job when jobID is
+// set, in the GitHub CLI's --log-failed shape ("job<TAB>step<TAB>line") that
+// internal/cilog reads. Only the last maxLogBytes are kept; cut tells that the
+// start is missing (the partial first line is dropped then).
 func (c *Client) FailedLog(ctx context.Context, dir string, runID, jobID int64) (log string, cut bool, err error) {
 	if err := checkID(runID); err != nil {
 		return "", false, err
@@ -260,31 +420,48 @@ func (c *Client) FailedLog(ctx context.Context, dir string, runID, jobID int64) 
 			return "", false, err
 		}
 	}
-	repo, err := c.Repo(ctx, dir)
+	a, info, err := c.session(ctx, dir)
 	if err != nil {
 		return "", false, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, writeTimeout) // logs are downloaded as a zip
+	ctx, cancel := context.WithTimeout(ctx, logTimeout)
 	defer cancel()
-	args := []string{"run", "view", strconv.FormatInt(runID, 10), "--repo=" + repo.NameWithOwner}
+	var jobs []restJob
 	if jobID != 0 {
-		args = append(args, "--job="+strconv.FormatInt(jobID, 10))
-	}
-	args = append(args, "--log-failed")
-	out := &tailBuffer{max: maxLogBytes}
-	stderr, err := c.execTo(ctx, dir, nil, out, args...)
-	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return "", false, fmt.Errorf("gh %s timed out", firstArgs(args))
-		}
-		if errors.Is(err, ErrNotInstalled) {
+		var j restJob
+		if err := c.getJSON(ctx, a, call{url: rest(a, "/repos/%s/%s/actions/jobs/%d", info.Owner, info.Name, jobID)}, &j); err != nil {
 			return "", false, err
 		}
-		msg := strings.TrimSpace(stderr)
-		if msg == "" {
-			msg = err.Error()
+		if j.RunID != runID {
+			return "", false, fmt.Errorf("%w: job %d is not part of run %d", ErrBadID, jobID, runID)
 		}
-		return "", false, classify(args, msg, err)
+		jobs = []restJob{j}
+	} else {
+		all, err := c.runJobs(ctx, a, info.Repo, runID)
+		if err != nil {
+			return "", false, err
+		}
+		for _, j := range all {
+			if failed(j.Conclusion) {
+				jobs = append(jobs, j)
+			}
+		}
+	}
+	out := &tailBuffer{max: maxLogBytes}
+	var firstErr error
+	got := 0
+	for _, j := range jobs {
+		raw, err := c.jobLog(ctx, a, info.Repo, j.ID)
+		if err != nil {
+			firstErr = cmp(firstErr, err)
+			continue
+		}
+		got++
+		out.cut = out.cut || raw.cut
+		_, _ = out.Write([]byte(failedSteps(j.job(), raw.String())))
+	}
+	if got == 0 && firstErr != nil {
+		return "", false, firstErr
 	}
 	text := out.String()
 	if out.cut {
@@ -297,19 +474,26 @@ func (c *Client) FailedLog(ctx context.Context, dir string, runID, jobID int64) 
 	return text, out.cut, nil
 }
 
+func cmp(a, b error) error {
+	if a != nil {
+		return a
+	}
+	return b
+}
+
 // RerunFailed re-runs the failed jobs of a run (and the jobs they need). It acts
 // on GitHub: the UI asks first.
 func (c *Client) RerunFailed(ctx context.Context, dir string, runID int64) error {
 	if err := checkID(runID); err != nil {
 		return err
 	}
-	repo, err := c.Repo(ctx, dir)
+	a, info, err := c.session(ctx, dir)
 	if err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(ctx, writeTimeout)
 	defer cancel()
-	_, err = c.run(ctx, dir, nil, "run", "rerun", strconv.FormatInt(runID, 10), "--repo="+repo.NameWithOwner, "--failed")
+	_, err = c.do(ctx, a, call{method: http.MethodPost, url: rest(a, "/repos/%s/%s/actions/runs/%d/rerun-failed-jobs", info.Owner, info.Name, runID)})
 	return err
 }
 

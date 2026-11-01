@@ -2,15 +2,15 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
+	"net/http"
 	"strings"
 )
 
 // Every mutation here changes something on GitHub, so each runs only on an explicit
-// user action and drops the cached pull request afterwards.
+// user action and drops the cached pull request afterwards. User text travels in
+// JSON bodies, never in a URL.
 
 const replyMutation = `mutation($thread:ID!,$body:String!){
   addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$thread,body:$body}){comment{id}}
@@ -38,6 +38,9 @@ const submitNewMutation = `mutation($pr:ID!,$event:PullRequestReviewEvent!,$body
 
 const discardMutation = `mutation($review:ID!){deletePullRequestReview(input:{pullRequestReviewId:$review}){pullRequestReview{id}}}`
 
+// maxBodyLen bounds a comment or review body (GitHub's own limit is 65536).
+const maxBodyLen = 65536
+
 // NewComment is a comment on lines of a file.
 type NewComment struct {
 	Path string `json:"path"`
@@ -56,6 +59,8 @@ func (n NewComment) validate() error {
 	switch {
 	case strings.TrimSpace(n.Body) == "":
 		return errors.New("the comment is empty")
+	case len(n.Body) > maxBodyLen:
+		return errors.New("the comment is too long")
 	case n.Path == "" || n.Line < 1:
 		return errors.New("pick a line to comment on")
 	case n.Side != "LEFT" && n.Side != "RIGHT":
@@ -66,13 +71,24 @@ func (n NewComment) validate() error {
 	return nil
 }
 
-// target resolves the repository and the pull request a mutation acts on.
-func (c *Client) target(ctx context.Context, dir string, number int) (Details, error) {
+// target resolves the auth and the pull request a mutation acts on.
+func (c *Client) target(ctx context.Context, dir string, number int) (Auth, Details, error) {
 	data, err := c.prData(ctx, dir, number, false)
 	if err != nil {
-		return Details{}, err
+		return Auth{}, Details{}, err
 	}
-	return data.details, nil
+	a, err := c.auth()
+	return a, data.details, err
+}
+
+// checkThread accepts only a thread of this pull request (ids come from the web view).
+func checkThread(d Details, id string) error {
+	for _, t := range d.Threads {
+		if t.ID == id && id != "" {
+			return nil
+		}
+	}
+	return fmt.Errorf("no such review thread on #%d", d.Number)
 }
 
 // Reply answers a review thread (posted right away).
@@ -80,20 +96,29 @@ func (c *Client) Reply(ctx context.Context, dir string, number int, threadID, bo
 	if strings.TrimSpace(body) == "" {
 		return errors.New("the reply is empty")
 	}
-	d, err := c.target(ctx, dir, number)
+	if len(body) > maxBodyLen {
+		return errors.New("the reply is too long")
+	}
+	a, d, err := c.target(ctx, dir, number)
 	if err != nil {
+		return err
+	}
+	if err := checkThread(d, threadID); err != nil {
 		return err
 	}
 	defer c.Invalidate(d.Repo, number)
 	ctx, cancel := context.WithTimeout(ctx, writeTimeout)
 	defer cancel()
-	return c.graphql(ctx, dir, replyMutation, map[string]any{"thread": threadID, "body": body}, nil)
+	return c.graphql(ctx, a, replyMutation, map[string]any{"thread": threadID, "body": body}, nil)
 }
 
 // SetResolved resolves or unresolves a review thread.
 func (c *Client) SetResolved(ctx context.Context, dir string, number int, threadID string, resolved bool) error {
-	d, err := c.target(ctx, dir, number)
+	a, d, err := c.target(ctx, dir, number)
 	if err != nil {
+		return err
+	}
+	if err := checkThread(d, threadID); err != nil {
 		return err
 	}
 	defer c.Invalidate(d.Repo, number)
@@ -103,7 +128,7 @@ func (c *Client) SetResolved(ctx context.Context, dir string, number int, thread
 	if resolved {
 		query = resolveMutation
 	}
-	return c.graphql(ctx, dir, query, map[string]any{"thread": threadID}, nil)
+	return c.graphql(ctx, a, query, map[string]any{"thread": threadID}, nil)
 }
 
 // AddComment comments on lines of a file: either a single comment posted at once
@@ -113,9 +138,12 @@ func (c *Client) AddComment(ctx context.Context, dir string, number int, n NewCo
 	if err := n.validate(); err != nil {
 		return err
 	}
-	d, err := c.target(ctx, dir, number)
+	a, d, err := c.target(ctx, dir, number)
 	if err != nil {
 		return err
+	}
+	if !changesFile(d, n.Path) {
+		return fmt.Errorf("%s is not changed by #%d", n.Path, number)
 	}
 	defer c.Invalidate(d.Repo, number)
 	ctx, cancel := context.WithTimeout(ctx, writeTimeout)
@@ -125,12 +153,7 @@ func (c *Client) AddComment(ctx context.Context, dir string, number int, n NewCo
 		if n.StartLine > 0 && n.StartLine < n.Line {
 			body["start_line"], body["start_side"] = n.StartLine, n.Side
 		}
-		payload, err := json.Marshal(body)
-		if err != nil {
-			return err
-		}
-		_, err = c.run(ctx, dir, payload, "api", "--method", "POST",
-			fmt.Sprintf("repos/%s/pulls/%s/comments", d.Repo.NameWithOwner, strconv.Itoa(number)), "--input", "-")
+		_, err := c.do(ctx, a, call{method: http.MethodPost, url: rest(a, "/repos/%s/%s/pulls/%d/comments", d.Repo.Owner, d.Repo.Name, number), body: body})
 		return err
 	}
 	review := d.PendingReviewID
@@ -142,7 +165,7 @@ func (c *Client) AddComment(ctx context.Context, dir string, number int, n NewCo
 				} `json:"pullRequestReview"`
 			} `json:"addPullRequestReview"`
 		}
-		if err := c.graphql(ctx, dir, startReviewMutation, map[string]any{"pr": d.ID, "commit": d.HeadOID}, &started); err != nil {
+		if err := c.graphql(ctx, a, startReviewMutation, map[string]any{"pr": d.ID, "commit": d.HeadOID}, &started); err != nil {
 			return err
 		}
 		review = started.AddPullRequestReview.PullRequestReview.ID
@@ -154,7 +177,16 @@ func (c *Client) AddComment(ctx context.Context, dir string, number int, n NewCo
 	if n.StartLine > 0 && n.StartLine < n.Line {
 		vars["startLine"], vars["startSide"] = n.StartLine, n.Side
 	}
-	return c.graphql(ctx, dir, addThreadMutation, vars, nil)
+	return c.graphql(ctx, a, addThreadMutation, vars, nil)
+}
+
+func changesFile(d Details, path string) bool {
+	for _, f := range d.Files {
+		if f.Path == path {
+			return true
+		}
+	}
+	return false
 }
 
 // SubmitReview submits my review: the pending one with its comments, or a new one.
@@ -165,7 +197,10 @@ func (c *Client) SubmitReview(ctx context.Context, dir string, number int, event
 	default:
 		return fmt.Errorf("unknown review event %q", event)
 	}
-	d, err := c.target(ctx, dir, number)
+	if len(body) > maxBodyLen {
+		return errors.New("the review summary is too long")
+	}
+	a, d, err := c.target(ctx, dir, number)
 	if err != nil {
 		return err
 	}
@@ -180,14 +215,14 @@ func (c *Client) SubmitReview(ctx context.Context, dir string, number int, event
 		text = body
 	}
 	if d.PendingReviewID != "" {
-		return c.graphql(ctx, dir, submitPendingMutation, map[string]any{"review": d.PendingReviewID, "event": event, "body": text}, nil)
+		return c.graphql(ctx, a, submitPendingMutation, map[string]any{"review": d.PendingReviewID, "event": event, "body": text}, nil)
 	}
-	return c.graphql(ctx, dir, submitNewMutation, map[string]any{"pr": d.ID, "event": event, "body": text}, nil)
+	return c.graphql(ctx, a, submitNewMutation, map[string]any{"pr": d.ID, "event": event, "body": text}, nil)
 }
 
 // DiscardReview deletes my pending review and its comments.
 func (c *Client) DiscardReview(ctx context.Context, dir string, number int) error {
-	d, err := c.target(ctx, dir, number)
+	a, d, err := c.target(ctx, dir, number)
 	if err != nil {
 		return err
 	}
@@ -197,22 +232,38 @@ func (c *Client) DiscardReview(ctx context.Context, dir string, number int) erro
 	defer c.Invalidate(d.Repo, number)
 	ctx, cancel := context.WithTimeout(ctx, writeTimeout)
 	defer cancel()
-	return c.graphql(ctx, dir, discardMutation, map[string]any{"review": d.PendingReviewID}, nil)
+	return c.graphql(ctx, a, discardMutation, map[string]any{"review": d.PendingReviewID}, nil)
 }
 
-// Checkout switches the project to the pull request's branch (gh pr checkout). It
-// refuses when dirty lists local changes to tracked files, which a checkout could
-// carry over or clobber.
+// Checkout switches the project to the pull request's branch: git fetch
+// <remote> pull/N/head, then a local branch at that commit (created, or
+// fast-forwarded). A branch of this repository keeps its name and tracks it;
+// a fork's branch is named <owner>/<branch>. It refuses when dirty lists local
+// changes to tracked files, which a checkout could carry over or clobber.
 func (c *Client) Checkout(ctx context.Context, dir string, number int, dirty []string) error {
 	if len(dirty) > 0 {
 		return fmt.Errorf("commit, stash or roll back your %d changed file(s) before checking out #%d (e.g. %s)", len(dirty), number, dirty[0])
 	}
-	repo, err := c.Repo(ctx, dir)
+	data, err := c.prData(ctx, dir, number, true)
 	if err != nil {
 		return err
 	}
+	d := data.details
+	if err := checkBranch(d.HeadRef); err != nil {
+		return err
+	}
+	branch, upstream := d.HeadRef, d.HeadRef
+	if d.CrossRepository {
+		if !validName(d.HeadOwner) {
+			return fmt.Errorf("unexpected owner of #%d's branch: %q", number, d.HeadOwner)
+		}
+		branch, upstream = d.HeadOwner+"/"+d.HeadRef, ""
+	}
 	ctx, cancel := context.WithTimeout(ctx, checkoutTimeout)
 	defer cancel()
-	_, err = c.run(ctx, dir, nil, "pr", "checkout", strconv.Itoa(number), "--repo", repo.NameWithOwner)
-	return err
+	g, err := openGit(ctx, dir)
+	if err != nil {
+		return err
+	}
+	return g.CheckoutPullRequest(ctx, d.Repo.Remote, number, branch, upstream)
 }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"flint/internal/accounts"
 	"flint/internal/agentsession"
 	"flint/internal/agenttask"
 	"flint/internal/config"
@@ -22,6 +23,7 @@ import (
 	"flint/internal/diag"
 	"flint/internal/fuzzy"
 	"flint/internal/git"
+	"flint/internal/github"
 	"flint/internal/httpfile"
 	"flint/internal/lsp"
 	"flint/internal/mcpserver"
@@ -55,6 +57,9 @@ type appState struct {
 	Update update.State `json:"update,omitzero"`
 	// AgentTasks are the agent tasks per repository (tasks_state.go).
 	AgentTasks agenttask.Store `json:"agentTasks,omitempty"`
+	// Accounts are the signed-in accounts (api_accounts.go): login, avatar,
+	// host and scopes only. Their tokens are in the keyring.
+	Accounts []accounts.Account `json:"accounts,omitempty"`
 }
 
 // App holds the services shared by all bound APIs.
@@ -96,6 +101,10 @@ type App struct {
 
 	settingsMu sync.Mutex
 	settings   settings.Settings // settings.json, loaded once at startup
+
+	accounts *accounts.Store    // tokens of signed-in accounts (keyring)
+	registry *accounts.Registry // account providers (GitHub)
+	github   *github.Client     // pull requests and CI (api_github.go, api_ci.go)
 
 	updates       *update.Client // GitHub's latest-release endpoint
 	updateMu      sync.Mutex
@@ -159,6 +168,7 @@ func NewApp() (*App, error) {
 		log.Printf("flint: %v (using default settings)", err)
 	}
 	a.openUsage()
+	a.wireAccounts()
 	a.mcp, a.mcpSources = newMCP(a)
 	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
 	a.agents = newAgentManager(a)

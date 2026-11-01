@@ -5,6 +5,10 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as usage$0 from "../usage/models.js";
+
 /**
  * AgentReview configures "Review Changes with Agent" (internal/review).
  */
@@ -805,6 +809,11 @@ export class Settings {
     "agentTasks": AgentTasks;
 
     /**
+     * Usage configures the usage dashboard: retention, budgets, prices (usage.go).
+     */
+    "usage": Usage;
+
+    /**
      * Prompts configures the prompt library (prompts.go).
      */
     "prompts": Prompts;
@@ -878,6 +887,9 @@ export class Settings {
         if (!("agentTasks" in $$source)) {
             this["agentTasks"] = (new AgentTasks());
         }
+        if (!("usage" in $$source)) {
+            this["usage"] = (new Usage());
+        }
         if (!("prompts" in $$source)) {
             this["prompts"] = (new Prompts());
         }
@@ -911,6 +923,7 @@ export class Settings {
         const $$createField19_0 = $$createType17;
         const $$createField20_0 = $$createType18;
         const $$createField21_0 = $$createType19;
+        const $$createField22_0 = $$createType20;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -951,16 +964,99 @@ export class Settings {
         if ("agentTasks" in $$parsedSource) {
             $$parsedSource["agentTasks"] = $$createField18_0($$parsedSource["agentTasks"]);
         }
+        if ("usage" in $$parsedSource) {
+            $$parsedSource["usage"] = $$createField19_0($$parsedSource["usage"]);
+        }
         if ("prompts" in $$parsedSource) {
-            $$parsedSource["prompts"] = $$createField19_0($$parsedSource["prompts"]);
+            $$parsedSource["prompts"] = $$createField20_0($$parsedSource["prompts"]);
         }
         if ("agentReview" in $$parsedSource) {
-            $$parsedSource["agentReview"] = $$createField20_0($$parsedSource["agentReview"]);
+            $$parsedSource["agentReview"] = $$createField21_0($$parsedSource["agentReview"]);
         }
         if ("ci" in $$parsedSource) {
-            $$parsedSource["ci"] = $$createField21_0($$parsedSource["ci"]);
+            $$parsedSource["ci"] = $$createField22_0($$parsedSource["ci"]);
         }
         return new Settings($$parsedSource as Partial<Settings>);
+    }
+}
+
+/**
+ * Usage configures the usage dashboard: how long daily aggregates are kept,
+ * the budgets and the prices used to estimate costs agents don't report.
+ */
+export class Usage {
+    /**
+     * RetentionDays is how many days of daily aggregates usage.json keeps.
+     */
+    "retentionDays": number;
+
+    /**
+     * Prices are per-model prices in USD per million tokens, used only for
+     * turns whose agent reported no cost; the result is labelled estimated.
+     */
+    "prices": { [_ in string]?: usage$0.Price };
+
+    /**
+     * Budgets; zero turns one off. Daily covers all chats of the day, task
+     * one agent task's chats.
+     */
+    "dailyBudgetUsd": number;
+    "dailyBudgetTokens": number;
+    "taskBudgetUsd": number;
+    "taskBudgetTokens": number;
+
+    /**
+     * PauseOverBudget refuses new turns while a budget is spent, until the
+     * user continues from the warning.
+     */
+    "pauseOverBudget": boolean;
+
+    /**
+     * CountCacheReads makes token budgets count cached input too (off: a
+     * long Claude conversation re-reads its cache on every call).
+     */
+    "countCacheReads": boolean;
+
+    /** Creates a new Usage instance. */
+    constructor($$source: Partial<Usage> = {}) {
+        if (!("retentionDays" in $$source)) {
+            this["retentionDays"] = 0;
+        }
+        if (!("prices" in $$source)) {
+            this["prices"] = {};
+        }
+        if (!("dailyBudgetUsd" in $$source)) {
+            this["dailyBudgetUsd"] = 0;
+        }
+        if (!("dailyBudgetTokens" in $$source)) {
+            this["dailyBudgetTokens"] = 0;
+        }
+        if (!("taskBudgetUsd" in $$source)) {
+            this["taskBudgetUsd"] = 0;
+        }
+        if (!("taskBudgetTokens" in $$source)) {
+            this["taskBudgetTokens"] = 0;
+        }
+        if (!("pauseOverBudget" in $$source)) {
+            this["pauseOverBudget"] = false;
+        }
+        if (!("countCacheReads" in $$source)) {
+            this["countCacheReads"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Usage instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Usage {
+        const $$createField1_0 = $$createType22;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("prices" in $$parsedSource) {
+            $$parsedSource["prices"] = $$createField1_0($$parsedSource["prices"]);
+        }
+        return new Usage($$parsedSource as Partial<Usage>);
     }
 }
 
@@ -982,6 +1078,9 @@ const $$createType13 = MCPServer.createFrom;
 const $$createType14 = Completions.createFrom;
 const $$createType15 = InlineEdit.createFrom;
 const $$createType16 = AgentTasks.createFrom;
-const $$createType17 = Prompts.createFrom;
-const $$createType18 = AgentReview.createFrom;
-const $$createType19 = CI.createFrom;
+const $$createType17 = Usage.createFrom;
+const $$createType18 = Prompts.createFrom;
+const $$createType19 = AgentReview.createFrom;
+const $$createType20 = CI.createFrom;
+const $$createType21 = usage$0.Price.createFrom;
+const $$createType22 = $Create.Map($Create.Any, $$createType21);

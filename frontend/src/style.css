@@ -4772,6 +4772,148 @@ body.file-drop-target-active::after {
   color: var(--accent);
 }
 
+/* Usage panel (components/usage/UsagePanel.tsx) and the chat's budget warning. */
+.usage-range {
+  display: flex;
+  gap: 2px;
+  text-transform: none;
+}
+.usage-range button {
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--fg-muted);
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.usage-range button.active {
+  color: var(--fg);
+  background: var(--bg-active);
+}
+.usage-body {
+  padding: 4px 12px 12px;
+  font-size: 12px;
+}
+.usage-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.usage-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.usage-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  font-size: 11px;
+}
+.usage-tile strong {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage-chart {
+  margin: 10px 0 4px;
+}
+.usage-chart svg {
+  display: block;
+  width: 100%;
+  height: 64px;
+}
+.usage-chart rect {
+  fill: var(--accent-dim);
+}
+.usage-chart rect.today {
+  fill: var(--accent);
+}
+.usage-chart figcaption {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+}
+.usage-note {
+  font-size: 11px;
+  margin: 6px 0;
+}
+.usage-problem {
+  font-size: 11px;
+  margin: 0 0 8px;
+}
+.usage-section h4 {
+  margin: 12px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+}
+.usage-row {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  padding: 2px 4px 4px;
+  border-radius: 4px;
+}
+.usage-row.pickable {
+  cursor: pointer;
+}
+.usage-row.pickable:hover {
+  background: var(--bg-hover);
+}
+.usage-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage-value {
+  flex: none;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.usage-bar {
+  position: absolute;
+  left: 4px;
+  bottom: 1px;
+  height: 2px;
+  max-width: calc(100% - 8px);
+  border-radius: 1px;
+  background: var(--accent);
+  opacity: 0.6;
+}
+.budget-warning {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--accent-dim);
+}
+.budget-warning.paused {
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+}
+.budget-icon {
+  color: var(--warn);
+}
+.budget-text {
+  flex: 1;
+  min-width: 0;
+}
+
 /* ---------- prompt library (/ picker, Run Prompt…) ---------- */
 
 .prompt-picker {

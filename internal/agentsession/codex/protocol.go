@@ -169,9 +169,22 @@ type planUpdatedNotification struct {
 	} `json:"plan"`
 }
 
+// tokenBreakdown is one usage figure. InputTokens includes the cached and
+// cache-written parts.
 type tokenBreakdown struct {
-	InputTokens  int `json:"inputTokens"`
-	OutputTokens int `json:"outputTokens"`
+	InputTokens           int `json:"inputTokens"`
+	CachedInputTokens     int `json:"cachedInputTokens"`
+	CacheWriteInputTokens int `json:"cacheWriteInputTokens"`
+	OutputTokens          int `json:"outputTokens"`
+}
+
+func (b tokenBreakdown) minus(o tokenBreakdown) tokenBreakdown {
+	return tokenBreakdown{
+		InputTokens:           max(b.InputTokens-o.InputTokens, 0),
+		CachedInputTokens:     max(b.CachedInputTokens-o.CachedInputTokens, 0),
+		CacheWriteInputTokens: max(b.CacheWriteInputTokens-o.CacheWriteInputTokens, 0),
+		OutputTokens:          max(b.OutputTokens-o.OutputTokens, 0),
+	}
 }
 
 type tokenUsageNotification struct {

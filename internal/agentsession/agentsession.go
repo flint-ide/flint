@@ -129,6 +129,25 @@ type Usage struct {
 	// input incl. cache) and ContextWindow the model's limit; zero when unknown.
 	ContextTokens int `json:"contextTokens,omitempty"`
 	ContextWindow int `json:"contextWindow,omitempty"`
+	// CacheReadTokens and CacheWriteTokens are the part of InputTokens read
+	// from or written to the prompt cache, when the agent reports them.
+	CacheReadTokens  int `json:"cacheReadTokens,omitempty"`
+	CacheWriteTokens int `json:"cacheWriteTokens,omitempty"`
+	// Model is the model that answered the turn, when the agent says.
+	Model string `json:"model,omitempty"`
+	// Models splits the turn by model when the agent reports that (Claude
+	// Code's sub-agents may use another model); empty otherwise.
+	Models []ModelUsage `json:"models,omitempty"`
+}
+
+// ModelUsage is one model's part of a turn. InputTokens includes the cache.
+type ModelUsage struct {
+	Model            string  `json:"model"`
+	InputTokens      int     `json:"inputTokens"`
+	OutputTokens     int     `json:"outputTokens"`
+	CacheReadTokens  int     `json:"cacheReadTokens,omitempty"`
+	CacheWriteTokens int     `json:"cacheWriteTokens,omitempty"`
+	CostUSD          float64 `json:"costUsd"`
 }
 
 // Attachment is extra context sent with a prompt (a file or a selection).

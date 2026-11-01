@@ -12,6 +12,7 @@ import { subscribeSessionAutosave } from './store/session'
 import { subscribeGitEvents } from './store/git'
 import { subscribeLspEvents } from './store/lsp'
 import { subscribeAgentChatEvents } from './store/agentChat'
+import { subscribeUsageEvents } from './store/usage'
 import { subscribeRunEvents, useRun } from './store/run'
 import { subscribeDebugEvents } from './store/debug'
 import { subscribeAutoSave } from './store/settings'
@@ -80,6 +81,7 @@ export default function App() {
     subscribeGitEvents()
     subscribeLspEvents()
     subscribeAgentChatEvents()
+subscribeUsageEvents()
     subscribeRunEvents()
     subscribeDebugEvents()
     subscribeSessionAutosave()

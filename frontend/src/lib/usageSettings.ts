@@ -1,0 +1,117 @@
+// Settings ▸ Usage (Go: internal/settings/usage.go): retention of the daily
+// aggregates, budgets, and per-model prices for agents that report no cost.
+
+export interface ModelPrice {
+  /** USD per million input tokens. */
+  in: number
+  /** USD per million output tokens. */
+  out: number
+  /** USD per million cached input tokens; 0 or missing leaves them out of estimates. */
+  cacheRead?: number
+}
+
+export interface UsageSettings {
+  retentionDays: number
+  prices: Record<string, ModelPrice>
+  dailyBudgetUsd: number
+  dailyBudgetTokens: number
+  taskBudgetUsd: number
+  taskBudgetTokens: number
+  pauseOverBudget: boolean
+  /** Token budgets count cached input too. */
+  countCacheReads: boolean
+}
+
+/** Same limits as Go's CheckUsage. */
+export const USAGE_LIMITS = {
+  retentionDays: { min: 7, max: 3650 },
+  budgetUsd: { min: 0, max: 1_000_000 },
+  budgetTokens: { min: 0, max: 1_000_000_000_000 },
+  price: { min: 0, max: 10_000 },
+  prices: 200,
+  modelName: 200,
+} as const
+
+export const DEFAULT_USAGE: UsageSettings = Object.freeze({
+  retentionDays: 90,
+  prices: Object.freeze({}) as Record<string, ModelPrice>,
+  dailyBudgetUsd: 0,
+  dailyBudgetTokens: 0,
+  taskBudgetUsd: 0,
+  taskBudgetTokens: 0,
+  pauseOverBudget: false,
+  countCacheReads: false,
+}) as UsageSettings
+
+export const validModelName = (m: string): boolean =>
+  m !== '' && m === m.trim() && m.length <= USAGE_LIMITS.modelName && !/[\x00-\x1f\x7f]/.test(m)
+
+const validPrice = (n: unknown): n is number =>
+  typeof n === 'number' && Number.isFinite(n) && n >= USAGE_LIMITS.price.min && n <= USAGE_LIMITS.price.max
+
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+
+function inRange(v: unknown, lim: { min: number; max: number }, def: number): number {
+  return typeof v === 'number' && Number.isFinite(v) && v >= lim.min && v <= lim.max ? v : def
+}
+
+/** Settings from untrusted JSON, like Go's normalizeUsage. */
+export function coerceUsage(v: unknown): UsageSettings {
+  if (!isObject(v)) return DEFAULT_USAGE
+  const d = DEFAULT_USAGE
+  const prices: Record<string, ModelPrice> = {}
+  if (isObject(v.prices)) {
+    for (const [model, p] of Object.entries(v.prices)) {
+      if (Object.keys(prices).length >= USAGE_LIMITS.prices) break
+      if (validModelName(model) && isObject(p) && validPrice(p.in ?? 0) && validPrice(p.out ?? 0) && validPrice(p.cacheRead ?? 0)) {
+        const price: ModelPrice = { in: (p.in as number) ?? 0, out: (p.out as number) ?? 0 }
+        if (typeof p.cacheRead === 'number' && p.cacheRead > 0) price.cacheRead = p.cacheRead
+        prices[model] = price
+      }
+    }
+  }
+  return {
+    retentionDays: Math.round(inRange(v.retentionDays, USAGE_LIMITS.retentionDays, d.retentionDays)),
+    prices,
+    dailyBudgetUsd: inRange(v.dailyBudgetUsd, USAGE_LIMITS.budgetUsd, 0),
+    dailyBudgetTokens: Math.round(inRange(v.dailyBudgetTokens, USAGE_LIMITS.budgetTokens, 0)),
+    taskBudgetUsd: inRange(v.taskBudgetUsd, USAGE_LIMITS.budgetUsd, 0),
+    taskBudgetTokens: Math.round(inRange(v.taskBudgetTokens, USAGE_LIMITS.budgetTokens, 0)),
+    pauseOverBudget: typeof v.pauseOverBudget === 'boolean' ? v.pauseOverBudget : d.pauseOverBudget,
+    countCacheReads: typeof v.countCacheReads === 'boolean' ? v.countCacheReads : d.countCacheReads,
+  }
+}
+
+/**
+ * Prices from the editor's text, one "model in out [cached]" per line (USD per
+ * million tokens, "#" starts a comment). Returns the prices and the lines that are not valid.
+ */
+export function parsePrices(text: string): { prices: Record<string, ModelPrice>; invalid: string[] } {
+  const prices: Record<string, ModelPrice> = {}
+  const invalid: string[] = []
+  for (const raw of text.split('\n')) {
+    const line = raw.replace(/#.*/, '').trim()
+    if (!line) continue
+    const parts = line.split(/\s+/)
+    const [model, inp, out, cached] = parts
+    const pIn = Number(inp)
+    const pOut = Number(out ?? '0')
+    const pCache = Number(cached ?? '0')
+    if (parts.length > 4 || !model || !validModelName(model) || inp === undefined || !validPrice(pIn) || !validPrice(pOut) || !validPrice(pCache)) {
+      invalid.push(raw.trim())
+    } else if (Object.keys(prices).length < USAGE_LIMITS.prices) {
+      prices[model] = pCache > 0 ? { in: pIn, out: pOut, cacheRead: pCache } : { in: pIn, out: pOut }
+    } else {
+      invalid.push(raw.trim())
+    }
+  }
+  return { prices, invalid }
+}
+
+/** The editor's text for prices, sorted by model. */
+export function formatPrices(prices: Record<string, ModelPrice>): string {
+  return Object.keys(prices)
+    .sort()
+    .map((m) => `${m} ${prices[m].in} ${prices[m].out}${prices[m].cacheRead ? ` ${prices[m].cacheRead}` : ''}`)
+    .join('\n')
+}

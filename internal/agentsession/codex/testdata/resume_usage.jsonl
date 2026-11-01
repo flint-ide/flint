@@ -1,0 +1,13 @@
+{"dir":"out","msg":{"id":1,"method":"initialize"}}
+{"dir":"in","msg":{"id":1,"result":{"userAgent":"fake/0.153.4","codexHome":"/tmp/codex-home","platformFamily":"unix","platformOs":"macos"}}}
+{"dir":"out","msg":{"method":"initialized"}}
+{"dir":"out","msg":{"id":2,"method":"thread/resume"}}
+{"dir":"in","msg":{"id":2,"result":{"thread":{"id":"thr-old"},"model":"gpt-5.6-luna","cwd":"$CWD"}}}
+{"dir":"out","msg":{"id":3,"method":"turn/start"}}
+{"dir":"in","msg":{"id":3,"result":{"turn":{"id":"turn-9","items":[],"status":"inProgress","error":null}}}}
+{"dir":"in","msg":{"method":"turn/started","params":{"threadId":"thr-old","turn":{"id":"turn-9","items":[],"status":"inProgress","error":null}}}}
+{"dir":"in","msg":{"method":"thread/tokenUsage/updated","params":{"threadId":"thr-old","turnId":"turn-9","tokenUsage":{"total":{"totalTokens":501000,"inputTokens":500000,"cachedInputTokens":400000,"cacheWriteInputTokens":0,"outputTokens":1000,"reasoningOutputTokens":0},"last":{"totalTokens":1230,"inputTokens":1200,"cachedInputTokens":1000,"cacheWriteInputTokens":0,"outputTokens":30,"reasoningOutputTokens":0},"modelContextWindow":258400}}}}
+{"dir":"in","msg":{"method":"thread/tokenUsage/updated","params":{"threadId":"thr-old","turnId":"turn-9","tokenUsage":{"total":{"totalTokens":502320,"inputTokens":501300,"cachedInputTokens":401200,"cacheWriteInputTokens":0,"outputTokens":1020,"reasoningOutputTokens":0},"last":{"totalTokens":1320,"inputTokens":1300,"cachedInputTokens":1200,"cacheWriteInputTokens":0,"outputTokens":20,"reasoningOutputTokens":0},"modelContextWindow":258400}}}}
+{"dir":"in","msg":{"method":"item/completed","params":{"threadId":"thr-old","turnId":"turn-9","item":{"type":"agentMessage","id":"msg-9","text":"Resumed.","phase":"final_answer"}}}}
+{"dir":"in","msg":{"method":"turn/completed","params":{"threadId":"thr-old","turn":{"id":"turn-9","items":[],"status":"completed","error":null}}}}
+{"dir":"sleep","ms":5000}

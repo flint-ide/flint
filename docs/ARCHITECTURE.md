@@ -290,6 +290,7 @@ Paths are the macOS ones. On Linux, `~/Library/Application Support/flint` is `$X
 | Database passwords | OS keyring (Keychain / Secret Service), service `flint-db`, account = connection id | deleted together with the profile |
 | Scratchpads (SQL consoles, notes) | `~/Library/Application Support/flint/scratch/`: `index.json` (including the selected connection `connId` and database `database`; empty = the profile default) plus `<id>.sql/.md/.txt` | autosaved |
 | Query history | `~/Library/Application Support/flint/history/<connection id>.jsonl`: one JSON line per statement (database, SQL, time, duration, rows, error, kind: query / explain / edit) | last 5000 per connection, `0600`. Appended with a single `write` using `O_APPEND`; when the file grows 25% past the limit, Go rewrites it atomically without the oldest entries (a truncated last line is skipped on load). No connection profiles or passwords; passwords in statements are masked. Deleted with the profile or with "Clear History…" |
+| Agent usage | `~/Library/Application Support/flint/usage.json`: daily rows per project, agent, model, agent task and chat (tokens, cache tokens, reported cost, unpriced tokens, turns), chat names from their first message (redacted), fired budget alerts and overrides | `0600`, written atomically about 2 s after changes and on quit (`internal/usage`); kept `usage.retentionDays` days (default 90), at most 20,000 rows and 500 chats; an undecodable file is moved to `usage.json.bad-<time>`, an unreadable or newer one is never overwritten |
 | Sidebar width | WebView `localStorage` | appearance settings only |
 | Open tabs, terminals, agent conversations and attached projects (project session) | `~/Library/Application Support/flint/sessions/<hash of the main project path>.json`, one file per project | written after changes (debounced) and on exit, `0600`, max 4 MB |
 | Agent conversation history | the agent CLI itself: `~/.claude/projects/…`, `~/.codex/sessions/…` | Flint resumes them after a restart (`claude --resume`, codex `thread/resume`) |
@@ -369,6 +370,7 @@ internal/acp                Agent Client Protocol client (newline-delimited JSON
 internal/agentsession       shared agent event model, approval policy, session manager
   claude/ codex/            native agent drivers
   acpdriver/                ACP agents from settings: chat sessions, one-shot runs, the Check handshake
+internal/usage              agent usage per day × project × agent × model × task (usage.json), budgets, CSV
 frontend/bindings           generated TypeScript bindings of the Go services (do not edit)
 frontend/src/wails          compatibility layer over the bindings and the Wails runtime
 frontend/src                React: store (createStore + event bus), components, lib, commands, panels (sidebar registry)

@@ -54,7 +54,7 @@ Type in the box at the bottom. `↵` sends, `⇧↵` adds a new line. While the 
 
 ### Usage and cost
 
-The chat header shows cumulative input and output tokens, the cost in USD when the agent reports it, and a context bar (for example "42% context") with details in a tooltip. The status bar shows the total for the project, or for the whole workspace when several projects are open.
+The chat header shows cumulative input and output tokens, the cost in USD when the agent reports it, and a context bar (for example "42% context") with details in a tooltip. The status bar shows the total for the project, or for the whole workspace when several projects are open. For totals over days, budgets and an export, see [Usage and budgets](#usage-and-budgets).
 
 ### Chats after a restart
 
@@ -261,6 +261,28 @@ Tasks are remembered per repository in `state.json`, so they survive a restart. 
 In [Restricted Mode](restricted-mode.md), a task's worktree is trusted when the checkout it started from is trusted (it holds the same repository's commits); otherwise it stays restricted like any new folder. Removing the task, or the worktree folder disappearing, removes that trust again. Because trust follows folders, a task from an untrusted checkout can't put its worktree inside a trusted folder, and no task worktree may lie inside the checkout itself; Flint refuses and asks you to pick another worktree folder. Worktrees you create by hand with **New Worktree…** don't inherit trust: trust them like any other folder.
 
 The worktree folder and the branch prefix are settings (Settings ▸ Agents ▸ Agent tasks; [`agentTasks`](../reference/settings.md#agenttasks) in `settings.json`).
+
+## Usage and budgets
+
+Flint records what every agent turn of Claude Code and Codex used, as it happens: input tokens (with the cached part, when the agent reports it), output tokens, and the cost in USD when the agent reports one. Claude Code reports a cost; Codex usually doesn't, so its turns count as tokens only. Flint never makes up a price: if you want a cost for those turns, give the model a price in Settings ▸ Usage (USD per million input, output and, optionally, cached input tokens), and every cost computed from it is marked as an estimate (`~$0.40 est.`). Without a cached-input price, cached tokens are left out of the estimate (the panel says so) rather than priced as fresh input. When Claude Code reports a turn per model (a sub-agent on another model), each model's share is counted under that model. Custom ACP agents don't report usage, so their chats aren't recorded.
+
+The **Usage** panel (∑ in the activity bar, or **Show Agent Usage** in the palette) shows:
+
+- totals for today, the last 7 days and the last 30 days;
+- a bar per day for the last 7 or 30 days (cost when any is known, tokens otherwise; today is highlighted);
+- the same range broken down by project, agent task, agent and model. Click a project or a task to show only its usage; the chip at the top clears the filter;
+- the chats that used the most in the range, with the first message as their name. Click an open one to show it;
+- **⇩** exports the daily totals (with the current filter) as CSV: one row per day, project, agent, model and task, with tokens, the reported cost and the estimated cost in separate columns.
+
+A chat in an [agent task](#agent-tasks-agents-in-parallel) counts for the task and for the repository it was started from.
+
+### Budgets
+
+In Settings ▸ Usage you can set a daily budget (in USD, tokens or both, for all chats of the day) and a budget per agent task (everything the task's chats used). When a turn reaches one, the chat shows a warning under its header and Flint tells you once: a short message when Flint is in front, a macOS notification when it isn't (if notifications are on). Each budget is reported once per day or per task; raising it arms it again.
+
+The warning never stops you typing. If you turn on **Pause new turns over budget**, a chat over budget doesn't send new messages and says why; **Continue anyway** in the warning lets that day (and that task) go on for another budget's worth, after which it pauses again. Raising a budget also starts it over. Token budgets count input and output but leave out input read from the prompt cache, which a long Claude Code chat re-reads on every call; turn on **Count cached input in token budgets** to include it.
+
+Usage is kept for 90 days by default (Settings ▸ Usage ▸ Keep daily totals for) in `usage.json` in Flint's data folder, on your Mac only. It is written a couple of seconds after each turn and when Flint quits. See [Files and data](../reference/files-and-data.md).
 
 ## Notifications
 

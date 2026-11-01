@@ -110,6 +110,8 @@ type Settings struct {
 	InlineEdit InlineEdit `json:"inlineEdit"`
 	// AgentTasks configures agent tasks (worktree folder, branch prefix).
 	AgentTasks AgentTasks `json:"agentTasks"`
+	// Usage configures the usage dashboard: retention, budgets, prices (usage.go).
+	Usage Usage `json:"usage"`
 	// Prompts configures the prompt library (prompts.go).
 	Prompts Prompts `json:"prompts"`
 	// AgentReview configures Review Changes with Agent (review.go).
@@ -145,6 +147,7 @@ func Default() Settings {
 		Completions:        defaultCompletions(),
 		InlineEdit:         defaultInlineEdit(),
 		AgentTasks:         defaultAgentTasks(),
+		Usage:              defaultUsage(),
 		Prompts:            defaultPrompts(),
 		AgentReview:        defaultAgentReview(),
 		CI:                 defaultCI(),
@@ -216,6 +219,7 @@ func Normalize(s Settings) Settings {
 	out.Completions = normalizeCompletions(s.Completions)
 	out.InlineEdit = normalizeInlineEdit(s.InlineEdit)
 	out.AgentTasks = normalizeAgentTasks(s.AgentTasks)
+	out.Usage = normalizeUsage(s.Usage)
 	out.AgentReview = normalizeAgentReview(s.AgentReview, out.CustomAgents)
 	out.CI = normalizeCI(s.CI)
 	return out
@@ -303,6 +307,9 @@ func Validate(s Settings) error {
 		return err
 	}
 	if err := CheckAgentTasks(s.AgentTasks); err != nil {
+		return err
+	}
+	if err := CheckUsage(s.Usage); err != nil {
 		return err
 	}
 	if err := validateAgentReview(s.AgentReview, s.CustomAgents); err != nil {

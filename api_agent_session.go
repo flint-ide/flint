@@ -25,6 +25,7 @@ func newAgentManager(a *App) *as.Manager {
 	m := as.NewManager(func(e as.Event) {
 		a.emit(eventAgentEvent, e)
 		a.tasks.Observe(e) // agent tasks follow their chats (tasks_state.go)
+		a.observeUsage(e)  // usage_state.go
 	})
 	registerDrivers(m, a.untrusted, a.agentConfig, a.offerMCP)
 	syncCustomAgents(m, nil, a.currentSettings().CustomAgents, a.untrusted, a.offerMCP)
@@ -47,6 +48,7 @@ func (c *AgentChatAPI) Start(agent, cwd string) (as.SessionInfo, error) {
 	info, err := c.app.agents.Start(ctx, agent, cwd)
 	if err == nil {
 		c.app.tasks.Bind(info.ID, cwd)
+		c.app.usageChats.bind(info.ID, usageChat{chat: info.ID, agent: info.Agent, cwd: cwd, model: info.Model})
 	}
 	return info, err
 }
@@ -59,12 +61,17 @@ func (c *AgentChatAPI) Resume(agent, cwd, sessionID string) (as.SessionInfo, err
 	info, err := c.app.agents.Resume(ctx, agent, cwd, sessionID)
 	if err == nil {
 		c.app.tasks.Bind(info.ID, cwd)
+		c.app.usageChats.bind(info.ID, usageChat{chat: sessionID, agent: info.Agent, cwd: cwd, model: info.Model})
 	}
 	return info, err
 }
 
 // Prompt sends a message; the reply streams as "agent:event" events.
 func (c *AgentChatAPI) Prompt(sessionID, text string, attachments []as.Attachment) error {
+	if err := c.app.usageGate(sessionID); err != nil {
+		return err
+	}
+	c.app.usageChats.prompted(sessionID, text)
 	// Before the turn starts: an early failure's events must come after it.
 	if !c.app.agents.Busy(sessionID) {
 		c.app.tasks.Prompted(sessionID)
@@ -83,6 +90,7 @@ func (c *AgentChatAPI) Respond(sessionID, requestID, optionID string) error {
 // Stop ends a conversation and its agent process.
 func (c *AgentChatAPI) Stop(sessionID string) error {
 	c.app.tasks.Unbind(sessionID)
+	c.app.usageChats.unbind(sessionID)
 	return c.app.agents.Stop(sessionID)
 }
 

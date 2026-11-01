@@ -77,6 +77,13 @@ The file is readable only by your user. It never contains secrets: database pass
   },
   "inlineEdit": { "contextLines": 60 },
   "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/" },
+  "usage": {
+    "retentionDays": 90,
+    "dailyBudgetUsd": 20,
+    "taskBudgetTokens": 5000000,
+    "pauseOverBudget": false,
+    "prices": { "gpt-5-codex": { "in": 1.25, "out": 10, "cacheRead": 0.125 } }
+  },
   "agentReview": { "scope": "selected", "maxDiffKB": 128, "agent": "", "timeoutSeconds": 300 },
   "ci": { "pollSeconds": 60, "logTailLines": 80, "logErrorLines": 40, "notify": true }
 }
@@ -105,6 +112,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `completions` | object | see below | Inline suggestions from a code model (off by default). See [completions](#completions). |
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
 | `agentTasks` | object | see below | Where agent task worktrees go and how their branches are named. See [agentTasks](#agenttasks). |
+| `usage` | object | see below | How long agent usage is kept, budgets, and prices for estimates. See [usage](#usage). |
 | `prompts` | object | see below | The prompt library of the agent chat (`/`). See [prompts](#prompts). |
 | `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
 | `ci` | object | see below | Following your pull requests' CI: poll interval, Fix with agent's log excerpt, notifications. See [ci](#ci). |
@@ -278,6 +286,21 @@ Used by [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel).
 | `branchPrefix` | string | `"agent/"` | Starts every task branch, followed by a name made from the task's first line. Letters, digits, `.`, `_`, `-` and `/`, up to 40 characters; may be empty. It may not start with `-`, `/` or `.`, or contain `..`, `//` or `/.`. |
 
 Slashes in a branch name become dashes in the folder name. The tasks themselves are kept in `state.json`.
+
+### usage
+
+Used by the [Usage panel and budgets](../guides/ai-agents.md#usage-and-budgets). A budget of `0` is off.
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `retentionDays` | integer | 7–3650 | `90` | Days of daily totals kept in `usage.json`; older days are dropped. |
+| `dailyBudgetUsd` | number | 0–1,000,000 | `0` | Money all agent chats of a day may use: reported costs plus estimates. |
+| `dailyBudgetTokens` | integer | 0–10¹² | `0` | Tokens (input plus output; cached input only with `countCacheReads`) all chats of a day may use. |
+| `taskBudgetUsd` | number | 0–1,000,000 | `0` | Money one agent task's chats may use, over the days kept. |
+| `taskBudgetTokens` | integer | 0–10¹² | `0` | Tokens one agent task's chats may use. |
+| `countCacheReads` | boolean | | `false` | Token budgets also count input read from the prompt cache. |
+| `pauseOverBudget` | boolean | | `false` | Refuse new turns while a budget is reached, until **Continue anyway** in the chat's warning. |
+| `prices` | object | up to 200 models | `{}` | Model name (exactly as the Usage panel shows it, case ignored) → `{ "in": …, "out": …, "cacheRead": … }` in USD per million tokens, 0–10,000; `cacheRead` is optional (without it, cached input is left out of estimates). Used only for turns whose agent reported no cost; the result is shown as an estimate. |
 
 ### prompts
 

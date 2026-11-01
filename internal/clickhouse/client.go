@@ -73,7 +73,6 @@ func New(cfg Config) (*Client, error) {
 	}
 	scheme := "http"
 	tr := &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
 		DialContext:           (&net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
 		TLSHandshakeTimeout:   10 * time.Second,
 		MaxIdleConnsPerHost:   4,
@@ -83,6 +82,8 @@ func New(cfg Config) (*Client, error) {
 	if cfg.TLS {
 		scheme = "https"
 		tr.TLSClientConfig = &tls.Config{ServerName: cfg.Host, MinVersion: tls.VersionTLS12, InsecureSkipVerify: cfg.Insecure} //nolint:gosec // the user's explicit choice
+		// A proxy only tunnels TLS; a plain-HTTP proxy would see the credentials in the headers.
+		tr.Proxy = http.ProxyFromEnvironment
 	}
 	return &Client{
 		cfg:  cfg,

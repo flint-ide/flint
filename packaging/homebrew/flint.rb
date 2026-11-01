@@ -5,10 +5,10 @@ cask "flint" do
   version "{{VERSION}}"
   sha256 "{{SHA256}}"
 
-  url "https://github.com/ODudek/flint/releases/download/v#{version}/Flint-v#{version}-macos-universal.zip"
+  url "https://github.com/flint-ide/flint/releases/download/v#{version}/Flint-v#{version}-macos-universal.zip"
   name "Flint"
   desc "Fast, AI-first IDE built around coding agents"
-  homepage "https://github.com/ODudek/flint"
+  homepage "https://github.com/flint-ide/flint"
 
   livecheck do
     url :url

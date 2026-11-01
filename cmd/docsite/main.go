@@ -136,7 +136,7 @@ func build(srcDir, outDir string) (int, error) {
 	var index []searchEntry
 	for rel, p := range pages {
 		v := view{Page: p, Root: rootPrefix(rel), Body: template.HTML(p.HTML), Outline: outline(p.Headings),
-			EditLink: "https://github.com/ODudek/flint/edit/main/site/" + rel}
+			EditLink: "https://github.com/flint-ide/flint/edit/main/site/" + rel}
 		for _, s := range nav {
 			nv := navView{Title: s.Title}
 			for _, item := range s.Pages {

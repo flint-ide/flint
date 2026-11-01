@@ -11,7 +11,7 @@ Flint also runs on Linux (x86_64 and arm64); see [Linux](#linux) below.
 
 ## Download
 
-1. Open the [Flint releases page](https://github.com/ODudek/flint/releases).
+1. Open the [Flint releases page](https://github.com/flint-ide/flint/releases).
 2. Download the `.dmg` or the `.zip` of the latest release, together with `SHA256SUMS.txt`.
 3. Open the `.dmg` (or unzip the `.zip`) and drag Flint to your Applications folder.
 
@@ -28,10 +28,10 @@ The file you downloaded should be reported as `OK`. A line for the file you did 
 
 ## Homebrew
 
-> **Note:** The Homebrew cask is not published yet. These commands will work once the `ODudek/homebrew-tap` tap exists and a notarized release has been published after it (only notarized releases go to Homebrew); until then, use the download above.
+> **Note:** The Homebrew cask is not published yet. These commands will work once the `flint-ide/homebrew-tap` tap exists and a notarized release has been published after it (only notarized releases go to Homebrew); until then, use the download above.
 
 ```bash
-brew install --cask odudek/tap/flint
+brew install --cask flint-ide/tap/flint
 ```
 
 Homebrew downloads the same universal `.zip` from the releases page and checks its SHA-256. To update, run `brew upgrade --cask flint`. Flint's own update check still tells you about new releases, but Flint never updates itself.
@@ -56,7 +56,7 @@ There are no Linux downloads on the releases page yet, so on Linux you build Fli
 ### Build and install
 
 ```bash
-git clone https://github.com/ODudek/flint.git
+git clone https://github.com/flint-ide/flint.git
 cd flint
 cd frontend && npm ci --ignore-scripts && cd ..
 wails3 task package:linux
@@ -74,7 +74,7 @@ This installs the `flint` command in `~/.local/bin`, a Flint launcher in your de
 
 ### Uninstall on Linux
 
-Delete `~/.local/bin/flint`, `~/.local/share/applications/io.github.odudek.flint.desktop`, `~/.local/share/icons/hicolor/512x512/apps/io.github.odudek.flint.png`, and, to remove your data, `~/.config/flint` and `~/.local/state/flint`. Stored passwords are `flint-db` items in your keyring (Seahorse, KWalletManager); delete the connections in Flint first to remove them.
+Delete `~/.local/bin/flint`, `~/.local/share/applications/io.github.flint_ide.flint.desktop`, `~/.local/share/icons/hicolor/512x512/apps/io.github.flint_ide.flint.png`, and, to remove your data, `~/.config/flint` and `~/.local/state/flint`. Stored passwords are `flint-db` items in your keyring (Seahorse, KWalletManager); delete the connections in Flint first to remove them.
 
 ## First launch
 
@@ -98,7 +98,7 @@ flint ~/src/my-app   # open another folder
 
 If Flint is already running, it takes the folder over and comes to the front instead of starting a second copy. Relative paths are resolved from the directory you run the command in.
 
-`make install` (when you build from source) installs the command as `~/.local/bin/flint`. If you installed Flint from a release, you can install the same small script by hand: save [scripts/flint](https://github.com/ODudek/flint/blob/main/scripts/flint) as `~/.local/bin/flint` and make it executable with `chmod +x ~/.local/bin/flint`. It expects Flint in `/Applications` or `~/Applications`.
+`make install` (when you build from source) installs the command as `~/.local/bin/flint`. If you installed Flint from a release, you can install the same small script by hand: save [scripts/flint](https://github.com/flint-ide/flint/blob/main/scripts/flint) as `~/.local/bin/flint` and make it executable with `chmod +x ~/.local/bin/flint`. It expects Flint in `/Applications` or `~/Applications`.
 
 > **Tip:** Make sure `~/.local/bin` is on your `PATH`.
 
@@ -152,13 +152,13 @@ Project files such as `.flint/run.json` and `.http` environment files stay in yo
 You need Go, Node, the Xcode Command Line Tools and the Wails v3 CLI. Then:
 
 ```bash
-git clone https://github.com/ODudek/flint.git
+git clone https://github.com/flint-ide/flint.git
 cd flint
 cd frontend && npm ci --ignore-scripts && cd ..
 make install
 ```
 
-`make install` builds the app, copies it to `/Applications` and installs the `flint` command in `~/.local/bin`. Exact versions and other build targets are described in [DEVELOPMENT.md](https://github.com/ODudek/flint/blob/main/docs/DEVELOPMENT.md).
+`make install` builds the app, copies it to `/Applications` and installs the `flint` command in `~/.local/bin`. Exact versions and other build targets are described in [DEVELOPMENT.md](https://github.com/flint-ide/flint/blob/main/docs/DEVELOPMENT.md).
 
 ## Next steps
 

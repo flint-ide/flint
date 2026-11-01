@@ -20,7 +20,7 @@ No. The only request Flint makes on its own is a daily check for a newer release
 
 ### Does Flint update itself?
 
-No. Flint tells you when a newer release exists (a notice in the status bar, or **Help ▸ Check for Updates…**), but you download it from the [releases page](https://github.com/ODudek/flint/releases) and replace the app yourself. See [Updating](../installation.md#updating).
+No. Flint tells you when a newer release exists (a notice in the status bar, or **Help ▸ Check for Updates…**), but you download it from the [releases page](https://github.com/flint-ide/flint/releases) and replace the app yourself. See [Updating](../installation.md#updating).
 
 ## Agents
 

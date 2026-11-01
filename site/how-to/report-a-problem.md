@@ -11,7 +11,7 @@ Recipes for reporting bugs with the information needed to fix them, and for repo
 
 Nothing is sent until you submit the issue yourself. If the prefilled text is cut short, paste the full version from the clipboard.
 
-You can also open an issue directly on [GitHub](https://github.com/ODudek/flint/issues).
+You can also open an issue directly on [GitHub](https://github.com/flint-ide/flint/issues).
 
 ## Copy diagnostics
 
@@ -43,7 +43,7 @@ Before the text is created, Flint removes credentials it recognizes (private key
 
 Don't open a public issue for a vulnerability.
 
-1. Go to the [Security tab](https://github.com/ODudek/flint/security) of the repository.
+1. Go to the [Security tab](https://github.com/flint-ide/flint/security) of the repository.
 2. Click **Report a vulnerability**.
 3. Fill in the form. Include the versions from **Help ▸ Copy Diagnostics**, a description of the impact, and steps to reproduce. Don't include real secrets.
 

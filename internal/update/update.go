@@ -1,5 +1,5 @@
 // Package update tells whether a newer Flint release exists. It asks GitHub's
-// public API for the latest release of ODudek/flint (one anonymous GET: no
+// public API for the latest release of flint-ide/flint (one anonymous GET: no
 // token, no cookies, no identifiers beyond the User-Agent "Flint/<version>")
 // and compares its tag with the running version. It never downloads or
 // installs anything: the user gets a link to the release page.
@@ -23,10 +23,10 @@ const (
 	DefaultAPIBase = "https://api.github.com"
 	// ReleasesURL is where the download link points when the API's link is not
 	// one Flint is willing to open.
-	ReleasesURL = "https://github.com/ODudek/flint/releases/latest"
+	ReleasesURL = "https://github.com/flint-ide/flint/releases/latest"
 	// releasePrefix is the only place a link from the API may point to.
-	releasePrefix = "https://github.com/ODudek/flint/"
-	latestPath    = "/repos/ODudek/flint/releases/latest"
+	releasePrefix = "https://github.com/flint-ide/flint/"
+	latestPath    = "/repos/flint-ide/flint/releases/latest"
 
 	// Interval is how often Flint asks on its own.
 	Interval = 24 * time.Hour
@@ -42,7 +42,7 @@ const (
 type Release struct {
 	Tag         string    `json:"tag"`         // "v1.2.3"
 	Name        string    `json:"name"`        // release title, may be empty
-	URL         string    `json:"url"`         // release page, always under https://github.com/ODudek/flint/
+	URL         string    `json:"url"`         // release page, always under https://github.com/flint-ide/flint/
 	PublishedAt time.Time `json:"publishedAt"` // zero when GitHub didn't say
 }
 

@@ -395,10 +395,10 @@ Unhealthy apps are sorted first and expanded.
 
 ### Update check
 
-- Flint asks GitHub's API for the latest release (`GET https://api.github.com/repos/ODudek/flint/releases/latest`): one anonymous request with `User-Agent: Flint/<version>`, no token, cookies or identifiers, a 10 s timeout and a 1 MB response limit (`internal/update`).
+- Flint asks GitHub's API for the latest release (`GET https://api.github.com/repos/flint-ide/flint/releases/latest`): one anonymous request with `User-Agent: Flint/<version>`, no token, cookies or identifiers, a 10 s timeout and a 1 MB response limit (`internal/update`).
 - Automatically: 5 s after launch and then once a day while Flint runs, at most once every 24 hours (the last check, its answer and a skipped version are kept in `state.json`, so a restart reuses the answer instead of asking again). Never in development builds (`dev`, `dev-<sha>`), and never when `checkForUpdates` is off (Settings ▸ Updates). A failed check is only logged.
 - The running version (`vX.Y.Z` from `-ldflags`) is compared with the release tag by Flint's own SemVer compare; a pre-release sorts below its release.
-- A newer release shows a notice in the status bar: **Download** opens the release page in the browser (only a `https://github.com/ODudek/flint/…` link from the API; anything else falls back to the releases page), **Skip This Version** stays quiet until a later release, **✕** hides it until the next launch.
+- A newer release shows a notice in the status bar: **Download** opens the release page in the browser (only a `https://github.com/flint-ide/flint/…` link from the API; anything else falls back to the releases page), **Skip This Version** stays quiet until a later release, **✕** hides it until the next launch.
 - **Help ▸ Check for Updates…** (also in the palette and Settings ▸ Updates ▸ Check Now) checks immediately, ignoring the daily limit and the setting, and says "You're up to date (vX.Y.Z)" when there is nothing new.
 - Flint never downloads or installs anything: there is no auto-update framework.
 

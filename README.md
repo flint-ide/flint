@@ -1,6 +1,6 @@
 # Flint
 
-[![CI](https://github.com/ODudek/flint/actions/workflows/ci.yml/badge.svg)](https://github.com/ODudek/flint/actions/workflows/ci.yml)
+[![CI](https://github.com/flint-ide/flint/actions/workflows/ci.yml/badge.svg)](https://github.com/flint-ide/flint/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Flint is a fast, minimal, AI-first IDE for macOS and Linux. Coding agents (Claude Code, Codex) write the code in a built-in chat or terminal, and Flint is where you navigate, search the project, review what the agent changed, run and debug, and work with your databases, APIs and clusters. It is a single Go process with the system web view (WKWebView on macOS, WebKitGTK on Linux; Wails v3), not Electron, so it starts quickly and stays light on CPU and memory.
@@ -91,7 +91,7 @@ The full reference, with every detail and all keyboard shortcuts, is in [docs/FE
 
 ### Download
 
-Download the latest `.dmg` (or `.zip`) from [GitHub Releases](https://github.com/ODudek/flint/releases) and drag Flint to Applications. Release builds are universal (Apple silicon and Intel) and come with SHA-256 checksums.
+Download the latest `.dmg` (or `.zip`) from [GitHub Releases](https://github.com/flint-ide/flint/releases) and drag Flint to Applications. Release builds are universal (Apple silicon and Intel) and come with SHA-256 checksums.
 
 Release builds are ad-hoc signed unless they are notarized. On first launch macOS may refuse to open the app: right-click Flint in Applications, choose **Open**, then confirm. You only need to do this once.
 
@@ -100,7 +100,7 @@ Release builds are ad-hoc signed unless they are notarized. On first launch macO
 See [Requirements](#requirements), then:
 
 ```bash
-git clone https://github.com/ODudek/flint.git
+git clone https://github.com/flint-ide/flint.git
 cd flint
 cd frontend && npm ci --ignore-scripts && cd ..
 make install    # macOS: builds build/bin/flint.app, copies it to /Applications, installs `flint` in ~/.local/bin
@@ -150,13 +150,13 @@ Development details (tests, bindings, server mode, releases) are in [docs/DEVELO
 
 Use **Help ▸ Report an Issue…** in Flint. It opens a prefilled GitHub issue in your browser with the versions of Flint, macOS, Go and Wails, the versions of installed tools, and the last 150 lines of Flint's log, all with secrets and your home path redacted. It also copies the full report to the clipboard. Review the issue before you submit it; nothing is sent automatically.
 
-You can also open an issue directly on [GitHub](https://github.com/ODudek/flint/issues). **Help ▸ Copy Diagnostics** copies the same redacted report, and **Help ▸ Show Logs in Finder** shows the log file (`~/Library/Logs/Flint/flint.log`).
+You can also open an issue directly on [GitHub](https://github.com/flint-ide/flint/issues). **Help ▸ Copy Diagnostics** copies the same redacted report, and **Help ▸ Show Logs in Finder** shows the log file (`~/Library/Logs/Flint/flint.log`).
 
 Report security vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
-**User guide:** https://odudek.github.io/flint/ — getting started, use cases, how-to recipes, feature guides and reference (built from `site/` with `make docs`).
+**User guide:** https://flint-ide.github.io/flint/ — getting started, use cases, how-to recipes, feature guides and reference (built from `site/` with `make docs`).
 
 - [docs/PRINCIPLES.md](docs/PRINCIPLES.md): the five architectural principles every change is held to
 - [docs/FEATURES.md](docs/FEATURES.md): full feature reference and keyboard shortcuts

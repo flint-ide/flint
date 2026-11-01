@@ -166,7 +166,7 @@ func NewApp() (*App, error) {
 	a.mcp, a.mcpSources = newMCP(a)
 	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
 	a.agents = newAgentManager(a)
-	a.remote, a.remoteDevices = newRemote(a, remoteKeychain{})
+	a.remote, a.remoteDevices = newRemote(a, remoteSecretStore())
 	return a, nil
 }
 

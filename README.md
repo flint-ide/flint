@@ -21,6 +21,18 @@ Opening the Go standard library source (12,000 files) with a fresh profile on an
 
 Memory is the physical footprint of all of the editor's processes, including the WebKit processes that render Flint's window. How it was measured, and how to repeat it on your machine with `go run ./cmd/bench`, is in [docs/BENCHMARK.md](docs/BENCHMARK.md).
 
+## Why another IDE?
+
+Coding agents now write much of the code; the work around them is giving them context, reviewing what they changed, running and debugging it, and handing back what broke. Today's editors were built for the person typing, with AI added on the side, so that work is spread over a terminal, an editor, a git client, a database client and a browser tab. Flint is built the other way round:
+
+- **Bring your own agent:** Claude Code, Codex or any ACP agent, with your own subscriptions; Flint has no model or AI plan of its own.
+- **Agents see what the IDE sees:** language server problems, the selection, test results, through Flint's own read-only MCP server.
+- **Every failure is one step from the agent:** a test, a build, a crashing pod, a query, a merge conflict, with the context gathered and redacted for you to review.
+- **Built for reviewing:** IntelliJ-style Git and pull request review, parallel agent tasks in their own worktrees.
+- **Everything in one window, and light:** databases, HTTP, Docker, Kubernetes, AWS, debugging, in about 120 MB.
+
+The full comparison with VS Code, Cursor, Zed, JetBrains and terminal agents, and when Flint is *not* the right choice yet, is in [Why Flint](site/why-flint.md).
+
 ## Features
 
 The full reference, with every detail and all keyboard shortcuts, is in [docs/FEATURES.md](docs/FEATURES.md).

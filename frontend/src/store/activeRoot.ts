@@ -16,6 +16,7 @@ export function activeContextPath(): string | null {
       return tab.path
     case 'pr':
     case 'prdiff':
+    case 'cilog':
       return tab.root
     case 'terminal': {
       const term = useTerminal.getState().tabs.find((t) => t.id === tab.termId)

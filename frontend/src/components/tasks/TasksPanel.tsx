@@ -16,6 +16,7 @@ import {
 import { BrowserOpenURL } from '../../wails/runtime'
 import { NewTaskForm } from './NewTaskForm'
 import { Icon } from '../ui/Icon'
+import { TaskCI, TaskCIFix } from './TaskCI'
 
 const basename = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 
@@ -71,6 +72,7 @@ function TaskRow({ t, changes, open, busy }: RowProps) {
         <span title={`${t.branch} from ${t.base} · ${t.agent}`}><Icon name="branch" size={12} /> {t.branch}</span>
         <span>{status}</span>
         {t.ahead > 0 && !t.merged && <span title={`Commits not in ${t.base}`}>↑{t.ahead}</span>}
+        <TaskCI t={t} />
       </div>
       {t.state === 'failed' && t.error && <div className="task-error">{t.error}</div>}
       <div className="task-actions">
@@ -80,6 +82,7 @@ function TaskRow({ t, changes, open, busy }: RowProps) {
         {a.merge && <button className="link" disabled={busy} onClick={() => void mergeTask(t)} title={`Merge into ${t.base} where it is checked out`}>Merge</button>}
         {a.pr && <button className="link" disabled={busy} onClick={() => void createTaskPullRequest(t)} title="Push the branch and create a pull request with gh">Create PR</button>}
         {t.pullRequest && <button className="link" onClick={() => BrowserOpenURL(t.pullRequest)} title={t.pullRequest}>PR ↗</button>}
+        <TaskCIFix t={t} />
         <span className="spacer" />
         <button className="icon" disabled={busy} title="Remove the task" onClick={() => void removeTask(t)}>✕</button>
       </div>

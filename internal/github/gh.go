@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -104,9 +105,16 @@ func (c *Client) run(ctx context.Context, dir string, stdin []byte, args ...stri
 
 // exec runs gh and returns its raw output.
 func (c *Client) exec(ctx context.Context, dir string, stdin []byte, args ...string) ([]byte, string, error) {
+	var stdout bytes.Buffer
+	stderr, err := c.execTo(ctx, dir, stdin, &stdout, args...)
+	return stdout.Bytes(), stderr, err
+}
+
+// execTo runs gh with its stdout going to w (e.g. a bounded buffer for logs).
+func (c *Client) execTo(ctx context.Context, dir string, stdin []byte, w io.Writer, args ...string) (string, error) {
 	bin, err := c.lookPath()
 	if err != nil {
-		return nil, "", ErrNotInstalled
+		return "", ErrNotInstalled
 	}
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = dir
@@ -123,11 +131,11 @@ func (c *Client) exec(ctx context.Context, dir string, stdin []byte, args ...str
 	if stdin != nil {
 		cmd.Stdin = bytes.NewReader(stdin)
 	}
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
+	var stderr bytes.Buffer
+	cmd.Stdout = w
 	cmd.Stderr = &stderr
 	err = cmd.Run()
-	return stdout.Bytes(), stderr.String(), err
+	return stderr.String(), err
 }
 
 // runJSON runs gh and decodes its stdout into v.

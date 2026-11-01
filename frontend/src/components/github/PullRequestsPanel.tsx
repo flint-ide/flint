@@ -7,6 +7,8 @@ import { ROLLUP_GLYPH, checksSummary, rollup, stateBadge, timeAgo } from '../../
 import type { PullRequest } from '../../api/backend'
 import { Select } from '../ui/Select'
 import { useWindowFocus } from './useWindowFocus'
+import { CIBanner } from './CIStatus'
+import { useCurrentCI } from '../../store/ci'
 
 const WHO: { value: Who; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -32,6 +34,7 @@ export function PullRequestsPanel() {
   const error = usePullRequests((s) => s.error)
   const who = usePullRequests((s) => s.who)
   const state = usePullRequests((s) => s.state)
+  const ci = useCurrentCI()
 
   // Loaded when shown and on window focus; the panel unmounts when hidden, so nothing polls.
   useEffect(() => void loadPullRequests(root), [root])
@@ -57,6 +60,7 @@ export function PullRequestsPanel() {
           {loading && <span className="muted pr-loading">Loading…</span>}
         </div>
       )}
+      {repo && <CIBanner entry={ci} />}
       <div className="tree scroll">
         {!root && <div className="placeholder muted">Open a folder to see its pull requests.</div>}
         {status && status.state !== 'ok' && <StatusMessage state={status.state} message={status.message} onRetry={() => void loadPullRequests(root, true)} />}

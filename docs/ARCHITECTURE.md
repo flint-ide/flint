@@ -102,6 +102,7 @@ flowchart LR
 ### Pull requests
 
 - `GitHubAPI` (`api_github.go` → `internal/github`) runs `gh` with timeouts (30 s for reads, 60 s for writes, 3 minutes for checkout), with no prompts, pager or colors.
+- CI of your pull requests (`api_ci.go`, `internal/cilog`, `frontend/src/store/ci.ts`): the frontend follows the current branch's and agent tasks' pull requests and polls only while a check runs (`settings.ci`). Fix with agent asks Go for a report: the run and its failed-steps log via `gh`, redacted (`internal/redact`) and cut to the failing step's tail plus error lines, with `file:line` references resolved to workspace files; `lib/ci.ts` turns it into the chat draft.
 - The project's repository is resolved with `gh repo view` (remotes, `gh repo set-default`, Enterprise hosts), and the login state with `gh auth status`. A missing `gh`, a missing login and a missing GitHub remote are distinct errors with a hint.
 - List: `gh pr list --json …` (check status counted in Go). Details, in parallel: `gh pr view --json …`, `gh api --paginate repos/…/pulls/N/files` (files with patches), and a GraphQL query for review threads (`gh api graphql --input -`, paginated).
 - File diff: the head comes from the local clone if it has the blob (`git cat-file`), otherwise from `gh api …/git/blobs/<sha>`. The base is reconstructed by reverse-applying GitHub's patch to the head (with a consistency check); for files without a patch (binary, huge) it comes from the merge base (`git merge-base` locally, or `gh api …/compare`).
@@ -348,7 +349,9 @@ internal/dap                Debug Adapter Protocol client, Delve (dlv dap) sessi
 internal/profiling          pprof profiles: call tree and top for the flame graph, fetching from net/http/pprof, temp dirs
 internal/restore            project session persistence (tabs, terminals, chats) across runs
 internal/git                status, commit, rollback, branches, worktrees, log, blame, file history, stash, objects and merge base (git CLI)
-internal/github             pull requests through gh: list, details, review threads (GraphQL), file diff, replies, resolve, review, checkout
+internal/github             pull requests through gh: list, details, review threads (GraphQL), file diff, replies, resolve, review, checkout,
+                            a branch's checks, workflow runs, failed-step logs (tail-bounded) and rerunning failed jobs
+internal/cilog              CI logs for the agent: parse --log-failed output, excerpt the failing step, map file:line references to the workspace
 internal/docker             docker CLI: Compose projects, containers, events
 internal/awsprof            AWS CLI profiles, credential status, login and refresh
 internal/kube               kubectl: contexts, namespaces, resources, apps, rollout state, diagnosis

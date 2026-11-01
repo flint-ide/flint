@@ -7,7 +7,7 @@ describe('icons', () => {
     for (const [name, paths] of Object.entries(ICONS)) {
       assert.ok(paths.length > 0, name)
       for (const d of paths) assert.match(d, /^M[-\d.]/, `${name}: ${d}`)
-      for (const d of paths) assert.doesNotMatch(d, /NaN|undefined/, `${name}: ${d}`)
+      for (const d of paths) assert.ok(!/NaN|undefined/.test(d), `${name}: ${d}`)
     }
   })
 

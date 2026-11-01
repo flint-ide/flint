@@ -13,6 +13,7 @@ import {
   type CompletionSettings, type InlineEditSettings,
 } from './editorAiSettings'
 import { coerceAgentTasks, DEFAULT_AGENT_TASKS, type AgentTaskSettings } from './agentTasks'
+import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
 
 import type { ResolvedTheme, ThemeMode } from './themeMode'
 
@@ -73,6 +74,8 @@ export interface AppSettings {
   inlineEdit: InlineEditSettings
   /** Where agent task worktrees go and how their branches start. */
   agentTasks: AgentTaskSettings
+  /** Following your pull requests' CI: poll interval, log excerpt size, notifications. */
+  ci: CISettings
 }
 
 /** Mirrors settings.Default() in Go (used until the backend answers). */
@@ -97,6 +100,7 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   completions: DEFAULT_COMPLETIONS,
   inlineEdit: DEFAULT_INLINE_EDIT,
   agentTasks: DEFAULT_AGENT_TASKS,
+  ci: DEFAULT_CI,
 }) as AppSettings
 
 /** Same limits as Go's settings.Validate, for the inputs. */
@@ -213,5 +217,6 @@ export function coerceSettings(v: unknown): AppSettings {
     completions: coerceCompletions(v.completions),
     inlineEdit: coerceInlineEdit(v.inlineEdit),
     agentTasks: coerceAgentTasks(v.agentTasks),
+    ci: coerceCI(v.ci),
   }
 }

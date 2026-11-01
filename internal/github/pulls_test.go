@@ -117,7 +117,7 @@ func TestCheckStates(t *testing.T) {
 		{ghCheck{Typename: "StatusContext", State: "ERROR"}, "failure"},
 	}
 	for _, tt := range tests {
-		if got := tt.check.check().State; got != tt.want {
+		if got := tt.check.check("").State; got != tt.want {
 			t.Errorf("%+v → %q, want %q", tt.check, got, tt.want)
 		}
 	}

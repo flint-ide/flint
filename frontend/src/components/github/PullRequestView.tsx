@@ -98,7 +98,7 @@ function Checks({ root, details }: { root: string; details: PullRequestDetails }
   const counts = useMemo(() => countChecks(checks), [checks])
   const state = rollup(counts)
   if (checks.length === 0) return null
-  const target: FixTarget = { root, pr: { number: details.number, title: details.title, url: details.url }, checks }
+  const target: FixTarget = { root, pr: { number: details.number, title: details.title, url: details.url, crossRepository: details.crossRepository }, checks }
   return (
     <section className="pr-section">
       <div className="pr-section-title clickable" onClick={() => setOpen(!open)}>

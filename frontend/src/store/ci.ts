@@ -7,10 +7,10 @@
 import { createStore } from '../lib/store'
 import { GitHub, errorMessage } from '../api/backend'
 import type { github } from '../wails/models'
-import { ciFixPrompt, ciNotice, ciState, ciTransition, checkName, failedRuns, nextPollMs, type CIState, type FailedRun } from '../lib/ci'
+import { ciFixPrompt, ciNotice, ciState, ciTransition, checkName, failedRuns, pollDelay, type CIState, type FailedRun } from '../lib/ci'
 import { askAgent } from '../lib/askAgent'
 import { alertDone } from './alerts'
-import { confirmAction, showToast } from './dialog'
+import { showToast } from './dialog'
 import { pullRequestTabId, useEditor } from './editor'
 import { useGit } from './git'
 import { useSettings } from './settings'
@@ -47,6 +47,8 @@ const timers = new Map<string, ReturnType<typeof setTimeout>>()
 const unchanged = new Map<string, number>()
 const signatures = new Map<string, string>()
 const lastRead = new Map<string, number>()
+/** Failed reads in a row, for the back-off. */
+const failures = new Map<string, number>()
 const inflight = new Map<string, Promise<void>>()
 
 /** Focus refreshes skip entries read this recently. */
@@ -71,7 +73,7 @@ function follow(owner: string, root: string | null, branch: string | null): void
 function forget(key: string): void {
   owners.delete(key)
   clearTimeout(timers.get(key))
-  for (const m of [timers, unchanged, signatures, lastRead]) m.delete(key)
+  for (const m of [timers, unchanged, signatures, lastRead, failures]) m.delete(key)
   set((s) => {
     const { [key]: _gone, ...entries } = s.entries
     return { entries }
@@ -102,8 +104,10 @@ async function read(key: string): Promise<void> {
     const sig = JSON.stringify(data.counts) + (data.pr?.headSha ?? '')
     unchanged.set(key, signatures.get(key) === sig ? (unchanged.get(key) ?? 0) + 1 : 0)
     signatures.set(key, sig)
+    failures.delete(key)
     patch(key, { data, state, error: null, loading: false })
   } catch (err) {
+    failures.set(key, (failures.get(key) ?? 0) + 1)
     patch(key, { error: errorMessage(err), loading: false })
   }
   schedule(key)
@@ -113,15 +117,24 @@ function patch(key: string, change: Partial<CIEntry>): void {
   set((s) => (s.entries[key] ? { entries: { ...s.entries, [key]: { ...s.entries[key], ...change } } } : s))
 }
 
-/** Polls again only while checks are running (in the background only when CI notifications are on). */
+/**
+ * Polls again only while checks are running (in the background only when CI
+ * notifications are on), backing off on failed reads and stopping after a few
+ * in a row; focus or a refresh reads again.
+ */
 function schedule(key: string): void {
   clearTimeout(timers.get(key))
   const entry = get().entries[key]
-  if (!entry?.data?.pr || entry.data.counts.pending === 0) return // nothing running: nothing to wait for
   const { ci, notifyInBackground } = useSettings.getState().settings
-  const focused = document.hasFocus()
-  if (!focused && !(ci.notify && notifyInBackground)) return // the focus handler reads it again
-  timers.set(key, setTimeout(() => void refresh(key), nextPollMs(ci.pollSeconds, unchanged.get(key) ?? 0, focused)))
+  const delay = pollDelay({
+    pollSeconds: ci.pollSeconds,
+    pending: !!entry?.data?.pr && entry.data.counts.pending > 0,
+    unchanged: unchanged.get(key) ?? 0,
+    errors: failures.get(key) ?? 0,
+    focused: document.hasFocus(),
+    background: ci.notify && notifyInBackground,
+  })
+  if (delay !== null) timers.set(key, setTimeout(() => void refresh(key), delay))
 }
 
 function notify(kind: 'failed' | 'passed' | null, root: string, data: github.BranchChecks): void {
@@ -190,7 +203,7 @@ export function useCurrentCI(): CIEntry | null {
 export interface FixTarget {
   /** Folder gh runs in and the agent works in. */
   root: string
-  pr: { number: number; title: string; url: string } | null
+  pr: { number: number; title: string; url: string; crossRepository?: boolean } | null
   checks: readonly github.Check[]
   /** An agent task: its chat and worktree get the draft. */
   task?: TaskView
@@ -236,14 +249,14 @@ export function openCILog(root: string, runId: number, jobId: number, label: str
   useEditor.getState().openCILog(root, runId, jobId, `Log: ${label}`)
 }
 
-/** Re-runs a run's failed jobs on GitHub after asking. */
+/** Re-runs a run's failed jobs on GitHub; Go asks first in a native dialog (repository and workflow). */
 export async function rerunFailedJobs(root: string, runId: number, label: string): Promise<void> {
-  if (!(await confirmAction(`Re-run the failed jobs of ${label} on GitHub?`, 'Re-run'))) return
   try {
     await GitHub.RerunFailed(root, runId)
     showToast(`Re-running the failed jobs of ${label}`)
     for (const [key, entry] of Object.entries(get().entries)) if (entry.root === root) void refresh(key)
   } catch (err) {
-    showToast(errorMessage(err), 'error')
+    const msg = errorMessage(err)
+    if (!msg.includes('cancelled')) showToast(msg, 'error')
   }
 }

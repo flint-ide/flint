@@ -6,6 +6,9 @@ import { showToast } from '../../store/dialog'
 import { findPathLinks, resolvePath } from '../../lib/pathLinks'
 import { fixCIWithAgent, rerunFailedJobs } from '../../store/ci'
 
+/** Lines rendered at a time: the end of the log first, earlier pages on request. */
+export const LOG_PAGE = 1000
+
 interface LogState {
   text: string
   files: Record<string, string>
@@ -17,10 +20,12 @@ export function CILogView({ tab }: { tab: CILogTab }) {
   const [log, setLog] = useState<LogState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
+  const [shown, setShown] = useState(LOG_PAGE)
 
   useEffect(() => {
     let live = true
     setError(null)
+    setShown(LOG_PAGE)
     GitHub.CILog(tab.root, tab.runId, tab.jobId)
       .then((l) => live && setLog({ text: l.text, files: (l.files ?? {}) as Record<string, string>, truncated: l.truncated }))
       .catch((err) => live && setError(errorMessage(err)))
@@ -30,6 +35,7 @@ export function CILogView({ tab }: { tab: CILogTab }) {
   }, [tab.root, tab.runId, tab.jobId, nonce])
 
   const lines = useMemo(() => (log ? log.text.split('\n') : []), [log])
+  const first = Math.max(0, lines.length - shown)
   const open = (path: string, line?: number, column?: number) => {
     const mapped = log?.files[path]
     if (!mapped) {
@@ -61,9 +67,15 @@ export function CILogView({ tab }: { tab: CILogTab }) {
       {!log && !error && <div className="placeholder muted">Loading the log…</div>}
       {log && (
         <pre className="ci-log-text selectable">
-          {log.truncated && <div className="muted">… the start of the log is left out</div>}
-          {lines.map((line, i) => (
-            <div key={i} className={line.startsWith('── ') ? 'ci-log-step' : undefined}>
+          {first > 0 ? (
+            <button className="link" onClick={() => setShown(shown + LOG_PAGE)}>
+              Show {Math.min(LOG_PAGE, first)} earlier lines ({first} hidden)
+            </button>
+          ) : (
+            log.truncated && <div className="muted">… the start of the log is left out (it was longer than Flint keeps)</div>
+          )}
+          {lines.slice(first).map((line, i) => (
+            <div key={first + i} className={line.startsWith('── ') ? 'ci-log-step' : undefined}>
               {linkify(line, log.files, open)}
             </div>
           ))}

@@ -92,6 +92,8 @@ type Settings struct {
 	LanguageServers map[string]LanguageServerSettings `json:"languageServers"`
 	// Refresh sets how often polling panels re-read their data.
 	Refresh Refresh `json:"refresh"`
+	// MCPServer configures what Flint's own MCP server tells agents.
+	MCPServer MCPServer `json:"mcpServer"`
 }
 
 // Default returns the settings Flint uses when nothing is configured.
@@ -117,6 +119,7 @@ func Default() Settings {
 		CustomAgents:       []CustomAgent{},
 		LanguageServers:    map[string]LanguageServerSettings{},
 		Refresh:            defaultRefresh(),
+		MCPServer:          defaultMCPServer(),
 	}
 }
 
@@ -179,6 +182,7 @@ func Normalize(s Settings) Settings {
 	out.Agents = normalizeAgents(s.Agents)
 	out.LanguageServers = normalizeLanguageServers(s.LanguageServers)
 	out.Refresh = normalizeRefresh(s.Refresh)
+	out.MCPServer = normalizeMCPServer(s.MCPServer)
 	return out
 }
 
@@ -249,6 +253,9 @@ func Validate(s Settings) error {
 		return err
 	}
 	if err := validateLanguageServers(s.LanguageServers); err != nil {
+		return err
+	}
+	if err := validateMCPServer(s.MCPServer); err != nil {
 		return err
 	}
 	return validateRefresh(s.Refresh)

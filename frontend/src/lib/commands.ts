@@ -170,7 +170,11 @@ const chordFor = (keys: string): Chord => {
  * ⇧⌘2 is '2', not '@'), and the space bar is 'space'.
  */
 export function eventKey(e: KeyEventLike): string {
-  if ((e.altKey || e.shiftKey) && e.code) {
+  // With a non-Latin layout (Cyrillic, Greek…) Ctrl+P gives key 'з': shortcuts go by
+  // the physical key then too. (Windows later: AltGr arrives as Ctrl+Alt, so a
+  // character typed with AltGr must not be read as a shortcut.)
+  const nonLatin = (e.ctrlKey || e.metaKey) && e.key.length === 1 && e.key > '\x7e'
+  if ((e.altKey || e.shiftKey || nonLatin) && e.code) {
     const m = /^(?:Key([A-Z])|Digit(\d))$/.exec(e.code)
     if (m) return (m[1] ?? m[2]).toLowerCase()
   }

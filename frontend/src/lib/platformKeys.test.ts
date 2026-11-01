@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   canonicalKeys,
   commandForKey,
+  eventKey,
   formatKeys,
   keyHint,
   keysFromEvent,
@@ -98,6 +99,18 @@ describe('platform conventions', () => {
     } finally {
       off()
     }
+  })
+
+  it('runs shortcuts by the physical key on non-Latin layouts', () => {
+    setMac(false)
+    // Russian layout: Ctrl+P types 'з', ⌘/Ctrl+Shift+P '{З}'.
+    assert.ok(matchesKeys(key('з', { ctrlKey: true, code: 'KeyP' }), 'Mod+P'))
+    assert.ok(matchesKeys(key('З', { ctrlKey: true, shiftKey: true, code: 'KeyP' }), 'Mod+Shift+P'))
+    // Typing without a modifier stays text, and named keys stay named.
+    assert.equal(eventKey(key('з', { code: 'KeyP' })), 'з')
+    assert.equal(eventKey(key('Enter', { ctrlKey: true, code: 'Enter' })), 'enter')
+    setMac(true)
+    assert.ok(matchesKeys(key('π', { metaKey: true, code: 'KeyP' }), 'Mod+P')) // Greek on macOS
   })
 
   it("shows a command's current shortcut", () => {

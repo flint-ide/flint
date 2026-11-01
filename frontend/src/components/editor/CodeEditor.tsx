@@ -4,6 +4,7 @@ import { EditorView, keymap, type KeyBinding } from '@codemirror/view'
 import { baseExtensions } from '../../lib/editorSetup'
 import { focusSoon } from '../../lib/focusSoon'
 import type { Reveal } from '../../store/editor'
+import { scheduleEditorContextSync } from '../../store/editorContext'
 
 interface Props {
   /** Initial document; the editor owns the text afterwards. */
@@ -37,6 +38,7 @@ export function CodeEditor({ initialDoc, language, keys = [], reveal, active, on
           languageConf.current.of(language),
           EditorView.updateListener.of((u) => {
             if (u.docChanged) onChangeRef.current?.()
+            if (u.selectionSet || u.focusChanged) scheduleEditorContextSync()
           }),
         ],
       }),

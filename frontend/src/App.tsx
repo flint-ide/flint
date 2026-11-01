@@ -15,6 +15,7 @@ import { subscribeAgentChatEvents } from './store/agentChat'
 import { subscribeRunEvents, useRun } from './store/run'
 import { subscribeDebugEvents } from './store/debug'
 import { subscribeAutoSave } from './store/settings'
+import { subscribeEditorContext } from './store/editorContext'
 import { activeRoot } from './store/activeRoot'
 import { openDropped } from './store/drop'
 import { refreshTrust, useTrust } from './store/trust'
@@ -79,6 +80,7 @@ export default function App() {
     subscribeAutoSave()
     subscribeAlerts()
     subscribeUpdates()
+    subscribeEditorContext()
     // Native File menu: Open Folder… / Open Recent ▸ <folder>.
     EventsOn('menu:open-recent', () => useWorkspace.getState().setRecentOpen(true))
     EventsOn('menu:open-folder', (path: string) => void useWorkspace.getState().openFolder(path))

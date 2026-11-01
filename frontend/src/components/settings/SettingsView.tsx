@@ -7,15 +7,17 @@ import { checkForUpdates, useUpdate } from '../../store/update'
 import { AgentsSection } from './AgentsSection'
 import { LanguageServersSection } from './LanguageServersSection'
 import { RefreshSection } from './RefreshSection'
+import { McpServerSection } from './McpServerSection'
 import { NumberField, Row, TextField } from './fields'
 
-type Section = 'appearance' | 'editor' | 'terminal' | 'agents' | 'lsp' | 'refresh' | 'todo' | 'keymap' | 'updates'
+type Section = 'appearance' | 'editor' | 'terminal' | 'agents' | 'agentContext' | 'lsp' | 'refresh' | 'todo' | 'keymap' | 'updates'
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'editor', label: 'Editor' },
   { id: 'terminal', label: 'Terminal' },
   { id: 'agents', label: 'Agents' },
+  { id: 'agentContext', label: 'Agent Context' },
   { id: 'lsp', label: 'Language Servers' },
   { id: 'refresh', label: 'Refresh' },
   { id: 'todo', label: 'TODO List' },
@@ -43,6 +45,7 @@ export function SettingsView({ active }: { active: boolean }) {
         {section === 'editor' && <EditorSection />}
         {section === 'terminal' && <TerminalSection />}
         {section === 'agents' && <AgentsSection />}
+        {section === 'agentContext' && <McpServerSection />}
         {section === 'lsp' && <LanguageServersSection />}
         {section === 'refresh' && <RefreshSection />}
         {section === 'todo' && <TodoSection />}

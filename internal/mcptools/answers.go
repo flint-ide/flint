@@ -191,7 +191,7 @@ func (s *Sources) terminals(_ context.Context, root string, args json.RawMessage
 	}
 	var b strings.Builder
 	for _, t := range pick {
-		tail, ok := s.Terminals.Tail(t.ID, lines)
+		tail, ok := s.Terminals.Tail(t.ID, root, lines)
 		if !ok {
 			continue
 		}

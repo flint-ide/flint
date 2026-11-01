@@ -13,6 +13,8 @@ import {
   setCommandErrorHandler,
   type Command,
   type KeyEventLike,
+  VIM_EDITOR,
+  vimOwnsKey,
 } from './commands'
 
 const noop = () => undefined
@@ -102,6 +104,31 @@ describe('commandForKey', () => {
     assert.equal(commandForKey(key('r', { metaKey: true }), nowhere)?.id, 't.global')
     register({ id: 't.local', title: 'Local', keys: 'Mod+R', run: noop })
     assert.equal(commandForKey(key('r', { metaKey: true }), nowhere)?.id, 't.local')
+  })
+
+  it('leaves Vim its ⌃ keys in a Vim editor, and only there', () => {
+    register({ id: 't.run', title: 'Run', keys: 'Ctrl+R', keysIgnoredIn: '.terminal-view', run: noop })
+    register({ id: 't.debug', title: 'Debug', keys: 'Ctrl+D', run: noop })
+    register({ id: 't.test', title: 'Test at Cursor', keys: 'Ctrl+Shift+R', run: noop })
+    register({ id: 't.palette', title: 'Palette', keys: 'Mod+Shift+P', run: noop })
+    const inVim = (s: string) => s === VIM_EDITOR
+    assert.equal(commandForKey(key('r', { ctrlKey: true }), inVim), undefined)
+    assert.equal(commandForKey(key('d', { ctrlKey: true }), inVim), undefined)
+    assert.equal(commandForKey(key('r', { ctrlKey: true }), nowhere)?.id, 't.run')
+    assert.equal(commandForKey(key('d', { ctrlKey: true }), nowhere)?.id, 't.debug')
+    // Other modifiers aren't Vim's: Flint keeps them in a Vim editor too.
+    assert.equal(commandForKey(key('R', { ctrlKey: true, shiftKey: true, code: 'KeyR' }), inVim)?.id, 't.test')
+    assert.equal(commandForKey(key('P', { metaKey: true, shiftKey: true }), inVim)?.id, 't.palette')
+  })
+
+  it('knows which keys Vim keeps', () => {
+    for (const k of ['r', 'd', 'v', 'o', 'i', 'u', 'f', 'b', 'w', 'a', 'x', '[', ']']) {
+      assert.ok(vimOwnsKey(key(k, { ctrlKey: true })), `⌃${k}`)
+    }
+    assert.ok(!vimOwnsKey(key('r', { ctrlKey: true, metaKey: true })))
+    assert.ok(!vimOwnsKey(key('r', { ctrlKey: true, altKey: true })))
+    assert.ok(!vimOwnsKey(key('f7', { ctrlKey: true })))
+    assert.ok(!vimOwnsKey(key('r')))
   })
 
   it('treats a throwing when() as unavailable', () => {

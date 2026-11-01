@@ -3,17 +3,31 @@
 // and costs nothing otherwise.
 //
 // Ex commands go through the command registry, so :w and :q do exactly what
-// Save and Close Tab do for the active tab. Flint's global shortcuts keep
-// working: their dispatcher runs before CodeMirror sees a key (lib/commands.ts).
+// Save and Close Tab do for the active tab; only editors that are that tab's
+// document (lib/vimFacet.ts) allow them. Flint's global shortcuts keep working
+// (their dispatcher runs before CodeMirror sees a key, lib/commands.ts), except
+// the ⌃ keys Vim needs, which a Vim editor keeps (VIM_EDITOR, vimOwnsKey).
 import { getCM, Vim, vim } from '@replit/codemirror-vim'
 import { EditorView, ViewPlugin } from '@codemirror/view'
 import type { Extension } from '@codemirror/state'
-import { getCommand, isAvailable, runCommand } from './commands'
+import { getCommand, isAvailable, runCommand, VIM_EDITOR } from './commands'
+import { vimFileCommands } from './vimFacet'
 import { vimModeLabel, vimStateLabel, type VimModeEvent } from './vimMode'
 
-/** Runs registry commands in order, each after the previous one finished (:wq saves, then closes). */
-function exec(...ids: string[]): () => void {
-  return () =>
+type ExCM = Parameters<Parameters<typeof Vim.defineEx>[2]>[0]
+
+/**
+ * Runs registry commands in order, each after the previous one finished (:wq
+ * saves, then closes), when the editor is the active tab's own document.
+ */
+function exec(...ids: string[]): (cm: ExCM) => void {
+  return (cm) => {
+    if (!cm.cm6.state.facet(vimFileCommands)) {
+      const note = document.createElement('span')
+      note.textContent = 'Only file and scratchpad editors can be saved or closed with :w and :q'
+      cm.openNotification(note, { bottom: true, duration: 4000 })
+      return
+    }
     runCommand({
       id: `vim.${ids.join('+')}`,
       title: ids.join(' + '),
@@ -24,6 +38,7 @@ function exec(...ids: string[]): () => void {
         }
       },
     })
+  }
 }
 
 let exDefined = false
@@ -56,5 +71,7 @@ export function vimExtension(onMode: (label: string) => void): Extension {
       return false
     },
   })
-  return [vim(), reporter, focus]
+  // Marks the editor so the global dispatcher leaves Vim its ⌃ keys.
+  const marker = EditorView.editorAttributes.of({ class: VIM_EDITOR.slice(1) })
+  return [vim(), reporter, focus, marker]
 }

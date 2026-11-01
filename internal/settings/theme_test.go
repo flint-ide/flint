@@ -1,6 +1,10 @@
 package settings
 
 import (
+	"os"
+	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -109,6 +113,27 @@ func TestVimModeRoundtrip(t *testing.T) {
 	}
 	if Default().Editor.VimMode {
 		t.Error("vim mode is on by default")
+	}
+}
+
+// The frontend filters cached settings with the same allow-list (lib/settings.ts).
+func TestThemeVariablesMatchFrontend(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join("..", "..", "frontend", "src", "lib", "settings.ts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := strings.Index(string(src), "THEME_VARIABLES")
+	end := strings.Index(string(src[start:]), "])")
+	if start < 0 || end < 0 {
+		t.Fatal("THEME_VARIABLES not found in lib/settings.ts")
+	}
+	got := regexp.MustCompile(`'(--[a-z0-9-]+)'`).FindAllStringSubmatch(string(src[start:start+end]), -1)
+	var names []string
+	for _, m := range got {
+		names = append(names, m[1])
+	}
+	if !slices.Equal(names, ThemeVariables) {
+		t.Errorf("frontend THEME_VARIABLES = %v\nGo ThemeVariables = %v", names, ThemeVariables)
 	}
 }
 

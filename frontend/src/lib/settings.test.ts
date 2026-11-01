@@ -87,7 +87,7 @@ describe('custom theme', () => {
   })
 
   it('drops colors that are not hex or not CSS variables', () => {
-    const s = coerceSettings({ customTheme: { name: 3, base: 'neon', colors: { '--bg': 'red; }', 'color': '#fff', '--fg': '#ABCDEF' } } })
+    const s = coerceSettings({ customTheme: { name: 3, base: 'neon', colors: { '--bg': 'red; }', 'color': '#fff', '--fg': '#ABCDEF', '--editor-font-size': '#123' } } })
     assert.deepEqual(s.customTheme, { name: '', base: 'dark', colors: { '--fg': '#ABCDEF' } })
   })
 

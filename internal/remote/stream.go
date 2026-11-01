@@ -214,7 +214,7 @@ func (s *Server) runStream(ctx context.Context, ws *wsConn, sub *subscriber, sin
 	go func() { readDone <- ws.readLoop(func([]byte) {}) }() // phase 1: client messages are dropped
 	readEnded := false
 	defer func() {
-		if !readEnded { // give the client a moment to answer our close frame
+		if !readEnded && !ws.broken() { // give the client a moment to answer our close frame
 			select {
 			case <-readDone:
 				readEnded = true
@@ -244,6 +244,12 @@ func (s *Server) runStream(ctx context.Context, ws *wsConn, sub *subscriber, sin
 	ping := time.NewTicker(pingInterval)
 	defer ping.Stop()
 	for {
+		// A cut stream ends now: select picks at random among ready cases, so
+		// without this a full queue could keep it writing after Stop or Revoke.
+		if ctx.Err() != nil {
+			closeFor(ws, context.Cause(ctx))
+			return
+		}
 		select {
 		case <-sub.lost: // before anything queued: the queue is incomplete
 			ws.sendClose(closeTryAgainLater, "fell behind: reconnect with since")

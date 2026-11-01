@@ -221,6 +221,14 @@ func (c *wsConn) sendClose(code int, reason string) {
 	})
 }
 
+// broken reports whether a write failed: the connection can't carry a close
+// handshake any more, so waiting for the client's close frame is pointless.
+func (c *wsConn) broken() bool {
+	c.wmu.Lock()
+	defer c.wmu.Unlock()
+	return c.writeError != nil
+}
+
 // close ends the TCP connection (readLoop returns).
 func (c *wsConn) close() error { return c.conn.Close() }
 

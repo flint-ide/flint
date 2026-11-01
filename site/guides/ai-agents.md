@@ -123,10 +123,10 @@ Flint fills these placeholders:
 
 | Placeholder | Becomes |
 |---|---|
-| `{{selection}}` | The selected text of the editor you used last, as a code block (empty when nothing is selected) |
+| `{{selection}}` | The selected text of the editor you used last, as a code block with secrets redacted (empty when nothing is selected; only a note for a credentials file such as `.env`) |
 | `{{file}}` | That editor's file, relative to the project |
-| `{{problems}}` | The language server's problems in that file, one per line |
-| `{{diff}}` | The uncommitted changes, including new files, as a `diff` code block (at most 60 KB, secrets redacted) |
+| `{{problems}}` | The language server's problems in that file, one per line, secrets redacted |
+| `{{diff}}` | The uncommitted changes, including new files, as a `diff` code block (at most 60 KB, secrets redacted). Credentials files (`.env`, keys, kubeconfig, …) are left out and only named |
 | `{{branch}}` | The current branch |
 
 Placeholders are filled once: text that a value brings in (a selection containing `{{diff}}`) is left as it is, and an unknown `{{name}}` stays in the draft for you to see.

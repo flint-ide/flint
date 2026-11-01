@@ -171,6 +171,81 @@ func TestPromptsExpandGit(t *testing.T) {
 	}
 }
 
+func TestPromptsDiffOmitsCredentialFiles(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	api, root := promptsApp(t, true)
+	write := func(rel, content string) {
+		t.Helper()
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	gitT(t, root, "init", "-q", "-b", "main")
+	write("config/credentials", "user=old\n")
+	write("keys/deploy.txt", "old\n")
+	write("app.go", "package app\n")
+	gitT(t, root, "add", ".")
+	gitT(t, root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "init")
+	write("config/credentials", "user=TRACKEDSECRET\n")
+	write(".env", "API=UNTRACKEDSECRET\n")
+	write("app.go", "package app\n\nvar visible = 1\n")
+	// A rename into a credentials name: the old path is harmless, the new one is not.
+	gitT(t, root, "mv", "keys/deploy.txt", "keys/deploy.pem")
+	write("keys/deploy.pem", "RENAMEDSECRET\n")
+
+	out, err := api.Expand(root, "review", PromptInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, secret := range []string{"TRACKEDSECRET", "UNTRACKEDSECRET", "RENAMEDSECRET"} {
+		if strings.Contains(out, secret) {
+			t.Errorf("%s reached the draft:\n%s", secret, out)
+		}
+	}
+	for _, note := range []string{
+		"(credentials file omitted: .env)",
+		"(credentials file omitted: config/credentials)",
+		"(credentials file omitted: keys/deploy.pem)",
+	} {
+		if !strings.Contains(out, note) {
+			t.Errorf("missing %q in:\n%s", note, out)
+		}
+	}
+	if !strings.Contains(out, "var visible = 1") {
+		t.Errorf("ordinary change missing:\n%s", out)
+	}
+}
+
+func TestPromptsRedactSelectionAndProblems(t *testing.T) {
+	api, root := promptsApp(t, true)
+	writePrompt(t, prompts.ProjectDir(root), "ctx", "{{selection}}\n\n{{problems}}")
+	token := "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+	out, err := api.Expand(root, "ctx", PromptInput{
+		File:      filepath.Join(root, "main.go"),
+		Selection: `client := New("` + token + `")`,
+		Problems:  "- 1:1 error: bad token " + token,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, token) || !strings.Contains(out, "client := New(") {
+		t.Fatalf("not redacted: %q", out)
+	}
+	out, err = api.Expand(root, "ctx", PromptInput{File: filepath.Join(root, ".env"), Selection: "DB_PASSWORD=hunter2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "hunter2") || !strings.Contains(out, "(selection omitted: .env holds credentials)") {
+		t.Fatalf("selection of a credentials file: %q", out)
+	}
+}
+
 func TestPromptsCreate(t *testing.T) {
 	api, root := promptsApp(t, true)
 	path, err := api.Create(root, false, "team-review")

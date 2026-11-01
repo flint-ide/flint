@@ -127,10 +127,17 @@ func promptVars(prompt prompts.Prompt, in PromptInput, root string) (map[string]
 	case in.File != "" && !filepath.IsAbs(in.File):
 		return nil, errors.New("the file path must be absolute")
 	}
+	file := displayPath(in.File, root)
+	// Like everything else Flint puts in a draft: credentials redacted, and
+	// nothing at all from a file that holds credentials as a whole.
+	selection := prompts.Fenced(redact.Secrets(in.Selection), "")
+	if in.Selection != "" && redact.SecretFile(in.File) {
+		selection = "(selection omitted: " + file + " holds credentials)"
+	}
 	vars := map[string]string{
-		"selection": prompts.Fenced(in.Selection, ""),
-		"file":      displayPath(in.File, root),
-		"problems":  orElse(strings.TrimSpace(in.Problems), "(no problems reported)"),
+		"selection": selection,
+		"file":      file,
+		"problems":  orElse(redact.Secrets(strings.TrimSpace(in.Problems)), "(no problems reported)"),
 	}
 	for k, v := range in.Args {
 		if !slices.Contains(prompt.Args, k) {
@@ -189,22 +196,19 @@ func (p *PromptsAPI) gitContext(root string, withDiff bool) (diff, branch string
 		if !withDiff {
 			return out, nil
 		}
-		var tracked, untracked []string
-		for _, f := range st.Files {
-			switch {
-			case f.Kind == git.Untracked:
-				untracked = append(untracked, f.Path)
-			case f.OrigPath != "":
-				tracked = append(tracked, f.OrigPath, f.Path)
-			default:
-				tracked = append(tracked, f.Path)
-			}
-		}
+		tracked, untracked, omitted := diffPaths(st.Files)
 		d, err := r.ChangesDiff(ctx, tracked, untracked, maxDiffForLLM)
 		if err != nil {
 			return result{}, err
 		}
-		out.diff = orElse(prompts.Fenced(redact.Secrets(strings.TrimLeft(d, "\n")), "diff"), "(no uncommitted changes)")
+		parts := []string{}
+		if fenced := prompts.Fenced(redact.Secrets(strings.TrimLeft(d, "\n")), "diff"); fenced != "" {
+			parts = append(parts, fenced)
+		}
+		for _, p := range omitted {
+			parts = append(parts, "(credentials file omitted: "+p+")")
+		}
+		out.diff = orElse(strings.Join(parts, "\n"), "(no uncommitted changes)")
 		return out, nil
 	})
 	if errors.Is(err, git.ErrNotRepository) {
@@ -215,6 +219,28 @@ func (p *PromptsAPI) gitContext(root string, withDiff bool) (diff, branch string
 		return msg, msg
 	}
 	return r.diff, r.branch
+}
+
+// diffPaths splits the changed files for {{diff}}. A file that holds
+// credentials as a whole (redact.SecretFile: .env, keys, kubeconfig…) is left
+// out entirely, whichever side of a rename it is on, and only named in omitted,
+// as inline edit and agent review do; pattern redaction alone isn't enough there.
+func diffPaths(files []git.FileChange) (tracked, untracked, omitted []string) {
+	for _, f := range files {
+		if redact.SecretFile(f.Path) || (f.OrigPath != "" && redact.SecretFile(f.OrigPath)) {
+			omitted = append(omitted, f.Path)
+			continue
+		}
+		switch {
+		case f.Kind == git.Untracked:
+			untracked = append(untracked, f.Path)
+		case f.OrigPath != "":
+			tracked = append(tracked, f.OrigPath, f.Path)
+		default:
+			tracked = append(tracked, f.Path)
+		}
+	}
+	return tracked, untracked, omitted
 }
 
 // Create writes a new prompt from a template, in the project's .flint/prompts

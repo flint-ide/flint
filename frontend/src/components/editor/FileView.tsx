@@ -27,6 +27,7 @@ import { useBlame } from './useBlame'
 import { isMarkdown } from '../../lib/previewFiles'
 import { markdownMode, setMarkdownMode, usePreview, type MarkdownMode } from '../../store/preview'
 import { editorAi } from '../../store/editorAi'
+import { formatKeys } from '../../lib/commands'
 
 const MarkdownPreview = lazy(() => import('../preview/MarkdownPreview').then((m) => ({ default: m.MarkdownPreview })))
 const PREVIEW_DELAY_MS = 150
@@ -168,7 +169,7 @@ export function FileView({ tab, active }: Props) {
       `${tab.title} was changed on disk (probably by the agent) after you started editing. Overwrite those changes with your version?`,
       'Overwrite',
     )
-    if (!ok) showToast('Not saved — your edits stay in the editor. Compare with the disk version in the Commit panel (⌘K).')
+    if (!ok) showToast(`Not saved — your edits stay in the editor. Compare with the disk version in the Commit panel (${formatKeys('Mod+K')}).`)
     return ok
   }
 

@@ -4823,3 +4823,208 @@ body.file-drop-target-active::after {
   flex: 1;
   min-width: 0;
 }
+
+/* ---------- Review Changes with Agent (components/review) ---------- */
+
+/* Review and Generate message share the row; it wraps rather than breaking a label. */
+.commit-box-tools {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.commit-box-tools .link {
+  white-space: nowrap;
+}
+
+.review-section {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+.review-count,
+.review-sev {
+  flex: none;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+}
+.review-count {
+  min-width: 8px;
+  font-weight: 600;
+}
+.review-sev {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.review-count.error,
+.review-sev.error {
+  color: var(--danger);
+}
+.review-count.warning,
+.review-sev.warning {
+  color: var(--warn);
+}
+.review-count.info,
+.review-sev.info {
+  color: var(--info);
+}
+.review-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin: 0 4px 0 2px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+.review-dot.error {
+  background: var(--danger);
+}
+.review-dot.info {
+  background: var(--info);
+}
+.review-row {
+  padding-left: 22px !important;
+  cursor: pointer;
+}
+.review-row .file-name {
+  flex: 0 1 auto;
+}
+.review-row.stale,
+.review-finding.stale {
+  opacity: 0.65;
+}
+.review-running,
+.review-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 22px;
+  font-size: 12px;
+}
+.review-note {
+  padding: 2px 10px 2px 22px;
+  font-size: 11px;
+}
+.review-error {
+  color: var(--danger);
+  flex-wrap: wrap;
+}
+.review-warning {
+  color: var(--warn);
+}
+.review-pulse {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1s ease-in-out infinite;
+}
+.review-text {
+  font: 12.5px/1.5 var(--font-ui);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.review-suggestion-label {
+  margin-top: 8px;
+  font-size: 11px;
+}
+.review-suggestion {
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font: 12px/1.45 var(--font-mono);
+  white-space: pre;
+  overflow: auto;
+  max-height: 240px;
+}
+/* CI of your pull requests (store/ci.ts) */
+.status-ci-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.status-ci {
+  background: none;
+  border: none;
+  padding: 0 6px;
+  font-size: 11px;
+  height: 18px;
+  border-radius: 4px;
+  color: var(--fg-muted);
+}
+.status-ci.failure {
+  color: #fff;
+  background: var(--danger);
+  font-weight: 600;
+}
+.status-ci.success {
+  color: var(--ok);
+}
+.status-ci.pending {
+  color: var(--accent);
+}
+.ci-banner {
+  margin: 0 8px 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.ci-banner.failure {
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--border));
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+.ci-banner-head,
+.ci-banner-check,
+.ci-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 20px;
+}
+.ci-banner-head {
+  cursor: pointer;
+}
+.ci-actions {
+  display: inline-flex;
+  gap: 8px;
+  flex: none;
+}
+.ci-actions .link,
+.ci-banner .link {
+  font-size: 11px;
+  padding: 0;
+}
+.ci-log {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.ci-log-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.ci-log-text {
+  flex: 1;
+  overflow: auto;
+  margin: 0;
+  padding: 8px 12px;
+  font: 12px/1.45 var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ci-log-step {
+  color: var(--fg-muted);
+  font-weight: 600;
+  margin-top: 6px;
+}

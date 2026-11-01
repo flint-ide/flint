@@ -16,6 +16,9 @@ export const ClipboardSetText = (text: string): Promise<boolean> =>
     () => false,
   )
 
+/** The clipboard's text ('' when empty or unreadable). */
+export const ClipboardGetText = (): Promise<string> => Clipboard.Text().catch(() => '')
+
 export const WindowToggleMaximise = (): Promise<void> => Window.ToggleMaximise()
 
 export const WindowIsFullscreen = (): Promise<boolean> => Window.IsFullscreen()

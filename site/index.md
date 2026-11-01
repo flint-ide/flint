@@ -8,6 +8,7 @@ Flint is a single native process that uses the macOS system WebView (WKWebView) 
 
 ## Start here
 
+- [Why Flint](why-flint.md): why another IDE, what it does differently, and when another tool is the better choice.
 - [Install Flint](installation.md): download, first launch, the `flint` command and the optional tools.
 - [First steps](first-steps.md): a 10-minute tour of the window and the shortcuts you will use every day.
 - [Keyboard shortcuts](reference/keyboard-shortcuts.md): the full list.

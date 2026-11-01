@@ -1,6 +1,7 @@
 // Commands of the run/test, debugger, git history, GitHub, HTTP client and "fix with agent" features. Kept apart
 // from appCommands so each feature's actions read as one list.
 import { registerCommands, type Command } from '../lib/commands'
+import { isMac } from '../lib/platform'
 import { isMarkdown } from '../lib/previewFiles'
 import { markdownMode, setMarkdownMode } from '../store/preview'
 import { testLang } from '../lib/testFiles'
@@ -200,14 +201,20 @@ function previewCommands(): Command[] {
   ]
 }
 
+// Run and debug use macOS's spare ⌃ key there; where Ctrl is Flint's modifier (Ctrl+R,
+// Ctrl+Shift+R and Ctrl+D are taken) they use IntelliJ's Linux keys.
+const RUN_KEYS = isMac() ? 'Ctrl+R' : 'Shift+F10'
+const RUN_CONTEXT_KEYS = isMac() ? 'Ctrl+Shift+R' : 'Ctrl+Shift+F10'
+const DEBUG_KEYS = isMac() ? 'Ctrl+D' : 'Shift+F9'
+
 function runCommands(): Command[] {
   return [
     {
-      id: 'run.selected', title: 'Run', category: 'Run', keys: 'Ctrl+R', keysIgnoredIn: IN_TERMINAL,
+      id: 'run.selected', title: 'Run', category: 'Run', keys: RUN_KEYS, keysIgnoredIn: IN_TERMINAL,
       keywords: 'start launch configuration', when: () => !!selectedRunConfig(), run: () => runSelected(),
     },
     {
-      id: 'run.context', title: 'Run Test at Cursor', category: 'Run', keys: 'Ctrl+Shift+R', keysIgnoredIn: IN_TERMINAL,
+      id: 'run.context', title: 'Run Test at Cursor', category: 'Run', keys: RUN_CONTEXT_KEYS, keysIgnoredIn: IN_TERMINAL,
       keywords: 'test context', run: () => runContext(),
     },
     { id: 'run.rerun', title: 'Rerun', category: 'Run', keywords: 'restart again', when: () => !!useRun.getState().lastKey, run: () => rerun() },
@@ -254,7 +261,7 @@ function debugCommands(): Command[] {
   const goFile = () => !!filePath()?.endsWith('.go')
   return [
     {
-      id: 'debug.selected', title: 'Debug', category: 'Debug', keys: 'Ctrl+D', keysIgnoredIn: IN_TERMINAL,
+      id: 'debug.selected', title: 'Debug', category: 'Debug', keys: DEBUG_KEYS, keysIgnoredIn: IN_TERMINAL,
       keywords: 'dlv delve breakpoint launch', when: () => canDebug(), run: () => debugSelected(),
     },
     {

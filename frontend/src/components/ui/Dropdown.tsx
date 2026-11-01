@@ -9,6 +9,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { modKey } from '../../lib/platform'
 
 // The one popover menu used across Flint (title bar, "+" menu, selects, settings,
 // right-click context menus via store/contextMenu). Rendered in a portal with fixed
@@ -28,6 +29,7 @@ export type DropdownItem =
       danger?: boolean
       /** Extra words matched by the filter. */
       keywords?: string
+      /** metaKey: the platform's primary modifier was held (⌘ on macOS, Ctrl elsewhere). */
       onSelect: (e: { altKey: boolean; metaKey: boolean }) => void
       /** Small trailing action (e.g. remove from list); doesn't close the menu. */
       action?: { label: string; title: string; onClick: () => void }
@@ -216,7 +218,7 @@ export function Menu({ anchor, atPoint, items, align, searchable, placeholder, m
     } else if (e.key === 'ArrowUp') {
       setCursor(selectable[Math.max(at - 1, 0)] ?? -1)
     } else if (e.key === 'Enter') {
-      choose(cur, { altKey: e.altKey, metaKey: e.metaKey })
+      choose(cur, { altKey: e.altKey, metaKey: modKey(e) })
     } else if (e.key === 'Escape' || e.key === 'Tab') {
       onClose()
     } else {
@@ -259,7 +261,7 @@ export function Menu({ anchor, atPoint, items, align, searchable, placeholder, m
               data-cursor={i === cursor}
               className={`dd-item${it.danger ? ' danger' : ''}${it.disabled ? ' disabled' : ''}`}
               onMouseMove={() => !it.disabled && setCursor(i)}
-              onClick={(e) => choose(i, { altKey: e.altKey, metaKey: e.metaKey })}
+              onClick={(e) => choose(i, { altKey: e.altKey, metaKey: modKey(e) })}
             >
               <span className="dd-check">{it.checked ? '✓' : ''}</span>
               {it.icon && <span className="dd-icon">{it.icon}</span>}

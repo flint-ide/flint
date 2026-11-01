@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Terminal as XTerm, type ILink } from '@xterm/xterm'
 import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
-import { BrowserOpenURL } from '../../wails/runtime'
+import { BrowserOpenURL, ClipboardGetText, ClipboardSetText } from '../../wails/runtime'
 import {
   TerminalBackend,
   attachSink,
@@ -25,6 +25,8 @@ import { sendTerminalSelectionToAgent } from '../../lib/agentContext'
 import type { DropdownItem } from '../ui/Dropdown'
 import { openContextMenu } from '../../store/contextMenu'
 import { currentTerminalOptions, useTerminalSettings } from './useTerminalSettings'
+import { formatKeys } from '../../lib/commands'
+import { modKey, isMac, modifierName } from '../../lib/platform'
 
 interface Props {
   tab: TerminalTab
@@ -50,7 +52,7 @@ export function TerminalView({ tab, active }: Props) {
       linkHandler: {
         allowNonHttpProtocols: false,
         activate: (event, uri) => {
-          if (event.metaKey && /^https?:\/\//i.test(uri)) BrowserOpenURL(uri)
+          if (modKey(event) && /^https?:\/\//i.test(uri)) BrowserOpenURL(uri)
         },
       },
     })
@@ -64,6 +66,14 @@ export function TerminalView({ tab, active }: Props) {
       // Shift+Enter inserts a newline in claude / codex prompts (ESC + CR, like Option+Enter).
       if (e.key === 'Enter' && e.shiftKey && !e.metaKey) {
         sendInput(tab.id, '\x1b\r')
+        return false
+      }
+      // Linux terminals copy and paste with Ctrl+Shift+C / V; Ctrl+C stays an interrupt.
+      if (!isMac()) {
+        if (!e.ctrlKey || !e.shiftKey || e.altKey || (e.code !== 'KeyC' && e.code !== 'KeyV')) return true
+        if (e.code === 'KeyC') void ClipboardSetText(xterm.getSelection())
+        else void ClipboardGetText().then((text) => text && xterm.paste(text))
+        e.preventDefault()
         return false
       }
       if (e.metaKey && e.key === 'k') {
@@ -82,7 +92,7 @@ export function TerminalView({ tab, active }: Props) {
           text: line.slice(l.start, l.end),
           decorations: { underline: true, pointerCursor: true },
           activate: (e) => {
-            if (!e.metaKey) return
+            if (!modKey(e)) return
             // Relative paths in agent output are relative to the terminal's project.
             const root = tab.project || useWorkspace.getState().root || tab.cwd
             useEditor.getState().openFile(resolvePath(root, l.path), l.line ? { line: l.line, from: 0, to: 0 } : undefined)
@@ -175,14 +185,14 @@ export function TerminalView({ tab, active }: Props) {
     return [
       {
         label: 'Send to agent',
-        hint: '⌥ sends now',
-        kbd: '⌘L',
+        hint: `${modifierName('Alt')} sends now`,
+        kbd: isMac() ? formatKeys('Mod+L') : undefined, // Ctrl+L belongs to the shell on Linux
         disabled: !selected,
         onSelect: (e) => void sendTerminalSelectionToAgent(tab.id, e.altKey),
       },
       {
         label: 'Copy',
-        kbd: '⌘C',
+        kbd: formatKeys(isMac() ? 'Mod+C' : 'Mod+Shift+C'),
         disabled: !selected,
         onSelect: () => void navigator.clipboard.writeText(term.current?.getSelection() ?? '').catch(() => undefined),
       },

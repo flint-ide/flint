@@ -6,6 +6,51 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
+ * BranchChecks is the CI state of a branch's pull request; PR is nil when the
+ * branch has none.
+ */
+export class BranchChecks {
+    "pr": PullRequestRef | null;
+    "checks": Check[];
+    "counts": CheckCounts;
+
+    /** Creates a new BranchChecks instance. */
+    constructor($$source: Partial<BranchChecks> = {}) {
+        if (!("pr" in $$source)) {
+            this["pr"] = null;
+        }
+        if (!("checks" in $$source)) {
+            this["checks"] = [];
+        }
+        if (!("counts" in $$source)) {
+            this["counts"] = (new CheckCounts());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new BranchChecks instance from a string or object.
+     */
+    static createFrom($$source: any = {}): BranchChecks {
+        const $$createField0_0 = $$createType1;
+        const $$createField1_0 = $$createType3;
+        const $$createField2_0 = $$createType4;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("pr" in $$parsedSource) {
+            $$parsedSource["pr"] = $$createField0_0($$parsedSource["pr"]);
+        }
+        if ("checks" in $$parsedSource) {
+            $$parsedSource["checks"] = $$createField1_0($$parsedSource["checks"]);
+        }
+        if ("counts" in $$parsedSource) {
+            $$parsedSource["counts"] = $$createField2_0($$parsedSource["counts"]);
+        }
+        return new BranchChecks($$parsedSource as Partial<BranchChecks>);
+    }
+}
+
+/**
  * Check is one CI check (a check run or a commit status).
  */
 export class Check {
@@ -23,6 +68,13 @@ export class Check {
     "status": string;
     "conclusion": string;
     "url": string;
+
+    /**
+     * RunID and JobID name the GitHub Actions run and job behind a check run
+     * (0 for other CI systems): what Fix with agent and Open log read.
+     */
+    "runId": number;
+    "jobId": number;
 
     /** Creates a new Check instance. */
     constructor($$source: Partial<Check> = {}) {
@@ -43,6 +95,12 @@ export class Check {
         }
         if (!("url" in $$source)) {
             this["url"] = "";
+        }
+        if (!("runId" in $$source)) {
+            this["runId"] = 0;
+        }
+        if (!("jobId" in $$source)) {
+            this["jobId"] = 0;
         }
 
         Object.assign(this, $$source);
@@ -324,13 +382,13 @@ export class Details {
      * Creates a new Details instance from a string or object.
      */
     static createFrom($$source: any = {}): Details {
-        const $$createField18_0 = $$createType0;
-        const $$createField20_0 = $$createType2;
-        const $$createField21_0 = $$createType4;
-        const $$createField22_0 = $$createType6;
-        const $$createField23_0 = $$createType8;
-        const $$createField24_0 = $$createType10;
-        const $$createField27_0 = $$createType11;
+        const $$createField18_0 = $$createType5;
+        const $$createField20_0 = $$createType7;
+        const $$createField21_0 = $$createType9;
+        const $$createField22_0 = $$createType3;
+        const $$createField23_0 = $$createType11;
+        const $$createField24_0 = $$createType13;
+        const $$createField27_0 = $$createType14;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("labels" in $$parsedSource) {
             $$parsedSource["labels"] = $$createField18_0($$parsedSource["labels"]);
@@ -470,8 +528,8 @@ export class FileDiff {
      * Creates a new FileDiff instance from a string or object.
      */
     static createFrom($$source: any = {}): FileDiff {
-        const $$createField7_0 = $$createType13;
-        const $$createField8_0 = $$createType13;
+        const $$createField7_0 = $$createType16;
+        const $$createField8_0 = $$createType16;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("left" in $$parsedSource) {
             $$parsedSource["left"] = $$createField7_0($$parsedSource["left"]);
@@ -670,12 +728,69 @@ export class PullRequest {
      * Creates a new PullRequest instance from a string or object.
      */
     static createFrom($$source: any = {}): PullRequest {
-        const $$createField8_0 = $$createType14;
+        const $$createField8_0 = $$createType4;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("checks" in $$parsedSource) {
             $$parsedSource["checks"] = $$createField8_0($$parsedSource["checks"]);
         }
         return new PullRequest($$parsedSource as Partial<PullRequest>);
+    }
+}
+
+/**
+ * PullRequestRef is the pull request a branch is the head of.
+ */
+export class PullRequestRef {
+    "number": number;
+    "title": string;
+    "url": string;
+
+    /**
+     * OPEN, CLOSED, MERGED
+     */
+    "state": string;
+    "headRef": string;
+    "headSha": string;
+
+    /**
+     * CrossRepository: the head is in a fork, whose author wrote the workflow
+     * names and the commands the log shows.
+     */
+    "crossRepository": boolean;
+
+    /** Creates a new PullRequestRef instance. */
+    constructor($$source: Partial<PullRequestRef> = {}) {
+        if (!("number" in $$source)) {
+            this["number"] = 0;
+        }
+        if (!("title" in $$source)) {
+            this["title"] = "";
+        }
+        if (!("url" in $$source)) {
+            this["url"] = "";
+        }
+        if (!("state" in $$source)) {
+            this["state"] = "";
+        }
+        if (!("headRef" in $$source)) {
+            this["headRef"] = "";
+        }
+        if (!("headSha" in $$source)) {
+            this["headSha"] = "";
+        }
+        if (!("crossRepository" in $$source)) {
+            this["crossRepository"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PullRequestRef instance from a string or object.
+     */
+    static createFrom($$source: any = {}): PullRequestRef {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PullRequestRef($$parsedSource as Partial<PullRequestRef>);
     }
 }
 
@@ -790,7 +905,7 @@ export class Status {
      * Creates a new Status instance from a string or object.
      */
     static createFrom($$source: any = {}): Status {
-        const $$createField2_0 = $$createType11;
+        const $$createField2_0 = $$createType14;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("repo" in $$parsedSource) {
             $$parsedSource["repo"] = $$createField2_0($$parsedSource["repo"]);
@@ -883,7 +998,7 @@ export class Thread {
      * Creates a new Thread instance from a string or object.
      */
     static createFrom($$source: any = {}): Thread {
-        const $$createField13_0 = $$createType16;
+        const $$createField13_0 = $$createType18;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("comments" in $$parsedSource) {
             $$parsedSource["comments"] = $$createField13_0($$parsedSource["comments"]);
@@ -893,20 +1008,22 @@ export class Thread {
 }
 
 // Private type creation functions
-const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = File.createFrom;
-const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = Commit.createFrom;
-const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = Check.createFrom;
-const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = Review.createFrom;
-const $$createType8 = $Create.Array($$createType7);
-const $$createType9 = Thread.createFrom;
-const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = Repo.createFrom;
-const $$createType12 = LineRange.createFrom;
+const $$createType0 = PullRequestRef.createFrom;
+const $$createType1 = $Create.Nullable($$createType0);
+const $$createType2 = Check.createFrom;
+const $$createType3 = $Create.Array($$createType2);
+const $$createType4 = CheckCounts.createFrom;
+const $$createType5 = $Create.Array($Create.Any);
+const $$createType6 = File.createFrom;
+const $$createType7 = $Create.Array($$createType6);
+const $$createType8 = Commit.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = Review.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = Thread.createFrom;
 const $$createType13 = $Create.Array($$createType12);
-const $$createType14 = CheckCounts.createFrom;
-const $$createType15 = Comment.createFrom;
+const $$createType14 = Repo.createFrom;
+const $$createType15 = LineRange.createFrom;
 const $$createType16 = $Create.Array($$createType15);
+const $$createType17 = Comment.createFrom;
+const $$createType18 = $Create.Array($$createType17);

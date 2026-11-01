@@ -13,6 +13,8 @@ import { Git } from '../../store/git'
 import { RunWidget } from '../run/RunWidget'
 import { activeRoot } from '../../store/activeRoot'
 import { rootLabels } from '../../lib/workspaceRoots'
+import { formatKeys } from '../../lib/commands'
+import { modifierName } from '../../lib/platform'
 
 const BranchesPopup = lazy(() => import('../git/BranchesPopup').then((m) => ({ default: m.BranchesPopup })))
 
@@ -92,8 +94,8 @@ function ProjectWidget() {
   }
 
   const items = (): DropdownItem[] => [
-    { label: 'Open Folder…', kbd: '⌘O', icon: <FileIcon name="folder" isDir open />, onSelect: () => void pick() },
-    { label: 'Add Project to Workspace…', kbd: '⇧⌘O', disabled: !root, onSelect: () => void useWorkspace.getState().pickRoot() },
+    { label: 'Open Folder…', kbd: formatKeys('Mod+O'), icon: <FileIcon name="folder" isDir open />, onSelect: () => void pick() },
+    { label: 'Add Project to Workspace…', kbd: formatKeys('Mod+Shift+O'), disabled: !root, onSelect: () => void useWorkspace.getState().pickRoot() },
     { label: 'Recent Projects…', onSelect: () => useWorkspace.getState().setRecentOpen(true) },
     ...(roots.length > 1 ? [{ type: 'section', label: 'Workspace' } as DropdownItem] : []),
     ...(roots.length > 1
@@ -108,7 +110,7 @@ function ProjectWidget() {
           }),
         )
       : []),
-    ...(recent.length ? [{ type: 'section', label: 'Recent · ⌥ adds to workspace' } as DropdownItem] : []),
+    ...(recent.length ? [{ type: 'section', label: `Recent · ${modifierName('Alt')} adds to workspace` } as DropdownItem] : []),
     ...recent.map(
       (p): DropdownItem => ({
         key: p,
@@ -189,15 +191,15 @@ function QuickActions() {
 
   return (
     <div className="tb-actions">
-      <button className="tb-search" onClick={() => setQuickOpen(true)} title="Go to file (⌘P)">
+      <button className="tb-search" onClick={() => setQuickOpen(true)} title={`Go to file (${formatKeys('Mod+P')})`}>
         <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden>
           <circle cx="7" cy="7" r="4.8" fill="none" stroke="currentColor" strokeWidth="1.5" />
           <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
         <span>Go to file</span>
-        <kbd>⌘P</kbd>
+        <kbd>{formatKeys('Mod+P')}</kbd>
       </button>
-      <button className="tb-icon" title="Terminal (⌘J) · new terminal ⇧⌘T" onClick={() => toggleTerminal(activeRoot())} onAuxClick={() => useTerminal.getState().create(activeRoot())}>
+      <button className="tb-icon" title={`Terminal (${formatKeys('Mod+J')}) · new terminal ${formatKeys('Mod+Shift+T')}`} onClick={() => toggleTerminal(activeRoot())} onAuxClick={() => useTerminal.getState().create(activeRoot())}>
         <TabKindIcon kind="terminal" />
       </button>
       {agent && (

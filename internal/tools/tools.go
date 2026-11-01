@@ -6,9 +6,23 @@ package tools
 
 import (
 	"path/filepath"
+	"runtime"
 
 	"flint/internal/lsp"
 )
+
+// install picks the install command for this system: Homebrew on macOS, the
+// Debian/Ubuntu package (or the vendor's npm/snap package) on Linux.
+func install(mac, linux string) string {
+	return installFor(runtime.GOOS, mac, linux)
+}
+
+func installFor(goos, mac, linux string) string {
+	if goos == "linux" {
+		return linux
+	}
+	return mac
+}
 
 // DocsBase is the user documentation site; Tool.Docs is a page relative to it.
 const DocsBase = "https://odudek.github.io/flint/"
@@ -77,31 +91,31 @@ func All() []Tool {
 		{
 			ID: "git", Name: "Git", Group: GroupCore, Required: true,
 			Feature: "Commit panel, diffs, blame, history and branches",
-			Install: "xcode-select --install", Docs: "guides/git-and-github.md",
+			Install: install("xcode-select --install", "sudo apt install git"), Docs: "guides/git-and-github.md",
 			candidates: one("git", "--version"),
 		},
 		{
 			ID: "rg", Name: "ripgrep", Group: GroupCore,
 			Feature: "Fast project search, Go to File and the TODO list",
-			Install: "brew install ripgrep", Docs: "how-to/search-and-replace.md#make-search-faster",
+			Install: install("brew install ripgrep", "sudo apt install ripgrep"), Docs: "how-to/search-and-replace.md#make-search-faster",
 			candidates: one("rg", "--version"),
 		},
 		{
 			ID: "gh", Name: "GitHub CLI", Group: GroupCore,
 			Feature: "Pull request review",
-			Install: "brew install gh", Docs: "guides/git-and-github.md#pull-requests",
+			Install: install("brew install gh", "sudo apt install gh"), Docs: "guides/git-and-github.md#pull-requests",
 			candidates: one("gh", "--version"),
 		},
 		{
 			ID: "claude", Name: "Claude Code", Group: GroupAgents,
 			Feature: "Agent chat, commit messages and merge conflict help",
-			Install: "brew install --cask claude-code", Docs: agentDocs,
+			Install: install("brew install --cask claude-code", "npm install -g @anthropic-ai/claude-code"), Docs: agentDocs,
 			candidates: one("claude", "--version"),
 		},
 		{
 			ID: "codex", Name: "Codex", Group: GroupAgents,
 			Feature: "Agent chat, commit messages and merge conflict help",
-			Install: "brew install --cask codex", Docs: agentDocs,
+			Install: install("brew install --cask codex", "npm install -g @openai/codex"), Docs: agentDocs,
 			candidates: one("codex", "--version"),
 		},
 		{
@@ -138,25 +152,25 @@ func All() []Tool {
 			// Only needed to install and run the npm-based language servers.
 			ID: "node", Name: "Node.js", Group: GroupLanguages,
 			Feature: "Runs the npm-installed TypeScript and Pyright language servers",
-			Install: "brew install node", Docs: langDocs,
+			Install: install("brew install node", "sudo apt install nodejs npm"), Docs: langDocs,
 			candidates: one("node", "--version"),
 		},
 		{
 			ID: "docker", Name: "Docker", Group: GroupInfra,
 			Feature: "Docker and Compose panel",
-			Install: "brew install --cask docker-desktop", Docs: "guides/docker.md",
+			Install: install("brew install --cask docker-desktop", "sudo apt install docker.io"), Docs: "guides/docker.md",
 			candidates: one("docker", "--version"),
 		},
 		{
 			ID: "kubectl", Name: "kubectl", Group: GroupInfra,
 			Feature: "Kubernetes panel",
-			Install: "brew install kubectl", Docs: "guides/kubernetes.md",
+			Install: install("brew install kubectl", "sudo snap install kubectl --classic"), Docs: "guides/kubernetes.md",
 			candidates: one("kubectl", "version", "--client=true"),
 		},
 		{
 			ID: "aws", Name: "AWS CLI", Group: GroupInfra,
 			Feature: "AWS profiles panel, login and credential refresh",
-			Install: "brew install awscli", Docs: "guides/aws.md",
+			Install: install("brew install awscli", "sudo snap install aws-cli --classic"), Docs: "guides/aws.md",
 			candidates: one("aws", "--version"),
 		},
 	}

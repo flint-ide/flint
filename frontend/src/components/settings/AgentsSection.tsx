@@ -8,6 +8,8 @@ import { Select } from '../ui/Select'
 import { CheckedField, Row } from './fields'
 import { CustomAgentsSection, reloadAgents } from './CustomAgentsSection'
 import { AgentTasksSection } from './AgentTasksSection'
+import { AgentReviewSection } from './AgentReviewSection'
+import { isMac } from '../../lib/platform'
 
 // The agent CLIs Flint drives (Go: agent.known).
 const AGENTS = [
@@ -52,8 +54,9 @@ export function AgentsSection() {
       </p>
       <CustomAgentsSection />
       <AgentTasksSection />
+      <AgentReviewSection />
       <h3>Notifications</h3>
-      <Row label="Tell me when work finishes in the background" hint="A macOS notification and a count on the Dock icon when a run, tests or an agent finish while Flint isn't the active app.">
+      <Row label="Tell me when work finishes in the background" hint={`${isMac() ? 'A macOS notification and a count on the Dock icon' : 'A desktop notification'} when a run, tests or an agent finish while Flint isn't the active app.`}>
         <input type="checkbox" checked={notify} onChange={(e) => update({ notifyInBackground: e.target.checked })} />
       </Row>
     </section>

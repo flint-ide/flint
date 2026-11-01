@@ -12,6 +12,8 @@ import { runTestsInFile } from '../../store/run'
 import { profileTestsInFile } from '../../store/profile'
 import { debugTestsInFile } from '../../store/debug'
 import { testLang } from '../../lib/testFiles'
+import { formatKeys } from '../../lib/commands'
+import { fileManagerName } from '../../lib/platform'
 
 export interface MenuActions {
   /** Starts inline creation of a file or folder in dir. */
@@ -19,7 +21,7 @@ export interface MenuActions {
   startRename: (path: string) => void
 }
 
-const addProject: DropdownItem = { label: 'Add Project to Workspace…', kbd: '⇧⌘O', onSelect: () => void useWorkspace.getState().pickRoot() }
+const addProject: DropdownItem = { label: 'Add Project to Workspace…', kbd: formatKeys('Mod+Shift+O'), onSelect: () => void useWorkspace.getState().pickRoot() }
 
 /**
  * Items of the file tree's context menu for the right-clicked targets (the selection
@@ -44,7 +46,7 @@ export function fileTreeMenu(roots: string[], targets: TreeEntry[], actions: Men
   if (!isRoot) {
     items.push(
       { label: 'Rename…', kbd: 'F2', disabled: !single, onSelect: () => single && actions.startRename(single.path) },
-      { label: 'Move to Trash', kbd: '⌘⌫', danger: true, onSelect: () => void trashEntries(paths.filter((p) => !roots.includes(p))) },
+      { label: 'Move to Trash', kbd: formatKeys('Mod+Backspace'), danger: true, onSelect: () => void trashEntries(paths.filter((p) => !roots.includes(p))) },
       { type: 'separator' },
     )
   }
@@ -55,7 +57,7 @@ export function fileTreeMenu(roots: string[], targets: TreeEntry[], actions: Men
   )
   if (single) {
     items.push(
-      { label: 'Reveal in Finder', onSelect: () => void revealInFinder(single.path) },
+      { label: `Reveal in ${fileManagerName()}`, onSelect: () => void revealInFinder(single.path) },
       { label: 'Open in Terminal', hint: shortName(folder), onSelect: () => void useTerminal.getState().create(folder, { project: root }) },
       { label: 'Find in Folder…', hint: shortName(folder), onSelect: () => findInFolder(folder) },
       { type: 'separator' },

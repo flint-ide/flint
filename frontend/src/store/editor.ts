@@ -149,6 +149,19 @@ export interface PullRequestDiffTab {
   dirty: boolean // always false
 }
 
+/** The failed-steps log of a GitHub Actions run (or one job), read in store/ci.ts. */
+export interface CILogTab {
+  id: string
+  kind: 'cilog'
+  /** Workspace folder the run's repository is checked out in; log paths resolve against it. */
+  root: string
+  runId: number
+  /** 0: every failed job of the run. */
+  jobId: number
+  title: string
+  dirty: boolean // always false
+}
+
 export type Tab =
   | FileTab
   | ScratchTab
@@ -162,6 +175,7 @@ export type Tab =
   | HttpTab
   | PullRequestTab
   | PullRequestDiffTab
+  | CILogTab
   | SettingsTab
 
 const HISTORY_LIMIT = 50
@@ -194,6 +208,7 @@ interface EditorState {
   openPullRequest: (root: string, number: number, title: string) => void
   /** Opens a changed file of a pull request, right after the pull request's tab. */
   openPullRequestDiff: (root: string, number: number, path: string) => void
+  openCILog: (root: string, runId: number, jobId: number, title: string) => void
   renameScratchTab: (scratchId: string, title: string) => void
   /** Renames a tab in place (terminals follow what they run). */
   retitleTab: (id: string, title: string) => void
@@ -216,6 +231,7 @@ export const historyTabId = (path: string) => `history:${path}`
 export const profileTabId = (profileId: string) => `profile:${profileId}`
 export const httpTabId = (path: string) => `http:${path}`
 export const pullRequestTabId = (root: string, number: number) => `pr:${root}#${number}`
+export const ciLogTabId = (root: string, runId: number, jobId: number) => `cilog:${root}#${runId}/${jobId}`
 export const pullRequestDiffTabId = (root: string, number: number, path: string) => `prdiff:${root}#${number}:${path}`
 const baseName = (path: string) => path.split('/').pop() ?? path
 
@@ -396,6 +412,14 @@ export const useEditor = createStore<EditorState>((set) => ({
       return { tabs: insertAfterActive(s.tabs, after, tab), ...activate(s, id) }
     }),
 
+  openCILog: (root, runId, jobId, title) =>
+    set((s) => {
+      const id = ciLogTabId(root, runId, jobId)
+      if (s.tabs.some((t) => t.id === id)) return activate(s, id)
+      const tab: CILogTab = { id, kind: 'cilog', root, runId, jobId, title, dirty: false }
+      return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
+    }),
+
   retitleTab: (id, title) =>
     set((s) => (s.tabs.some((t) => t.id === id && t.title !== title) ? { tabs: s.tabs.map((t) => (t.id === id ? { ...t, title } : t)) } : s)),
 
@@ -433,7 +457,7 @@ export const useEditor = createStore<EditorState>((set) => ({
         (t) =>
           ((t.kind === 'file' || t.kind === 'diff' || t.kind === 'history' || t.kind === 'http') && paths.some((p) => isWithin(p, t.path))) ||
           // Pull requests belong to a project: they go when it leaves the workspace.
-          ((t.kind === 'pr' || t.kind === 'prdiff') && paths.some((p) => isWithin(p, t.root))),
+          ((t.kind === 'pr' || t.kind === 'prdiff' || t.kind === 'cilog') && paths.some((p) => isWithin(p, t.root))),
       )
       return gone.reduce<Partial<EditorState>>((acc, t) => ({ ...acc, ...removeTab({ ...s, ...acc } as EditorState, t.id) }), {})
     }),

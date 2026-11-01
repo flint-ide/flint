@@ -83,7 +83,9 @@ The file is readable only by your user. It never contains secrets: database pass
     "taskBudgetTokens": 5000000,
     "pauseOverBudget": false,
     "prices": { "gpt-5-codex": { "in": 1.25, "out": 10, "cacheRead": 0.125 } }
-  }
+  },
+  "agentReview": { "scope": "selected", "maxDiffKB": 128, "agent": "", "timeoutSeconds": 300 },
+  "ci": { "pollSeconds": 60, "logTailLines": 80, "logErrorLines": 40, "notify": true }
 }
 ```
 
@@ -111,6 +113,8 @@ The file is readable only by your user. It never contains secrets: database pass
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
 | `agentTasks` | object | see below | Where agent task worktrees go and how their branches are named. See [agentTasks](#agenttasks). |
 | `usage` | object | see below | How long agent usage is kept, budgets, and prices for estimates. See [usage](#usage). |
+| `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
+| `ci` | object | see below | Following your pull requests' CI: poll interval, Fix with agent's log excerpt, notifications. See [ci](#ci). |
 
 ### Font objects
 
@@ -231,7 +235,7 @@ A change made in the Settings tab restarts that language's servers. Servers that
 | `kubernetesSeconds` | integer (s) | 2–600 | `5` | How often the Kubernetes panel re-reads the namespace while it is shown and the window is visible. |
 | `awsSeconds` | integer (s) | 5–3600 | `30` | How often the AWS panel re-reads profiles and credential expiry while it is shown. |
 
-Git status, Docker and pull requests don't poll: they follow change events, and pull requests reload when the window regains focus.
+Git status, Docker and pull requests don't poll: they follow change events, and pull requests reload when the window regains focus. Running CI checks are polled at [`ci.pollSeconds`](#ci).
 
 ### mcpServer
 
@@ -296,6 +300,29 @@ Used by the [Usage panel and budgets](../guides/ai-agents.md#usage-and-budgets).
 | `countCacheReads` | boolean | | `false` | Token budgets also count input read from the prompt cache. |
 | `pauseOverBudget` | boolean | | `false` | Refuse new turns while a budget is reached, until **Continue anyway** in the chat's warning. |
 | `prices` | object | up to 200 models | `{}` | Model name (exactly as the Usage panel shows it, case ignored) → `{ "in": …, "out": …, "cacheRead": … }` in USD per million tokens, 0–10,000; `cacheRead` is optional (without it, cached input is left out of estimates). Used only for turns whose agent reported no cost; the result is shown as an estimate. |
+
+### agentReview
+
+Used by [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-agent). Settings ▸ Agents ▸ Review.
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `scope` | string | `"selected"`, `"all"` | `"selected"` | What a review covers: the changes ticked in the Commit panel, or every change. A review started from a diff tab always includes that tab's file. |
+| `maxDiffKB` | integer | 8–512 | `128` | Largest diff sent to the agent, in KB; never exceeded. Above it, small files still go in whole and the larger ones share the rest: each keeps its first hunks, or is summarized in one line, with a note that tells the agent to read the file. Files with no room left at all are left out and listed in a note. Untracked files are read only as far as their share. |
+| `agent` | string | | `""` | The reviewing agent: `"claude"`, `"codex"` or the `id` of a custom agent. Empty uses `defaultAgent`. An agent that isn't configured falls back to empty. What each agent can read on its own is described in [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-agent): Codex can read any file you can, and a custom agent started with an auto-approve flag is not read-only. |
+| `timeoutSeconds` | integer | 30–1800 | `300` | A review that takes longer is stopped, with the agent and everything it started. |
+### ci
+
+Used by [When CI fails](../guides/git-and-github.md#when-ci-fails).
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `pollSeconds` | integer (s) | 10–3600 | `30` | How often a pull request's checks are re-read while some are still running; the wait grows by half each time nothing changed (up to 8×, at most 30 minutes) and doubles while Flint is in the background. Nothing is polled while no check runs. |
+| `logTailLines` | integer | 5–1000 | `60` | Lines from the end of the failed step that **Fix with agent** puts in the draft. |
+| `logErrorLines` | integer | 0–500 | `40` | Error lines (test failures, compiler errors, `file:line` references) picked from the rest of the failed step. |
+| `notify` | boolean | | `true` | A notification when your pull request's CI fails or turns green while Flint is in the background. Also needs `notifyInBackground`. |
+
+Flint keeps at most the last 8 MB of each failed job's log (and says when it cut one), describes at most 4 failed jobs per run, cuts log lines at 2,000 characters and workflow, job and step names at 120, and the Log tab keeps the last 20,000 lines; these limits are not settings.
 
 ## Related settings stored elsewhere
 

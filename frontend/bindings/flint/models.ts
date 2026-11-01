@@ -16,6 +16,9 @@ import * as docker$0 from "./internal/docker/models.js";
 import * as git$0 from "./internal/git/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as review$0 from "./internal/review/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as runconfig$0 from "./internal/runconfig/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -116,6 +119,241 @@ export class BudgetStatus {
 }
 
 /**
+ * CIFileRef is a file:line reference from a CI log that exists in the workspace.
+ */
+export class CIFileRef {
+    /**
+     * Text is the reference as the log writes it.
+     */
+    "text": string;
+
+    /**
+     * Path is relative to the folder the report was made for.
+     */
+    "path": string;
+    "line": number;
+    "column": number;
+
+    /** Creates a new CIFileRef instance. */
+    constructor($$source: Partial<CIFileRef> = {}) {
+        if (!("text" in $$source)) {
+            this["text"] = "";
+        }
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("line" in $$source)) {
+            this["line"] = 0;
+        }
+        if (!("column" in $$source)) {
+            this["column"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CIFileRef instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CIFileRef {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CIFileRef($$parsedSource as Partial<CIFileRef>);
+    }
+}
+
+/**
+ * CIJob is one failed job of a run: its failed step and the relevant lines.
+ */
+export class CIJob {
+    "id": number;
+    "name": string;
+    "url": string;
+    "step": string;
+    "stepNumber": number;
+    "lines": string[];
+    "omitted": number;
+    "files": CIFileRef[];
+
+    /**
+     * NoLog: GitHub returned no log for the job (expired, or still uploading).
+     */
+    "noLog": boolean;
+
+    /**
+     * LogCut: the log was longer than Flint keeps; only its end was read.
+     */
+    "logCut": boolean;
+
+    /** Creates a new CIJob instance. */
+    constructor($$source: Partial<CIJob> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("url" in $$source)) {
+            this["url"] = "";
+        }
+        if (!("step" in $$source)) {
+            this["step"] = "";
+        }
+        if (!("stepNumber" in $$source)) {
+            this["stepNumber"] = 0;
+        }
+        if (!("lines" in $$source)) {
+            this["lines"] = [];
+        }
+        if (!("omitted" in $$source)) {
+            this["omitted"] = 0;
+        }
+        if (!("files" in $$source)) {
+            this["files"] = [];
+        }
+        if (!("noLog" in $$source)) {
+            this["noLog"] = false;
+        }
+        if (!("logCut" in $$source)) {
+            this["logCut"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CIJob instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CIJob {
+        const $$createField5_0 = $$createType0;
+        const $$createField7_0 = $$createType4;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("lines" in $$parsedSource) {
+            $$parsedSource["lines"] = $$createField5_0($$parsedSource["lines"]);
+        }
+        if ("files" in $$parsedSource) {
+            $$parsedSource["files"] = $$createField7_0($$parsedSource["files"]);
+        }
+        return new CIJob($$parsedSource as Partial<CIJob>);
+    }
+}
+
+/**
+ * CILog is a run's failed-steps log for the Open log tab.
+ */
+export class CILog {
+    "text": string;
+
+    /**
+     * Files maps paths as the log writes them to workspace paths (relative to
+     * the folder asked about), for the tab's file:line links.
+     */
+    "files": { [_ in string]?: string };
+
+    /**
+     * Truncated: the start is missing (the log was longer than Flint keeps).
+     */
+    "truncated": boolean;
+
+    /** Creates a new CILog instance. */
+    constructor($$source: Partial<CILog> = {}) {
+        if (!("text" in $$source)) {
+            this["text"] = "";
+        }
+        if (!("files" in $$source)) {
+            this["files"] = {};
+        }
+        if (!("truncated" in $$source)) {
+            this["truncated"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CILog instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CILog {
+        const $$createField1_0 = $$createType5;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("files" in $$parsedSource) {
+            $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
+        }
+        return new CILog($$parsedSource as Partial<CILog>);
+    }
+}
+
+/**
+ * CIReport is what Fix with agent puts in the chat draft: redacted, bounded by
+ * settings.CI, with references mapped to the workspace. Names come from the
+ * workflow file (a fork's author, for cross-repository pull requests): they
+ * are one line each, without control characters, and cut to maxCINameRunes.
+ */
+export class CIReport {
+    "runId": number;
+    "workflow": string;
+    "title": string;
+    "url": string;
+    "branch": string;
+    "sha": string;
+    "event": string;
+    "attempt": number;
+    "jobs": CIJob[];
+
+    /**
+     * More: failed jobs beyond maxCIJobs that the report leaves out.
+     */
+    "more": number;
+
+    /** Creates a new CIReport instance. */
+    constructor($$source: Partial<CIReport> = {}) {
+        if (!("runId" in $$source)) {
+            this["runId"] = 0;
+        }
+        if (!("workflow" in $$source)) {
+            this["workflow"] = "";
+        }
+        if (!("title" in $$source)) {
+            this["title"] = "";
+        }
+        if (!("url" in $$source)) {
+            this["url"] = "";
+        }
+        if (!("branch" in $$source)) {
+            this["branch"] = "";
+        }
+        if (!("sha" in $$source)) {
+            this["sha"] = "";
+        }
+        if (!("event" in $$source)) {
+            this["event"] = "";
+        }
+        if (!("attempt" in $$source)) {
+            this["attempt"] = 0;
+        }
+        if (!("jobs" in $$source)) {
+            this["jobs"] = [];
+        }
+        if (!("more" in $$source)) {
+            this["more"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CIReport instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CIReport {
+        const $$createField8_0 = $$createType7;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("jobs" in $$parsedSource) {
+            $$parsedSource["jobs"] = $$createField8_0($$parsedSource["jobs"]);
+        }
+        return new CIReport($$parsedSource as Partial<CIReport>);
+    }
+}
+
+/**
  * Collected is a profile recorded from a running program.
  */
 export class Collected {
@@ -179,8 +417,8 @@ export class DockerOverview {
      * Creates a new DockerOverview instance from a string or object.
      */
     static createFrom($$source: any = {}): DockerOverview {
-        const $$createField0_0 = $$createType4;
-        const $$createField1_0 = $$createType6;
+        const $$createField0_0 = $$createType9;
+        const $$createField1_0 = $$createType11;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("containers" in $$parsedSource) {
             $$parsedSource["containers"] = $$createField0_0($$parsedSource["containers"]);
@@ -215,7 +453,7 @@ export class FileHistory {
      * Creates a new FileHistory instance from a string or object.
      */
     static createFrom($$source: any = {}): FileHistory {
-        const $$createField1_0 = $$createType8;
+        const $$createField1_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("commits" in $$parsedSource) {
             $$parsedSource["commits"] = $$createField1_0($$parsedSource["commits"]);
@@ -338,7 +576,7 @@ export class ProfiledTests {
      * Creates a new ProfiledTests instance from a string or object.
      */
     static createFrom($$source: any = {}): ProfiledTests {
-        const $$createField2_0 = $$createType9;
+        const $$createField2_0 = $$createType14;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField2_0($$parsedSource["files"]);
@@ -492,6 +730,131 @@ export class RepoInfo {
 }
 
 /**
+ * ReviewFile is one change to review, as the Commit panel lists it. Go takes
+ * only the path from it: the kind and a rename's source come from git status.
+ */
+export class ReviewFile {
+    /**
+     * relative to the repository root
+     */
+    "path": string;
+
+    /**
+     * a rename's source
+     */
+    "origPath": string;
+
+    /**
+     * git.FileChange kind
+     */
+    "kind": string;
+
+    /** Creates a new ReviewFile instance. */
+    constructor($$source: Partial<ReviewFile> = {}) {
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("origPath" in $$source)) {
+            this["origPath"] = "";
+        }
+        if (!("kind" in $$source)) {
+            this["kind"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ReviewFile instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ReviewFile {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ReviewFile($$parsedSource as Partial<ReviewFile>);
+    }
+}
+
+/**
+ * ReviewRequest asks for a review of files in the repository at Root.
+ */
+export class ReviewRequest {
+    "root": string;
+    "files": ReviewFile[];
+
+    /** Creates a new ReviewRequest instance. */
+    constructor($$source: Partial<ReviewRequest> = {}) {
+        if (!("root" in $$source)) {
+            this["root"] = "";
+        }
+        if (!("files" in $$source)) {
+            this["files"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ReviewRequest instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ReviewRequest {
+        const $$createField1_0 = $$createType16;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("files" in $$parsedSource) {
+            $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
+        }
+        return new ReviewRequest($$parsedSource as Partial<ReviewRequest>);
+    }
+}
+
+/**
+ * ReviewResult is the agent's findings and what the user should know about
+ * the run (files left out, a shortened diff, a cut-off answer).
+ */
+export class ReviewResult {
+    "agent": string;
+    "files": string[];
+    "findings": review$0.Finding[];
+    "notes": string[];
+
+    /** Creates a new ReviewResult instance. */
+    constructor($$source: Partial<ReviewResult> = {}) {
+        if (!("agent" in $$source)) {
+            this["agent"] = "";
+        }
+        if (!("files" in $$source)) {
+            this["files"] = [];
+        }
+        if (!("findings" in $$source)) {
+            this["findings"] = [];
+        }
+        if (!("notes" in $$source)) {
+            this["notes"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ReviewResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ReviewResult {
+        const $$createField1_0 = $$createType0;
+        const $$createField2_0 = $$createType18;
+        const $$createField3_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("files" in $$parsedSource) {
+            $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
+        }
+        if ("findings" in $$parsedSource) {
+            $$parsedSource["findings"] = $$createField2_0($$parsedSource["findings"]);
+        }
+        if ("notes" in $$parsedSource) {
+            $$parsedSource["notes"] = $$createField3_0($$parsedSource["notes"]);
+        }
+        return new ReviewResult($$parsedSource as Partial<ReviewResult>);
+    }
+}
+
+/**
  * RunConfigs lists a project's run configurations.
  */
 export class RunConfigs {
@@ -541,9 +904,9 @@ export class RunConfigs {
      * Creates a new RunConfigs instance from a string or object.
      */
     static createFrom($$source: any = {}): RunConfigs {
-        const $$createField0_0 = $$createType11;
-        const $$createField1_0 = $$createType11;
-        const $$createField2_0 = $$createType13;
+        const $$createField0_0 = $$createType20;
+        const $$createField1_0 = $$createType20;
+        const $$createField2_0 = $$createType22;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("saved" in $$parsedSource) {
             $$parsedSource["saved"] = $$createField0_0($$parsedSource["saved"]);
@@ -687,7 +1050,9 @@ export class TaskView {
 }
 
 /**
- * TitlebarMetrics describes where macOS draws the window buttons.
+ * TitlebarMetrics describes where macOS draws the window buttons (all zero on
+ * other systems, which keep their own window frame). One definition for every
+ * system, so the generated bindings don't depend on where they are generated.
  */
 export class TitlebarMetrics {
     /**
@@ -800,8 +1165,8 @@ export class UsageView {
      * Creates a new UsageView instance from a string or object.
      */
     static createFrom($$source: any = {}): UsageView {
-        const $$createField0_0 = $$createType14;
-        const $$createField1_0 = $$createType15;
+        const $$createField0_0 = $$createType23;
+        const $$createField1_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("summary" in $$parsedSource) {
             $$parsedSource["summary"] = $$createField0_0($$parsedSource["summary"]);
@@ -817,16 +1182,24 @@ export class UsageView {
 const $$createType0 = $Create.Array($Create.Any);
 const $$createType1 = usage$0.Alert.createFrom;
 const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = docker$0.Container.createFrom;
+const $$createType3 = CIFileRef.createFrom;
 const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = docker$0.ComposeProject.createFrom;
-const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = git$0.FileCommit.createFrom;
-const $$createType8 = $Create.Array($$createType7);
-const $$createType9 = testrun$0.Profiles.createFrom;
-const $$createType10 = runconfig$0.Config.createFrom;
+const $$createType5 = $Create.Map($Create.Any, $Create.Any);
+const $$createType6 = CIJob.createFrom;
+const $$createType7 = $Create.Array($$createType6);
+const $$createType8 = docker$0.Container.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = docker$0.ComposeProject.createFrom;
 const $$createType11 = $Create.Array($$createType10);
-const $$createType12 = runconfig$0.Capabilities.createFrom;
-const $$createType13 = $Create.Map($Create.Any, $$createType12);
-const $$createType14 = usage$0.Summary.createFrom;
-const $$createType15 = $Create.Map($Create.Any, $Create.Any);
+const $$createType12 = git$0.FileCommit.createFrom;
+const $$createType13 = $Create.Array($$createType12);
+const $$createType14 = testrun$0.Profiles.createFrom;
+const $$createType15 = ReviewFile.createFrom;
+const $$createType16 = $Create.Array($$createType15);
+const $$createType17 = review$0.Finding.createFrom;
+const $$createType18 = $Create.Array($$createType17);
+const $$createType19 = runconfig$0.Config.createFrom;
+const $$createType20 = $Create.Array($$createType19);
+const $$createType21 = runconfig$0.Capabilities.createFrom;
+const $$createType22 = $Create.Map($Create.Any, $$createType21);
+const $$createType23 = usage$0.Summary.createFrom;

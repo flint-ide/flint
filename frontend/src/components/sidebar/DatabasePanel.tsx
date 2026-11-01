@@ -6,6 +6,7 @@ import { useScratch } from '../../store/scratch'
 import { confirmAction } from '../../store/dialog'
 import { ConnectionForm } from './ConnectionForm'
 import { DatabasesNode } from './DatabaseTree'
+import { keyringName } from '../../lib/platform'
 
 /** Connections list; each expands into its server's databases, each with a lazily loaded schema tree. */
 export function DatabasePanel() {
@@ -48,7 +49,7 @@ function ConnectionNode({ conn, onEdit }: { conn: Connection; onEdit: () => void
   }
 
   const remove = async () => {
-    if (await confirmAction(`Delete connection "${conn.name}"? Its password is removed from the Keychain.`, 'Delete')) {
+    if (await confirmAction(`Delete connection "${conn.name}"? Its password is removed from the ${keyringName()}.`, 'Delete')) {
       await removeConnection(conn.id)
     }
   }

@@ -10,6 +10,10 @@ import { conflictHint } from '../../lib/customAgents'
 import { Select } from '../ui/Select'
 import { openStashDialog } from '../../store/stash'
 import { StashSection } from './StashSection'
+import { ReviewSection } from '../review/ReviewSection'
+import { reviewChanges, useAgentReview } from '../../store/agentReview'
+import { formatKeys } from '../../lib/commands'
+import { modKey } from '../../lib/platform'
 
 const KIND_LETTER: Record<string, string> = {
   modified: 'M', added: 'A', deleted: 'D', renamed: 'R', copied: 'C',
@@ -41,6 +45,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
   const [generating, setGenerating] = useState(false)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const agents = useAgent()
+  const reviewing = useAgentReview((s) => !!s.running)
   useFocus(textarea, focusToken)
   useEffect(() => {
     if (!agents.loaded) void agents.load()
@@ -101,7 +106,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
         <button className="icon" title="Refresh" onClick={() => void refresh()}>↻</button>
         <button className="icon" title="Fetch" disabled={!!busy} onClick={() => void remote('fetch')}>⇣</button>
         <button className="icon" title="Update project (pull)" disabled={!!busy} onClick={() => void remote('pull')}>⤓</button>
-        <button className="icon" title="Push (⇧⌘K)" disabled={!!busy} onClick={() => void remote('push')}>⤒</button>
+        <button className="icon" title={`Push (${formatKeys('Mod+Shift+K')})`} disabled={!!busy} onClick={() => void remote('push')}>⤒</button>
         <button className="icon" title="Stash changes…" disabled={!!busy} onClick={openStashDialog}>⊟</button>
       </div>
       <div className="git-branch-line muted">
@@ -177,6 +182,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
             </div>
           )
         })}
+        <ReviewSection root={root} />
         <StashSection />
       </div>
 
@@ -196,6 +202,14 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
           <span className="spacer" />
           <button
             className="link"
+            disabled={!agents.preferred || reviewing || (status?.files ?? []).length === 0}
+            onClick={() => void reviewChanges()}
+            title="Let the agent review the ticked changes (or all of them: Settings ▸ Agents ▸ Review) before you commit"
+          >
+            {reviewing ? 'Reviewing…' : '✦ Review'}
+          </button>
+          <button
+            className="link"
             disabled={!agents.preferred || generating || selected.length === 0}
             onClick={() => void generateMessage()}
             title="Let the agent write a message for the ticked changes"
@@ -210,7 +224,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
           spellCheck={false}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && e.metaKey && canCommit) {
+            if (e.key === 'Enter' && modKey(e) && canCommit) {
               e.preventDefault()
               void commit(e.altKey)
             }
@@ -222,10 +236,10 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
           </label>
           <span className="spacer" />
           <span className="muted count">{selected.length} selected</span>
-          <button className="primary" disabled={!canCommit} onClick={() => void commit(false)} title="⌘↵">
+          <button className="primary" disabled={!canCommit} onClick={() => void commit(false)} title={formatKeys('Mod+Enter')}>
             {busy === 'commit' ? 'Committing…' : 'Commit'}
           </button>
-          <button disabled={!canCommit} onClick={() => void commit(true)} title="⌥⌘↵">
+          <button disabled={!canCommit} onClick={() => void commit(true)} title={formatKeys('Alt+Mod+Enter')}>
             Commit and Push
           </button>
         </div>

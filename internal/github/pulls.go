@@ -33,6 +33,10 @@ type Check struct {
 	Status     string `json:"status"`
 	Conclusion string `json:"conclusion"`
 	URL        string `json:"url"`
+	// RunID and JobID name the GitHub Actions run and job behind a check run
+	// (0 for other CI systems): what Fix with agent and Open log read.
+	RunID int64 `json:"runId"`
+	JobID int64 `json:"jobId"`
 }
 
 // CheckCounts sums checks by normalized state (the list's CI badge).
@@ -76,10 +80,13 @@ type ghCheck struct {
 	TargetURL    string `json:"targetUrl"`
 }
 
-func (g ghCheck) check() Check {
+// check normalizes the item; repoURL (the repository's https URL) decides
+// whether its details URL names a run of this repository's Actions.
+func (g ghCheck) check(repoURL string) Check {
 	if g.Typename == "StatusContext" {
 		return Check{Name: g.Context, State: statusState(g.State), Status: g.State, URL: g.TargetURL}
 	}
+	run, job := actionsIDs(repoURL, g.DetailsURL)
 	return Check{
 		Name:       g.Name,
 		Workflow:   g.WorkflowName,
@@ -87,6 +94,8 @@ func (g ghCheck) check() Check {
 		Status:     g.Status,
 		Conclusion: g.Conclusion,
 		URL:        g.DetailsURL,
+		RunID:      run,
+		JobID:      job,
 	}
 }
 
@@ -124,7 +133,7 @@ func statusState(state string) string {
 func countChecks(raw []ghCheck) CheckCounts {
 	var n CheckCounts
 	for _, r := range raw {
-		switch r.check().State {
+		switch r.check("").State {
 		case "success":
 			n.Success++
 		case "failure":
@@ -461,7 +470,7 @@ func buildDetails(repo Repo, v prView, files []restFile, tp threadPage) *prData 
 		d.Commits = append(d.Commits, Commit{OID: cm.Oid, Headline: cm.MessageHeadline, Author: author, Date: cm.CommittedDate})
 	}
 	for _, ch := range v.StatusCheckRollup {
-		d.Checks = append(d.Checks, ch.check())
+		d.Checks = append(d.Checks, ch.check(repo.URL))
 	}
 	for _, r := range v.Reviews {
 		// Bare comments of a review show up in its threads; keep reviews that say something.

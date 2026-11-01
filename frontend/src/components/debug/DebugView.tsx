@@ -6,6 +6,7 @@ import {
 import { usePersistentNumber } from '../../lib/usePersistentNumber'
 import { Splitter } from '../layout/Splitter'
 import { RerunIcon, StopIcon } from '../run/RunWidget'
+import { formatKeys } from '../../lib/commands'
 
 /** The debug tab: stepping toolbar, frames, variables and the console. */
 export function DebugView() {
@@ -22,7 +23,7 @@ export function DebugView() {
         <button className="icon" title="Restart" onClick={() => void restartDebug()}>
           <RerunIcon />
         </button>
-        <button className="icon run-stop" title="Stop (⌘F2)" disabled={!live && session.status !== 'starting'} onClick={() => void stopDebug()}>
+        <button className="icon run-stop" title={`Stop (${formatKeys('Mod+F2')})`} disabled={!live && session.status !== 'starting'} onClick={() => void stopDebug()}>
           <StopIcon />
         </button>
         <span className="debug-sep" />
@@ -30,7 +31,7 @@ export function DebugView() {
         <StepButton title="Pause" disabled={session.status !== 'running'} onClick={() => void debugStep('pause')}>❚❚</StepButton>
         <StepButton title="Step Over (F8)" disabled={!paused} onClick={() => void debugStep('next')}>↷</StepButton>
         <StepButton title="Step Into (F7)" disabled={!paused} onClick={() => void debugStep('stepIn')}>↓</StepButton>
-        <StepButton title="Step Out (⇧F8)" disabled={!paused} onClick={() => void debugStep('stepOut')}>↑</StepButton>
+        <StepButton title={`Step Out (${formatKeys('Shift+F8')})`} disabled={!paused} onClick={() => void debugStep('stepOut')}>↑</StepButton>
         <span className={`run-status ${statusClass(session)}`}>{statusText(session)}</span>
       </div>
       <div className="run-body" ref={body}>

@@ -1,5 +1,6 @@
 ## Get started
 - [Home](index.md)
+- [Why Flint](why-flint.md)
 - [Installation](installation.md)
 - [First steps](first-steps.md)
 

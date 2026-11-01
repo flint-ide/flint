@@ -7,6 +7,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/evanw/esbuild v0.28.2
 	github.com/fsnotify/fsevents v0.2.0
+	github.com/godbus/dbus/v5 v5.2.2
 	github.com/google/pprof v0.0.0-20260709232956-b9395ee17fa0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/wailsapp/wails/v3 v3.0.0
@@ -26,7 +27,6 @@ require (
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
-	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

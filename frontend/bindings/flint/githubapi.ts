@@ -15,6 +15,10 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as github$0 from "./internal/github/models.js";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 /**
  * AddComment comments on lines of a file, at once or in my pending review.
  */
@@ -23,11 +27,41 @@ export function AddComment(dir: string, $number: number, comment: github$0.NewCo
 }
 
 /**
+ * BranchChecks reads the CI checks of branch's pull request (no pull request:
+ * pr is null). The frontend decides when to ask (settings.CI.PollSeconds).
+ */
+export function BranchChecks(dir: string, branch: string): $CancellablePromise<github$0.BranchChecks> {
+    return $Call.ByID(3836656350, dir, branch).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
+/**
+ * CIFailure describes the failed jobs of a run (jobIDs narrows it; empty means
+ * all failed jobs) for the agent, with logs redacted and excerpts bounded.
+ */
+export function CIFailure(dir: string, runID: number, jobIDs: number[]): $CancellablePromise<$models.CIReport> {
+    return $Call.ByID(785188551, dir, runID, jobIDs).then(($result: any) => {
+        return $$createType1($result);
+    });
+}
+
+/**
+ * CILog returns the failed steps' log of a run (or one job) for reading in a
+ * tab: cleaned, redacted, at most maxCILogLines from the end.
+ */
+export function CILog(dir: string, runID: number, jobID: number): $CancellablePromise<$models.CILog> {
+    return $Call.ByID(1582117775, dir, runID, jobID).then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
+/**
  * Check reports whether gh is installed and logged in and which repository dir is.
  */
 export function Check(dir: string, force: boolean): $CancellablePromise<github$0.Status> {
     return $Call.ByID(2554954249, dir, force).then(($result: any) => {
-        return $$createType0($result);
+        return $$createType3($result);
     });
 }
 
@@ -44,7 +78,7 @@ export function Checkout(dir: string, $number: number): $CancellablePromise<void
  */
 export function Details(dir: string, $number: number, force: boolean): $CancellablePromise<github$0.Details> {
     return $Call.ByID(3513689967, dir, $number, force).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType4($result);
     });
 }
 
@@ -60,7 +94,7 @@ export function DiscardReview(dir: string, $number: number): $CancellablePromise
  */
 export function FileDiff(dir: string, $number: number, path: string): $CancellablePromise<github$0.FileDiff> {
     return $Call.ByID(3794132550, dir, $number, path).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType5($result);
     });
 }
 
@@ -69,7 +103,7 @@ export function FileDiff(dir: string, $number: number, path: string): $Cancellab
  */
 export function List(dir: string, filter: github$0.ListFilter, force: boolean): $CancellablePromise<github$0.PullRequest[]> {
     return $Call.ByID(1366910959, dir, filter, force).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType7($result);
     });
 }
 
@@ -78,6 +112,15 @@ export function List(dir: string, filter: github$0.ListFilter, force: boolean): 
  */
 export function Reply(dir: string, $number: number, threadID: string, body: string): $CancellablePromise<void> {
     return $Call.ByID(2090988113, dir, $number, threadID, body);
+}
+
+/**
+ * RerunFailed re-runs a run's failed jobs on GitHub, after a native
+ * confirmation naming the repository and the workflow (the web view can't
+ * answer it).
+ */
+export function RerunFailed(dir: string, runID: number): $CancellablePromise<void> {
+    return $Call.ByID(1554732258, dir, runID);
 }
 
 /**
@@ -95,8 +138,11 @@ export function SubmitReview(dir: string, $number: number, event: string, body: 
 }
 
 // Private type creation functions
-const $$createType0 = github$0.Status.createFrom;
-const $$createType1 = github$0.Details.createFrom;
-const $$createType2 = github$0.FileDiff.createFrom;
-const $$createType3 = github$0.PullRequest.createFrom;
-const $$createType4 = $Create.Array($$createType3);
+const $$createType0 = github$0.BranchChecks.createFrom;
+const $$createType1 = $models.CIReport.createFrom;
+const $$createType2 = $models.CILog.createFrom;
+const $$createType3 = github$0.Status.createFrom;
+const $$createType4 = github$0.Details.createFrom;
+const $$createType5 = github$0.FileDiff.createFrom;
+const $$createType6 = github$0.PullRequest.createFrom;
+const $$createType7 = $Create.Array($$createType6);

@@ -1,0 +1,24 @@
+Build and test (macOS)	go test	﻿2026-11-01T12:42:22.7832780Z ##[group]Run go test -race ./...
+Build and test (macOS)	go test	2026-11-01T12:42:22.7833110Z [36;1mgo test -race ./...[0m
+Build and test (macOS)	go test	2026-11-01T12:42:22.7865810Z shell: /bin/bash -e {0}
+Build and test (macOS)	go test	2026-11-01T12:42:22.7866180Z env:
+Build and test (macOS)	go test	2026-11-01T12:42:22.7866320Z   GH_TOKEN: ghp_0123456789abcdefghijklmnopqrstuvwxyzAB
+Build and test (macOS)	go test	2026-11-01T12:42:22.7866850Z ##[endgroup]
+Build and test (macOS)	go test	2026-11-01T12:42:28.1444280Z # flint.test
+Build and test (macOS)	go test	2026-11-01T12:42:28.1445030Z ld: warning: ignoring duplicate libraries: '-lobjc'
+Build and test (macOS)	go test	2026-11-01T12:42:28.1446160Z ld: warning: object file (/private/var/folders/n6/T/go-link-1750898141/go.o) was built for newer 'macOS' version (13.0) than being linked (12.0)
+Build and test (macOS)	go test	2026-11-01T12:42:40.7459440Z ok  	flint	12.471s
+Build and test (macOS)	go test	2026-11-01T12:42:40.7460160Z ok  	flint/cmd/docsite	1.063s
+Build and test (macOS)	go test	2026-11-01T12:42:40.7461120Z ok  	flint/internal/acp	4.872s
+Build and test (macOS)	go test	2026-11-01T12:42:41.1000000Z # flint/internal/ratelimit
+Build and test (macOS)	go test	2026-11-01T12:42:41.1000100Z internal/ratelimit/bucket.go:42:9: undefined: refillRate
+Build and test (macOS)	go test	2026-11-01T12:42:41.1000200Z FAIL	flint/internal/ratelimit [build failed]
+Build and test (macOS)	go test	2026-11-01T12:42:48.7323210Z ok  	flint/internal/redact	1.086s
+Build and test (macOS)	go test	2026-11-01T12:42:48.7323590Z --- FAIL: TestStopDoesNotWaitForAClientThatStoppedReading (4.62s)
+Build and test (macOS)	go test	2026-11-01T12:42:48.7324470Z     review_test.go:316: Stop took 4.312903333s with a client that doesn't read
+Build and test (macOS)	go test	2026-11-01T12:42:48.7324830Z FAIL
+Build and test (macOS)	go test	2026-11-01T12:42:48.7325080Z FAIL	flint/internal/remote	5.546s
+Build and test (macOS)	go test	2026-11-01T12:42:48.7325420Z ok  	flint/internal/remote/client	1.153s
+Build and test (macOS)	go test	2026-11-01T12:42:48.7334970Z ok  	flint/internal/vscodeimport	1.193s
+Build and test (macOS)	go test	2026-11-01T12:42:48.7335660Z FAIL
+Build and test (macOS)	go test	2026-11-01T12:42:48.7655750Z ##[error]Process completed with exit code 1.

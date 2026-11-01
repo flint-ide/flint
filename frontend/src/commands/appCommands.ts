@@ -5,6 +5,7 @@ import { parseKeys, registerCommands, type Command } from '../lib/commands'
 import { attachSelectionToAgent } from '../lib/agentContext'
 import { registerFeatureCommands } from './featureCommands'
 import { registerTaskCommands } from './taskCommands'
+import { registerReviewCommands } from './reviewCommands'
 import { requestCloseTab } from '../components/editor/EditorArea'
 import { useWorkspace } from '../store/workspace'
 import { PANELS } from '../panels'
@@ -28,6 +29,7 @@ import { checkForUpdates } from '../store/update'
 import { openInlineEditInActiveEditor } from '../store/editorAi'
 import { useSettings } from '../store/settings'
 import { openVSCodeImport } from '../store/vscodeImport'
+import { fileManagerName } from '../lib/platform'
 
 // Where a global shortcut belongs to the focused widget instead: ⌘B in an editor is
 // "go to declaration" (IntelliJ), ⌘K in a terminal clears the screen.
@@ -51,7 +53,9 @@ export function registerAppCommands(): () => void {
   const offFeatures = registerFeatureCommands()
   const offRoots = registerWorkspaceRootCommands()
   const offTasks = registerTaskCommands()
+  const offReview = registerReviewCommands()
   return () => {
+    offReview()
     offTasks()
     offStatic()
     offAgents()
@@ -96,7 +100,7 @@ function appCommands(): Command[] {
     },
     { id: 'help.reportIssue', title: 'Report an Issue…', category: 'Help', keywords: 'bug feedback github diagnostics logs', run: () => void reportIssue() },
     { id: 'help.copyDiagnostics', title: 'Copy Diagnostics', category: 'Help', keywords: 'logs versions support', run: () => void copyDiagnostics() },
-    { id: 'help.showLogs', title: 'Show Logs in Finder', category: 'Help', keywords: 'log file debug', run: showLogs },
+    { id: 'help.showLogs', title: `Show Logs in ${fileManagerName()}`, category: 'Help', keywords: 'log file debug', run: showLogs },
     {
       id: 'help.checkTools', title: 'Check Tools…', category: 'Help',
       keywords: 'install setup missing path version git ripgrep gh claude codex kubectl docker aws delve language server',

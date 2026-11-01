@@ -7,7 +7,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/evanw/esbuild v0.28.2
 	github.com/fsnotify/fsevents v0.2.0
-	github.com/godbus/dbus/v5 v5.2.2
+	github.com/godbus/dbus/v5 v5.2.4
 	github.com/google/pprof v0.0.0-20260709232956-b9395ee17fa0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/wailsapp/wails/v3 v3.0.0

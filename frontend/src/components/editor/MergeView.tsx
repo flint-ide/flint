@@ -17,12 +17,14 @@ import { formatKeys } from '../../lib/commands'
 import { relativePath } from '../../lib/agentPrompt'
 import { mergeConflicts, type MergeState } from '../../lib/mergeDecorations'
 import {
+  applyRedaction,
   baseFor,
   conflictAt,
   conflictPrompt,
   conflictText,
   diff3Segments,
   nextConflict,
+  redactionInput,
   replaceConflict,
   resolvedLines,
   type Resolution,
@@ -84,18 +86,42 @@ export function MergeView({ tab, active }: { tab: MergeTab; active: boolean }) {
     })
   }, [])
 
+  /**
+   * Runs a write that Go refuses when the file changed on disk since the editor
+   * loaded it (an agent, another editor); the user may then overwrite. Returns
+   * whether it wrote. Other errors propagate.
+   */
+  const writeChecked = useCallback(
+    async (write: (overwrite: boolean) => Promise<void>): Promise<boolean> => {
+      try {
+        await write(false)
+        return true
+      } catch (err) {
+        if (!errorMessage(err).includes('changed on disk')) throw err
+      }
+      const overwrite = await confirmAction(
+        `${rel} changed on disk since the merge editor loaded it (an agent or another editor?). Overwrite it with the merge editor's version? Cancel keeps the file on disk; reopen the merge editor to load it.`,
+        'Overwrite',
+      )
+      if (!overwrite) return false
+      await write(true)
+      return true
+    },
+    [rel],
+  )
+
   const save = useCallback(async () => {
     const v = view.current
     if (!v) return
     const text = v.state.sliceDoc()
     try {
-      await Workspace.WriteFile(tab.path, text)
+      if (!(await writeChecked((overwrite) => Git.SaveMergeResult(tab.path, text, saved.current, overwrite)))) return
       saved.current = text
       setDirty(tab.id, false)
     } catch (err) {
       showToast(errorMessage(err), 'error')
     }
-  }, [tab.path, tab.id, setDirty])
+  }, [tab.path, tab.id, setDirty, writeChecked])
 
   const resolveAt = useCallback((index: number, how: Resolution) => {
     const v = view.current
@@ -116,7 +142,11 @@ export function MergeView({ tab, active }: { tab: MergeTab; active: boolean }) {
       if (v.state.sliceDoc() !== saved.current && (await confirmAction('The agent edits the file on disk. Save your changes first?', 'Save'))) {
         await save()
       }
-      const text = conflictText(v.state.doc, c)
+      const raw = conflictText(v.state.doc, c)
+      const rawBase = baseFor(raw, diff3Segments(data.diff3))
+      // Credentials are redacted in Go, and a secret file's contents stay out entirely.
+      const redacted = await Git.RedactForAgent(tab.path, redactionInput(raw, rawBase))
+      const { text, base, secretFile } = applyRedaction(raw, rawBase, redacted)
       const root = rootFor(tab.path)
       const prompt = conflictPrompt({
         rel: relativePath(tab.path, root),
@@ -124,7 +154,8 @@ export function MergeView({ tab, active }: { tab: MergeTab; active: boolean }) {
         total: list.length,
         range: c,
         text,
-        base: baseFor(text, diff3Segments(data.diff3)),
+        base,
+        secretFile,
         operation: data.sides.operation,
         current: data.sides.current,
         incoming: data.sides.incoming,
@@ -159,7 +190,8 @@ export function MergeView({ tab, active }: { tab: MergeTab; active: boolean }) {
     }
     setBusy(true)
     try {
-      await Git.MarkResolved(tab.path, text, left > 0)
+      const expected = saved.current
+      if (!(await writeChecked((overwrite) => Git.MarkResolved(tab.path, text, expected, left > 0, overwrite)))) return
       saved.current = text
       setDirty(tab.id, false)
       showToast(`${rel} marked as resolved`)
@@ -170,7 +202,7 @@ export function MergeView({ tab, active }: { tab: MergeTab; active: boolean }) {
     } finally {
       setBusy(false)
     }
-  }, [busy, rel, tab.path, tab.id, setDirty])
+  }, [busy, rel, tab.path, tab.id, setDirty, writeChecked])
 
   // The commands (palette, shortcuts) act on the cursor's conflict, else the next one.
   const resolveAtCursor = useCallback(

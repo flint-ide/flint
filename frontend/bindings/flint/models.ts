@@ -68,6 +68,42 @@ export class AgentInfo {
 }
 
 /**
+ * AgentText is text from a file on its way to an agent's chat draft.
+ */
+export class AgentText {
+    /**
+     * SecretFile: the file holds credentials as a whole (.env, keys…), so Texts is
+     * empty and the hand-off leaves its contents out.
+     */
+    "secretFile": boolean;
+    "texts": string[];
+
+    /** Creates a new AgentText instance. */
+    constructor($$source: Partial<AgentText> = {}) {
+        if (!("secretFile" in $$source)) {
+            this["secretFile"] = false;
+        }
+        if (!("texts" in $$source)) {
+            this["texts"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AgentText instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AgentText {
+        const $$createField1_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("texts" in $$parsedSource) {
+            $$parsedSource["texts"] = $$createField1_0($$parsedSource["texts"]);
+        }
+        return new AgentText($$parsedSource as Partial<AgentText>);
+    }
+}
+
+/**
  * Breakpoints are the breakpoints to set at launch, by absolute file path.
  */
 export type Breakpoints = { [_ in string]?: dap$0.SourceBreakpoint[] };

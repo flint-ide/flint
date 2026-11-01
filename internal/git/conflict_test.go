@@ -123,21 +123,21 @@ func TestMarkResolved(t *testing.T) {
 	}
 	working := readFile(t, r.Root, "f.txt")
 
-	if err := r.MarkResolved(ctx, "f.txt", working, false); !errors.Is(err, ErrConflictMarkers) {
+	if err := r.MarkResolved(ctx, "f.txt", working, working, false, false); !errors.Is(err, ErrConflictMarkers) {
 		t.Fatalf("markers left: err = %v, want ErrConflictMarkers", err)
 	}
 	if readFile(t, r.Root, "f.txt") != working {
 		t.Fatal("a refused resolve must not write the file")
 	}
-	if err := r.MarkResolved(ctx, "../f.txt", "x\n", false); err == nil {
+	if err := r.MarkResolved(ctx, "../f.txt", "x\n", "", false, false); err == nil {
 		t.Fatal("a path outside the repository must be refused")
 	}
-	if err := r.MarkResolved(ctx, "README.md", "x\n", false); err == nil {
+	if err := r.MarkResolved(ctx, "README.md", "x\n", "", false, false); err == nil {
 		t.Fatal("a file without a conflict must be refused")
 	}
 
 	resolved := strings.Replace(conflictBase, "two", "two-both", 1)
-	if err := r.MarkResolved(ctx, "f.txt", resolved, false); err != nil {
+	if err := r.MarkResolved(ctx, "f.txt", resolved, working, false, false); err != nil {
 		t.Fatal(err)
 	}
 	if readFile(t, r.Root, "f.txt") != resolved {
@@ -165,7 +165,7 @@ func TestMarkResolvedKeepsMarkersWhenAllowed(t *testing.T) {
 		t.Fatal(err)
 	}
 	working := readFile(t, r.Root, "f.txt")
-	if err := r.MarkResolved(ctx, "f.txt", working, true); err != nil {
+	if err := r.MarkResolved(ctx, "f.txt", working, working, true, false); err != nil {
 		t.Fatal(err)
 	}
 	info, err := os.Stat(filepath.Join(r.Root, "f.txt"))
@@ -192,7 +192,7 @@ func TestMarkResolvedRefusesSymlinks(t *testing.T) {
 	if err := os.Symlink(outside, p); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.MarkResolved(ctx, "f.txt", "x\n", false); err == nil {
+	if err := r.MarkResolved(ctx, "f.txt", "x\n", "", false, true); err == nil {
 		t.Fatal("writing through a symlink must be refused")
 	}
 	if readFile(t, filepath.Dir(outside), "outside.txt") != "secret\n" {

@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"flint/internal/config"
 )
@@ -72,34 +74,92 @@ func (r *Repo) Conflict(ctx context.Context, rel string) (ConflictFile, error) {
 
 // MarkResolved writes content as the file's resolution and stages it (git add). With
 // conflict markers left in content it refuses unless allowMarkers. The path must be a
-// regular file of the work tree that is still unmerged in the index.
-func (r *Repo) MarkResolved(ctx context.Context, rel, content string, allowMarkers bool) error {
+// regular file of the work tree that is still unmerged in the index. expected is the
+// file as the editor loaded it: see SaveResult.
+func (r *Repo) MarkResolved(ctx context.Context, rel, content, expected string, allowMarkers, overwrite bool) error {
 	if err := r.requireUnmerged(ctx, rel); err != nil {
 		return err
 	}
 	if !allowMarkers && HasConflictMarkers(content) {
 		return ErrConflictMarkers
 	}
-	abs := filepath.Join(r.Root, filepath.FromSlash(rel))
-	info, err := os.Lstat(abs)
-	if err != nil {
-		return fmt.Errorf("%s: %w", rel, err)
-	}
-	if !info.Mode().IsRegular() {
-		return fmt.Errorf("%s is not a regular file; resolve it in the terminal", rel)
-	}
-	if err := config.WriteFileAtomic(abs, []byte(content), info.Mode().Perm()); err != nil {
+	if err := r.SaveResult(ctx, rel, content, expected, overwrite); err != nil {
 		return err
 	}
-	_, err = r.git(ctx, "add", "--", literal(rel))
+	_, err := r.git(ctx, "add", "--", literal(rel))
 	return err
+}
+
+// SaveResult writes the merge editor's content to rel without staging it. Unless
+// overwrite, it refuses with ErrChangedOnDisk when the file no longer holds expected
+// (what the editor loaded or last wrote): another tool or an agent changed it since.
+func (r *Repo) SaveResult(_ context.Context, rel, content, expected string, overwrite bool) error {
+	abs, info, err := r.workTreeFile(rel)
+	if err != nil {
+		return err
+	}
+	if info == nil {
+		return fmt.Errorf("%s is missing or not a regular file of the work tree; resolve it in the terminal", rel)
+	}
+	if !overwrite {
+		current, err := os.ReadFile(abs)
+		if err != nil {
+			return err
+		}
+		if string(current) != expected {
+			return ErrChangedOnDisk
+		}
+	}
+	return config.WriteFileAtomic(abs, []byte(content), info.Mode().Perm())
+}
+
+// ErrChangedOnDisk: the file is no longer what the merge editor loaded.
+var ErrChangedOnDisk = errors.New("the file changed on disk since you opened it — reload or overwrite")
+
+// workTreeFile resolves rel to a regular file inside the work tree. info is nil when
+// the file is missing or isn't a regular file. A path that leaves the work tree
+// through a symlinked folder is an error, so nothing is read or written outside it.
+func (r *Repo) workTreeFile(rel string) (string, fs.FileInfo, error) {
+	if err := validRel(rel); err != nil {
+		return "", nil, err
+	}
+	abs := filepath.Join(r.Root, filepath.FromSlash(rel))
+	info, err := os.Lstat(abs)
+	if errors.Is(err, fs.ErrNotExist) {
+		return abs, nil, nil
+	}
+	if err != nil {
+		return "", nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return abs, nil, nil
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", nil, err
+	}
+	root, err := filepath.EvalSymlinks(r.Root)
+	if err != nil {
+		return "", nil, err
+	}
+	if _, inside := relInside(root, resolved); !inside {
+		return "", nil, fmt.Errorf("%s leads outside the repository through a symlink", rel)
+	}
+	return abs, info, nil
+}
+
+func validRel(rel string) error {
+	if rel == "" || path.IsAbs(rel) || path.Clean(rel) != rel || rel == ".." || strings.HasPrefix(rel, "../") {
+		return fmt.Errorf("invalid path %q", rel)
+	}
+	return nil
 }
 
 // requireUnmerged checks that rel is a plain path inside the work tree with
 // unmerged index entries.
 func (r *Repo) requireUnmerged(ctx context.Context, rel string) error {
-	if rel == "" || path.IsAbs(rel) || path.Clean(rel) != rel || rel == ".." || strings.HasPrefix(rel, "../") {
-		return fmt.Errorf("invalid path %q", rel)
+	if err := validRel(rel); err != nil {
+		return err
 	}
 	out, err := r.git(ctx, "ls-files", "-u", "-z", "--", literal(rel))
 	if err != nil {
@@ -116,16 +176,13 @@ func (r *Repo) requireUnmerged(ctx context.Context, rel string) error {
 // literal turns off pathspec magic and globbing for one path.
 func literal(rel string) string { return ":(literal)" + rel }
 
-// workingFile reads rel from the work tree; anything but a regular file (missing,
-// a symlink, a directory) comes back with Exists false.
+// workingFile reads rel from the work tree; anything but a regular file inside it
+// (missing, a symlink, a directory, a file behind a symlinked folder) comes back
+// with Exists false.
 func (r *Repo) workingFile(rel string) (Revision, error) {
-	abs := filepath.Join(r.Root, filepath.FromSlash(rel))
-	info, err := os.Lstat(abs)
-	if errors.Is(err, fs.ErrNotExist) || (err == nil && !info.Mode().IsRegular()) {
+	abs, info, err := r.workTreeFile(rel)
+	if info == nil || err != nil {
 		return Revision{}, nil
-	}
-	if err != nil {
-		return Revision{}, err
 	}
 	if info.Size() > maxRevisionFile {
 		return Revision{Exists: true, Binary: true}, nil
@@ -141,14 +198,53 @@ func (r *Repo) workingFile(rel string) (Revision, error) {
 }
 
 // conflictCount is the number of conflict blocks left in a conflicted file of the
-// work tree (0 when it can't be read).
+// work tree (0 when it can't be read). Status asks on every refresh, so counts are
+// kept until the file's size or modification time changes.
 func (r *Repo) conflictCount(rel string) int {
-	f, err := r.workingFile(rel)
-	if err != nil || !f.Exists || f.Binary {
+	abs, info, err := r.workTreeFile(rel)
+	if err != nil || info == nil {
 		return 0
 	}
-	return len(ParseConflictMarkers(f.Content))
+	key := countKey{size: info.Size(), mtime: info.ModTime().UnixNano()}
+	countMu.Lock()
+	hit, ok := countCache[abs]
+	countMu.Unlock()
+	if ok && hit.countKey == key {
+		return hit.n
+	}
+	conflictReads.Add(1)
+	n := 0
+	if f, err := r.workingFile(rel); err == nil && f.Exists && !f.Binary {
+		n = len(ParseConflictMarkers(f.Content))
+	}
+	countMu.Lock()
+	if len(countCache) >= maxCountCache {
+		clear(countCache)
+	}
+	countCache[abs] = countEntry{countKey: key, n: n}
+	countMu.Unlock()
+	return n
 }
+
+type countKey struct {
+	size  int64
+	mtime int64
+}
+
+type countEntry struct {
+	countKey
+	n int
+}
+
+// maxCountCache bounds the conflict-count cache (one entry per conflicted file).
+const maxCountCache = 256
+
+var (
+	countMu    sync.Mutex
+	countCache = map[string]countEntry{}
+	// conflictReads counts files read to count conflicts (tests check the cache).
+	conflictReads atomic.Int64
+)
 
 // mergeStages runs git merge-file on the three versions (in a private temporary
 // folder) and returns the result with diff3 markers. Histogram diff matches what

@@ -224,20 +224,58 @@ export interface ConflictPrompt {
   operation: string
   current: SideInfo
   incoming: SideInfo
+  /** The file holds credentials as a whole (Go's redact.SecretFile): no contents go along. */
+  secretFile?: boolean
 }
 
-/** Prompt handing one conflict, with both sides and the base, to the agent. */
+/** What GitAPI.RedactForAgent returns. */
+export interface Redacted {
+  secretFile: boolean
+  texts: string[]
+}
+
+/** A conflict's sides and base as GitAPI.RedactForAgent takes them: one string each. */
+export function redactionInput(t: ConflictText, base: string[] | null): string[] {
+  return [t.current, t.incoming, ...(base ? [base] : [])].map((lines) => lines.join('\n'))
+}
+
+/** The sides and base again, from RedactForAgent's answer to redactionInput. */
+export function applyRedaction(t: ConflictText, base: string[] | null, r: Redacted): { text: ConflictText; base: string[] | null; secretFile: boolean } {
+  if (r.secretFile || r.texts.length !== redactionInput(t, base).length) {
+    return { text: { current: [], base: null, incoming: [] }, base: null, secretFile: true }
+  }
+  const lines = (i: number, original: string[]) => (original.length === 0 ? [] : r.texts[i].split('\n'))
+  return {
+    text: { current: lines(0, t.current), base: null, incoming: lines(1, t.incoming) },
+    base: base ? lines(2, base) : null,
+    secretFile: false,
+  }
+}
+
+/**
+ * Prompt handing one conflict, with both sides and the base, to the agent. The texts
+ * must already be redacted (GitAPI.RedactForAgent).
+ */
 export function conflictPrompt(p: ConflictPrompt): string {
   const op = OPERATION_NAMES[p.operation] ?? 'applying changes (for example git stash pop)'
   const block = (lines: string[]) => fenced(lines.join('\n'))
   const base = p.base
     ? `Base (common ancestor):\n\n${block(p.base)}`
     : `Base: not shown here; \`git show :1:${p.rel}\` prints the base version of the file.`
+  const sides = p.secretFile
+    ? [
+        `Current (${p.current.label}): ${p.current.detail}`,
+        `Incoming (${p.incoming.label}): ${p.incoming.detail}`,
+        `${p.rel} holds credentials, so Flint left the conflict's contents out of this message.`,
+      ]
+    : [
+        `Current (${p.current.label}): ${p.current.detail}\n\n${block(p.text.current)}`,
+        `Incoming (${p.incoming.label}): ${p.incoming.detail}\n\n${block(p.text.incoming)}`,
+        base,
+      ]
   return [
     `Resolve merge conflict ${p.index + 1} of ${p.total} in ${p.rel} (lines ${p.range.open}–${p.range.close}), left by ${op}.`,
-    `Current (${p.current.label}): ${p.current.detail}\n\n${block(p.text.current)}`,
-    `Incoming (${p.incoming.label}): ${p.incoming.detail}\n\n${block(p.text.incoming)}`,
-    base,
+    ...sides,
     'Replace only this conflict block in the file (from its <<<<<<< line to its >>>>>>> line) with code that keeps what both sides intended. Leave the other conflicts and the index alone: I review the result in the merge editor and mark the file resolved myself.',
   ].join('\n\n')
 }

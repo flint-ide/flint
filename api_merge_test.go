@@ -49,11 +49,14 @@ func TestMarkResolvedOnlyInsideOpenFolders(t *testing.T) {
 	a := &App{settings: settings.Default(), ctx: context.Background(), roots: []string{open}}
 	g := &GitAPI{app: a}
 
-	if err := g.MarkResolved(filepath.Join(other, "f.txt"), "x\n", false); err == nil {
+	if err := g.MarkResolved(filepath.Join(other, "f.txt"), "x\n", "", false, true); err == nil {
 		t.Fatal("a file outside the open folders must be refused")
 	}
-	if err := g.MarkResolved("f.txt", "x\n", false); err == nil {
+	if err := g.MarkResolved("f.txt", "x\n", "", false, true); err == nil {
 		t.Fatal("a relative path must be refused")
+	}
+	if err := g.SaveMergeResult(filepath.Join(other, "f.txt"), "x\n", "", true); err == nil {
+		t.Fatal("Save outside the open folders must be refused")
 	}
 
 	path := filepath.Join(open, "f.txt")
@@ -61,13 +64,27 @@ func TestMarkResolvedOnlyInsideOpenFolders(t *testing.T) {
 	if err != nil || !git.HasConflictMarkers(c.Diff3) || c.Sides.Incoming.Label != "feature" {
 		t.Fatalf("Conflict = %+v, %v", c, err)
 	}
-	if err := g.MarkResolved(path, c.Working.Content, false); err == nil || !strings.Contains(err.Error(), git.ErrConflictMarkers.Error()) {
+	if err := g.MarkResolved(path, c.Working.Content, c.Working.Content, false, false); err == nil || !strings.Contains(err.Error(), git.ErrConflictMarkers.Error()) {
 		t.Fatalf("markers left: err = %v", err)
 	}
-	if err := g.MarkResolved(path, "a\nmain\nfeature\nc\n", false); err != nil {
+	if err := g.SaveMergeResult(path, "a\nmain\nc\n", "stale", false); err == nil || !strings.Contains(err.Error(), "changed on disk") {
+		t.Fatalf("stale save: err = %v", err)
+	}
+	if err := g.MarkResolved(path, "a\nmain\nfeature\nc\n", c.Working.Content, false, false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := g.Conflict(path); !errors.Is(err, git.ErrNoConflict) {
 		t.Fatalf("after resolving: err = %v, want ErrNoConflict", err)
+	}
+}
+
+func TestRedactForAgent(t *testing.T) {
+	g := &GitAPI{app: &App{}}
+	got := g.RedactForAgent("/p/config.go", []string{`token := "ghp_0123456789abcdefghijklmnopqrstuvwxyzAB"`, "plain()"})
+	if got.SecretFile || len(got.Texts) != 2 || strings.Contains(got.Texts[0], "ghp_0123") || got.Texts[1] != "plain()" {
+		t.Fatalf("redacted = %+v", got)
+	}
+	if got := g.RedactForAgent("/p/.env", []string{"API_KEY=abc"}); !got.SecretFile || len(got.Texts) != 0 {
+		t.Fatalf("a secret file passed its contents on: %+v", got)
 	}
 }

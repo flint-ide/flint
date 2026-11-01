@@ -2,6 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { Text } from '@codemirror/state'
 import {
+  applyRedaction,
   baseFor,
   conflictAt,
   conflictPrompt,
@@ -12,6 +13,7 @@ import {
   linesOf,
   markerKind,
   nextConflict,
+  redactionInput,
   replaceConflict,
   resolvedLines,
   type ConflictRange,
@@ -165,6 +167,24 @@ describe('baseFor', () => {
   })
 })
 
+describe('redaction', () => {
+  const text = { current: ['a', 'token = "s3cret"'], base: null, incoming: [] }
+
+  it('sends each side and the base as one string and puts the answer back', () => {
+    assert.deepEqual(redactionInput(text, ['o']), ['a\ntoken = "s3cret"', '', 'o'])
+    const back = applyRedaction(text, ['o'], { secretFile: false, texts: ['a\ntoken = "[redacted]"', '', 'o'] })
+    assert.deepEqual(back, { text: { current: ['a', 'token = "[redacted]"'], base: null, incoming: [] }, base: ['o'], secretFile: false })
+  })
+
+  it('drops everything of a secret file, or when the answer does not fit', () => {
+    for (const r of [{ secretFile: true, texts: [] }, { secretFile: false, texts: ['only one'] }]) {
+      const back = applyRedaction(text, null, r)
+      assert.equal(back.secretFile, true)
+      assert.deepEqual(back.text, { current: [], base: null, incoming: [] })
+    }
+  })
+})
+
 describe('conflictPrompt', () => {
   const range = { open: 2, base: null, sep: 4, close: 6 }
   const input = {
@@ -185,6 +205,13 @@ describe('conflictPrompt', () => {
     assert.match(p, /Current \(main\): the branch you are rebasing onto\n\n```\nours\n```/)
     assert.match(p, /Incoming \(feature\): your commit abc “Fix”\n\n```\ntheirs\n```/)
     assert.match(p, /Base \(common ancestor\):\n\n```\norig\n```/)
+  })
+
+  it('leaves the contents of a secret file out', () => {
+    const p = conflictPrompt({ ...input, rel: '.env', text: { current: ['KEY=a'], base: null, incoming: ['KEY=b'] }, base: ['KEY=o'], secretFile: true })
+    assert.ok(!/KEY=/.test(p))
+    assert.match(p, /\.env holds credentials/)
+    assert.match(p, /Current \(main\): the branch you are rebasing onto/)
   })
 
   it('says where the base is when it is not known', () => {

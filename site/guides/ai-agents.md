@@ -75,6 +75,37 @@ Open chats are part of the project session. After a restart you see the transcri
 
 Context goes to the chat of the project it belongs to: the active or most recently used chat there, or a new chat with the default agent if there is none. It lands in the draft so you can add your own words before sending. `⌥`-click sends it immediately.
 
+## What agents can see in Flint
+
+An agent chat in Flint can also look things up by itself. Flint runs a small [MCP](https://modelcontextprotocol.io) server and offers it to every chat, so the agent can read what Flint knows and a terminal doesn't:
+
+| Tool | What the agent gets |
+|---|---|
+| `get_diagnostics` | The errors and warnings the language servers report, for the project, a folder or a file. Only files a language server has checked are included: usually the open files and, for Go, their packages. |
+| `get_editor_state` | The files open in the editor (and which have unsaved changes), the active file, and your selection with its text, or the cursor position. Ask about "this function" and the agent can see which one. |
+| `get_terminal_output` | The recent output of your terminals and run consoles in the project (dev servers, builds), as plain text without colors. |
+| `get_test_results` | The last test run in Flint: totals, and each failed test with its location and output. |
+| `get_kubernetes_status` | What is failing in a namespace of the current Kubernetes context: unhealthy apps, workloads that didn't roll out, failing pods with their reason, failed jobs and warning events. No secrets and no logs. |
+
+The tools only read. Claude Code shows them as `mcp__flint__…`; with the default approval policy ("Read and search the project" on) they run without asking. Codex and custom agents decide about them with their own rules.
+
+How it is protected:
+
+- The server listens only on `127.0.0.1`, on a port the system picks, and only while Flint runs. It starts with the first chat.
+- Each project gets its own random token, and an agent only ever sees its own project (the Kubernetes tool is the exception: it reads the current context, like `kubectl` does). Requests without the token, or from a web page, are refused.
+- The token reaches the agent through an environment variable (Claude Code, Codex) or the ACP connection, never on a command line.
+- Answers are bounded in size, and credentials (keys, tokens, passwords in URLs) are redacted before they reach the agent.
+- Folders in [Restricted Mode](restricted-mode.md) get no access.
+
+Which agents get it:
+
+- **Claude Code**: through `--mcp-config`, next to your own MCP servers.
+- **Codex**: through `-c mcp_servers.flint…` overrides.
+- **Custom (ACP) agents**: when the agent says it can connect to HTTP MCP servers (`mcpCapabilities.http`); otherwise not.
+- Commit messages and other one-shot runs don't use it.
+
+To turn it off, or to switch off single tools (for example Kubernetes), open Settings (`⌘,`) ▸ **Agent Context**. Switching the server off cuts running chats off at once; new chats no longer get it. See [`mcpServer`](../reference/settings.md#mcpserver) for the keys.
+
 ## What the agent may do without asking
 
 The link in the chat header (for example **auto: edits**) shows and changes the approval policy. The policy is shared by all chats and kept between runs.
@@ -104,7 +135,7 @@ When an agent turn finishes while Flint isn't the active app, you get a macOS no
 
 ## Agents in Restricted Mode
 
-In a folder you haven't trusted, agents run without the project's own agent settings and hooks (Claude Code is started with `--setting-sources user`). Trust the folder to let them apply. Custom ACP agents don't start there at all. See [Restricted Mode](restricted-mode.md).
+In a folder you haven't trusted, agents run without the project's own agent settings and hooks (Claude Code is started with `--setting-sources user`). Trust the folder to let them apply. Custom ACP agents don't start there at all, and chats there don't get [Flint's MCP server](#what-agents-can-see-in-flint): a hostile repository could otherwise steer the agent into reading your terminals or cluster without a prompt. See [Restricted Mode](restricted-mode.md).
 
 ## Related
 

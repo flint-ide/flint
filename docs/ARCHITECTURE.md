@@ -88,6 +88,7 @@ flowchart LR
 - Custom agents (`customAgents` in settings.json) are ACP agents: each gets one `acpdriver.Driver`, registered at startup and again whenever settings are saved (`syncCustomAgents`). A replaced or removed driver keeps the sessions it runs until they stop, and is still closed on quit. Adding an agent CLI with an ACP mode needs no code.
 - The agent lists (chat menus, default-agent pickers, `AgentAPI.Info`) are the native CLIs found on the login PATH, then the custom agents whose command resolves.
 - One-shot work goes through `AgentAPI`: commit messages run `agent.Headless` (`claude -p`, `codex exec`) or, for a custom agent, `acpdriver.Headless` (a fresh ACP session that declines every permission request and refuses writes). Conflict resolution types an interactive command into a terminal, so it always uses a native agent (`AgentInfo.conflictAgent`).
+- Flint's own MCP server (`api_mcp.go` → `internal/mcpserver`, `internal/mcptools`) gives chat agents read-only tools: LSP diagnostics, the editor snapshot, terminal and run output, the last test run and the Kubernetes status. `mcpserver` is MCP's Streamable HTTP transport on the standard library (JSON-RPC over POST, protocol 2025-06-18, no SSE, stateless), listening on `127.0.0.1` from the first session that gets it until quit. `mcptools` keeps bounded stores fed by events (`LSPAPI.wire`, `terminalEvents`, `runEvents`, and `EditorContextAPI.Update`, which the frontend calls debounced and only on change); nothing polls. Drivers receive an `agentsession.MCPProvider`: Claude Code gets an inline `--mcp-config` whose header expands `${FLINT_MCP_TOKEN}` from its environment, Codex `-c mcp_servers.flint.*` with `bearer_token_env_var`, ACP agents an `http` McpServer in `session/new` when they advertise `mcpCapabilities.http`.
 - `SettingsAPI.ProbeCustomAgent` runs only the ACP `initialize` handshake of a saved custom agent, in an empty temporary folder, for the Check button. Settings are written by the web view, so before a command line runs for the first time in a session Go shows a native dialog with that exact command line; the UI cannot answer or skip it.
 
 ### File operations
@@ -185,6 +186,15 @@ A custom agent is a binary the user configured, so it runs with the user's right
 - The client offers file reads and writes (`fs/read_text_file`, `fs/write_text_file`) but no terminal. Paths must be absolute and stay inside the session folder after resolving symlinks (checked again right before the file is opened). Reads take regular files up to 10 MB. Writes into a `.git` directory or file at any depth are refused, writes into the other protected folders (`.claude`, `.codex`, `.vscode`, `.idea`) are shown to the user as a permission request, and every write goes through a temporary file and a rename, so a hard link never carries it out of the project.
 - Every `session/request_permission` goes through `agentsession.Manager`: the user's approval policy answers what it allows (by default edits and reads of known paths inside the project, outside `.git` and agent config folders) and the chat asks about the rest, exactly as for Claude Code and Codex. One-shot runs (commit messages) decline every request.
 - The agent runs in its own process group (`Setpgid`), which also holds the processes it starts (gemini-cli relaunches itself as a child that shares its stdio); stopping a chat, a one-shot run or Flint sends SIGTERM to the group and SIGKILL after a grace period. An agent that misses the `initialize` handshake gets SIGKILL at once, so the Check returns right after its timeout.
+
+### Flint's MCP server
+
+Any local process can reach a loopback port, and a web page can try through DNS rebinding, so the server trusts nothing but its tokens:
+
+- One random 256-bit bearer token per project root; a request only ever reads the root its token maps to. Tokens live in memory (hashed for lookup) and reach agents through an environment variable or the ACP pipe, never argv.
+- `Host` must be `127.0.0.1:<port>` or `localhost:<port>` and an `Origin`, if any, the same; bodies are capped at 1 MiB; at most four tool calls run at once, each with a 30 s timeout, cancelled on quit.
+- Every request re-checks the setting and the folder's trust: untrusted folders get no token, and a token stops working when the server is switched off or trust is revoked.
+- Every tool only reads; answers are cut at 64 KiB and passed through `redact.Secrets`. Paths a tool accepts must stay inside the project.
 
 ### Untrusted rendered content
 

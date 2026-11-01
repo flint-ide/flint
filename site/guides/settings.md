@@ -8,7 +8,7 @@ Flint's settings open in a tab. Every change applies immediately, without a rest
 - **flint ▸ Settings…** in the menu bar
 - "Settings…" in the command palette
 
-The tab has nine sections: Appearance, Editor, Terminal, Agents, Language Servers, Refresh, TODO List, Keymap and Updates.
+The tab has ten sections: Appearance, Editor, Terminal, Agents, Agent Context, Language Servers, Refresh, TODO List, Keymap and Updates.
 
 ## Appearance
 
@@ -38,6 +38,14 @@ Font family, size (default 13) and line height (default 1.2) for terminals and r
 
   Agent settings apply to chats, commit messages and conflict resolution started afterwards; running chats keep theirs.
 - **Tell me when work finishes in the background**: shows a macOS notification and a count on the Dock icon when a run, a test run or an agent turn finishes while Flint isn't the active app. On by default.
+
+## Agent Context
+
+What agent chats can read from Flint through its own MCP server (see [What agents can see in Flint](ai-agents.md#what-agents-can-see-in-flint)):
+
+- **Share Flint's context with agents**: offer the server to agent chats. On by default. Turning it off cuts running chats off at once.
+- **Tools**: diagnostics, open editors and selection, terminal output, test results and Kubernetes status, each on or off. Changes apply to running chats too.
+- **Terminal lines**: the most lines of one terminal's output an agent gets, 10 to 2000 (default 200).
 
 ## Language Servers
 

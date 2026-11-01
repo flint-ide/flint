@@ -58,10 +58,10 @@ func New(o Options) (*Docker, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newWithEndpoint(ep, o), nil
+	return newWithEndpoint(ep), nil
 }
 
-func newWithEndpoint(ep Endpoint, o Options) *Docker {
+func newWithEndpoint(ep Endpoint) *Docker {
 	d := &Docker{ep: ep}
 	tr := &http.Transport{
 		DialContext:         func(ctx context.Context, _, _ string) (net.Conn, error) { return ep.dial(ctx) },
@@ -78,7 +78,6 @@ func newWithEndpoint(ep Endpoint, o Options) *Docker {
 	if ep.Source == "setting" {
 		d.cliHost = ep.Host
 	}
-	_ = o
 	return d
 }
 

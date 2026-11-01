@@ -19,8 +19,6 @@ export interface InlineCompletionConfig {
   /** Read on every keystroke, so a settings change applies right away. */
   options: () => CompletionOptions
   complete: (editor: string, prefix: string, suffix: string) => Cancellable<string>
-  /** The request was given up (cursor moved, editor closed). */
-  cancel: (editor: string) => void
   onSuccess: () => void
   onError: (err: unknown) => void
 }
@@ -133,10 +131,7 @@ class Controller {
     this.timer = undefined
     const call = this.inflight
     this.inflight = null
-    if (call) {
-      call.cancel()
-      this.config.cancel(this.id)
-    }
+    call?.cancel() // cancels the Go call's context, which aborts the HTTP request
   }
 
   destroy(): void {

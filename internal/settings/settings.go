@@ -2,7 +2,7 @@
 // directory): theme (and a custom palette), editor fonts and Vim mode, terminal
 // fonts, the default agent, agent CLIs,
 // custom ACP agents,
-// language servers, refresh intervals, keyboard shortcut overrides and whether
+// language servers, refresh intervals, keyboard shortcut overrides, Flint Remote and whether
 // to look for new releases. Loading is forgiving (a hand-edited file never stops Flint
 // from starting: bad values fall back to defaults, unknown keys are ignored);
 // saving is strict. Nothing secret belongs here: credentials live in the Keychain.
@@ -110,6 +110,8 @@ type Settings struct {
 	InlineEdit InlineEdit `json:"inlineEdit"`
 	// AgentTasks configures agent tasks (worktree folder, branch prefix).
 	AgentTasks AgentTasks `json:"agentTasks"`
+	// Remote configures Flint Remote, the API a paired phone uses (remote.go).
+	Remote Remote `json:"remote"`
 }
 
 // Default returns the settings Flint uses when nothing is configured.
@@ -139,6 +141,7 @@ func Default() Settings {
 		Completions:        defaultCompletions(),
 		InlineEdit:         defaultInlineEdit(),
 		AgentTasks:         defaultAgentTasks(),
+		Remote:             defaultRemote(),
 		CustomTheme:        defaultCustomTheme(),
 	}
 }
@@ -207,6 +210,7 @@ func Normalize(s Settings) Settings {
 	out.Completions = normalizeCompletions(s.Completions)
 	out.InlineEdit = normalizeInlineEdit(s.InlineEdit)
 	out.AgentTasks = normalizeAgentTasks(s.AgentTasks)
+	out.Remote = normalizeRemote(s.Remote)
 	return out
 }
 
@@ -292,6 +296,9 @@ func Validate(s Settings) error {
 		return err
 	}
 	if err := CheckAgentTasks(s.AgentTasks); err != nil {
+		return err
+	}
+	if err := validateRemote(s.Remote); err != nil {
 		return err
 	}
 	return validateRefresh(s.Refresh)

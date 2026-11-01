@@ -228,6 +228,7 @@ func (s Settings) Clone() Settings {
 	out.CustomAgents = cloneCustomAgents(s.CustomAgents)
 	out.LanguageServers = cloneLanguageServers(s.LanguageServers)
 	out.CustomTheme = s.CustomTheme.clone()
+	out.Remote.AllowedHosts = append([]string{}, s.Remote.AllowedHosts...)
 	return out
 }
 

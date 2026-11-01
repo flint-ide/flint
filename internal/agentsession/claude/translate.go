@@ -1,7 +1,9 @@
 package claude
 
 import (
+	"cmp"
 	"encoding/json"
+	"slices"
 
 	"flint/internal/agentsession"
 )
@@ -17,6 +19,11 @@ type translator struct {
 	tools    map[string]*toolState // by tool_use id, until its result
 	tasks    taskList
 	lastCost float64 // cumulative total_cost_usd of the previous result
+	// costSeen: a result with a total cost arrived in this process. After
+	// --resume (resumed) the first total may include earlier runs, so
+	// without a per-turn figure that turn's cost is unknown, not the total.
+	costSeen bool
+	resumed  bool
 }
 
 type toolState struct {
@@ -26,8 +33,8 @@ type toolState struct {
 	call   agentsession.ToolCall
 }
 
-func newTranslator() translator {
-	return translator{streamed: map[string]bool{}, tools: map[string]*toolState{}}
+func newTranslator(resumed bool) translator {
+	return translator{streamed: map[string]bool{}, tools: map[string]*toolState{}, resumed: resumed}
 }
 
 // handleLine dispatches one stdout line.
@@ -259,15 +266,18 @@ func mapResult(r *resultMsg, cancelled bool) (stop, errText string) {
 // the process; model_usage_since_last_result (when present) is per turn.
 func (tr *translator) usage(r *resultMsg) *agentsession.Usage {
 	cost := 0.0
-	if r.ModelUsageSinceLastResult != nil {
+	switch {
+	case r.ModelUsageSinceLastResult != nil:
 		for _, m := range r.ModelUsageSinceLastResult {
 			cost += m.CostUSD
 		}
-	} else if r.TotalCostUSD >= tr.lastCost {
+	case tr.resumed && !tr.costSeen:
+		// The total may cover the conversation before --resume: unknown.
+	case r.TotalCostUSD >= tr.lastCost:
 		cost = r.TotalCostUSD - tr.lastCost
 	}
 	if r.TotalCostUSD > 0 {
-		tr.lastCost = r.TotalCostUSD
+		tr.lastCost, tr.costSeen = r.TotalCostUSD, true
 	}
 	if r.Usage == nil && cost == 0 {
 		return nil
@@ -285,7 +295,31 @@ func (tr *translator) usage(r *resultMsg) *agentsession.Usage {
 		}
 	}
 	u.ContextWindow = contextWindow(r)
+	u.Models = byModel(r.ModelUsageSinceLastResult)
 	return u
+}
+
+// byModel is the turn split by model, biggest cost first (nil when the
+// result has no per-turn figures).
+func byModel(m map[string]modelUsage) []agentsession.ModelUsage {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make([]agentsession.ModelUsage, 0, len(m))
+	for name, mu := range m {
+		out = append(out, agentsession.ModelUsage{
+			Model:            name,
+			InputTokens:      mu.InputTokens + mu.CacheReadInputTokens + mu.CacheCreationInputTokens,
+			OutputTokens:     mu.OutputTokens,
+			CacheReadTokens:  mu.CacheReadInputTokens,
+			CacheWriteTokens: mu.CacheCreationInputTokens,
+			CostUSD:          mu.CostUSD,
+		})
+	}
+	slices.SortFunc(out, func(a, b agentsession.ModelUsage) int {
+		return cmp.Or(cmp.Compare(b.CostUSD, a.CostUSD), cmp.Compare(b.OutputTokens, a.OutputTokens), cmp.Compare(a.Model, b.Model))
+	})
+	return out
 }
 
 // contextWindow is the largest window among the models used (the main model

@@ -163,7 +163,7 @@ func TestPromptsExpandGit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "on main") || !strings.Contains(out, "```diff") || !strings.Contains(out, "new file: new.txt") {
+	if !strings.Contains(out, "on main") || !strings.Contains(out, "```diff\nnew file: new.txt") {
 		t.Fatalf("expanded %q", out)
 	}
 	if strings.Contains(out, "ghp_abcdef") {

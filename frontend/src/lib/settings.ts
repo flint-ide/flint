@@ -13,6 +13,7 @@ import {
   type CompletionSettings, type InlineEditSettings,
 } from './editorAiSettings'
 import { coerceAgentTasks, DEFAULT_AGENT_TASKS, type AgentTaskSettings } from './agentTasks'
+import { coercePromptSettings, DEFAULT_PROMPT_SETTINGS, type PromptSettings } from './prompts'
 
 import type { ResolvedTheme, ThemeMode } from './themeMode'
 
@@ -71,6 +72,8 @@ export interface AppSettings {
   inlineEdit: InlineEditSettings
   /** Where agent task worktrees go and how their branches start. */
   agentTasks: AgentTaskSettings
+  /** The prompt library: whether Flint's own prompts are offered. */
+  prompts: PromptSettings
 }
 
 /** Mirrors settings.Default() in Go (used until the backend answers). */
@@ -94,6 +97,7 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   completions: DEFAULT_COMPLETIONS,
   inlineEdit: DEFAULT_INLINE_EDIT,
   agentTasks: DEFAULT_AGENT_TASKS,
+  prompts: DEFAULT_PROMPT_SETTINGS,
 }) as AppSettings
 
 /** Same limits as Go's settings.Validate, for the inputs. */
@@ -206,5 +210,6 @@ export function coerceSettings(v: unknown): AppSettings {
     completions: coerceCompletions(v.completions),
     inlineEdit: coerceInlineEdit(v.inlineEdit),
     agentTasks: coerceAgentTasks(v.agentTasks),
+    prompts: coercePromptSettings(v.prompts),
   }
 }

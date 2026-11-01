@@ -4681,3 +4681,59 @@ body.file-drop-target-active::after {
   border-radius: 6px;
   color: var(--accent);
 }
+
+/* ---------- prompt library (/ picker, Run Prompt…) ---------- */
+
+.prompt-picker {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  overflow: hidden;
+}
+.prompt-picker .quick-list {
+  max-height: 220px;
+}
+.prompt-list .quick-item {
+  overflow: hidden;
+}
+.prompt-list .path-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prompt-list .badge.untrusted,
+.prompt-picker-note .untrusted {
+  color: var(--warn);
+}
+.prompt-picker-note {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-top: 1px solid var(--border);
+}
+.prompt-picker-note:first-child {
+  border-top: none;
+}
+.prompt-args {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+}
+.prompt-args label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.prompt-args label span {
+  min-width: 90px;
+  color: var(--fg-muted);
+}
+.prompt-args label input {
+  flex: 1;
+}
+.prompt-args-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}

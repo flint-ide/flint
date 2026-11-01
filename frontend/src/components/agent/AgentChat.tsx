@@ -8,6 +8,7 @@ import { useWorkspace } from '../../store/workspace'
 import { rootOf } from '../../lib/workspaceRoots'
 import { FileLink, MessageText, PermissionCard, PlanView, ToolCallRow, UsageLine, ChatUsage } from './ChatItems'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
+import { usePromptPicker } from './PromptPicker'
 
 /** Conversation with a coding agent: streamed replies, tool calls, plan and questions. */
 // memo: chunks for one session must not re-render the others (actions are stable).
@@ -25,6 +26,7 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
   const input = useRef<HTMLTextAreaElement>(null)
   const stick = useRef(true)
   const frame = useRef(0)
+  const picker = usePromptPicker(session, input)
   const { chat } = session
 
   // Follow the stream unless the user scrolled up to read. Scrolling (which reads the
@@ -135,13 +137,15 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
             ))}
           </div>
         )}
+        {picker.element}
         <textarea
           ref={input}
           value={session.draft}
-          placeholder={chat.busy ? `${session.agent} is working… (Esc to stop)` : `Message ${session.agent} (Enter to send, ⇧Enter newline)`}
+          placeholder={chat.busy ? `${session.agent} is working… (Esc to stop)` : `Message ${session.agent} (Enter to send, ⇧Enter newline, / for prompts)`}
           spellCheck={false}
           onChange={(e) => setDraft(session.id, e.target.value)}
           onKeyDown={(e) => {
+            if (picker.onKeyDown(e)) return
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault()
               void send(session.id)

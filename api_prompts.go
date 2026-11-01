@@ -204,7 +204,7 @@ func (p *PromptsAPI) gitContext(root string, withDiff bool) (diff, branch string
 		if err != nil {
 			return result{}, err
 		}
-		out.diff = orElse(prompts.Fenced(redact.Secrets(d), "diff"), "(no uncommitted changes)")
+		out.diff = orElse(prompts.Fenced(redact.Secrets(strings.TrimLeft(d, "\n")), "diff"), "(no uncommitted changes)")
 		return out, nil
 	})
 	if errors.Is(err, git.ErrNotRepository) {

@@ -15,13 +15,6 @@ const (
 	ClickHouse Driver = "clickhouse"
 )
 
-// Protocol is the ClickHouse wire protocol: the native TCP one or HTTP(S).
-// It's a plain string in JSON; "" means native so older profiles keep working.
-const (
-	ProtocolNative = "native"
-	ProtocolHTTP   = "http"
-)
-
 // Connection is a saved connection profile. The password lives in the OS keychain,
 // never in this struct's JSON.
 type Connection struct {
@@ -35,10 +28,8 @@ type Connection struct {
 	// Other databases of the same cluster are reachable with WithDatabase.
 	Database string `json:"database"`
 	User     string `json:"user"`
-	// Protocol selects the ClickHouse transport (ProtocolNative or ProtocolHTTP); unused for Postgres.
-	Protocol string `json:"protocol"`
 	// TLS enables encrypted transport with the server's certificate and host
-	// name verified (Postgres sslmode=verify-full, ClickHouse secure ports).
+	// name verified (Postgres sslmode=verify-full, ClickHouse over HTTPS).
 	TLS bool `json:"tls"`
 	// TLSInsecure skips that verification (self-signed or private CAs): the
 	// traffic is encrypted but a man in the middle can read it.
@@ -53,15 +44,11 @@ func (c Connection) DefaultPort() int {
 	case Postgres:
 		return 5432
 	case ClickHouse:
-		switch {
-		case c.Protocol == ProtocolHTTP && c.TLS:
+		// ClickHouse is reached over its HTTP interface.
+		if c.TLS {
 			return 8443
-		case c.Protocol == ProtocolHTTP:
-			return 8123
-		case c.TLS:
-			return 9440
 		}
-		return 9000
+		return 8123
 	}
 	return 0
 }
@@ -91,12 +78,6 @@ func (c Connection) Normalized() Connection {
 	c.Host = strings.TrimSpace(c.Host)
 	c.Database = strings.TrimSpace(c.Database)
 	c.User = strings.TrimSpace(c.User)
-	if c.Driver == ClickHouse && c.Protocol == "" {
-		c.Protocol = ProtocolNative
-	}
-	if c.Driver != ClickHouse {
-		c.Protocol = ""
-	}
 	if c.Port == 0 {
 		c.Port = c.DefaultPort()
 	}
@@ -114,9 +95,6 @@ func (c Connection) Validate() error {
 	case Postgres, ClickHouse:
 	default:
 		return fmt.Errorf("unsupported driver %q", c.Driver)
-	}
-	if c.Driver == ClickHouse && c.Protocol != "" && c.Protocol != ProtocolNative && c.Protocol != ProtocolHTTP {
-		return fmt.Errorf("unsupported clickhouse protocol %q", c.Protocol)
 	}
 	if c.Host == "" {
 		return errors.New("host is required")

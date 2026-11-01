@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Database, errorMessage, newConnection, type ClickHouseProtocol, type Connection, type Driver } from '../../api/backend'
+import { Database, errorMessage, newConnection, type Connection, type Driver } from '../../api/backend'
 import { db } from '../../wails/models'
 import { useDatabase } from '../../store/database'
 import { Modal } from '../layout/Modal'
@@ -45,8 +45,8 @@ export function ConnectionForm({ initial, onClose }: Props) {
   }
 
   const isClickHouse = conn.driver === 'clickhouse'
-  const http = isClickHouse && conn.protocol === 'http'
-  const defaultPort = isClickHouse ? (http ? (conn.tls ? 8443 : 8123) : conn.tls ? 9440 : 9000) : 5432
+  // ClickHouse is reached over HTTP(S); a different port (a proxy, a custom setup) goes in the Port field.
+  const defaultPort = isClickHouse ? (conn.tls ? 8443 : 8123) : 5432
 
   return (
     <Modal title={initial ? `Edit ${initial.name}` : 'New connection'} onClose={onClose}>
@@ -66,23 +66,9 @@ export function ConnectionForm({ initial, onClose }: Props) {
               { value: 'postgres', label: 'PostgreSQL', icon: <span className="driver-badge postgres">PG</span> },
               { value: 'clickhouse', label: 'ClickHouse', icon: <span className="driver-badge clickhouse">CH</span> },
             ]}
-            onChange={(driver) => update({ driver: driver as Connection['driver'], port: 0, protocol: driver === 'clickhouse' ? 'native' : '' })}
+            onChange={(driver) => update({ driver: driver as Connection['driver'], port: 0 })}
           />
         </label>
-        {isClickHouse && (
-          <label>
-            Protocol
-            <Select
-              block
-              value={(conn.protocol || 'native') as ClickHouseProtocol}
-              options={[
-                { value: 'native', label: 'Native TCP', hint: conn.tls ? 'port 9440' : 'port 9000' },
-                { value: 'http', label: 'HTTP', hint: conn.tls ? 'HTTPS, port 8443' : 'port 8123' },
-              ]}
-              onChange={(protocol) => update({ protocol, port: 0 })}
-            />
-          </label>
-        )}
         <label>
           Name
           <input value={conn.name} placeholder="prod-analytics" onChange={(e) => update({ name: e.target.value })} />

@@ -4,7 +4,7 @@ An audit of the code base against [the five architectural principles](../PRINCIP
 
 | Principle | Score | In one line |
 |---|---|---|
-| Minimal dependencies | 4/5 | 10 direct Go modules and 22 runtime npm packages, all in use; clickhouse-go is the one heavy subtree |
+| Minimal dependencies | 4/5 | 10 direct Go modules and 22 runtime npm packages, all in use; clickhouse-go was the one heavy subtree (since replaced by `internal/clickhouse` on `net/http`: 14 modules fewer) |
 | Simplicity | 3/5 | small Go files and functions, but dead ACP code, copy-paste between agent drivers, and a 4,400-line stylesheet |
 | Extensibility | 3/5 | the command registry and agent driver interface are good; panels, languages, DB drivers and run types are spread over several files |
 | AI-first | 3/5 | one good "ask the agent" path, but two features bypass it and only the Kubernetes diagnosis is redacted |

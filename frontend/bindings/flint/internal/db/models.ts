@@ -53,13 +53,8 @@ export class Connection {
     "user": string;
 
     /**
-     * Protocol selects the ClickHouse transport (ProtocolNative or ProtocolHTTP); unused for Postgres.
-     */
-    "protocol": string;
-
-    /**
      * TLS enables encrypted transport with the server's certificate and host
-     * name verified (Postgres sslmode=verify-full, ClickHouse secure ports).
+     * name verified (Postgres sslmode=verify-full, ClickHouse over HTTPS).
      */
     "tls": boolean;
 
@@ -96,9 +91,6 @@ export class Connection {
         }
         if (!("user" in $$source)) {
             this["user"] = "";
-        }
-        if (!("protocol" in $$source)) {
-            this["protocol"] = "";
         }
         if (!("tls" in $$source)) {
             this["tls"] = false;

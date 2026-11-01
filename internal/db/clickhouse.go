@@ -2,115 +2,157 @@ package db
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
-	"net"
-	"reflect"
-	"strconv"
+	"math"
 	"strings"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2"
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"flint/internal/clickhouse"
 )
 
+// chSession is a ClickHouse connection over the HTTP interface (internal/clickhouse).
+// There is no pool: each statement is one request, and idle connections are reused.
 type chSession struct {
-	conn driver.Conn
+	client *clickhouse.Client
 }
 
 func openClickHouse(_ context.Context, c Connection, password string) (*chSession, error) {
-	opts := &clickhouse.Options{
-		Protocol: clickhouseProtocol(c.Protocol),
-		Addr:     []string{net.JoinHostPort(c.Host, strconv.Itoa(c.Port))},
-		Auth: clickhouse.Auth{
-			Database: c.DefaultDatabase(), // "" = the user's default_database
-			Username: c.User,
-			Password: password,
-		},
-		DialTimeout:     10 * time.Second,
-		MaxOpenConns:    4,
-		MaxIdleConns:    2,
-		ConnMaxLifetime: 10 * time.Minute,
-		ClientInfo: clickhouse.ClientInfo{
-			Products: []struct{ Name, Version string }{{Name: "flint", Version: "0.1"}},
-		},
-	}
-	if c.Protocol == ProtocolHTTP {
-		// Over HTTP a cancelled context only closes the request; without this setting the
-		// server keeps running the query after Cancel or the row limit.
-		opts.Settings = clickhouse.Settings{"cancel_http_readonly_queries_on_client_close": 1}
-	}
-	if c.TLS {
-		opts.TLS = &tls.Config{ServerName: c.Host, MinVersion: tls.VersionTLS12, InsecureSkipVerify: c.TLSInsecure} //nolint:gosec // the user's explicit choice
-	}
-	conn, err := clickhouse.Open(opts)
+	client, err := clickhouse.New(clickhouse.Config{
+		Host:     c.Host,
+		Port:     c.Port,
+		TLS:      c.TLS,
+		Insecure: c.TLSInsecure,
+		User:     c.User,
+		Password: password,
+		Database: c.DefaultDatabase(), // "" = the user's default_database
+		ReadOnly: c.ReadOnly,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("clickhouse config: %w", err)
 	}
-	return &chSession{conn: conn}, nil
+	return &chSession{client: client}, nil
 }
 
-func clickhouseProtocol(p string) clickhouse.Protocol {
-	if p == ProtocolHTTP {
-		return clickhouse.HTTP
-	}
-	return clickhouse.Native
+type ctxKey int
+
+const (
+	queryIDKey ctxKey = iota
+	consoleKey
+)
+
+// withQueryID names the server-side run, so Cancel's KILL QUERY can find it.
+func withQueryID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, queryIDKey, id)
 }
 
-func (s *chSession) Ping(ctx context.Context) error { return s.conn.Ping(ctx) }
+// WithConsole marks statements as belonging to one SQL console. ClickHouse keeps SET and
+// temporary tables per session, so a console's statements share a session id.
+func WithConsole(ctx context.Context, consoleID string) context.Context {
+	return context.WithValue(ctx, consoleKey, consoleID)
+}
 
-func (s *chSession) Close() { _ = s.conn.Close() }
+func ctxString(ctx context.Context, key ctxKey) string {
+	s, _ := ctx.Value(key).(string)
+	return s
+}
 
+func (s *chSession) Ping(ctx context.Context) error { return s.client.Ping(ctx) }
+
+func (s *chSession) Close() { s.client.Close() }
+
+// Query runs one statement in the console's session (if the context names one).
 func (s *chSession) Query(ctx context.Context, sql string, limit int) (*QueryResult, error) {
-	start := time.Now()
-	if !isReadStatement(sql) {
-		if err := s.conn.Exec(ctx, sql); err != nil {
-			return nil, err
-		}
-		return &QueryResult{Rows: [][]any{}, Columns: []Column{}, Command: "OK", ElapsedMs: time.Since(start).Milliseconds()}, nil
+	var session string
+	if console := ctxString(ctx, consoleKey); console != "" {
+		session = "flint-" + console
 	}
+	return s.run(ctx, sql, limit, session)
+}
 
-	// Cancelling aborts the server-side query once the row limit is reached.
+// run streams the statement's rows into a QueryResult of at most limit rows. Cancelling
+// ctx (the user's Cancel, the row limit, a timeout) closes the request and kills the
+// statement on the server.
+func (s *chSession) run(ctx context.Context, sql string, limit int, session string) (*QueryResult, error) {
+	start := time.Now()
+	queryID := ctxString(ctx, queryIDKey)
+	if queryID == "" {
+		queryID = clickhouse.NewQueryID()
+	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	// Registered before the request goes out: Cancel may arrive while the server is still
+	// computing and hasn't sent a byte. stop is called on every path that isn't a cancel.
+	stop := context.AfterFunc(ctx, func() { _ = s.client.Kill(queryID) })
 
-	rows, err := s.conn.Query(ctx, sql)
+	rows, err := s.client.Query(ctx, clickhouse.Request{SQL: sql, QueryID: queryID, SessionID: session})
 	if err != nil {
+		stop()
 		return nil, err
 	}
 	defer rows.Close()
 
-	colTypes := rows.ColumnTypes()
-	res := &QueryResult{Rows: [][]any{}, Columns: make([]Column, len(colTypes))}
-	for i, ct := range colTypes {
-		res.Columns[i] = Column{Name: ct.Name(), Type: ct.DatabaseTypeName()}
+	cols := rows.Columns()
+	res := &QueryResult{Rows: [][]any{}, Columns: make([]Column, len(cols))}
+	for i, c := range cols {
+		res.Columns[i] = Column{Name: c.Name, Type: c.Type}
 	}
-
 	for rows.Next() {
 		if len(res.Rows) >= limit {
 			res.Truncated = true
-			cancel()
+			cancel() // stops the transfer and kills the rest of the statement
 			break
 		}
-		dest := make([]any, len(colTypes))
-		for i, ct := range colTypes {
-			dest[i] = reflect.New(ct.ScanType()).Interface()
-		}
-		if err := rows.Scan(dest...); err != nil {
-			return nil, err
-		}
-		row := make([]any, len(dest))
-		for i, d := range dest {
-			row[i] = normalize(d) // normalize dereferences the scan pointers
-		}
-		res.Rows = append(res.Rows, row)
+		res.Rows = append(res.Rows, rows.Values())
 	}
 	if err := rows.Err(); err != nil && !res.Truncated {
+		stop()
 		return nil, err
 	}
-	res.Command = fmt.Sprintf("SELECT %d", len(res.Rows))
+	stop()
+	if len(cols) == 0 {
+		res.Command = "OK"
+		res.Affected = rows.Written()
+	} else {
+		res.Command = fmt.Sprintf("SELECT %d", len(res.Rows))
+	}
 	res.ElapsedMs = time.Since(start).Milliseconds()
 	return res, nil
+}
+
+// introspect runs a metadata query outside any console session and hands each row to scan.
+func (s *chSession) introspect(ctx context.Context, sql string, scan func(row []any)) error {
+	res, err := s.run(ctx, sql, math.MaxInt, "")
+	if err != nil {
+		return err
+	}
+	for _, row := range res.Rows {
+		scan(row)
+	}
+	return nil
+}
+
+func cell(row []any, i int) string {
+	if i >= len(row) {
+		return ""
+	}
+	if s, ok := row[i].(string); ok {
+		return s
+	}
+	return fmt.Sprint(row[i])
+}
+
+// truthy reads a boolean cell: ClickHouse comparisons are UInt8, Bool columns are JSON booleans.
+func truthy(row []any, i int) bool {
+	if i >= len(row) {
+		return false
+	}
+	switch v := row[i].(type) {
+	case bool:
+		return v
+	case int64:
+		return v != 0
+	}
+	return false
 }
 
 // Explain returns EXPLAIN PLAN (or, with pipeline, EXPLAIN PIPELINE) of sql as indented
@@ -122,20 +164,8 @@ func (s *chSession) Explain(ctx context.Context, sql string, pipeline bool) (*Ex
 	}
 	stmt := clickhouseExplainSQL(target, pipeline)
 	start := time.Now()
-	rows, err := s.conn.Query(ctx, stmt)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
 	var lines []string
-	for rows.Next() {
-		var line string
-		if err := rows.Scan(&line); err != nil {
-			return nil, err
-		}
-		lines = append(lines, line)
-	}
-	if err := rows.Err(); err != nil {
+	if err := s.introspect(ctx, stmt, func(row []any) { lines = append(lines, cell(row, 0)) }); err != nil {
 		return nil, err
 	}
 	return &ExplainResult{
@@ -158,23 +188,14 @@ WHERE c.database = currentDatabase()
 ORDER BY c.table, c.position`
 
 func (s *chSession) Schema(ctx context.Context) ([]Table, error) {
-	rows, err := s.conn.Query(ctx, chSchemaSQL)
-	if err != nil {
-		return nil, fmt.Errorf("clickhouse schema: %w", err)
-	}
-	defer rows.Close()
-
 	var collected []schemaRow
-	for rows.Next() {
-		var r schemaRow
-		var engine string
-		if err := rows.Scan(&r.schema, &r.table, &engine, &r.column, &r.colType); err != nil {
-			return nil, fmt.Errorf("clickhouse schema: %w", err)
-		}
-		r.kind = clickhouseKind(engine)
-		collected = append(collected, r)
-	}
-	if err := rows.Err(); err != nil {
+	err := s.introspect(ctx, chSchemaSQL, func(row []any) {
+		collected = append(collected, schemaRow{
+			schema: cell(row, 0), table: cell(row, 1), kind: clickhouseKind(cell(row, 2)),
+			column: cell(row, 3), colType: cell(row, 4),
+		})
+	})
+	if err != nil {
 		return nil, fmt.Errorf("clickhouse schema: %w", err)
 	}
 	return groupTables(collected), nil
@@ -184,22 +205,11 @@ func (s *chSession) Schema(ctx context.Context) ([]Table, error) {
 const chDatabasesSQL = `SELECT name, name = currentDatabase() FROM system.databases ORDER BY name`
 
 func (s *chSession) Databases(ctx context.Context) ([]DatabaseInfo, error) {
-	rows, err := s.conn.Query(ctx, chDatabasesSQL)
-	if err != nil {
-		return nil, fmt.Errorf("clickhouse databases: %w", err)
-	}
-	defer rows.Close()
-
 	dbs := []DatabaseInfo{}
-	for rows.Next() {
-		var name string
-		var isDefault bool
-		if err := rows.Scan(&name, &isDefault); err != nil {
-			return nil, fmt.Errorf("clickhouse databases: %w", err)
-		}
-		dbs = append(dbs, DatabaseInfo{Name: name, CanConnect: true, Default: isDefault})
-	}
-	if err := rows.Err(); err != nil {
+	err := s.introspect(ctx, chDatabasesSQL, func(row []any) {
+		dbs = append(dbs, DatabaseInfo{Name: cell(row, 0), CanConnect: true, Default: truthy(row, 1)})
+	})
+	if err != nil {
 		return nil, fmt.Errorf("clickhouse databases: %w", err)
 	}
 	return dbs, nil

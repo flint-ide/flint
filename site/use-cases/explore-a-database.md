@@ -1,6 +1,6 @@
 # Explore a database
 
-You need to understand a PostgreSQL database: what is in it, how a slow query behaves, and maybe fix a few rows. This walkthrough adds a connection safely, browses the schema, runs and explains queries, and edits data with a review step. ClickHouse works the same way for browsing, querying and EXPLAIN.
+You need to understand a PostgreSQL database: what is in it, how a slow query behaves, and maybe fix a few rows. This walkthrough adds a connection safely, browses the schema, runs and explains queries, and edits data with a review step. ClickHouse works the same way for browsing, querying and EXPLAIN. Use its HTTP port (8123, or 8443 with TLS) when you add the connection.
 
 ## 1. Add a connection
 

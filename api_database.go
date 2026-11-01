@@ -88,9 +88,16 @@ func (d *DatabaseAPI) TestConnection(c db.Connection, password string, updatePas
 }
 
 // RunQuery executes one statement on a database of the connection ("" = the profile's
-// default) and returns at most limit rows.
-func (d *DatabaseAPI) RunQuery(connID, database, queryID, sql string, limit int) (*db.QueryResult, error) {
-	return d.app.db.Query(d.app.ctx, connID, database, queryID, sql, limit)
+// default) and returns at most limit rows. consoleID names the SQL console: its statements
+// share one ClickHouse session, so SET and temporary tables carry over between them.
+func (d *DatabaseAPI) RunQuery(connID, database, queryID, consoleID, sql string, limit int) (*db.QueryResult, error) {
+	return d.app.db.Query(db.WithConsole(d.app.ctx, consoleID), connID, database, queryID, sql, limit)
+}
+
+// MigrationNotice returns, once, the message about connections Flint moved from
+// ClickHouse's native protocol to HTTP ("" when there is none).
+func (d *DatabaseAPI) MigrationNotice() string {
+	return d.app.db.Store().TakeMigrationNotice()
 }
 
 // CancelQuery aborts a running query by id.

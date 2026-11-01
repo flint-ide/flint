@@ -36,6 +36,7 @@
 - [Docker](guides/docker.md)
 - [Preview and TODO list](guides/preview-and-todo.md)
 - [Restricted Mode](guides/restricted-mode.md)
+- [Flint Remote (preview)](guides/remote.md)
 - [Settings](guides/settings.md)
 
 ## Reference

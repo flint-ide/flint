@@ -97,6 +97,15 @@ A searchable list of all commands. Search by name or by shortcut (for example `�
 
 The command palette uses your shortcuts too.
 
+## Remote
+
+[Flint Remote](remote.md) (early preview): follow your agent chats and tasks from your phone through your own tunnel. Off by default.
+
+- **Allow paired devices**, **Port** (default 7419, on `127.0.0.1` only) and **Extra allowed hosts** (the name `tailscale serve` gives the laptop).
+- **Paired devices**: each with when it was paired and last seen, and **Revoke**; **Revoke All** when there are several.
+- **Pair a Device…** shows a QR code and a code valid for one device for two minutes.
+- **Limits**: events kept per chat, their memory, and requests per minute per device.
+
 ## Updates
 
 - **Check for new releases**: once a day Flint asks GitHub which release is the latest and shows a notice in the status bar when there is a newer one, with **Download** (opens the release page in your browser), **Skip This Version** and **✕**. On by default. When it is off, Flint makes no request on its own.

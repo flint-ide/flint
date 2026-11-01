@@ -12,8 +12,8 @@ Most of Flint's data lives in:
 
 | File or folder | What it holds |
 |---|---|
-| `state.json` | Recent folders, the agent approval policy, trusted folders, [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel) per repository (description with credentials removed, agent, branch, base, worktree folder, last state, pull request link), whether the tool check has been shown, and the [update check](privacy-and-security.md#update-check)'s last time, the release it found and a version you skipped. |
-| `settings.json` | Your preferences: theme (and an imported custom theme), fonts, Vim mode, default agent, auto-save, notifications, update check, shortcut overrides, TODO excludes, agent CLIs, language servers, refresh intervals, agent context, inline completions, agent tasks. No secrets. See [Settings file](settings.md). |
+| `state.json` | Recent folders, the agent approval policy, trusted folders, [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel) per repository (description with credentials removed, agent, branch, base, worktree folder, last state, pull request link), whether the tool check has been shown, and the [update check](privacy-and-security.md#update-check)'s last time, the release it found and a version you skipped, and the devices paired with [Flint Remote](../guides/remote.md) (id, name, scopes, when paired and last seen; no tokens). |
+| `settings.json` | Your preferences: theme (and an imported custom theme), fonts, Vim mode, default agent, auto-save, notifications, update check, shortcut overrides, TODO excludes, agent CLIs, language servers, refresh intervals, agent context, inline completions, agent tasks, Flint Remote. No secrets. See [Settings file](settings.md). |
 | `connections.json` | Database connection profiles: host, port, user, default database, ClickHouse protocol, TLS and read-only options. No passwords. |
 | `sessions/` | One file per project: open tabs, terminals, agent conversations, attached projects, the selected run configuration and breakpoints. |
 | `scratch/` | Scratchpads: SQL consoles and notes, with the connection and database each console uses. |
@@ -38,6 +38,8 @@ Each connection's history keeps its last 5000 statements, with the database, tim
 ## Keychain
 
 Database passwords are stored in the macOS Keychain under the service `flint-db`, one item per connection. They are deleted together with the connection.
+
+[Flint Remote](../guides/remote.md) keeps a SHA-256 hash of each paired device's token (never the token) under the service `flint-remote`, one item per device. It is deleted when you revoke the device.
 
 ## Logs
 

@@ -18,6 +18,7 @@ Apart from the update check, data leaves your Mac only when you do something tha
 | HTTP client | The request you send | The server in the request |
 | Databases, Kubernetes, AWS, Docker | The commands and queries you run | Your servers and cloud accounts, through your own credentials |
 | Markdown preview | Requests for remote images, only after you click **Load remote images** | The image hosts |
+| [Flint Remote](../guides/remote.md), when you switch it on and pair a device | Your open agent chats (redacted), agent tasks and their state | The paired device, through your own tunnel (`ssh -L`, `tailscale serve`); Flint listens on `127.0.0.1` only |
 | Update check (on its own once a day, or Help ▸ Check for Updates…) | One anonymous request for the latest release, described below | GitHub's API (`api.github.com`) |
 
 Agents decide what they read and send to their provider. The [approval policy](../guides/ai-agents.md#what-the-agent-may-do-without-asking) controls what they may do without asking.

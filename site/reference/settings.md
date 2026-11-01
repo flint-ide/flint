@@ -103,6 +103,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `completions` | object | see below | Inline suggestions from a code model (off by default). See [completions](#completions). |
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
 | `agentTasks` | object | see below | Where agent task worktrees go and how their branches are named. See [agentTasks](#agenttasks). |
+| `remote` | object | see below | Flint Remote: a read-only API for paired phones (off by default, early preview). See [remote](#remote). |
 
 ### Font objects
 
@@ -274,11 +275,26 @@ Used by [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel).
 
 Slashes in a branch name become dashes in the folder name. The tasks themselves are kept in `state.json`.
 
+### remote
+
+[Flint Remote](../guides/remote.md) (early preview): a read-only API on `127.0.0.1` that a paired phone reaches through your own tunnel.
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `enabled` | boolean | | `false` | Listen for paired devices. When `false`, nothing listens and open streams end. |
+| `port` | integer | 1024–65535 | `7419` | The port on `127.0.0.1`. Fixed, so a tunnel can target it. |
+| `allowedHosts` | array of strings | up to 16 | `[]` | Extra host names a request may be addressed to (the `Host` header, and `Origin` when a browser sends one), such as the name `tailscale serve` gives the laptop. Plain DNS names only: no scheme, port or wildcard. `127.0.0.1`, `localhost` and `::1` are always allowed, on any port (an `ssh -L` tunnel may use another local port). |
+| `replayEvents` | integer | 100–20000 | `2000` | Events kept per chat for a device that connects in the middle of a conversation. |
+| `replayKB` | integer (KB) | 256–65536 | `4096` | Memory those events may take per chat; the oldest go first. |
+| `requestsPerMinute` | integer | 10–6000 | `120` | Each paired device's request budget. |
+
+Events are kept only while `enabled` is on. Paired devices are not settings: they are listed in `state.json`, and a hash of each device's token is in the macOS Keychain (service `flint-remote`).
+
 ## Related settings stored elsewhere
 
 Some preferences are not in `settings.json`:
 
-- Recent folders, the agent approval policy, trusted folders, agent tasks and the update check's last result (including a skipped version) are in `state.json`.
+- Recent folders, the agent approval policy, trusted folders, agent tasks, the devices paired with Flint Remote and the update check's last result (including a skipped version) are in `state.json`.
 - The sidebar width is kept by the app's web view.
 - The selected HTTP environment is remembered only until Flint quits.
 

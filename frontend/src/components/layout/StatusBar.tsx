@@ -12,6 +12,8 @@ import { useGit } from '../../store/git'
 import { showFileHistory, toggleBlame, useGitHistory } from '../../store/gitHistory'
 import { dismissUpdate, downloadUpdate, skipUpdate, useUpdate } from '../../store/update'
 import { offerText } from '../../lib/update'
+import { useSettings } from '../../store/settings'
+import { useVimStatus } from '../../store/vimStatus'
 
 export function StatusBar() {
   const root = useWorkspace((s) => s.root)
@@ -26,6 +28,7 @@ export function StatusBar() {
     <footer className="status-bar">
       <span className="truncate">{location ?? ''}</span>
       <span className="spacer" />
+      {(active?.kind === 'file' || active?.kind === 'scratch') && <VimModeWidget />}
       {active?.kind === 'file' && <GitFileActions path={active.path} />}
       {root && <span>{files.toLocaleString()} files</span>}
       <span>{terminals} {terminals === 1 ? 'terminal' : 'terminals'}</span>
@@ -34,6 +37,14 @@ export function StatusBar() {
       <UpdateWidget />
     </footer>
   )
+}
+
+/** Vim's mode in the focused editor, while Vim mode is on. */
+function VimModeWidget() {
+  const on = useSettings((s) => s.settings.editor.vimMode)
+  const mode = useVimStatus((s) => s.mode)
+  if (!on || !mode) return null
+  return <span className="status-vim" title="Vim mode (Settings ▸ Editor)">-- {mode} --</span>
 }
 
 /** A newer Flint release (found by the daily check or "Check for Updates…"). */

@@ -6,6 +6,60 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
+ * AgentReview configures "Review Changes with Agent" (internal/review).
+ */
+export class AgentReview {
+    /**
+     * Scope is what a review covers by default: "selected" (the files ticked
+     * in the Commit panel) or "all" (every change).
+     */
+    "scope": string;
+
+    /**
+     * MaxDiffKB bounds the diff sent to the agent; larger diffs are
+     * shortened per file.
+     */
+    "maxDiffKB": number;
+
+    /**
+     * Agent reviews ("claude", "codex" or a custom agent's id); empty means
+     * the default agent.
+     */
+    "agent": string;
+
+    /**
+     * TimeoutSeconds stops a review that takes longer.
+     */
+    "timeoutSeconds": number;
+
+    /** Creates a new AgentReview instance. */
+    constructor($$source: Partial<AgentReview> = {}) {
+        if (!("scope" in $$source)) {
+            this["scope"] = "";
+        }
+        if (!("maxDiffKB" in $$source)) {
+            this["maxDiffKB"] = 0;
+        }
+        if (!("agent" in $$source)) {
+            this["agent"] = "";
+        }
+        if (!("timeoutSeconds" in $$source)) {
+            this["timeoutSeconds"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AgentReview instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AgentReview {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AgentReview($$parsedSource as Partial<AgentReview>);
+    }
+}
+
+/**
  * AgentSettings configures one agent CLI ("agents" → "claude" / "codex").
  * Changes apply to sessions started afterwards.
  */
@@ -665,6 +719,11 @@ export class Settings {
      */
     "agentTasks": AgentTasks;
 
+    /**
+     * AgentReview configures Review Changes with Agent (review.go).
+     */
+    "agentReview": AgentReview;
+
     /** Creates a new Settings instance. */
     constructor($$source: Partial<Settings> = {}) {
         if (!("version" in $$source)) {
@@ -724,6 +783,9 @@ export class Settings {
         if (!("agentTasks" in $$source)) {
             this["agentTasks"] = (new AgentTasks());
         }
+        if (!("agentReview" in $$source)) {
+            this["agentReview"] = (new AgentReview());
+        }
 
         Object.assign(this, $$source);
     }
@@ -745,6 +807,7 @@ export class Settings {
         const $$createField16_0 = $$createType14;
         const $$createField17_0 = $$createType15;
         const $$createField18_0 = $$createType16;
+        const $$createField19_0 = $$createType17;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -785,6 +848,9 @@ export class Settings {
         if ("agentTasks" in $$parsedSource) {
             $$parsedSource["agentTasks"] = $$createField18_0($$parsedSource["agentTasks"]);
         }
+        if ("agentReview" in $$parsedSource) {
+            $$parsedSource["agentReview"] = $$createField19_0($$parsedSource["agentReview"]);
+        }
         return new Settings($$parsedSource as Partial<Settings>);
     }
 }
@@ -807,3 +873,4 @@ const $$createType13 = MCPServer.createFrom;
 const $$createType14 = Completions.createFrom;
 const $$createType15 = InlineEdit.createFrom;
 const $$createType16 = AgentTasks.createFrom;
+const $$createType17 = AgentReview.createFrom;

@@ -5,6 +5,7 @@ export {
     AgentReview,
     AgentSettings,
     AgentTasks,
+    CI,
     Completions,
     CustomAgent,
     CustomTheme,

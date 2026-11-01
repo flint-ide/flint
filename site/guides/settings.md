@@ -8,7 +8,7 @@ Flint's settings open in a tab. Every change applies immediately, without a rest
 - **flint ▸ Settings…** in the menu bar
 - "Settings…" in the command palette
 
-The tab has twelve sections: Appearance, Editor, Terminal, Agents, Agent Context, AI in the Editor, Language Servers, Refresh, TODO List, Keymap, Updates and Import.
+The tab has thirteen sections: Appearance, Editor, Terminal, Agents, Agent Context, AI in the Editor, Language Servers, Refresh, CI, TODO List, Keymap, Updates and Import.
 
 ## Appearance
 
@@ -80,6 +80,15 @@ How often panels that poll re-read their data while they are shown:
 - **AWS panel**: 5 to 3600 seconds (default 30).
 
 Git status, Docker and pull requests update on their own, without polling.
+
+## CI
+
+How Flint follows the checks of your pull requests ([When CI fails](git-and-github.md#when-ci-fails)):
+
+- **Check again every**: how often running checks are re-read, 10 to 3600 seconds (default 30). Nothing is read while no check is running.
+- **Log lines from the end**: lines from the end of the failed step that Fix with agent puts in the draft, 5 to 1000 (default 60).
+- **Error lines before them**: error lines picked from the rest of the step, 0 to 500 (default 40).
+- **Tell me when CI fails or passes**: a notification while Flint is in the background (default on). It also needs "Tell me when work finishes in the background" in Agents.
 
 ## TODO List
 

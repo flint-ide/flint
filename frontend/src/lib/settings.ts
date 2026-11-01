@@ -14,6 +14,7 @@ import {
 } from './editorAiSettings'
 import { coerceAgentTasks, DEFAULT_AGENT_TASKS, type AgentTaskSettings } from './agentTasks'
 import { coerceAgentReview, DEFAULT_AGENT_REVIEW, type AgentReviewSettings } from './reviewSettings'
+import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
 
 import type { ResolvedTheme, ThemeMode } from './themeMode'
 
@@ -74,6 +75,8 @@ export interface AppSettings {
   agentTasks: AgentTaskSettings
   /** Review Changes with Agent (lib/reviewSettings.ts). */
   agentReview: AgentReviewSettings
+  /** Following your pull requests' CI: poll interval, log excerpt size, notifications. */
+  ci: CISettings
 }
 
 /** Mirrors settings.Default() in Go (used until the backend answers). */
@@ -98,6 +101,7 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   inlineEdit: DEFAULT_INLINE_EDIT,
   agentTasks: DEFAULT_AGENT_TASKS,
   agentReview: DEFAULT_AGENT_REVIEW,
+  ci: DEFAULT_CI,
 }) as AppSettings
 
 /** Same limits as Go's settings.Validate, for the inputs. */
@@ -211,5 +215,6 @@ export function coerceSettings(v: unknown): AppSettings {
     inlineEdit: coerceInlineEdit(v.inlineEdit),
     agentTasks: coerceAgentTasks(v.agentTasks),
     agentReview: coerceAgentReview(v.agentReview),
+    ci: coerceCI(v.ci),
   }
 }

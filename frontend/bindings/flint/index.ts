@@ -66,6 +66,10 @@ export {
 
 export {
     AgentInfo,
+    CIFileRef,
+    CIJob,
+    CILog,
+    CIReport,
     Collected,
     DockerOverview,
     FileHistory,

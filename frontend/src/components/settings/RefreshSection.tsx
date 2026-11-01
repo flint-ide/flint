@@ -30,7 +30,8 @@ export function RefreshSection() {
         <button disabled={isDefault} onClick={() => update({ refresh: DEFAULT_REFRESH })}>Reset to Defaults</button>
       </div>
       <p className="muted settings-note">
-        Git status, Docker and pull requests don't poll: they follow change events, and pull requests reload when the window regains focus.
+        Git status, Docker and pull requests don't poll: they follow change events, and pull requests reload when the window regains focus. Running CI
+        checks are re-read at the interval in Settings ▸ CI.
       </p>
     </section>
   )

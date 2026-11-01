@@ -112,6 +112,8 @@ type Settings struct {
 	AgentTasks AgentTasks `json:"agentTasks"`
 	// AgentReview configures Review Changes with Agent (review.go).
 	AgentReview AgentReview `json:"agentReview"`
+	// CI configures following your pull requests' checks (ci.go).
+	CI CI `json:"ci"`
 }
 
 // Default returns the settings Flint uses when nothing is configured.
@@ -142,6 +144,7 @@ func Default() Settings {
 		InlineEdit:         defaultInlineEdit(),
 		AgentTasks:         defaultAgentTasks(),
 		AgentReview:        defaultAgentReview(),
+		CI:                 defaultCI(),
 		CustomTheme:        defaultCustomTheme(),
 	}
 }
@@ -211,6 +214,7 @@ func Normalize(s Settings) Settings {
 	out.InlineEdit = normalizeInlineEdit(s.InlineEdit)
 	out.AgentTasks = normalizeAgentTasks(s.AgentTasks)
 	out.AgentReview = normalizeAgentReview(s.AgentReview, out.CustomAgents)
+	out.CI = normalizeCI(s.CI)
 	return out
 }
 
@@ -299,6 +303,9 @@ func Validate(s Settings) error {
 		return err
 	}
 	if err := validateAgentReview(s.AgentReview, s.CustomAgents); err != nil {
+		return err
+	}
+	if err := CheckCI(s.CI); err != nil {
 		return err
 	}
 	return validateRefresh(s.Refresh)

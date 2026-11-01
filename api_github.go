@@ -13,6 +13,8 @@ type GitHubAPI struct {
 	app *App
 	git *GitAPI
 	gh  *github.Client
+	// ciGH replaces gh for the CI bindings in tests (api_ci.go).
+	ciGH ciGitHub
 }
 
 // Check reports whether gh is installed and logged in and which repository dir is.

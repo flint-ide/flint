@@ -15,6 +15,7 @@ import { offerText } from '../../lib/update'
 import { useSettings } from '../../store/settings'
 import { useCompletionStatus } from '../../store/editorAi'
 import { useVimStatus } from '../../store/vimStatus'
+import { CIWidget } from './CIWidget'
 
 export function StatusBar() {
   const root = useWorkspace((s) => s.root)
@@ -33,6 +34,7 @@ export function StatusBar() {
       {active?.kind === 'file' && <GitFileActions path={active.path} />}
       {root && <span>{files.toLocaleString()} files</span>}
       <span>{terminals} {terminals === 1 ? 'terminal' : 'terminals'}</span>
+      <CIWidget />
       <AgentUsageWidget roots={roots} />
       <CompletionsWidget />
       <LspWidget path={active?.kind === 'file' ? active.path : null} />

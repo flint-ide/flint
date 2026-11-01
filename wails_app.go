@@ -25,8 +25,10 @@ func (l *lifecycle) ServiceShutdown() error {
 	return nil
 }
 
-// emit sends an event to the frontend; a no-op before the application runs.
+// emit sends an event to the frontend (a no-op before the application runs)
+// and to Flint Remote's open streams.
 func (a *App) emit(name string, data ...any) {
+	a.remoteFanout(name, data)
 	if a.wails == nil || a.ctx == nil {
 		return
 	}

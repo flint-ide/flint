@@ -16,6 +16,9 @@ import * as docker$0 from "./internal/docker/models.js";
 import * as git$0 from "./internal/git/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as remote$0 from "./internal/remote/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as runconfig$0 from "./internal/runconfig/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -265,6 +268,70 @@ export class NewTask {
 }
 
 /**
+ * PairingView is an open pairing: the secret (valid for one device, two
+ * minutes) and the link the mobile app reads from the QR code.
+ */
+export class PairingView {
+    /**
+     * Secret in groups of four, for typing.
+     */
+    "secret": string;
+
+    /**
+     * URL is the address the phone uses.
+     */
+    "url": string;
+
+    /**
+     * Link is flint-remote://pair?url=…&secret=… (what the QR code holds).
+     */
+    "link": string;
+
+    /**
+     * Unix ms
+     */
+    "expires": number;
+
+    /**
+     * QR draws the link: an SVG path for a viewBox of -4 -4 QRSize+8 QRSize+8.
+     */
+    "qr": string;
+    "qrSize": number;
+
+    /** Creates a new PairingView instance. */
+    constructor($$source: Partial<PairingView> = {}) {
+        if (!("secret" in $$source)) {
+            this["secret"] = "";
+        }
+        if (!("url" in $$source)) {
+            this["url"] = "";
+        }
+        if (!("link" in $$source)) {
+            this["link"] = "";
+        }
+        if (!("expires" in $$source)) {
+            this["expires"] = 0;
+        }
+        if (!("qr" in $$source)) {
+            this["qr"] = "";
+        }
+        if (!("qrSize" in $$source)) {
+            this["qrSize"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PairingView instance from a string or object.
+     */
+    static createFrom($$source: any = {}): PairingView {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PairingView($$parsedSource as Partial<PairingView>);
+    }
+}
+
+/**
  * ProfiledTests is a started profiling test run.
  */
 export class ProfiledTests {
@@ -301,6 +368,54 @@ export class ProfiledTests {
             $$parsedSource["files"] = $$createField2_0($$parsedSource["files"]);
         }
         return new ProfiledTests($$parsedSource as Partial<ProfiledTests>);
+    }
+}
+
+/**
+ * RemoteStatus is what Settings shows.
+ */
+export class RemoteStatus {
+    "enabled": boolean;
+    "listening": boolean;
+    "address": string;
+    "error": string;
+    "devices": remote$0.Device[];
+    "streams": number;
+
+    /** Creates a new RemoteStatus instance. */
+    constructor($$source: Partial<RemoteStatus> = {}) {
+        if (!("enabled" in $$source)) {
+            this["enabled"] = false;
+        }
+        if (!("listening" in $$source)) {
+            this["listening"] = false;
+        }
+        if (!("address" in $$source)) {
+            this["address"] = "";
+        }
+        if (!("error" in $$source)) {
+            this["error"] = "";
+        }
+        if (!("devices" in $$source)) {
+            this["devices"] = [];
+        }
+        if (!("streams" in $$source)) {
+            this["streams"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new RemoteStatus instance from a string or object.
+     */
+    static createFrom($$source: any = {}): RemoteStatus {
+        const $$createField4_0 = $$createType9;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("devices" in $$parsedSource) {
+            $$parsedSource["devices"] = $$createField4_0($$parsedSource["devices"]);
+        }
+        return new RemoteStatus($$parsedSource as Partial<RemoteStatus>);
     }
 }
 
@@ -498,9 +613,9 @@ export class RunConfigs {
      * Creates a new RunConfigs instance from a string or object.
      */
     static createFrom($$source: any = {}): RunConfigs {
-        const $$createField0_0 = $$createType9;
-        const $$createField1_0 = $$createType9;
-        const $$createField2_0 = $$createType11;
+        const $$createField0_0 = $$createType11;
+        const $$createField1_0 = $$createType11;
+        const $$createField2_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("saved" in $$parsedSource) {
             $$parsedSource["saved"] = $$createField0_0($$parsedSource["saved"]);
@@ -739,7 +854,9 @@ const $$createType4 = $Create.Array($$createType3);
 const $$createType5 = git$0.FileCommit.createFrom;
 const $$createType6 = $Create.Array($$createType5);
 const $$createType7 = testrun$0.Profiles.createFrom;
-const $$createType8 = runconfig$0.Config.createFrom;
+const $$createType8 = remote$0.Device.createFrom;
 const $$createType9 = $Create.Array($$createType8);
-const $$createType10 = runconfig$0.Capabilities.createFrom;
-const $$createType11 = $Create.Map($Create.Any, $$createType10);
+const $$createType10 = runconfig$0.Config.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = runconfig$0.Capabilities.createFrom;
+const $$createType13 = $Create.Map($Create.Any, $$createType12);

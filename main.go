@@ -80,6 +80,7 @@ func main() {
 			application.NewService(&DiagnosticsAPI{app: flint}),
 			application.NewService(&UpdateAPI{app: flint}),
 			application.NewService(newCompletionsAPI(flint)),
+			application.NewService(&RemoteAPI{app: flint}),
 		},
 	})
 	flint.wails = app

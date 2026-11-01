@@ -576,6 +576,76 @@ export class Refresh {
 }
 
 /**
+ * Remote configures Flint Remote (internal/remote): a read-only API on
+ * 127.0.0.1 that a paired phone reaches through the user's own tunnel
+ * (ssh -L, tailscale serve). Off by default. Paired devices are not settings:
+ * they live in state.json, their token hashes in the Keychain.
+ */
+export class Remote {
+    "enabled": boolean;
+
+    /**
+     * Port on 127.0.0.1; fixed so a tunnel can target it.
+     */
+    "port": number;
+
+    /**
+     * AllowedHosts are extra host names requests may be addressed to (the
+     * Host header, and Origin when a browser sends one), e.g. the name
+     * `tailscale serve` gives the laptop. Loopback names are always allowed.
+     */
+    "allowedHosts": string[];
+
+    /**
+     * ReplayEvents and ReplayKB bound the events kept per chat for a client
+     * that connects mid-conversation.
+     */
+    "replayEvents": number;
+    "replayKB": number;
+
+    /**
+     * RequestsPerMinute is each paired device's request budget.
+     */
+    "requestsPerMinute": number;
+
+    /** Creates a new Remote instance. */
+    constructor($$source: Partial<Remote> = {}) {
+        if (!("enabled" in $$source)) {
+            this["enabled"] = false;
+        }
+        if (!("port" in $$source)) {
+            this["port"] = 0;
+        }
+        if (!("allowedHosts" in $$source)) {
+            this["allowedHosts"] = [];
+        }
+        if (!("replayEvents" in $$source)) {
+            this["replayEvents"] = 0;
+        }
+        if (!("replayKB" in $$source)) {
+            this["replayKB"] = 0;
+        }
+        if (!("requestsPerMinute" in $$source)) {
+            this["requestsPerMinute"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Remote instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Remote {
+        const $$createField2_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("allowedHosts" in $$parsedSource) {
+            $$parsedSource["allowedHosts"] = $$createField2_0($$parsedSource["allowedHosts"]);
+        }
+        return new Remote($$parsedSource as Partial<Remote>);
+    }
+}
+
+/**
  * Settings is the whole settings.json document.
  */
 export class Settings {
@@ -665,6 +735,11 @@ export class Settings {
      */
     "agentTasks": AgentTasks;
 
+    /**
+     * Remote configures Flint Remote, the API a paired phone uses (remote.go).
+     */
+    "remote": Remote;
+
     /** Creates a new Settings instance. */
     constructor($$source: Partial<Settings> = {}) {
         if (!("version" in $$source)) {
@@ -724,6 +799,9 @@ export class Settings {
         if (!("agentTasks" in $$source)) {
             this["agentTasks"] = (new AgentTasks());
         }
+        if (!("remote" in $$source)) {
+            this["remote"] = (new Remote());
+        }
 
         Object.assign(this, $$source);
     }
@@ -745,6 +823,7 @@ export class Settings {
         const $$createField16_0 = $$createType14;
         const $$createField17_0 = $$createType15;
         const $$createField18_0 = $$createType16;
+        const $$createField19_0 = $$createType17;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -785,6 +864,9 @@ export class Settings {
         if ("agentTasks" in $$parsedSource) {
             $$parsedSource["agentTasks"] = $$createField18_0($$parsedSource["agentTasks"]);
         }
+        if ("remote" in $$parsedSource) {
+            $$parsedSource["remote"] = $$createField19_0($$parsedSource["remote"]);
+        }
         return new Settings($$parsedSource as Partial<Settings>);
     }
 }
@@ -807,3 +889,4 @@ const $$createType13 = MCPServer.createFrom;
 const $$createType14 = Completions.createFrom;
 const $$createType15 = InlineEdit.createFrom;
 const $$createType16 = AgentTasks.createFrom;
+const $$createType17 = Remote.createFrom;

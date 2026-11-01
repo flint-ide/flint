@@ -26,6 +26,7 @@ import (
 	"flint/internal/lsp"
 	"flint/internal/mcpserver"
 	"flint/internal/mcptools"
+	"flint/internal/remote"
 	"flint/internal/restore"
 	"flint/internal/runner"
 	"flint/internal/scratch"
@@ -54,6 +55,9 @@ type appState struct {
 	Update update.State `json:"update,omitzero"`
 	// AgentTasks are the agent tasks per repository (tasks_state.go).
 	AgentTasks agenttask.Store `json:"agentTasks,omitempty"`
+	// RemoteDevices are the phones paired with Flint Remote (api_remote.go);
+	// their token hashes are in the Keychain.
+	RemoteDevices []remote.Device `json:"remoteDevices,omitempty"`
 }
 
 // App holds the services shared by all bound APIs.
@@ -83,6 +87,10 @@ type App struct {
 	sessions    *restore.Store
 	files       fuzzy.Index      // quick-open file list of the open folder
 	http        *httpfile.Client // requests of .http files, sent only on demand
+
+	remote        *remote.Server  // Flint Remote (api_remote.go); listens only while on
+	remoteDevices *remote.Devices // its paired devices
+	remoteErr     remoteState     // why it couldn't start, for Settings
 
 	projMu   sync.Mutex
 	roots    []string                    // open project folders, the primary one first
@@ -158,12 +166,16 @@ func NewApp() (*App, error) {
 	a.mcp, a.mcpSources = newMCP(a)
 	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
 	a.agents = newAgentManager(a)
+	a.remote, a.remoteDevices = newRemote(a, remoteKeychain{})
 	return a, nil
 }
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	go a.watchForUpdates(ctx)
+	if r := a.currentSettings().Remote; r.Enabled {
+		go a.applyRemote(r)
+	}
 }
 
 func (a *App) shutdown() {
@@ -179,6 +191,7 @@ func (a *App) shutdown() {
 		a.lsp.Shutdown,
 		func() { _ = a.agents.Close() },
 		func() { _ = a.mcp.Close() },
+		func() { _ = a.remote.Close() },
 		a.db.CloseAll,
 		a.profiles.closeAll,
 		a.closeProject,

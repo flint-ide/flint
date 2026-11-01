@@ -49,6 +49,7 @@ func (a *App) updateSettings(change func(settings.Settings) settings.Settings) (
 		return settings.Settings{}, err
 	}
 	a.mcpSettingsChanged(prev.MCPServer, saved.MCPServer)
+	a.remoteSettingsChanged(prev.Remote, saved.Remote)
 	for _, language := range settings.ChangedLanguageServers(prev, saved) {
 		a.lsp.Reconfigure(language)
 	}

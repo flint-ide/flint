@@ -15,9 +15,9 @@ Opening the Go standard library source (12,000 files) with a fresh profile on an
 
 | Editor | First window | Memory after 30 s idle |
 |---|---|---|
-| **Flint** | 0.44 s | **135 MB** |
-| Visual Studio Code 1.115 | 0.56 s | 599 MB |
-| Zed 1.27 | 0.34 s | 160 MB |
+| **Flint** | **0.29 s** | **120 MB** |
+| Visual Studio Code 1.115 | 0.48 s | 592 MB |
+| Zed 1.27 | 0.32 s | 134 MB |
 
 Memory is the physical footprint of all of the editor's processes, including the WebKit processes that render Flint's window. How it was measured, and how to repeat it on your machine with `go run ./cmd/bench`, is in [docs/BENCHMARK.md](docs/BENCHMARK.md).
 

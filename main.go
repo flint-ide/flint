@@ -20,7 +20,6 @@ var assets embed.FS
 func main() {
 	logger := diag.Setup()
 	slog.Info("start", "version", diag.Version(version))
-	shellenv.Load() // import the login-shell PATH in the background (git hooks, rg, brew)
 	flint, err := NewApp()
 	if err != nil {
 		log.Fatalf("flint: %v", err)
@@ -123,6 +122,11 @@ func main() {
 	flint.window = win
 	app.Event.OnApplicationEvent(events.Mac.ApplicationDidFinishLaunching, func(*application.ApplicationEvent) {
 		flint.showWindowEarly()
+		// Import the login-shell PATH (git hooks, rg, brew) in the background,
+		// only now: the login shell runs the user's startup files, and while it
+		// ran during launch the window appeared about 70 ms later. Whatever
+		// needs the PATH earlier starts the import itself (shellenv.Wait).
+		shellenv.Load()
 	})
 	win.OnWindowEvent(events.Mac.WebViewDidFinishNavigation, func(*application.WindowEvent) {
 		flint.onPageLoaded()

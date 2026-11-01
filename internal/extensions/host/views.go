@@ -137,7 +137,7 @@ func cleanText(s string, limit int) string {
 		switch {
 		case r == '\t' || r == '\n':
 			return ' '
-		case r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0) || r == '‮' || r == '‭':
+		case r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0) || (r >= '‪' && r <= '‮') || (r >= '⁦' && r <= '⁩'):
 			return -1
 		}
 		return r

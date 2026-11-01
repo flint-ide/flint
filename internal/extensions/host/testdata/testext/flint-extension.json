@@ -1,0 +1,27 @@
+{
+  "contract": 1,
+  "id": "test.ext",
+  "name": "Test Extension",
+  "version": "1.0.0",
+  "run": { "command": "testext" },
+  "permissions": ["workspace.read", "secrets"],
+  "contributes": {
+    "commands": [
+      { "id": "test.ext.status", "title": "Status" },
+      { "id": "test.ext.read", "title": "Read" },
+      { "id": "test.ext.open", "title": "Open" },
+      { "id": "test.ext.url", "title": "URL" },
+      { "id": "test.ext.secret", "title": "Secret" },
+      { "id": "test.ext.ask", "title": "Ask" },
+      { "id": "test.ext.unknown", "title": "Unknown method" },
+      { "id": "test.ext.crash", "title": "Crash" },
+      { "id": "test.ext.garbage", "title": "Garbage" },
+      { "id": "test.ext.hang", "title": "Hang" },
+      { "id": "test.ext.child", "title": "Child" }
+    ],
+    "panels": [{ "id": "test.ext.items", "title": "Items", "icon": "files", "order": 300, "view": "tree" }],
+    "statusItems": [{ "id": "test.ext.count", "order": 1 }],
+    "settings": { "properties": { "greeting": { "type": "string", "default": "hi" }, "count": { "type": "integer", "minimum": 1, "maximum": 9, "default": 3 } } },
+    "agentTools": [{ "name": "lookup", "description": "Looks things up.", "inputSchema": { "type": "object" } }]
+  }
+}

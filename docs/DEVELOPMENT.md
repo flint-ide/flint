@@ -117,6 +117,10 @@ make test-db-down
 - `make test-integration`: Go tests with the `integration` build tag against throwaway Postgres 16 and ClickHouse 24.8 containers started by `make test-db-up`. Ports default to 55432 (Postgres), 59000 (ClickHouse native) and 58123 (ClickHouse HTTP) and can be changed with `PG_PORT`, `CH_PORT` and `CH_HTTP_PORT`.
 - GitHub tests use a fake `gh` on `PATH` (answers from `internal/github/testdata`), so they never contact GitHub.
 
+## Benchmark
+
+`go run ./cmd/bench -flint build/bin/flint.app` measures time to the first window and memory after 30 s idle for Flint, VS Code, Zed and Cursor (those installed), each with a fresh profile, on the Go source tree. It opens editor windows, so quit those editors first and leave the machine idle. The method, the latest results and the caveats are in [BENCHMARK.md](BENCHMARK.md); update the README table from it.
+
 ## Lint
 
 ```bash
@@ -172,4 +176,4 @@ make docs                                   # build into _site/ and preview at h
 go run ./cmd/docsite -src site -out _site   # build only
 ```
 
-`.github/workflows/pages.yml` builds the site on pull requests that touch it and publishes it to GitHub Pages from `main` (repository Settings ▸ Pages ▸ Source: GitHub Actions).
+`.github/workflows/pages.yml` builds the site on pull requests that touch it and publishes it to GitHub Pages from `main` (repository Settings ▸ Pages ▸ Source: GitHub Actions). While the repository is private it only builds it: Pages needs a public repository on the free plan.

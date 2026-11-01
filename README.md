@@ -9,6 +9,18 @@ Flint is a fast, minimal, AI-first IDE for macOS. Coding agents (Claude Code, Co
 
 ![A tour of Flint: go to a file, search the project, review a change in the Commit panel, and hand a failing Kubernetes deploy to the agent](site/images/tour.gif)
 
+## Fast and light
+
+Opening the Go standard library source (12,000 files) with a fresh profile on an Apple M4 Pro:
+
+| Editor | First window | Memory after 30 s idle |
+|---|---|---|
+| **Flint** | 0.56 s | **118 MB** |
+| Visual Studio Code 1.115 | 0.57 s | 671 MB |
+| Zed 1.27 | 0.39 s | 135 MB |
+
+Memory is the physical footprint of all of the editor's processes, including the WebKit processes that render Flint's window. How it was measured, and how to repeat it on your machine with `go run ./cmd/bench`, is in [docs/BENCHMARK.md](docs/BENCHMARK.md).
+
 ## Features
 
 The full reference, with every detail and all keyboard shortcuts, is in [docs/FEATURES.md](docs/FEATURES.md).
@@ -19,12 +31,15 @@ The full reference, with every detail and all keyboard shortcuts, is in [docs/FE
 - `⌘P` go to file and project-wide search and replace, powered by ripgrep, with no up-front indexing
 - Language servers (gopls, rust-analyzer, vtsls / typescript-language-server, basedpyright / pyright): completion, hover, go to definition, find usages, live diagnostics
 - Files edited by agents reload in place as they change
+- `⌘I` *Edit with Agent* on the selection, optional ghost-text completions from a local model (Ollama or any OpenAI-compatible server), and a Vim mode
 
 **AI agents**
 - Native Claude Code and Codex chat drivers, no npm: streamed responses, tool calls with mini diffs, plan, changed files, token usage and cost
 - Any other agent with an Agent Client Protocol mode (Gemini CLI, OpenCode, …), added in Settings with no code
 - *Fix with agent* on any LSP problem, `⌘L` to send a selection or terminal output to the chat
 - Generated commit messages and agent-assisted merge conflict resolution
+- Agents see what Flint sees through its own MCP server: language server problems, open files and the selection, the last test results
+- Agent tasks: one click gives an agent its own branch and worktree, so several work in parallel; a panel shows their state and diff, with Merge and Create PR
 
 **Git and GitHub**
 - IntelliJ-style Commit panel, side-by-side diffs, gutter markers, blame, file history, stash, branches and worktrees
@@ -55,6 +70,7 @@ The full reference, with every detail and all keyboard shortcuts, is in [docs/FE
 - Markdown preview (rendered in Go, no raw HTML) and image preview
 - TODO / FIXME list across the workspace
 - Settings tab with theme (Dark, Light, System), fonts and a fully editable keymap; a command palette for every action
+- Import your settings, shortcuts and color theme from VS Code, Cursor or VSCodium
 - Restricted Mode for folders you have not trusted yet
 - Local diagnostics log and a Report an Issue command; no telemetry
 - A notice when a new release is out (one anonymous request to GitHub a day, can be turned off; nothing is downloaded or installed for you)

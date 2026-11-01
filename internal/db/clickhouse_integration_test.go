@@ -74,8 +74,8 @@ func TestClickHouseExactValues(t *testing.T) {
 
 func TestClickHouseConsoleSessionKeepsState(t *testing.T) {
 	m, conn := chManager(t, Connection{})
-	a := WithConsole(context.Background(), "console-a")
-	b := WithConsole(context.Background(), "console-b")
+	a := WithConsole(context.Background(), fmt.Sprintf("it-a-%d", time.Now().UnixNano()))
+	b := WithConsole(context.Background(), fmt.Sprintf("it-b-%d", time.Now().UnixNano()))
 	if _, err := chQuery(t, m, a, conn, "", "SET max_result_rows = 77"); err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestClickHouseCancelKillsServerSide(t *testing.T) {
 	waitFor(t, func() bool { return running() == 0 })
 
 	// The console can run its next statement right away (the killed one may still hold the session).
-	a := WithConsole(context.Background(), "console-cancel")
+	a := WithConsole(context.Background(), fmt.Sprintf("it-c-%d", time.Now().UnixNano()))
 	go func() {
 		_, err := chQuery(t, m, a, conn, id+"-2", "SELECT sleepEachRow(1) FROM numbers(60) SETTINGS max_block_size = 1")
 		done <- err

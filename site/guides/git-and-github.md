@@ -91,9 +91,26 @@ Click a file to open a side-by-side diff against the merge base, as on GitHub.
 
 The review bar, in the pull request tab and in the diff, takes a summary and has **Comment**, **Approve** and **Request changes**. While you have a pending review, it shows the number of comments and a **Discard** button.
 
+### When CI fails
+
+Flint follows the checks of your current branch's pull request, and of the pull requests of [agent tasks](ai-agents.md#agent-tasks-agents-in-parallel). When a check fails:
+
+- the status bar shows a red **✗ CI** badge (click it to open the pull request) with **Fix with agent**;
+- the Pull Requests view shows **Your branch** on top, with each failed check;
+- the task's row in the Agent Tasks panel shows **✗ CI** and **✦ Fix CI**.
+
+**Fix with agent** reads the failed jobs' logs (`gh run view --log-failed`), keeps the failing step's last lines plus its error lines (test failures, compiler errors, `file:line` references), removes secrets and your home folder from them, and puts a draft in the agent chat of that project (for a task, the task's chat and worktree): which workflow, job and step failed, the excerpt, the files of your workspace the log points at, links to the run and job, and the branch and commit. Nothing is sent until you press Send.
+
+Each failed check (in the pull request tab under **Checks**, and in the Pull Requests view) also has:
+
+- **Log**: the failed steps' log in a tab, with `file:line` references that open the file at that line, even when CI printed a runner path (`/home/runner/work/…`) or a bare test file name (`review_test.go:316`).
+- **Rerun**: re-runs the run's failed jobs on GitHub (`gh run rerun --failed`), after you confirm.
+
+GitHub can't notify a desktop app, so Flint reads the checks when you open the folder, switch branches, push or fetch, and return to the window, and polls only while some check is still running (every 30 seconds by default, less often while nothing changes). When CI fails or turns green while Flint is in the background, you get a notification. The interval, the size of the excerpt and the notification are in [Settings ▸ CI](settings.md#ci).
+
 ### Refreshing
 
-Nothing refreshes in the background. The list loads when you open the view, a pull request loads when you open its tab, and both reload when you return to the Flint window or click ↻. Responses are cached for about 30 seconds.
+Nothing refreshes in the background except running CI checks (see above). The list loads when you open the view, a pull request loads when you open its tab, and both reload when you return to the Flint window or click ↻. Responses are cached for about 30 seconds.
 
 ## Git in Restricted Mode
 

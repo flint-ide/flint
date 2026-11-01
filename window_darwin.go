@@ -69,7 +69,20 @@ static void flintSetWebViewHidden(void *nsWindow, int hidden) {
 */
 import "C"
 
-import "github.com/wailsapp/wails/v3/pkg/application"
+import (
+	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
+)
+
+// onLaunched runs launched once macOS has finished launching the app, and
+// reveals the web view when its page has loaded.
+func (a *App) onLaunched(app *application.App, win *application.WebviewWindow, launched func()) {
+	app.Event.OnApplicationEvent(events.Mac.ApplicationDidFinishLaunching, func(*application.ApplicationEvent) { launched() })
+	win.OnWindowEvent(events.Mac.WebViewDidFinishNavigation, func(*application.WindowEvent) { a.onPageLoaded() })
+}
+
+// linuxWindow: no Linux options on macOS.
+func linuxWindow() application.LinuxWindow { return application.LinuxWindow{} }
 
 // setNativeAppearance makes the window chrome follow theme ("dark", "light" or
 // "system") and reports whether it is now dark. Not for the main thread.
@@ -86,15 +99,6 @@ func setNativeAppearance(theme string) bool {
 
 // systemPrefersDark reports whether macOS uses the dark appearance.
 func systemPrefersDark() bool { return C.flintSystemPrefersDark() != 0 }
-
-// TitlebarMetrics describes where macOS draws the window buttons.
-type TitlebarMetrics struct {
-	Height       float64 `json:"height"`       // title bar height in points
-	ButtonsLeft  float64 `json:"buttonsLeft"`  // x of the close button
-	ButtonsTop   float64 `json:"buttonsTop"`   // y of the close button from the top
-	ButtonWidth  float64 `json:"buttonWidth"`  // size of one traffic light
-	ButtonHeight float64 `json:"buttonHeight"` //
-}
 
 func titlebarMetrics() TitlebarMetrics {
 	var h, x, y, w, bh C.double

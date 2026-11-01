@@ -14,6 +14,7 @@ import { Splitter } from '../layout/Splitter'
 import { Select } from '../ui/Select'
 import { DatabaseIcon } from '../icons/DatabaseIcon'
 import { QueryHistory } from './QueryHistory'
+import { formatKeys } from '../../lib/commands'
 
 const LIMITS = [100, 1000, 10_000, 100_000]
 
@@ -248,14 +249,14 @@ export function QueryPanel({ tabId, scratchId, connId, database, runner, editor,
         {state.running ? (
           <button className="danger" onClick={runner.cancel}>■ Cancel</button>
         ) : (
-          <button className="primary" onClick={() => view.current && runner.runAtCursor(view.current)} title="Run statement under cursor or selection (⌘↵)">
+          <button className="primary" onClick={() => view.current && runner.runAtCursor(view.current)} title={`Run statement under cursor or selection (${formatKeys('Mod+Enter')})`}>
             ▶ Run
           </button>
         )}
         <button
           disabled={state.running || !conn}
           onClick={() => view.current && runner.explainAtCursor(view.current, false)}
-          title={isClickHouse ? 'EXPLAIN PLAN of the statement under the cursor (⇧⌘E)' : 'EXPLAIN the statement under the cursor (⇧⌘E)'}
+          title={`${isClickHouse ? 'EXPLAIN PLAN of' : 'EXPLAIN'} the statement under the cursor (${formatKeys('Mod+Shift+E')})`}
         >
           Explain
         </button>
@@ -264,8 +265,8 @@ export function QueryPanel({ tabId, scratchId, connId, database, runner, editor,
           onClick={() => view.current && runner.explainAtCursor(view.current, true)}
           title={
             isClickHouse
-              ? 'EXPLAIN PIPELINE of the statement under the cursor (⇧⌘A)'
-              : 'EXPLAIN ANALYZE: runs the statement in a rolled-back transaction (⇧⌘A)'
+              ? `EXPLAIN PIPELINE of the statement under the cursor (${formatKeys('Mod+Shift+A')})`
+              : `EXPLAIN ANALYZE: runs the statement in a rolled-back transaction (${formatKeys('Mod+Shift+A')})`
           }
         >
           {isClickHouse ? 'Pipeline' : 'Analyze'}
@@ -279,7 +280,7 @@ export function QueryPanel({ tabId, scratchId, connId, database, runner, editor,
           title="Maximum rows fetched"
         />
         <span className="spacer" />
-        <button disabled={!conn} onClick={() => setHistoryOpen(true)} title="Statements run on this connection (⇧⌘H)">
+        <button disabled={!conn} onClick={() => setHistoryOpen(true)} title={`Statements run on this connection (${formatKeys('Mod+Shift+H')})`}>
           History
         </button>
       </div>

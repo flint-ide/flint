@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ReviewThread as Thread } from '../../api/backend'
 import { addReviewComment, openInBrowser, replyToThread, setThreadResolved, usePullRequests, detailsKey } from '../../store/pullRequests'
 import { timeAgo } from '../../lib/prReview'
+import { formatKeys } from '../../lib/commands'
 
 /** Markdown rendered in Go (no raw HTML); links open in the browser. */
 export function HtmlBody({ html, className = '' }: { html: string; className?: string }) {
@@ -86,7 +87,7 @@ export function ReviewThread({ root, number, thread, label }: ThreadProps) {
               <textarea
                 rows={reply ? 3 : 1}
                 value={reply}
-                placeholder="Reply… (⌘↵ to send)"
+                placeholder={`Reply… (${formatKeys('Mod+Enter')} to send)`}
                 spellCheck={false}
                 onChange={(e) => setReply(e.target.value)}
                 onKeyDown={(e) => {
@@ -152,7 +153,7 @@ export function CommentComposer({ root, number, path, line, side, pendingReview,
           rows={3}
           autoFocus
           value={body}
-          placeholder="Leave a comment (Markdown). ⌘↵ adds it to your review."
+          placeholder={`Leave a comment (Markdown). ${formatKeys('Mod+Enter')} adds it to your review.`}
           spellCheck={false}
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={(e) => {
@@ -164,7 +165,7 @@ export function CommentComposer({ root, number, path, line, side, pendingReview,
           }}
         />
         <div className="pr-actions">
-          <button className="primary" disabled={!body.trim() || busy} onClick={() => void post(true)} title="Only you see it until the review is submitted (⌘↵)">
+          <button className="primary" disabled={!body.trim() || busy} onClick={() => void post(true)} title={`Only you see it until the review is submitted (${formatKeys('Mod+Enter')})`}>
             {pendingReview ? 'Add review comment' : 'Start a review'}
           </button>
           <button disabled={!body.trim() || busy} onClick={() => void post(false)} title="Posted right away">

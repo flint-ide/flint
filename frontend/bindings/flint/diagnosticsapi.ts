@@ -48,7 +48,7 @@ export function Report(): $CancellablePromise<string> {
 }
 
 /**
- * RevealLogs selects the log file in Finder.
+ * RevealLogs selects the log file in the file manager.
  */
 export function RevealLogs(): $CancellablePromise<void> {
     return $Call.ByID(4119293350);

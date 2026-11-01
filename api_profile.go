@@ -7,12 +7,12 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"net/url"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
 	"sync"
 
+	"flint/internal/desktop"
 	"flint/internal/profiling"
 	"flint/internal/runconfig"
 	"flint/internal/testrun"
@@ -168,7 +168,7 @@ func (p *ProfileAPI) ChooseFile() (string, error) {
 	)
 }
 
-// Reveal selects a profile file in Finder (temporary profiles live outside
+// Reveal selects a profile file in the file manager (temporary profiles live outside
 // the workspace, so WorkspaceAPI.RevealInFinder doesn't apply).
 func (p *ProfileAPI) Reveal(path string) error {
 	info, err := os.Stat(path)
@@ -178,8 +178,8 @@ func (p *ProfileAPI) Reveal(path string) error {
 	if !filepath.IsAbs(path) || !info.Mode().IsRegular() {
 		return fmt.Errorf("%s is not a profile file", path)
 	}
-	if out, err := exec.Command("open", "-R", path).CombinedOutput(); err != nil {
-		return fmt.Errorf("reveal %s: %s", filepath.Base(path), strings.TrimSpace(string(out)))
+	if err := desktop.Reveal(path); err != nil {
+		return fmt.Errorf("reveal %s: %w", filepath.Base(path), err)
 	}
 	return nil
 }

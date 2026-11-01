@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
+	"flint/internal/desktop"
 	"flint/internal/fuzzy"
 	"flint/internal/git"
 	"flint/internal/watcher"
@@ -227,13 +227,14 @@ func (w *WorkspaceAPI) TrashPaths(paths []string) ([]string, error) {
 	return moved, nil
 }
 
-// RevealInFinder selects path in a Finder window.
+// RevealInFinder selects path in the file manager (Finder on macOS; the name
+// stays for the generated bindings).
 func (w *WorkspaceAPI) RevealInFinder(path string) error {
 	if _, err := w.app.rootOf(path); err != nil {
 		return err
 	}
-	if out, err := exec.Command("open", "-R", path).CombinedOutput(); err != nil {
-		return fmt.Errorf("reveal %s: %s", filepath.Base(path), strings.TrimSpace(string(out)))
+	if err := desktop.Reveal(path); err != nil {
+		return fmt.Errorf("reveal %s: %w", filepath.Base(path), err)
 	}
 	return nil
 }

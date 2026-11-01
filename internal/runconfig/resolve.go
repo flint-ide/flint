@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"flint/internal/shellenv"
 )
 
 // Command is one process of a launch.
@@ -95,11 +97,7 @@ func NewCommand(program string, args ...string) Command {
 // Shell runs line with the user's shell (PATH comes from the login shell, see
 // internal/shellenv), so pipes, globs and && work as in a terminal.
 func Shell(line string) Command {
-	shell := os.Getenv("SHELL")
-	if shell == "" {
-		shell = "/bin/zsh"
-	}
-	return Command{Label: line, Program: shell, Args: []string{"-c", line}}
+	return Command{Label: line, Program: shellenv.UserShell(), Args: []string{"-c", line}}
 }
 
 // Quote quotes s for a POSIX shell when it needs it.

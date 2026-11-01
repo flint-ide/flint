@@ -16,6 +16,8 @@ import {
 } from '../../lib/editorAiSettings'
 import { Select } from '../ui/Select'
 import { NumberField, Row, TextField } from './fields'
+import { formatKeys } from '../../lib/commands'
+import { keyringName } from '../../lib/platform'
 
 const PROVIDERS: { value: CompletionProvider; label: string }[] = [
   { value: 'ollama', label: 'Ollama' },
@@ -32,7 +34,7 @@ export function EditorAiSection() {
   return (
     <section>
       <h2>AI in the Editor</h2>
-      <h3>Edit with Agent (⌘I)</h3>
+      <h3>Edit with Agent ({formatKeys('Mod+I')})</h3>
       <Row label="Context lines" hint="Lines above and below the selection the default agent sees with your instruction. Secrets in them are redacted.">
         <NumberField
           value={inlineEdit.contextLines}
@@ -83,7 +85,7 @@ export function EditorAiSection() {
 }
 
 /**
- * The endpoint's API key, kept in the macOS Keychain (never in settings.json)
+ * The endpoint's API key, kept in the OS keyring (Keychain, Secret Service; never in settings.json)
  * for that endpoint's origin: another endpoint never gets it.
  */
 function ApiKeyRow({ endpoint }: { endpoint: string }) {
@@ -109,8 +111,8 @@ function ApiKeyRow({ endpoint }: { endpoint: string }) {
     <Row
       label="API key"
       hint={stored
-        ? 'A key for this endpoint is stored in the Keychain and sent to it as a bearer token.'
-        : 'Only if the endpoint needs one. Stored in the macOS Keychain for this endpoint only.'}
+        ? `A key for this endpoint is stored in the ${keyringName()} and sent to it as a bearer token.`
+        : `Only if the endpoint needs one. Stored in the ${keyringName()} for this endpoint only.`}
     >
       <span className="settings-control">
         <input

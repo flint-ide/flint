@@ -11,6 +11,7 @@ import { McpServerSection } from './McpServerSection'
 import { EditorAiSection } from './EditorAiSection'
 import { NumberField, Row, TextField } from './fields'
 import { openVSCodeImport } from '../../store/vscodeImport'
+import { isMac } from '../../lib/platform'
 
 type Section = 'appearance' | 'editor' | 'terminal' | 'agents' | 'agentContext' | 'editorAi' | 'lsp' | 'refresh' | 'todo' | 'keymap' | 'updates' | 'import'
 
@@ -75,7 +76,7 @@ function AppearanceSection() {
     ...(hasCustom || mode === 'custom' ? [{ value: 'custom' as const, label: 'Custom' }] : []),
   ]
   const hint =
-    mode === 'system' ? `Follows macOS (now ${theme})`
+    mode === 'system' ? `Follows ${isMac() ? 'macOS' : 'the system'} (now ${theme})`
     : mode === 'custom' ? `${custom.name || 'Imported theme'} on the ${custom.base} palette`
     : undefined
   return (
@@ -108,7 +109,7 @@ function EditorSection() {
         <input type="checkbox" checked={autoSave} onChange={(e) => update({ autoSave: e.target.checked })} />
       </Row>
       <h3>Keys</h3>
-      <Row label="Vim mode" hint="Vim key bindings in every editor; :w saves, :q closes the tab. A focused Vim editor keeps Vim's ⌃ keys (⌃R redo, not Run); other Flint shortcuts keep working.">
+      <Row label="Vim mode" hint={`Vim key bindings in every editor; :w saves, :q closes the tab. ${isMac() ? "A focused Vim editor keeps Vim's ⌃ keys (⌃R redo, not Run)" : 'A focused Vim editor keeps Ctrl+R, Ctrl+D, Ctrl+U, Ctrl+V, Ctrl+A, Ctrl+X and Ctrl+['}; other Flint shortcuts keep working.`}>
         <input type="checkbox" checked={editor.vimMode} onChange={(e) => update({ editor: { ...editor, vimMode: e.target.checked } })} />
       </Row>
     </section>

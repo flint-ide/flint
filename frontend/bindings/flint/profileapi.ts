@@ -69,7 +69,7 @@ export function Open(path: string, sampleType: string): $CancellablePromise<prof
 }
 
 /**
- * Reveal selects a profile file in Finder (temporary profiles live outside
+ * Reveal selects a profile file in the file manager (temporary profiles live outside
  * the workspace, so WorkspaceAPI.RevealInFinder doesn't apply).
  */
 export function Reveal(path: string): $CancellablePromise<void> {

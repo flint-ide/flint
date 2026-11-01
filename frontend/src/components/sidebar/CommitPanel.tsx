@@ -12,6 +12,8 @@ import { openStashDialog } from '../../store/stash'
 import { StashSection } from './StashSection'
 import { ReviewSection } from '../review/ReviewSection'
 import { reviewChanges, useAgentReview } from '../../store/agentReview'
+import { formatKeys } from '../../lib/commands'
+import { modKey } from '../../lib/platform'
 
 const KIND_LETTER: Record<string, string> = {
   modified: 'M', added: 'A', deleted: 'D', renamed: 'R', copied: 'C',
@@ -104,7 +106,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
         <button className="icon" title="Refresh" onClick={() => void refresh()}>↻</button>
         <button className="icon" title="Fetch" disabled={!!busy} onClick={() => void remote('fetch')}>⇣</button>
         <button className="icon" title="Update project (pull)" disabled={!!busy} onClick={() => void remote('pull')}>⤓</button>
-        <button className="icon" title="Push (⇧⌘K)" disabled={!!busy} onClick={() => void remote('push')}>⤒</button>
+        <button className="icon" title={`Push (${formatKeys('Mod+Shift+K')})`} disabled={!!busy} onClick={() => void remote('push')}>⤒</button>
         <button className="icon" title="Stash changes…" disabled={!!busy} onClick={openStashDialog}>⊟</button>
       </div>
       <div className="git-branch-line muted">
@@ -222,7 +224,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
           spellCheck={false}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && e.metaKey && canCommit) {
+            if (e.key === 'Enter' && modKey(e) && canCommit) {
               e.preventDefault()
               void commit(e.altKey)
             }
@@ -234,10 +236,10 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
           </label>
           <span className="spacer" />
           <span className="muted count">{selected.length} selected</span>
-          <button className="primary" disabled={!canCommit} onClick={() => void commit(false)} title="⌘↵">
+          <button className="primary" disabled={!canCommit} onClick={() => void commit(false)} title={formatKeys('Mod+Enter')}>
             {busy === 'commit' ? 'Committing…' : 'Commit'}
           </button>
-          <button disabled={!canCommit} onClick={() => void commit(true)} title="⌥⌘↵">
+          <button disabled={!canCommit} onClick={() => void commit(true)} title={formatKeys('Alt+Mod+Enter')}>
             Commit and Push
           </button>
         </div>

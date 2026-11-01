@@ -32,7 +32,7 @@ const (
 
 var (
 	// ErrNotInstalled: no gh on the login-shell PATH.
-	ErrNotInstalled = errors.New("the GitHub CLI (gh) is not installed: install it with `brew install gh`, then run `gh auth login`")
+	ErrNotInstalled = errors.New("the GitHub CLI (gh) is not installed: install it (`brew install gh` on macOS, `sudo apt install gh` or https://cli.github.com on Linux), then run `gh auth login`")
 	// ErrNotAuthenticated: gh is there but not logged in.
 	ErrNotAuthenticated = errors.New("gh is not logged in to GitHub: run `gh auth login` in a terminal")
 	// ErrNotGitHub: the project has no remote on a GitHub host gh knows.

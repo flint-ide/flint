@@ -2,11 +2,11 @@ package main
 
 import (
 	"log/slog"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
 
+	"flint/internal/desktop"
 	"flint/internal/diag"
 	"flint/internal/tools"
 )
@@ -90,10 +90,8 @@ func (d *DiagnosticsAPI) ToolCheckOnFirstRun() bool { return d.app.claimToolChec
 // LogPath is the log file, for the UI.
 func (d *DiagnosticsAPI) LogPath() string { return diag.LogPath() }
 
-// RevealLogs selects the log file in Finder.
-func (d *DiagnosticsAPI) RevealLogs() error {
-	return exec.Command("open", "-R", diag.LogPath()).Run()
-}
+// RevealLogs selects the log file in the file manager.
+func (d *DiagnosticsAPI) RevealLogs() error { return desktop.Reveal(diag.LogPath()) }
 
 // LogFrontend records an error of the web UI (uncaught exceptions, failed
 // renders), rate-limited and size-capped.

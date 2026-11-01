@@ -133,7 +133,8 @@ export function RenamePath(path: string, newName: string): $CancellablePromise<s
 }
 
 /**
- * RevealInFinder selects path in a Finder window.
+ * RevealInFinder selects path in the file manager (Finder on macOS; the name
+ * stays for the generated bindings).
  */
 export function RevealInFinder(path: string): $CancellablePromise<void> {
     return $Call.ByID(3190943883, path);

@@ -1,6 +1,6 @@
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
-import { effectiveKeys, getCommand } from '../../lib/commands'
+import { effectiveKeys, getCommand, formatKeys } from '../../lib/commands'
 import { PANELS } from '../../panels'
 import { isPanelAvailable, panelTooltip, type PanelSpec } from '../../panels/registry'
 
@@ -34,7 +34,7 @@ export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {
         </button>
       ))}
       <span className="spacer" />
-      <button className={`activity${terminalActive ? ' active' : ''}`} title="Terminal (⌘J)" onClick={onTerminal}>
+      <button className={`activity${terminalActive ? ' active' : ''}`} title={`Terminal (${formatKeys('Mod+J')})`} onClick={onTerminal}>
         ❯_
       </button>
     </nav>

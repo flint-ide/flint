@@ -20,7 +20,7 @@ export function ToolCheck() {
   return (
     <Modal title="Tools" onClose={closeToolCheck} className="tool-check">
       <p className="muted tool-check-intro">
-        Flint uses the tools already on your Mac. Only Git is required; each of the others turns on the features listed next to it.
+        Flint uses the tools already on your computer. Only Git is required; each of the others turns on the features listed next to it.
       </p>
       <div className="tool-check-list">
         {!tools && !error && <div className="muted tool-check-empty">Checking…</div>}
@@ -33,7 +33,7 @@ export function ToolCheck() {
         ))}
       </div>
       <p className="muted tool-check-note">
-        Flint looks for tools on your login shell&apos;s PATH. If a tool you installed still shows as missing, check that it runs in a new Terminal window, then restart Flint.
+        Flint looks for tools on your login shell&apos;s PATH. If a tool you installed still shows as missing, check that it runs in a new terminal window, then restart Flint.
       </p>
       <div className="form-actions">
         {summary && <span className={`aws-status ${summary.tone}`}>{summary.text}</span>}

@@ -19,26 +19,42 @@ type Source struct {
 	ExtensionsDir string `json:"extensionsDir"`
 }
 
-// knownSources are the editors Flint knows, by where they keep their files
-// relative to the home directory (macOS).
-var knownSources = []struct{ id, name, userDir, extensionsDir string }{
-	{"vscode", "Visual Studio Code", "Library/Application Support/Code/User", ".vscode/extensions"},
-	{"vscode-insiders", "Visual Studio Code - Insiders", "Library/Application Support/Code - Insiders/User", ".vscode-insiders/extensions"},
-	{"cursor", "Cursor", "Library/Application Support/Cursor/User", ".cursor/extensions"},
-	{"vscodium", "VSCodium", "Library/Application Support/VSCodium/User", ".vscode-oss/extensions"},
+// knownSources are the editors Flint knows: the name of their data directory
+// and where their extensions live, relative to the home directory.
+var knownSources = []struct{ id, name, dataDir, extensionsDir string }{
+	{"vscode", "Visual Studio Code", "Code", ".vscode/extensions"},
+	{"vscode-insiders", "Visual Studio Code - Insiders", "Code - Insiders", ".vscode-insiders/extensions"},
+	{"cursor", "Cursor", "Cursor", ".cursor/extensions"},
+	{"vscodium", "VSCodium", "VSCodium", ".vscode-oss/extensions"},
 }
+
+// userDirParents are where VS Code-family editors keep their data directory,
+// relative to the home directory: macOS, then Linux (the XDG config default).
+// Windows (%APPDATA%) is not supported yet.
+var userDirParents = []string{"Library/Application Support", ".config"}
 
 // Sources lists the known editors that have a user directory under home.
 func Sources(home string) []Source {
 	out := []Source{}
 	for _, k := range knownSources {
-		user := filepath.Join(home, filepath.FromSlash(k.userDir))
-		if info, err := os.Stat(user); err != nil || !info.IsDir() {
+		user, ok := userDir(home, k.dataDir)
+		if !ok {
 			continue
 		}
 		out = append(out, Source{ID: k.id, Name: k.name, UserDir: user, ExtensionsDir: filepath.Join(home, filepath.FromSlash(k.extensionsDir))})
 	}
 	return out
+}
+
+// userDir is the first existing <parent>/<dataDir>/User under home.
+func userDir(home, dataDir string) (string, bool) {
+	for _, parent := range userDirParents {
+		user := filepath.Join(home, filepath.FromSlash(parent), dataDir, "User")
+		if info, err := os.Stat(user); err == nil && info.IsDir() {
+			return user, true
+		}
+	}
+	return "", false
 }
 
 // FindSource returns the source with this id, if it is installed under home.

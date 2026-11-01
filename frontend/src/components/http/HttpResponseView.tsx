@@ -13,6 +13,7 @@ import { bodyLanguagePath, formatBytes, formatTime, statusTone } from '../../lib
 import { languageFor } from '../../lib/language'
 import { CodeEditor } from '../editor/CodeEditor'
 import { Select } from '../ui/Select'
+import { formatKeys } from '../../lib/commands'
 
 const NO_HISTORY: HttpResponse[] = []
 
@@ -57,7 +58,7 @@ export function HttpResponseView({ tab, active }: { tab: HttpTab; active: boolea
       </div>
       {error && <div className="placeholder error selectable">{error}</div>}
       {!error && !response && !pending && (
-        <div className="placeholder muted">No response yet. Put the cursor in a request and press ⌘↵ (or click ▶ on the margin).</div>
+        <div className="placeholder muted">No response yet. Put the cursor in a request and press {formatKeys('Mod+Enter')} (or click ▶ on the margin).</div>
       )}
       {shown && <ResponseDetails response={shown} active={active} />}
     </div>

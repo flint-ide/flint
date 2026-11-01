@@ -3,6 +3,8 @@ import * as PreviewAPI from '../../../bindings/flint/previewapi'
 import { errorMessage } from '../../api/backend'
 import { toggleSvgSource } from '../../store/preview'
 import { onFileChanged } from '../../store/fsEvents'
+import { formatKeys } from '../../lib/commands'
+import { modKey } from '../../lib/platform'
 
 const ZOOMS = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8]
 
@@ -43,7 +45,7 @@ export function ImageView({ path, active }: { path: string; active: boolean }) {
   useEffect(() => {
     if (!active) return
     const onKey = (e: KeyboardEvent) => {
-      if (!e.metaKey || e.altKey || e.ctrlKey) return
+      if (!modKey(e) || e.altKey || (e.metaKey && e.ctrlKey)) return
       if (e.key === '=' || e.key === '+') step(1)
       else if (e.key === '-') step(-1)
       else if (e.key === '0') setZoom(null)
@@ -63,9 +65,9 @@ export function ImageView({ path, active }: { path: string; active: boolean }) {
   return (
     <div className="image-view">
       <div className="run-toolbar">
-        <button className="icon" title="Zoom out (⌘-)" onClick={() => step(-1)}>−</button>
-        <button className="icon" title="Fit (⌘0)" onClick={() => setZoom(null)}>{zoom === null ? 'Fit' : `${Math.round(scale * 100)}%`}</button>
-        <button className="icon" title="Zoom in (⌘+)" onClick={() => step(1)}>+</button>
+        <button className="icon" title={`Zoom out (${formatKeys('Mod+-')})`} onClick={() => step(-1)}>−</button>
+        <button className="icon" title={`Fit (${formatKeys('Mod+0')})`} onClick={() => setZoom(null)}>{zoom === null ? 'Fit' : `${Math.round(scale * 100)}%`}</button>
+        <button className="icon" title={`Zoom in (${formatKeys('Mod++')})`} onClick={() => step(1)}>+</button>
         <button className="icon" title="Actual size" onClick={() => setZoom(1)}>1:1</button>
         {svg && (
           <button className="icon" title="Edit the SVG source" onClick={() => toggleSvgSource(path)}>Source</button>
@@ -79,7 +81,7 @@ export function ImageView({ path, active }: { path: string; active: boolean }) {
         ref={box}
         className="image-stage"
         onWheel={(e) => {
-          if (!e.metaKey) return
+          if (!modKey(e)) return
           e.preventDefault()
           step(e.deltaY < 0 ? 1 : -1)
         }}

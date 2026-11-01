@@ -1,8 +1,9 @@
-# Flint's build (Wails v3, macOS). Run with `wails3 task <name>`:
-#   build    the flint binary in build/bin
-#   package  build/bin/flint.app (ad-hoc signed)
-#   dev      the app with live reload of Go and the frontend
-#   server   the app as an HTTP server for a browser (no window), for UI checks
+# Flint's build (Wails v3, macOS and Linux). Run with `wails3 task <name>`:
+#   build          the flint binary in build/bin (for the system it runs on)
+#   package        build/bin/flint.app (ad-hoc signed; macOS)
+#   package:linux  build/bin/flint-<version>-linux-<arch>.tar.gz (Linux)
+#   dev            the app with live reload of Go and the frontend
+#   server         the app as an HTTP server for a browser (no window), for UI checks
 version: '3'
 
 vars:
@@ -15,9 +16,10 @@ vars:
 
 env:
   CGO_ENABLED: 1
+  # macOS builds target macOS 12; elsewhere cgo keeps its defaults (GTK 4 / WebKitGTK 6 on Linux).
   MACOSX_DEPLOYMENT_TARGET: "12.0"
-  CGO_CFLAGS: -mmacosx-version-min=12.0
-  CGO_LDFLAGS: -mmacosx-version-min=12.0
+  CGO_CFLAGS: '{{if eq OS "darwin"}}-mmacosx-version-min=12.0{{else}}-O2 -g{{end}}'
+  CGO_LDFLAGS: '{{if eq OS "darwin"}}-mmacosx-version-min=12.0{{else}}-O2 -g{{end}}'
 
 tasks:
   bindings:
@@ -69,6 +71,26 @@ tasks:
     deps: ["build:universal", icons]
     cmds:
       - task: bundle
+
+  package:linux:
+    summary: Packs build/bin/flint-<version>-linux-<arch>.tar.gz (run on Linux)
+    deps: [build]
+    vars:
+      PKG: '{{.BIN_DIR}}/linux-package'
+      ID: io.github.odudek.flint
+      ARCHIVE: '{{.BIN_DIR}}/{{.APP_NAME}}-{{.VERSION}}-linux-{{ARCH}}.tar.gz'
+    preconditions:
+      - sh: '[ "{{OS}}" = linux ]'
+        msg: package:linux links against GTK and WebKitGTK, so it runs on Linux (see docs/DEVELOPMENT.md for the Docker recipe)
+    cmds:
+      # A prefix layout: `tar -xzf … -C ~/.local` installs the command, the launcher and the icon.
+      - rm -rf "{{.PKG}}"
+      - mkdir -p "{{.PKG}}/bin" "{{.PKG}}/share/applications" "{{.PKG}}/share/icons/hicolor/512x512/apps"
+      - install -m 755 "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.PKG}}/bin/{{.APP_NAME}}"
+      - install -m 644 "build/linux/{{.ID}}.desktop" "{{.PKG}}/share/applications/"
+      - install -m 644 build/linux/icon-512.png "{{.PKG}}/share/icons/hicolor/512x512/apps/{{.ID}}.png"
+      - tar -C "{{.PKG}}" -czf "{{.ARCHIVE}}" bin share
+      - rm -rf "{{.PKG}}"
 
   bundle:
     internal: true

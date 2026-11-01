@@ -13,9 +13,6 @@ import * as accounts$0 from "./internal/accounts/models.js";
 import * as dap$0 from "./internal/dap/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as docker$0 from "./internal/docker/models.js";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
 import * as git$0 from "./internal/git/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -432,72 +429,6 @@ export class Collected {
 }
 
 /**
- * DockerOverview is everything the Docker panel shows.
- */
-export class DockerOverview {
-    "containers": docker$0.Container[];
-
-    /**
-     * Projects: Compose projects with containers, plus compose files found in
-     * the workspace that have none (yet).
-     */
-    "projects": docker$0.ComposeProject[];
-
-    /**
-     * ComposeAvailable: the docker CLI is installed, which Compose up / down /
-     * pull need. Everything else works through the Engine API.
-     */
-    "composeAvailable": boolean;
-
-    /**
-     * Endpoint is where the engine was found ("unix:///var/run/docker.sock").
-     */
-    "endpoint": string;
-
-    /**
-     * Warning is set when the connection is not protected (plain tcp://).
-     */
-    "warning": string;
-
-    /** Creates a new DockerOverview instance. */
-    constructor($$source: Partial<DockerOverview> = {}) {
-        if (!("containers" in $$source)) {
-            this["containers"] = [];
-        }
-        if (!("projects" in $$source)) {
-            this["projects"] = [];
-        }
-        if (!("composeAvailable" in $$source)) {
-            this["composeAvailable"] = false;
-        }
-        if (!("endpoint" in $$source)) {
-            this["endpoint"] = "";
-        }
-        if (!("warning" in $$source)) {
-            this["warning"] = "";
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new DockerOverview instance from a string or object.
-     */
-    static createFrom($$source: any = {}): DockerOverview {
-        const $$createField0_0 = $$createType9;
-        const $$createField1_0 = $$createType11;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("containers" in $$parsedSource) {
-            $$parsedSource["containers"] = $$createField0_0($$parsedSource["containers"]);
-        }
-        if ("projects" in $$parsedSource) {
-            $$parsedSource["projects"] = $$createField1_0($$parsedSource["projects"]);
-        }
-        return new DockerOverview($$parsedSource as Partial<DockerOverview>);
-    }
-}
-
-/**
  * FileHistory is a file's log together with the work tree it was read from.
  */
 export class FileHistory {
@@ -520,7 +451,7 @@ export class FileHistory {
      * Creates a new FileHistory instance from a string or object.
      */
     static createFrom($$source: any = {}): FileHistory {
-        const $$createField1_0 = $$createType13;
+        const $$createField1_0 = $$createType9;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("commits" in $$parsedSource) {
             $$parsedSource["commits"] = $$createField1_0($$parsedSource["commits"]);
@@ -643,7 +574,7 @@ export class ProfiledTests {
      * Creates a new ProfiledTests instance from a string or object.
      */
     static createFrom($$source: any = {}): ProfiledTests {
-        const $$createField2_0 = $$createType14;
+        const $$createField2_0 = $$createType10;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField2_0($$parsedSource["files"]);
@@ -762,7 +693,7 @@ export class PromptLibrary {
      * Creates a new PromptLibrary instance from a string or object.
      */
     static createFrom($$source: any = {}): PromptLibrary {
-        const $$createField0_0 = $$createType16;
+        const $$createField0_0 = $$createType12;
         const $$createField1_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("prompts" in $$parsedSource) {
@@ -827,7 +758,7 @@ export class ProviderInfo {
      * Creates a new ProviderInfo instance from a string or object.
      */
     static createFrom($$source: any = {}): ProviderInfo {
-        const $$createField3_0 = $$createType18;
+        const $$createField3_0 = $$createType14;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("account" in $$parsedSource) {
             $$parsedSource["account"] = $$createField3_0($$parsedSource["account"]);
@@ -1047,7 +978,7 @@ export class ReviewRequest {
      * Creates a new ReviewRequest instance from a string or object.
      */
     static createFrom($$source: any = {}): ReviewRequest {
-        const $$createField1_0 = $$createType20;
+        const $$createField1_0 = $$createType16;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
@@ -1089,7 +1020,7 @@ export class ReviewResult {
      */
     static createFrom($$source: any = {}): ReviewResult {
         const $$createField1_0 = $$createType0;
-        const $$createField2_0 = $$createType22;
+        const $$createField2_0 = $$createType18;
         const $$createField3_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
@@ -1155,9 +1086,9 @@ export class RunConfigs {
      * Creates a new RunConfigs instance from a string or object.
      */
     static createFrom($$source: any = {}): RunConfigs {
-        const $$createField0_0 = $$createType24;
-        const $$createField1_0 = $$createType24;
-        const $$createField2_0 = $$createType26;
+        const $$createField0_0 = $$createType20;
+        const $$createField1_0 = $$createType20;
+        const $$createField2_0 = $$createType22;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("saved" in $$parsedSource) {
             $$parsedSource["saved"] = $$createField0_0($$parsedSource["saved"]);
@@ -1456,7 +1387,7 @@ export class UsageView {
      * Creates a new UsageView instance from a string or object.
      */
     static createFrom($$source: any = {}): UsageView {
-        const $$createField0_0 = $$createType27;
+        const $$createField0_0 = $$createType23;
         const $$createField1_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("summary" in $$parsedSource) {
@@ -1478,23 +1409,19 @@ const $$createType4 = $Create.Array($$createType3);
 const $$createType5 = $Create.Map($Create.Any, $Create.Any);
 const $$createType6 = CIJob.createFrom;
 const $$createType7 = $Create.Array($$createType6);
-const $$createType8 = docker$0.Container.createFrom;
+const $$createType8 = git$0.FileCommit.createFrom;
 const $$createType9 = $Create.Array($$createType8);
-const $$createType10 = docker$0.ComposeProject.createFrom;
-const $$createType11 = $Create.Array($$createType10);
-const $$createType12 = git$0.FileCommit.createFrom;
-const $$createType13 = $Create.Array($$createType12);
-const $$createType14 = testrun$0.Profiles.createFrom;
-const $$createType15 = prompts$0.Prompt.createFrom;
+const $$createType10 = testrun$0.Profiles.createFrom;
+const $$createType11 = prompts$0.Prompt.createFrom;
+const $$createType12 = $Create.Array($$createType11);
+const $$createType13 = accounts$0.Account.createFrom;
+const $$createType14 = $Create.Nullable($$createType13);
+const $$createType15 = ReviewFile.createFrom;
 const $$createType16 = $Create.Array($$createType15);
-const $$createType17 = accounts$0.Account.createFrom;
-const $$createType18 = $Create.Nullable($$createType17);
-const $$createType19 = ReviewFile.createFrom;
+const $$createType17 = review$0.Finding.createFrom;
+const $$createType18 = $Create.Array($$createType17);
+const $$createType19 = runconfig$0.Config.createFrom;
 const $$createType20 = $Create.Array($$createType19);
-const $$createType21 = review$0.Finding.createFrom;
-const $$createType22 = $Create.Array($$createType21);
-const $$createType23 = runconfig$0.Config.createFrom;
-const $$createType24 = $Create.Array($$createType23);
-const $$createType25 = runconfig$0.Capabilities.createFrom;
-const $$createType26 = $Create.Map($Create.Any, $$createType25);
-const $$createType27 = usage$0.Summary.createFrom;
+const $$createType21 = runconfig$0.Capabilities.createFrom;
+const $$createType22 = $Create.Map($Create.Any, $$createType21);
+const $$createType23 = usage$0.Summary.createFrom;

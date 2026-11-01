@@ -1,6 +1,7 @@
 // The shape of settings.json (internal/settings in Go) and the pure parts of
 // applying it: theme resolution and the CSS variables editors read. Framework-free,
 // so it is testable with node:test; store/settings.ts does the applying.
+// Keys that feature modules own are not listed here: see lib/settingsSections.ts.
 
 import {
   coerceAgents, coerceRefresh, coerceServers, DEFAULT_REFRESH,
@@ -18,7 +19,7 @@ import { coercePromptSettings, DEFAULT_PROMPT_SETTINGS, type PromptSettings } fr
 import { coerceAgentReview, DEFAULT_AGENT_REVIEW, type AgentReviewSettings } from './reviewSettings'
 import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
 import { coerceGitHub, DEFAULT_GITHUB, type GitHubSettings } from './githubSettings'
-import { coerceDocker, DEFAULT_DOCKER, type DockerSettings } from './dockerSettings'
+import { coerceSections, type FeatureSettings } from './settingsSections'
 
 import type { ResolvedTheme, ThemeMode } from './themeMode'
 
@@ -43,7 +44,8 @@ export interface CustomTheme {
   colors: Record<string, string>
 }
 
-export interface AppSettings {
+/** The keys of settings.json that Flint itself owns. */
+export interface CoreSettings {
   version: number
   theme: ThemeMode
   editor: EditorSettings
@@ -55,12 +57,8 @@ export interface AppSettings {
   autoSave: boolean
   /** Notification and Dock badge when work finishes while Flint is in the background. */
   notifyInBackground: boolean
-  /** Ask GitHub once a day whether a newer Flint release exists. */
-  checkForUpdates: boolean
   /** Shortcut overrides: command id → keys ('' = none). */
   keymap: Record<string, string>
-  /** Extra folders / globs the TODO list skips, gitignore-style. */
-  todoExclude: string[]
   /** Folder names (or globs over one) the Linux file watcher skips, on top of dependency folders. */
   watchExclude: string[]
   /** Agent CLIs by name ('claude', 'codex'); missing = defaults. */
@@ -89,12 +87,13 @@ export interface AppSettings {
   ci: CISettings
   /** GitHub host, the OAuth App Flint signs in with, scopes and the retry wait (lib/githubSettings.ts). */
   github: GitHubSettings
-  /** How the Docker panel reaches the engine (lib/dockerSettings.ts). */
-  docker: DockerSettings
 }
 
-/** Mirrors settings.Default() in Go (used until the backend answers). */
-export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
+/** The whole settings.json: Flint's keys plus the sections features registered. */
+export type AppSettings = CoreSettings & FeatureSettings
+
+/** Mirrors settings.Default() in Go for Flint's own keys (used until the backend answers). */
+export const DEFAULT_SETTINGS: CoreSettings = Object.freeze({
   version: 1,
   theme: 'dark',
   editor: Object.freeze({ fontFamily: `'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace`, fontSize: 13, lineHeight: 1.55, vimMode: false }),
@@ -103,9 +102,7 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   defaultAgent: '',
   autoSave: false,
   notifyInBackground: true,
-  checkForUpdates: true,
   keymap: Object.freeze({}) as Record<string, string>,
-  todoExclude: Object.freeze([]) as unknown as string[],
   watchExclude: Object.freeze(['dist', '.cache']) as unknown as string[],
   agents: Object.freeze({}) as Record<string, AgentSettings>,
   customAgents: Object.freeze([]) as unknown as CustomAgent[],
@@ -120,8 +117,10 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   agentReview: DEFAULT_AGENT_REVIEW,
   ci: DEFAULT_CI,
   github: DEFAULT_GITHUB,
-  docker: DEFAULT_DOCKER,
-}) as AppSettings
+}) as CoreSettings
+
+/** Flint's own keys; a feature's section may not use one. */
+export const CORE_KEYS: readonly string[] = Object.freeze(Object.keys(DEFAULT_SETTINGS))
 
 /** Same limits as Go's settings.Validate, for the inputs. */
 export const FONT_SIZE = { min: 8, max: 32 }
@@ -149,7 +148,7 @@ export function parseExcludes(text: string, valid: (p: string) => boolean = vali
 }
 
 /** The custom theme's CSS variables, set on :root over the base palette (none unless Theme is Custom). */
-export function themeCssVars(s: AppSettings): Record<string, string> {
+export function themeCssVars(s: CoreSettings): Record<string, string> {
   return s.theme === 'custom' ? s.customTheme.colors : {}
 }
 
@@ -182,7 +181,7 @@ function customTheme(v: unknown, def: CustomTheme): CustomTheme {
 }
 
 /** CSS custom properties on :root that the editors read (style.css, lib/editorSetup.ts). */
-export function editorCssVars(s: AppSettings): Record<string, string> {
+export function editorCssVars(s: CoreSettings): Record<string, string> {
   return {
     '--editor-font': s.editor.fontFamily,
     '--editor-font-size': `${s.editor.fontSize}px`,
@@ -205,9 +204,14 @@ function font(v: unknown, def: FontSettings): FontSettings {
 /**
  * Settings from untrusted JSON (the backend, or the copy cached in localStorage
  * for the first paint): missing or invalid values get defaults, like Go's Normalize.
+ * Registered sections are coerced by their own feature (lib/settingsSections.ts).
  */
 export function coerceSettings(v: unknown): AppSettings {
-  if (!isObject(v)) return DEFAULT_SETTINGS
+  const obj = isObject(v) ? v : {}
+  return { ...coerceCore(obj), ...coerceSections(obj) }
+}
+
+function coerceCore(v: Record<string, unknown>): CoreSettings {
   const d = DEFAULT_SETTINGS
   const keymap: Record<string, string> = {}
   if (isObject(v.keymap)) {
@@ -225,9 +229,7 @@ export function coerceSettings(v: unknown): AppSettings {
     defaultAgent: typeof v.defaultAgent === 'string' ? v.defaultAgent : d.defaultAgent,
     autoSave: typeof v.autoSave === 'boolean' ? v.autoSave : d.autoSave,
     notifyInBackground: typeof v.notifyInBackground === 'boolean' ? v.notifyInBackground : d.notifyInBackground,
-    checkForUpdates: typeof v.checkForUpdates === 'boolean' ? v.checkForUpdates : d.checkForUpdates,
     keymap,
-    todoExclude: Array.isArray(v.todoExclude) ? v.todoExclude.filter((p): p is string => typeof p === 'string' && validExclude(p)) : [],
     watchExclude: Array.isArray(v.watchExclude) ? v.watchExclude.filter((p): p is string => typeof p === 'string' && validWatchExclude(p)) : d.watchExclude,
     agents: coerceAgents(v.agents),
     customAgents: coerceCustomAgents(v.customAgents),
@@ -242,6 +244,5 @@ export function coerceSettings(v: unknown): AppSettings {
     agentReview: coerceAgentReview(v.agentReview),
     ci: coerceCI(v.ci),
     github: coerceGitHub(v.github),
-    docker: coerceDocker(v.docker),
   }
 }

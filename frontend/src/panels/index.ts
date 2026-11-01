@@ -1,18 +1,19 @@
-// The sidebar panels. Adding one is a component plus one entry here: the activity
-// bar, the sidebar, the "Show …" command and the SidebarView type follow from it.
+// Flint's own sidebar panels. Adding one is a component plus one entry here: the
+// activity bar, the sidebar and the "Show …" command follow from it. A feature
+// module contributes its panels itself (lib/features.ts); usePanels and
+// currentPanels are both lists together.
 import { lazy } from 'react'
 import { FileTree } from '../components/sidebar/FileTree'
 import { SearchPanel } from '../components/sidebar/SearchPanel'
 import { ScratchPanel } from '../components/sidebar/ScratchPanel'
-import { definePanels } from './registry'
+import { definePanels, mergePanels, type PanelSpec } from './registry'
+import { useContributions, type Contributions } from '../lib/contributions'
 
 // Light panels are imported directly; the rest are fetched when first opened, so
 // their code (and their dependencies) is not parsed at startup.
 const CommitPanel = lazy(() => import('../components/sidebar/CommitPanel').then((m) => ({ default: m.CommitPanel })))
 const PullRequestsPanel = lazy(() => import('../components/github/PullRequestsPanel').then((m) => ({ default: m.PullRequestsPanel })))
 const DatabasePanel = lazy(() => import('../components/sidebar/DatabasePanel').then((m) => ({ default: m.DatabasePanel })))
-const TodoPanel = lazy(() => import('../components/sidebar/TodoPanel').then((m) => ({ default: m.TodoPanel })))
-const DockerPanel = lazy(() => import('../components/sidebar/DockerPanel').then((m) => ({ default: m.DockerPanel })))
 const AwsPanel = lazy(() => import('../components/sidebar/AwsPanel').then((m) => ({ default: m.AwsPanel })))
 const TasksPanel = lazy(() => import('../components/tasks/TasksPanel').then((m) => ({ default: m.TasksPanel })))
 const KubePanel = lazy(() => import('../components/sidebar/KubePanel').then((m) => ({ default: m.KubePanel })))
@@ -50,14 +51,6 @@ export const PANELS = definePanels([
     command: { id: 'view.scratchpads', keywords: 'notes sql consoles' },
   },
   {
-    id: 'todo', title: 'TODO', icon: 'checkbox', order: 70, component: TodoPanel,
-    command: { title: 'TODO List', keywords: 'fixme hack xxx bug notes comments' },
-  },
-  {
-    id: 'docker', title: 'Docker', icon: 'ship', order: 80, component: DockerPanel,
-    command: { title: 'Docker', keywords: 'containers compose logs' },
-  },
-  {
     id: 'aws', title: 'AWS Profiles', icon: 'cloud', order: 90, component: AwsPanel,
     command: { title: 'AWS Profiles', keywords: 'amazon sso login credentials terminal' },
   },
@@ -67,5 +60,15 @@ export const PANELS = definePanels([
   },
 ])
 
-/** Id of a built-in panel; the open sidebar view is one of these. */
+/** Id of a built-in panel; the open sidebar view is one of these or a contributed panel's. */
 export type PanelId = (typeof PANELS)[number]['id']
+
+let merged: { extra: Contributions['panels']; all: readonly PanelSpec[] } = { extra: [], all: PANELS }
+const withContributed = (s: Contributions): readonly PanelSpec[] => {
+  if (merged.extra !== s.panels) merged = { extra: s.panels, all: mergePanels(PANELS, s.panels) }
+  return merged.all
+}
+
+/** Every panel: Flint's and contributed ones, in activity bar order. */
+export const usePanels = () => useContributions(withContributed)
+export const currentPanels = () => withContributed(useContributions.getState())

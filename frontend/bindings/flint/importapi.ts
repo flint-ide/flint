@@ -25,9 +25,7 @@ import * as vscodeimport$0 from "./internal/vscodeimport/models.js";
  * it stays, so the user can fix the cause and click Import again.
  */
 export function Apply(planID: string): $CancellablePromise<settings$0.Settings> {
-    return $Call.ByID(1423746103, planID).then(($result: any) => {
-        return $$createType0($result);
-    });
+    return $Call.ByID(1423746103, planID);
 }
 
 /**
@@ -36,7 +34,7 @@ export function Apply(planID: string): $CancellablePromise<settings$0.Settings> 
  */
 export function Preview(sourceID: string): $CancellablePromise<vscodeimport$0.Plan> {
     return $Call.ByID(548810763, sourceID).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType0($result);
     });
 }
 
@@ -45,12 +43,11 @@ export function Preview(sourceID: string): $CancellablePromise<vscodeimport$0.Pl
  */
 export function Sources(): $CancellablePromise<vscodeimport$0.Source[]> {
     return $Call.ByID(3728359981).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType2($result);
     });
 }
 
 // Private type creation functions
-const $$createType0 = settings$0.Settings.createFrom;
-const $$createType1 = vscodeimport$0.Plan.createFrom;
-const $$createType2 = vscodeimport$0.Source.createFrom;
-const $$createType3 = $Create.Array($$createType2);
+const $$createType0 = vscodeimport$0.Plan.createFrom;
+const $$createType1 = vscodeimport$0.Source.createFrom;
+const $$createType2 = $Create.Array($$createType1);

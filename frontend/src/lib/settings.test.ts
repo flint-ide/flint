@@ -46,8 +46,6 @@ describe('coerceSettings', () => {
     assert.equal(s.editor.fontFamily, DEFAULT_SETTINGS.editor.fontFamily)
     assert.deepEqual(s.terminal, DEFAULT_SETTINGS.terminal)
     assert.deepEqual(s.keymap, {})
-    assert.equal(s.checkForUpdates, true)
-    assert.equal(coerceSettings({ checkForUpdates: false }).checkForUpdates, false)
   })
 
   it('replaces invalid values', () => {
@@ -55,19 +53,18 @@ describe('coerceSettings', () => {
       theme: 'neon',
       editor: { fontFamily: 'x; } body {', fontSize: 200, lineHeight: '2' },
       autoSave: 'yes',
-      checkForUpdates: 0,
       keymap: { 'git.push': 'Mod+K', 'git.pull': 3 },
     })
     assert.equal(s.theme, 'dark')
     assert.deepEqual(s.editor, DEFAULT_SETTINGS.editor)
     assert.equal(s.autoSave, false)
-    assert.equal(s.checkForUpdates, true)
     assert.deepEqual(s.keymap, { 'git.push': 'Mod+K' })
   })
 
   it('falls back to the defaults for garbage', () => {
-    assert.equal(coerceSettings(null), DEFAULT_SETTINGS)
-    assert.equal(coerceSettings([1, 2]), DEFAULT_SETTINGS)
+    // No feature registered a section here (lib/settingsSections.test.ts has them).
+    assert.deepEqual(coerceSettings(null), DEFAULT_SETTINGS)
+    assert.deepEqual(coerceSettings([1, 2]), DEFAULT_SETTINGS)
   })
 })
 
@@ -115,11 +112,6 @@ describe('TODO excludes', () => {
 
   it('reports what Go would refuse', () => {
     assert.deepEqual(parseExcludes('!src\na,b\ngen/').invalid, ['!src', 'a,b'])
-  })
-
-  it('drops invalid patterns from untrusted settings', () => {
-    assert.deepEqual(coerceSettings({ todoExclude: ['ok', '!no', 3] }).todoExclude, ['ok'])
-    assert.deepEqual(coerceSettings({}).todoExclude, [])
   })
 
   it('keeps watch excludes to folder names, defaulting like Go', () => {

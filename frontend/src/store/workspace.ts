@@ -5,8 +5,8 @@ import { addRootError, withoutRoot } from '../lib/workspaceRoots'
 import { useEditor } from './editor'
 import type { PanelId } from '../panels'
 
-/** The open sidebar panel; the list lives in panels/index.ts. */
-export type SidebarView = PanelId
+/** The open sidebar panel: a built-in one (panels/index.ts) or one a feature contributed. */
+export type SidebarView = PanelId | (string & {})
 /** What the branches popup opens on (title bar widget or the palette). */
 export type BranchesMode = 'list' | 'new-branch' | 'new-worktree'
 

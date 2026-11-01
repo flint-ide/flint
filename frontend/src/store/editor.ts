@@ -2,6 +2,7 @@ import { createStore } from '../lib/store'
 import type { EditorView } from '@codemirror/view'
 import type { ScratchKind, ScratchPad } from '../api/backend'
 import { isWithin, remapPath } from '../lib/fileTree'
+import type { ContributedTab } from '../lib/features'
 
 export interface Reveal {
   line: number // 1-based
@@ -174,6 +175,8 @@ export interface CILogTab {
   dirty: boolean // always false
 }
 
+export type { ContributedTab }
+
 export type Tab =
   | FileTab
   | ScratchTab
@@ -190,6 +193,7 @@ export type Tab =
   | PullRequestDiffTab
   | CILogTab
   | SettingsTab
+  | ContributedTab
 
 const HISTORY_LIMIT = 50
 
@@ -223,6 +227,11 @@ interface EditorState {
   /** Opens a changed file of a pull request, right after the pull request's tab. */
   openPullRequestDiff: (root: string, number: number, path: string) => void
   openCILog: (root: string, runId: number, jobId: number, title: string) => void
+  /**
+   * Opens a tab of a kind a feature contributed (lib/features.ts TabKind), one per
+   * view and key: opening it again shows it with the new title and data.
+   */
+  openContributed: (view: string, key: string, title: string, data?: unknown) => void
   renameScratchTab: (scratchId: string, title: string) => void
   /** Renames a tab in place (terminals follow what they run). */
   retitleTab: (id: string, title: string) => void
@@ -440,6 +449,14 @@ export const useEditor = createStore<EditorState>((set) => ({
       const id = ciLogTabId(root, runId, jobId)
       if (s.tabs.some((t) => t.id === id)) return activate(s, id)
       const tab: CILogTab = { id, kind: 'cilog', root, runId, jobId, title, dirty: false }
+      return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
+    }),
+
+  openContributed: (view, key, title, data = null) =>
+    set((s) => {
+      const id = `contrib:${view}:${key}`
+      const tab: ContributedTab = { id, kind: 'contrib', view, title, data, dirty: false }
+      if (s.tabs.some((t) => t.id === id)) return { tabs: s.tabs.map((t) => (t.id === id ? tab : t)), ...activate(s, id) }
       return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
     }),
 

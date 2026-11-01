@@ -33,7 +33,9 @@ func newMCP(a *App) (*mcpserver.Server, *mcptools.Sources) {
 		return kc, nil
 	}
 	server := mcpserver.New(mcpserver.Options{
-		Tools:        func() []mcpserver.Tool { return sources.Tools(mcpToolConfig(a.currentSettings().MCPServer)) },
+		Tools: func() []mcpserver.Tool {
+			return append(sources.Tools(mcpToolConfig(a.currentSettings().MCPServer)), a.features.AgentTools()...)
+		},
 		Allow:        a.allowMCP,
 		Version:      diag.Version(version),
 		Instructions: mcptools.Instructions,

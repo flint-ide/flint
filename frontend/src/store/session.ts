@@ -97,6 +97,8 @@ async function captureTab(t: Tab, roots: string[]): Promise<SavedTab | null> {
       return null // pull requests and CI logs are fetched from GitHub when opened
     case 'merge':
       return null // conflicts are reopened from the Commit panel
+    case 'contrib':
+      return null // a feature's view may not exist next time; it reopens its tabs itself
   }
 }
 

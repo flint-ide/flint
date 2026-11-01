@@ -1,7 +1,7 @@
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
 import { effectiveKeys, getCommand, formatKeys } from '../../lib/commands'
-import { PANELS } from '../../panels'
+import { usePanels } from '../../panels'
 import { isPanelAvailable, panelTooltip, type PanelSpec } from '../../panels/registry'
 import { Icon } from '../ui/Icon'
 
@@ -17,10 +17,11 @@ export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {
   const visible = useWorkspace((s) => s.sidebarVisible)
   const setSidebar = useWorkspace((s) => s.setSidebar)
   const toggleSidebar = useWorkspace((s) => s.toggleSidebar)
+  const panels = usePanels()
 
   return (
     <nav className="activity-bar">
-      {PANELS.filter(isPanelAvailable).map((v) => (
+      {panels.filter(isPanelAvailable).map((v) => (
         <button
           key={v.id}
           className={`activity${visible && sidebar === v.id ? ' active' : ''}`}

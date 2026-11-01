@@ -12,7 +12,6 @@ import * as DatabaseAPI from "./databaseapi.js";
 import * as DebugAPI from "./debugapi.js";
 import * as DiagnosticsAPI from "./diagnosticsapi.js";
 import * as DiffAPI from "./diffapi.js";
-import * as DockerAPI from "./dockerapi.js";
 import * as EditorContextAPI from "./editorcontextapi.js";
 import * as GitAPI from "./gitapi.js";
 import * as GitHubAPI from "./githubapi.js";
@@ -30,8 +29,6 @@ import * as SessionAPI from "./sessionapi.js";
 import * as SettingsAPI from "./settingsapi.js";
 import * as TaskAPI from "./taskapi.js";
 import * as TerminalAPI from "./terminalapi.js";
-import * as TodoAPI from "./todoapi.js";
-import * as UpdateAPI from "./updateapi.js";
 import * as UsageAPI from "./usageapi.js";
 import * as WorkspaceAPI from "./workspaceapi.js";
 export {
@@ -46,7 +43,6 @@ export {
     DebugAPI,
     DiagnosticsAPI,
     DiffAPI,
-    DockerAPI,
     EditorContextAPI,
     GitAPI,
     GitHubAPI,
@@ -64,8 +60,6 @@ export {
     SettingsAPI,
     TaskAPI,
     TerminalAPI,
-    TodoAPI,
-    UpdateAPI,
     UsageAPI,
     WorkspaceAPI
 };
@@ -79,7 +73,6 @@ export {
     CILog,
     CIReport,
     Collected,
-    DockerOverview,
     FileHistory,
     MergeResult,
     NewTask,

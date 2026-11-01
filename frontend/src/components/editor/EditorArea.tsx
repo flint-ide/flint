@@ -1,5 +1,7 @@
 import { Suspense, lazy, memo, useLayoutEffect } from 'react'
-import { useEditor, type FileTab, type Tab } from '../../store/editor'
+import { useEditor, type ContributedTab, type FileTab, type Tab } from '../../store/editor'
+import { useContributions } from '../../lib/contributions'
+import { Icon } from '../ui/Icon'
 import { usePreview } from '../../store/preview'
 import { isImage } from '../../lib/previewFiles'
 import { confirmAction } from '../../store/dialog'
@@ -166,6 +168,7 @@ const TabPanel = memo(function TabPanel({ tab, active }: { tab: Tab; active: boo
           {tab.kind === 'pr' && <PullRequestView tab={tab} active={active} />}
           {tab.kind === 'prdiff' && <PullRequestDiffView tab={tab} active={active} />}
           {tab.kind === 'cilog' && <CILogView tab={tab} />}
+          {tab.kind === 'contrib' && <ContributedTabView tab={tab} active={active} />}
         </Suspense>
       </ErrorBoundary>
     </div>
@@ -182,6 +185,18 @@ function FileOrImage({ tab, active }: { tab: FileTab; active: boolean }) {
 function TerminalTabView({ termId, active }: { termId: string; active: boolean }) {
   const tab = useTerminal((s) => s.tabs.find((t) => t.id === termId))
   return tab ? <TerminalView tab={tab} active={active} /> : null
+}
+
+/** A tab of a kind a feature contributed; its view may be gone (an extension that stopped). */
+function ContributedTabView({ tab, active }: { tab: ContributedTab; active: boolean }) {
+  const kind = useContributions((s) => s.tabKinds.find((k) => k.id === tab.view))
+  if (!kind) return <p className="muted empty">{tab.title} is not available.</p>
+  return <kind.component tab={tab} active={active} />
+}
+
+function ContributedTabIcon({ view }: { view: string }) {
+  const icon = useContributions((s) => s.tabKinds.find((k) => k.id === view)?.icon)
+  return icon ? <Icon name={icon} /> : null
 }
 
 function ChatTabView({ sessionId, active }: { sessionId: string; active: boolean }) {
@@ -209,6 +224,8 @@ function TabIcon({ tab, debugActive }: { tab: Tab; debugActive: boolean }) {
       return <TabKindIcon kind={tab.kind === 'pr' ? 'pr' : 'diff'} />
     case 'cilog':
       return <TabKindIcon kind="run" />
+    case 'contrib':
+      return <ContributedTabIcon view={tab.view} />
     default:
       return <TabKindIcon kind={tab.kind} busy={false} />
   }

@@ -15,7 +15,7 @@ import {
 } from '../../store/terminal'
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
-import * as DockerBackend from '../../../bindings/flint/dockerapi'
+import * as DockerBackend from '../../../bindings/flint/internal/features/docker/api'
 import { findPathLinks, resolvePath } from '../../lib/pathLinks'
 import { showToast } from '../../store/dialog'
 import { errorMessage } from '../../api/backend'

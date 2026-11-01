@@ -98,6 +98,39 @@ You never have to accept diffs one by one. Edits are applied directly, show up i
 - **✦ Generate message** in the Commit panel gives the agent the diff of the ticked files and your recent commit messages. The result lands in the message field for you to edit.
 - **Resolve with claude** (or your default agent, when it is Claude Code or Codex) appears when there are merge conflicts. It opens an interactive agent session in a new terminal. The agent runs `git add` on resolved files but doesn't commit.
 
+## Agent tasks: agents in parallel
+
+An agent task gives an agent its own branch in its own [git worktree](git-and-github.md), so several agents can work at once without touching each other's files or yours.
+
+1. Run "New Agent Task…" from the command palette (`⇧⌘P`), or click `＋` in the **Agent Tasks** panel (`⑂` on the activity bar).
+2. Describe the task. Its first line names the branch: "Add rate limiting" becomes `agent/add-rate-limiting` (`-2`, `-3`… when the name is taken).
+3. Pick the agent (the default agent is preselected; Claude Code, Codex or a custom agent) and the branch to start from (the current one by default), then click **Start** (`⌘↵`).
+
+Flint creates the branch and the worktree (by default in `<repository>.worktrees/` next to your checkout, like **New Worktree…** in the branch widget), attaches the folder to the window as another project, opens a chat there and sends your description as the first message. Nothing else is added to it.
+
+The panel lists the tasks of every repository open in the window, newest first. Each row shows:
+
+| What | Meaning |
+|---|---|
+| State | **working**, **waiting for you** (the agent asks for approval in its chat), **finished** (the turn ended: review it), **failed** (the error is shown under the row) or **idle**. It follows the chat's own events; nothing polls. |
+| Branch | The task's branch, and **↑N** for the commits its base doesn't have yet. |
+| Changes | Files changed since the branch left its base, committed or not, new files included, with added and removed lines (**merged** once its base has every commit). Refreshed when files or Git change. |
+
+The actions:
+
+- **Open** shows the task's folder and its chat (a new chat if you closed it).
+- **Show diff** lists the changed files; click one for a side-by-side diff against the point where the branch started.
+- **✦ Ask agent** (failed tasks) puts the error into the task's chat draft, so you can add a hint and send it.
+- **Merge** merges the branch into its base, in the checkout where the base is checked out. Flint refuses while the task or that checkout has uncommitted changes, or while the agent is working. When the merge would conflict, nothing is changed: Flint offers to merge the base into the task's branch instead and let an agent resolve the conflicts there, in a terminal (as **Resolve with claude** does); then merge again.
+- **Create PR** pushes the branch and creates a pull request into its base with `gh`, titled with the task's first line and described by its text. Flint asks first, because it publishes the branch. **PR ↗** opens it afterwards.
+- **✕** removes the task: it stops the task's chats, closes its folder and deletes the worktree. Uncommitted work and a branch with commits its base doesn't have are deleted only if you confirm; otherwise the branch is kept.
+
+Tasks are remembered per repository in `state.json`, so they survive a restart. A task whose worktree folder was deleted outside Flint shows as **stale** and can only be removed.
+
+In [Restricted Mode](restricted-mode.md), a task's worktree is trusted when the checkout it started from is trusted (it holds the same repository's commits); otherwise it stays restricted like any new folder. Removing the task removes that trust again.
+
+The worktree folder and the branch prefix are settings (Settings ▸ Agents ▸ Agent tasks; [`agentTasks`](../reference/settings.md#agenttasks) in `settings.json`).
+
 ## Notifications
 
 When an agent turn finishes while Flint isn't the active app, you get a macOS notification (click it to jump to the chat) and a badge on the Dock icon. Turn this off in Settings ▸ Agents.

@@ -59,7 +59,8 @@ The file is readable only by your user. It never contains secrets: database pass
     "python": { "disabled": false, "command": "pylsp", "args": [] },
     "rust": { "disabled": true, "command": "", "args": [] }
   },
-  "refresh": { "kubernetesSeconds": 10, "awsSeconds": 60 }
+  "refresh": { "kubernetesSeconds": 10, "awsSeconds": 60 },
+  "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/" }
 }
 ```
 
@@ -81,6 +82,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `customAgents` | array | `[]` | Other agents, spoken to over the Agent Client Protocol. See [customAgents](#customagents). |
 | `languageServers` | object | `{}` | Language servers by language (`"go"`, `"typescript"`, `"python"`, `"rust"`). See [languageServers](#languageservers). |
 | `refresh` | object | see below | How often polling panels re-read their data. See [refresh](#refresh). |
+| `agentTasks` | object | see below | Where agent task worktrees go and how their branches are named. See [agentTasks](#agenttasks). |
 
 ### Font objects
 
@@ -180,11 +182,22 @@ A change made in the Settings tab restarts that language's servers. Servers that
 
 Git status, Docker and pull requests don't poll: they follow change events, and pull requests reload when the window regains focus.
 
+### agentTasks
+
+Used by [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel).
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `worktreeDir` | string | `""` | Folder for task worktrees, which go to `<worktreeDir>/<repository>/<branch>`. An absolute path or one starting with `~/`, up to 1024 characters. Empty puts them in `<repository>.worktrees/<branch>` next to the main checkout, like **New Worktree…** in the branch widget. |
+| `branchPrefix` | string | `"agent/"` | Starts every task branch, followed by a name made from the task's first line. Letters, digits, `.`, `_`, `-` and `/`, up to 40 characters; may be empty. It may not start with `-`, `/` or `.`, or contain `..`, `//` or `/.`. |
+
+Slashes in a branch name become dashes in the folder name. The tasks themselves are kept in `state.json`.
+
 ## Related settings stored elsewhere
 
 Some preferences are not in `settings.json`:
 
-- Recent folders, the agent approval policy, trusted folders and the update check's last result (including a skipped version) are in `state.json`.
+- Recent folders, the agent approval policy, trusted folders, agent tasks and the update check's last result (including a skipped version) are in `state.json`.
 - The sidebar width is kept by the app's web view.
 - The selected HTTP environment is remembered only until Flint quits.
 

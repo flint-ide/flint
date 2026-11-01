@@ -51,7 +51,7 @@ flowchart LR
   end
 
   UI -- "method calls (Wails bindings)" --> GO
-  GO -- "events: term:data · agent:event · run:event · debug:event · search:batch<br/>fs:changed · git:changed · lsp:diagnostics" --> UI
+  GO -- "events: term:data · agent:event · run:event · debug:event · search:batch<br/>fs:changed · git:changed · lsp:diagnostics · tasks:changed" --> UI
   srch & git & gh & lsp --> bins
   ag --> agents
   term --> shell

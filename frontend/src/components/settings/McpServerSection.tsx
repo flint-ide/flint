@@ -5,9 +5,9 @@ import { NumberField, Row } from './fields'
 const TOOLS: { key: McpToolKey; label: string; hint: string }[] = [
   { key: 'diagnostics', label: 'Diagnostics', hint: 'Errors and warnings from the language servers.' },
   { key: 'editor', label: 'Open editors and selection', hint: 'Which files are open, the active one, and the selected text.' },
-  { key: 'terminals', label: 'Terminal output', hint: 'Recent output of terminals and run consoles, without colors.' },
+  { key: 'terminals', label: 'Terminal output', hint: 'Recent output printed in the project by terminals and run consoles. Off by default; the agent asks before each call.' },
   { key: 'tests', label: 'Test results', hint: 'The last test run: totals and failed tests with their output.' },
-  { key: 'kubernetes', label: 'Kubernetes status', hint: 'Failing apps, pods and warning events of the current context. No secrets or logs.' },
+  { key: 'kubernetes', label: 'Kubernetes status', hint: 'Failing apps, pods and warning events of the current context. No secrets or logs. Off by default; the agent asks before each call.' },
 ]
 
 /** Settings ▸ Agent Context: Flint's own MCP server for the agents it starts. */
@@ -41,9 +41,9 @@ export function McpServerSection() {
         </button>
       </div>
       <p className="muted settings-note">
-        Flint serves these tools on 127.0.0.1 only, with a separate token per project: an agent sees only its own project. Answers are bounded and
-        credentials are redacted. Folders in Restricted Mode get no access. Turning the server or a tool off applies at once; new chats stop getting
-        the server. Commit messages and other one-shot runs don't use it.
+        Flint serves these tools on 127.0.0.1 only, with a separate token per chat that ends with the chat: an agent sees only its own project.
+        Answers are bounded and credentials are redacted. Folders in Restricted Mode get no access. Turning the server or a tool off applies at
+        once. Commit messages and other one-shot runs don't use it.
       </p>
     </section>
   )

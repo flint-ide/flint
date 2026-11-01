@@ -100,6 +100,8 @@ func TestCleanReplacement(t *testing.T) {
 		{"unclosed fence", "```go\nreturn nil", "x", "return nil"},
 		{"longer fence around inner fence", "````md\n```go\nx\n```\n````", "x", "```go\nx\n```"},
 		{"markdown selection keeps inner fences", "Intro\n\n```go\nx\n```", "Intro\n\n```sh\ny\n```", "Intro\n\n```go\nx\n```"},
+		{"selection starting with a fence keeps the prose after it", "```go\ny()\n```\n\nSome prose.", "```go\nx()\n```\n\nProse.", "```go\ny()\n```\n\nSome prose."},
+		{"selection starting with a fence, answer wrapped in a longer one", "````md\n```go\ny()\n```\nprose\n````", "```go\nx()\n```\nprose", "```go\ny()\n```\nprose"},
 		{"markers echoed", selectionStart + "\nfoo()\n" + selectionEnd, "x", "foo()"},
 		{"crlf", "```go\r\na\r\nb\r\n```\r\n", "x", "a\nb"},
 		{"empty", "  \n", "x", ""},

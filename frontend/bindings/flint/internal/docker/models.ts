@@ -43,7 +43,7 @@ export class ComposeProject {
 }
 
 /**
- * Container is one row of `docker ps -a`.
+ * Container is one row of the panel.
  */
 export class Container {
     "id": string;

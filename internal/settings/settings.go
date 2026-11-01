@@ -121,6 +121,8 @@ type Settings struct {
 	AgentReview AgentReview `json:"agentReview"`
 	// CI configures following your pull requests' checks (ci.go).
 	CI CI `json:"ci"`
+	// Docker configures how the Docker panel reaches the engine (docker.go).
+	Docker Docker `json:"docker"`
 }
 
 // Default returns the settings Flint uses when nothing is configured.
@@ -155,6 +157,7 @@ func Default() Settings {
 		Prompts:            defaultPrompts(),
 		AgentReview:        defaultAgentReview(),
 		CI:                 defaultCI(),
+		Docker:             defaultDocker(),
 		CustomTheme:        defaultCustomTheme(),
 	}
 }
@@ -227,6 +230,7 @@ func Normalize(s Settings) Settings {
 	out.Usage = normalizeUsage(s.Usage)
 	out.AgentReview = normalizeAgentReview(s.AgentReview, out.CustomAgents)
 	out.CI = normalizeCI(s.CI)
+	out.Docker = normalizeDocker(s.Docker)
 	return out
 }
 
@@ -324,6 +328,9 @@ func Validate(s Settings) error {
 		return err
 	}
 	if err := CheckCI(s.CI); err != nil {
+		return err
+	}
+	if err := CheckDocker(s.Docker); err != nil {
 		return err
 	}
 	return validateRefresh(s.Refresh)

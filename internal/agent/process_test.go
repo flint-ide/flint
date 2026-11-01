@@ -62,3 +62,28 @@ func waitForPID(t *testing.T, path string) int {
 	t.Fatal("the fake agent never started its child")
 	return 0
 }
+
+// A run that answers and exits must not leave its children behind either, and
+// a child that keeps stdout open must not turn the answer into an error.
+func TestHeadlessSuccessKillsLeftoverChildren(t *testing.T) {
+	dir := t.TempDir()
+	pidFile := filepath.Join(dir, "child.pid")
+	script := filepath.Join(dir, "claude")
+	body := "#!/bin/sh\ncat > /dev/null\nsleep 300 &\necho $! > " + pidFile + "\necho the answer\n"
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Headless(context.Background(), Claude, Config{Path: script}, dir, "hi", "", false)
+	if err != nil || got != "the answer" {
+		t.Fatalf("Headless = %q, %v; want the answer", got, err)
+	}
+	child := waitForPID(t, pidFile)
+	deadline := time.Now().Add(5 * time.Second)
+	for syscall.Kill(child, 0) == nil {
+		if time.Now().After(deadline) {
+			_ = syscall.Kill(child, syscall.SIGKILL)
+			t.Fatal("the agent's child outlived a finished run")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}

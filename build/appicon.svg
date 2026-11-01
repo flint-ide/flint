@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- macOS icon grid: the tile is 824 px inside the 1024 px canvas -->
+  <g transform="translate(100 100) scale(0.8046875)">
+  <rect width="1024" height="1024" rx="224" fill="#18191c"/>
+  <g stroke="#18191c" stroke-width="12" stroke-linejoin="round">
+    <path d="M290 430 L470 250 L710 300 L790 530 L650 780 L380 790 L240 610Z" fill="#6b6f7a"/>
+    <path d="M470 250 L710 300 L565 480Z" fill="#9a9ea8"/>
+    <path d="M290 430 L470 250 L565 480Z" fill="#82868f"/>
+    <path d="M565 480 L710 300 L790 530Z" fill="#5d6069"/>
+    <path d="M240 610 L290 430 L565 480 L380 790Z" fill="#6f737c"/>
+    <path d="M565 480 L790 530 L650 780 L380 790Z" fill="#4b4e56"/>
+  </g>
+  <path d="M730 190 C740 270 768 298 848 308 C768 318 740 346 730 426 C720 346 692 318 612 308 C692 298 720 270 730 190Z" fill="#f59e0b"/>
+  </g>
+</svg>

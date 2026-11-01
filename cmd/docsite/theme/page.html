@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>{{.Page.Title}} · Flint</title>
+<link rel="icon" href="{{.Root}}assets/logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="{{.Root}}assets/style.css">
 <script src="{{.Root}}assets/theme.js"></script>
 <script defer src="{{.Root}}assets/search.js" data-root="{{.Root}}"></script>
@@ -12,7 +13,7 @@
 <body>
 <header class="topbar">
   <button class="menu" aria-label="Menu" aria-controls="sidebar" aria-expanded="false">☰</button>
-  <a class="brand" href="{{.Root}}index.html"><span class="logo">◆</span> Flint <span class="muted">docs</span></a>
+  <a class="brand" href="{{.Root}}index.html"><img class="logo" src="{{.Root}}assets/logo.svg" alt="" width="20" height="20"> Flint <span class="muted">docs</span></a>
   <div class="search">
     <input id="search" type="search" placeholder="Search the docs  /" autocomplete="off" spellcheck="false" aria-label="Search the documentation">
     <ol id="results" class="results" hidden></ol>

@@ -59,7 +59,7 @@ func TestParseSince(t *testing.T) {
 func TestRedactEventLeavesTheOriginalAlone(t *testing.T) {
 	tc := &as.ToolCall{Input: "curl -H 'Authorization: Bearer abcdefghijklmnopqrstuvwxyz012345'", Paths: []string{"/x"}}
 	e := as.Event{Kind: as.KindPermission, Text: "AKIAABCDEFGHIJKLMNOP", ToolCall: tc, Permission: &as.PermissionRequest{ToolCall: *tc}, Plan: []as.PlanEntry{{Content: "AKIAABCDEFGHIJKLMNOP"}}}
-	r := redactEvent(e)
+	r := redactEvent(e, false)
 	b, _ := json.Marshal(r)
 	if strings.Contains(string(b), "AKIAABCDEFGHIJKLMNOP") || strings.Contains(string(b), "abcdefghijklmnopqrstuvwxyz012345") {
 		t.Fatalf("not redacted: %s", b)

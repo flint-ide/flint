@@ -7,23 +7,20 @@ import (
 	"flint/internal/redact"
 )
 
-// secretFileText replaces the content of a diff of a credentials file
-// (.env, keys): the phone sees that the file changed, not what is in it.
-const secretFileText = "[secret file: not shown remotely]"
-
 // redactEvent returns a copy of e with credentials and the home directory
-// taken out of every text a phone would see. e itself is not changed (the
+// taken out of every text a phone would see; secret withholds the input and
+// output of its tool call (secretcalls.go). e itself is not changed (the
 // desktop and the event log share it).
-func redactEvent(e as.Event) as.Event {
+func redactEvent(e as.Event, secret bool) as.Event {
 	out := e
 	out.Text = redact.String(e.Text)
 	if e.ToolCall != nil {
-		tc := redactToolCall(*e.ToolCall)
+		tc := redactToolCall(*e.ToolCall, secret)
 		out.ToolCall = &tc
 	}
 	if e.Permission != nil {
 		p := *e.Permission
-		p.ToolCall = redactToolCall(p.ToolCall)
+		p.ToolCall = redactToolCall(p.ToolCall, secret)
 		p.Options = slices.Clone(p.Options)
 		for i := range p.Options {
 			p.Options[i].Name = redact.String(p.Options[i].Name)
@@ -40,11 +37,19 @@ func redactEvent(e as.Event) as.Event {
 	return out
 }
 
-func redactToolCall(tc as.ToolCall) as.ToolCall {
+func redactToolCall(tc as.ToolCall, secret bool) as.ToolCall {
 	out := tc
 	out.Title = redact.String(tc.Title)
 	out.Input = redact.String(tc.Input)
 	out.Output = redact.String(tc.Output)
+	if secret {
+		if tc.Input != "" {
+			out.Input = secretFileText
+		}
+		if tc.Output != "" {
+			out.Output = secretFileText
+		}
+	}
 	if tc.Paths != nil {
 		out.Paths = make([]string, len(tc.Paths))
 		for i, p := range tc.Paths {

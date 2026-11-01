@@ -96,6 +96,37 @@ func TestRevokeAllRaceLeavesNoStreamOpen(t *testing.T) {
 	}
 }
 
+// A client reconnecting after a call's start (since) still gets its update
+// from a credentials file withheld: the stream reads the start from the log.
+func TestSecretFileOutputIsWithheldAfterAReconnect(t *testing.T) {
+	e := newEnv(t, 600)
+	e.world.chats = []remote.Chat{{ID: "c1"}}
+	e.world.events["c1"] = []as.Event{
+		{SessionID: "c1", Seq: 1, Kind: as.KindToolCall, ToolCall: &as.ToolCall{ID: "t1", Kind: as.ToolRead, Paths: []string{"/p/.env"}}},
+		{SessionID: "c1", Seq: 2, Kind: as.KindToolCallUpdate, ToolCall: &as.ToolCall{ID: "t1", Output: "DB_PASS=hunter2"}},
+	}
+	c := e.pair(t, "phone")
+	s, err := c.Stream(context.Background(), map[string]uint64{"c1": 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	var got []as.Event
+	for _, m := range collect(t, s) {
+		if m.Type == "agent" {
+			got = append(got, *m.Event)
+		}
+	}
+	if len(got) != 1 || got[0].Seq != 2 || strings.Contains(got[0].ToolCall.Output, "hunter2") {
+		t.Fatalf("replayed %+v", got)
+	}
+	// Live too.
+	e.srv.AgentEvent(as.Event{SessionID: "c1", Seq: 3, Kind: as.KindToolCallUpdate, ToolCall: &as.ToolCall{ID: "t1", Output: "STRIPE=rk_live_51Habcdefghijklmnop"}})
+	if m := next(t, s, "agent"); strings.Contains(m.Event.ToolCall.Output, "rk_live") {
+		t.Fatalf("live update leaked %q", m.Event.ToolCall.Output)
+	}
+}
+
 // openRaw opens a stream with a hand-written handshake (a Host the client
 // couldn't dial) and returns the connection after the 101.
 func openRaw(t *testing.T, e *env, token, host string) (net.Conn, *bufio.Reader) {

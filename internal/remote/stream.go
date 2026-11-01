@@ -169,9 +169,10 @@ func (s *Server) handleStream(w *statusRecorder, r *http.Request, dev Device) {
 
 // streamState tracks what one stream has sent.
 type streamState struct {
-	ctx  context.Context
-	ws   *wsConn
-	sent map[string]uint64 // chat → last Seq sent
+	ctx   context.Context
+	ws    *wsConn
+	sent  map[string]uint64 // chat → last Seq sent
+	calls *secretCalls      // which tool calls touch credentials files
 }
 
 func (st *streamState) send(m StreamMessage) error {
@@ -197,11 +198,14 @@ func (st *streamState) send(m StreamMessage) error {
 }
 
 func (st *streamState) agent(e as.Event) error {
+	// Observed even when not sent: a call the client already has may get
+	// its output (from a credentials file) in a later update.
+	secret := st.calls.observe(e)
 	if e.Seq <= st.sent[e.SessionID] {
-		return nil // already replayed
+		return nil // already replayed, or the client had it (since)
 	}
 	st.sent[e.SessionID] = e.Seq
-	re := redactEvent(e)
+	re := redactEvent(e, secret)
 	return st.send(StreamMessage{Type: "agent", Event: &re})
 }
 
@@ -228,7 +232,7 @@ func (s *Server) runStream(ctx context.Context, ws *wsConn, sub *subscriber, sin
 	stopHurry := context.AfterFunc(ctx, ws.hurry)
 	defer stopHurry()
 
-	st := &streamState{ctx: ctx, ws: ws, sent: map[string]uint64{}}
+	st := &streamState{ctx: ctx, ws: ws, sent: map[string]uint64{}, calls: newSecretCalls()}
 	if err := s.replay(st, since); err != nil {
 		if ctx.Err() != nil {
 			closeFor(ws, context.Cause(ctx))
@@ -284,9 +288,13 @@ func (s *Server) replay(st *streamState, since map[string]uint64) error {
 	for _, c := range chats {
 		after := since[c.ID]
 		st.sent[c.ID] = after
-		events, gap := s.opts.Replay(c.ID, after)
-		if gap != nil {
-			if err := st.send(StreamMessage{Type: "gap", Gap: gap}); err != nil {
+		// From the start of the log: the events the client already has are
+		// observed (which calls touch credentials files), not sent.
+		events, gap := s.opts.Replay(c.ID, 0)
+		if gap != nil && gap.To > after {
+			g := *gap
+			g.From = max(g.From, after+1)
+			if err := st.send(StreamMessage{Type: "gap", Gap: &g}); err != nil {
 				return err
 			}
 		}

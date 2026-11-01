@@ -225,6 +225,9 @@ func (s *AccountsAPI) ImportGitHubCLI() (accounts.Account, error) {
 	if err != nil {
 		return accounts.Account{}, err
 	}
+	if _, dev, _ := s.app.githubEndpoints(); dev {
+		return accounts.Account{}, errors.New("the GitHub CLI's token is never sent to a local fake GitHub")
+	}
 	host := p.Host()
 	msg := fmt.Sprintf("Flint will run `gh auth token` once to read the GitHub CLI's token for %s, check it with GitHub and keep it in the system keyring. "+
 		"It is sent only to %s, never shown in Flint.", host, host)

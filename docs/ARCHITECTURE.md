@@ -151,9 +151,18 @@ Measured with `cmd/bench` (see [BENCHMARK.md](BENCHMARK.md)). What did not help,
 
 The registry in `src/lib/commands.ts` (`registerCommand({ id, title, category, keys, when, run })`) feeds the `⇧⌘P` palette and the only global `keydown` listener (capture phase, ahead of CodeMirror and xterm). Shortcuts owned by the editor (for example `⌘B`, `⌘S`) are only displayed by the palette, which runs them through the active editor's keymap.
 
+### Feature modules
+
+A feature that is more than a panel (a backend service, settings, a tool, a Settings page, a status item) is a **feature module**: one Go package in `internal/features/<id>` and one directory in `frontend/src/features/<id>`, listed once in `features.go` and once in `frontend/src/features/index.ts`. The module declares everything it adds, and the registries take it from there:
+
+- Go (`internal/feature`): a `Module` with its settings sections (`settings.Section[T]`, keys in the same flat `settings.json`), external tools (`tools.Register`), `state.json` keys, and a `New(Host)` that returns its Wails services, MCP tools for agents and `Start` / `Close` hooks. `Host` is the module's only view of `App`.
+- Frontend (`lib/features.ts`): a `FeatureModule` with settings sections (typed by augmenting `FeatureSettings` in `lib/settingsSections.ts`), panels, commands, Settings pages, status items, tab kinds and file-tree menu entries. `features/install.ts` registers the data before the first render and the commands and `activate` hooks after Flint's own commands. `lib/contributions.ts` holds what was contributed, by source, so a source can be withdrawn later (external extensions).
+
+Docker, the TODO list and the release check are modules; the design, the list of features still to migrate and the plan for external extensions are in [design/extensions.md](design/extensions.md). How to add one: [Add a feature](DEVELOPMENT.md#add-a-feature).
+
 ### Sidebar panels
 
-`src/panels/index.ts` lists the sidebar panels; the activity bar, the sidebar, the `SidebarView` type and one palette command per panel are derived from that list (`src/panels/registry.ts`). To add a panel:
+`src/panels/index.ts` lists Flint's own sidebar panels, and feature modules contribute theirs (`panels` in `lib/features.ts`). The activity bar, the sidebar and one palette command per panel are derived from both lists, merged by `order` (`usePanels`, `src/panels/registry.ts`). To add a panel without a module:
 
 1. Write the component (for example `components/sidebar/GcpPanel.tsx`). It receives `focusToken`, which `focusPanel(id)` bumps when a command asks the panel to focus its input.
 2. Add one entry to `PANELS`: `{ id: 'gcp', title: 'Google Cloud', icon: '◇', order: 95, component: GcpPanel }`. Wrap the component in `React.lazy` unless it is small, so its code is fetched on first open rather than at startup.
@@ -276,7 +285,7 @@ Flint drives many CLIs (git, docker compose, kubectl, aws, saml2aws, claude, cod
 
 ### Network requests Flint makes on its own
 
-Every other connection is the result of a user action or of a CLI the user runs, and GitHub's API is only called while a view needs it, plus CI polls (conditional requests) while a check of a followed pull request runs. The one exception is the update check (`internal/update`, `api_update.go`): an anonymous `GET https://api.github.com/repos/flint-ide/flint/releases/latest` (no token, no cookie jar, `User-Agent: Flint/<version>`, 10 s timeout, 1 MB body limit, redirects only within the same host), a few seconds after launch and then at most once per 24 hours, only in release builds and only while the `checkForUpdates` setting is on. The response is treated as untrusted: the tag must be a SemVer version, the title is stripped of control characters and capped, and the release link is opened only if it is an `https://github.com/flint-ide/flint/` URL (otherwise the releases page). The browser is opened from Go (`UpdateAPI.OpenRelease`), so the UI cannot pass it a URL. Flint never downloads or installs a release.
+Every other connection is the result of a user action or of a CLI the user runs, and GitHub's API is only called while a view needs it, plus CI polls (conditional requests) while a check of a followed pull request runs. The one exception is the update check (`internal/update`, `internal/features/update`): an anonymous `GET https://api.github.com/repos/flint-ide/flint/releases/latest` (no token, no cookie jar, `User-Agent: Flint/<version>`, 10 s timeout, 1 MB body limit, redirects only within the same host), a few seconds after launch and then at most once per 24 hours, only in release builds and only while the `checkForUpdates` setting is on. The response is treated as untrusted: the tag must be a SemVer version, the title is stripped of control characters and capped, and the release link is opened only if it is an `https://github.com/flint-ide/flint/` URL (otherwise the releases page). The browser is opened from Go (the update feature's `API.OpenRelease`), so the UI cannot pass it a URL. Flint never downloads or installs a release.
 
 ### Redaction
 
@@ -331,7 +340,10 @@ The `~/Library/Application Support/flint` directory can be changed with the `FLI
 
 ```
 main.go, app.go, api_*.go   Wails services (thin layer over internal/*)
+features.go                 the feature modules list and the Host they get from App
 menu.go, wails_app.go       application menu, window and event wiring
+internal/feature            the feature-module contract: Module, Instance, Host; featuretest: a fake Host
+internal/features/<id>      feature modules: docker, todo, update (service, settings sections, tools, hooks)
 cmd/webbuild                frontend bundler (esbuild Go API), --watch, --test, CSP
 build/                      Wails config (config.yml), Info.plist, app icon
 scripts/flint               the `flint [folder]` command installed by `make install`
@@ -349,7 +361,7 @@ internal/db                 connection profiles, Keychain, pgx/clickhouse, type 
                             EXPLAIN (Postgres plan parser, warnings), row editing by primary key
 internal/scratch            persistent scratchpads
 internal/config             on-disk locations, atomic JSON writes
-internal/settings           settings.json: settings, defaults, validation, schema version, custom theme
+internal/settings           settings.json: settings, defaults, validation, schema version, custom theme, sections features own
 internal/vscodeimport       Import from VS Code / Cursor / VSCodium: JSONC, settings, keybindings and color theme
                             mapped onto settings (read-only; ImportAPI previews, then saves through settings)
 internal/terminal           PTY, output coalescing, shell cwd (proc_pidinfo); stream-backed sessions (Docker logs and container shells)
@@ -369,7 +381,7 @@ internal/docker             Docker Engine API (unix socket or TLS): endpoint dis
 internal/awsprof            AWS CLI profiles, credential status, login and refresh
 internal/kube               kubectl: contexts, namespaces, resources, apps, rollout state, diagnosis
 internal/diag               Flint's log file, bug report and diagnostics
-internal/tools              external tools Flint drives: one table (feature, install command, docs) and the installed-version check
+internal/tools              external tools Flint drives: one table (feature, install command, docs; features register theirs) and the installed-version check
 internal/update             new-release check: GitHub's latest-release API (net/http), SemVer compare, link allow-list
 internal/redact             removes credentials and the home path from logs, reports and agent context
 internal/prompts            prompt library: Markdown prompts (project, personal, built-in), front matter, placeholders
@@ -384,7 +396,8 @@ internal/agentsession       shared agent event model, approval policy, session m
 internal/usage              agent usage per day × project × agent × model × task (usage.json), budgets, CSV
 frontend/bindings           generated TypeScript bindings of the Go services (do not edit)
 frontend/src/wails          compatibility layer over the bindings and the Wails runtime
-frontend/src                React: store (createStore + event bus), components, lib, commands, panels (sidebar registry)
+frontend/src                React: store (createStore + event bus), components, lib, commands, panels (sidebar registry),
+                            features (feature modules: docker, todo, update; install.ts hands them to the registries)
 ```
 
 For data storage details see [Where Flint stores data](#where-flint-stores-data).

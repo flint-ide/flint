@@ -29,11 +29,12 @@ The simplest design that works is the easiest to secure, review and change.
 Adding a language, an agent, a panel, a database or a run type should mean adding one unit, not editing a dozen files.
 
 - Features register themselves in a registry (commands and shortcuts in `lib/commands.ts`, sidebar panels in `panels/index.ts`, agent drivers, LSP server specs, run-configuration detectors) instead of being listed in several places.
+- A feature with its own backend, settings or tools is a feature module: a package in `internal/features/<id>` and a directory in `frontend/src/features/<id>`, listed once on each side. It declares its settings keys, tools, services, lifecycle hooks, panels, commands, Settings pages and status items as data, so unrelated features never edit the same file ([design/extensions.md](design/extensions.md), [Add a feature](DEVELOPMENT.md#add-a-feature)). External extensions will map onto the same contribution points.
 - Backends talk to the UI through Wails services and events with stable, typed contracts (generated bindings).
 - A new external tool is a package under `internal/` with a narrow API, validated inputs and its own tests.
 - What differs per operating system lives behind one small API with a file per system (`_darwin.go`, `_linux.go`, and an `_other.go` fallback that says honestly what isn't supported) and, in the UI, in `lib/platform.ts`; feature code doesn't branch on the system or hard-code ⌘ (see [Platforms](ARCHITECTURE.md#platforms)).
 
-**In practice:** a contributor should be able to add a feature by reading one existing feature of the same kind.
+**In practice:** a contributor should be able to add a feature by reading one existing feature of the same kind; for a feature module, copy `docker`, `todo` or `update`.
 
 ## 4. AI-first
 

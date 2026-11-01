@@ -290,6 +290,209 @@ export class Commit {
 }
 
 /**
+ * ConflictBlock is one conflict as git writes it into a file: the current side
+ * (ours), the base (only with merge.conflictStyle diff3 / zdiff3) and the incoming
+ * side (theirs). Each side keeps its line endings.
+ */
+export class ConflictBlock {
+    "current": string;
+    "base": string;
+    "hasBase": boolean;
+    "incoming": string;
+
+    /** Creates a new ConflictBlock instance. */
+    constructor($$source: Partial<ConflictBlock> = {}) {
+        if (!("current" in $$source)) {
+            this["current"] = "";
+        }
+        if (!("base" in $$source)) {
+            this["base"] = "";
+        }
+        if (!("hasBase" in $$source)) {
+            this["hasBase"] = false;
+        }
+        if (!("incoming" in $$source)) {
+            this["incoming"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ConflictBlock instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ConflictBlock {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ConflictBlock($$parsedSource as Partial<ConflictBlock>);
+    }
+}
+
+/**
+ * ConflictFile is everything the merge editor needs for one conflicted file.
+ */
+export class ConflictFile {
+    /**
+     * Base, Current and Incoming are index stages 1, 2 and 3 (base, ours, theirs).
+     * A side that is missing (added on both sides, deleted on one) has Exists false.
+     */
+    "base": Revision;
+    "current": Revision;
+    "incoming": Revision;
+
+    /**
+     * Working is the file in the work tree: git's merge with conflict markers, plus
+     * whatever the user or an agent changed since. Exists is false when it is missing
+     * or not a regular file.
+     */
+    "working": Revision;
+
+    /**
+     * Blocks are the conflicts of a fresh three-way merge of the stages, each with
+     * its base, so a block of the working file can be shown with the base it lacks
+     * (git's default conflict style leaves the base out).
+     */
+    "blocks": ConflictBlock[];
+    "sides": ConflictSides;
+
+    /** Creates a new ConflictFile instance. */
+    constructor($$source: Partial<ConflictFile> = {}) {
+        if (!("base" in $$source)) {
+            this["base"] = (new Revision());
+        }
+        if (!("current" in $$source)) {
+            this["current"] = (new Revision());
+        }
+        if (!("incoming" in $$source)) {
+            this["incoming"] = (new Revision());
+        }
+        if (!("working" in $$source)) {
+            this["working"] = (new Revision());
+        }
+        if (!("blocks" in $$source)) {
+            this["blocks"] = [];
+        }
+        if (!("sides" in $$source)) {
+            this["sides"] = (new ConflictSides());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ConflictFile instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ConflictFile {
+        const $$createField0_0 = $$createType5;
+        const $$createField1_0 = $$createType5;
+        const $$createField2_0 = $$createType5;
+        const $$createField3_0 = $$createType5;
+        const $$createField4_0 = $$createType7;
+        const $$createField5_0 = $$createType8;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("base" in $$parsedSource) {
+            $$parsedSource["base"] = $$createField0_0($$parsedSource["base"]);
+        }
+        if ("current" in $$parsedSource) {
+            $$parsedSource["current"] = $$createField1_0($$parsedSource["current"]);
+        }
+        if ("incoming" in $$parsedSource) {
+            $$parsedSource["incoming"] = $$createField2_0($$parsedSource["incoming"]);
+        }
+        if ("working" in $$parsedSource) {
+            $$parsedSource["working"] = $$createField3_0($$parsedSource["working"]);
+        }
+        if ("blocks" in $$parsedSource) {
+            $$parsedSource["blocks"] = $$createField4_0($$parsedSource["blocks"]);
+        }
+        if ("sides" in $$parsedSource) {
+            $$parsedSource["sides"] = $$createField5_0($$parsedSource["sides"]);
+        }
+        return new ConflictFile($$parsedSource as Partial<ConflictFile>);
+    }
+}
+
+/**
+ * ConflictSide names one side of a conflict for the merge editor.
+ */
+export class ConflictSide {
+    /**
+     * Label is short: a branch name or an abbreviated commit.
+     */
+    "label": string;
+
+    /**
+     * Detail says what the side is in this operation, in a sentence.
+     */
+    "detail": string;
+
+    /** Creates a new ConflictSide instance. */
+    constructor($$source: Partial<ConflictSide> = {}) {
+        if (!("label" in $$source)) {
+            this["label"] = "";
+        }
+        if (!("detail" in $$source)) {
+            this["detail"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ConflictSide instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ConflictSide {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ConflictSide($$parsedSource as Partial<ConflictSide>);
+    }
+}
+
+/**
+ * ConflictSides says what "current" (ours, index stage 2) and "incoming" (theirs,
+ * stage 3) are. They depend on the operation: in a rebase, current is the branch
+ * being rebased onto and incoming is the user's own commit being replayed.
+ */
+export class ConflictSides {
+    /**
+     * Operation as in Status ("merging", "rebasing", "cherry-picking", "reverting");
+     * "" when no operation is recorded, e.g. after git stash pop.
+     */
+    "operation": string;
+    "current": ConflictSide;
+    "incoming": ConflictSide;
+
+    /** Creates a new ConflictSides instance. */
+    constructor($$source: Partial<ConflictSides> = {}) {
+        if (!("operation" in $$source)) {
+            this["operation"] = "";
+        }
+        if (!("current" in $$source)) {
+            this["current"] = (new ConflictSide());
+        }
+        if (!("incoming" in $$source)) {
+            this["incoming"] = (new ConflictSide());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ConflictSides instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ConflictSides {
+        const $$createField1_0 = $$createType9;
+        const $$createField2_0 = $$createType9;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("current" in $$parsedSource) {
+            $$parsedSource["current"] = $$createField1_0($$parsedSource["current"]);
+        }
+        if ("incoming" in $$parsedSource) {
+            $$parsedSource["incoming"] = $$createField2_0($$parsedSource["incoming"]);
+        }
+        return new ConflictSides($$parsedSource as Partial<ConflictSides>);
+    }
+}
+
+/**
  * DiffStat summarises what the work tree changed since it forked from base.
  */
 export class DiffStat {
@@ -337,7 +540,7 @@ export class DiffStat {
      * Creates a new DiffStat instance from a string or object.
      */
     static createFrom($$source: any = {}): DiffStat {
-        const $$createField1_0 = $$createType6;
+        const $$createField1_0 = $$createType11;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
@@ -370,6 +573,11 @@ export class FileChange {
      * Y column: unstaged state
      */
     "worktree": string;
+
+    /**
+     * Conflicts counts the conflict blocks left in a conflicted file's work-tree copy.
+     */
+    "conflicts"?: number;
 
     /** Creates a new FileChange instance. */
     constructor($$source: Partial<FileChange> = {}) {
@@ -440,7 +648,7 @@ export class FileCommit {
      * Creates a new FileCommit instance from a string or object.
      */
     static createFrom($$source: any = {}): FileCommit {
-        const $$createField0_0 = $$createType7;
+        const $$createField0_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("commit" in $$parsedSource) {
             $$parsedSource["commit"] = $$createField0_0($$parsedSource["commit"]);
@@ -697,7 +905,7 @@ export class Status {
      * Creates a new Status instance from a string or object.
      */
     static createFrom($$source: any = {}): Status {
-        const $$createField5_0 = $$createType9;
+        const $$createField5_0 = $$createType14;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField5_0($$parsedSource["files"]);
@@ -772,8 +980,13 @@ const $$createType1 = $Create.Array($$createType0);
 const $$createType2 = BlameRange.createFrom;
 const $$createType3 = $Create.Array($$createType2);
 const $$createType4 = $Create.Array($Create.Any);
-const $$createType5 = FileStat.createFrom;
-const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = Commit.createFrom;
-const $$createType8 = FileChange.createFrom;
-const $$createType9 = $Create.Array($$createType8);
+const $$createType5 = Revision.createFrom;
+const $$createType6 = ConflictBlock.createFrom;
+const $$createType7 = $Create.Array($$createType6);
+const $$createType8 = ConflictSides.createFrom;
+const $$createType9 = ConflictSide.createFrom;
+const $$createType10 = FileStat.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = Commit.createFrom;
+const $$createType13 = FileChange.createFrom;
+const $$createType14 = $Create.Array($$createType13);

@@ -26,6 +26,8 @@ type FileChange struct {
 	Kind     string `json:"kind"`
 	Index    string `json:"index"`    // X column: staged state ("." when clean)
 	Worktree string `json:"worktree"` // Y column: unstaged state
+	// Conflicts counts the conflict blocks left in a conflicted file's work-tree copy.
+	Conflicts int `json:"conflicts,omitempty"`
 }
 
 // Status summarises the work tree.
@@ -51,6 +53,11 @@ func (r *Repo) Status(ctx context.Context) (Status, error) {
 		return Status{}, err
 	}
 	st.Operation = r.operation()
+	for i, f := range st.Files {
+		if f.Kind == Conflicted {
+			st.Files[i].Conflicts = r.conflictCount(f.Path)
+		}
+	}
 	return st, nil
 }
 

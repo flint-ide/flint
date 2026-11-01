@@ -38,6 +38,18 @@ type DayTotals struct {
 	Totals Totals `json:"totals"`
 }
 
+// Chat is one chat's use within the range, for Top chats.
+type Chat struct {
+	ID      string `json:"id"`
+	Label   string `json:"label"`
+	Project string `json:"project"`
+	Agent   string `json:"agent"`
+	Model   string `json:"model,omitempty"` // the model it spent most on
+	Task    string `json:"task,omitempty"`
+	LastDay string `json:"lastDay"`
+	Totals  Totals `json:"totals"`
+}
+
 // Summary is what the Usage panel shows.
 type Summary struct {
 	Today Totals `json:"today"`
@@ -49,28 +61,41 @@ type Summary struct {
 	Agents   []Group     `json:"agents"`
 	Models   []Group     `json:"models"`
 	Tasks    []Group     `json:"tasks"` // chats in agent tasks only
-	// Chats are the chats active in the range that spent the most.
+	// Chats are the chats that spent the most within the range.
 	Chats []Chat `json:"chats"`
 	// Estimated: some cost is an estimate from settings prices.
 	Estimated bool `json:"estimated"`
 	// Unpriced: some tokens have neither a reported cost nor a price.
-	Unpriced      bool `json:"unpriced"`
+	Unpriced bool `json:"unpriced"`
+	// CacheLeftOut: cached input of a priced model without a cache-read
+	// price is not in the estimates.
+	CacheLeftOut  bool `json:"cacheLeftOut"`
 	RetentionDays int  `json:"retentionDays"`
+	// Problem says why usage is not being saved ("" when it is).
+	Problem string `json:"problem,omitempty"`
 }
 
-// priced is a row's totals with the estimate filled in.
-func priced(r Row, prices Prices) (t Totals, estimated, unpriced bool) {
-	t = r.Totals
-	est, ok := prices.estimate(r.Model, t)
+// pricedRow is a row's totals with the estimate filled in.
+type pricedRow struct {
+	t                            Totals
+	estimated, unpriced, leftOut bool
+}
+
+func priced(r Row, prices Prices) pricedRow {
+	t := r.Totals
+	est, ok, leftOut := prices.estimate(r.Model, t)
 	t.EstimatedUSD = est
-	return t, ok, !ok && t.UnpricedInputTokens+t.UnpricedOutputTokens > 0
+	return pricedRow{t: t, estimated: ok, unpriced: !ok && t.UnpricedInputTokens+t.UnpricedOutputTokens > 0, leftOut: leftOut}
 }
 
 // Summary answers the Usage panel for q.
 func (s *Store) Summary(q Query, prices Prices) Summary {
 	s.mu.Lock()
 	f, today := s.snapshot()
-	retention := s.retention
+	out := Summary{RetentionDays: s.retention}
+	if s.readOnly != nil {
+		out.Problem = s.readOnly.Error()
+	}
 	s.mu.Unlock()
 
 	days := q.Days
@@ -81,42 +106,59 @@ func (s *Store) Summary(q Query, prices Prices) Summary {
 	start := dayBefore(today, days-1)
 	weekStart, monthStart := dayBefore(today, weekDays-1), dayBefore(today, monthDays-1)
 
-	out := Summary{RetentionDays: retention}
 	perDay := map[string]Totals{}
 	groups := [4]map[string]Totals{{}, {}, {}, {}}
+	chats := map[string]*Chat{}
+	chatModels := map[string]map[string]Totals{}
 	for _, r := range f.Rows {
 		if !q.match(r.Project, r.Task) {
 			continue
 		}
-		t, est, unp := priced(r, prices)
+		p := priced(r, prices)
 		if r.Day == today {
-			out.Today = out.Today.add(t)
+			out.Today = out.Today.add(p.t)
 		}
 		if r.Day >= weekStart {
-			out.Week = out.Week.add(t)
+			out.Week = out.Week.add(p.t)
 		}
 		if r.Day >= monthStart {
-			out.Month = out.Month.add(t)
+			out.Month = out.Month.add(p.t)
 		}
 		if r.Day < start {
 			continue
 		}
-		out.Estimated = out.Estimated || est
-		out.Unpriced = out.Unpriced || unp
-		perDay[r.Day] = perDay[r.Day].add(t)
+		out.Estimated = out.Estimated || p.estimated
+		out.Unpriced = out.Unpriced || p.unpriced
+		out.CacheLeftOut = out.CacheLeftOut || p.leftOut
+		perDay[r.Day] = perDay[r.Day].add(p.t)
 		for i, k := range [4]string{r.Project, r.Agent, r.Model, r.Task} {
 			if k != "" || i == 2 {
-				groups[i][k] = groups[i][k].add(t)
+				groups[i][k] = groups[i][k].add(p.t)
 			}
 		}
+		addToChat(chats, chatModels, r, p.t)
 	}
 	for d := range days {
 		day := dayBefore(today, days-1-d)
 		out.Days = append(out.Days, DayTotals{Day: day, Totals: perDay[day]})
 	}
 	out.Projects, out.Agents, out.Models, out.Tasks = ranked(groups[0]), ranked(groups[1]), ranked(groups[2]), ranked(groups[3])
-	out.Chats = topChatsOf(f.Chats, q, start, prices)
+	out.Chats = topChatsOf(chats, chatModels, f.Chats)
 	return out
+}
+
+func addToChat(chats map[string]*Chat, models map[string]map[string]Totals, r Row, t Totals) {
+	if r.Chat == "" {
+		return
+	}
+	c := chats[r.Chat]
+	if c == nil {
+		c = &Chat{ID: r.Chat, Project: r.Project, Agent: r.Agent, Task: r.Task}
+		chats[r.Chat], models[r.Chat] = c, map[string]Totals{}
+	}
+	c.Totals = c.Totals.add(t)
+	c.LastDay = max(c.LastDay, r.Day)
+	models[r.Chat][r.Model] = models[r.Chat][r.Model].add(t)
 }
 
 // bigger orders by spent money, then tokens: biggest first.
@@ -133,14 +175,14 @@ func ranked(m map[string]Totals) []Group {
 	return out
 }
 
-func topChatsOf(chats []Chat, q Query, start string, prices Prices) []Chat {
-	out := []Chat{}
-	for _, c := range chats {
-		if c.LastDay < start || !q.match(c.Project, c.Task) {
-			continue
+func topChatsOf(chats map[string]*Chat, models map[string]map[string]Totals, infos []chatInfo) []Chat {
+	out := make([]Chat, 0, len(chats))
+	for id, c := range chats {
+		if i := slices.IndexFunc(infos, func(ci chatInfo) bool { return ci.ID == id }); i >= 0 {
+			c.Label = infos[i].Label
 		}
-		c.Totals.EstimatedUSD, _ = prices.estimate(c.Model, c.Totals)
-		out = append(out, c)
+		c.Model = ranked(models[id])[0].Key
+		out = append(out, *c)
 	}
 	slices.SortFunc(out, func(a, b Chat) int { return cmp.Or(bigger(a.Totals, b.Totals), cmp.Compare(a.ID, b.ID)) })
 	return out[:min(len(out), topChats)]

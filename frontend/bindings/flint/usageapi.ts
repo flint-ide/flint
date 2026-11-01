@@ -45,7 +45,8 @@ export function ExportCSV(q: usage$0.Query): $CancellablePromise<string> {
 
 /**
  * Override lets sessionID's chat (and every chat today) start turns although
- * a budget is spent: "Continue anyway" in the warning.
+ * a budget is spent, for another budget's worth: "Continue anyway" in the
+ * warning.
  */
 export function Override(sessionID: string): $CancellablePromise<void> {
     return $Call.ByID(1136797851, sessionID);

@@ -186,6 +186,7 @@ func (a *App) shutdown() {
 		a.db.CloseAll,
 		a.profiles.closeAll,
 		a.closeProject,
+		a.closeUsage,
 	} {
 		wg.Add(1)
 		go func(stop func()) {

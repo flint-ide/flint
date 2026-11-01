@@ -16,6 +16,7 @@ func usageApp(t *testing.T, change func(*settings.Usage)) *App {
 	change(&s.Usage)
 	a := &App{configDir: t.TempDir(), settings: s, roots: []string{"/work/repo"}}
 	a.openUsage()
+	t.Cleanup(a.closeUsage) // writes are batched: stop the timer before the folder goes
 	return a
 }
 
@@ -86,6 +87,20 @@ func TestUsageCSV(t *testing.T) {
 	out, err := (&UsageAPI{app: a}).CSV(usage.Query{})
 	if err != nil || !strings.Contains(out, "codex,gpt-5,,1,1000000,0,0,0,0.000000,1.000000") {
 		t.Errorf("csv = %q %v", out, err)
+	}
+}
+
+// A turn the agent split by model counts each model's share under it, and
+// the turn once.
+func TestRecordUsageSplitsByModel(t *testing.T) {
+	a := usageApp(t, func(*settings.Usage) {})
+	a.usageChats.bind("s", usageChat{chat: "s", agent: "claude", cwd: "/work/repo", model: "opus"})
+	a.recordUsage("s", mustChat(t, a, "s"), &as.Usage{InputTokens: 30, CostUSD: 0.6, Model: "opus", Models: []as.ModelUsage{
+		{Model: "opus", InputTokens: 20, CostUSD: 0.5}, {Model: "haiku", InputTokens: 10, CostUSD: 0.1},
+	}})
+	sum := (&UsageAPI{app: a}).Summary(usage.Query{}).Summary
+	if len(sum.Models) != 2 || sum.Models[1].Key != "haiku" || sum.Models[1].Totals.InputTokens != 10 || sum.Today.Turns != 1 {
+		t.Errorf("models %+v, turns %d", sum.Models, sum.Today.Turns)
 	}
 }
 

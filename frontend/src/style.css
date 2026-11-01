@@ -4756,6 +4756,10 @@ body.file-drop-target-active::after {
   font-size: 11px;
   margin: 6px 0;
 }
+.usage-problem {
+  font-size: 11px;
+  margin: 0 0 8px;
+}
 .usage-section h4 {
   margin: 12px 0 4px;
   font-size: 11px;

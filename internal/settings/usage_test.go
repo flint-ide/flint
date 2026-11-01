@@ -26,15 +26,16 @@ func TestUsageValidation(t *testing.T) {
 		return u
 	}
 	bad := map[string]Usage{
-		"retention too short": ok(func(u *Usage) { u.RetentionDays = 1 }),
-		"retention too long":  ok(func(u *Usage) { u.RetentionDays = 100000 }),
-		"negative budget":     ok(func(u *Usage) { u.DailyBudgetUSD = -1 }),
-		"NaN budget":          ok(func(u *Usage) { u.TaskBudgetUSD = math.NaN() }),
-		"negative tokens":     ok(func(u *Usage) { u.TaskBudgetTokens = -5 }),
-		"empty model":         ok(func(u *Usage) { u.Prices = map[string]usage.Price{"": {In: 1}} }),
-		"spaced model":        ok(func(u *Usage) { u.Prices = map[string]usage.Price{" gpt": {In: 1}} }),
-		"control in model":    ok(func(u *Usage) { u.Prices = map[string]usage.Price{"a\nb": {In: 1}} }),
-		"huge price":          ok(func(u *Usage) { u.Prices = map[string]usage.Price{"gpt": {Out: 1e9}} }),
+		"retention too short":  ok(func(u *Usage) { u.RetentionDays = 1 }),
+		"retention too long":   ok(func(u *Usage) { u.RetentionDays = 100000 }),
+		"negative budget":      ok(func(u *Usage) { u.DailyBudgetUSD = -1 }),
+		"NaN budget":           ok(func(u *Usage) { u.TaskBudgetUSD = math.NaN() }),
+		"negative tokens":      ok(func(u *Usage) { u.TaskBudgetTokens = -5 }),
+		"empty model":          ok(func(u *Usage) { u.Prices = map[string]usage.Price{"": {In: 1}} }),
+		"spaced model":         ok(func(u *Usage) { u.Prices = map[string]usage.Price{" gpt": {In: 1}} }),
+		"control in model":     ok(func(u *Usage) { u.Prices = map[string]usage.Price{"a\nb": {In: 1}} }),
+		"huge price":           ok(func(u *Usage) { u.Prices = map[string]usage.Price{"gpt": {Out: 1e9}} }),
+		"negative cache price": ok(func(u *Usage) { u.Prices = map[string]usage.Price{"gpt": {In: 1, CacheRead: -1}} }),
 	}
 	for name, u := range bad {
 		if CheckUsage(u) == nil {
@@ -43,11 +44,14 @@ func TestUsageValidation(t *testing.T) {
 	}
 	good := ok(func(u *Usage) {
 		u.DailyBudgetUSD, u.DailyBudgetTokens, u.TaskBudgetUSD = 5, 2_000_000, 1.5
-		u.Prices = map[string]usage.Price{"gpt-5": {In: 1.25, Out: 10}}
-		u.PauseOverBudget = true
+		u.Prices = map[string]usage.Price{"gpt-5": {In: 1.25, Out: 10, CacheRead: 0.125}}
+		u.PauseOverBudget, u.CountCacheReads = true, true
 	})
 	if err := CheckUsage(good); err != nil {
 		t.Error(err)
+	}
+	if l := good.Limits(); !l.CountCacheReads || l.DailyTokens != 2_000_000 {
+		t.Errorf("limits = %+v", l)
 	}
 }
 

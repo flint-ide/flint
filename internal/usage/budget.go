@@ -9,12 +9,13 @@ import (
 // Limits are the budgets from settings; zero turns one off. The daily budget
 // covers every chat of the day; the task budget one agent task's chats over
 // the retention. Money counts reported costs plus estimates; tokens are
-// input (cache included) plus output.
+// input plus output, without cache reads unless CountCacheReads.
 type Limits struct {
-	DailyUSD    float64 `json:"dailyUsd"`
-	DailyTokens int64   `json:"dailyTokens"`
-	TaskUSD     float64 `json:"taskUsd"`
-	TaskTokens  int64   `json:"taskTokens"`
+	DailyUSD        float64 `json:"dailyUsd"`
+	DailyTokens     int64   `json:"dailyTokens"`
+	TaskUSD         float64 `json:"taskUsd"`
+	TaskTokens      int64   `json:"taskTokens"`
+	CountCacheReads bool    `json:"countCacheReads"`
 }
 
 // Budget scopes and kinds.
@@ -38,20 +39,25 @@ type Alert struct {
 	Overridden bool `json:"overridden"`
 }
 
-func (a Alert) scopeMark() string { return a.Scope + "/" + a.Key }
-
 // mark identifies the alert per threshold: raising the limit arms it again.
 func (a Alert) mark() string {
-	return "alert/" + a.scopeMark() + "/" + a.Kind + "/" + strconv.FormatFloat(a.Limit, 'g', -1, 64)
+	return a.Scope + "/" + a.Key + "/" + a.Kind + "/" + strconv.FormatFloat(a.Limit, 'g', -1, 64)
 }
 
-// markDay is the day a mark is about, for pruning; ok is false for task marks.
-func markDay(m string) (string, bool) {
+// alertDay is the day an alert mark is about, for pruning; ok is false for tasks.
+func alertDay(m string) (string, bool) {
 	parts := strings.Split(m, "/")
-	if len(parts) >= 3 && parts[1] == ScopeDay {
-		return parts[2], true
+	if len(parts) >= 2 && parts[0] == ScopeDay {
+		return parts[1], true
 	}
 	return "", false
+}
+
+// overridden: a "Continue anyway" for this very threshold still has room.
+func (a Alert) overriddenBy(overrides []Override) bool {
+	return slices.ContainsFunc(overrides, func(o Override) bool {
+		return o.Scope == a.Scope && o.Key == a.Key && o.Kind == a.Kind && o.Limit == a.Limit && a.Spent < o.Until
+	})
 }
 
 // Over lists the budgets that today and task (when not "") have reached.
@@ -76,61 +82,66 @@ func (s *Store) Fire(l Limits, task string, prices Prices) ([]Alert, error) {
 	f, today := s.snapshot()
 	var fresh []Alert
 	for _, a := range over(f, today, l, task, prices) {
-		if !slices.Contains(f.Marks, a.mark()) {
+		if !slices.Contains(s.f.Alerts, a.mark()) {
 			fresh = append(fresh, a)
-			f.Marks = append(f.Marks, a.mark())
+			s.f.Alerts = append(s.f.Alerts, a.mark())
 		}
 	}
 	if len(fresh) == 0 {
 		return nil, nil
 	}
-	return fresh, s.write(f)
+	return fresh, s.changed()
 }
 
 // Override lets new turns run although today's budget, and task's (when not
-// ""), are spent: the user chose to continue from the warning.
-func (s *Store) Override(task string) error {
+// ""), are spent: the user chose to continue from the warning. Each lasts
+// for another budget's worth of spending at the current limit.
+func (s *Store) Override(l Limits, task string, prices Prices) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	f, today := s.snapshot()
-	scopes := []string{ScopeDay + "/" + today}
-	if task != "" {
-		scopes = append(scopes, ScopeTask+"/"+clean(task, maxField))
-	}
 	changed := false
-	for _, sc := range scopes {
-		if m := "override/" + sc; !slices.Contains(f.Marks, m) {
-			f.Marks, changed = append(f.Marks, m), true
+	for _, a := range over(f, today, l, task, prices) {
+		if !a.Overridden {
+			s.f.Overrides = append(s.f.Overrides, Override{Scope: a.Scope, Key: a.Key, Kind: a.Kind, Limit: a.Limit, Until: a.Spent + a.Limit})
+			changed = true
 		}
 	}
 	if !changed {
 		return nil
 	}
-	return s.write(f)
+	return s.changed()
 }
 
 func over(f file, today string, l Limits, task string, prices Prices) []Alert {
 	var day, tsk Totals
 	var dayEst, taskEst bool
 	for _, r := range f.Rows {
-		if r.Day != today && (task == "" || r.Task != task) {
+		inTask := task != "" && r.Task == task
+		if r.Day != today && !inTask {
 			continue
 		}
-		t, est, _ := priced(r, prices)
+		p := priced(r, prices)
 		if r.Day == today {
-			day, dayEst = day.add(t), dayEst || est
+			day, dayEst = day.add(p.t), dayEst || p.estimated
 		}
-		if task != "" && r.Task == task {
-			tsk, taskEst = tsk.add(t), taskEst || est
+		if inTask {
+			tsk, taskEst = tsk.add(p.t), taskEst || p.estimated
 		}
 	}
+	tokens := func(t Totals) float64 {
+		if l.CountCacheReads {
+			return float64(t.Tokens())
+		}
+		return float64(t.Tokens() - t.CacheReadTokens)
+	}
 	var out []Alert
-	check := func(scope, key string, t Totals, est bool, usd float64, tokens int64) {
+	check := func(scope, key string, t Totals, est bool, usd float64, limit int64) {
 		if usd > 0 && t.Spent() >= usd {
 			out = append(out, Alert{Scope: scope, Key: key, Kind: KindUSD, Limit: usd, Spent: t.Spent(), Estimated: est})
 		}
-		if tokens > 0 && t.Tokens() >= tokens {
-			out = append(out, Alert{Scope: scope, Key: key, Kind: KindTokens, Limit: float64(tokens), Spent: float64(t.Tokens())})
+		if limit > 0 && tokens(t) >= float64(limit) {
+			out = append(out, Alert{Scope: scope, Key: key, Kind: KindTokens, Limit: float64(limit), Spent: tokens(t)})
 		}
 	}
 	check(ScopeDay, today, day, dayEst, l.DailyUSD, l.DailyTokens)
@@ -138,7 +149,7 @@ func over(f file, today string, l Limits, task string, prices Prices) []Alert {
 		check(ScopeTask, task, tsk, taskEst, l.TaskUSD, l.TaskTokens)
 	}
 	for i := range out {
-		out[i].Overridden = slices.Contains(f.Marks, "override/"+out[i].scopeMark())
+		out[i].Overridden = out[i].overriddenBy(f.Overrides)
 	}
 	return out
 }

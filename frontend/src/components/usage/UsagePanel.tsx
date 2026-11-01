@@ -40,7 +40,9 @@ interface View {
     chats: ChatRow[]
     estimated: boolean
     unpriced: boolean
+    cacheLeftOut: boolean
     retentionDays: number
+    problem?: string
   }
   taskTitles: Record<string, string>
 }
@@ -93,6 +95,7 @@ export function UsagePanel() {
       </div>
       <div className="scroll usage-body">
         {error && <div className="placeholder error">{error}</div>}
+        {sum?.problem && <div className="usage-problem error">{sum.problem}</div>}
         {(filter.project || filter.task) && (
           <div className="usage-filters">
             {filter.project && (
@@ -120,6 +123,7 @@ export function UsagePanel() {
             {(sum.estimated || sum.unpriced) && (
               <p className="muted usage-note">
                 {sum.estimated && '~ marks costs estimated from your prices in Settings ▸ Usage. '}
+                {sum.cacheLeftOut && 'Cached input is left out of estimates for models without a cached-input price. '}
                 {sum.unpriced && 'Some agents (Codex) report no cost: their turns count as tokens only until you set a price.'}
               </p>
             )}
@@ -216,7 +220,7 @@ function TopChats({ chats, taskName }: { chats: ChatRow[]; taskName: (id: string
   if (chats.length === 0) return null
   return (
     <section className="usage-section">
-      <h4>Top chats</h4>
+      <h4>Top chats in this range</h4>
       {chats.map((c) => {
         const isOpen = !!open[c.id]
         return (

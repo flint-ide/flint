@@ -87,7 +87,15 @@ func (a *App) openUsage() {
 	if err != nil {
 		a.logf("usage: %v", err)
 	}
+	store.OnError = func(err error) { a.logf("usage: %v", err) }
 	a.usage = store
+}
+
+// closeUsage writes what the last seconds recorded (writes are batched).
+func (a *App) closeUsage() {
+	if err := a.usage.Close(); err != nil {
+		a.logf("usage: %v", err)
+	}
 }
 
 // observeUsage records a usage event off the agent's goroutine (the file is
@@ -105,17 +113,18 @@ func (a *App) observeUsage(e as.Event) {
 
 func (a *App) recordUsage(sessionID string, c usageChat, u *as.Usage) {
 	task := a.taskByFolder(c.cwd)
-	model := u.Model
-	if model == "" {
-		model = c.model
-	}
-	err := a.usage.Add(usage.Entry{
-		Chat: c.chat, Label: c.label, Project: a.usageProject(c.cwd, task),
-		Agent: c.agent, Model: model, Task: task, Usage: usage.FromEvent(u),
-	})
-	if err != nil {
-		a.logf("usage: %v", err)
-		return
+	project := a.usageProject(c.cwd, task)
+	for _, p := range usage.Parts(u) {
+		model := p.Model
+		if model == "" {
+			model = c.model
+		}
+		err := a.usage.Add(usage.Entry{
+			Chat: c.chat, Label: c.label, Project: project, Agent: c.agent, Model: model, Task: task, Usage: p.Usage,
+		})
+		if err != nil {
+			a.logf("usage: %v", err)
+		}
 	}
 	a.emit(eventUsageChanged)
 	s := a.currentSettings().Usage

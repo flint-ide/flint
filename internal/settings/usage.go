@@ -28,6 +28,9 @@ type Usage struct {
 	// PauseOverBudget refuses new turns while a budget is spent, until the
 	// user continues from the warning.
 	PauseOverBudget bool `json:"pauseOverBudget"`
+	// CountCacheReads makes token budgets count cached input too (off: a
+	// long Claude conversation re-reads its cache on every call).
+	CountCacheReads bool `json:"countCacheReads"`
 }
 
 // Limits for the usage settings.
@@ -47,7 +50,7 @@ func defaultUsage() Usage {
 func (u Usage) Limits() usage.Limits {
 	return usage.Limits{
 		DailyUSD: u.DailyBudgetUSD, DailyTokens: u.DailyBudgetTokens,
-		TaskUSD: u.TaskBudgetUSD, TaskTokens: u.TaskBudgetTokens,
+		TaskUSD: u.TaskBudgetUSD, TaskTokens: u.TaskBudgetTokens, CountCacheReads: u.CountCacheReads,
 	}
 }
 
@@ -97,7 +100,7 @@ func checkPrice(model string, p usage.Price) error {
 		return errors.New("a model price needs a model name without surrounding spaces")
 	case len(model) > maxModelNameLen || strings.ContainsFunc(model, unicode.IsControl):
 		return fmt.Errorf("invalid model name %q", model)
-	case !validAmount(p.In, maxPrice) || !validAmount(p.Out, maxPrice):
+	case !validAmount(p.In, maxPrice) || !validAmount(p.Out, maxPrice) || !validAmount(p.CacheRead, maxPrice):
 		return fmt.Errorf("price of %s out of range 0–%d per million tokens", model, maxPrice)
 	}
 	return nil

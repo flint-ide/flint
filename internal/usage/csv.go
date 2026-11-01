@@ -15,13 +15,25 @@ var csvHeader = []string{
 	"cost_usd_reported", "cost_usd_estimated",
 }
 
-// CSV exports the daily aggregates matching q (all retained days), oldest
-// first. The estimated cost column is empty for rows without a price.
+// CSV exports the daily aggregates matching q (all retained days, chats
+// summed), oldest first. The estimated cost column is empty for rows
+// without a price.
 func (s *Store) CSV(q Query, prices Prices) ([]byte, error) {
 	s.mu.Lock()
 	f, _ := s.snapshot()
 	s.mu.Unlock()
-	rows := slices.DeleteFunc(f.Rows, func(r Row) bool { return !q.match(r.Project, r.Task) })
+	sums := map[Key]Totals{}
+	for _, r := range f.Rows {
+		if q.match(r.Project, r.Task) {
+			k := r.Key
+			k.Chat = ""
+			sums[k] = sums[k].add(r.Totals)
+		}
+	}
+	rows := make([]Row, 0, len(sums))
+	for k, t := range sums {
+		rows = append(rows, Row{Key: k, Totals: t})
+	}
 	slices.SortFunc(rows, func(a, b Row) int {
 		return cmp.Or(
 			strings.Compare(a.Day, b.Day), strings.Compare(a.Project, b.Project), strings.Compare(a.Agent, b.Agent),
@@ -33,7 +45,7 @@ func (s *Store) CSV(q Query, prices Prices) ([]byte, error) {
 	_ = w.Write(csvHeader)
 	for _, r := range rows {
 		est := ""
-		if v, ok := prices.estimate(r.Model, r.Totals); ok {
+		if v, ok, _ := prices.estimate(r.Model, r.Totals); ok {
 			est = strconv.FormatFloat(v, 'f', 6, 64)
 		}
 		_ = w.Write([]string{

@@ -26,7 +26,7 @@ export function UsageSection() {
       <Row label="Daily budget" hint="All agent chats of the day. Costs Codex doesn't report count only with a price below.">
         <NumberField value={u.dailyBudgetUsd} min={usd.min} max={usd.max} step={1} suffix="USD" onCommit={(v) => set({ dailyBudgetUsd: v })} />
       </Row>
-      <Row label="Daily token budget" hint="Input (cache included) plus output tokens.">
+      <Row label="Daily token budget" hint="Input plus output tokens; cached input only if counted below.">
         <NumberField value={u.dailyBudgetTokens} min={tok.min} max={tok.max} step={100000} suffix="tokens" onCommit={(v) => set({ dailyBudgetTokens: Math.round(v) })} />
       </Row>
       <Row label="Budget per agent task" hint="Everything one agent task's chats used, over the days kept.">
@@ -34,6 +34,12 @@ export function UsageSection() {
       </Row>
       <Row label="Token budget per agent task">
         <NumberField value={u.taskBudgetTokens} min={tok.min} max={tok.max} step={100000} suffix="tokens" onCommit={(v) => set({ taskBudgetTokens: Math.round(v) })} />
+      </Row>
+      <Row
+        label="Count cached input in token budgets"
+        hint="Off: token budgets leave out input read from the prompt cache, which a long Claude chat re-reads on every call and which costs a fraction of fresh input."
+      >
+        <input type="checkbox" checked={u.countCacheReads} onChange={(e) => set({ countCacheReads: e.target.checked })} />
       </Row>
       <Row label="Pause new turns over budget" hint="A chat over budget doesn't send new messages until you choose Continue anyway in its warning.">
         <input type="checkbox" checked={u.pauseOverBudget} onChange={(e) => set({ pauseOverBudget: e.target.checked })} />
@@ -61,14 +67,14 @@ function PricesField() {
   return (
     <Row
       label="Model prices"
-      hint={'One "model input output" per line, in USD per million tokens, for agents that report no cost (Codex). The model name must match the Usage panel. Costs computed from these are marked as estimates.'}
+      hint={'One "model input output [cached]" per line, in USD per million tokens, for agents that report no cost (Codex). The model name must match the Usage panel. Without a cached-input price, cached tokens are left out of the estimate. Costs computed from these are marked as estimates.'}
     >
       <div className="settings-control settings-control-stack">
         <textarea
           className={`settings-textarea${invalid.length ? ' invalid' : ''}`}
           value={draft}
           spellCheck={false}
-          placeholder={'gpt-5-codex 1.25 10'}
+          placeholder={'gpt-5-codex 1.25 10 0.125'}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
         />

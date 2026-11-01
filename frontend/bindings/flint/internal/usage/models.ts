@@ -73,13 +73,17 @@ export class Alert {
 }
 
 /**
- * Chat is one chat's totals over the retention, for Top chats.
+ * Chat is one chat's use within the range, for Top chats.
  */
 export class Chat {
     "id": string;
     "label": string;
     "project": string;
     "agent": string;
+
+    /**
+     * the model it spent most on
+     */
     "model"?: string;
     "task"?: string;
     "lastDay": string;
@@ -187,11 +191,14 @@ export class Group {
 }
 
 /**
- * Price is what a model costs, in USD per million tokens.
+ * Price is what a model costs, in USD per million tokens. CacheRead prices
+ * cached input; 0 leaves cached tokens out of estimates (they cost a
+ * fraction of fresh input, so the input price would overstate them).
  */
 export class Price {
     "in": number;
     "out": number;
+    "cacheRead"?: number;
 
     /** Creates a new Price instance. */
     constructor($$source: Partial<Price> = {}) {
@@ -280,7 +287,7 @@ export class Summary {
     "tasks": Group[];
 
     /**
-     * Chats are the chats active in the range that spent the most.
+     * Chats are the chats that spent the most within the range.
      */
     "chats": Chat[];
 
@@ -293,7 +300,18 @@ export class Summary {
      * Unpriced: some tokens have neither a reported cost nor a price.
      */
     "unpriced": boolean;
+
+    /**
+     * CacheLeftOut: cached input of a priced model without a cache-read
+     * price is not in the estimates.
+     */
+    "cacheLeftOut": boolean;
     "retentionDays": number;
+
+    /**
+     * Problem says why usage is not being saved ("" when it is).
+     */
+    "problem"?: string;
 
     /** Creates a new Summary instance. */
     constructor($$source: Partial<Summary> = {}) {
@@ -329,6 +347,9 @@ export class Summary {
         }
         if (!("unpriced" in $$source)) {
             this["unpriced"] = false;
+        }
+        if (!("cacheLeftOut" in $$source)) {
+            this["cacheLeftOut"] = false;
         }
         if (!("retentionDays" in $$source)) {
             this["retentionDays"] = 0;
@@ -398,11 +419,13 @@ export class Totals {
     "costUsd": number;
 
     /**
-     * UnpricedInputTokens and UnpricedOutputTokens are the tokens of turns
-     * whose agent reported no cost: the only ones an estimate applies to.
+     * The unpriced tokens are those of turns whose agent reported no cost:
+     * the only ones an estimate applies to. The cache-read part is priced
+     * separately (or left out when the model has no cache-read price).
      */
     "unpricedInputTokens"?: number;
     "unpricedOutputTokens"?: number;
+    "unpricedCacheReadTokens"?: number;
     "turns": number;
 
     /**

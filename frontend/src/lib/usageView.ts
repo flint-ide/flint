@@ -12,6 +12,7 @@ export interface UsageTotals {
   costUsd: number
   unpricedInputTokens?: number
   unpricedOutputTokens?: number
+  unpricedCacheReadTokens?: number
   turns: number
   estimatedUsd?: number
 }

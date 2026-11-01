@@ -836,6 +836,12 @@ export class Usage {
      */
     "pauseOverBudget": boolean;
 
+    /**
+     * CountCacheReads makes token budgets count cached input too (off: a
+     * long Claude conversation re-reads its cache on every call).
+     */
+    "countCacheReads": boolean;
+
     /** Creates a new Usage instance. */
     constructor($$source: Partial<Usage> = {}) {
         if (!("retentionDays" in $$source)) {
@@ -858,6 +864,9 @@ export class Usage {
         }
         if (!("pauseOverBudget" in $$source)) {
             this["pauseOverBudget"] = false;
+        }
+        if (!("countCacheReads" in $$source)) {
+            this["countCacheReads"] = false;
         }
 
         Object.assign(this, $$source);

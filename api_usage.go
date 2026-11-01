@@ -65,13 +65,15 @@ func (u *UsageAPI) Budget(sessionID string) BudgetStatus {
 }
 
 // Override lets sessionID's chat (and every chat today) start turns although
-// a budget is spent: "Continue anyway" in the warning.
+// a budget is spent, for another budget's worth: "Continue anyway" in the
+// warning.
 func (u *UsageAPI) Override(sessionID string) error {
+	s := u.app.currentSettings().Usage
 	task := ""
 	if c, ok := u.app.usageChats.get(sessionID); ok {
 		task = u.app.taskByFolder(c.cwd)
 	}
-	if err := u.app.usage.Override(task); err != nil {
+	if err := u.app.usage.Override(s.Limits(), task, s.Prices); err != nil {
 		return err
 	}
 	u.app.emit(eventUsageChanged)

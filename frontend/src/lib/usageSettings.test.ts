@@ -16,8 +16,10 @@ test('coerceUsage keeps valid values and defaults the rest', () => {
 })
 
 test('prices parse from "model in out" lines and format back', () => {
-  const { prices, invalid } = parsePrices('gpt-5 1.25 10\n# comment\n\ngpt-5-mini 0.25  # out defaults to 0\nbad line here x\nneg -1 2')
-  assert.deepEqual(prices, { 'gpt-5': { in: 1.25, out: 10 }, 'gpt-5-mini': { in: 0.25, out: 0 } })
-  assert.deepEqual(invalid, ['bad line here x', 'neg -1 2'])
-  assert.equal(formatPrices(prices), 'gpt-5 1.25 10\ngpt-5-mini 0.25 0')
+  const { prices, invalid } = parsePrices('gpt-5 1.25 10 0.125\n# comment\n\ngpt-5-mini 0.25  # out defaults to 0\ntoo many words in here\nneg -1 2')
+  assert.deepEqual(prices, { 'gpt-5': { in: 1.25, out: 10, cacheRead: 0.125 }, 'gpt-5-mini': { in: 0.25, out: 0 } })
+  assert.deepEqual(invalid, ['too many words in here', 'neg -1 2'])
+  assert.equal(formatPrices(prices), 'gpt-5 1.25 10 0.125\ngpt-5-mini 0.25 0')
+  assert.equal(coerceUsage({ countCacheReads: true }).countCacheReads, true)
+  assert.equal(DEFAULT_USAGE.countCacheReads, false)
 })

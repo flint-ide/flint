@@ -6,6 +6,8 @@ export interface ModelPrice {
   in: number
   /** USD per million output tokens. */
   out: number
+  /** USD per million cached input tokens; 0 or missing leaves them out of estimates. */
+  cacheRead?: number
 }
 
 export interface UsageSettings {
@@ -16,6 +18,8 @@ export interface UsageSettings {
   taskBudgetUsd: number
   taskBudgetTokens: number
   pauseOverBudget: boolean
+  /** Token budgets count cached input too. */
+  countCacheReads: boolean
 }
 
 /** Same limits as Go's CheckUsage. */
@@ -36,6 +40,7 @@ export const DEFAULT_USAGE: UsageSettings = Object.freeze({
   taskBudgetUsd: 0,
   taskBudgetTokens: 0,
   pauseOverBudget: false,
+  countCacheReads: false,
 }) as UsageSettings
 
 export const validModelName = (m: string): boolean =>
@@ -58,8 +63,10 @@ export function coerceUsage(v: unknown): UsageSettings {
   if (isObject(v.prices)) {
     for (const [model, p] of Object.entries(v.prices)) {
       if (Object.keys(prices).length >= USAGE_LIMITS.prices) break
-      if (validModelName(model) && isObject(p) && validPrice(p.in ?? 0) && validPrice(p.out ?? 0)) {
-        prices[model] = { in: (p.in as number) ?? 0, out: (p.out as number) ?? 0 }
+      if (validModelName(model) && isObject(p) && validPrice(p.in ?? 0) && validPrice(p.out ?? 0) && validPrice(p.cacheRead ?? 0)) {
+        const price: ModelPrice = { in: (p.in as number) ?? 0, out: (p.out as number) ?? 0 }
+        if (typeof p.cacheRead === 'number' && p.cacheRead > 0) price.cacheRead = p.cacheRead
+        prices[model] = price
       }
     }
   }
@@ -71,12 +78,13 @@ export function coerceUsage(v: unknown): UsageSettings {
     taskBudgetUsd: inRange(v.taskBudgetUsd, USAGE_LIMITS.budgetUsd, 0),
     taskBudgetTokens: Math.round(inRange(v.taskBudgetTokens, USAGE_LIMITS.budgetTokens, 0)),
     pauseOverBudget: typeof v.pauseOverBudget === 'boolean' ? v.pauseOverBudget : d.pauseOverBudget,
+    countCacheReads: typeof v.countCacheReads === 'boolean' ? v.countCacheReads : d.countCacheReads,
   }
 }
 
 /**
- * Prices from the editor's text, one "model in out" per line (USD per million
- * tokens, "#" starts a comment). Returns the prices and the lines that are not valid.
+ * Prices from the editor's text, one "model in out [cached]" per line (USD per
+ * million tokens, "#" starts a comment). Returns the prices and the lines that are not valid.
  */
 export function parsePrices(text: string): { prices: Record<string, ModelPrice>; invalid: string[] } {
   const prices: Record<string, ModelPrice> = {}
@@ -85,13 +93,14 @@ export function parsePrices(text: string): { prices: Record<string, ModelPrice>;
     const line = raw.replace(/#.*/, '').trim()
     if (!line) continue
     const parts = line.split(/\s+/)
-    const [model, inp, out] = parts
+    const [model, inp, out, cached] = parts
     const pIn = Number(inp)
     const pOut = Number(out ?? '0')
-    if (parts.length > 3 || !model || !validModelName(model) || inp === undefined || !validPrice(pIn) || !validPrice(pOut)) {
+    const pCache = Number(cached ?? '0')
+    if (parts.length > 4 || !model || !validModelName(model) || inp === undefined || !validPrice(pIn) || !validPrice(pOut) || !validPrice(pCache)) {
       invalid.push(raw.trim())
     } else if (Object.keys(prices).length < USAGE_LIMITS.prices) {
-      prices[model] = { in: pIn, out: pOut }
+      prices[model] = pCache > 0 ? { in: pIn, out: pOut, cacheRead: pCache } : { in: pIn, out: pOut }
     } else {
       invalid.push(raw.trim())
     }
@@ -103,6 +112,6 @@ export function parsePrices(text: string): { prices: Record<string, ModelPrice>;
 export function formatPrices(prices: Record<string, ModelPrice>): string {
   return Object.keys(prices)
     .sort()
-    .map((m) => `${m} ${prices[m].in} ${prices[m].out}`)
+    .map((m) => `${m} ${prices[m].in} ${prices[m].out}${prices[m].cacheRead ? ` ${prices[m].cacheRead}` : ''}`)
     .join('\n')
 }

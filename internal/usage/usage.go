@@ -1,12 +1,14 @@
 // Package usage records what agent chats consume (tokens, and cost when the
-// agent reports it) as daily aggregates per project, agent, model and agent
-// task, and answers the Usage panel, the CSV export and the budget checks.
+// agent reports it) as daily aggregates per project, agent, model, agent
+// task and chat, and answers the Usage panel, the CSV export and the budget
+// checks.
 //
 // Everything stays local: one small JSON file in Flint's config directory,
-// rewritten atomically after each turn (a crash leaves the previous version),
-// bounded by a retention in days and by row and chat caps. Costs are only
-// what the agent reported; an estimate exists only for models the user gave
-// a price in settings, and is kept apart so the UI can label it.
+// written atomically a few seconds after changes and when Flint quits (a
+// crash leaves the previous version), bounded by a retention in days and by
+// row and chat caps. Costs are only what the agent reported; an estimate
+// exists only for models the user gave a price in settings, and is kept
+// apart so the UI can label it.
 package usage
 
 import (
@@ -27,11 +29,13 @@ type Totals struct {
 	CacheWriteTokens int64 `json:"cacheWriteTokens,omitempty"`
 	// CostUSD is what the agents reported.
 	CostUSD float64 `json:"costUsd"`
-	// UnpricedInputTokens and UnpricedOutputTokens are the tokens of turns
-	// whose agent reported no cost: the only ones an estimate applies to.
-	UnpricedInputTokens  int64 `json:"unpricedInputTokens,omitempty"`
-	UnpricedOutputTokens int64 `json:"unpricedOutputTokens,omitempty"`
-	Turns                int   `json:"turns"`
+	// The unpriced tokens are those of turns whose agent reported no cost:
+	// the only ones an estimate applies to. The cache-read part is priced
+	// separately (or left out when the model has no cache-read price).
+	UnpricedInputTokens     int64 `json:"unpricedInputTokens,omitempty"`
+	UnpricedOutputTokens    int64 `json:"unpricedOutputTokens,omitempty"`
+	UnpricedCacheReadTokens int64 `json:"unpricedCacheReadTokens,omitempty"`
+	Turns                   int   `json:"turns"`
 	// EstimatedUSD prices the unpriced tokens with the prices from settings.
 	// Computed for answers, never stored.
 	EstimatedUSD float64 `json:"estimatedUsd,omitempty"`
@@ -45,16 +49,34 @@ func (t Totals) Spent() float64 { return t.CostUSD + t.EstimatedUSD }
 
 func (t Totals) add(o Totals) Totals {
 	return Totals{
-		InputTokens:          t.InputTokens + o.InputTokens,
-		OutputTokens:         t.OutputTokens + o.OutputTokens,
-		CacheReadTokens:      t.CacheReadTokens + o.CacheReadTokens,
-		CacheWriteTokens:     t.CacheWriteTokens + o.CacheWriteTokens,
-		CostUSD:              t.CostUSD + o.CostUSD,
-		UnpricedInputTokens:  t.UnpricedInputTokens + o.UnpricedInputTokens,
-		UnpricedOutputTokens: t.UnpricedOutputTokens + o.UnpricedOutputTokens,
-		Turns:                t.Turns + o.Turns,
-		EstimatedUSD:         t.EstimatedUSD + o.EstimatedUSD,
+		InputTokens:             t.InputTokens + o.InputTokens,
+		OutputTokens:            t.OutputTokens + o.OutputTokens,
+		CacheReadTokens:         t.CacheReadTokens + o.CacheReadTokens,
+		CacheWriteTokens:        t.CacheWriteTokens + o.CacheWriteTokens,
+		CostUSD:                 t.CostUSD + o.CostUSD,
+		UnpricedInputTokens:     t.UnpricedInputTokens + o.UnpricedInputTokens,
+		UnpricedOutputTokens:    t.UnpricedOutputTokens + o.UnpricedOutputTokens,
+		UnpricedCacheReadTokens: t.UnpricedCacheReadTokens + o.UnpricedCacheReadTokens,
+		Turns:                   t.Turns + o.Turns,
+		EstimatedUSD:            t.EstimatedUSD + o.EstimatedUSD,
 	}
+}
+
+func totals(in, out, cacheRead, cacheWrite int, cost float64, turns int) Totals {
+	nonNeg := func(n int) int64 { return int64(max(n, 0)) }
+	t := Totals{
+		InputTokens:      nonNeg(in),
+		OutputTokens:     nonNeg(out),
+		CacheReadTokens:  min(nonNeg(cacheRead), nonNeg(in)),
+		CacheWriteTokens: nonNeg(cacheWrite),
+		Turns:            turns,
+	}
+	if cost > 0 && !math.IsInf(cost, 0) {
+		t.CostUSD = cost
+	} else {
+		t.UnpricedInputTokens, t.UnpricedOutputTokens, t.UnpricedCacheReadTokens = t.InputTokens, t.OutputTokens, t.CacheReadTokens
+	}
+	return t
 }
 
 // FromEvent is one turn's usage event as totals.
@@ -62,26 +84,43 @@ func FromEvent(u *as.Usage) Totals {
 	if u == nil {
 		return Totals{}
 	}
-	nonNeg := func(n int) int64 { return int64(max(n, 0)) }
-	t := Totals{
-		InputTokens:      nonNeg(u.InputTokens),
-		OutputTokens:     nonNeg(u.OutputTokens),
-		CacheReadTokens:  nonNeg(u.CacheReadTokens),
-		CacheWriteTokens: nonNeg(u.CacheWriteTokens),
-		Turns:            1,
-	}
-	if cost := u.CostUSD; cost > 0 && !math.IsInf(cost, 0) {
-		t.CostUSD = cost
-	} else {
-		t.UnpricedInputTokens, t.UnpricedOutputTokens = t.InputTokens, t.OutputTokens
-	}
-	return t
+	return totals(u.InputTokens, u.OutputTokens, u.CacheReadTokens, u.CacheWriteTokens, u.CostUSD, 1)
 }
 
-// Price is what a model costs, in USD per million tokens.
+// Part is the share of a turn one model used.
+type Part struct {
+	Model string
+	Usage Totals
+}
+
+// Parts splits a turn by model when the agent reported that (the turn is
+// counted once, for the model listed first), else it is one part for
+// u.Model ("" when unknown).
+func Parts(u *as.Usage) []Part {
+	if u == nil {
+		return nil
+	}
+	if len(u.Models) == 0 {
+		return []Part{{Model: u.Model, Usage: FromEvent(u)}}
+	}
+	out := make([]Part, 0, len(u.Models))
+	for i, m := range u.Models {
+		turns := 0
+		if i == 0 {
+			turns = 1
+		}
+		out = append(out, Part{Model: m.Model, Usage: totals(m.InputTokens, m.OutputTokens, m.CacheReadTokens, m.CacheWriteTokens, m.CostUSD, turns)})
+	}
+	return out
+}
+
+// Price is what a model costs, in USD per million tokens. CacheRead prices
+// cached input; 0 leaves cached tokens out of estimates (they cost a
+// fraction of fresh input, so the input price would overstate them).
 type Price struct {
-	In  float64 `json:"in"`
-	Out float64 `json:"out"`
+	In        float64 `json:"in"`
+	Out       float64 `json:"out"`
+	CacheRead float64 `json:"cacheRead,omitempty"`
 }
 
 // Prices maps model names (matched exactly, ignoring case) to prices.
@@ -99,19 +138,29 @@ func (p Prices) lookup(model string) (Price, bool) {
 	return Price{}, false
 }
 
-// estimate prices t's unpriced tokens for model; ok is false without a price.
-func (p Prices) estimate(model string, t Totals) (float64, bool) {
+// estimate prices t's unpriced tokens for model; ok is false without a
+// price, cacheLeftOut when cached tokens had no cache-read price.
+func (p Prices) estimate(model string, t Totals) (usd float64, ok, cacheLeftOut bool) {
 	if t.UnpricedInputTokens+t.UnpricedOutputTokens == 0 {
-		return 0, false
+		return 0, false, false
 	}
 	pr, ok := p.lookup(model)
 	if !ok {
-		return 0, false
+		return 0, false, false
 	}
-	return (float64(t.UnpricedInputTokens)*pr.In + float64(t.UnpricedOutputTokens)*pr.Out) / 1e6, true
+	cached := min(t.UnpricedCacheReadTokens, t.UnpricedInputTokens)
+	usd = float64(t.UnpricedInputTokens-cached)*pr.In + float64(t.UnpricedOutputTokens)*pr.Out
+	if cached > 0 {
+		if pr.CacheRead > 0 {
+			usd += float64(cached) * pr.CacheRead
+		} else {
+			cacheLeftOut = true
+		}
+	}
+	return usd / 1e6, true, cacheLeftOut
 }
 
-// Entry is one turn of one chat.
+// Entry is one model's part of one turn of one chat.
 type Entry struct {
 	Chat    string // the chat's id
 	Label   string // what the chat is about (its first message), shown in Top chats

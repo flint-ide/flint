@@ -4,10 +4,26 @@
     <meta charset="UTF-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>flint</title>
+    <!-- Before the first paint: the cached theme and sidebar width (src/boot.ts). -->
+    <script src="./src/boot.ts"></script>
+    <!-- The skeleton below is what shows until React renders: the shell's layout
+         (title bar, activity bar, sidebar, editor, status bar) in the palette of
+         style.css, so Flint looks ready from the first frame. Keep it in step. -->
+    <style>
+        html, body, #root { height: 100%; margin: 0; overflow: hidden; }
+        html { --sk-side: #1c1d21; --sk-main: #141518; --sk-border: #2a2c32; background: var(--sk-main); }
+        html[data-theme='light'] { --sk-side: #ececef; --sk-main: #ffffff; --sk-border: #d5d6dc; }
+        .boot { display: flex; flex-direction: column; height: 100%; }
+        .boot > div { flex: none; background: var(--sk-side); }
+        .boot-titlebar { height: 40px; border-bottom: 1px solid var(--sk-border); }
+        .boot-workbench { flex: 1 !important; display: flex; min-height: 0; background: var(--sk-main) !important; }
+        .boot-activity { width: 44px; background: var(--sk-side); border-right: 1px solid var(--sk-border); }
+        .boot-sidebar { width: var(--boot-sidebar, 280px); background: var(--sk-side); border-right: 1px solid var(--sk-border); }
+        .boot-status { height: 22px; border-top: 1px solid var(--sk-border); }
+    </style>
 </head>
 <body data-file-drop-target>
-<div id="root"></div>
+<div id="root"><div class="boot" aria-hidden="true"><div class="boot-titlebar"></div><div class="boot-workbench"><div class="boot-activity"></div><div class="boot-sidebar"></div></div><div class="boot-status"></div></div></div>
 <script src="./src/main.tsx" type="module"></script>
 </body>
 </html>
-

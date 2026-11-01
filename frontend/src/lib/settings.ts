@@ -14,8 +14,9 @@ import {
 } from './editorAiSettings'
 import { coerceAgentTasks, DEFAULT_AGENT_TASKS, type AgentTaskSettings } from './agentTasks'
 
-export type ThemeMode = 'dark' | 'light' | 'system' | 'custom'
-export type ResolvedTheme = 'dark' | 'light'
+import type { ResolvedTheme, ThemeMode } from './themeMode'
+
+export { resolveTheme, type ResolvedTheme, type ThemeMode } from './themeMode'
 
 export interface FontSettings {
   fontFamily: string
@@ -115,13 +116,6 @@ export function parseExcludes(text: string): { patterns: string[]; invalid: stri
   }
   if (patterns.length > MAX_EXCLUDES) invalid.push(...patterns.splice(MAX_EXCLUDES))
   return { patterns, invalid }
-}
-
-/** The palette to use: System follows macOS (prefers-color-scheme), Custom its base palette. */
-export function resolveTheme(mode: ThemeMode, systemDark: boolean, customBase: ResolvedTheme = 'dark'): ResolvedTheme {
-  if (mode === 'system') return systemDark ? 'dark' : 'light'
-  if (mode === 'custom') return customBase
-  return mode
 }
 
 /** The custom theme's CSS variables, set on :root over the base palette (none unless Theme is Custom). */

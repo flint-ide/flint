@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -57,11 +58,13 @@ type appState struct {
 
 // App holds the services shared by all bound APIs.
 type App struct {
-	ctx       context.Context // ends when the application shuts down
-	wails     *application.App
-	window    application.Window // the main window
-	configDir string
-	argFolder string
+	ctx    context.Context // ends when the application shuts down
+	wails  *application.App
+	window application.Window // the main window
+	// pageLoaded is set once the window's page has loaded (window_darwin.go).
+	pageLoaded atomic.Bool
+	configDir  string
+	argFolder  string
 
 	db          *db.Manager
 	scratch     *scratch.Store

@@ -94,6 +94,8 @@ func main() {
 		MinWidth:         800,
 		MinHeight:        500,
 		BackgroundColour: background,
+		// Shown by showWindowEarly as soon as it exists, not after the page loads.
+		Hidden: true,
 		// Folders and files dragged from Finder (see filesDropped).
 		EnableFileDrop: true,
 		Mac: application.MacWindow{
@@ -119,6 +121,12 @@ func main() {
 		flint.emit(eventFilesDropped, droppedPaths(e.Context().DroppedFiles()))
 	})
 	flint.window = win
+	app.Event.OnApplicationEvent(events.Mac.ApplicationDidFinishLaunching, func(*application.ApplicationEvent) {
+		flint.showWindowEarly()
+	})
+	win.OnWindowEvent(events.Mac.WebViewDidFinishNavigation, func(*application.WindowEvent) {
+		flint.onPageLoaded()
+	})
 
 	if err := app.Run(); err != nil {
 		log.Fatalf("flint: %v", err)

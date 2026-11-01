@@ -119,6 +119,16 @@ flowchart LR
 - `wails3 task dev` runs `webbuild --watch`: a rebuild after every change and a page reload through esbuild's SSE stream (`/esbuild`), with no HMR. The dev server listens on `localhost:5173` (`FRONTEND_DEVSERVER_URL`), and Go rebuilds on change (`build/config.yml`).
 - `cmd/webbuild` also writes the Content Security Policy into `index.html` (see [Security model](#security-model)).
 
+### Startup
+
+What is on screen during the first half second:
+
+1. Wails creates the window hidden (`Hidden: true`) and, left alone, would show it only once the page has loaded, after WebKit has started its processes. Flint shows it as soon as it exists instead (`showWindowEarly`, on `ApplicationDidFinishLaunching`): the title bar and the theme's background (set in Go before the window exists) appear about 120 ms sooner (0.56 → 0.44 s in `cmd/bench`).
+2. The web view stays hidden until its page has loaded (`onPageLoaded`, on `WebViewDidFinishNavigation`), so it never flashes white; then the window is shown again, which is what Wails does for a window that isn't created hidden.
+3. `index.html` holds a skeleton of the shell (title bar, activity bar, sidebar, editor, status bar) styled inline in `style.css`'s palette, and `src/boot.ts`, a 1 KB classic script in `<head>` (built to `assets/boot.js`), sets the cached theme and sidebar width before the first paint. React replaces the skeleton when it renders. A change to the shell's layout or palette should be mirrored there.
+
+Measured with `cmd/bench` (see [BENCHMARK.md](BENCHMARK.md)). What did not help, and was left out: a lighter menu at startup, fewer bound services, and the logger. Each changed nothing measurable. Most of the remaining time is AppKit and WebKit starting: a Wails app with one empty window shows it after about 300 ms on the same machine.
+
 ### Tests
 
 `webbuild --test` compiles `src/**/*.test.ts(x)` into a temporary directory and runs `node --test`. Tests use `node:test` and `node:assert`. Types are checked by `tsc --noEmit`, and the `node:test` types are declared locally in `src/testing/node.d.ts` (no `@types/node`).

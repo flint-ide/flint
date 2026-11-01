@@ -62,6 +62,35 @@ func TestBuildBundlesTSXAndCSS(t *testing.T) {
 	}
 }
 
+// The boot script runs before the first paint, so it is a classic script of its
+// own in <head>, not part of the module bundle.
+func TestBuildBundlesTheBootScript(t *testing.T) {
+	root := newFrontend(t, map[string]string{
+		"index.html": `<!DOCTYPE html>
+<html><head><title>t</title><script src="./src/boot.ts"></script></head>
+<body><div id="root"></div>
+<script src="./src/main.tsx" type="module"></script>
+</body></html>`,
+		"src/main.tsx": "document.title = 'x'\n",
+		"src/boot.ts":  "import { theme } from './theme'\ndocument.documentElement.dataset.theme = theme()\n",
+		"src/theme.ts": "export const theme = (): string => 'dark'\n",
+	})
+	if err := build(root); err != nil {
+		t.Fatal(err)
+	}
+	js, err := os.ReadFile(filepath.Join(root, distDir, "assets/boot.js"))
+	if err != nil {
+		t.Fatalf("missing dist/assets/boot.js: %v", err)
+	}
+	if strings.Contains(string(js), "import") || strings.Contains(string(js), "export") {
+		t.Errorf("boot.js must be a classic script:\n%s", js)
+	}
+	html, _ := os.ReadFile(filepath.Join(root, distDir, "index.html"))
+	if !strings.Contains(string(html), `<script src="./assets/boot.js"></script>`) || strings.Contains(string(html), "boot.ts") {
+		t.Errorf("index.html doesn't load the built boot script:\n%s", html)
+	}
+}
+
 func TestBuildReportsErrors(t *testing.T) {
 	root := newFrontend(t, map[string]string{
 		"index.html":   indexHTML,

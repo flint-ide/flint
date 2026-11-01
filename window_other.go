@@ -19,3 +19,14 @@ func setNativeAppearance(string) bool { return true }
 func systemPrefersDark() bool { return true }
 
 func titlebarMetrics() TitlebarMetrics { return TitlebarMetrics{} }
+
+// showWindowEarly does nothing: there is no native window to show.
+func (a *App) showWindowEarly() {}
+
+// onPageLoaded shows the window once its page has loaded.
+func (a *App) onPageLoaded() {
+	a.pageLoaded.Store(true)
+	if a.window != nil {
+		a.window.Show()
+	}
+}

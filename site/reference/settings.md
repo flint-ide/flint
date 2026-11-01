@@ -103,6 +103,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `completions` | object | see below | Inline suggestions from a code model (off by default). See [completions](#completions). |
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
 | `agentTasks` | object | see below | Where agent task worktrees go and how their branches are named. See [agentTasks](#agenttasks). |
+| `prompts` | object | see below | The prompt library of the agent chat (`/`). See [prompts](#prompts). |
 
 ### Font objects
 
@@ -273,6 +274,16 @@ Used by [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel).
 | `branchPrefix` | string | `"agent/"` | Starts every task branch, followed by a name made from the task's first line. Letters, digits, `.`, `_`, `-` and `/`, up to 40 characters; may be empty. It may not start with `-`, `/` or `.`, or contain `..`, `//` or `/.`. |
 
 Slashes in a branch name become dashes in the folder name. The tasks themselves are kept in `state.json`.
+
+### prompts
+
+Used by the [prompt library](../guides/ai-agents.md#prompt-library).
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `builtins` | boolean | `true` | Offer the prompts that ship with Flint (`/review`, `/test`, `/explain`, `/fix`). |
+
+The prompts themselves are Markdown files, not settings: personal ones in the `prompts` folder next to `settings.json`, project ones in the repository's `.flint/prompts`.
 
 ## Related settings stored elsewhere
 

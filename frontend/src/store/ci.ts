@@ -117,7 +117,7 @@ function patch(key: string, change: Partial<CIEntry>): void {
 function schedule(key: string): void {
   clearTimeout(timers.get(key))
   const entry = get().entries[key]
-  if (entry?.state !== 'pending') return
+  if (!entry?.data?.pr || entry.data.counts.pending === 0) return // nothing running: nothing to wait for
   const { ci, notifyInBackground } = useSettings.getState().settings
   const focused = document.hasFocus()
   if (!focused && !(ci.notify && notifyInBackground)) return // the focus handler reads it again

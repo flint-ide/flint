@@ -1,7 +1,8 @@
-// Package cilog turns a CI log (gh run view --log-failed) into what an agent
+// Package cilog turns a CI log (failed steps in the GitHub CLI's --log-failed
+// shape, which internal/github writes from the Actions API) into what an agent
 // needs to fix the failure: the failing step's error lines and tail, and the
 // file:line references in it mapped to files of the workspace. Pure functions
-// over text plus file existence checks; no network, no gh.
+// over text plus file existence checks; no network.
 package cilog
 
 import (

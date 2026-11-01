@@ -172,14 +172,24 @@ func measure(e editor, project string, settle, timeout time.Duration) (result, e
 	return result{window: window, memory: memory}, nil
 }
 
+// waitForWindow polls the window list until the editor shows a window. The
+// main process owns the window in every measured editor; its children are
+// checked too, but listing them spawns ps, so only every 100 ms.
 func waitForWindow(pid int, start time.Time, timeout time.Duration) (time.Duration, error) {
-	for time.Since(start) < timeout {
-		for _, p := range processTree(pid) {
+	var tree []int
+	for i := 0; time.Since(start) < timeout; i++ {
+		if hasWindow(pid) {
+			return time.Since(start), nil
+		}
+		if i%50 == 0 {
+			tree = processTree(pid)[1:]
+		}
+		for _, p := range tree {
 			if hasWindow(p) {
 				return time.Since(start), nil
 			}
 		}
-		time.Sleep(5 * time.Millisecond)
+		time.Sleep(2 * time.Millisecond)
 	}
 	return 0, errors.New("no window appeared in time")
 }
@@ -252,28 +262,19 @@ func processTree(pid int) []int {
 var footprintLine = regexp.MustCompile(`\[(\d+)\]: .*Footprint: (\d+) B`)
 
 // footprint sums the physical footprint (what Activity Monitor shows as
-// Memory) of the processes.
+// Memory) of the processes. A process that exited meanwhile (a short-lived
+// helper) is skipped: footprint refuses the whole list when one pid is gone.
 func footprint(pids []int) (int64, error) {
-	args := []string{"-f", "bytes"}
-	for _, p := range pids {
-		args = append(args, strconv.Itoa(p))
-	}
-	out, err := exec.Command("footprint", args...).CombinedOutput()
-	if err != nil && len(out) == 0 {
-		return 0, fmt.Errorf("footprint: %w", err)
-	}
 	var total int64
-	seen := map[string]bool{}
-	for _, m := range footprintLine.FindAllStringSubmatch(string(out), -1) {
-		if seen[m[1]] {
-			continue
+	for _, pid := range pids {
+		out, _ := exec.Command("footprint", "-f", "bytes", strconv.Itoa(pid)).CombinedOutput()
+		if m := footprintLine.FindStringSubmatch(string(out)); m != nil {
+			n, _ := strconv.ParseInt(m[2], 10, 64)
+			total += n
 		}
-		seen[m[1]] = true
-		n, _ := strconv.ParseInt(m[2], 10, 64)
-		total += n
 	}
 	if total == 0 {
-		return 0, fmt.Errorf("footprint gave no numbers: %s", firstLine(out))
+		return 0, errors.New("footprint gave no numbers")
 	}
 	return total, nil
 }
@@ -328,11 +329,6 @@ func firstExisting(paths ...string) string {
 		}
 	}
 	return paths[0]
-}
-
-func firstLine(b []byte) string {
-	s, _, _ := strings.Cut(string(b), "\n")
-	return s
 }
 
 func fatal(err error) {

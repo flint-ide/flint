@@ -4,20 +4,22 @@ The numbers in the README come from `cmd/bench`. This page says what they measur
 
 ## Results
 
-Measured on 2026-11-01 on an Apple M4 Pro with 24 GB of memory, macOS 27.0.1. The project is the Go standard library source (`$(go env GOROOT)/src`, 12,053 files). Each editor ran once to warm up and then five times; the table shows the medians.
+Measured on 2026-11-01 on an Apple M4 Pro with 24 GB of memory, macOS 27.0.1. The project is the Go standard library source (`$(go env GOROOT)/src`, 12,053 files). Each editor ran once to warm up and then seven times (`-runs 7`); the table shows the medians.
 
 | Editor | Version | First window | Memory after 30 s idle |
 |---|---|---|---|
-| Flint | build of `main` | 0.56 s | 118 MB |
-| Visual Studio Code | 1.115.0 | 0.57 s | 671 MB |
-| Zed | 1.27.0 (Preview) | 0.39 s | 135 MB |
+| Flint | build of `main` | 0.44 s | 135 MB |
+| Visual Studio Code | 1.115.0 | 0.56 s | 599 MB |
+| Zed | 1.27.0 (Preview) | 0.34 s | 160 MB |
+
+Flint before it showed its window early (see [Startup](ARCHITECTURE.md#startup)), measured in the same session: 0.56 s and 136 MB. Zed's memory varied most between runs (134 to 169 MB).
 
 Cursor wasn't installed on that machine; the program measures it too when it is.
 
 ## What is measured
 
-- **First window:** the time from starting the editor's binary until it has an on-screen window of a real size (at least 300 × 200 points). The program watches the window list of the editor's processes through CoreGraphics, which needs no Screen Recording permission. This is when a window appears, not when everything in it has finished loading: VS Code, for example, keeps loading its workbench after the window shows.
-- **Memory:** the physical footprint, what Activity Monitor shows as Memory, read with `footprint` 30 seconds after the window appeared, summed over all of the editor's processes:
+- **First window:** the time from starting the editor's binary until it has an on-screen window of a real size (at least 300 × 200 points). The program polls the window list through CoreGraphics, which needs no Screen Recording permission: the main process every 2 ms, its children every 100 ms (listing them runs `ps`). This is when a window appears, not when everything in it has finished loading: VS Code keeps loading its workbench after the window shows, and Flint's window shows only its title bar and background until its page has loaded.
+- **Memory:** the physical footprint, what Activity Monitor shows as Memory, read with `footprint` for each process 30 seconds after the window appeared, summed over all of the editor's processes (a helper that exits meanwhile is skipped):
   - the process the program started and all its descendants (VS Code's helpers, language servers);
   - for Flint, also WebKit's processes (web content, networking, GPU) that appeared during the run. A WKWebView renders in XPC services that launchd starts, so they are not Flint's children, but they are part of what Flint costs.
 

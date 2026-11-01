@@ -4798,6 +4798,7 @@ body.file-drop-target-active::after {
   white-space: pre;
   overflow: auto;
   max-height: 240px;
+}
 /* CI of your pull requests (store/ci.ts) */
 .status-ci-group {
   display: flex;

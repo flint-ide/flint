@@ -35,7 +35,10 @@ func systemPrefersDark() bool { return desktop.PrefersDark() }
 
 func titlebarMetrics() TitlebarMetrics { return TitlebarMetrics{} }
 
-// onLaunched runs launched once the app has started.
+// onLaunched runs launched once the app has started. In the server build
+// (which uses this file on macOS too) Wails never emits ApplicationStarted and
+// its windows are no-ops, so nothing runs there: the login-shell PATH is
+// imported on first use (shellenv.Wait), as before.
 func (a *App) onLaunched(app *application.App, _ *application.WebviewWindow, launched func()) {
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) { launched() })
 }

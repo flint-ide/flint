@@ -152,6 +152,41 @@ func TestParseCapsSizes(t *testing.T) {
 	}
 }
 
+// An agent may quote a credential it read (a planted instruction can ask it
+// to): findings carry no secret values, and no bidi or zero-width tricks.
+func TestParseRedactsAndStripsFormatCharacters(t *testing.T) {
+	answer := `[{"file": "main.go", "line": 1, "title": "Leaked ‮key‬ AKIAIOSFODNN7EXAMPLE",
+	  "explanation": "The .env has DB_PASSWORD=hunter2 and ghp_0123456789abcdefghijklmnopqrstuvwxyzAB​.",
+	  "suggestion": "\tpassword := \"hunter2-secret\""}]`
+	p, err := Parse(answer, files)
+	if err != nil || len(p.Findings) != 1 {
+		t.Fatalf("%+v %v", p, err)
+	}
+	f := p.Findings[0]
+	all := f.Title + f.Explanation + f.Suggestion
+	for _, leak := range []string{"AKIAIOSFODNN7EXAMPLE", "hunter2", "ghp_0123", "‮", "‬", "​"} {
+		if strings.Contains(all, leak) {
+			t.Errorf("finding keeps %q: %+v", leak, f)
+		}
+	}
+	if !strings.HasPrefix(f.Suggestion, "\tpassword := ") {
+		t.Errorf("suggestion lost its indentation: %q", f.Suggestion)
+	}
+}
+
+func TestPlace(t *testing.T) {
+	f := Place(Finding{Line: 4, EndLine: 9}, files["main.go"])
+	if f.Line != 4 || f.EndLine != 5 || f.LineText != "\tx := 1" || f.Before != "func main() {" || f.After != "}" {
+		t.Errorf("Place = %+v", f)
+	}
+	if f := Place(Finding{Line: 6, LineText: "stale"}, files["main.go"]); f.Line != 0 || f.LineText != "" {
+		t.Errorf("past the end = %+v", f)
+	}
+	if f := Place(Finding{Line: 40}, nil); f.Line != 40 || f.EndLine != 40 {
+		t.Errorf("unknown lines = %+v", f)
+	}
+}
+
 func TestPromptAsksForJSON(t *testing.T) {
 	p := Prompt()
 	for _, want := range []string{`"findings"`, "severity", "line", "Do not change any files"} {

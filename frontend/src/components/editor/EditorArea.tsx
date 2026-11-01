@@ -18,6 +18,7 @@ import { Welcome } from '../layout/Welcome'
 import { ErrorBoundary } from '../layout/ErrorBoundary'
 import { FileIcon, TabKindIcon } from '../icons/FileIcon'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
+import { formatKeys } from '../../lib/commands'
 
 // CodeMirror, the SQL console and the agent chat load on first use, keeping startup
 // to the layout plus the terminal.
@@ -240,7 +241,7 @@ function NewTabMenu() {
   ]
   const items = (): DropdownItem[] => {
     const here = activeRoot()
-    const head = forRoot(here).map((it, i) => (i === 0 && 'onSelect' in it ? { ...it, kbd: '⇧⌘T' } : it))
+    const head = forRoot(here).map((it, i) => (i === 0 && 'onSelect' in it ? { ...it, kbd: formatKeys('Mod+Shift+T') } : it))
     if (roots.length < 2) return [...head, ...tail]
     const labels = rootLabels(roots)
     return [
@@ -252,7 +253,7 @@ function NewTabMenu() {
   }
   const tail: DropdownItem[] = [
     { type: 'separator' },
-    { label: 'SQL console', kbd: '⌘N', icon: <TabKindIcon kind="sql" />, onSelect: () => void useScratch.getState().create('sql') },
+    { label: 'SQL console', kbd: formatKeys('Mod+N'), icon: <TabKindIcon kind="sql" />, onSelect: () => void useScratch.getState().create('sql') },
     { label: 'Markdown note', icon: <TabKindIcon kind="markdown" />, onSelect: () => void useScratch.getState().create('markdown') },
   ]
   return (
@@ -261,7 +262,7 @@ function NewTabMenu() {
         align="end"
         items={items}
         trigger={(t) => (
-          <button {...t} className="icon new-tab" title="New terminal (⇧⌘T), agent chat or SQL console">＋</button>
+          <button {...t} className="icon new-tab" title={`New terminal (${formatKeys('Mod+Shift+T')}), agent chat or SQL console`}>＋</button>
         )}
       />
       {starting && <span className="muted starting">starting {starting}…</span>}

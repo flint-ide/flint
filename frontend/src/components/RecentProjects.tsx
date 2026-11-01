@@ -5,6 +5,7 @@ import { useWorkspace } from '../store/workspace'
 import { showToast } from '../store/dialog'
 import { Modal } from './layout/Modal'
 import { FileIcon } from './icons/FileIcon'
+import { formatKeys } from '../lib/commands'
 
 const tildify = (p: string) => p.replace(/^\/Users\/[^/]+/, '~')
 
@@ -76,7 +77,7 @@ export function RecentProjects() {
       <input
         autoFocus
         className="quick-input"
-        placeholder={root ? 'Open recent project…  (⌘↵ new window · ⌥↵ add to workspace)' : 'Open recent project…  (⌘↵ new window)'}
+        placeholder={`Open recent project…  (${formatKeys('Mod+Enter')} new window${root ? ` · ${formatKeys('Alt+Enter')} add to workspace` : ''})`}
         value={query}
         spellCheck={false}
         onChange={(e) => setQuery(e.target.value)}
@@ -95,14 +96,14 @@ export function RecentProjects() {
               <FileIcon name="folder" isDir />
               <span className="file-name">Add Project to Workspace…</span>
               <span className="muted path-hint">open it next to {root?.split('/').pop()}</span>
-              <kbd>⇧⌘O</kbd>
+              <kbd>{formatKeys('Mod+Shift+O')}</kbd>
             </div>
           ) : path === null ? (
             <div key="browse" className={`quick-item${i === cursor ? ' selected' : ''}`} onMouseMove={() => setCursor(i)} onClick={() => void browse()}>
               <FileIcon name="folder" isDir open />
               <span className="file-name">Browse…</span>
               <span className="muted path-hint">choose a folder</span>
-              <kbd>⌘O</kbd>
+              <kbd>{formatKeys('Mod+O')}</kbd>
             </div>
           ) : (
             <div
@@ -120,7 +121,7 @@ export function RecentProjects() {
               {root && !roots.includes(path) && (
                 <button
                   className="icon recent-forget"
-                  title="Add to workspace (⌥↵)"
+                  title={`Add to workspace (${formatKeys('Alt+Enter')})`}
                   onClick={(e) => {
                     e.stopPropagation()
                     void addProject(path)

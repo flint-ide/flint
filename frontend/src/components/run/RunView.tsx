@@ -15,6 +15,8 @@ import { usePersistentNumber } from '../../lib/usePersistentNumber'
 import { Splitter } from '../layout/Splitter'
 import { currentTerminalOptions, useTerminalSettings } from '../terminal/useTerminalSettings'
 import { PlayIcon, RerunIcon, StopIcon } from './RunWidget'
+import { formatKeys, keyHint } from '../../lib/commands'
+import { modifierName } from '../../lib/platform'
 
 interface Props {
   runKey: string
@@ -33,10 +35,10 @@ export function RunView({ runKey, active }: Props) {
   return (
     <div className="run-view">
       <div className="run-toolbar">
-        <button className="icon" title="Rerun (⌃R)" onClick={() => void rerun(runKey)}>
+        <button className="icon" title={`Rerun (${keyHint('run.selected')})`} onClick={() => void rerun(runKey)}>
           {session.running ? <RerunIcon /> : <PlayIcon />}
         </button>
-        <button className="icon run-stop" title="Stop (⌘F2)" disabled={!session.running} onClick={() => void stopRun(runKey)}>
+        <button className="icon run-stop" title={`Stop (${formatKeys('Mod+F2')})`} disabled={!session.running} onClick={() => void stopRun(runKey)}>
           <StopIcon />
         </button>
         {isTests && (
@@ -46,7 +48,7 @@ export function RunView({ runKey, active }: Props) {
             </button>
             <button
               className="run-fix"
-              title="Send the failures to the agent chat (⌥-click sends right away)"
+              title={`Send the failures to the agent chat (${modifierName('Alt')}-click sends right away)`}
               disabled={session.running || noFailures}
               onClick={(e) => void fixFailedTestsWithAgent(e.altKey)}
             >

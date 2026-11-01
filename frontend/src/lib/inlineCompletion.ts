@@ -6,7 +6,6 @@
 // keeps the rest shown.
 import { EditorSelection, Prec, StateEffect, StateField, Transaction, type Extension, type Text } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin, WidgetType, keymap, type DecorationSet, type ViewUpdate } from '@codemirror/view'
-import { completionStatus } from '@codemirror/autocomplete'
 import { acceptGhost, advanceGhost, cleanSuggestion, completionContext, shouldSuggest, type Ghost } from './ghostText'
 import type { Cancellable } from './inlineEditWidget'
 
@@ -94,7 +93,8 @@ class Controller {
       lineText: line.text,
       column: head - line.from,
     })
-    if (!trigger || state.field(ghostField, false) || completionStatus(state) !== null) return
+    // The completion popup may be open too: Enter picks from it, Tab takes the suggestion.
+    if (!trigger || state.field(ghostField, false)) return
     this.timer = setTimeout(() => this.request(), opts.debounceMs)
   }
 

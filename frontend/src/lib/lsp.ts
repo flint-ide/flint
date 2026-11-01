@@ -7,6 +7,7 @@ import * as LSP from '../../bindings/flint/lspapi'
 import type { lsp } from '../wails/models'
 import { onDiagnostics, currentDiagnostics } from '../store/lsp'
 import { agentActions, fixFileProblemsWithAgent } from './lspAgent'
+import { modKey } from './platform'
 
 export type Location = lsp.Location
 
@@ -184,7 +185,7 @@ export function lspExtension(root: string, path: string, hooks: LspHooks): Exten
     ]),
     EditorView.domEventHandlers({
       mousedown(e, view) {
-        if (!e.metaKey || e.button !== 0) return false
+        if (!modKey(e) || e.button !== 0) return false
         const pos = view.posAtCoords({ x: e.clientX, y: e.clientY })
         if (pos === null) return false
         e.preventDefault()

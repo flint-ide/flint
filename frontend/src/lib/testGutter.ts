@@ -6,6 +6,7 @@ import { EditorView, GutterMarker, ViewPlugin, gutter, type ViewUpdate } from '@
 import * as RunAPI from '../../bindings/flint/runapi'
 import type { TestStatus } from './runTree'
 import { testLang, type TestGutterHooks, type TestMark } from './testFiles'
+import { modifierName } from './platform'
 
 export { testLang, type TestGutterHooks, type TestMark }
 
@@ -46,8 +47,8 @@ class TestMarker extends GutterMarker {
     el.textContent = ICONS[this.status ?? 'idle']
     el.title =
       this.mark.kind === 'file'
-        ? `Run tests in file (⌥-click: whole package${this.go ? ', ⇧-click: debug' : ''})`
-        : `Run ${this.mark.name}${this.status ? ` — last run: ${this.status}` : ''}${this.go ? ' (⇧-click: debug, right click: more)' : ''}`
+        ? `Run tests in file (${modifierName('Alt')}-click: whole package${this.go ? `, ${modifierName('Shift')}-click: debug` : ''})`
+        : `Run ${this.mark.name}${this.status ? ` — last run: ${this.status}` : ''}${this.go ? ` (${modifierName('Shift')}-click: debug, right click: more)` : ''}`
     return el
   }
 }

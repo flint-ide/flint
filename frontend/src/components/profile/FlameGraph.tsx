@@ -4,6 +4,7 @@ import {
   type FlameFrame, type FramePath, type FrameRect, type SearchResult,
 } from '../../lib/flame'
 import { useSettings } from '../../store/settings'
+import { modKey, modifierName } from '../../lib/platform'
 
 /** Row height of a frame (CSS px). */
 const ROW = 18
@@ -89,7 +90,7 @@ export function FlameGraph({ root, unit, focus, onFocus, search, onOpen }: Props
         onClick={(e) => {
           const rect = at(e)
           if (!rect) return
-          if (e.metaKey) onOpen(rect.frame)
+          if (modKey(e)) onOpen(rect.frame)
           else if (!samePath(rect.path, focus)) onFocus(rect.path)
         }}
         onDoubleClick={(e) => {
@@ -123,7 +124,7 @@ function Tooltip({ hover, rootTotal, focusTotal, zoomed, unit }: { hover: Hover;
         <b>{formatValue(frame.self, unit)}</b>
         <span>{percent(frame.self, rootTotal)}</span>
       </div>
-      <div className="muted flame-tooltip-hint">Click to zoom · ⌘-click or double-click opens the source</div>
+      <div className="muted flame-tooltip-hint">Click to zoom · {modifierName('Mod')}-click or double-click opens the source</div>
     </div>
   )
 }

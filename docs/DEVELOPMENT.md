@@ -4,10 +4,10 @@ This guide covers building, running and testing Flint from source. For how the c
 
 ## Requirements
 
-- macOS 12 or later
+- macOS 12 or later, or Linux (x86_64 or arm64) with GTK 4 and WebKitGTK 6.0 (see [Building on Linux](#building-on-linux))
 - Go 1.27.3+
 - Node 22+ (only for type checking and running frontend tests; there is no npm build step)
-- Xcode Command Line Tools (`xcode-select --install`), needed for cgo
+- macOS: Xcode Command Line Tools (`xcode-select --install`), needed for cgo
 - `wails3` v3.0.0:
 
   ```bash
@@ -104,6 +104,49 @@ The build targets macOS 12 (`MACOSX_DEPLOYMENT_TARGET=12.0`) with cgo enabled.
 
 `make install` copies the app to `/Applications` and installs `scripts/flint` as `~/.local/bin/flint`. `flint [folder]` opens a folder (default: the current one); a running Flint takes it over and comes to the front.
 
+## Building on Linux
+
+Flint builds against GTK 4 and WebKitGTK 6.0 (Wails v3's default on Linux), so it needs a distribution that ships them: Ubuntu 24.04+, Debian 13+, Fedora 39+ or Arch. On Debian and Ubuntu:
+
+```bash
+sudo apt install build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev libx11-dev
+go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
+cd frontend && npm ci --ignore-scripts && cd ..
+wails3 task build            # build/bin/flint
+wails3 task package:linux    # build/bin/flint-dev-linux-<arch>.tar.gz
+build/bin/flint .
+```
+
+`package:linux` packs a prefix layout: `bin/flint`, `share/applications/io.github.odudek.flint.desktop` and the icon in `share/icons/hicolor/512x512/apps`. `tar -xzf build/bin/flint-dev-linux-amd64.tar.gz -C ~/.local` installs it for the current user (the launcher appears in the desktop's app list; `~/.local/bin` must be on `PATH`). The binary is the `flint` command: a second `flint <folder>` hands the folder to the running Flint, as on macOS.
+
+`make dev`, `make server` and `make test` work as on macOS; `make build` and `make install` build the macOS app bundle, so use the tasks above.
+
+### From macOS, in Docker
+
+`build/linux/Dockerfile` is a Linux environment with Go, Node 22, wails3, the GTK and WebKitGTK headers, and Xvfb. `node_modules` from a macOS checkout holds macOS binaries, so the container gets its own in a volume:
+
+```bash
+docker build -t flint-linux build/linux
+docker run --rm -v "$PWD:/src" -v flint-linux-node-modules:/src/frontend/node_modules -w /src flint-linux sh -c '
+  (cd frontend && npm ci --ignore-scripts) &&
+  go vet ./... && go test ./... &&
+  wails3 task package:linux'
+```
+
+To see the window, start it under Xvfb in the same container and take a screenshot of the virtual display:
+
+```bash
+Xvfb :99 -screen 0 1440x920x24 & export DISPLAY=:99
+FLINT_CONFIG_DIR=/tmp/flint dbus-run-session -- build/bin/flint /src &
+sleep 20; xwd -root -silent | convert xwd:- png:/src/build/bin/screen.png
+```
+
+Server mode (`go run -tags server .`) needs no display at all. Remove the image and volumes when you are done (`docker rmi flint-linux`, `docker volume rm flint-linux-node-modules`).
+
+### Platform code
+
+What differs per system is listed in [ARCHITECTURE.md](ARCHITECTURE.md#platforms). In short: a `_darwin.go` / `_linux.go` / `_other.go` file per system for anything that needs cgo or a system service, `runtime.GOOS` in small pure functions otherwise, and `lib/platform.ts` in the frontend. Shortcuts are written with `Mod` (⌘ on macOS, Ctrl elsewhere) and shown with `formatKeys`; never put a ⌘ glyph in UI text. Go tests of Linux code run in the Linux CI job (or the Docker recipe above); frontend tests switch platforms with `setMac(false)`.
+
 ## Tests
 
 ```bash
@@ -128,7 +171,7 @@ make lint       # go vet ./... and gofmt -l (fails on unformatted files)
 make vuln       # govulncheck (pinned version, via go run) and npm audit of runtime dependencies
 ```
 
-CI (`.github/workflows/ci.yml`, macOS) runs on every pull request and on pushes to `main`: the bindings staleness check, frontend tests and typecheck, gofmt, go vet, `go test -race ./...`, a build with the `production` and `server` tags, govulncheck, and `npm audit --omit=dev --audit-level=high`. CodeQL (`.github/workflows/codeql.yml`) analyzes the Go and TypeScript code.
+CI (`.github/workflows/ci.yml`) runs on every pull request and on pushes to `main`. The macOS job runs the bindings staleness check, frontend tests and typecheck, gofmt, go vet, `go test -race ./...`, a build with the `production` and `server` tags, govulncheck, and `npm audit --omit=dev --audit-level=high`. The Linux jobs (Ubuntu 24.04, x86_64 and arm64) run the frontend tests, go vet, `go test -race ./...`, the `server` build and `wails3 task package:linux`. CodeQL (`.github/workflows/codeql.yml`) analyzes the Go and TypeScript code.
 
 ## npm policy
 
@@ -163,7 +206,7 @@ Signing and notarization are optional. They run only when the Apple secrets are 
 
 ## Logs while developing
 
-Flint writes its log to `~/Library/Logs/Flint/flint.log` (Help ▸ Show Logs in Finder). Frontend errors and Go panics are logged there too. Use `internal/redact` for anything that might contain secrets or personal paths before it reaches the log.
+Flint writes its log to `~/Library/Logs/Flint/flint.log` on macOS and `~/.local/state/flint/flint.log` on Linux (Help ▸ Show Logs in Finder / File Manager). Frontend errors and Go panics are logged there too. Use `internal/redact` for anything that might contain secrets or personal paths before it reaches the log.
 
 ## User documentation site
 

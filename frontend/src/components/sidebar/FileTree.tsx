@@ -11,6 +11,8 @@ import { createEntry, renameEntry, trashEntries, type NewKind } from '../../stor
 import { FileIcon } from '../icons/FileIcon'
 import { openContextMenu } from '../../store/contextMenu'
 import { fileTreeMenu } from './fileTreeMenu'
+import { formatKeys } from '../../lib/commands'
+import { modKey } from '../../lib/platform'
 
 const ROW_HEIGHT = 22
 
@@ -82,7 +84,7 @@ export function FileTree() {
   }
 
   const onRowClick = (e: MouseEvent, entry: TreeEntry) => {
-    if (e.metaKey) {
+    if (modKey(e)) {
       setSelection((sel) => toggleIn(sel, entry.path))
       setAnchor(entry.path)
       setLead(entry.path)
@@ -148,7 +150,7 @@ export function FileTree() {
     <div className="panel">
       <div className="panel-header">
         <span className="panel-title" title={roots.join('\n')}>{implicitRoot ? basename(implicitRoot) : 'Workspace'}</span>
-        <button className="icon" title="Add Project to Workspace… (⇧⌘O)" onClick={() => void useWorkspace.getState().pickRoot()}>＋</button>
+        <button className="icon" title={`Add Project to Workspace… (${formatKeys('Mod+Shift+O')})`} onClick={() => void useWorkspace.getState().pickRoot()}>＋</button>
         <button className="icon" title="Refresh" onClick={() => void reloadTree()}>↻</button>
       </div>
       <div className="tree" ref={setTreeRef} tabIndex={0} onKeyDown={onKeyDown} onContextMenu={(e) => onContextMenu(e, null)}>
@@ -226,13 +228,13 @@ interface KeyActions {
   clear: () => void
 }
 
-/** Finder-style keys: arrows move / expand, Enter or F2 renames, ⌘⌫ or Delete trashes. */
+/** Finder-style keys: arrows move / expand, Enter or F2 renames, ⌘⌫ (Ctrl+Backspace) or Delete trashes. */
 function treeKey(e: KeyboardEvent, rows: Row[], lead: string | null, act: KeyActions): boolean {
   const at = rows.findIndex((r) => r.entry.path === lead)
   const row = rows[at]
   switch (e.key) {
     case 'ArrowDown':
-      if (e.metaKey) return row ? (act.open(row), true) : false
+      if (modKey(e)) return row ? (act.open(row), true) : false
       return rows.length > 0 && (act.move(rows[Math.min(at + 1, rows.length - 1)].entry.path, e.shiftKey), true)
     case 'ArrowUp':
       return rows.length > 0 && (act.move(rows[Math.max(at - 1, 0)].entry.path, e.shiftKey), true)
@@ -254,7 +256,7 @@ function treeKey(e: KeyboardEvent, rows: Row[], lead: string | null, act: KeyAct
     case 'Delete':
       return act.trash(), true
     case 'Backspace':
-      return e.metaKey && (act.trash(), true)
+      return modKey(e) && (act.trash(), true)
     case 'Escape':
       return act.clear(), true
   }

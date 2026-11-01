@@ -7,6 +7,8 @@ import type { SearchMatch } from '../../api/backend'
 import { FileIcon } from '../icons/FileIcon'
 import { displayPath, labelOf } from '../../lib/workspaceRoots'
 import { fileKey, matchKey } from '../../lib/replaceTargets'
+import { formatKeys } from '../../lib/commands'
+import { modKey } from '../../lib/platform'
 
 const basename = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 const dirname = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
@@ -102,7 +104,7 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
           <Toggle on={params.wholeWord} title="Whole word" onClick={() => setParams({ wholeWord: !params.wholeWord })}>W</Toggle>
           <Toggle on={params.regex} title="Regular expression" onClick={() => setParams({ regex: !params.regex })}>.*</Toggle>
           <Toggle on={showFilters} title="File filters" onClick={() => setShowFilters(!showFilters)}>⋯</Toggle>
-          <Toggle on={params.replaceOn} title="Replace (⇧⌘R)" onClick={() => setParams({ replaceOn: !params.replaceOn })}>⇄</Toggle>
+          <Toggle on={params.replaceOn} title={`Replace (${formatKeys('Mod+Shift+R')})`} onClick={() => setParams({ replaceOn: !params.replaceOn })}>⇄</Toggle>
         </div>
         {params.replaceOn && (
           <div className="search-input search-replace">
@@ -111,11 +113,11 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
               placeholder={params.regex ? 'Replace ($1, ${name} for groups)' : 'Replace'}
               spellCheck={false}
               onChange={(e) => setParams({ replace: e.target.value })}
-              onKeyDown={(e) => e.key === 'Enter' && e.metaKey && void useSearch.getState().replaceAll(roots)}
+              onKeyDown={(e) => e.key === 'Enter' && modKey(e) && void useSearch.getState().replaceAll(roots)}
             />
             <button
               className="replace-all"
-              title="Replace every ticked match (⌘↵)"
+              title={`Replace every ticked match (${formatKeys('Mod+Enter')})`}
               disabled={replacing || !!runningId || matches.length === 0}
               onClick={() => void useSearch.getState().replaceAll(roots)}
             >

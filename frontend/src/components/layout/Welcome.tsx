@@ -2,17 +2,18 @@ import { useEffect, useState } from 'react'
 import { Workspace } from '../../api/backend'
 import { useWorkspace } from '../../store/workspace'
 import { openToolCheck } from '../../store/toolCheck'
+import { formatKeys } from '../../lib/commands'
 
 const SHORTCUTS: [string, string][] = [
-  ['⌘P', 'Go to file'],
-  ['⇧⌘F', 'Search in project'],
-  ['⌘K', 'Commit'],
-  ['⇧⌘K', 'Push'],
-  ['⌘J', 'Terminal ↔ last file'],
-  ['⌘[ / ⌘]', 'Back / forward'],
-  ['⌘N', 'New SQL console'],
-  ['⌘↵', 'Run statement'],
-  ['⌘B', 'Toggle sidebar'],
+  [formatKeys('Mod+P'), 'Go to file'],
+  [formatKeys('Mod+Shift+F'), 'Search in project'],
+  [formatKeys('Mod+K'), 'Commit'],
+  [formatKeys('Mod+Shift+K'), 'Push'],
+  [formatKeys('Mod+J'), 'Terminal ↔ last file'],
+  [`${formatKeys('Mod+[')} / ${formatKeys('Mod+]')}`, 'Back / forward'],
+  [formatKeys('Mod+N'), 'New SQL console'],
+  [formatKeys('Mod+Enter'), 'Run statement'],
+  [formatKeys('Mod+B'), 'Toggle sidebar'],
 ]
 
 export function Welcome() {

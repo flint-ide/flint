@@ -4,6 +4,7 @@ import { db } from '../../wails/models'
 import { useDatabase } from '../../store/database'
 import { Modal } from '../layout/Modal'
 import { Select } from '../ui/Select'
+import { keyringName } from '../../lib/platform'
 
 interface Props {
   initial: Connection | null
@@ -115,7 +116,7 @@ export function ConnectionForm({ initial, onClose }: Props) {
             <input
               type="password"
               value={password}
-              placeholder={passwordTouched ? '' : '•••••• (stored in Keychain)'}
+              placeholder={passwordTouched ? '' : `•••••• (stored in ${keyringName()})`}
               autoComplete="new-password"
               onChange={(e) => {
                 setPassword(e.target.value)

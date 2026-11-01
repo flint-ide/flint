@@ -4,6 +4,7 @@ import { formatDuration } from '../../lib/format'
 import { historyKindLabel, relativeTime, sqlPreview } from '../../lib/queryHistory'
 import { confirmAction, showToast } from '../../store/dialog'
 import { Modal } from '../layout/Modal'
+import { formatKeys } from '../../lib/commands'
 
 const FILTER_DEBOUNCE_MS = 80
 const LIST_LIMIT = 300
@@ -134,8 +135,8 @@ export function QueryHistory({ connId, connName, driver, database, onInsert, onR
                 <span className="spacer" />
                 <span className="row-actions">
                   <button className="link" onClick={() => onInsert(entry)} title="Insert into the editor (↵)">Insert</button>
-                  {canRun(entry) && <button className="link" onClick={() => onRun(entry)} title="Run again (⌘↵)">Run</button>}
-                  <button className="link" onClick={() => void copy(entry)} title="Copy (⌘C)">Copy</button>
+                  {canRun(entry) && <button className="link" onClick={() => onRun(entry)} title={`Run again (${formatKeys('Mod+Enter')})`}>Run</button>}
+                  <button className="link" onClick={() => void copy(entry)} title={`Copy (${formatKeys('Mod+C')})`}>Copy</button>
                 </span>
               </div>
             </div>
@@ -146,7 +147,7 @@ export function QueryHistory({ connId, connName, driver, database, onInsert, onR
         )}
       </div>
       <div className="history-footer muted">
-        <span>↵ insert · ⌘↵ run · ⌘C copy</span>
+        <span>↵ insert · {formatKeys('Mod+Enter')} run · {formatKeys('Mod+C')} copy</span>
         <span className="spacer" />
         <button className="link" onClick={() => void clear()}>Clear History…</button>
       </div>

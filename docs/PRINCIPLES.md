@@ -31,6 +31,7 @@ Adding a language, an agent, a panel, a database or a run type should mean addin
 - Features register themselves in a registry (commands and shortcuts in `lib/commands.ts`, sidebar panels in `panels/index.ts`, agent drivers, LSP server specs, run-configuration detectors) instead of being listed in several places.
 - Backends talk to the UI through Wails services and events with stable, typed contracts (generated bindings).
 - A new external tool is a package under `internal/` with a narrow API, validated inputs and its own tests.
+- What differs per operating system lives behind one small API with a file per system (`_darwin.go`, `_linux.go`, and an `_other.go` fallback that says honestly what isn't supported) and, in the UI, in `lib/platform.ts`; feature code doesn't branch on the system or hard-code ⌘ (see [Platforms](ARCHITECTURE.md#platforms)).
 
 **In practice:** a contributor should be able to add a feature by reading one existing feature of the same kind.
 

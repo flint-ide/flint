@@ -9,7 +9,7 @@
 //     id: 'git.blame',                 // unique, "<area>.<action>"
 //     title: 'Annotate with Git Blame',
 //     category: 'Git',
-//     keys: 'Mod+Alt+B',               // optional global shortcut ('Mod' = ⌘)
+//     keys: 'Mod+Alt+B',               // optional global shortcut ('Mod' = ⌘ / Ctrl)
 //     when: () => useGit.getState().isRepo, // optional: hidden and not dispatched when false
 //     run: () => openBlame(),
 //   }), [])
@@ -25,6 +25,12 @@
 // maps a command id to other keys, or to '' for none. effectiveKeys is what the
 // dispatcher runs and the palette shows; `keys` stays the default.
 // Framework-free on purpose: no React, no stores, so it is testable with node:test.
+//
+// Platforms (lib/platform.ts): 'Mod' is ⌘ on macOS and Ctrl on Linux / Windows, where
+// 'Meta' names the Super key. Shortcuts show as glyphs on macOS (⇧⌘P) and spelled out
+// elsewhere (Ctrl+Shift+P). A default that has to differ per platform picks with isMac().
+
+import { isMac } from './platform'
 
 export interface Command {
   /** Unique id, "<area>.<action>" (e.g. "git.push"). */
@@ -122,10 +128,16 @@ export function runCommand(cmd: Command): void {
 }
 
 const MODIFIERS: Record<string, keyof Omit<Chord, 'key'>> = {
-  mod: 'meta', cmd: 'meta', meta: 'meta', ctrl: 'ctrl', control: 'ctrl', alt: 'alt', option: 'alt', shift: 'shift',
+  cmd: 'meta', meta: 'meta', super: 'meta', ctrl: 'ctrl', control: 'ctrl', alt: 'alt', option: 'alt', shift: 'shift',
 }
 
-/** 'Mod+Shift+P' → { key: 'p', meta: true, shift: true, … }. 'Mod' is ⌘ (Flint is macOS-only). */
+/** The chord flag of a modifier name; 'Mod' is ⌘ on macOS and Ctrl elsewhere. */
+function modifierFlag(name: string): keyof Omit<Chord, 'key'> | undefined {
+  const m = name.toLowerCase()
+  return m === 'mod' ? (isMac() ? 'meta' : 'ctrl') : MODIFIERS[m]
+}
+
+/** 'Mod+Shift+P' → { key: 'p', meta: true, shift: true, … } on macOS ({ ctrl: true, … } elsewhere). */
 export function parseKeys(keys: string): Chord {
   const parts = keys.split('+')
   // 'Mod++' names the plus key itself.
@@ -133,20 +145,22 @@ export function parseKeys(keys: string): Chord {
   const mods = keys.endsWith('++') ? parts.slice(0, -2) : parts.slice(0, -1)
   const chord: Chord = { key: key.toLowerCase(), meta: false, ctrl: false, alt: false, shift: false }
   for (const m of mods) {
-    const flag = MODIFIERS[m.toLowerCase()]
+    const flag = modifierFlag(m)
     if (!flag) throw new Error(`Unknown modifier "${m}" in shortcut "${keys}"`)
     chord[flag] = true
   }
   return chord
 }
 
-// Every keystroke in an editor passes through the dispatcher: parse each shortcut once.
+// Every keystroke in an editor passes through the dispatcher: parse each shortcut once
+// (per platform, since 'Mod' depends on it).
 const parsed = new Map<string, Chord>()
 const chordFor = (keys: string): Chord => {
-  const hit = parsed.get(keys)
+  const id = (isMac() ? 'mac:' : 'pc:') + keys
+  const hit = parsed.get(id)
   if (hit) return hit
   const c = parseKeys(keys)
-  parsed.set(keys, c)
+  parsed.set(id, c)
   return c
 }
 
@@ -175,11 +189,16 @@ const KEY_NAMES: Record<string, string> = {
   home: 'Home', end: 'End', pageup: 'PageUp', pagedown: 'PageDown',
 }
 
-/** A chord in the canonical spelling ('Ctrl+Alt+Shift+Mod+K'), so equal shortcuts compare equal. */
+/**
+ * A chord in the canonical spelling, so equal shortcuts compare equal: 'Ctrl+Alt+Shift+Mod+K'
+ * on macOS, 'Mod+Meta+Alt+Shift+K' elsewhere (where Ctrl is 'Mod').
+ */
 export function chordToKeys(c: Chord): string {
   const named = KEY_NAMES[c.key] ?? (/^f\d{1,2}$/.test(c.key) ? c.key.toUpperCase() : c.key.length === 1 ? c.key.toUpperCase() : c.key)
-  const mods = [c.ctrl && 'Ctrl', c.alt && 'Alt', c.shift && 'Shift', c.meta && 'Mod'].filter(Boolean)
-  return [...mods, named].join('+')
+  const mods = isMac()
+    ? [c.ctrl && 'Ctrl', c.alt && 'Alt', c.shift && 'Shift', c.meta && 'Mod']
+    : [c.ctrl && 'Mod', c.meta && 'Meta', c.alt && 'Alt', c.shift && 'Shift']
+  return [...mods.filter(Boolean), named].join('+')
 }
 
 /** 'shift+mod+p' → 'Shift+Mod+P'; throws on an unknown modifier like parseKeys. */
@@ -298,11 +317,26 @@ const KEY_GLYPHS: Record<string, string> = {
   arrowup: '↑', arrowdown: '↓', arrowleft: '←', arrowright: '→',
 }
 
-/** 'Mod+Shift+P' → '⇧⌘P' (macOS order: ⌃⌥⇧⌘). */
+const KEY_WORDS: Record<string, string> = {
+  ...KEY_NAMES, escape: 'Esc', arrowup: '↑', arrowdown: '↓', arrowleft: '←', arrowright: '→',
+}
+
+/** 'Mod+Shift+P' → '⇧⌘P' on macOS (in the order ⌃⌥⇧⌘), 'Ctrl+Shift+P' elsewhere. */
 export function formatKeys(keys: string): string {
   const c = parseKeys(keys)
+  if (!isMac()) {
+    const key = KEY_WORDS[c.key] ?? c.key.toUpperCase()
+    return [c.ctrl && 'Ctrl', c.meta && 'Super', c.alt && 'Alt', c.shift && 'Shift', key].filter(Boolean).join('+')
+  }
   const key = KEY_GLYPHS[c.key] ?? c.key.toUpperCase()
   return `${c.ctrl ? '⌃' : ''}${c.alt ? '⌥' : ''}${c.shift ? '⇧' : ''}${c.meta ? '⌘' : ''}${key}`
+}
+
+/** A command's shortcut as shown ('' when it has none), e.g. for a button's tooltip. */
+export function keyHint(id: string): string {
+  const cmd = commands.get(id)
+  const keys = cmd && shownKeys(cmd)
+  return keys ? formatKeys(keys) : ''
 }
 
 /** An editor with Vim mode on (class set by lib/vim.ts). */
@@ -312,10 +346,30 @@ export const VIM_EDITOR = '.flint-vim'
  * Keys a focused Vim editor keeps for itself: ⌃ with a letter, [ or ] and no
  * other modifier (⌃R redo, ⌃D/⌃U scroll, ⌃V block visual, ⌃O/⌃I jumps,
  * ⌃A/⌃X numbers, ⌃W windows, ⌃[ escape…). Flint's shortcuts on those keys
- * (⌃R Run, ⌃D Debug) still work everywhere else.
+ * (⌃R Run, ⌃D Debug) still work everywhere else. Where Ctrl is also Flint's
+ * modifier (Linux), Vim keeps only redo, scrolling, block visual, numbers and
+ * escape, so Ctrl+P, Ctrl+S, Ctrl+W… stay Flint's.
  */
 export function vimOwnsKey(e: KeyEventLike): boolean {
-  return e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && /^[a-z[\]]$/.test(eventKey(e))
+  if (!e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return false
+  return (isMac() ? /^[a-z[\]]$/ : /^[rduvax[\]]$/).test(eventKey(e))
+}
+
+/** A terminal (xterm.js) element: terminals and run output. */
+export const TERMINAL = '.xterm'
+
+/**
+ * Keys a focused terminal keeps for the shell where Ctrl is Flint's modifier
+ * (Linux): Ctrl with a letter, [, ] or \ and no other modifier (Ctrl+C, Ctrl+R
+ * history search, Ctrl+W…), and Ctrl+Shift+C / Ctrl+Shift+V (copy, paste). Ctrl+J
+ * still toggles the terminal; other Ctrl+Shift shortcuts stay Flint's. On macOS
+ * Flint's ⌘ never clashes with the shell.
+ */
+export function terminalOwnsKey(e: KeyEventLike): boolean {
+  if (isMac() || !e.ctrlKey || e.metaKey || e.altKey) return false
+  const key = eventKey(e)
+  if (e.shiftKey) return key === 'c' || key === 'v'
+  return key !== 'j' && /^[a-z[\]\\]$/.test(key)
 }
 
 /**
@@ -327,6 +381,7 @@ export function commandForKey(e: KeyEventLike, isInside: (selector: string) => b
   const bound = keyIndex().get(eventKey(e))
   if (!bound) return undefined // plain typing: no command uses this key
   if (vimOwnsKey(e) && isInside(VIM_EDITOR)) return undefined
+  if (terminalOwnsKey(e) && isInside(TERMINAL)) return undefined
   for (let i = bound.length - 1; i >= 0; i--) {
     const { cmd, keys } = bound[i]
     if (!matchesKeys(e, keys)) continue

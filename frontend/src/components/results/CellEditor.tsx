@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react'
 import { validateCell, type CellValue, type TargetColumn } from '../../lib/rowEdits'
+import { formatKeys } from '../../lib/commands'
 
 interface Props {
   column: TargetColumn
@@ -116,7 +117,7 @@ export function CellEditor({ column, initial, style, onCommit, onCancel }: Props
           </button>
         )}
         {kind === 'json' && (
-          <button className="primary" onMouseDown={(e) => e.preventDefault()} onClick={() => commit()} title="Apply (⌘↵)">
+          <button className="primary" onMouseDown={(e) => e.preventDefault()} onClick={() => commit()} title={`Apply (${formatKeys('Mod+Enter')})`}>
             OK
           </button>
         )}

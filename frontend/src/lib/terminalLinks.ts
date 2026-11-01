@@ -1,6 +1,7 @@
 // Clickable http(s) URLs in the terminal (what @xterm/addon-web-links did),
 // including URLs soft-wrapped across rows, e.g. long login links printed by agents.
 import type { IBufferCell, ILink, Terminal } from '@xterm/xterm'
+import { modKey } from './platform'
 
 const URL_RE = /(https?|HTTPS?):[/]{2}[^\s"'!*(){}|\\^<>`]*[^\s"':,.!?{}|\\^~[\]`()<>]/g
 const MAX_LOGICAL_LINE = 4096
@@ -98,7 +99,7 @@ export function registerUrlLinks(term: Terminal, open: (url: string) => void) {
           range: { start: { x: start.x, y: start.y }, end: { x: end.x + end.width - 1, y: end.y } },
           text: m.url,
           decorations: { underline: true, pointerCursor: true },
-          activate: (e: MouseEvent) => e.metaKey && open(m.url),
+          activate: (e: MouseEvent) => modKey(e) && open(m.url),
         }
       })
       callback(links)

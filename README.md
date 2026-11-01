@@ -3,7 +3,7 @@
 [![CI](https://github.com/ODudek/flint/actions/workflows/ci.yml/badge.svg)](https://github.com/ODudek/flint/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Flint is a fast, minimal, AI-first IDE for macOS. Coding agents (Claude Code, Codex) write the code in a built-in chat or terminal, and Flint is where you navigate, search the project, review what the agent changed, run and debug, and work with your databases, APIs and clusters. It is a single Go process with the native WKWebView (Wails v3), not Electron, so it starts quickly and stays light on CPU and memory.
+Flint is a fast, minimal, AI-first IDE for macOS and Linux. Coding agents (Claude Code, Codex) write the code in a built-in chat or terminal, and Flint is where you navigate, search the project, review what the agent changed, run and debug, and work with your databases, APIs and clusters. It is a single Go process with the system web view (WKWebView on macOS, WebKitGTK on Linux; Wails v3), not Electron, so it starts quickly and stays light on CPU and memory.
 
 **Stack:** Go + [Wails v3](https://v3.wails.io) (system WebView, no Electron) · React 19 + TypeScript · CodeMirror 6 · xterm.js (WebGL)
 
@@ -103,20 +103,23 @@ See [Requirements](#requirements), then:
 git clone https://github.com/ODudek/flint.git
 cd flint
 cd frontend && npm ci --ignore-scripts && cd ..
-make install    # builds build/bin/flint.app, copies it to /Applications, installs `flint` in ~/.local/bin
+make install    # macOS: builds build/bin/flint.app, copies it to /Applications, installs `flint` in ~/.local/bin
 ```
+
+On Linux there are no release downloads yet: build it with `wails3 task package:linux` and unpack the archive into `~/.local` ([Building on Linux](docs/DEVELOPMENT.md#building-on-linux), [Installation](site/installation.md#linux)).
 
 ## Requirements
 
 To run Flint:
 
-- macOS 12 or later
+- macOS 12 or later, or
+- Linux on x86_64 or arm64 with GTK 4 and WebKitGTK 6.0 (Ubuntu 24.04+, Debian 13+, Fedora 39+), and a Secret Service (GNOME Keyring or KWallet) for stored passwords
 
 To build Flint:
 
 - Go 1.27.3+
 - Node 22+
-- Xcode Command Line Tools
+- macOS: Xcode Command Line Tools; Linux: `libgtk-4-dev`, `libwebkitgtk-6.0-dev`, `libx11-dev` and a C compiler (see [Building on Linux](docs/DEVELOPMENT.md#building-on-linux))
 - `wails3` v3.0.0: `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0`
 
 Optional tools, used by the features that need them:
@@ -139,7 +142,7 @@ make install    # copy to /Applications and add the `flint` command to ~/.local/
 flint .         # open the current directory
 ```
 
-Useful first shortcuts: `⇧⌘P` command palette, `⌘P` go to file, `⇧⌘F` search, `⌘K` commit, `⌘J` terminal, `⌘,` settings. See [docs/FEATURES.md](docs/FEATURES.md#keyboard-shortcuts) for the full list.
+Useful first shortcuts: `⇧⌘P` command palette, `⌘P` go to file, `⇧⌘F` search, `⌘K` commit, `⌘J` terminal, `⌘,` settings (on Linux, Ctrl instead of ⌘: `Ctrl+Shift+P`, `Ctrl+P`…). See [docs/FEATURES.md](docs/FEATURES.md#keyboard-shortcuts) for the full list.
 
 Development details (tests, bindings, server mode, releases) are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 

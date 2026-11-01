@@ -1,3 +1,4 @@
+import { formatKeys } from './commands'
 // Pure helpers of the HTTP client (.http / .rest files); no React, no stores, so
 // node:test covers them.
 
@@ -91,7 +92,7 @@ export function freeHttpFileName(taken: ReadonlySet<string>): string {
 }
 
 /** Content of a new request file. */
-export const HTTP_FILE_TEMPLATE = `# Requests to your API. Put the cursor in a request and press ⌘↵ (or click ▶) to send it.
+export const HTTP_FILE_TEMPLATE = `# Requests to your API. Put the cursor in a request and press ${formatKeys('Mod+Enter')} (or click ▶) to send it.
 # Variables: @name = value here, or per environment in http-client.env.json next to this file
 # (secrets in http-client.private.env.json, which belongs in .gitignore).
 @baseUrl = http://localhost:8080

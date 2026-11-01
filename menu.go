@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -25,28 +26,83 @@ const (
 	eventMenuCheckUpdates    = "menu:check-updates"
 )
 
-// buildMenu creates the native macOS menu bar. File ▸ Open Recent mirrors the
-// recent-folders list and is rebuilt whenever it changes.
+// isMac: macOS has an app menu, needs the Edit menu for ⌘C / ⌘V in the web
+// view, and lets the menu own its shortcuts. On Linux the web view handles
+// Ctrl+C / Ctrl+V itself, and menu accelerators would reach GTK before the
+// page, taking Ctrl keys from terminals: the frontend's own keymap
+// (lib/commands.ts) runs Ctrl+O, Ctrl+, and the rest there.
+var isMac = runtime.GOOS == "darwin"
+
+// shortcut sets a menu accelerator where the menu owns shortcuts (macOS).
+func shortcut(item *application.MenuItem, accel string) *application.MenuItem {
+	if isMac {
+		item.SetAccelerator(accel)
+	}
+	return item
+}
+
+// buildMenu creates the native menu: the menu bar on macOS, the header bar
+// menu on Linux. File ▸ Open Recent mirrors the recent-folders list and is
+// rebuilt whenever it changes.
 func (a *App) buildMenu() *application.Menu {
 	m := application.NewMenu()
+	settings := func(*application.Context) { a.emit(eventMenuSettings) }
 
-	// The first submenu is the app menu on macOS.
-	appMenu := m.AddSubmenu("flint")
-	appMenu.AddRole(application.About)
-	appMenu.AddSeparator()
-	appMenu.Add("Settings…").SetAccelerator("CmdOrCtrl+,").OnClick(func(*application.Context) { a.emit(eventMenuSettings) })
-	appMenu.AddSeparator()
-	appMenu.AddRole(application.ServicesMenu)
-	appMenu.AddSeparator()
-	appMenu.AddRole(application.Hide)
-	appMenu.AddRole(application.HideOthers)
-	appMenu.AddRole(application.ShowAll)
-	appMenu.AddSeparator()
-	appMenu.AddRole(application.Quit)
+	if isMac { // the first submenu is the app menu
+		appMenu := m.AddSubmenu("flint")
+		appMenu.AddRole(application.About)
+		appMenu.AddSeparator()
+		shortcut(appMenu.Add("Settings…"), "CmdOrCtrl+,").OnClick(settings)
+		appMenu.AddSeparator()
+		appMenu.AddRole(application.ServicesMenu)
+		appMenu.AddSeparator()
+		appMenu.AddRole(application.Hide)
+		appMenu.AddRole(application.HideOthers)
+		appMenu.AddRole(application.ShowAll)
+		appMenu.AddSeparator()
+		appMenu.AddRole(application.Quit)
+	}
 
 	file := m.AddSubmenu("File")
-	file.Add("Open Folder…").SetAccelerator("CmdOrCtrl+O").OnClick(func(*application.Context) { a.emit(eventMenuOpenRecent) })
-	file.Add("Add Project to Workspace…").SetAccelerator("CmdOrCtrl+Shift+O").OnClick(func(*application.Context) { a.emit(eventMenuAddProject) })
+	shortcut(file.Add("Open Folder…"), "CmdOrCtrl+O").OnClick(func(*application.Context) { a.emit(eventMenuOpenRecent) })
+	shortcut(file.Add("Add Project to Workspace…"), "CmdOrCtrl+Shift+O").OnClick(func(*application.Context) { a.emit(eventMenuAddProject) })
+	a.addRecentMenu(file)
+	if !isMac {
+		file.AddSeparator()
+		file.Add("Settings…").OnClick(settings)
+		file.AddSeparator()
+		file.AddRole(application.Quit)
+	}
+
+	if isMac {
+		// Without an Edit menu macOS webviews ignore Cmd+C / Cmd+V / Cmd+Z.
+		m.AddRole(application.EditMenu)
+		m.AddRole(application.WindowMenu)
+	}
+
+	help := m.AddSubmenu("Help")
+	help.Add("Check Tools…").OnClick(func(*application.Context) { a.emit(eventMenuCheckTools) })
+	help.AddSeparator()
+	help.Add("Report an Issue…").OnClick(func(*application.Context) { a.emit(eventMenuReportIssue) })
+	help.Add("Copy Diagnostics").OnClick(func(*application.Context) { a.emit(eventMenuCopyDiagnostics) })
+	help.Add(showLogsLabel()).OnClick(func(*application.Context) { a.emit(eventMenuShowLogs) })
+	help.AddSeparator()
+	help.Add("Check for Updates…").OnClick(func(*application.Context) { a.emit(eventMenuCheckUpdates) })
+	if !isMac {
+		help.AddRole(application.About)
+	}
+	return m
+}
+
+func showLogsLabel() string {
+	if isMac {
+		return "Show Logs in Finder"
+	}
+	return "Show Logs in File Manager"
+}
+
+// addRecentMenu adds File ▸ Open Recent.
+func (a *App) addRecentMenu(file *application.Menu) {
 	recentMenu := file.AddSubmenu("Open Recent")
 	recent := a.recentFolders()
 	for _, path := range recent {
@@ -58,20 +114,6 @@ func (a *App) buildMenu() *application.Menu {
 		recentMenu.AddSeparator()
 		recentMenu.Add("Clear Recently Opened").OnClick(func(*application.Context) { _ = a.clearRecentFolders() })
 	}
-
-	// Without an Edit menu macOS webviews ignore Cmd+C / Cmd+V / Cmd+Z.
-	m.AddRole(application.EditMenu)
-	m.AddRole(application.WindowMenu)
-
-	help := m.AddSubmenu("Help")
-	help.Add("Check Tools…").OnClick(func(*application.Context) { a.emit(eventMenuCheckTools) })
-	help.AddSeparator()
-	help.Add("Report an Issue…").OnClick(func(*application.Context) { a.emit(eventMenuReportIssue) })
-	help.Add("Copy Diagnostics").OnClick(func(*application.Context) { a.emit(eventMenuCopyDiagnostics) })
-	help.Add("Show Logs in Finder").OnClick(func(*application.Context) { a.emit(eventMenuShowLogs) })
-	help.AddSeparator()
-	help.Add("Check for Updates…").OnClick(func(*application.Context) { a.emit(eventMenuCheckUpdates) })
-	return m
 }
 
 // refreshMenu re-installs the menu after the recent list changed.

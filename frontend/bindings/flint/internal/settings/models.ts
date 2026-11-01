@@ -6,6 +6,60 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
+ * AgentReview configures "Review Changes with Agent" (internal/review).
+ */
+export class AgentReview {
+    /**
+     * Scope is what a review covers by default: "selected" (the files ticked
+     * in the Commit panel) or "all" (every change).
+     */
+    "scope": string;
+
+    /**
+     * MaxDiffKB bounds the diff sent to the agent; larger diffs are
+     * shortened per file.
+     */
+    "maxDiffKB": number;
+
+    /**
+     * Agent reviews ("claude", "codex" or a custom agent's id); empty means
+     * the default agent.
+     */
+    "agent": string;
+
+    /**
+     * TimeoutSeconds stops a review that takes longer.
+     */
+    "timeoutSeconds": number;
+
+    /** Creates a new AgentReview instance. */
+    constructor($$source: Partial<AgentReview> = {}) {
+        if (!("scope" in $$source)) {
+            this["scope"] = "";
+        }
+        if (!("maxDiffKB" in $$source)) {
+            this["maxDiffKB"] = 0;
+        }
+        if (!("agent" in $$source)) {
+            this["agent"] = "";
+        }
+        if (!("timeoutSeconds" in $$source)) {
+            this["timeoutSeconds"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AgentReview instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AgentReview {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AgentReview($$parsedSource as Partial<AgentReview>);
+    }
+}
+
+/**
  * AgentSettings configures one agent CLI ("agents" → "claude" / "codex").
  * Changes apply to sessions started afterwards.
  */
@@ -756,6 +810,11 @@ export class Settings {
     "prompts": Prompts;
 
     /**
+     * AgentReview configures Review Changes with Agent (review.go).
+     */
+    "agentReview": AgentReview;
+
+    /**
      * CI configures following your pull requests' checks (ci.go).
      */
     "ci": CI;
@@ -822,6 +881,9 @@ export class Settings {
         if (!("prompts" in $$source)) {
             this["prompts"] = (new Prompts());
         }
+        if (!("agentReview" in $$source)) {
+            this["agentReview"] = (new AgentReview());
+        }
         if (!("ci" in $$source)) {
             this["ci"] = (new CI());
         }
@@ -848,6 +910,7 @@ export class Settings {
         const $$createField18_0 = $$createType16;
         const $$createField19_0 = $$createType17;
         const $$createField20_0 = $$createType18;
+        const $$createField21_0 = $$createType19;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("editor" in $$parsedSource) {
             $$parsedSource["editor"] = $$createField2_0($$parsedSource["editor"]);
@@ -891,8 +954,11 @@ export class Settings {
         if ("prompts" in $$parsedSource) {
             $$parsedSource["prompts"] = $$createField19_0($$parsedSource["prompts"]);
         }
+        if ("agentReview" in $$parsedSource) {
+            $$parsedSource["agentReview"] = $$createField20_0($$parsedSource["agentReview"]);
+        }
         if ("ci" in $$parsedSource) {
-            $$parsedSource["ci"] = $$createField20_0($$parsedSource["ci"]);
+            $$parsedSource["ci"] = $$createField21_0($$parsedSource["ci"]);
         }
         return new Settings($$parsedSource as Partial<Settings>);
     }
@@ -917,4 +983,5 @@ const $$createType14 = Completions.createFrom;
 const $$createType15 = InlineEdit.createFrom;
 const $$createType16 = AgentTasks.createFrom;
 const $$createType17 = Prompts.createFrom;
-const $$createType18 = CI.createFrom;
+const $$createType18 = AgentReview.createFrom;
+const $$createType19 = CI.createFrom;

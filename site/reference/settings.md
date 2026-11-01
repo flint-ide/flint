@@ -77,6 +77,7 @@ The file is readable only by your user. It never contains secrets: database pass
   },
   "inlineEdit": { "contextLines": 60 },
   "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/" },
+  "agentReview": { "scope": "selected", "maxDiffKB": 128, "agent": "", "timeoutSeconds": 300 },
   "ci": { "pollSeconds": 60, "logTailLines": 80, "logErrorLines": 40, "notify": true }
 }
 ```
@@ -105,6 +106,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
 | `agentTasks` | object | see below | Where agent task worktrees go and how their branches are named. See [agentTasks](#agenttasks). |
 | `prompts` | object | see below | The prompt library of the agent chat (`/`). See [prompts](#prompts). |
+| `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
 | `ci` | object | see below | Following your pull requests' CI: poll interval, Fix with agent's log excerpt, notifications. See [ci](#ci). |
 
 ### Font objects
@@ -286,6 +288,16 @@ Used by the [prompt library](../guides/ai-agents.md#prompt-library).
 | `builtins` | boolean | `true` | Offer the prompts that ship with Flint (`/review`, `/test`, `/explain`, `/fix`). |
 
 The prompts themselves are Markdown files, not settings: personal ones in the `prompts` folder next to `settings.json`, project ones in the repository's `.flint/prompts`.
+### agentReview
+
+Used by [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-agent). Settings ▸ Agents ▸ Review.
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `scope` | string | `"selected"`, `"all"` | `"selected"` | What a review covers: the changes ticked in the Commit panel, or every change. A review started from a diff tab always includes that tab's file. |
+| `maxDiffKB` | integer | 8–512 | `128` | Largest diff sent to the agent, in KB; never exceeded. Above it, small files still go in whole and the larger ones share the rest: each keeps its first hunks, or is summarized in one line, with a note that tells the agent to read the file. Files with no room left at all are left out and listed in a note. Untracked files are read only as far as their share. |
+| `agent` | string | | `""` | The reviewing agent: `"claude"`, `"codex"` or the `id` of a custom agent. Empty uses `defaultAgent`. An agent that isn't configured falls back to empty. What each agent can read on its own is described in [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-agent): Codex can read any file you can, and a custom agent started with an auto-approve flag is not read-only. |
+| `timeoutSeconds` | integer | 30–1800 | `300` | A review that takes longer is stopped, with the agent and everything it started. |
 ### ci
 
 Used by [When CI fails](../guides/git-and-github.md#when-ci-fails).

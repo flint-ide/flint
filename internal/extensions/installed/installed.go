@@ -12,11 +12,13 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"syscall"
 
 	"flint/internal/extensions/manifest"
 )
 
-// Bounds on what Discover reads and Install copies.
+// Bounds on what Discover reads and Install copies: extensions, files and
+// folders per extension, and bytes per extension.
 const (
 	MaxExtensions = 500
 	MaxFiles      = 5000
@@ -78,7 +80,17 @@ func Install(src, root string, confirmed manifest.Manifest) (Extension, error) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return Extension{}, err
 	}
-	if inside(root, src) || inside(src, root) {
+	// Compare and copy real paths: a symlinked folder is copied as its
+	// target, and a path through a symlink can't hide that src is root.
+	src, err := filepath.EvalSymlinks(src)
+	if err != nil {
+		return Extension{}, err
+	}
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return Extension{}, err
+	}
+	if inside(realRoot, src) || inside(src, realRoot) {
 		return Extension{}, errors.New("the folder is inside Flint's extensions folder, or contains it")
 	}
 	tmp, err := os.MkdirTemp(root, ".install-")
@@ -139,16 +151,25 @@ func inside(parent, child string) bool {
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
+// maxDepth bounds how deep folders in an extension may nest.
+const maxDepth = 32
+
+var errTooBig = fmt.Errorf("the extension has more than %d files and folders, folders nested deeper than %d, or more than %d MiB", MaxFiles, maxDepth, MaxBytes>>20)
+
 // copyTree copies regular files and folders. Symlinks and other special
 // files are refused: an extension is copied as it is, never pointing
-// outside itself. The .git folder is left out.
+// outside itself. The .git folder is left out. Everything is read through
+// an os.Root and each opened file is checked against what the walk saw, so
+// a folder changed during the copy can't swap in a symlink, a FIFO or a
+// growing file.
 func copyTree(src, dst string) error {
-	files, total := 0, int64(0)
-	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(src, path)
+	r, err := os.OpenRoot(src)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	entries, total := 0, int64(0)
+	return fs.WalkDir(r.FS(), ".", func(rel string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -156,9 +177,13 @@ func copyTree(src, dst string) error {
 			return nil
 		}
 		if d.IsDir() && d.Name() == ".git" {
-			return filepath.SkipDir
+			return fs.SkipDir
 		}
-		target := filepath.Join(dst, rel)
+		entries++
+		if entries > MaxFiles || strings.Count(rel, "/") >= maxDepth {
+			return errTooBig
+		}
+		target := filepath.Join(dst, filepath.FromSlash(rel))
 		info, err := d.Info()
 		if err != nil {
 			return err
@@ -169,32 +194,41 @@ func copyTree(src, dst string) error {
 		case !info.Mode().IsRegular():
 			return fmt.Errorf("%s is a symlink or special file, which extensions may not contain", rel)
 		}
-		files++
-		total += info.Size()
-		if files > MaxFiles || total > MaxBytes {
-			return fmt.Errorf("the extension has more than %d files or %d MiB", MaxFiles, MaxBytes>>20)
-		}
-		return copyFile(path, target, info.Mode().Perm())
+		n, err := copyFile(r, rel, target, info, MaxBytes-total)
+		total += n
+		return err
 	})
 }
 
-func copyFile(src, dst string, perm fs.FileMode) error {
-	in, err := os.Open(src)
+// copyFile copies src (inside r) to dst, at most budget bytes. The opened
+// file must be the regular file the walk listed (want).
+func copyFile(r *os.Root, src, dst string, want fs.FileInfo, budget int64) (int64, error) {
+	in, err := r.OpenFile(src, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer in.Close()
+	got, err := in.Stat()
+	if err != nil {
+		return 0, err
+	}
+	if !got.Mode().IsRegular() || !os.SameFile(got, want) {
+		return 0, fmt.Errorf("%s changed while it was being copied", src)
+	}
 	mode := fs.FileMode(0o644)
-	if perm&0o111 != 0 {
+	if got.Mode().Perm()&0o111 != 0 {
 		mode = 0o755 // keep programs runnable
 	}
 	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	if _, err := io.Copy(out, in); err != nil {
-		out.Close()
-		return err
+	n, err := io.Copy(out, io.LimitReader(in, budget+1))
+	if err == nil && n > budget {
+		err = errTooBig
 	}
-	return out.Close()
+	if cerr := out.Close(); err == nil {
+		err = cerr
+	}
+	return n, err
 }

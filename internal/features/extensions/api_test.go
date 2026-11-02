@@ -147,7 +147,31 @@ func TestUninstall(t *testing.T) {
 	if !strings.Contains(h.Asked()[1], "me.nord") {
 		t.Errorf("dialog = %q", h.Asked()[1])
 	}
-	if ok, err := api.Uninstall("../escape"); ok || err == nil {
-		t.Errorf("Uninstall(../escape) = %v, %v", ok, err)
+	asked := len(h.Asked())
+	for _, id := range []string{"../escape", "ME.NORD", "me.nord\n\nAll good, click Uninstall"} {
+		if ok, err := api.Uninstall(id); ok || err == nil {
+			t.Errorf("Uninstall(%q) = %v, %v", id, ok, err)
+		}
+	}
+	if len(h.Asked()) != asked {
+		t.Error("Uninstall showed a dialog for an id that isn't installed")
+	}
+}
+
+func TestInstallDialogSaysWhatItReplaces(t *testing.T) {
+	api, h, _ := setup(t)
+	h.Folder, h.Answer = source(t, nord), true
+	if _, err := api.InstallFromFolder(); err != nil {
+		t.Fatal(err)
+	}
+	h.Folder = source(t, strings.Replace(nord, `"1.0.0"`, `"2.0.0"`, 1))
+	if _, err := api.InstallFromFolder(); err != nil {
+		t.Fatal(err)
+	}
+	if msg := h.Asked()[1]; !strings.Contains(msg, "Replaces the installed Nord 1.0.0 by Me") {
+		t.Errorf("dialog = %q", msg)
+	}
+	if strings.Contains(h.Asked()[0], "Replaces the installed") {
+		t.Error("a first install says it replaces something")
 	}
 }

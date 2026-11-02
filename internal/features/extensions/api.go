@@ -3,6 +3,8 @@ package extensions
 import (
 	"fmt"
 	"maps"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -76,12 +78,13 @@ func (a *API) InstallFromFolder() (*Extension, error) {
 	if err != nil {
 		return nil, fmt.Errorf("can't install %s: %w", src, err)
 	}
-	if !a.host.Ask(fmt.Sprintf("Install the extension %q?", m.Name), installMessage(m, src), "Install") {
-		return nil, nil
-	}
 	root, err := a.root()
 	if err != nil {
 		return nil, err
+	}
+	replaces, _ := a.installed(root, m.ID)
+	if !a.host.Ask(fmt.Sprintf("Install the extension %q?", m.Name), installMessage(m, src, replaces), "Install") {
+		return nil, nil
 	}
 	a.mu.Lock()
 	ext, err := installed.Install(src, root, m)
@@ -102,25 +105,38 @@ func (a *API) Uninstall(id string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	name := id
-	if exts, err := installed.Discover(root); err == nil {
-		for _, e := range exts {
-			if e.ID() == id && e.Err == nil {
-				name = e.Manifest.Name
-			}
-		}
+	// The web view sends the id: only an exact folder name of an installed
+	// extension gets a dialog, so page code can't show text of its choosing.
+	ext, ok := a.installed(root, id)
+	if !ok {
+		return false, fmt.Errorf("%q is not installed", id)
 	}
-	if !a.host.Ask(fmt.Sprintf("Uninstall %q?", name), fmt.Sprintf("Flint deletes the folder of %s from its extensions folder. A color theme you took from it stays selected.", id), "Uninstall") {
+	name := ext.ID()
+	if ext.Err == nil {
+		name = ext.Manifest.Name
+	}
+	if !a.host.Ask(fmt.Sprintf("Uninstall %q?", name), fmt.Sprintf("Flint deletes the folder of %s from its extensions folder. A color theme you took from it stays selected.", ext.ID()), "Uninstall") {
 		return false, nil
 	}
 	a.mu.Lock()
-	err = installed.Remove(root, id)
+	err = installed.Remove(root, filepath.Base(ext.Dir))
 	a.mu.Unlock()
 	if err != nil {
 		return false, err
 	}
 	a.host.Emit(EventChanged)
 	return true, nil
+}
+
+// installed finds the extension whose folder is named exactly id.
+func (a *API) installed(root, id string) (installed.Extension, bool) {
+	exts, _ := installed.Discover(root)
+	for _, e := range exts {
+		if filepath.Base(e.Dir) == id {
+			return e, true
+		}
+	}
+	return installed.Extension{}, false
 }
 
 func describe(e installed.Extension) Extension {
@@ -174,14 +190,26 @@ func contributions(m manifest.Manifest) []string {
 	return out
 }
 
-// installMessage is the install dialog's text: everything the user agrees to.
-func installMessage(m manifest.Manifest, src string) string {
+// installMessage is the install dialog's text: everything the user agrees
+// to. replaces is the installed extension with the same id, if any.
+func installMessage(m manifest.Manifest, src string, replaces installed.Extension) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s %s (%s)", m.Name, m.Version, m.ID)
 	if m.Publisher != "" {
 		fmt.Fprintf(&b, " by %s", m.Publisher)
 	}
 	b.WriteString("\nFrom: " + src + "\n")
+	switch {
+	case replaces.Dir != "" && replaces.Err == nil:
+		old := replaces.Manifest
+		fmt.Fprintf(&b, "\nReplaces the installed %s %s", old.Name, old.Version)
+		if old.Publisher != "" {
+			fmt.Fprintf(&b, " by %s", old.Publisher)
+		}
+		b.WriteString(".\n")
+	case replaces.Dir != "":
+		b.WriteString("\nReplaces the installed, disabled extension with this id.\n")
+	}
 	if m.Description != "" {
 		b.WriteString("\n" + m.Description + "\n")
 	}
@@ -189,7 +217,8 @@ func installMessage(m manifest.Manifest, src string) string {
 		b.WriteString("\nAdds: " + strings.Join(list, ", ") + "\n")
 	}
 	if m.Run != nil {
-		fmt.Fprintf(&b, "\nProgram: %s\nIt runs with your user's permissions when its features are used. This version of Flint doesn't start extension programs yet: only themes take effect.\n", m.Run.Command)
+		prog := m.Run.For(runtime.GOOS)
+		fmt.Fprintf(&b, "\nProgram: %s\nIt runs with your user's permissions when its features are used. This version of Flint doesn't start extension programs yet: only themes take effect.\n", strings.Join(append([]string{prog.Command}, prog.Args...), " "))
 		for _, ev := range m.Activation {
 			if ev == "onStartup" {
 				b.WriteString("It asks to run at startup.\n")

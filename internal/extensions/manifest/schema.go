@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -105,11 +106,26 @@ func checkProperty(p *problems, name string, prop Property) {
 	}
 }
 
+// Bounds on a string setting's enum and pattern.
+const (
+	maxEnum       = 100
+	maxEnumLen    = 200
+	maxPatternLen = 500
+)
+
 func checkStringProperty(p *problems, field string, prop Property) {
 	if prop.MaxLength != nil && *prop.MaxLength < 0 {
 		p.add("%s: maxLength is negative", field)
 	}
-	if prop.Pattern != "" {
+	if len(prop.Enum) > maxEnum {
+		p.add("%s.enum: more than %d values", field, maxEnum)
+	}
+	for _, v := range prop.Enum {
+		checkText(p, field+".enum", v, maxEnumLen, false)
+	}
+	if len(prop.Pattern) > maxPatternLen {
+		p.add("%s.pattern: longer than %d bytes", field, maxPatternLen)
+	} else if prop.Pattern != "" {
 		if _, err := regexp.Compile(prop.Pattern); err != nil {
 			p.add("%s.pattern: %w", field, err)
 		}
@@ -119,8 +135,12 @@ func checkStringProperty(p *problems, field string, prop Property) {
 	}
 }
 
-// Check reports why value is not a valid value of the setting.
+// Check reports why value is not a valid value of the setting. null is
+// never valid (decoding it into a Go value would silently succeed).
 func (prop Property) Check(value json.RawMessage) error {
+	if string(bytes.TrimSpace(value)) == "null" {
+		return fmt.Errorf("null is not a %s", prop.Type)
+	}
 	switch prop.Type {
 	case "string":
 		var s string

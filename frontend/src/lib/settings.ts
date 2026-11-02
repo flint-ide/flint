@@ -173,7 +173,9 @@ export const THEME_VARIABLES: readonly string[] = Object.freeze([
 const THEME_VARIABLE_SET: ReadonlySet<string> = new Set(THEME_VARIABLES)
 const TERMINAL_COLOR_SET: ReadonlySet<string> = new Set(TERMINAL_COLOR_NAMES)
 const MAX_THEME_SOURCE_LEN = 200 // Go's settings.MaxThemeSourceLen
-const CONTROL_CHARS = /[\u0000-\u001f\u007f]/
+// Go's unicode.IsControl: C0, DEL and C1.
+const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/
+const utf8Length = (s: string) => new TextEncoder().encode(s).length
 
 /** The hex colors of v whose names are allowed; anything else is dropped. */
 export function coerceColorMap(v: unknown, allowed: ReadonlySet<string>): Record<string, string> {
@@ -184,7 +186,7 @@ export function coerceColorMap(v: unknown, allowed: ReadonlySet<string>): Record
 /** A custom theme from untrusted JSON, filtered like Go's normalizeCustomTheme. */
 export function coerceCustomTheme(v: unknown, def: CustomTheme = DEFAULT_SETTINGS.customTheme): CustomTheme {
   if (!isObject(v)) return def
-  const source = typeof v.source === 'string' && v.source.length <= MAX_THEME_SOURCE_LEN && !CONTROL_CHARS.test(v.source) ? v.source : ''
+  const source = typeof v.source === 'string' && utf8Length(v.source) <= MAX_THEME_SOURCE_LEN && !CONTROL_CHARS.test(v.source) ? v.source : ''
   return {
     name: typeof v.name === 'string' ? v.name : '',
     base: v.base === 'light' ? 'light' : 'dark',

@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -139,6 +140,23 @@ func TestParseRefuses(t *testing.T) {
 		{"escaping platform command", func(m map[string]any) {
 			m["run"].(map[string]any)["linux"] = map[string]any{"command": "../x"}
 		}, "run.linux.command"},
+		{"newline in command", func(m map[string]any) {
+			m["run"].(map[string]any)["command"] = "bin/x\n\nThis extension contains only a theme."
+		}, "control characters"},
+		{"control char in arg", func(m map[string]any) { m["run"].(map[string]any)["args"] = []any{"--a\rb"} }, "control characters"},
+		{"too many permissions", func(m map[string]any) {
+			perms := []any{}
+			for i := 0; i < 21; i++ {
+				perms = append(perms, fmt.Sprintf("network:h%d.example.com", i))
+			}
+			m["permissions"] = perms
+		}, "more than 20 entries"},
+		{"too many hosts", func(m map[string]any) {
+			m["permissions"] = []any{"network:" + strings.TrimSuffix(strings.Repeat("a.example.com,", 21), ",")}
+		}, "more than 20 network hosts"},
+		{"null default", func(m map[string]any) { setting(m, "pollMinutes")["default"] = nil }, "null is not"},
+		{"control char in enum", func(m map[string]any) { setting(m, "jql")["enum"] = []any{"a\nb"} }, "control characters"},
+		{"long pattern", func(m map[string]any) { setting(m, "jql")["pattern"] = strings.Repeat("a", 501) }, "pattern: longer"},
 		{"unknown permission", func(m map[string]any) { m["permissions"] = []any{"exec"} }, "unknown permission"},
 		{"bad network host", func(m map[string]any) { m["permissions"] = []any{"network:acme.com,https://x"} }, "not a host name"},
 		{"duplicate permission", func(m map[string]any) { m["permissions"] = []any{"secrets", "secrets"} }, "listed twice"},
@@ -188,6 +206,22 @@ func TestParseRefuses(t *testing.T) {
 				t.Errorf("Parse() = %v, want an error containing %q", err, c.want)
 			}
 		})
+	}
+}
+
+func TestRunFor(t *testing.T) {
+	m, err := Parse([]byte(full))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := m.Run.For("darwin"); got.Command != "bin/flint-jira-darwin" || len(got.Args) != 0 {
+		t.Errorf("For(darwin) = %+v", got)
+	}
+	if got := m.Run.For("linux"); got.Command != "bin/flint-jira-linux" {
+		t.Errorf("For(linux) = %+v", got)
+	}
+	if got := m.Run.For("freebsd"); got.Command != "bin/flint-jira" || len(got.Args) != 1 {
+		t.Errorf("For(freebsd) = %+v", got)
 	}
 }
 

@@ -89,7 +89,7 @@ function AppearanceSection() {
   const theme = useSettings((s) => s.theme)
   const custom = useSettings((s) => s.settings.customTheme)
   const update = useSettings((s) => s.update)
-  const hasCustom = Object.keys(custom.colors).length > 0
+  const hasCustom = Object.keys(custom.colors).length + Object.keys(custom.terminal).length > 0
   const options: { value: ThemeMode; label: string }[] = [
     { value: 'dark', label: 'Dark' },
     { value: 'light', label: 'Light' },

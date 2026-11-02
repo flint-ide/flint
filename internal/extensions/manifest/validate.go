@@ -99,30 +99,52 @@ func (m Manifest) checkRun(p *problems) {
 }
 
 // checkProgram: the command is a relative path inside the extension's
-// directory, written with forward slashes.
+// directory, written with forward slashes. Neither it nor an argument may
+// hold control characters: both are shown in the install dialog.
 func checkProgram(p *problems, field, command string, args []string) {
 	clean := path.Clean(command)
 	switch {
 	case command == "":
 		p.add("%s.command: missing", field)
-	case strings.ContainsAny(command, "\\\x00") || path.IsAbs(command) || clean != command || clean == "." || clean == ".." || strings.HasPrefix(clean, "../"):
+	case len(command) > maxArgLen || !utf8.ValidString(command) || strings.ContainsFunc(command, unicode.IsControl):
+		p.add("%s.command: longer than %d bytes or contains control characters", field, maxArgLen)
+	case strings.Contains(command, "\\") || path.IsAbs(command) || clean != command || clean == "." || clean == ".." || strings.HasPrefix(clean, "../"):
 		p.add("%s.command %q must be a clean relative path inside the extension (bin/tool)", field, command)
 	}
 	if len(args) > maxArgs {
 		p.add("%s.args: more than %d arguments", field, maxArgs)
 	}
 	for _, a := range args {
-		if len(a) > maxArgLen || strings.ContainsRune(a, 0) {
-			p.add("%s.args: an argument is longer than %d bytes or contains NUL", field, maxArgLen)
+		if len(a) > maxArgLen || !utf8.ValidString(a) || strings.ContainsFunc(a, unicode.IsControl) {
+			p.add("%s.args: an argument is longer than %d bytes or contains control characters", field, maxArgLen)
 			break
 		}
 	}
 }
 
+// For is the program that runs on goos ("darwin", "linux"): the platform's
+// override if there is one, else the default.
+func (r Run) For(goos string) Program {
+	switch {
+	case goos == "darwin" && r.Darwin != nil:
+		return *r.Darwin
+	case goos == "linux" && r.Linux != nil:
+		return *r.Linux
+	}
+	return Program{Command: r.Command, Args: r.Args}
+}
+
 // Permissions an extension may declare (besides network:<hosts>).
 var Permissions = []string{"workspace.read", "secrets", "agent.ask"}
 
+// maxPermissions bounds the permissions and the hosts of one network permission.
+const maxPermissions = 20
+
 func (m Manifest) checkPermissions(p *problems) {
+	if len(m.Permissions) > maxPermissions {
+		p.add("permissions: more than %d entries", maxPermissions)
+		return
+	}
 	seen := map[string]bool{}
 	for _, perm := range m.Permissions {
 		if seen[perm] {
@@ -131,7 +153,12 @@ func (m Manifest) checkPermissions(p *problems) {
 		}
 		seen[perm] = true
 		if hosts, ok := strings.CutPrefix(perm, "network:"); ok {
-			for _, h := range strings.Split(hosts, ",") {
+			list := strings.Split(hosts, ",")
+			if len(list) > maxPermissions {
+				p.add("permissions: more than %d network hosts", maxPermissions)
+				continue
+			}
+			for _, h := range list {
 				if len(h) > 253 || !hostname.MatchString(h) {
 					p.add("permissions: %q is not a host name", h)
 				}

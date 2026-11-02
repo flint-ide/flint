@@ -39,14 +39,18 @@ export function syncContributions(list: readonly InstalledExtension[]): void {
   }
 }
 
-/** Reads the installed extensions again. */
+let loads = 0
+
+/** Reads the installed extensions again; an answer older than a later read's is dropped. */
 export async function loadExtensions(): Promise<void> {
+  const seq = ++loads
   try {
     const list = coerceExtensions(await ExtensionsAPI.List())
+    if (seq !== loads) return
     syncContributions(list)
     useExtensions.setState({ extensions: list, loaded: true, error: '' })
   } catch (err) {
-    useExtensions.setState({ loaded: true, error: errorMessage(err) })
+    if (seq === loads) useExtensions.setState({ loaded: true, error: errorMessage(err) })
   }
 }
 
@@ -79,8 +83,13 @@ export function uninstallExtension(id: string): Promise<void> {
   })
 }
 
-/** Reads the list now and again whenever Go says it changed; the result unsubscribes. */
+/** Reads the list now and again whenever Go says it changed; the result unsubscribes and withdraws the contributions. */
 export function watchExtensions(): () => void {
   void loadExtensions()
-  return EventsOn('extensions:changed', () => void loadExtensions())
+  const off = EventsOn('extensions:changed', () => void loadExtensions())
+  return () => {
+    off()
+    loads++ // a read still in flight is dropped
+    syncContributions([])
+  }
 }

@@ -93,6 +93,8 @@ describe('custom theme', () => {
     assert.deepEqual(s.customTheme.terminal, { red: '#f00' })
     assert.equal(s.customTheme.source, 'acme.nord.dark')
     assert.equal(coerceSettings({ customTheme: { source: 'a\nb' } }).customTheme.source, '')
+    assert.equal(coerceSettings({ customTheme: { source: 'a\u0085b' } }).customTheme.source, '') // C1, as Go's unicode.IsControl
+    assert.equal(coerceSettings({ customTheme: { source: 'ą'.repeat(101) } }).customTheme.source, '') // 202 bytes in UTF-8
   })
 
   it('recolors terminals from the custom colors', () => {

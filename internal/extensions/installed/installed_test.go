@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"flint/internal/extensions/manifest"
@@ -131,6 +132,54 @@ func TestInstallRefusesSymlinks(t *testing.T) {
 	entries, _ := os.ReadDir(root)
 	if len(entries) != 0 {
 		t.Errorf("a failed install left %d entries", len(entries))
+	}
+}
+
+func TestInstallFollowsASymlinkedFolder(t *testing.T) {
+	root := t.TempDir()
+	src := writeExt(t, filepath.Join(t.TempDir(), "src"), nord, map[string]string{"README.md": "hi"})
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(src, link); err != nil {
+		t.Skip("symlinks unsupported:", err)
+	}
+	ext, err := Install(link, root, mustLoad(t, link))
+	if err != nil {
+		t.Fatalf("Install(symlinked folder) = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(ext.Dir, "README.md")); err != nil {
+		t.Errorf("README.md not copied: %v", err)
+	}
+}
+
+func TestInstallRefusesDeepFolders(t *testing.T) {
+	root := t.TempDir()
+	deep := strings.Repeat("d/", maxDepth+1) + "f.txt"
+	src := writeExt(t, filepath.Join(t.TempDir(), "src"), nord, map[string]string{deep: "x"})
+	if _, err := Install(src, root, mustLoad(t, src)); err == nil {
+		t.Error("Install() copied folders nested too deep")
+	}
+}
+
+func TestInstallRefusesFIFOs(t *testing.T) {
+	root := t.TempDir()
+	src := writeExt(t, filepath.Join(t.TempDir(), "src"), nord, nil)
+	if err := syscall.Mkfifo(filepath.Join(src, "pipe"), 0o644); err != nil {
+		t.Skip("mkfifo unsupported:", err)
+	}
+	if _, err := Install(src, root, mustLoad(t, src)); err == nil || !strings.Contains(err.Error(), "special file") {
+		t.Errorf("Install() = %v, want a special file error", err)
+	}
+}
+
+func TestInstallIntoAPathThroughASymlinkToRoot(t *testing.T) {
+	root := t.TempDir()
+	src := writeExt(t, filepath.Join(root, "me.nord"), nord, nil)
+	alias := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(root, alias); err != nil {
+		t.Skip("symlinks unsupported:", err)
+	}
+	if _, err := Install(filepath.Join(alias, "me.nord"), root, mustLoad(t, src)); err == nil {
+		t.Error("Install() copied a folder inside the extensions folder reached through a symlink")
 	}
 }
 

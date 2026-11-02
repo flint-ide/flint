@@ -1,4 +1,4 @@
-import type { Connection, DatabaseInfo } from '../api/backend'
+import type { Connection, DatabaseInfo, Table } from '../api/backend'
 
 /** The parts of a connection that pick its default database. */
 type ConnectionRef = { driver: string; database: string }
@@ -34,6 +34,38 @@ export function schemaKey(connId: string, database: string): string {
 /** True when the schema cache key belongs to the connection (any of its databases). */
 export function isSchemaKeyOf(key: string, connId: string): boolean {
   return key.startsWith(`${connId}\u0000`)
+}
+
+/**
+ * An identifier ready to paste into SQL: bare when it's plain lowercase, else quoted with the
+ * dialect's quote (backtick for ClickHouse, double quote for Postgres), the quote doubled inside.
+ */
+export function quoteIdent(driver: string, name: string): string {
+  if (/^[a-z_][a-z0-9_]*$/.test(name)) return name
+  const q = driver === 'clickhouse' ? '`' : '"'
+  return `${q}${name.replaceAll(q, q + q)}${q}`
+}
+
+/** "schema.table", each part quoted as needed (ClickHouse's schema is the database). */
+export function qualifiedTable(driver: string, t: Pick<Table, 'schema' | 'name'>): string {
+  return `${quoteIdent(driver, t.schema)}.${quoteIdent(driver, t.name)}`
+}
+
+/** The statement a table preview opens with. */
+export function previewQuery(driver: string, t: Pick<Table, 'schema' | 'name'>): string {
+  return `SELECT *\nFROM ${qualifiedTable(driver, t)}\nLIMIT 100;\n`
+}
+
+/** The statement that counts a table's rows. */
+export function countQuery(driver: string, t: Pick<Table, 'schema' | 'name'>): string {
+  return `SELECT count(*)\nFROM ${qualifiedTable(driver, t)};\n`
+}
+
+/** A password-less URL of the connection, e.g. postgresql://app@db:5432/shop, for psql or clickhouse-client. */
+export function connectionUrl(conn: ConnectionRef & Pick<Connection, 'host' | 'port' | 'user'>): string {
+  const scheme = conn.driver === 'clickhouse' ? 'clickhouse' : 'postgresql'
+  const user = conn.user ? `${encodeURIComponent(conn.user)}@` : ''
+  return `${scheme}://${user}${conn.host}:${conn.port}/${encodeURIComponent(defaultDatabase(conn))}`
 }
 
 /**

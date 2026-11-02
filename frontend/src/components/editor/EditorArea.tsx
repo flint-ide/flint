@@ -9,6 +9,7 @@ import { confirmAction } from '../../store/dialog'
 import { useTerminal } from '../../store/terminal'
 import { useAgentChat } from '../../store/agentChat'
 import { useScratch } from '../../store/scratch'
+import { isFeatureActive } from '../../lib/activeFeatures'
 import { closeRunSession, useRun } from '../../store/run'
 import { isDebugging, stopDebug, useDebug } from '../../store/debug'
 import { closeProfile } from '../../store/profile'
@@ -285,7 +286,9 @@ function NewTabMenu() {
   }
   const tail: DropdownItem[] = [
     { type: 'separator' },
-    { label: 'SQL console', kbd: formatKeys('Mod+N'), icon: <TabKindIcon kind="sql" />, onSelect: () => void useScratch.getState().create('sql') },
+    ...(isFeatureActive('database')
+      ? [{ label: 'SQL console', kbd: formatKeys('Mod+N'), icon: <TabKindIcon kind="sql" />, onSelect: () => void useScratch.getState().create('sql') }]
+      : []),
     { label: 'Markdown note', icon: <TabKindIcon kind="markdown" />, onSelect: () => void useScratch.getState().create('markdown') },
   ]
   return (

@@ -3,7 +3,6 @@ import { lazyPreload, preloadInBackground } from './lib/lazyPreload'
 import { EventsOn } from './wails/runtime'
 import { useWorkspace } from './store/workspace'
 import { useEditor } from './store/editor'
-import { useDatabase } from './store/database'
 import { useScratch } from './store/scratch'
 import { subscribeTerminalEvents, toggleTerminal, useTerminal } from './store/terminal'
 import { subscribeSearchEvents } from './store/search'
@@ -98,7 +97,6 @@ subscribeUsageEvents()
     EventsOn('menu:show-logs', showLogs)
     EventsOn('menu:check-tools', openToolCheck)
     EventsOn('files:dropped', (dropped: DroppedPath[]) => void openDropped(dropped))
-    void useDatabase.getState().loadConnections()
     void useScratch.getState().load()
     void useWorkspace.getState().init()
     void openToolCheckOnFirstRun()

@@ -46,6 +46,11 @@ type Module struct {
 	State []string
 	// New builds the running parts; nil when the feature has none.
 	New func(Host) Instance
+	// Optional features can be switched off in Settings ▸ Extensions (the
+	// "features" settings key, Toggles); a switched-off feature isn't built,
+	// so it binds no services and offers no tools until Flint restarts with
+	// it on. Its settings and tools stay registered, so nothing is lost.
+	Optional bool
 }
 
 // Instance is what a module contributes once the app is built. Every field
@@ -128,6 +133,7 @@ func Register(mods []Module) error {
 			stateKeys[key] = m.ID
 		}
 	}
+	settings.Register(Section)
 	for _, m := range mods {
 		settings.Register(m.Settings...)
 		tools.Register(m.Tools...)
@@ -146,18 +152,42 @@ func StateKeys(mods []Module) []string {
 
 // Set is the running modules; a nil Set has none.
 type Set struct {
-	parts []Instance
+	parts  []Instance
+	active []string
 }
 
-// New builds every module that has running parts, in list order.
+// New builds every module that is switched on (Toggles) and has running
+// parts, in list order.
 func New(mods []Module, h Host) *Set {
 	s := &Set{}
+	toggles := Section.Default()
+	if h != nil {
+		toggles = Section.Get(h.Settings())
+	}
 	for _, m := range mods {
+		if !toggles.On(m) {
+			continue
+		}
+		s.active = append(s.active, m.ID)
 		if m.New != nil {
 			s.parts = append(s.parts, m.New(h))
 		}
 	}
 	return s
+}
+
+// Has reports whether the module with this id runs in this process.
+func (s *Set) Has(id string) bool {
+	return s != nil && slices.Contains(s.active, id)
+}
+
+// Active are the ids of the modules running in this process, in list order:
+// the frontend installs the halves of these and leaves the others out.
+func (s *Set) Active() []string {
+	if s == nil {
+		return nil
+	}
+	return slices.Clone(s.active)
 }
 
 // Services are every module's bound services.

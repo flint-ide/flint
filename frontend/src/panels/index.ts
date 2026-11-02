@@ -1,4 +1,5 @@
-// Flint's own sidebar panels. Adding one is a component plus one entry here: the
+// Flint's own sidebar panels (Databases and Kubernetes come from their feature
+// modules). Adding one is a component plus one entry here: the
 // activity bar, the sidebar and the "Show …" command follow from it. A feature
 // module contributes its panels itself (lib/features.ts); usePanels and
 // currentPanels are both lists together.
@@ -13,10 +14,8 @@ import { useContributions, type Contributions } from '../lib/contributions'
 // fetched in the background once the app is idle (or when first opened).
 const CommitPanel = lazyPreload(() => import('../components/sidebar/CommitPanel').then((m) => ({ default: m.CommitPanel })))
 const PullRequestsPanel = lazyPreload(() => import('../components/github/PullRequestsPanel').then((m) => ({ default: m.PullRequestsPanel })))
-const DatabasePanel = lazyPreload(() => import('../components/sidebar/DatabasePanel').then((m) => ({ default: m.DatabasePanel })))
 const AwsPanel = lazyPreload(() => import('../components/sidebar/AwsPanel').then((m) => ({ default: m.AwsPanel })))
 const TasksPanel = lazyPreload(() => import('../components/tasks/TasksPanel').then((m) => ({ default: m.TasksPanel })))
-const KubePanel = lazyPreload(() => import('../components/sidebar/KubePanel').then((m) => ({ default: m.KubePanel })))
 const UsagePanel = lazyPreload(() => import('../components/usage/UsagePanel').then((m) => ({ default: m.UsagePanel })))
 
 // Command ids and titles predating the registry are kept: keymap overrides are stored by id.
@@ -43,20 +42,12 @@ export const PANELS = definePanels([
     command: { id: 'github.pullRequests', title: 'Pull Requests…', category: 'GitHub', keywords: 'pr review github list' },
   },
   {
-    id: 'database', title: 'Databases', icon: 'database', order: 50, component: DatabasePanel,
-    command: { id: 'view.databases', keywords: 'sql postgres clickhouse' },
-  },
-  {
     id: 'scratch', title: 'Scratchpads', icon: 'pencil', order: 60, component: ScratchPanel,
     command: { id: 'view.scratchpads', keywords: 'notes sql consoles' },
   },
   {
     id: 'aws', title: 'AWS Profiles', icon: 'cloud', order: 90, component: AwsPanel,
     command: { title: 'AWS Profiles', keywords: 'amazon sso login credentials terminal' },
-  },
-  {
-    id: 'kube', title: 'Kubernetes', icon: 'helm', order: 100, component: KubePanel,
-    command: { title: 'Kubernetes', keywords: 'k8s kubectl cluster pods context namespace' },
   },
 ])
 

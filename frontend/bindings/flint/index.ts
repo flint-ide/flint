@@ -8,7 +8,6 @@ import * as AgentChatAPI from "./agentchatapi.js";
 import * as AlertsAPI from "./alertsapi.js";
 import * as AppAPI from "./appapi.js";
 import * as CompletionsAPI from "./completionsapi.js";
-import * as DatabaseAPI from "./databaseapi.js";
 import * as DebugAPI from "./debugapi.js";
 import * as DiagnosticsAPI from "./diagnosticsapi.js";
 import * as DiffAPI from "./diffapi.js";
@@ -17,7 +16,6 @@ import * as GitAPI from "./gitapi.js";
 import * as GitHubAPI from "./githubapi.js";
 import * as HTTPAPI from "./httpapi.js";
 import * as ImportAPI from "./importapi.js";
-import * as KubeAPI from "./kubeapi.js";
 import * as LSPAPI from "./lspapi.js";
 import * as PreviewAPI from "./previewapi.js";
 import * as ProfileAPI from "./profileapi.js";
@@ -39,7 +37,6 @@ export {
     AlertsAPI,
     AppAPI,
     CompletionsAPI,
-    DatabaseAPI,
     DebugAPI,
     DiagnosticsAPI,
     DiffAPI,
@@ -48,7 +45,6 @@ export {
     GitHubAPI,
     HTTPAPI,
     ImportAPI,
-    KubeAPI,
     LSPAPI,
     PreviewAPI,
     ProfileAPI,

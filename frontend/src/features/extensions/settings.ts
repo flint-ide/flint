@@ -5,11 +5,14 @@
 // Kept as the flat object it is in the file, so values of extensions that
 // aren't installed survive every save. Framework-free.
 import { defineSection } from '../../lib/settingsSections'
+import { coerceToggles, DEFAULT_TOGGLES, type FeatureToggles } from '../../lib/featureToggles'
 
 declare module '../../lib/settingsSections' {
   interface FeatureSettings {
     /** Installed extensions: on or off, tools offered, and their own settings by id. */
     extensions: ExtensionsSettings
+    /** Built-in extensions (optional features) switched off; applied at the next start. */
+    features: FeatureToggles
   }
 }
 
@@ -70,3 +73,6 @@ export function withValue(s: ExtensionsSettings, id: string, key: string, value:
 }
 
 export const extensionsSettings = defineSection('extensions', {}, coerceExtensions)
+
+/** Built-in extensions switched off (lib/featureToggles.ts; Go: internal/feature/toggles.go). */
+export const featureToggleSettings = defineSection('features', DEFAULT_TOGGLES, coerceToggles)

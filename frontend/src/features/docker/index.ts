@@ -11,6 +11,9 @@ const DockerSection = lazyPreload(() => import('./DockerSection').then((m) => ({
 
 export default defineFeature({
   id: 'docker',
+  optional: true,
+  name: 'Docker',
+  description: 'Containers and Compose projects through the Docker Engine API: start, stop, logs, shells and compose up, down and pull.',
   settings: [dockerSettings],
   panels: [
     {

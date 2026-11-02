@@ -36,6 +36,11 @@ type AppAPI struct {
 // laid out around them (0s on platforms without them).
 func (q *AppAPI) Titlebar() TitlebarMetrics { return titlebarMetrics() }
 
+// Features are the ids of the feature modules running in this process; an
+// optional one switched off in settings (features.enabled) is missing until
+// Flint restarts with it on. The frontend installs only these modules' halves.
+func (q *AppAPI) Features() []string { return q.app.features.Active() }
+
 // Quit closes the app after the frontend saved what it had to.
 func (q *AppAPI) Quit() {
 	q.app.closeMu.Lock()

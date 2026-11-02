@@ -95,6 +95,13 @@ export interface ThemeContribution {
 export interface FeatureModule {
   /** The feature's id, the same as its Go module's (internal/features/<id>). */
   id: string
+  /**
+   * A built-in extension that can be switched off in Settings ▸ Extensions (Go:
+   * feature.Module.Optional); name and description are shown there.
+   */
+  optional?: boolean
+  name?: string
+  description?: string
   settings?: readonly SettingsSection[]
   panels?: readonly PanelSpec[]
   commands?: readonly Command[]

@@ -2,7 +2,7 @@
 // and adds types for event payloads the generator can't see.
 import * as Workspace from '../../bindings/flint/workspaceapi'
 import * as Search from '../../bindings/flint/searchapi'
-import * as Database from '../../bindings/flint/databaseapi'
+import * as Database from '../../bindings/flint/internal/features/database/api'
 import * as Scratch from '../../bindings/flint/scratchapi'
 import * as Diff from '../../bindings/flint/diffapi'
 import * as GitHub from '../../bindings/flint/githubapi'

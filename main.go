@@ -56,7 +56,6 @@ func main() {
 			application.NewService(&lifecycle{app: flint}), // first: the others use App.ctx
 			application.NewService(&WorkspaceAPI{app: flint}),
 			application.NewService(&SearchAPI{app: flint}),
-			application.NewService(&DatabaseAPI{app: flint}),
 			application.NewService(&ScratchAPI{app: flint}),
 			application.NewService(&TerminalAPI{app: flint}),
 			application.NewService(&RunAPI{app: flint}),
@@ -81,7 +80,6 @@ func main() {
 			application.NewService(&ImportAPI{app: flint}),
 			application.NewService(newAlertsAPI(flint)),
 			application.NewService(newAWSAPI(flint)),
-			application.NewService(&KubeAPI{app: flint}),
 			application.NewService(&DiagnosticsAPI{app: flint}),
 			application.NewService(newCompletionsAPI(flint)),
 		}, flint.featureServices()...),

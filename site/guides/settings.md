@@ -12,7 +12,7 @@ The tab has fifteen sections: Appearance, Editor, Terminal, Agents, Agent Contex
 
 ## Appearance
 
-**Theme**: Dark, Light or System, and Custom once you have [imported a theme from VS Code](../how-to/customize-flint.md#import-your-settings-from-vs-code). System follows the macOS appearance and switches when macOS does. Custom lays the imported colors over the dark or light palette; the hint under the label names the theme. The title bar and window buttons follow the theme, and Flint starts in the theme you used last, so a light theme never flashes dark on launch.
+**Theme**: Dark, Light or System, and Custom once you have [imported a theme from VS Code](../how-to/customize-flint.md#import-your-settings-from-vs-code) or [chosen one from an extension](../how-to/customize-flint.md#use-a-theme-from-an-extension). **Color theme**, shown when an installed extension has themes, picks one of them. System follows the macOS appearance and switches when macOS does. Custom lays the imported colors over the dark or light palette; the hint under the label names the theme. The title bar and window buttons follow the theme, and Flint starts in the theme you used last, so a light theme never flashes dark on launch.
 
 ## Editor
 
@@ -137,6 +137,13 @@ The command palette uses your shortcuts too.
 - **Check Now**: checks right away, even when the daily check is off, and tells you if you are up to date. **Help ▸ Check for Updates…** does the same.
 
 Flint never downloads or installs updates itself. See [Update check](../reference/privacy-and-security.md#update-check) for exactly what is sent.
+
+## Extensions
+
+- **Install from Folder…**: pick an extension's folder; Flint shows its name, what it adds, its program and permissions in a dialog and copies it into its extensions folder only when you choose **Install**. Installing a newer version of the same extension replaces the old one.
+- Each installed extension shows what it adds, its permissions and its folder, with **Use …** for each color theme and **Uninstall** (deletes its folder after asking). An extension whose manifest Flint can't accept is listed as disabled, with the reason.
+
+Flint applies extension color themes; extensions with a program are listed but not started yet. See [Use a theme from an extension](../how-to/customize-flint.md#use-a-theme-from-an-extension).
 
 ## Import
 

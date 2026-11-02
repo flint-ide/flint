@@ -20,6 +20,7 @@ import { coerceAgentReview, DEFAULT_AGENT_REVIEW, type AgentReviewSettings } fro
 import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
 import { coerceGitHub, DEFAULT_GITHUB, type GitHubSettings } from './githubSettings'
 import { coerceSections, type FeatureSettings } from './settingsSections'
+import { TERMINAL_COLOR_NAMES } from './terminalTheme'
 
 import type { ResolvedTheme, ThemeMode } from './themeMode'
 
@@ -42,6 +43,10 @@ export interface CustomTheme {
   base: ResolvedTheme
   /** CSS variable ('--bg-editor') → hex color; Go allows only style.css's theme variables. */
   colors: Record<string, string>
+  /** xterm color ('red', 'brightBlue', 'background') → hex color; see TERMINAL_COLOR_NAMES. */
+  terminal: Record<string, string>
+  /** The extension theme it was taken from ('acme.nord.dark'), or '' (imported or hand-written). */
+  source: string
 }
 
 /** The keys of settings.json that Flint itself owns. */
@@ -98,7 +103,9 @@ export const DEFAULT_SETTINGS: CoreSettings = Object.freeze({
   theme: 'dark',
   editor: Object.freeze({ fontFamily: `'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace`, fontSize: 13, lineHeight: 1.55, vimMode: false }),
   terminal: Object.freeze({ fontFamily: `"JetBrains Mono", "SF Mono", Menlo, monospace`, fontSize: 13, lineHeight: 1.2 }),
-  customTheme: Object.freeze({ name: '', base: 'dark', colors: Object.freeze({}) as Record<string, string> }) as CustomTheme,
+  customTheme: Object.freeze({
+    name: '', base: 'dark', colors: Object.freeze({}) as Record<string, string>, terminal: Object.freeze({}) as Record<string, string>, source: '',
+  }) as CustomTheme,
   defaultAgent: '',
   autoSave: false,
   notifyInBackground: true,
@@ -163,20 +170,27 @@ export const THEME_VARIABLES: readonly string[] = Object.freeze([
   '--syn-keyword', '--syn-string', '--syn-number', '--syn-comment', '--syn-function',
   '--syn-type', '--syn-property', '--syn-definition', '--syn-punct',
 ])
-const THEME_VARIABLE_SET = new Set(THEME_VARIABLES)
+const THEME_VARIABLE_SET: ReadonlySet<string> = new Set(THEME_VARIABLES)
+const TERMINAL_COLOR_SET: ReadonlySet<string> = new Set(TERMINAL_COLOR_NAMES)
+const MAX_THEME_SOURCE_LEN = 200 // Go's settings.MaxThemeSourceLen
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/
 
-function customTheme(v: unknown, def: CustomTheme): CustomTheme {
+/** The hex colors of v whose names are allowed; anything else is dropped. */
+export function coerceColorMap(v: unknown, allowed: ReadonlySet<string>): Record<string, string> {
+  if (!isObject(v)) return {}
+  return Object.fromEntries(Object.entries(v).filter(([name, color]) => allowed.has(name) && typeof color === 'string' && HEX_COLOR.test(color))) as Record<string, string>
+}
+
+/** A custom theme from untrusted JSON, filtered like Go's normalizeCustomTheme. */
+export function coerceCustomTheme(v: unknown, def: CustomTheme = DEFAULT_SETTINGS.customTheme): CustomTheme {
   if (!isObject(v)) return def
-  const colors: Record<string, string> = {}
-  if (isObject(v.colors)) {
-    for (const [name, color] of Object.entries(v.colors)) {
-      if (THEME_VARIABLE_SET.has(name) && typeof color === 'string' && HEX_COLOR.test(color)) colors[name] = color
-    }
-  }
+  const source = typeof v.source === 'string' && v.source.length <= MAX_THEME_SOURCE_LEN && !CONTROL_CHARS.test(v.source) ? v.source : ''
   return {
     name: typeof v.name === 'string' ? v.name : '',
     base: v.base === 'light' ? 'light' : 'dark',
-    colors,
+    colors: coerceColorMap(v.colors, THEME_VARIABLE_SET),
+    terminal: coerceColorMap(v.terminal, TERMINAL_COLOR_SET),
+    source,
   }
 }
 
@@ -225,7 +239,7 @@ function coerceCore(v: Record<string, unknown>): CoreSettings {
       vimMode: isObject(v.editor) && typeof v.editor.vimMode === 'boolean' ? v.editor.vimMode : d.editor.vimMode,
     },
     terminal: font(v.terminal, d.terminal),
-    customTheme: customTheme(v.customTheme, d.customTheme),
+    customTheme: coerceCustomTheme(v.customTheme, d.customTheme),
     defaultAgent: typeof v.defaultAgent === 'string' ? v.defaultAgent : d.defaultAgent,
     autoSave: typeof v.autoSave === 'boolean' ? v.autoSave : d.autoSave,
     notifyInBackground: typeof v.notifyInBackground === 'boolean' ? v.notifyInBackground : d.notifyInBackground,

@@ -10,6 +10,7 @@
 //   statusItems    status bar items, after Flint's own
 //   tabKinds       editor tab views, opened with useEditor().openContributed
 //   fileMenu       entries of the file tree's context menu
+//   themes         color themes offered in Settings ▸ Appearance
 //   activate       runs once after the first render (event subscriptions); may return a cleanup
 //
 // Components are types only, so React.lazy or lazyPreload components keep their
@@ -22,6 +23,7 @@ import type { Command } from './commands'
 import type { SettingsSection } from './settingsSections'
 import type { PanelSpec } from '../panels/registry'
 import type { IconName } from '../components/ui/icons'
+import type { ResolvedTheme } from './themeMode'
 
 /** A page of the Settings tab. */
 export interface SettingsPage {
@@ -72,6 +74,24 @@ export interface FileMenuItem {
   run: (paths: readonly string[]) => void | Promise<unknown>
 }
 
+/**
+ * A color theme offered in Settings ▸ Appearance. Choosing it copies it into
+ * the custom theme (settings.customTheme, source = id), so saving checks it
+ * with the custom theme rules in Go, as for an imported VS Code theme.
+ */
+export interface ThemeContribution {
+  /** Unique among themes; becomes customTheme.source. */
+  id: string
+  label: string
+  /** Who offers it, shown next to the label ("Nord", the extension's name). */
+  group: string
+  base: ResolvedTheme
+  /** CSS variable → hex color (THEME_VARIABLES). */
+  colors: Readonly<Record<string, string>>
+  /** xterm color → hex color (TERMINAL_COLOR_NAMES). */
+  terminal: Readonly<Record<string, string>>
+}
+
 export interface FeatureModule {
   /** The feature's id, the same as its Go module's (internal/features/<id>). */
   id: string
@@ -82,6 +102,7 @@ export interface FeatureModule {
   statusItems?: readonly StatusItem[]
   tabKinds?: readonly TabKind[]
   fileMenu?: readonly FileMenuItem[]
+  themes?: readonly ThemeContribution[]
   /** Runs once after the first render; the returned function undoes it. */
   activate?: () => void | (() => void)
 }
@@ -105,6 +126,7 @@ export function checkFeatures(mods: readonly FeatureModule[]): void {
     ['status item', (m) => m.statusItems],
     ['tab kind', (m) => m.tabKinds],
     ['file menu item', (m) => m.fileMenu],
+    ['theme', (m) => m.themes],
   ]
   for (const [kind, of] of kinds) {
     const seen = new Set<string>()

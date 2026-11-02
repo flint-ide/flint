@@ -85,7 +85,14 @@ describe('custom theme', () => {
 
   it('drops colors that are not hex or not CSS variables', () => {
     const s = coerceSettings({ customTheme: { name: 3, base: 'neon', colors: { '--bg': 'red; }', 'color': '#fff', '--fg': '#ABCDEF', '--editor-font-size': '#123' } } })
-    assert.deepEqual(s.customTheme, { name: '', base: 'dark', colors: { '--fg': '#ABCDEF' } })
+    assert.deepEqual(s.customTheme, { name: '', base: 'dark', colors: { '--fg': '#ABCDEF' }, terminal: {}, source: '' })
+  })
+
+  it('keeps known terminal colors and a printable source', () => {
+    const s = coerceSettings({ customTheme: { base: 'light', colors: {}, terminal: { red: '#f00', pink: '#f0f', blue: 'blue' }, source: 'acme.nord.dark' } })
+    assert.deepEqual(s.customTheme.terminal, { red: '#f00' })
+    assert.equal(s.customTheme.source, 'acme.nord.dark')
+    assert.equal(coerceSettings({ customTheme: { source: 'a\nb' } }).customTheme.source, '')
   })
 
   it('recolors terminals from the custom colors', () => {
@@ -94,6 +101,15 @@ describe('custom theme', () => {
     assert.equal(t.background, '#1b1d23')
     assert.equal(t.cursorAccent, '#1b1d23')
     assert.equal(t.red, TERMINAL_THEMES.light.red)
+  })
+
+  it('takes ANSI and other terminal colors from the terminal map', () => {
+    const font = DEFAULT_SETTINGS.terminal
+    const t = terminalOptions(font, 'dark', 0, custom.colors, { red: '#bf616a', background: '#2e3440' }).theme
+    assert.equal(t.red, '#bf616a')
+    assert.equal(t.background, '#2e3440')
+    assert.equal(t.cursorAccent, '#2e3440')
+    assert.equal(t.green, TERMINAL_THEMES.dark.green)
   })
 })
 

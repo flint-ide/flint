@@ -21,6 +21,10 @@ type Host struct {
 	Ctx context.Context
 	// Version is what Version reports ("v1.0.0" by default).
 	VersionString string
+	// Folder is what PickFolder returns ("" = cancelled).
+	Folder string
+	// Answer is what Ask returns.
+	Answer bool
 
 	mu       sync.Mutex
 	settings settings.Settings
@@ -29,6 +33,24 @@ type Host struct {
 	events   []Event
 	opened   []string
 	streams  map[string]terminal.Stream
+	asked    []string
+}
+
+func (h *Host) PickFolder(string) (string, error) { return h.Folder, nil }
+
+// Ask records the question's message and returns Answer.
+func (h *Host) Ask(_, message, _ string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.asked = append(h.asked, message)
+	return h.Answer
+}
+
+// Asked returns the messages of the questions asked so far.
+func (h *Host) Asked() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return append([]string{}, h.asked...)
 }
 
 // Event is one Emit call.

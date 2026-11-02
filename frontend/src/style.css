@@ -5229,6 +5229,28 @@ body.file-drop-target-active::after {
   align-items: center;
   gap: 10px;
 }
+.settings-select {
+  max-width: 420px;
+}
+.extension-themes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.theme-swatches {
+  display: inline-flex;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.theme-swatch {
+  width: 10px;
+  height: 14px;
+  border: 1px solid var(--border);
+}
+.theme-swatch + .theme-swatch {
+  border-left: 0;
+}
 .account-avatar {
   width: 36px;
   height: 36px;

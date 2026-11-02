@@ -2,6 +2,7 @@ import { Suspense, useMemo, useState } from 'react'
 import { useSettings } from '../../store/settings'
 import { DEFAULT_SETTINGS, FONT_SIZE, LINE_HEIGHT, type FontSettings, type ThemeMode } from '../../lib/settings'
 import { byOrder, useContributions } from '../../lib/contributions'
+import { activeThemeId, customThemeFrom, groupThemes } from '../../lib/contributedThemes'
 import { KeymapSection } from './KeymapSection'
 import { AgentsSection } from './AgentsSection'
 import { LanguageServersSection } from './LanguageServersSection'
@@ -111,7 +112,36 @@ function AppearanceSection() {
           ))}
         </div>
       </Row>
+      <ContributedThemeRow />
     </section>
+  )
+}
+
+/** Color themes from extensions: choosing one makes it the custom theme. Hidden when there are none. */
+function ContributedThemeRow() {
+  const themes = useContributions((s) => s.themes)
+  const active = useSettings((s) => activeThemeId(s.settings, themes))
+  const update = useSettings((s) => s.update)
+  if (themes.length === 0) return null
+  const choose = (id: string) => {
+    const t = themes.find((x) => x.id === id)
+    if (t) update({ theme: 'custom', customTheme: customThemeFrom(t) })
+  }
+  return (
+    <Row label="Color theme" hint="From your extensions (Settings ▸ Extensions). Chosen, it becomes the Custom theme, terminal colors included.">
+      <select className="settings-select" value={active} onChange={(e) => choose(e.target.value)} aria-label="Color theme">
+        {active === '' && <option value="">Choose a theme…</option>}
+        {groupThemes(themes).map((g) => (
+          <optgroup key={g.group} label={g.group}>
+            {g.themes.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label} ({t.base})
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+    </Row>
   )
 }
 

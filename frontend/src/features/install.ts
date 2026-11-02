@@ -23,7 +23,7 @@ export function installFeatures(mods: readonly FeatureModule[] = FEATURES): void
   for (const m of mods) {
     registerSections(m.settings ?? [], CORE_KEYS)
     contribute(`feature:${m.id}`, {
-      panels: m.panels, settingsPages: m.settingsPages, statusItems: m.statusItems, tabKinds: m.tabKinds, fileMenu: m.fileMenu,
+      panels: m.panels, settingsPages: m.settingsPages, statusItems: m.statusItems, tabKinds: m.tabKinds, fileMenu: m.fileMenu, themes: m.themes,
     })
   }
   installed = mods

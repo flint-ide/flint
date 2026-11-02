@@ -219,6 +219,32 @@ var colorSources = []struct {
 	{"--diff-del-bg", []string{"diffEditor.removedTextBackground", "diffEditor.removedLineBackground"}},
 }
 
+// terminalSources maps VS Code's terminal colors onto the custom theme's
+// terminal palette (settings.TerminalColors).
+var terminalSources = []struct{ color, key string }{
+	{"background", "terminal.background"},
+	{"foreground", "terminal.foreground"},
+	{"cursor", "terminalCursor.foreground"},
+	{"cursorAccent", "terminalCursor.background"},
+	{"selectionBackground", "terminal.selectionBackground"},
+	{"black", "terminal.ansiBlack"},
+	{"red", "terminal.ansiRed"},
+	{"green", "terminal.ansiGreen"},
+	{"yellow", "terminal.ansiYellow"},
+	{"blue", "terminal.ansiBlue"},
+	{"magenta", "terminal.ansiMagenta"},
+	{"cyan", "terminal.ansiCyan"},
+	{"white", "terminal.ansiWhite"},
+	{"brightBlack", "terminal.ansiBrightBlack"},
+	{"brightRed", "terminal.ansiBrightRed"},
+	{"brightGreen", "terminal.ansiBrightGreen"},
+	{"brightYellow", "terminal.ansiBrightYellow"},
+	{"brightBlue", "terminal.ansiBrightBlue"},
+	{"brightMagenta", "terminal.ansiBrightMagenta"},
+	{"brightCyan", "terminal.ansiBrightCyan"},
+	{"brightWhite", "terminal.ansiBrightWhite"},
+}
+
 // syntaxSources lists, per Flint syntax color, representative TextMate scopes
 // of that kind of token, most typical first. fallback uses the text color.
 var syntaxSources = []struct {
@@ -252,6 +278,14 @@ func convertTheme(t vsTheme, name, base string) settings.CustomTheme {
 	for _, src := range colorSources {
 		if c := pick(src.keys); c != "" {
 			out.Colors[src.variable] = c
+		}
+	}
+	for _, src := range terminalSources {
+		if c := pick([]string{src.key}); c != "" {
+			if out.Terminal == nil {
+				out.Terminal = map[string]string{}
+			}
+			out.Terminal[src.color] = c
 		}
 	}
 	if accent := out.Colors["--accent"]; accent != "" {

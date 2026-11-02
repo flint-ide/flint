@@ -60,6 +60,7 @@ Query history masks passwords in `CREATE/ALTER ROLE … PASSWORD` and ClickHouse
 - Markdown, pull request descriptions and comments are rendered without raw HTML, and `javascript:` links are dropped.
 - HTTP response bodies are shown as text in a read-only editor, never rendered as HTML.
 - Names that come from the UI or from tool output (containers, contexts, namespaces, pods) are validated before Flint passes them to a command.
+- Extensions are installed only from a folder you pick, after a dialog that Flint's native code shows (code in the window can't answer it) with the extension's program and permissions. What an extension adds is data that Flint draws with its own components: it can't run code in the window. Its theme colors pass the same check as an imported theme (known color names, hex values only). Symlinks inside an extension's folder are refused when it is installed.
 
 ## Reporting a vulnerability
 

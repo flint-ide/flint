@@ -1,11 +1,11 @@
-// What feature modules (and, later, external extensions) add to the shell's
-// UI: panels, Settings pages, status items, tab kinds and file menu entries,
-// by the source that contributed them. The shell renders Flint's own entries
+// What feature modules and external extensions add to the shell's UI:
+// panels, Settings pages, status items, tab kinds, file menu entries and
+// color themes, by the source that contributed them. The shell renders Flint's own entries
 // plus these; a source can be withdrawn as a whole (an extension stopped or
 // uninstalled). Commands and settings sections have registries of their own
 // (lib/commands.ts, lib/settingsSections.ts).
 import { createStore } from './store'
-import type { FileMenuItem, SettingsPage, StatusItem, TabKind } from './features'
+import type { FileMenuItem, SettingsPage, StatusItem, TabKind, ThemeContribution } from './features'
 import type { PanelSpec } from '../panels/registry'
 
 export interface Contributions {
@@ -14,9 +14,10 @@ export interface Contributions {
   statusItems: readonly StatusItem[]
   tabKinds: readonly TabKind[]
   fileMenu: readonly FileMenuItem[]
+  themes: readonly ThemeContribution[]
 }
 
-const EMPTY: Contributions = Object.freeze({ panels: [], settingsPages: [], statusItems: [], tabKinds: [], fileMenu: [] })
+const EMPTY: Contributions = Object.freeze({ panels: [], settingsPages: [], statusItems: [], tabKinds: [], fileMenu: [], themes: [] })
 
 /** The contributions of every source, flattened in contribution order; ordered lists are sorted by order. */
 export const useContributions = createStore<Contributions>(() => EMPTY)
@@ -52,6 +53,7 @@ function flatten(sources: ReadonlyMap<string, Partial<Contributions>>): Contribu
     statusItems: byOrder(of('statusItems')),
     tabKinds: of('tabKinds'),
     fileMenu: of('fileMenu'),
+    themes: of('themes'),
   }
   for (const [kind, list] of Object.entries(out) as [string, readonly { id: string }[]][]) {
     const seen = new Set<string>()

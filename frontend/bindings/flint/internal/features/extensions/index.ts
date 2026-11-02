@@ -5,8 +5,3 @@ import * as API from "./api.js";
 export {
     API
 };
-
-export {
-    Extension,
-    Theme
-} from "./models.js";

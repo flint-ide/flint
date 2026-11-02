@@ -64,7 +64,7 @@ A minimal theme extension:
 }
 ```
 
-The color names are those of [customTheme](../reference/settings.md#customtheme). Extensions with a program (commands, panels, agent tools) can be installed and are listed, but this version of Flint doesn't start their programs yet.
+The color names are those of [customTheme](../reference/settings.md#customtheme). Without `run`, the extension has no program and runs no code. Extensions can also be programs that add commands and panels: see [Extensions](../guides/extensions.md) and [Write an extension](../extensions/write-an-extension.md).
 
 ## Use Vim key bindings
 

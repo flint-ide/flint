@@ -1,13 +1,13 @@
 # Extensions: feature modules (level 1) and external extensions (level 2)
 
-Status: level 1 implemented (Docker, TODO list and the release check migrated). Level 2: the manifest, installing from a folder and color themes are implemented ([what exists today](#level-2-what-exists-today)); extension processes, declarative views, tab views and editor decorations are designed, not implemented.
+Status: level 1 implemented (Docker, TODO list and the release check migrated). Level 2 implemented in its first version (contract 1), color themes included: see [what is implemented and the decisions taken](#level-2-implemented-v1). The richer component catalog, tab views, editor decorations and file icons are designed, not implemented ([plan](#implementation-plan-level-2)).
 
 Flint should be easy to extend through an explicit contract. Two levels:
 
 1. **Feature modules** (level 1): features inside Flint's repository. A feature is one Go package plus one frontend directory, listed once on each side. No edits to `settings.go`, `settings.ts`, `SettingsView`, `main.go`'s service list, the tool table or the panel list.
 2. **External extensions** (level 2): separate processes in any language, installed explicitly by the user, talking JSON-RPC 2.0 over stdio and described by a manifest. Flint renders their UI from data (no extension JavaScript or HTML in the WebView). Level 2 is built on level 1: an extension's contributions land in the same registries as a feature module's.
 
-Contents: [Goals](#goals) · [Level 1](#level-1-feature-modules) · [Level 2](#level-2-external-extensions) ([themes](#themes-and-file-icons) · [components](#component-catalog) · [tab views](#tab-views) · [editor decorations](#editor-decorations) · [today](#level-2-what-exists-today)) · [Remaining migration](#what-remains-to-migrate) · [Open questions](#open-questions)
+Contents: [Goals](#goals) · [Level 1](#level-1-feature-modules) · [Level 2](#level-2-external-extensions) ([themes](#themes-and-file-icons) · [components](#component-catalog) · [tab views](#tab-views) · [editor decorations](#editor-decorations) · [implemented](#level-2-implemented-v1)) · [Remaining migration](#what-remains-to-migrate) · [Open questions](#open-questions)
 
 ## Goals
 
@@ -67,8 +67,10 @@ type Host interface {
 	LoadState(key string, v any) error
 	SaveState(key string, v any) error
 	StartStream(termID, title string, st terminal.Stream) error // a terminal tab agents can read too
-	PickFolder(title string) (string, error)  // native folder picker; "" when cancelled
-	Ask(title, message, ok string) bool        // native question the web view can't answer
+	Trusted(path string) bool                  // Restricted Mode
+	ConfigDir() string
+	Confirm(title, message, ok string) bool    // native question the web view can't answer
+	Choose(title, message string, buttons []string) string
 }
 ```
 
@@ -523,18 +525,6 @@ A theme is data and runs no code, so it needs neither a program nor a permission
 - `customTheme.terminal` is new and also filled by the VS Code import (`terminal.ansi*`, `terminal.background` and so on). Without it, terminals keep taking the background, text, accent and selection from `colors` and the ANSI colors from the base palette.
 - **File icons** follow the same idea. Flint's file icons are a badge (a label of up to 4 characters, a background and a text color) on an outlined page (`components/icons/FileIcon.tsx`). An extension contributes badges by file name and extension, `{ "label": "JQL", "bg": "#0c66e4", "fg": "#ffffff" }`, checked as hex colors and short plain text. Flint's own mappings win for names it knows; extensions fill the gaps. No SVG and no images, so icons stay crisp, consistent and safe.
 
-### Level 2: what exists today
-
-Implemented in this step, with no extension process yet:
-
-- `internal/extensions/manifest`: parsing and every rule above for `contract`, `id`, `name`, `version`, `run`, `activation`, `permissions` and `contributes` (commands, panels, settings and its schema subset, status items, file menu, tab views, agent tools, themes), with table tests and a fuzz test. `fileIcons`, `decorations` and `onLanguage:` activation are not accepted yet (unknown fields are ignored; `onLanguage:` is refused) and come with their features.
-- `internal/extensions/installed`: discovery of `<config>/extensions/<id>/` (manifests only), install by copying a folder (a symlinked folder is resolved first; inside it regular files only, no symlinks or FIFOs, at most 5,000 files and folders, 32 levels deep and 256 MiB, `.git` left out; read through an `os.Root`, with each opened file checked against what the walk listed, so a folder changed during the copy can't swap in a symlink or a growing file; an older version replaced atomically; refused if the manifest changed after the user approved it) and removal.
-- `internal/features/extensions`: the level-1 module with `ExtensionsAPI.List`, `InstallFromFolder` and `Uninstall`. Install and uninstall ask through `Host.Ask`, a native dialog that code in the web view can't answer; the install dialog lists the contributions, the program that would run on this platform with its arguments, the permissions, and the installed version it replaces. Uninstall shows its dialog only for the exact folder name of an installed extension, since the id comes from the web view. `feature.Host` gained `PickFolder` and `Ask` for this.
-- `frontend/src/features/extensions`: Settings ▸ Extensions (install, list with errors, contributions, permissions, themes with **Use …**, uninstall), the palette command "Install Extension from Folder…" and the contribution of each extension's themes under `extension:<id>`. Level 1 gained the `themes` contribution point, which Settings ▸ Appearance reads.
-- `settings.CustomTheme` gained `terminal` and `source`, checked and normalized like `colors`.
-
-Extensions with a program can be installed and are listed with what they would add, and the install dialog says that this version doesn't start programs.
-
 ### Activation and limits
 
 - **Lazy.** A process starts on its first activation event: a command run, a panel or tab view shown, an agent tool called, or `onStartup`. `onStartup` needs to be declared and is shown as "runs at startup" when installing. Even then the process starts after launch, never before the window.
@@ -590,15 +580,39 @@ for line in sys.stdin:
 
 Each step is one pull request that leaves Flint shippable.
 
-1. **Done.** `internal/extensions/manifest`, `internal/extensions/installed`, the `extensions` module, Settings ▸ Extensions, theme contributions and terminal colors in custom themes ([what exists today](#level-2-what-exists-today)).
-2. **File icons.** `fileIcons` in the manifest, a `fileIcons` contribution point and its use in `FileIcon.tsx`. Data only, like themes.
-3. `internal/extensions/rpc`: newline-delimited JSON-RPC over pipes, with bounded messages, cancellation and timeouts, fuzzed.
-4. `internal/extensions/host`: lazy start, idle stop, crash policy, permissions and keyring access, tested with an extension written in Go under `testdata`; the `extensions` settings section (enabled flags and per-extension values); project extensions in trusted folders; `flint --install-extension <dir>`.
-5. **Declarative views, part 1.** `DeclarativeView` with `tree`, `list`, `table`, `form` and `message`, panels, commands, status items and the file menu. This is the first step where extension programs run.
-6. **Declarative views, part 2.** `markdown`, `chart`, `cards` and `stack`, and tab views with session restore (`TabKind.restore`).
-7. **Editor decorations.** The `decorationSets` point and `lib/editorDecorations.ts`, the `editor/*` notifications, quick-fix actions, per-set toggles.
-8. **Agent tools** on Flint's MCP server, with their toggle in Settings ▸ Agent Context.
-9. Docs: a guide for extension authors and a protocol reference generated from the Go types; a conformance extension in `testdata` run in CI.
+1. **Done (v1).** Manifest, RPC, host, the `extensions` module and settings section, commands, `tree`/`list` panels, status items, agent tools, docs and the conformance test ([implemented](#level-2-implemented-v1)).
+2. **Done.** Color themes, with no program needed, and terminal colors in custom themes ([Themes](#themes-and-file-icons)).
+3. **File icons.** `fileIcons` in the manifest, a `fileIcons` contribution point and its use in `FileIcon.tsx`. Data only, like themes.
+4. **Declarative views, part 1.** `table` and `form` in `DeclarativeView` (today's manifests with them are refused), and the file menu.
+5. **Declarative views, part 2.** `markdown`, `chart`, `cards` and `stack`, and tab views with session restore (`TabKind.restore`).
+6. **Editor decorations.** The `decorationSets` point and `lib/editorDecorations.ts`, the `editor/*` notifications, quick-fix actions, per-set toggles.
+7. Later: project extensions (after sandboxing), `flint --install-extension <dir>`, a protocol reference generated from the Go types.
+
+### Level 2: implemented (v1)
+
+Code: `internal/extensions/{manifest,rpc,host}`, the module `internal/features/extensions`, `frontend/src/features/extensions`, the example `examples/extensions/stats` (Go, standard library). Docs: [site/guides/extensions.md](../../site/guides/extensions.md) (users), [site/extensions/write-an-extension.md](../../site/extensions/write-an-extension.md) and [site/extensions/protocol.md](../../site/extensions/protocol.md) (authors; the reference is written by hand, not generated). Tests: manifest table tests, the RPC transport (with a fuzz target), the host against `host/testdata/testext` (lazy start, permissions, crashes, idle stop, timeouts, process-group kill, environment, tools, settings) and a conformance test that builds the example and drives every contribution point it uses; frontend tests for the translation into contributions, the settings section and the schema checks.
+
+**Implemented as designed:** the manifest and its rules (ids namespaced by `<id>.`, `run.command` inside the folder, no shell or `PATH`), the lifecycle (`initialize` with contract check, `initialized`, `shutdown`, then stdin closed and the process group killed after 2 s), lazy activation, idle stop after 5 minutes, the timeouts, the 4 MiB message cap and the 8 MiB/s × 5 s flood limit, 3 crashes in 10 minutes stop the extension, `$/cancelRequest`, the permissions and `-32001`, the keyring layout, the `extensions` settings section (objects of extensions that aren't installed are kept), agent tools named `<short>_<name>`, contributions under `extension:<id>` withdrawn when an extension is turned off or uninstalled.
+
+**Decisions where this design was open or is narrowed in v1:**
+
+- **Project-local extensions are not supported.** Only user-installed extensions in `<config>/extensions/<id>/`. Project ones wait for sandboxing (open question 1); a repository can't make Flint run anything.
+- **Restricted Mode is stricter than designed:** untrusted roots are not passed at all (instead of `trusted: false`), so an extension learns only of folders the user trusts. `roots` keeps the `trusted` field for compatibility; it is always `true`.
+- **Installation** is the palette command and Settings ▸ Extensions ▸ Install from Folder…; the folder picker is the frontend's, the confirmation is Go's native dialog (in the dev-only server build it says yes, like every native confirmation there). No `flint --install-extension` CLI yet. A copy skips `.git`, follows symbolic links only inside the folder, and is limited to 10,000 files and 512 MiB; the old version is stopped before it is replaced.
+- **Discovery** happens on the frontend's first `List` after the first render (and on install, uninstall, **Reload**), not on a goroutine at launch; folders aren't watched. `onStartup` extensions start after that first `List`.
+- **Contribution points in v1:** commands, panels (`tree`, `list`, plus `message`), the settings page, status items, toasts, `window/showMessageRequest` (a native question with up to three buttons), files and links, chat drafts and agent tools. `table` and `form` views, `tabViews` / `window/openTab` and `fileMenu` are not implemented: a manifest with a `table` or `form` panel is refused, and unknown contribution points are ignored with a warning in Settings.
+- **`window/openUrl`** (not in the original tables) opens `http(s)` links only, after a native confirmation once per extension and origin per session. The extension could open a browser itself, so this is about not surprising the user, not containment.
+- **Settings are checked when they are written and when they are used,** not when `settings.json` is saved: Go's save check is structural (ids, sizes). The generated page refuses invalid values, and the extension always receives schema-valid values (invalid ones become defaults). This way a newer manifest with a stricter schema can never make `settings.json` unsavable. `enabled` and `agentTools` are maps where a missing id means on.
+- **Crash policy details:** the next start waits 1 s after the first crash and 4 s after the second; an extension with a panel on screen or `onStartup` is restarted on its own after that delay, others on their next use. "Failed" lasts for the session; **Restart** (or turning it off and on) clears it. Contributions stay while an extension is crashed or failed; their use reports why.
+- **Idle stop** doesn't apply to `onStartup` extensions: the user saw "starts with Flint" when installing, so they run for the session.
+- **Agent tools are read-only only** (open question 4 stays open): there is no approval path for acting tools. They are listed from manifests (no process starts for `tools/list`), offered only for trusted roots while the MCP server is on, and can be turned off per extension in Settings ▸ Extensions (`extensions.agentTools`), not in Settings ▸ Agent Context.
+- **Environment:** `PATH` (with the login shell's additions), `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `TZ`, `LANG`, `LC_ALL`, `LC_CTYPE`, proxy variables, and `FLINT_EXTENSION_ID`, `FLINT_EXTENSION_DIR`, `FLINT_VERSION`. The working directory is the extension's folder.
+- **Logs** are in memory (the last 256 KiB per extension, stderr lines cut at 2,000 characters), shown in Settings ▸ Extensions; they are not written to Flint's log file. RSS is not shown yet.
+- **Uninstall** deletes the folder and keeps the settings and keychain secrets (the keyring API can't list an extension's keys).
+- **Level-1 contract additions** this needed: `Host.Trusted`, `ConfigDir`, `Confirm`, `Choose`, and `Instance.SettingsChanged`, `RootsChanged`.
+- **Color themes** (`contributes.themes`, added after v1) are data: an extension with only themes (and settings) needs no `run` and never starts a program; Settings ▸ Extensions says "runs no code" and the install dialog shows no program. Themes are checked with `settings.ValidateCustomTheme` when the manifest is read, offered through the level-1 `themes` contribution point (Settings ▸ Appearance ▸ Color theme, and **Use …** on the extension's card), and copied into `customTheme` (with `source` and the new `terminal` colors) when chosen, so saving checks them again.
+- **Installing, hardened after review:** the copy reads through an `os.Root`, checks each opened file against what the walk listed, opens non-blocking (a FIFO can't hang it), counts folders, limits depth to 32 and enforces the byte limit while copying; a manifest that changed between the confirmation and the copy is refused; `run.command` and arguments may not hold control characters (the dialog shows them), and the dialog shows the command for this platform.
+- **Panels appear after the first paint.** Extensions are discovered after the window is up, so their activity bar buttons arrive a moment later; a stored sidebar choice of an extension panel falls back to Files on the next start.
 
 ---
 
@@ -631,10 +645,10 @@ Points not yet in the contract, to add when a migration needs them:
 
 ## Open questions
 
-1. **Sandboxing extension processes.** On macOS, `sandbox-exec` is deprecated but works, and an App Sandbox helper is heavy. On Linux, Landlock or seccomp would need cgo or a helper. v1 relies on explicit installation and honest disclosure. Is that enough for project-local extensions, or should they be disabled entirely until sandboxing exists?
+1. **Sandboxing extension processes.** On macOS, `sandbox-exec` is deprecated but works, and an App Sandbox helper is heavy. On Linux, Landlock or seccomp would need cgo or a helper. v1 relies on explicit installation and honest disclosure. *Decided for v1:* project-local extensions are disabled entirely until sandboxing exists.
 2. **Memory and CPU limits.** `setrlimit` on Linux is easy; macOS has no reliable per-process memory cap. Should Flint watch RSS and stop a runaway extension instead?
 3. **Distribution.** "Install from folder" leaves signing and updates to the user. A signed index (minisign) could come later without changing the protocol.
 4. **Agent tools that act.** v1 extension tools are read-only, like Flint's own MCP tools. Tools that change state would need the agent approval policy (`agentsession.Policy`) to apply to them.
 5. **Shared views between extensions.** A tab kind from one extension used by another is out of scope; ids are namespaced per extension.
 6. **The Wails `Settings` type is `any` in TypeScript.** If typed bindings for settings are wanted back, `SettingsAPI` could return a wrapper type, at the cost of a second representation. Today the frontend's own `AppSettings` is the typed view and nothing was lost.
-7. **Contract checks in CI.** Level 1 is checked by tests (Go and frontend keys, documentation partials, duplicate ids). Level 2 will need a conformance test extension in `testdata` that runs in CI on both platforms.
+7. **Contract checks in CI.** Level 1 is checked by tests (Go and frontend keys, documentation partials, duplicate ids). Level 2 has `host/testdata/testext` and the conformance test of `examples/extensions/stats`, which build with `go` and are skipped without it; they run wherever `go test ./...` runs, which includes CI's macOS and Linux jobs.

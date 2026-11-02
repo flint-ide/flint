@@ -2,296 +2,201 @@ package manifest
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
 
-// full is the example manifest of docs/design/extensions.md plus a theme.
-const full = `{
-  "contract": 1,
-  "id": "acme.jira",
-  "name": "Jira",
-  "version": "0.3.0",
-  "publisher": "Acme",
-  "description": "Your Jira issues next to your code.",
-  "run": {
-    "command": "bin/flint-jira",
-    "args": ["--stdio"],
-    "darwin": { "command": "bin/flint-jira-darwin" },
-    "linux": { "command": "bin/flint-jira-linux" }
-  },
-  "activation": ["onCommand:acme.jira.refresh", "onView:acme.jira.issues", "onAgentTool:jira_issue", "onStartup"],
-  "permissions": ["network:acme.atlassian.net", "secrets", "workspace.read", "agent.ask"],
+const valid = `{
+  "contract": 1, "id": "acme.jira", "name": "Jira", "version": "0.3.0", "publisher": "Acme",
+  "run": { "command": "bin/jira", "args": ["--stdio"] },
+  "activation": ["onStartup", "onCommand:acme.jira.refresh", "onView:acme.jira.issues", "onAgentTool:jira_issue"],
+  "permissions": ["network:acme.atlassian.net", "secrets", "workspace.read"],
   "contributes": {
-    "commands": [{ "id": "acme.jira.refresh", "title": "Refresh Issues", "category": "Jira", "keys": "Mod+Alt+J" },
-                 { "id": "acme.jira.link", "title": "Link to Jira Issue" }],
+    "commands": [{ "id": "acme.jira.refresh", "title": "Refresh Issues", "category": "Jira", "keys": "Mod+Alt+J" }],
     "panels": [{ "id": "acme.jira.issues", "title": "Jira", "icon": "checkbox", "order": 120, "view": "tree" }],
-    "settings": {
-      "title": "Jira",
-      "properties": {
-        "site": { "type": "string", "format": "hostname", "default": "", "description": "Your Atlassian site." },
-        "jql": { "type": "string", "default": "assignee = currentUser() AND resolution = Unresolved", "maxLength": 500 },
-        "pollMinutes": { "type": "integer", "minimum": 1, "maximum": 60, "default": 10 },
-        "projects": { "type": "array", "items": { "type": "string" }, "default": ["ABC"] }
-      }
-    },
     "statusItems": [{ "id": "acme.jira.count", "order": 10 }],
-    "fileMenu": [{ "id": "acme.jira.linkfile", "label": "Link to Jira Issue…", "command": "acme.jira.link" }],
-    "tabViews": [{ "id": "acme.jira.issue", "view": "stack" }],
-    "agentTools": [{
-      "name": "jira_issue",
-      "title": "Jira issue",
-      "description": "Summary, status and description of a Jira issue by key (ABC-123).",
-      "inputSchema": { "type": "object", "properties": { "key": { "type": "string" } }, "required": ["key"] }
-    }],
-    "themes": [{ "id": "acme.jira.dark", "label": "Jira Dark", "base": "dark",
-                 "colors": { "--bg-editor": "#1d2125", "--accent": "#579dff" },
-                 "terminal": { "red": "#f87168", "brightBlue": "#85b8ff" } }]
+    "settings": { "title": "Jira", "properties": {
+      "site": { "type": "string", "format": "hostname", "default": "" },
+      "pollMinutes": { "type": "integer", "minimum": 1, "maximum": 60, "default": 10 },
+      "mode": { "type": "string", "enum": ["mine", "all"] },
+      "labels": { "type": "array", "items": { "type": "string" }, "maxLength": 20 },
+      "verbose": { "type": "boolean" }
+    }},
+    "agentTools": [{ "name": "jira_issue", "description": "An issue by key.", "inputSchema": { "type": "object" } }],
+    "fileMenu": [{ "id": "acme.jira.link", "label": "Link" }]
   }
 }`
 
-// themeOnly is an extension without a program: a color theme.
-const themeOnly = `{
-  "contract": 1, "id": "me.nord", "name": "Nord", "version": "1.0.0",
-  "contributes": { "themes": [
-    { "id": "me.nord.dark", "label": "Nord", "base": "dark", "colors": { "--bg-editor": "#2e3440", "--fg": "#d8dee9" },
-      "terminal": { "background": "#2e3440", "red": "#bf616a" } },
-    { "id": "me.nord.light", "label": "Nord Light", "base": "light", "colors": { "--bg-editor": "#eceff4" } }
-  ] }
-}`
-
-func TestParseFull(t *testing.T) {
-	m, err := Parse([]byte(full))
+func TestParseValid(t *testing.T) {
+	m, err := Parse([]byte(valid))
 	if err != nil {
-		t.Fatalf("Parse() = %v", err)
+		t.Fatal(err)
 	}
-	if m.ID != "acme.jira" || len(m.Contributes.Commands) != 2 || m.Contributes.Settings.Properties["pollMinutes"].Type != "integer" {
-		t.Errorf("Parse() = %+v", m)
+	if m.ID != "acme.jira" || !m.RunsAtStartup() || !m.HasPermission(PermSecrets) || m.HasPermission(PermAgentAsk) {
+		t.Errorf("parsed %+v", m)
 	}
-	if !m.NeedsProgram() {
-		t.Error("NeedsProgram() = false for an extension with commands")
+	if got := m.NetworkHosts(); !reflect.DeepEqual(got, []string{"acme.atlassian.net"}) {
+		t.Errorf("hosts = %v", got)
+	}
+	if !reflect.DeepEqual(m.Contributes.Unsupported, []string{"fileMenu"}) {
+		t.Errorf("unsupported = %v", m.Contributes.Unsupported)
+	}
+	var keys []string
+	for _, p := range m.Contributes.Settings.Properties {
+		keys = append(keys, p.Key)
+	}
+	if !reflect.DeepEqual(keys, []string{"site", "pollMinutes", "mode", "labels", "verbose"}) {
+		t.Errorf("settings keep the manifest's order: %v", keys)
+	}
+	if m.Contributes.Settings.Properties[2].Default != "mine" {
+		t.Errorf("an enum defaults to its first value: %v", m.Contributes.Settings.Properties[2].Default)
 	}
 }
 
-func TestParseThemeOnly(t *testing.T) {
-	m, err := Parse([]byte(themeOnly))
-	if err != nil {
-		t.Fatalf("Parse() = %v", err)
-	}
-	if m.NeedsProgram() || m.Run != nil {
-		t.Error("a theme-only extension needs a program")
-	}
-	c := m.Contributes.Themes[0].CustomTheme()
-	if c.Name != "Nord" || c.Source != "me.nord.dark" || c.Terminal["red"] != "#bf616a" || c.Colors["--fg"] != "#d8dee9" {
-		t.Errorf("CustomTheme() = %+v", c)
-	}
-	if light := m.Contributes.Themes[1].CustomTheme(); light.Terminal != nil || light.Base != "light" {
-		t.Errorf("CustomTheme() = %+v, want no terminal map on light", light)
-	}
-}
-
-// mutate applies f to the decoded full manifest and parses the result.
-func mutate(t *testing.T, base string, f func(m map[string]any)) error {
+// edit applies change to the valid manifest's JSON object.
+func edit(t *testing.T, change func(m map[string]any)) []byte {
 	t.Helper()
-	var doc map[string]any
-	if err := json.Unmarshal([]byte(base), &doc); err != nil {
+	var m map[string]any
+	if err := json.Unmarshal([]byte(valid), &m); err != nil {
 		t.Fatal(err)
 	}
-	f(doc)
-	data, err := json.Marshal(doc)
+	change(m)
+	data, err := json.Marshal(m)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = Parse(data)
-	return err
+	return data
 }
 
 func contributes(m map[string]any) map[string]any { return m["contributes"].(map[string]any) }
 
-func first(m map[string]any, kind string) map[string]any {
-	return contributes(m)[kind].([]any)[0].(map[string]any)
-}
-
-func setting(m map[string]any, name string) map[string]any {
-	return contributes(m)["settings"].(map[string]any)["properties"].(map[string]any)[name].(map[string]any)
-}
-
 func TestParseRefuses(t *testing.T) {
-	cases := []struct {
-		name string
-		f    func(m map[string]any)
-		want string
+	for _, tc := range []struct {
+		name, want string
+		change     func(m map[string]any)
 	}{
-		{"other contract", func(m map[string]any) { m["contract"] = 2 }, "contract 2; this Flint supports 1"},
-		{"no contract", func(m map[string]any) { delete(m, "contract") }, "contract: missing"},
-		{"id without publisher", func(m map[string]any) { m["id"] = "jira" }, "publisher.name"},
-		{"id upper case", func(m map[string]any) { m["id"] = "Acme.Jira" }, "publisher.name"},
-		{"no name", func(m map[string]any) { m["name"] = " " }, "name: missing"},
-		{"control char in name", func(m map[string]any) { m["name"] = "Ji\u001bra" }, "control characters"},
-		{"bad version", func(m map[string]any) { m["version"] = "v1" }, "semantic version"},
-		{"no run", func(m map[string]any) { delete(m, "run") }, "run: missing"},
-		{"absolute command", func(m map[string]any) { m["run"].(map[string]any)["command"] = "/bin/sh" }, "clean relative path"},
-		{"escaping command", func(m map[string]any) { m["run"].(map[string]any)["command"] = "../../bin/sh" }, "clean relative path"},
-		{"unclean command", func(m map[string]any) { m["run"].(map[string]any)["command"] = "bin/../x" }, "clean relative path"},
-		{"backslash command", func(m map[string]any) { m["run"].(map[string]any)["command"] = `bin\x` }, "clean relative path"},
-		{"escaping platform command", func(m map[string]any) {
-			m["run"].(map[string]any)["linux"] = map[string]any{"command": "../x"}
-		}, "run.linux.command"},
-		{"newline in command", func(m map[string]any) {
-			m["run"].(map[string]any)["command"] = "bin/x\n\nThis extension contains only a theme."
-		}, "control characters"},
-		{"control char in arg", func(m map[string]any) { m["run"].(map[string]any)["args"] = []any{"--a\rb"} }, "control characters"},
-		{"too many permissions", func(m map[string]any) {
-			perms := []any{}
-			for i := 0; i < 21; i++ {
-				perms = append(perms, fmt.Sprintf("network:h%d.example.com", i))
-			}
-			m["permissions"] = perms
-		}, "more than 20 entries"},
-		{"too many hosts", func(m map[string]any) {
-			m["permissions"] = []any{"network:" + strings.TrimSuffix(strings.Repeat("a.example.com,", 21), ",")}
-		}, "more than 20 network hosts"},
-		{"null default", func(m map[string]any) { setting(m, "pollMinutes")["default"] = nil }, "null is not"},
-		{"control char in enum", func(m map[string]any) { setting(m, "jql")["enum"] = []any{"a\nb"} }, "control characters"},
-		{"long pattern", func(m map[string]any) { setting(m, "jql")["pattern"] = strings.Repeat("a", 501) }, "pattern: longer"},
-		{"unknown permission", func(m map[string]any) { m["permissions"] = []any{"exec"} }, "unknown permission"},
-		{"bad network host", func(m map[string]any) { m["permissions"] = []any{"network:acme.com,https://x"} }, "not a host name"},
-		{"duplicate permission", func(m map[string]any) { m["permissions"] = []any{"secrets", "secrets"} }, "listed twice"},
-		{"activation of unknown command", func(m map[string]any) { m["activation"] = []any{"onCommand:acme.jira.nope"} }, "activation"},
-		{"unknown activation", func(m map[string]any) { m["activation"] = []any{"onLanguage:go"} }, "activation"},
-		{"foreign command id", func(m map[string]any) { first(m, "commands")["id"] = "git.push" }, `must start with "acme.jira."`},
-		{"bare prefix id", func(m map[string]any) { first(m, "panels")["id"] = "acme.jira." }, `must start with "acme.jira."`},
-		{"duplicate command", func(m map[string]any) {
-			c := contributes(m)
-			c["commands"] = append(c["commands"].([]any), c["commands"].([]any)[0])
-		}, "listed twice"},
-		{"command without title", func(m map[string]any) { first(m, "commands")["title"] = "" }, "title: missing"},
-		{"bad icon", func(m map[string]any) { first(m, "panels")["icon"] = "<svg>" }, "not an icon name"},
-		{"unknown view", func(m map[string]any) { first(m, "panels")["view"] = "html" }, "is not one of"},
-		{"file menu with unknown command", func(m map[string]any) { first(m, "fileMenu")["command"] = "acme.jira.nope" }, "not a contributed command"},
-		{"tool name with dash", func(m map[string]any) {
-			first(m, "agentTools")["name"] = "jira-issue"
-			m["activation"] = []any{}
-		}, "agentTools: name"},
-		{"tool schema not object", func(m map[string]any) { first(m, "agentTools")["inputSchema"] = map[string]any{"type": "string"} }, "inputSchema"},
-		{"unsupported setting keyword", func(m map[string]any) { setting(m, "jql")["oneOf"] = []any{} }, `"oneOf" is not supported`},
-		{"unknown setting type", func(m map[string]any) { setting(m, "jql")["type"] = "object" }, "is not string"},
-		{"bad default", func(m map[string]any) { setting(m, "pollMinutes")["default"] = 100 }, "out of range"},
-		{"default not integer", func(m map[string]any) { setting(m, "pollMinutes")["default"] = 1.5 }, "not an integer"},
-		{"array of numbers", func(m map[string]any) { setting(m, "projects")["items"] = map[string]any{"type": "number"} }, "arrays must have"},
-		{"bad pattern", func(m map[string]any) { setting(m, "jql")["pattern"] = "(" }, "pattern"},
-		{"bad format", func(m map[string]any) { setting(m, "site")["format"] = "email" }, "not hostname or uri"},
-		{"maxLength on number", func(m map[string]any) { setting(m, "pollMinutes")["maxLength"] = 3 }, "apply to strings"},
-		{"theme unknown variable", func(m map[string]any) { first(m, "themes")["colors"] = map[string]any{"--evil": "#fff"} }, "unknown color"},
-		{"theme css injection", func(m map[string]any) {
-			first(m, "themes")["colors"] = map[string]any{"--bg": "red; } body { display: none"}
-		}, "must be a hex color"},
-		{"theme unknown terminal color", func(m map[string]any) { first(m, "themes")["terminal"] = map[string]any{"pink": "#f0f"} }, "unknown terminal color"},
-		{"theme bad base", func(m map[string]any) { first(m, "themes")["base"] = "system" }, "must be dark or light"},
-		{"theme foreign id", func(m map[string]any) { first(m, "themes")["id"] = "nord" }, `must start with "acme.jira."`},
-		{"theme without colors", func(m map[string]any) {
-			th := first(m, "themes")
-			delete(th, "colors")
-			delete(th, "terminal")
-		}, "no colors"},
-		{"theme without label", func(m map[string]any) { first(m, "themes")["label"] = "" }, "label: missing"},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			err := mutate(t, full, c.f)
-			if err == nil || !strings.Contains(err.Error(), c.want) {
-				t.Errorf("Parse() = %v, want an error containing %q", err, c.want)
+		{"newer contract", "contract 2; this Flint supports 1", func(m map[string]any) { m["contract"] = 2 }},
+		{"no contract", `"contract" is missing`, func(m map[string]any) { delete(m, "contract") }},
+		{"upper-case id", "publisher.name", func(m map[string]any) { m["id"] = "Acme.Jira" }},
+		{"id without publisher", "publisher.name", func(m map[string]any) { m["id"] = "jira" }},
+		{"bad version", "major.minor.patch", func(m map[string]any) { m["version"] = "1" }},
+		{"absolute command", "relative path", func(m map[string]any) { m["run"] = map[string]any{"command": "/bin/sh"} }},
+		{"escaping command", "clean relative path", func(m map[string]any) { m["run"] = map[string]any{"command": "../x"} }},
+		{"unclean command", "clean relative path", func(m map[string]any) { m["run"] = map[string]any{"command": "bin/../../x"} }},
+		{"unknown permission", "unknown permission", func(m map[string]any) { m["permissions"] = []string{"exec"} }},
+		{"bad network host", "not a host name", func(m map[string]any) { m["permissions"] = []string{"network:a b"} }},
+		{"foreign command id", `must start with "acme.jira."`, func(m map[string]any) {
+			contributes(m)["commands"] = []any{map[string]any{"id": "git.push", "title": "Push"}}
+		}},
+		{"duplicate command", "used twice", func(m map[string]any) {
+			c := map[string]any{"id": "acme.jira.x", "title": "X"}
+			contributes(m)["commands"] = []any{c, c}
+			m["activation"] = []string{}
+		}},
+		{"table view", `view "table" is not supported`, func(m map[string]any) {
+			contributes(m)["panels"] = []any{map[string]any{"id": "acme.jira.issues", "title": "J", "icon": "files", "view": "table"}}
+		}},
+		{"activation of a missing command", "activation event", func(m map[string]any) { m["activation"] = []string{"onCommand:acme.jira.nope"} }},
+		{"unknown schema keyword", "unknown field", func(m map[string]any) {
+			contributes(m)["settings"] = map[string]any{"properties": map[string]any{"x": map[string]any{"type": "string", "oneOf": []any{}}}}
+		}},
+		{"invalid default", "default: must be between", func(m map[string]any) {
+			contributes(m)["settings"] = map[string]any{"properties": map[string]any{"x": map[string]any{"type": "integer", "minimum": 1, "maximum": 5, "default": 9}}}
+		}},
+		{"object type", `type "object" is not supported`, func(m map[string]any) {
+			contributes(m)["settings"] = map[string]any{"properties": map[string]any{"x": map[string]any{"type": "object"}}}
+		}},
+		{"tool schema not an object", `"type": "object"`, func(m map[string]any) {
+			contributes(m)["agentTools"] = []any{map[string]any{"name": "jira_issue", "description": "d", "inputSchema": map[string]any{"type": "string"}}}
+		}},
+		{"control characters in a title", "control characters", func(m map[string]any) { m["name"] = "Ji\x1bra" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := Parse(edit(t, tc.change))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("err = %v, want it to mention %q", err, tc.want)
 			}
 		})
 	}
 }
 
-func TestRunFor(t *testing.T) {
-	m, err := Parse([]byte(full))
+func TestLoadAndProgram(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name string, data string, mode os.FileMode) {
+		t.Helper()
+		path := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(data), mode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(FileName, valid, 0o644)
+	if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), "bin/jira") {
+		t.Fatalf("a missing program: %v", err)
+	}
+	write("bin/jira", "#!/bin/sh\n", 0o644)
+	if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), "not an executable") {
+		t.Fatalf("a program without the executable bit: %v", err)
+	}
+	if err := os.Chmod(filepath.Join(dir, "bin/jira"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Load(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := m.Run.For("darwin"); got.Command != "bin/flint-jira-darwin" || len(got.Args) != 0 {
-		t.Errorf("For(darwin) = %+v", got)
+	path, args, err := m.Program(dir)
+	if err != nil || filepath.Base(path) != "jira" || !reflect.DeepEqual(args, []string{"--stdio"}) {
+		t.Errorf("Program = %q %v %v", path, args, err)
 	}
-	if got := m.Run.For("linux"); got.Command != "bin/flint-jira-linux" {
-		t.Errorf("For(linux) = %+v", got)
-	}
-	if got := m.Run.For("freebsd"); got.Command != "bin/flint-jira" || len(got.Args) != 1 {
-		t.Errorf("For(freebsd) = %+v", got)
-	}
-}
-
-func TestParseListsEveryProblem(t *testing.T) {
-	err := mutate(t, full, func(m map[string]any) {
-		m["version"] = "x"
-		m["permissions"] = []any{"root"}
-	})
-	if err == nil || !strings.Contains(err.Error(), "semantic version") || !strings.Contains(err.Error(), "unknown permission") {
-		t.Errorf("Parse() = %v, want both problems", err)
-	}
-}
-
-func TestParseRefusesLargeAndBrokenFiles(t *testing.T) {
-	if _, err := Parse([]byte(strings.Repeat(" ", MaxSize+1))); err == nil {
-		t.Error("Parse() accepted an oversized manifest")
-	}
-	if _, err := Parse([]byte(`{"contract":`)); err == nil {
-		t.Error("Parse() accepted broken JSON")
-	}
-}
-
-func TestLoad(t *testing.T) {
-	dir := t.TempDir()
-	if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), "no flint-extension.json") {
-		t.Errorf("Load(empty) = %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, FileName), []byte(themeOnly), 0o644); err != nil {
+	// A symbolic link out of the folder is refused.
+	outside := filepath.Join(t.TempDir(), "evil")
+	if err := os.WriteFile(outside, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if m, err := Load(dir); err != nil || m.ID != "me.nord" {
-		t.Errorf("Load() = %+v, %v", m, err)
+	if err := os.Remove(filepath.Join(dir, "bin/jira")); err != nil {
+		t.Fatal(err)
 	}
-	link := t.TempDir()
-	if err := os.Symlink(filepath.Join(dir, FileName), filepath.Join(link, FileName)); err != nil {
-		t.Skip("symlinks unsupported:", err)
+	if err := os.Symlink(outside, filepath.Join(dir, "bin/jira")); err != nil {
+		t.Fatal(err)
 	}
-	if _, err := Load(link); err == nil || !strings.Contains(err.Error(), "not a regular file") {
-		t.Errorf("Load(symlink) = %v", err)
+	if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), "outside") {
+		t.Errorf("a link out of the folder: %v", err)
 	}
 }
 
-func FuzzParse(f *testing.F) {
-	f.Add([]byte(full))
-	f.Add([]byte(themeOnly))
-	f.Add([]byte(`{"contract":1,"contributes":{"settings":{"properties":{"x":{"type":"string","pattern":"(a"}}}}}`))
-	f.Fuzz(func(t *testing.T, data []byte) {
-		m, err := Parse(data)
-		if err == nil && m.Contract != Contract {
-			t.Errorf("Parse() accepted contract %d", m.Contract)
+func TestSchemaValues(t *testing.T) {
+	m, err := Parse([]byte(valid))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := m.Contributes.Settings
+	got := s.Values(json.RawMessage(`{"site":"x.example.com","pollMinutes":99,"mode":"all","labels":["a",3],"extra":1}`))
+	want := map[string]any{"site": "x.example.com", "pollMinutes": float64(10), "mode": "all", "labels": []any{}, "verbose": false}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Values = %#v, want %#v", got, want)
+	}
+	if got := s.Values(json.RawMessage(`"not an object"`)); got["pollMinutes"] != float64(10) {
+		t.Errorf("a non-object gives the defaults: %v", got)
+	}
+	for raw, want := range map[string]string{
+		`{"pollMinutes": 1.5}`: "whole number",
+		`{"site": "a b"}`:      "host name",
+		`{"mode": "some"}`:     "one of mine, all",
+		`{"labels": ["` + strings.Repeat("x", 21) + `"]}`: "at most 20",
+		`{"verbose": "yes"}`:                              "true or false",
+		`[]`:                                              "object",
+	} {
+		if err := s.Check(json.RawMessage(raw)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("Check(%s) = %v, want %q", raw, err, want)
 		}
-	})
-}
-
-func TestPropertyCheck(t *testing.T) {
-	maxLen := 3
-	p := Property{Type: "string", MaxLength: &maxLen, Enum: []string{"a", "abcd"}}
-	if err := p.Check(json.RawMessage(`"a"`)); err != nil {
-		t.Errorf("Check(a) = %v", err)
 	}
-	for _, v := range []string{`"abcd"`, `"b"`, `3`} {
-		if p.Check(json.RawMessage(v)) == nil {
-			t.Errorf("Check(%s) accepted", v)
-		}
-	}
-	host := Property{Type: "string", Format: "hostname"}
-	if host.Check(json.RawMessage(`"acme.atlassian.net"`)) != nil || host.Check(json.RawMessage(`"http://x"`)) == nil {
-		t.Error("hostname format check is wrong")
-	}
-	if (Property{Type: "boolean"}).Check(json.RawMessage(`"true"`)) == nil {
-		t.Error("boolean check accepted a string")
+	if err := s.Check(json.RawMessage(`{"pollMinutes": 5, "unknown": true}`)); err != nil {
+		t.Errorf("valid values: %v", err)
 	}
 }

@@ -200,14 +200,6 @@ func builtin() []Tool {
 			Install: install("brew install node", "sudo apt install nodejs npm"), Docs: langDocs,
 			candidates: one("node", "--version"),
 		},
-		// Docker and kubectl are registered by their features
-		// (internal/features/docker, internal/features/kubernetes).
-		{
-			ID: "aws", Name: "AWS CLI", Group: GroupInfra, Order: 30,
-			Feature: "AWS profiles panel, login and credential refresh",
-			Install: install("brew install awscli", "sudo snap install aws-cli --classic"), Docs: "guides/aws.md",
-			candidates: one("aws", "--version"),
-		},
 	}
 }
 

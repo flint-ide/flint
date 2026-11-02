@@ -129,11 +129,6 @@ New chats, commit messages and conflict resolution use the new settings; running
 
 The language's server restarts right away. A server Flint doesn't know starts only in trusted folders.
 
-## Change how often panels refresh
-
-1. Press `⌘,` and open **Refresh**.
-2. Set the interval of the **Kubernetes panel** or the **AWS panel**, in seconds.
-
 ## Exclude folders from the TODO list
 
 1. Press `⌘,` and open **TODO List**.

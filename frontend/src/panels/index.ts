@@ -1,6 +1,5 @@
-// Flint's own sidebar panels (Databases and Kubernetes come from their feature
-// modules). Adding one is a component plus one entry here: the
-// activity bar, the sidebar and the "Show …" command follow from it. A feature
+// Flint's own sidebar panels (Databases comes from its feature module).
+// Adding one is a component plus one entry here: the activity bar, the sidebar and the "Show …" command follow from it. A feature
 // module contributes its panels itself (lib/features.ts); usePanels and
 // currentPanels are both lists together.
 import { lazyPreload } from '../lib/lazyPreload'
@@ -14,7 +13,6 @@ import { useContributions, type Contributions } from '../lib/contributions'
 // fetched in the background once the app is idle (or when first opened).
 const CommitPanel = lazyPreload(() => import('../components/sidebar/CommitPanel').then((m) => ({ default: m.CommitPanel })))
 const PullRequestsPanel = lazyPreload(() => import('../components/github/PullRequestsPanel').then((m) => ({ default: m.PullRequestsPanel })))
-const AwsPanel = lazyPreload(() => import('../components/sidebar/AwsPanel').then((m) => ({ default: m.AwsPanel })))
 const TasksPanel = lazyPreload(() => import('../components/tasks/TasksPanel').then((m) => ({ default: m.TasksPanel })))
 const UsagePanel = lazyPreload(() => import('../components/usage/UsagePanel').then((m) => ({ default: m.UsagePanel })))
 
@@ -44,10 +42,6 @@ export const PANELS = definePanels([
   {
     id: 'scratch', title: 'Scratchpads', icon: 'pencil', order: 60, component: ScratchPanel,
     command: { id: 'view.scratchpads', keywords: 'notes sql consoles' },
-  },
-  {
-    id: 'aws', title: 'AWS Profiles', icon: 'cloud', order: 90, component: AwsPanel,
-    command: { title: 'AWS Profiles', keywords: 'amazon sso login credentials terminal' },
   },
 ])
 

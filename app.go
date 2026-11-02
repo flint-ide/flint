@@ -21,7 +21,6 @@ import (
 	"flint/internal/config"
 	"flint/internal/dap"
 	"flint/internal/feature"
-	"flint/internal/features/kubernetes"
 	"flint/internal/fuzzy"
 	"flint/internal/git"
 	"flint/internal/github"
@@ -163,11 +162,6 @@ func NewApp() (*App, error) {
 	a.wireAccounts()
 	a.mcp, a.mcpSources = newMCP(a)
 	a.features = feature.New(features, featureHost{a})
-	// get_kubernetes_status stays with the other MCP tools; without its
-	// feature there is no cluster reader, so the tool isn't offered.
-	if !a.features.Has(kubernetes.ID) {
-		a.mcpSources.Kube = nil
-	}
 	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
 	a.agents = newAgentManager(a)
 	return a, nil

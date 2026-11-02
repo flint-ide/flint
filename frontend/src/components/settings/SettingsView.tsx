@@ -6,7 +6,6 @@ import { activeThemeId, customThemeFrom, groupThemes } from '../../lib/contribut
 import { KeymapSection } from './KeymapSection'
 import { AgentsSection } from './AgentsSection'
 import { LanguageServersSection } from './LanguageServersSection'
-import { RefreshSection } from './RefreshSection'
 import { WatchSection } from './WatchSection'
 import { McpServerSection } from './McpServerSection'
 import { EditorAiSection } from './EditorAiSection'
@@ -17,10 +16,10 @@ import { NumberField, Row, TextField } from './fields'
 import { openVSCodeImport } from '../../store/vscodeImport'
 import { isMac } from '../../lib/platform'
 
-type Section = 'appearance' | 'editor' | 'terminal' | 'accounts' | 'agents' | 'agentContext' | 'usage' | 'editorAi' | 'lsp' | 'refresh' | 'ci' | 'keymap' | 'import'
+type Section = 'appearance' | 'editor' | 'terminal' | 'accounts' | 'agents' | 'agentContext' | 'usage' | 'editorAi' | 'lsp' | 'watch' | 'ci' | 'keymap' | 'import'
 
 // Flint's own pages. Feature modules add theirs between them by order (lib/features.ts:
-// Docker 110, TODO List 130, Updates 150), so keep the gaps.
+// TODO List 130, Updates 150), so keep the gaps.
 const SECTIONS: { id: Section; label: string; order: number }[] = [
   { id: 'appearance', label: 'Appearance', order: 10 },
   { id: 'editor', label: 'Editor', order: 20 },
@@ -31,7 +30,8 @@ const SECTIONS: { id: Section; label: string; order: number }[] = [
   { id: 'usage', label: 'Usage', order: 70 },
   { id: 'editorAi', label: 'AI in the Editor', order: 80 },
   { id: 'lsp', label: 'Language Servers', order: 90 },
-  { id: 'refresh', label: 'Refresh', order: 100 },
+  // Only Linux has something to set here (WatchSection).
+  ...(isMac() ? [] : [{ id: 'watch' as const, label: 'File Watching', order: 100 }]),
   { id: 'ci', label: 'CI', order: 120 },
   { id: 'keymap', label: 'Keymap', order: 140 },
   { id: 'import', label: 'Import', order: 160 },
@@ -65,12 +65,7 @@ export function SettingsView({ active }: { active: boolean }) {
         {section === 'usage' && <UsageSection />}
         {section === 'editorAi' && <EditorAiSection />}
         {section === 'lsp' && <LanguageServersSection />}
-        {section === 'refresh' && (
-          <>
-            <RefreshSection />
-            <WatchSection />
-          </>
-        )}
+        {section === 'watch' && <WatchSection />}
         {section === 'ci' && <CISection />}
         {section === 'keymap' && <KeymapSection active={active} />}
         {section === 'import' && <ImportSection />}

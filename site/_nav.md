@@ -32,12 +32,12 @@
 - [Databases](guides/databases.md)
 - [HTTP client](guides/http-client.md)
 - [Terminals](guides/terminals.md)
-- [Kubernetes](guides/kubernetes.md)
-- [AWS](guides/aws.md)
-- [Docker](guides/docker.md)
 - [Preview and TODO list](guides/preview-and-todo.md)
 - [Restricted Mode](guides/restricted-mode.md)
 - [Extensions](guides/extensions.md)
+- [Docker (extension)](guides/docker.md)
+- [Kubernetes (extension)](guides/kubernetes.md)
+- [AWS (extension)](guides/aws.md)
 - [Settings](guides/settings.md)
 
 ## Write extensions

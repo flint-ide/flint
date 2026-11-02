@@ -2,12 +2,9 @@
 // `main.TermData`…), re-exported from the Wails v3 generated bindings.
 
 export * as accounts from '../../bindings/flint/internal/accounts/models'
-export * as kube from '../../bindings/flint/internal/kube/models'
-export * as awsprof from '../../bindings/flint/internal/awsprof/models'
 export * as agentsession from '../../bindings/flint/internal/agentsession/models'
 export * as dap from '../../bindings/flint/internal/dap/models'
 export * as db from '../../bindings/flint/internal/db/models'
-export * as docker from '../../bindings/flint/internal/docker/models'
 export * as fuzzy from '../../bindings/flint/internal/fuzzy/models'
 export * as git from '../../bindings/flint/internal/git/models'
 export * as github from '../../bindings/flint/internal/github/models'

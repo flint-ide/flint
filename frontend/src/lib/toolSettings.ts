@@ -1,4 +1,4 @@
-// The agent, language-server and refresh parts of settings.json (Go:
+// The agent and language-server parts of settings.json (Go:
 // internal/settings/tools.go). Go validates every value; these helpers only
 // shape what the Settings tab edits and read values with their defaults.
 
@@ -18,46 +18,12 @@ export interface LanguageServerSettings {
   args: string[]
 }
 
-/** How often polling panels re-read their data, in seconds. */
-export interface RefreshSettings {
-  kubernetesSeconds: number
-  awsSeconds: number
-}
-
-export type RefreshKey = keyof RefreshSettings
-
 export const EMPTY_AGENT: AgentSettings = Object.freeze({ path: '', model: '', args: Object.freeze([]) as unknown as string[] })
 export const EMPTY_SERVER: LanguageServerSettings = Object.freeze({ disabled: false, command: '', args: Object.freeze([]) as unknown as string[] })
-
-/** Mirrors Go's defaultRefresh. */
-export const DEFAULT_REFRESH: RefreshSettings = Object.freeze({ kubernetesSeconds: 5, awsSeconds: 30 })
-
-/** Same bounds as Go's settings (Min/Max*Seconds). */
-export const REFRESH_LIMITS: Record<RefreshKey, { min: number; max: number }> = {
-  kubernetesSeconds: { min: 2, max: 600 },
-  awsSeconds: { min: 5, max: 3600 },
-}
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
-
-/** Clamps n into key's range; anything not a number is the default. */
-export function clampRefresh(key: RefreshKey, n: unknown): number {
-  if (typeof n !== 'number' || !Number.isFinite(n) || n === 0) return DEFAULT_REFRESH[key]
-  const { min, max } = REFRESH_LIMITS[key]
-  return Math.min(max, Math.max(min, Math.round(n)))
-}
-
-/** The polling interval of key in milliseconds. */
-export function refreshMs(refresh: RefreshSettings, key: RefreshKey): number {
-  return clampRefresh(key, refresh[key]) * 1000
-}
-
-export function coerceRefresh(v: unknown): RefreshSettings {
-  const r = isObject(v) ? v : {}
-  return { kubernetesSeconds: clampRefresh('kubernetesSeconds', r.kubernetesSeconds), awsSeconds: clampRefresh('awsSeconds', r.awsSeconds) }
-}
 
 export function coerceAgents(v: unknown): Record<string, AgentSettings> {
   const out: Record<string, AgentSettings> = {}

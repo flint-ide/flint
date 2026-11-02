@@ -3,7 +3,6 @@ package mcptools
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -11,13 +10,12 @@ import (
 	"time"
 
 	"flint/internal/agentsession"
-	"flint/internal/kube"
 	"flint/internal/lsp"
 	"flint/internal/mcpserver"
 	"flint/internal/testrun"
 )
 
-var allOn = Config{Diagnostics: true, Editor: true, Terminals: true, Tests: true, Kubernetes: true, TerminalLines: 200}
+var allOn = Config{Diagnostics: true, Editor: true, Terminals: true, Tests: true, TerminalLines: 200}
 
 func toolNamed(t *testing.T, s *Sources, cfg Config, name string) mcpserver.Tool {
 	t.Helper()
@@ -37,7 +35,6 @@ func run(t *testing.T, s *Sources, name, root, args string) (string, error) {
 
 func TestToolsFollowConfigAndHaveSchemas(t *testing.T) {
 	s := NewSources()
-	s.Kube = func() (Kube, error) { return nil, errors.New("no kubectl") }
 	tools := s.Tools(allOn)
 	if len(tools) != len(Names) {
 		t.Fatalf("%d tools", len(tools))
@@ -53,10 +50,6 @@ func TestToolsFollowConfigAndHaveSchemas(t *testing.T) {
 	}
 	if got := s.Tools(Config{Tests: true}); len(got) != 1 || got[0].Name != ToolTests {
 		t.Fatalf("only tests: %+v", got)
-	}
-	s.Kube = nil
-	if got := s.Tools(Config{Kubernetes: true}); len(got) != 0 {
-		t.Fatal("kubernetes offered without a reader")
 	}
 }
 
@@ -207,72 +200,5 @@ func TestTestsTool(t *testing.T) {
 	}
 	if strings.Contains(out, "\x1b") {
 		t.Errorf("escape codes left:\n%s", out)
-	}
-}
-
-type fakeKube struct {
-	contexts []kube.Context
-	ov       kube.Overview
-	asked    []string
-}
-
-func (f *fakeKube) Contexts(context.Context) ([]kube.Context, error) { return f.contexts, nil }
-func (f *fakeKube) Overview(_ context.Context, c, ns string) (kube.Overview, error) {
-	f.asked = append(f.asked, c+"/"+ns)
-	return f.ov, nil
-}
-
-func TestKubernetesTool(t *testing.T) {
-	fk := &fakeKube{
-		contexts: []kube.Context{{Name: "other"}, {Name: "dev", Cluster: "kind-dev", Namespace: "shop", Current: true}},
-		ov: kube.Overview{
-			Apps: []kube.App{
-				{Name: "web", Source: "helm", Health: kube.HealthBad, Problems: []string{"0/2 pods ready"}},
-				{Name: "db", Source: "label", Health: kube.HealthOK},
-			},
-			Workloads: []kube.Workload{
-				{Kind: "Deployment", Name: "web", Ready: 0, Desired: 2, Rollout: kube.RolloutFailed, RolloutMessage: "deadline exceeded"},
-				{Kind: "Deployment", Name: "db", Ready: 1, Desired: 1, Rollout: kube.RolloutComplete},
-			},
-			Pods: []kube.Pod{
-				{Name: "web-1", Status: "CrashLoopBackOff", Ready: 0, Total: 1, Restarts: 7, Problem: "OOMKilled (exit 137) in app"},
-				{Name: "db-0", Status: "Running", Healthy: true, Ready: 1, Total: 1},
-			},
-			Jobs:    []kube.Job{{Kind: "Job", Name: "migrate", Status: "failed (3)"}, {Kind: "Job", Name: "ok", Status: "complete"}},
-			Events:  []kube.Event{{Kind: "Pod", Name: "web-1", Reason: "BackOff", Message: "Back-off restarting", Count: 12, LastSeen: "1m"}},
-			Partial: []string{"ingresses"},
-		},
-	}
-	s := NewSources()
-	s.Kube = func() (Kube, error) { return fk, nil }
-	out, err := run(t, s, ToolKubernetes, "/p", `{}`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, w := range []string{
-		"Context: dev (cluster kind-dev), namespace: shop", "Apps: 2 (1 ok, 0 warning, 1 failing)",
-		"- web (helm, bad): 0/2 pods ready", "- Deployment/web: 0/2 ready, rollout failed deadline exceeded",
-		"- web-1: CrashLoopBackOff, 0/1 ready, 7 restarts — OOMKilled", "- Job/migrate: failed (3)",
-		"- Pod/web-1 BackOff (×12, 1m): Back-off restarting", "Not readable (permissions or missing CRDs): ingresses",
-	} {
-		if !strings.Contains(out, w) {
-			t.Errorf("missing %q in:\n%s", w, out)
-		}
-	}
-	if strings.Contains(out, "db-0") || strings.Contains(out, "Deployment/db") || strings.Contains(out, "Job/ok") {
-		t.Errorf("healthy objects listed:\n%s", out)
-	}
-	if _, err := run(t, s, ToolKubernetes, "/p", `{"namespace":"kube-system"}`); err != nil {
-		t.Fatal(err)
-	}
-	if !slices.Equal(fk.asked, []string{"dev/shop", "dev/kube-system"}) {
-		t.Errorf("asked %v", fk.asked)
-	}
-	if _, err := run(t, s, ToolKubernetes, "/p", `{"namespace":"--all"}`); err == nil {
-		t.Error("invalid namespace accepted")
-	}
-	fk.contexts = []kube.Context{{Name: "x"}}
-	if _, err := run(t, s, ToolKubernetes, "/p", `{}`); err == nil {
-		t.Error("no current context accepted")
 	}
 }

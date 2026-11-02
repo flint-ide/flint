@@ -1,7 +1,6 @@
 // Package mcptools is what Flint's MCP server (internal/mcpserver) tells the
 // agents it starts: language-server diagnostics, the open editors and the
-// selection, recent terminal and run output, the last test run and the
-// Kubernetes status. The stores here are fed by Flint as things happen (no
+// selection, recent terminal and run output and the last test run. The stores here are fed by Flint as things happen (no
 // polling); the tools read them for one project at a time.
 package mcptools
 
@@ -21,20 +20,19 @@ const (
 	ToolEditor      = "get_editor_state"
 	ToolTerminals   = "get_terminal_output"
 	ToolTests       = "get_test_results"
-	ToolKubernetes  = "get_kubernetes_status"
 )
 
 // Names lists every tool Flint can offer.
-var Names = []string{ToolDiagnostics, ToolEditor, ToolTerminals, ToolTests, ToolKubernetes}
+var Names = []string{ToolDiagnostics, ToolEditor, ToolTerminals, ToolTests}
 
 // Instructions are sent to the agent with initialize.
 const Instructions = "You are running inside Flint, the user's IDE. These read-only tools show what Flint sees and a terminal doesn't: " +
 	"language-server diagnostics, the files open in the editor and the user's selection, recent output of the user's terminals and run consoles, " +
-	"the results of the last test run, and the Kubernetes status of the current context. Use them to find out what the user is looking at or what is failing before you ask."
+	"and the results of the last test run. Use them to find out what the user is looking at or what is failing before you ask."
 
 // Config selects the tools offered (settings.json "mcpServer").
 type Config struct {
-	Diagnostics, Editor, Terminals, Tests, Kubernetes bool
+	Diagnostics, Editor, Terminals, Tests bool
 	// TerminalLines is the most lines get_terminal_output returns per console.
 	TerminalLines int
 }
@@ -45,13 +43,11 @@ type Sources struct {
 	Editor      *Editor
 	Terminals   *Terminals
 	Tests       *Tests
-	// Kube returns the cluster reader (kubectl), or an error when there is none.
-	Kube func() (Kube, error)
 	// Now is the clock (tests); nil is time.Now.
 	Now func() time.Time
 }
 
-// NewSources returns empty stores; Kube is left for the caller.
+// NewSources returns empty stores.
 func NewSources() *Sources {
 	return &Sources{Diagnostics: NewDiagnostics(), Editor: NewEditor(), Terminals: NewTerminals(), Tests: NewTests()}
 }
@@ -116,18 +112,6 @@ func (s *Sources) Tools(cfg Config) []mcpserver.Tool {
 			Call:        s.tests,
 		})
 	}
-	if cfg.Kubernetes && s.Kube != nil {
-		out = append(out, mcpserver.Tool{
-			Name:  ToolKubernetes,
-			Title: "Kubernetes status",
-			Description: "What is unhealthy in a namespace of the kubeconfig's current context: apps with problems, workloads not rolled out, " +
-				"failing pods with their reason, failed jobs and recent warning events. Read-only; no secrets or logs.",
-			InputSchema: json.RawMessage(`{"type":"object","properties":{` +
-				`"namespace":{"type":"string","description":"Default: the current context's namespace."}` +
-				`},"additionalProperties":false}`),
-			Call: s.kubernetes,
-		})
-	}
 	return out
 }
 
@@ -158,18 +142,4 @@ func scopePath(root, p string) (string, error) {
 		return "", fmt.Errorf("%s is outside the project", p)
 	}
 	return p, nil
-}
-
-func (s *Sources) kubernetes(ctx context.Context, _ string, args json.RawMessage) (string, error) {
-	var in struct {
-		Namespace string `json:"namespace"`
-	}
-	if err := decode(args, &in); err != nil {
-		return "", err
-	}
-	k, err := s.Kube()
-	if err != nil {
-		return "", err
-	}
-	return kubeStatus(ctx, k, in.Namespace)
 }

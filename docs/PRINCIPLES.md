@@ -34,7 +34,7 @@ Adding a language, an agent, a panel, a database or a run type should mean addin
 - A new external tool is a package under `internal/` with a narrow API, validated inputs and its own tests.
 - What differs per operating system lives behind one small API with a file per system (`_darwin.go`, `_linux.go`, and an `_other.go` fallback that says honestly what isn't supported) and, in the UI, in `lib/platform.ts`; feature code doesn't branch on the system or hard-code ⌘ (see [Platforms](ARCHITECTURE.md#platforms)).
 
-**In practice:** a contributor should be able to add a feature by reading one existing feature of the same kind; for a feature module, copy `docker`, `todo` or `update`.
+**In practice:** a contributor should be able to add a feature by reading one existing feature of the same kind; for a feature module, copy `todo` or `update`.
 
 ## 4. AI-first
 

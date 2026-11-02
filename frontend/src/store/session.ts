@@ -70,7 +70,6 @@ async function captureTab(t: Tab, roots: string[]): Promise<SavedTab | null> {
       return inWorkspace(t.path) ? { kind: 'history', path: t.path } : null
     case 'terminal': {
       const term = useTerminal.getState().tabs.find((x) => x.id === t.termId)
-      if (term?.docker) return null // a log or container shell can't be reopened as a plain shell
       if (!term || (!roots.includes(term.project ?? '') && !inWorkspace(term.cwd))) return null
       const cwd = term.exitCode === null ? await TerminalBackend.Cwd(t.termId).catch(() => '') : ''
       return { kind: 'terminal', title: t.title, pinned: term.pinned, env: term.env, tag: term.tag, cwd: cwd || term.cwd, output: recentOutput(t.termId, SCROLLBACK_LINES), project: term.project }

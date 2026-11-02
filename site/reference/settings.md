@@ -15,8 +15,8 @@ The file is readable only by your user. It never contains secrets: database pass
 ## How the file is read
 
 - Missing keys get their default value.
-- Unknown keys are ignored.
-- A value of the wrong type or out of range is replaced with its default (refresh intervals are clamped into their range instead). Invalid extra arguments of an agent or language server are dropped as a whole. A hand-edited file never stops Flint from starting.
+- Unknown keys are ignored. This includes `docker`, `refresh` and `mcpServer.tools.kubernetes` from versions with built-in Docker, Kubernetes and AWS panels: those panels are [extensions](../guides/extensions.md) now, with their settings under `extensions.flint.docker`, `extensions.flint.kubernetes` and `extensions.flint.aws`. The old keys are dropped the next time Flint saves the file.
+- A value of the wrong type or out of range is replaced with its default. Invalid extra arguments of an agent or language server are dropped as a whole. A hand-edited file never stops Flint from starting.
 - When Flint saves the file, it checks every value strictly and writes the whole document.
 
 ## Example
@@ -60,10 +60,9 @@ The file is readable only by your user. It never contains secrets: database pass
     "python": { "disabled": false, "command": "pylsp", "args": [] },
     "rust": { "disabled": true, "command": "", "args": [] }
   },
-  "refresh": { "kubernetesSeconds": 10, "awsSeconds": 60 },
   "mcpServer": {
     "enabled": true,
-    "tools": { "diagnostics": true, "editor": true, "terminals": true, "tests": true, "kubernetes": false },
+    "tools": { "diagnostics": true, "editor": true, "terminals": true, "tests": true },
     "terminalLines": 200
   },
   "completions": {
@@ -86,8 +85,7 @@ The file is readable only by your user. It never contains secrets: database pass
   },
   "agentReview": { "scope": "selected", "maxDiffKB": 128, "agent": "", "timeoutSeconds": 300 },
   "ci": { "pollSeconds": 60, "logTailLines": 80, "logErrorLines": 40, "notify": true },
-  "github": { "host": "github.com", "clientId": "", "scopes": ["repo", "read:org", "workflow"], "maxRetryWaitSeconds": 60 },
-  "docker": { "host": "", "logTailLines": 500 }
+  "github": { "host": "github.com", "clientId": "", "scopes": ["repo", "read:org", "workflow"], "maxRetryWaitSeconds": 60 }
 }
 ```
 
@@ -107,7 +105,6 @@ The file is readable only by your user. It never contains secrets: database pass
 | `agents` | object | `{}` | Agent CLIs by name (`"claude"`, `"codex"`). See [agents](#agents). |
 | `customAgents` | array | `[]` | Other agents, spoken to over the Agent Client Protocol. See [customAgents](#customagents). |
 | `languageServers` | object | `{}` | Language servers by language (`"go"`, `"typescript"`, `"python"`, `"rust"`). See [languageServers](#languageservers). |
-| `refresh` | object | see below | How often polling panels re-read their data. See [refresh](#refresh). |
 | `mcpServer` | object | see below | What Flint's own MCP server tells the agents Flint starts. See [mcpServer](#mcpserver). |
 | `completions` | object | see below | Inline suggestions from a code model (off by default). See [completions](#completions). |
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
@@ -225,15 +222,6 @@ Each entry configures the server of one language. A missing entry or key uses th
 
 A change made in the Settings tab restarts that language's servers. Servers that run the project's code (rust-analyzer, the Python servers) still start only in trusted folders, whatever this setting says.
 
-### refresh
-
-| Key | Type | Range | Default | Meaning |
-|---|---|---|---|---|
-| `kubernetesSeconds` | integer (s) | 2–600 | `5` | How often the Kubernetes panel re-reads the namespace while it is shown and the window is visible. |
-| `awsSeconds` | integer (s) | 5–3600 | `30` | How often the AWS panel re-reads profiles and credential expiry while it is shown. |
-
-Git status, Docker and pull requests don't poll: they follow change events, and pull requests reload when the window regains focus. Running CI checks are polled at [`ci.pollSeconds`](#ci).
-
 ### mcpServer
 
 Flint's own read-only MCP server for agent chats. See [What agents can see in Flint](../guides/ai-agents.md#what-agents-can-see-in-flint).
@@ -245,7 +233,6 @@ Flint's own read-only MCP server for agent chats. See [What agents can see in Fl
 | `tools.editor` | boolean | | `true` | `get_editor_state`: open files, the active file and the selection. When `false`, Flint also stops sending the editor state to its backend. |
 | `tools.terminals` | boolean | | `false` | `get_terminal_output`: recent output terminals and run consoles printed in the project. The agent asks before each call. |
 | `tools.tests` | boolean | | `true` | `get_test_results`: the last test run. |
-| `tools.kubernetes` | boolean | | `false` | `get_kubernetes_status`: what is failing in the current Kubernetes context. The agent asks before each call. |
 | `terminalLines` | integer | 10–2000 | `200` | The most lines of one terminal's output an agent gets (clamped into the range). |
 
 Tool switches apply right away, also to running chats.

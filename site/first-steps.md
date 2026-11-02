@@ -4,7 +4,7 @@ This tour takes about ten minutes. It walks you through opening a project, findi
 
 ## Check your tools
 
-The first time Flint starts, it opens the **Tools** window: which of the tools Flint drives (Git, ripgrep, Claude Code, Codex, language servers, Docker, kubectl, the AWS CLI) are installed, and what each one enables. A panel that stays empty usually means its tool is missing. Copy the install command of anything you need, run it in Terminal and click **Recheck**. Open the window again later with **Help ▸ Check Tools…**.
+The first time Flint starts, it opens the **Tools** window: which of the tools Flint drives (Git, ripgrep, Claude Code, Codex, language servers, Delve, Node.js) are installed, and what each one enables. A panel that stays empty usually means its tool is missing. Copy the install command of anything you need, run it in Terminal and click **Recheck**. Open the window again later with **Help ▸ Check Tools…**.
 
 ![The Tools window: installed tools with their versions, and the install command for one that isn't working](images/tool-check.png)
 
@@ -18,7 +18,7 @@ Flint works on folders. Open one in any of these ways:
 - Drag a folder from Finder onto the Flint window.
 - Run `flint .` in a terminal (see [the flint command](installation.md#the-flint-command)).
 
-The window then shows the file tree on the left, the tab area in the middle and the status bar at the bottom. The icons on the far left (the activity bar) switch the sidebar between Files, Search, Commit, Pull Requests, Databases, Scratchpads, TODO, Docker, AWS Profiles and Kubernetes. `⌘B` hides or shows the sidebar when you are not in an editor.
+The window then shows the file tree on the left, the tab area in the middle and the status bar at the bottom. The icons on the far left (the activity bar) switch the sidebar between Files, Search, Commit, Pull Requests, Databases, Scratchpads and TODO, plus the panels of the extensions you installed. `⌘B` hides or shows the sidebar when you are not in an editor.
 
 Learn more: [Open projects](how-to/open-projects.md).
 

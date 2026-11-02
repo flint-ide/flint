@@ -1,7 +1,7 @@
 // Package settings holds the user's preferences (settings.json in the config
 // directory): theme (and a custom palette), editor fonts and Vim mode, terminal
-// fonts, the default agent, agent CLIs, custom ACP agents, language servers,
-// refresh intervals and keyboard shortcut overrides, plus the sections features
+// fonts, the default agent, agent CLIs, custom ACP agents, language servers
+// and keyboard shortcut overrides, plus the sections features
 // register for their own keys (section.go). Loading is forgiving (a hand-edited file never stops Flint
 // from starting: bad values fall back to defaults, unknown keys are ignored);
 // saving is strict. Nothing secret belongs here: credentials live in the Keychain.
@@ -95,8 +95,6 @@ type Settings struct {
 	CustomAgents []CustomAgent `json:"customAgents"`
 	// LanguageServers configures language servers by language ("go", …).
 	LanguageServers map[string]LanguageServerSettings `json:"languageServers"`
-	// Refresh sets how often polling panels re-read their data.
-	Refresh Refresh `json:"refresh"`
 	// MCPServer configures what Flint's own MCP server tells agents.
 	MCPServer MCPServer `json:"mcpServer"`
 	// Completions configures inline suggestions from a code model (editorai.go).
@@ -141,7 +139,6 @@ func Default() Settings {
 		Agents:             map[string]AgentSettings{},
 		CustomAgents:       []CustomAgent{},
 		LanguageServers:    map[string]LanguageServerSettings{},
-		Refresh:            defaultRefresh(),
 		MCPServer:          defaultMCPServer(),
 		Completions:        defaultCompletions(),
 		InlineEdit:         defaultInlineEdit(),
@@ -215,7 +212,6 @@ func Normalize(s Settings) Settings {
 	out.WatchExclude = cleanWatchExcludes(s.WatchExclude)
 	out.Agents = normalizeAgents(s.Agents)
 	out.LanguageServers = normalizeLanguageServers(s.LanguageServers)
-	out.Refresh = normalizeRefresh(s.Refresh)
 	out.MCPServer = normalizeMCPServer(s.MCPServer)
 	out.Completions = normalizeCompletions(s.Completions)
 	out.InlineEdit = normalizeInlineEdit(s.InlineEdit)
@@ -319,10 +315,7 @@ func Validate(s Settings) error {
 	if err := CheckGitHub(s.GitHub); err != nil {
 		return err
 	}
-	if err := checkSections(s); err != nil {
-		return err
-	}
-	return validateRefresh(s.Refresh)
+	return checkSections(s)
 }
 
 // CheckExcludes reports the first pattern of a list that would not be saved;

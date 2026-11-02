@@ -15,7 +15,6 @@ import {
 } from '../../store/terminal'
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
-import * as DockerBackend from '../../../bindings/flint/internal/features/docker/api'
 import { findPathLinks, resolvePath } from '../../lib/pathLinks'
 import { showToast } from '../../store/dialog'
 import { errorMessage } from '../../api/backend'
@@ -236,9 +235,7 @@ function readBuffer(xterm: XTerm, maxLines: number): string {
   return lines.slice(-maxLines).join('\n')
 }
 
-/** Starts what the tab shows: a local shell, or a Docker log / container shell stream. */
+/** Starts what the tab shows: a local shell. */
 function startSession(tab: TerminalTab, cols: number, rows: number): Promise<void> {
-  if (tab.docker?.kind === 'logs') return DockerBackend.OpenLogs(tab.id, tab.docker.container)
-  if (tab.docker?.kind === 'shell') return DockerBackend.OpenShell(tab.id, tab.docker.container, cols, rows)
   return TerminalBackend.Start(tab.id, tab.cwd, cols, rows, tab.env ?? {})
 }

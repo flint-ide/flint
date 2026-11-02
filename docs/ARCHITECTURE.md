@@ -21,7 +21,7 @@ flowchart LR
   subgraph UI["WebView · React + TypeScript"]
     direction TB
     tabs["Tabs: CodeMirror 6 · xterm.js · agent chat · SQL console · diff"]
-    side["Panels: files · search · Commit · databases · scratchpads · Docker · AWS · Kubernetes"]
+    side["Panels: files · search · Commit · databases · scratchpads · extensions"]
     stores["stores: createStore + event bus"]
   end
 
@@ -38,7 +38,6 @@ flowchart LR
     term["terminal (PTY · streams)"]
     db["db: pgx · clickhouse (HTTP, net/http)"]
     http["httpfile: .http files · net/http"]
-    infra["docker · awsprof · kube"]
     cfg["config · scratch · OS keyring · diag (log)"]
   end
 
@@ -48,8 +47,6 @@ flowchart LR
     ghapi[("GitHub API (github.com or Enterprise)")]
     agents["claude -p stream-json · codex app-server · ACP agents (stdio)"]
     shell["login shell (zsh)"]
-    clis["docker compose · aws · kubectl"]
-    sock["Docker Engine API socket"]
     dbs[("PostgreSQL · ClickHouse")]
     apis[("Your APIs (HTTP)")]
   end
@@ -60,8 +57,6 @@ flowchart LR
   gh & acct --> ghapi
   ag --> agents
   term --> shell
-  infra --> clis
-  infra --> sock
   db --> dbs
   http --> apis
 ```
@@ -94,7 +89,7 @@ flowchart LR
 - Custom agents (`customAgents` in settings.json) are ACP agents: each gets one `acpdriver.Driver`, registered at startup and again whenever settings are saved (`syncCustomAgents`). A replaced or removed driver keeps the sessions it runs until they stop, and is still closed on quit. Adding an agent CLI with an ACP mode needs no code.
 - The agent lists (chat menus, default-agent pickers, `AgentAPI.Info`) are the native CLIs found on the login PATH, then the custom agents whose command resolves.
 - One-shot work goes through `AgentAPI`: commit messages, reviews (`ReviewChanges`: `internal/review` builds the bounded, redacted input and parses the JSON findings) and inline edits run `agent.Headless` (`claude -p`, `codex exec`) or, for a custom agent, `acpdriver.Headless` (a fresh ACP session that declines every permission request and refuses writes). Conflict resolution types an interactive command into a terminal, so it always uses a native agent (`AgentInfo.conflictAgent`).
-- Flint's own MCP server (`api_mcp.go` → `internal/mcpserver`, `internal/mcptools`) gives chat agents read-only tools: LSP diagnostics, the editor snapshot, terminal and run output, the last test run and the Kubernetes status. `mcpserver` is MCP's Streamable HTTP transport on the standard library (JSON-RPC over POST, protocol 2025-06-18, no SSE, stateless), listening on `127.0.0.1` from the first session that gets it until it is switched off or Flint quits. `mcptools` keeps bounded stores fed by events (`LSPAPI.wire`, `terminalEvents`, `runEvents`, and `EditorContextAPI.Update`, which the frontend calls debounced and only on change); nothing polls. Drivers receive an `agentsession.MCPProvider`: Claude Code gets an inline `--mcp-config` whose header expands `${FLINT_MCP_TOKEN}` from its environment, Codex `-c mcp_servers.flint.*` with `bearer_token_env_var`, ACP agents an `http` McpServer in `session/new` when they advertise `mcpCapabilities.http`.
+- Flint's own MCP server (`api_mcp.go` → `internal/mcpserver`, `internal/mcptools`) gives chat agents read-only tools: LSP diagnostics, the editor snapshot, terminal and run output, and the last test run. `mcpserver` is MCP's Streamable HTTP transport on the standard library (JSON-RPC over POST, protocol 2025-06-18, no SSE, stateless), listening on `127.0.0.1` from the first session that gets it until it is switched off or Flint quits. `mcptools` keeps bounded stores fed by events (`LSPAPI.wire`, `terminalEvents`, `runEvents`, and `EditorContextAPI.Update`, which the frontend calls debounced and only on change); nothing polls. Drivers receive an `agentsession.MCPProvider`: Claude Code gets an inline `--mcp-config` whose header expands `${FLINT_MCP_TOKEN}` from its environment, Codex `-c mcp_servers.flint.*` with `bearer_token_env_var`, ACP agents an `http` McpServer in `session/new` when they advertise `mcpCapabilities.http`.
 - `SettingsAPI.ProbeCustomAgent` runs only the ACP `initialize` handshake of a saved custom agent, in an empty temporary folder, for the Check button. Settings are written by the web view, so before a command line runs for the first time in a session Go shows a native dialog with that exact command line; the UI cannot answer or skip it.
 
 ### File operations
@@ -123,7 +118,7 @@ flowchart LR
 ### Build
 
 - `cmd/webbuild` (Go, `github.com/evanw/esbuild/pkg/api`) bundles TSX and CSS into `frontend/dist` in about 0.1 s, with code splitting. About 350 KB of JS loads at startup; the editor (CodeMirror), terminal (xterm.js), languages, chat and panels are not parsed at startup.
-- Sidebar panels (Commit, Databases, Docker, AWS, Kubernetes, TODO, Pull Requests), dialogs and the heavier tab views are `lazyPreload` components (`lib/lazyPreload.ts`): `React.lazy` whose code is not parsed at startup but fetched in the background, one chunk per idle period, starting 1.5 s after launch. The first click on a panel or dialog then renders in the same frame instead of waiting for its code (about 300 ms for the branch popup before); idle memory grows by about 2 MB. Languages still load when a file of that language is first opened.
+- Sidebar panels (Commit, Databases, TODO, Pull Requests), dialogs and the heavier tab views are `lazyPreload` components (`lib/lazyPreload.ts`): `React.lazy` whose code is not parsed at startup but fetched in the background, one chunk per idle period, starting 1.5 s after launch. The first click on a panel or dialog then renders in the same frame instead of waiting for its code (about 300 ms for the branch popup before); idle memory grows by about 2 MB. Languages still load when a file of that language is first opened.
 - `wails3 task build` (`Taskfile.yml`) runs it with `--typecheck` (first `tsc --noEmit`, because esbuild only strips types).
 - `wails3 task dev` runs `webbuild --watch`: a rebuild after every change and a page reload through esbuild's SSE stream (`/esbuild`), with no HMR. The dev server listens on `localhost:5173` (`FRONTEND_DEVSERVER_URL`), and Go rebuilds on change (`build/config.yml`).
 - `cmd/webbuild` also writes the Content Security Policy into `index.html` (see [Security model](#security-model)).
@@ -158,7 +153,7 @@ A feature that is more than a panel (a backend service, settings, a tool, a Sett
 - Go (`internal/feature`): a `Module` with its settings sections (`settings.Section[T]`, keys in the same flat `settings.json`), external tools (`tools.Register`), `state.json` keys, and a `New(Host)` that returns its Wails services, MCP tools for agents and `Start` / `Close` hooks. `Host` is the module's only view of `App`.
 - Frontend (`lib/features.ts`): a `FeatureModule` with settings sections (typed by augmenting `FeatureSettings` in `lib/settingsSections.ts`), panels, commands, Settings pages, status items, tab kinds, file-tree menu entries and color themes. `features/install.ts` registers the data before the first render and the commands and `activate` hooks after Flint's own commands. `lib/contributions.ts` holds what was contributed, by source, so a source can be withdrawn later (external extensions).
 
-Docker, the TODO list and the release check are modules; the design and the list of features still to migrate are in [design/extensions.md](design/extensions.md). How to add one: [Add a feature](DEVELOPMENT.md#add-a-feature). Besides its services, `Instance` has `SettingsChanged` and `RootsChanged` hooks, and `Host` offers `Trusted`, `ConfigDir` and the native `Confirm` / `Choose` dialogs.
+The database tools, the TODO list, the release check and the extension host are modules (Docker, Kubernetes and AWS Profiles moved out to extensions in flint-ide/extensions); the design and the list of features still to migrate are in [design/extensions.md](design/extensions.md). How to add one: [Add a feature](DEVELOPMENT.md#add-a-feature). Besides its services, `Instance` has `SettingsChanged` and `RootsChanged` hooks, and `Host` offers `Trusted`, `ConfigDir` and the native `Confirm` / `Choose` dialogs.
 
 ### External extensions
 
@@ -301,15 +296,13 @@ Markdown files, PR descriptions and comments, HTTP responses and terminal output
 
 ### CLI argument validation
 
-Flint drives many CLIs (git, docker compose, kubectl, aws, saml2aws, claude, codex). Names and identifiers that come from the UI or from external output (container names, contexts, namespaces, pod names) are validated before they are passed to a command, and user strings are never passed in a position where they could be read as a flag. Text for GitHub (comments, reviews) goes in JSON request bodies; owners, repositories, numbers, run, job and thread ids from the web view are validated (and thread ids must belong to the pull request) before a URL is built, and every path segment is escaped. Every kubectl call passes explicit `--context` and `--namespace`.
+Flint drives many CLIs (git, rg, dlv, claude, codex). Names and identifiers that come from the UI or from external output (branches, refs, paths) are validated before they are passed to a command, and user strings are never passed in a position where they could be read as a flag. Text for GitHub (comments, reviews) goes in JSON request bodies; owners, repositories, numbers, run, job and thread ids from the web view are validated (and thread ids must belong to the pull request) before a URL is built, and every path segment is escaped.
 
 ### Secrets
 
 - Database passwords are stored only in the OS keyring (the macOS Keychain, or the Secret Service on Linux; service `flint-db`). Profile files hold no passwords.
-- AWS keys and tokens are read only in Go to check that they exist and never reach the UI.
 - GitHub tokens (Sign in with GitHub, or the GitHub CLI's token imported after a native confirmation) are stored only in the OS keyring (service `flint-accounts`). Only Go reads them: no binding returns one, and they never reach the log or an error message. A token is attached only to requests to the configured API origin; the API client follows redirects only within that origin, and a job log's redirect is downloaded by a separate client that never carries it. `GH_TOKEN` / `GITHUB_TOKEN` from the environment are used, never stored. Tests use a fake keyring.
 - Revoking a token at GitHub needs the OAuth App's client secret, which Flint doesn't have, so Sign Out deletes it locally and links to GitHub's authorized apps page.
-- Kubernetes terminals use an override kubeconfig that holds only `current-context` and the namespace; credentials are not copied.
 - Settings, connections, query history, sessions and the log file are written with mode `0600`.
 
 ### Network requests Flint makes on its own
@@ -331,7 +324,7 @@ Paths are the macOS ones. On Linux, `~/Library/Application Support/flint` is `$X
 | What | Where | Notes |
 |---|---|---|
 | Recent folders, agent permission policy, trusted folders, whether the first-run tool check was shown, update check (last check time, the latest release found, the skipped version), signed-in accounts (provider, host, login, name, avatar URL, scopes; no token) | `~/Library/Application Support/flint/state.json` | the preferred agent stored here before `settings.json` existed is read from it until you pick a default in Settings |
-| Settings: theme, editor and terminal fonts, default agent, autosave, shortcut overrides (`keymap`: command id → shortcut, `""` = none), agent CLIs (`agents`), custom ACP agents (`customAgents`: id, name, command, arguments), language servers (`languageServers`), panel refresh intervals (`refresh`) | `~/Library/Application Support/flint/settings.json` | has a schema version; missing keys get defaults, unknown keys are ignored, invalid values are replaced with defaults on load (writes validate strictly); `0600`; **no secrets**. A copy for the first render lives in `localStorage` (`flint.settings`) |
+| Settings: theme, editor and terminal fonts, default agent, autosave, shortcut overrides (`keymap`: command id → shortcut, `""` = none), agent CLIs (`agents`), custom ACP agents (`customAgents`: id, name, command, arguments), language servers (`languageServers`) | `~/Library/Application Support/flint/settings.json` | has a schema version; missing keys get defaults, unknown keys are ignored, invalid values are replaced with defaults on load (writes validate strictly); `0600`; **no secrets**. A copy for the first render lives in `localStorage` (`flint.settings`) |
 | Database connection profiles (host, port, user, optional default database, TLS, read-only) | `~/Library/Application Support/flint/connections.json` | **no passwords**, mode `0600` |
 | Database passwords | OS keyring (Keychain / Secret Service), service `flint-db`, account = connection id | deleted together with the profile |
 | Scratchpads (SQL consoles, notes) | `~/Library/Application Support/flint/scratch/`: `index.json` (including the selected connection `connId` and database `database`; empty = the profile default) plus `<id>.sql/.md/.txt` | autosaved |
@@ -373,7 +366,7 @@ main.go, app.go, api_*.go   Wails services (thin layer over internal/*)
 features.go                 the feature modules list and the Host they get from App
 menu.go, wails_app.go       application menu, window and event wiring
 internal/feature            the feature-module contract: Module, Instance, Host; featuretest: a fake Host
-internal/features/<id>      feature modules: docker, todo, update, extensions (service, settings sections, tools, hooks)
+internal/features/<id>      feature modules: database, todo, update, extensions (service, settings sections, tools, hooks)
 internal/extensions         external extensions: manifest (flint-extension.json, themes included), rpc, host
 cmd/webbuild                frontend bundler (esbuild Go API), --watch, --test, CSP
 build/                      Wails config (config.yml), Info.plist, app icon
@@ -395,7 +388,7 @@ internal/config             on-disk locations, atomic JSON writes
 internal/settings           settings.json: settings, defaults, validation, schema version, custom theme, sections features own
 internal/vscodeimport       Import from VS Code / Cursor / VSCodium: JSONC, settings, keybindings and color theme
                             mapped onto settings (read-only; ImportAPI previews, then saves through settings)
-internal/terminal           PTY, output coalescing, shell cwd (proc_pidinfo); stream-backed sessions (Docker logs and container shells)
+internal/terminal           PTY, output coalescing, shell cwd (proc_pidinfo); stream-backed sessions (feature.Host.StartStream; no built-in user since Docker moved to an extension)
 internal/runconfig          .flint/run.json: schema, validation, save, detection (Go main, make, npm)
 internal/runner             configuration and test processes: steps, PTY or pipes, process group, Stop
 internal/testrun            test run plans, go test -json and TAP parsers, tests in a file (gutter)
@@ -408,9 +401,6 @@ internal/github             GitHub REST/GraphQL client: repository from remotes,
                             resolve, review, checkout, create, a branch's checks (conditional requests), runs, failed-step logs (tail-bounded),
                             rerunning failed jobs, Identify and the GitHub CLI token import; githubtest is a fake GitHub for tests and cmd/fakegithub
 internal/cilog              CI logs for the agent: parse --log-failed output, excerpt the failing step, map file:line references to the workspace
-internal/docker             Docker Engine API (unix socket or TLS): endpoint discovery, version negotiation, containers, logs, exec shell, events; Compose via the CLI
-internal/awsprof            AWS CLI profiles, credential status, login and refresh
-internal/kube               kubectl: contexts, namespaces, resources, apps, rollout state, diagnosis
 internal/diag               Flint's log file, bug report and diagnostics
 internal/tools              external tools Flint drives: one table (feature, install command, docs; features register theirs) and the installed-version check
 internal/update             new-release check: GitHub's latest-release API (net/http), SemVer compare, link allow-list
@@ -428,7 +418,7 @@ internal/usage              agent usage per day × project × agent × model × 
 frontend/bindings           generated TypeScript bindings of the Go services (do not edit)
 frontend/src/wails          compatibility layer over the bindings and the Wails runtime
 frontend/src                React: store (createStore + event bus), components, lib, commands, panels (sidebar registry),
-                            features (feature modules: docker, todo, update, extensions; install.ts hands them to the registries)
+                            features (feature modules: database, todo, update, extensions; install.ts hands them to the registries)
 ```
 
 For data storage details see [Where Flint stores data](#where-flint-stores-data).

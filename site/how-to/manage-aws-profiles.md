@@ -1,6 +1,6 @@
 # Manage AWS profiles
 
-Recipes for checking and renewing AWS credentials. For how the panel works, see [AWS](../guides/aws.md).
+Recipes for checking and renewing AWS credentials in the AWS Profiles panel, which comes with the AWS Profiles extension. To install it, see [AWS](../guides/aws.md).
 
 ## Check which profiles are valid
 

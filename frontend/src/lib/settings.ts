@@ -3,10 +3,7 @@
 // so it is testable with node:test; store/settings.ts does the applying.
 // Keys that feature modules own are not listed here: see lib/settingsSections.ts.
 
-import {
-  coerceAgents, coerceRefresh, coerceServers, DEFAULT_REFRESH,
-  type AgentSettings, type LanguageServerSettings, type RefreshSettings,
-} from './toolSettings'
+import { coerceAgents, coerceServers, type AgentSettings, type LanguageServerSettings } from './toolSettings'
 import { coerceCustomAgents, type CustomAgent } from './customAgents'
 import { coerceMcpServer, DEFAULT_MCP_SERVER, type McpServerSettings } from './mcpSettings'
 import {
@@ -72,8 +69,6 @@ export interface CoreSettings {
   customAgents: CustomAgent[]
   /** Language servers by language ('go', 'typescript', …); missing = defaults. */
   languageServers: Record<string, LanguageServerSettings>
-  /** Polling intervals of the Kubernetes and AWS panels. */
-  refresh: RefreshSettings
   /** What Flint's own MCP server tells agents. */
   mcpServer: McpServerSettings
   /** Inline suggestions from a code model (lib/editorAiSettings.ts). */
@@ -114,7 +109,6 @@ export const DEFAULT_SETTINGS: CoreSettings = Object.freeze({
   agents: Object.freeze({}) as Record<string, AgentSettings>,
   customAgents: Object.freeze([]) as unknown as CustomAgent[],
   languageServers: Object.freeze({}) as Record<string, LanguageServerSettings>,
-  refresh: DEFAULT_REFRESH,
   mcpServer: DEFAULT_MCP_SERVER,
   completions: DEFAULT_COMPLETIONS,
   inlineEdit: DEFAULT_INLINE_EDIT,
@@ -250,7 +244,6 @@ function coerceCore(v: Record<string, unknown>): CoreSettings {
     agents: coerceAgents(v.agents),
     customAgents: coerceCustomAgents(v.customAgents),
     languageServers: coerceServers(v.languageServers),
-    refresh: coerceRefresh(v.refresh),
     mcpServer: coerceMcpServer(v.mcpServer),
     completions: coerceCompletions(v.completions),
     inlineEdit: coerceInlineEdit(v.inlineEdit),

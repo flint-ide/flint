@@ -82,7 +82,7 @@ In the macOS Keychain, never in files. See [Files and data](files-and-data.md#ke
 
 ### Can Flint change my current Kubernetes context?
 
-Only when you click ★ in the Kubernetes panel. Everything else passes an explicit context and namespace and leaves your kubeconfig alone.
+Flint itself never touches your kubeconfig. The [Kubernetes extension](../guides/kubernetes.md) changes the current context only when you click ★ in its panel; everything else passes an explicit context and namespace.
 
 ### Are my HTTP client tokens safe?
 

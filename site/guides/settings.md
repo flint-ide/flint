@@ -8,7 +8,7 @@ Flint's settings open in a tab. Every change applies immediately, without a rest
 - **flint ▸ Settings…** in the menu bar
 - "Settings…" in the command palette
 
-The tab has fifteen sections: Appearance, Editor, Terminal, Agents, Agent Context, Usage, AI in the Editor, Language Servers, Refresh, Docker, CI, TODO List, Keymap, Updates and Import.
+The tab has these sections: Appearance, Editor, Terminal, Accounts, Agents, Agent Context, Usage, AI in the Editor, Language Servers, File Watching (Linux only), CI, TODO List, Keymap, Updates, Extensions and Import, followed by a page for each installed extension that has settings (for example Docker, Kubernetes or AWS Profiles).
 
 ## Appearance
 
@@ -58,7 +58,7 @@ The GitHub account pull requests and CI use ([Signing in](git-and-github.md#sign
 What agent chats can read from Flint through its own MCP server (see [What agents can see in Flint](ai-agents.md#what-agents-can-see-in-flint)):
 
 - **Share Flint's context with agents**: offer the server to agent chats. On by default. Turning it off closes the server and cuts running chats off at once.
-- **Tools**: diagnostics, open editors and selection, and test results (on by default); terminal output and Kubernetes status (off by default, and the agent asks before each call). Changes apply to running chats too.
+- **Tools**: diagnostics, open editors and selection, and test results (on by default); terminal output (off by default, and the agent asks before each call). Changes apply to running chats too.
 - **Terminal lines**: the most lines of one terminal's output an agent gets, 10 to 2000 (default 200).
 ## Usage
 
@@ -93,18 +93,9 @@ For Go, TypeScript / JavaScript, Python and Rust:
 
 A change restarts that language's servers for the open files. Rust and Python servers run the project's code and start only in trusted folders, whatever you choose here.
 
-## Refresh
+## File Watching
 
-How often panels that poll re-read their data while they are shown:
-
-- **Kubernetes panel**: 2 to 600 seconds (default 5).
-- **AWS panel**: 5 to 3600 seconds (default 30).
-
-Git status, Docker and pull requests update on their own, without polling.
-
-## Docker
-
-How the Docker panel reaches the engine: an optional **Host** (empty finds the engine like the docker CLI does) and how many **Log lines** a container's log tab starts with (1 to 10000, default 500). See [docker](../reference/settings.md#docker).
+On Linux, the folders the file watcher skips (`watchExclude`), one name per line. macOS watches a whole tree at once and has nothing to set, so the page isn't shown there.
 
 ## CI
 

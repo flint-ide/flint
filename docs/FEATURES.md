@@ -143,10 +143,10 @@ Persistent SQL consoles and notes (MD/TXT) with autosave. `⌘↵` runs the quer
 
 ### Agent context (Flint's MCP server)
 
-- Chats started by Flint get Flint's own MCP server (`internal/mcpserver`, MCP over HTTP on `127.0.0.1`, standard library only) with read-only tools (`internal/mcptools`): `get_diagnostics` (language server problems), `get_editor_state` (open files, the active file and the selection), `get_test_results` (the last test runs), and, when turned on in Settings ▸ Agent Context, `get_terminal_output` and `get_kubernetes_status`.
+- Chats started by Flint get Flint's own MCP server (`internal/mcpserver`, MCP over HTTP on `127.0.0.1`, standard library only) with read-only tools (`internal/mcptools`): `get_diagnostics` (language server problems), `get_editor_state` (open files, the active file and the selection), `get_test_results` (the last test runs), and, when turned on in Settings ▸ Agent Context, `get_terminal_output`.
 - Claude Code gets it through `--mcp-config`, Codex through `-c mcp_servers.flint.*` (only when the installed Codex supports HTTP servers), custom ACP agents in `session/new` when they advertise HTTP MCP support. Commit messages and inline edits don't get it.
 - Every chat gets its own token (in `FLINT_MCP_TOKEN`, never on a command line), revoked when the chat ends or its project closes; a token only sees its own project. Requests from web pages are refused (Host and Origin checks), answers are redacted and bounded, and turning the server off closes its port.
-- Diagnostics, editor state and test results count as reads (no prompt). Terminal output and cluster status are off by default and always ask, because they can show anything, including what a command printed from outside the project. Untrusted folders get no server.
+- Diagnostics, editor state and test results count as reads (no prompt). Terminal output is off by default and always asks, because they can show anything, including what a command printed from outside the project. Untrusted folders get no server.
 
 ### Commit messages and conflicts
 
@@ -314,75 +314,19 @@ IntelliJ-style `.http` / `.rest` files with requests to your own APIs.
 
 ## Infrastructure panels
 
-### Docker / Compose
-
-Panel ⛴ (palette: "Docker"), through the Docker Engine API (Docker Desktop, Colima, OrbStack, a plain daemon); the `docker` CLI is optional and only Compose Up / Down / Pull need it. The engine is found like the CLI does (Settings ▸ Docker ▸ Host, `DOCKER_HOST` incl. TLS, the current docker context, default sockets); the API version is negotiated; plain `tcp://` shows a warning:
-
-- Compose projects (from the labels of running containers and from `compose.yaml` / `docker-compose.yml` files in project folders and one level below) with their services, plus all other containers.
-- Status (running / unhealthy / paused / stopped) and ports that open in the browser on click.
-- Actions: Logs (the container's log, last N lines then following, in a terminal tab backed by the API stream), Shell (an exec with a TTY on a hijacked connection, resized with the tab; bash or sh), Start / Stop / Restart / Remove (with confirmation). For a project: Up / Down (with confirmation) / Pull need the CLI and are disabled with a hint without it; Restart / Stop use Compose when the CLI exists and otherwise act on the project's containers through the API.
-- Changes arrive from the engine's event stream only while the panel is visible (it reconnects with a growing delay if the engine goes away).
-- Container names are validated before they reach a request; redirects are never followed; responses and log tails are bounded.
-
-### AWS profiles
-
-Panel ☁ (palette: "AWS Profiles"):
-
-- Profiles from `~/.aws/config` and `~/.aws/credentials` (or `AWS_CONFIG_FILE` / `AWS_SHARED_CREDENTIALS_FILE`) with their kind (SSO, session keys from saml2aws and similar tools, static keys, role, `credential_process`), account, role, region and validity.
-- Validity comes from the SSO token in `~/.aws/sso/cache` and, for session keys, from `x_security_token_expires` / `aws_expiration`. Time to expiry counts down live; the list refreshes every 30 s and when you return to the window.
-- **Terminal as profile** (double-click or `❯_`): a shell with `AWS_PROFILE` and `AWS_REGION`, in a tab named `aws:<profile> · …`. The profile survives a restart.
-- **Log In** runs `aws sso login` or `saml2aws login --role …` in a terminal.
-- **Refresh (↻)** does the same without a terminal: `aws sso login` (waits up to 5 minutes for approval in the browser), saml2aws with `--skip-prompt --force` (stored password and role), and for roles and `credential_process` an STS call that fetches and caches the credentials. There is no stdin: when the tool asks for something (for example an MFA code), refresh fails immediately with a "Log In" button. A running refresh can be cancelled (■).
-- aws-azure-login is not supported because it is deprecated; its settings (`azure_*`) are ignored.
-- **Check Identity** asks STS (`aws sts get-caller-identity`).
-- Secrets (keys, tokens) are read only in Go, to determine that they exist, and never reach the UI.
-
-### Kubernetes
-
-Panel ☸ (palette: "Kubernetes"), through `kubectl` (any sign-in method: `aws eks get-token`, GKE, OIDC, and so on).
-
-**Context and namespace.** Pick a context from your kubeconfig (EKS names are shortened to "cluster (account)") and a namespace; the choice is remembered between runs. **The global current-context never changes**; ★ changes it on request. Every command passes an explicit `--context` and `--namespace`.
-
-**Apps view (default).** Objects are grouped into apps by, in order:
-
-1. Flux Kustomization label `kustomize.toolkit.fluxcd.io/name`;
-2. Argo CD label `argocd.argoproj.io/instance`;
-3. Helm release annotation `meta.helm.sh/release-name`;
-4. `app.kubernetes.io/instance` or `app.kubernetes.io/name`, or the `app` label;
-5. otherwise, a single workload is its own app.
-
-Each app shows:
-
-- Flux Kustomization readiness and revision;
-- Ingress routes → Service (ready/total backing pods) → Deployment / StatefulSet / DaemonSet;
-- rollout state computed like `kubectl rollout status`: complete (with revision), rolling out (with the reason), failed (on `ProgressDeadlineExceeded`), paused, or scaled down; plus the images;
-- pods with status, restarts, pods of the previous revision marked, and the concrete problem, such as "CrashLoopBackOff, last OOMKilled (exit 137)" or the image pull error;
-- recent Warning events attached to the app.
-
-Unhealthy apps are sorted first and expanded.
-
-**Resources view.** Flat lists: workloads (Deployment, StatefulSet, DaemonSet: ready / desired), pods (status as in `kubectl get pods`, such as CrashLoopBackOff or Terminating, readiness, restarts, age), services with ports, and jobs. A filter is available. The panel refreshes every 5 s while it is visible.
-
-**Actions** (context menu; double-click opens logs): logs (`kubectl logs -f`), shell in a pod (bash or sh, with container choice), describe, port-forward, rollout status / history, rollout restart, undo rollout, scale, delete pod, and `flux reconcile`. Destructive actions ask for confirmation (including scaling to 0).
-
-**Diagnose with AI** (✦ AI on an unhealthy app) gathers the rollout state, problems, events, and the last 60 log lines (and the previous crashed run) of up to 4 failing pods. It redacts secrets and home paths and puts a read-only investigation request into the agent chat draft, which you review before sending.
-
-**Terminal in a context** (`❯_`): `KUBECONFIG` starts with a small override file holding only `current-context` and the namespace (kubectl takes the first match), followed by your own kubeconfig. No credentials are copied. The tab is named `k8s:<cluster>/<namespace>`.
-
-**EKS.** EKS contexts show the AWS profile from the kubeconfig's `AWS_PROFILE` and its validity, with one-click refresh; when the login has expired there is a "Log In" button.
+Docker / Compose, Kubernetes and AWS Profiles are not part of Flint any more: they are extensions in [flint-ide/extensions](https://github.com/flint-ide/extensions) (`docker/`, `kubernetes/`, `aws/`; ids `flint.docker`, `flint.kubernetes`, `flint.aws`), installed with **Install Extension from Folder…**. They use webview panels, terminal tabs (logs, shells, logins, port forwards and context or profile terminals run the CLIs there) and `run.env` for `DOCKER_HOST`, `KUBECONFIG` and the AWS variables. Their settings are their own Settings pages, stored under `extensions.flint.<name>`. Guides: [Docker](../site/guides/docker.md), [Kubernetes](../site/guides/kubernetes.md), [AWS](../site/guides/aws.md).
 
 ## Settings and macOS integration
 
 ### Settings
 
-`⌘,` (flint menu ▸ Settings…, or "Settings…" in the palette) opens a settings tab with Appearance, Editor, Terminal, Accounts, Agents, Agent Context, Usage, AI in the Editor, Language Servers, Refresh, TODO List, Keymap, Updates and Import sections. Every change applies immediately, without a restart, and saves itself (agent settings apply to sessions started afterwards).
+`⌘,` (flint menu ▸ Settings…, or "Settings…" in the palette) opens a settings tab with Appearance, Editor, Terminal, Accounts, Agents, Agent Context, Usage, AI in the Editor, Language Servers, File Watching (Linux only), CI, TODO List, Keymap, Updates, Extensions and Import sections, then a page per installed extension with settings. Every change applies immediately, without a restart, and saves itself (agent settings apply to sessions started afterwards).
 
 - **Theme**: Dark, Light or System (follows the macOS appearance, `prefers-color-scheme`). Colors are CSS variables in `style.css` (`:root` and `[data-theme="light"]`); terminals have their own palette (`lib/terminalTheme.ts`); Go switches the title bar and window buttons (`NSApp.appearance`). The theme from the last run is applied before the first render (a copy in `localStorage`, and the window appearance set in Go before the window is created), so a light theme never flashes dark.
 - **Editor**: font family, size and line height for all CodeMirror editors (files, diffs, scratchpads); optional save on window focus loss.
 - **Terminal**: font, size and line height for terminals and run consoles (xterm refits immediately and the PTY gets the new size).
 - **Agents**: the default agent for new chats, commit messages and conflict resolution (a custom agent can be the default; conflicts then go to a native agent). Per agent (Claude Code, Codex): the executable (empty = looked up on the login PATH; otherwise a command name or an absolute path, never one relative to the project), the model (empty = the CLI's default) and extra command-line arguments, one per line. Extra arguments go before Flint's own flags, so Flint's flags are parsed last and win; arguments that name a flag Flint sets (the stream protocol, the permission prompt and mode, `--setting-sources`, `--settings`, `--resume`, `--model`; for Codex the sandbox, approval policy, `--yolo`, `--listen` and `-c approval_policy/sandbox*/projects*`) and `--` are refused, as are newlines, more than 32 arguments or arguments over 512 characters. In Restricted Mode the extra arguments are left out entirely, since a flag such as `--mcp-config` or `--add-dir` with a relative path would load the project's files. Changes apply to new chats, commit messages and conflict resolution; running chats keep their settings. Custom ACP agents are added, edited, checked and removed in the same section (see [Custom agents (ACP)](#custom-agents-acp)). *Review* sets what Review Changes with Agent covers (ticked or all changes), its agent, the largest diff it sends and its time limit (`agentReview`). Background notifications can be turned off here.
 - **Language Servers**: per language (Go, TypeScript/JavaScript, Python, Rust): on/off, which server (a known server's name such as `pylsp`, an absolute path to one, or another server; empty tries the known servers in order) and extra arguments, added after the server's own (`--stdio`). A change restarts that language's servers for the open files. Restricted Mode still applies: servers that run the project's code and servers Flint doesn't know start only in trusted folders, and extra arguments are ignored there. typescript-language-server, also under another name or path, is always pinned to its own TypeScript, and `--tsserver-path` is refused.
-- **Refresh**: how often the Kubernetes panel (default 5 s, 2–600 s) and the AWS panel (default 30 s, 5–3600 s) re-read their data while shown; values out of range are clamped. Git status, Docker and pull requests don't poll.
 - **Keymap**: a searchable list of all commands (by name or by shortcut, for example `⌘K`). Click a shortcut and press a new combination to change it; conflicts with other commands are shown, `↺` restores the default and `✕` removes it. Shortcuts handled by CodeMirror (`⌘F`, `⌘S`, `⌘↵`, and so on) are display-only. Overrides go into a layer of the command registry (`lib/commands.ts`), so the palette and the dispatcher use the effective shortcuts.
 - **Updates**: the daily release check (see [Update check](#update-check)) can be turned off; **Check Now** checks right away.
 - **Agent Context**, **Usage** and **AI in the Editor**: see [Agent context](#agent-context-flints-mcp-server), [Usage and budgets](#usage-and-budgets) and [AI in the editor](#ai-in-the-editor).

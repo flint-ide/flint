@@ -34,27 +34,6 @@ type LanguageServerSettings struct {
 	Args []string `json:"args"`
 }
 
-// Refresh holds how often panels that poll re-read their data while shown.
-type Refresh struct {
-	// KubernetesSeconds: the Kubernetes panel's namespace overview.
-	KubernetesSeconds int `json:"kubernetesSeconds"`
-	// AWSSeconds: the AWS profiles and their credential expiry.
-	AWSSeconds int `json:"awsSeconds"`
-}
-
-// Bounds of the refresh intervals: short enough to feel live, long enough
-// not to hammer the API server or the AWS CLI.
-const (
-	MinKubernetesSeconds = 2
-	MaxKubernetesSeconds = 600
-	MinAWSSeconds        = 5
-	MaxAWSSeconds        = 3600
-)
-
-func defaultRefresh() Refresh {
-	return Refresh{KubernetesSeconds: 5, AWSSeconds: 30}
-}
-
 // AgentConfig is the agent package's view of name's settings.
 func (s Settings) AgentConfig(name string) agent.Config {
 	a := s.Agents[name]
@@ -122,16 +101,6 @@ func CheckLanguageServer(language string, l LanguageServerSettings) error {
 	return lsp.CheckArgs(l.Args)
 }
 
-func validateRefresh(r Refresh) error {
-	if r.KubernetesSeconds < MinKubernetesSeconds || r.KubernetesSeconds > MaxKubernetesSeconds {
-		return fmt.Errorf("Kubernetes refresh %d s out of range %d–%d", r.KubernetesSeconds, MinKubernetesSeconds, MaxKubernetesSeconds)
-	}
-	if r.AWSSeconds < MinAWSSeconds || r.AWSSeconds > MaxAWSSeconds {
-		return fmt.Errorf("AWS refresh %d s out of range %d–%d", r.AWSSeconds, MinAWSSeconds, MaxAWSSeconds)
-	}
-	return nil
-}
-
 // normalizeAgents keeps the known agents, each value valid or empty: a bad
 // path or model falls back to the default, bad arguments are all dropped
 // (dropping one could leave its value behind as a stray argument).
@@ -173,22 +142,6 @@ func normalizeLanguageServers(servers map[string]LanguageServerSettings) map[str
 		out[language] = n
 	}
 	return out
-}
-
-// normalizeRefresh clamps each interval into its range (0 or missing is the
-// default).
-func normalizeRefresh(r Refresh) Refresh {
-	def := defaultRefresh()
-	clamp := func(v, lo, hi, d int) int {
-		if v == 0 {
-			return d
-		}
-		return max(lo, min(hi, v))
-	}
-	return Refresh{
-		KubernetesSeconds: clamp(r.KubernetesSeconds, MinKubernetesSeconds, MaxKubernetesSeconds, def.KubernetesSeconds),
-		AWSSeconds:        clamp(r.AWSSeconds, MinAWSSeconds, MaxAWSSeconds, def.AWSSeconds),
-	}
 }
 
 func cloneArgs(args []string) []string {

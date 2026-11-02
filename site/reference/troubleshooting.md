@@ -21,7 +21,7 @@ You only need to do this once per version. See [Installation](../installation.md
 
 ## A panel is empty or a feature is missing
 
-Most panels drive a command-line tool: Kubernetes needs `kubectl`, Docker needs a running Docker engine (and `docker` only for Compose up, down and pull), AWS Profiles needs `aws`, agent chat needs `claude` or `codex`. Choose **Help ▸ Check Tools…** (or "Check Tools…" in the command palette) to see which tools Flint found, their versions, and an install command for each missing one.
+Most panels drive a command-line tool: the Commit panel needs `git`, agent chat needs `claude` or `codex`, and the Docker, Kubernetes and AWS Profiles extensions need `docker`, `kubectl` and `aws`. Choose **Help ▸ Check Tools…** (or "Check Tools…" in the command palette) to see which tools Flint found, their versions, and an install command for each missing one.
 
 - **Not installed** although it is: Flint uses your login shell's `PATH`. Check that the tool runs in a new Terminal window; if you just added its folder to `PATH` (for example `~/go/bin`), restart Flint.
 - **Not working**: the tool is on your `PATH` but its version command failed. The window shows the error. A common case is `rust-analyzer` provided by rustup without the component installed: run `rustup component add rust-analyzer`.
@@ -69,14 +69,14 @@ If an agent is installed but you get the wrong one by default, pick it in Settin
 
 ## Kubernetes: authentication expired
 
-If the Kubernetes panel shows authentication errors:
+If the panel of the [Kubernetes extension](../guides/kubernetes.md) shows authentication errors:
 
 - **EKS:** the panel shows the AWS profile of the context and its validity. Click refresh next to it, or **Log In** if the login has expired. See [Manage AWS profiles](../how-to/manage-aws-profiles.md).
 - **Other providers:** sign in again the way you do in Terminal (for example with your OIDC or `gcloud` login), then refresh the panel.
 
 ## AWS refresh fails with "needs input"
 
-Refresh runs without a terminal, so it can't answer questions such as an MFA code. When the tool asks for input, refresh stops and shows a **Log In** button. Click it to finish the login in a terminal, where you can type the answer.
+In the [AWS Profiles extension](../guides/aws.md), refresh runs without a terminal, so it can't answer questions such as an MFA code. When the tool asks for input, refresh stops and shows a **Log In** button. Click it to finish the login in a terminal, where you can type the answer.
 
 For SSO profiles, refresh waits up to 5 minutes for you to approve the login in your browser.
 

@@ -11,7 +11,6 @@ import (
 
 	"flint/internal/config"
 	"flint/internal/settings"
-	"flint/internal/tools"
 )
 
 func TestFeatureStateKeepsItsKeys(t *testing.T) {
@@ -70,20 +69,17 @@ func TestFeaturesAreRegistered(t *testing.T) {
 		t.Fatal(err)
 	}
 	keys := settings.SectionKeys()
-	for _, want := range []string{"docker", "todoExclude", "checkForUpdates"} {
+	for _, want := range []string{"todoExclude", "checkForUpdates", "features", "extensions"} {
 		if !slices.Contains(keys, want) {
 			t.Errorf("settings section %q not registered (have %v)", want, keys)
 		}
-	}
-	if !slices.ContainsFunc(tools.All(), func(t tools.Tool) bool { return t.ID == "docker" }) {
-		t.Error("the docker tool is not in the tool check")
 	}
 	// Defaults are what they were before the keys moved into features.
 	data, err := json.Marshal(settings.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"checkForUpdates":true`, `"todoExclude":[]`, `"docker":{"host":"","logTailLines":500}`} {
+	for _, want := range []string{`"checkForUpdates":true`, `"todoExclude":[]`} {
 		if !strings.Contains(string(data), want) {
 			t.Errorf("defaults lack %s", want)
 		}

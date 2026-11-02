@@ -36,7 +36,7 @@ export function ToolCheck() {
         Flint looks for tools on your login shell&apos;s PATH. If a tool you installed still shows as missing, check that it runs in a new terminal window, then restart Flint.
       </p>
       <div className="form-actions">
-        {summary && <span className={`aws-status ${summary.tone}`}>{summary.text}</span>}
+        {summary && <span className={`tool-check-status ${summary.tone}`}>{summary.text}</span>}
         <span className="spacer" />
         <button onClick={() => void recheckTools()} disabled={checking}>{checking ? 'Checking…' : 'Recheck'}</button>
         <button className="primary" autoFocus onClick={closeToolCheck}>Done</button>
@@ -58,7 +58,7 @@ function ToolRow({ tool: t }: { tool: ToolStatus }) {
           <span className="tool-name">{t.name}</span>
           {t.required && <span className="muted">required</span>}
           <span className="spacer" />
-          <span className={`aws-status ${tone}`} title={t.detail || (t.state === 'missing' ? `Looked for ${lookedFor(t.binaries)}` : '')}>
+          <span className={`tool-check-status ${tone}`} title={t.detail || (t.state === 'missing' ? `Looked for ${lookedFor(t.binaries)}` : '')}>
             {statusLabel(t)}
           </span>
         </div>

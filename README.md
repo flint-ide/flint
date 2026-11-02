@@ -31,7 +31,7 @@ Coding agents now write much of the code; the work around them is giving them co
 - **Agents see what the IDE sees:** language server problems, the selection, test results, through Flint's own read-only MCP server.
 - **Every failure is one step from the agent:** a test, a build, a crashing pod, a query, a merge conflict, with the context gathered and redacted for you to review.
 - **Built for reviewing:** IntelliJ-style Git and pull request review, parallel agent tasks in their own worktrees.
-- **Everything in one window, and light:** databases, HTTP, Docker, Kubernetes, AWS, debugging, in about 120 MB.
+- **Everything in one window, and light:** databases, HTTP, debugging, in about 120 MB, with Docker, Kubernetes and AWS as extensions.
 
 The full comparison with VS Code, Cursor, Zed, JetBrains and terminal agents, and when Flint is *not* the right choice yet, is in [Why Flint](site/why-flint.md).
 
@@ -75,7 +75,7 @@ The full reference, with every detail and all keyboard shortcuts, is in [docs/FE
 **Terminals**
 - Real PTYs with your login shell, WebGL rendering, clickable `path:line`, and terminals that come back after a restart
 
-**Infrastructure**
+**Infrastructure** (extensions from [flint-ide/extensions](https://github.com/flint-ide/extensions), installed with **Install Extension from Folder…**)
 - Docker / Compose: projects, services and containers with logs, shell and lifecycle actions
 - Kubernetes: context and namespace picker that never changes your global context; apps grouped by Flux, Argo CD, Helm or labels, with rollout state, pod problems, events, and *Diagnose with AI*
 - AWS profiles: SSO and session credential status and expiry, one-click refresh, terminals per profile
@@ -127,9 +127,7 @@ To build Flint:
 Optional tools, used by the features that need them:
 
 - `ripgrep` (`brew install ripgrep`): fast search and `⌘P` (a slower Go fallback is used without it)
-- `kubectl`: Kubernetes panel
-- `docker`: optional, only Compose up/down/pull (the Docker panel uses the Engine API)
-- `aws` (and `saml2aws` if you use it): AWS profiles panel
+- `docker`, `kubectl`, `aws` (and `saml2aws` if you use it): the Docker, Kubernetes and AWS Profiles extensions
 - `dlv`, language servers, `claude` / `codex`: debugging, LSP and agents
 
 Flint uses the tools already installed on your machine and launches them with your login shell's `PATH`, so authentication and configuration work the same as in your terminal.

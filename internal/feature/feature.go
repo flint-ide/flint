@@ -36,7 +36,7 @@ import (
 
 // Module declares a feature.
 type Module struct {
-	// ID names the feature ("docker"); lower-case letters, digits and dashes.
+	// ID names the feature ("todo"); lower-case letters, digits and dashes.
 	ID string
 	// Settings are the settings.json keys the feature owns.
 	Settings []settings.AnySection

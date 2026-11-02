@@ -5,16 +5,13 @@ import (
 
 	as "flint/internal/agentsession"
 	"flint/internal/diag"
-	"flint/internal/kube"
 	"flint/internal/mcpserver"
 	"flint/internal/mcptools"
 	"flint/internal/settings"
-	"flint/internal/shellenv"
 )
 
 // Flint's MCP server gives the agents Flint starts read-only access to what
-// Flint knows (diagnostics, editors, terminal output, test results, cluster
-// status). The stores in a.mcpSources are fed by the services as things
+// Flint knows (diagnostics, editors, terminal output, test results). The stores in a.mcpSources are fed by the services as things
 // happen; the server starts with the first agent session that gets it.
 //
 // Restricted Mode: untrusted folders get no server (no token, and a token
@@ -24,14 +21,6 @@ import (
 // newMCP builds the (not yet listening) server and its empty stores.
 func newMCP(a *App) (*mcpserver.Server, *mcptools.Sources) {
 	sources := mcptools.NewSources()
-	sources.Kube = func() (mcptools.Kube, error) {
-		shellenv.Wait()
-		kc, err := kube.New()
-		if err != nil {
-			return nil, err
-		}
-		return kc, nil
-	}
 	server := mcpserver.New(mcpserver.Options{
 		Tools: func() []mcpserver.Tool {
 			return append(sources.Tools(mcpToolConfig(a.currentSettings().MCPServer)), a.features.AgentTools()...)
@@ -46,7 +35,7 @@ func newMCP(a *App) (*mcpserver.Server, *mcptools.Sources) {
 func mcpToolConfig(m settings.MCPServer) mcptools.Config {
 	return mcptools.Config{
 		Diagnostics: m.Tools.Diagnostics, Editor: m.Tools.Editor, Terminals: m.Tools.Terminals,
-		Tests: m.Tools.Tests, Kubernetes: m.Tools.Kubernetes, TerminalLines: m.TerminalLines,
+		Tests: m.Tools.Tests, TerminalLines: m.TerminalLines,
 	}
 }
 

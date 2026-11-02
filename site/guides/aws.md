@@ -1,62 +1,20 @@
 # AWS
 
-The AWS Profiles panel shows the profiles on your Mac, whether their credentials are still valid, and lets you refresh them or open a terminal that uses one.
+AWS Profiles is an extension now, not part of Flint itself. It adds an AWS Profiles panel with the profiles in `~/.aws/config` and `~/.aws/credentials`, whether their credentials are still valid and for how long, and actions to refresh them, check who you are (`aws sts get-caller-identity`) and copy the profile name. **Log In** (`aws sso login`, `saml2aws login`) and **Open Terminal** as a profile open as terminal tabs, with `AWS_PROFILE` and `AWS_REGION` set.
 
-Open it with the `☁` icon on the activity bar or "AWS Profiles" in the command palette.
+## Install it
 
-## Profiles
+1. Get the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository and build its `aws/` folder as the README there describes (`go build -o aws-ext .` in that folder).
+2. Run **Install Extension from Folder…** from the command palette and pick the `aws/` folder. See [Install an extension](extensions.md#install-an-extension).
 
-Flint reads `~/.aws/config` and `~/.aws/credentials` (or the files named by `AWS_CONFIG_FILE` and `AWS_SHARED_CREDENTIALS_FILE`). For each profile it shows:
+The extension needs the AWS CLI (`brew install awscli`), and `saml2aws` if you use it. It gets `AWS_CONFIG_FILE` and the related variables of your environment because its manifest names them (`run.env`); the install dialog lists them.
 
-- the kind: SSO, session keys (from saml2aws and similar tools), static keys, role, or `credential_process`;
-- the account, role and region;
-- whether the credentials are valid, and the time left until they expire.
+## Settings
 
-Validity comes from the SSO token cache in `~/.aws/sso/cache` and, for session keys, from `x_security_token_expires` or `aws_expiration`. The countdown is live. The list refreshes every 30 seconds and when you return to the Flint window.
-
-## Actions
-
-Right-click a profile for its actions. Refresh Credentials and Log In appear only for kinds of profile that support them.
-
-| Action | What it does |
-|---|---|
-| Open Terminal | Opens a terminal with `AWS_PROFILE` and `AWS_REGION` set (also: double-click or `❯_`) |
-| Refresh Credentials | Renews the credentials without a terminal (also: ↻) |
-| Log In | Runs the interactive login in a terminal |
-| Check Identity | Asks STS who you are (`aws sts get-caller-identity`) |
-| Copy Profile Name | Copies the name |
-| Copy export AWS_PROFILE | Copies `export AWS_PROFILE=…` for use elsewhere |
-
-### Terminal as profile
-
-The terminal tab is named `aws:<profile> · …`, and it keeps its profile after a restart.
-
-### Log In
-
-Runs `aws sso login` for SSO profiles or `saml2aws login --role …` for saml2aws profiles in a terminal, where you can answer any prompts.
-
-### Refresh
-
-Refresh does the same work without a terminal:
-
-- SSO: `aws sso login`, which waits up to 5 minutes for you to approve in the browser;
-- saml2aws: login with the stored password and role (`--skip-prompt --force`);
-- roles and `credential_process`: an STS call that fetches and caches the credentials.
-
-Refresh can't answer questions. If the tool asks for input, for example an MFA code, refresh stops immediately and offers a **Log In** button so you can finish in a terminal. You can cancel a running refresh with ■.
-
-## Not supported
-
-aws-azure-login is deprecated and not supported; its `azure_*` settings are ignored.
-
-## How secrets are handled
-
-Access keys and tokens are read only by Flint's native process, to check that they exist. They never reach the user interface or the log.
-
-## EKS
-
-The [Kubernetes](kubernetes.md#eks-and-aws-credentials) panel shows the AWS profile of EKS contexts and offers the same refresh and Log In buttons.
+**Settings ▸ AWS Profiles** is the extension's own page. Its values are stored in `settings.json` under `extensions.flint.aws` (see [extensions](../reference/settings.md#extensions)). The `refresh.awsSeconds` key of the old built-in panel is ignored.
 
 ## Related
 
 - [Manage AWS profiles](../how-to/manage-aws-profiles.md)
+- [Kubernetes](kubernetes.md)
+- [Extensions](extensions.md)

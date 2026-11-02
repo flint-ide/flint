@@ -8,7 +8,6 @@ export interface McpTools {
   editor: boolean
   terminals: boolean
   tests: boolean
-  kubernetes: boolean
 }
 
 export type McpToolKey = keyof McpTools
@@ -27,7 +26,7 @@ export const TERMINAL_LINES = { min: 10, max: 2000 }
 /** Mirrors Go's defaultMCPServer. */
 export const DEFAULT_MCP_SERVER: McpServerSettings = Object.freeze({
   enabled: true,
-  tools: Object.freeze({ diagnostics: true, editor: true, terminals: false, tests: true, kubernetes: false }),
+  tools: Object.freeze({ diagnostics: true, editor: true, terminals: false, tests: true }),
   terminalLines: 200,
 }) as McpServerSettings
 
@@ -49,7 +48,6 @@ export function coerceMcpServer(v: unknown): McpServerSettings {
       editor: bool(t.editor, d.tools.editor),
       terminals: bool(t.terminals, d.tools.terminals),
       tests: bool(t.tests, d.tools.tests),
-      kubernetes: bool(t.kubernetes, d.tools.kubernetes),
     },
     terminalLines: lines,
   }

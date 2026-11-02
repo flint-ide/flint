@@ -49,7 +49,7 @@ func TestCheck(t *testing.T) {
 	for name, tc := range map[string]struct {
 		manifest, script, want string
 	}{
-		"good": {panelManifest, shellExtension(`"result":{"kind":"list","items":[{"id":"1","label":"one"}]}`), ""},
+		"good":                 {panelManifest, shellExtension(`"result":{"kind":"list","items":[{"id":"1","label":"one"}]}`), ""},
 		"message view is fine": {panelManifest, shellExtension(`"result":{"kind":"message","text":"Sign in first."}`), ""},
 		"bad manifest":         {`{"contract":1,"id":"Bad Id","name":"T","version":"1"}`, "", "manifest"},
 		"no program":           {panelManifest, "", "manifest"},

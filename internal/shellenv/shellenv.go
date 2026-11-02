@@ -17,8 +17,11 @@ import (
 )
 
 const (
-	marker  = "__FLINT_PATH__="
-	timeout = 4 * time.Second
+	marker = "__FLINT_PATH__="
+	// timeout is generous: right after login the machine is busy and a .zshrc
+	// with nvm/rvm/sdkman can take several seconds; a miss leaves the app with
+	// launchd's PATH until restart.
+	timeout = 10 * time.Second
 	// waitDelay bounds the wait for stdout to close after the shell exits.
 	waitDelay = time.Second
 )
@@ -33,11 +36,40 @@ func Load() {
 	once.Do(func() {
 		go func() {
 			defer close(done)
+			current := os.Getenv("PATH")
 			if path := loginPath(); path != "" {
-				_ = os.Setenv("PATH", mergePaths(path, os.Getenv("PATH")))
+				current = mergePaths(path, current)
 			}
+			// Always add the usual install locations: when the login shell
+			// timed out or failed, Homebrew & co. are still found.
+			home, _ := os.UserHomeDir()
+			fallback := strings.Join(fallbackDirs(home, dirExists), ":")
+			_ = os.Setenv("PATH", mergePaths(current, fallback))
 		}()
 	})
+}
+
+// fallbackDirs lists the common tool directories that exist on this machine,
+// in the order a typical login shell would put them.
+func fallbackDirs(home string, exists func(string) bool) []string {
+	candidates := []string{"/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin", "/usr/local/sbin"}
+	if home != "" {
+		for _, rel := range []string{".local/bin", "go/bin", ".cargo/bin", ".bun/bin", ".docker/bin"} {
+			candidates = append(candidates, home+"/"+rel)
+		}
+	}
+	out := make([]string, 0, len(candidates))
+	for _, d := range candidates {
+		if exists(d) {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
 
 // Wait blocks until the PATH import finished (or timed out). Call before spawning tools.

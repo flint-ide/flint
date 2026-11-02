@@ -62,3 +62,27 @@ func TestLoginPathDoesNotWaitForBackgroundProcesses(t *testing.T) {
 		t.Errorf("loginPath = %q", got)
 	}
 }
+
+// When the login shell can't be read (slow startup files, a timeout), the
+// usual install locations still end up on PATH, so Homebrew tools are found.
+func TestFallbackDirs(t *testing.T) {
+	home := t.TempDir()
+	existing := filepath.Join(home, "go", "bin")
+	if err := os.MkdirAll(existing, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	exists := func(p string) bool { _, err := os.Stat(p); return err == nil }
+	got := fallbackDirs(home, exists)
+	if !strings.Contains(strings.Join(got, ":"), existing) {
+		t.Errorf("fallbackDirs = %v, want it to contain %s", got, existing)
+	}
+	for _, d := range got {
+		if !exists(d) {
+			t.Errorf("fallbackDirs returned missing dir %s", d)
+		}
+	}
+	all := fallbackDirs("/h", func(string) bool { return true })
+	if all[0] != "/opt/homebrew/bin" {
+		t.Errorf("fallbackDirs[0] = %q, want /opt/homebrew/bin", all[0])
+	}
+}

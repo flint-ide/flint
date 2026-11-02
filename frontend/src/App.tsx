@@ -1,4 +1,5 @@
-import { Suspense, lazy, useEffect, useRef, type ReactNode, type RefObject } from 'react'
+import { Suspense, useEffect, useRef, type ReactNode, type RefObject } from 'react'
+import { lazyPreload, preloadInBackground } from './lib/lazyPreload'
 import { EventsOn } from './wails/runtime'
 import { useWorkspace } from './store/workspace'
 import { useEditor } from './store/editor'
@@ -46,13 +47,13 @@ import { usePersistentNumber } from './lib/usePersistentNumber'
 
 const ACTIVITY_BAR = 44
 
-const RecentProjects = lazy(() => import('./components/RecentProjects').then((m) => ({ default: m.RecentProjects })))
-const QuickOpen = lazy(() => import('./components/QuickOpen').then((m) => ({ default: m.QuickOpen })))
-const RunConfigDialog = lazy(() => import('./components/run/RunConfigDialog').then((m) => ({ default: m.RunConfigDialog })))
-const CommandPalette = lazy(() => import('./components/CommandPalette').then((m) => ({ default: m.CommandPalette })))
-const ToolCheck = lazy(() => import('./components/layout/ToolCheck').then((m) => ({ default: m.ToolCheck })))
-const PromptDialog = lazy(() => import('./components/agent/PromptDialog').then((m) => ({ default: m.PromptDialog })))
-const ImportVSCodeDialog = lazy(() => import('./components/settings/ImportVSCodeDialog').then((m) => ({ default: m.ImportVSCodeDialog })))
+const RecentProjects = lazyPreload(() => import('./components/RecentProjects').then((m) => ({ default: m.RecentProjects })))
+const QuickOpen = lazyPreload(() => import('./components/QuickOpen').then((m) => ({ default: m.QuickOpen })), { early: true })
+const RunConfigDialog = lazyPreload(() => import('./components/run/RunConfigDialog').then((m) => ({ default: m.RunConfigDialog })))
+const CommandPalette = lazyPreload(() => import('./components/CommandPalette').then((m) => ({ default: m.CommandPalette })), { early: true })
+const ToolCheck = lazyPreload(() => import('./components/layout/ToolCheck').then((m) => ({ default: m.ToolCheck })))
+const PromptDialog = lazyPreload(() => import('./components/agent/PromptDialog').then((m) => ({ default: m.PromptDialog })))
+const ImportVSCodeDialog = lazyPreload(() => import('./components/settings/ImportVSCodeDialog').then((m) => ({ default: m.ImportVSCodeDialog })))
 
 export default function App() {
   const sidebar = useWorkspace((s) => s.sidebar)
@@ -101,6 +102,9 @@ subscribeUsageEvents()
     void useScratch.getState().load()
     void useWorkspace.getState().init()
     void openToolCheckOnFirstRun()
+    // Panels, dialogs and views load on first use; fetch them once startup settled
+    // so that first use is instant too.
+    preloadInBackground()
   }, [])
 
   useEffect(() => {

@@ -1,4 +1,5 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazyPreload } from '../../lib/lazyPreload'
 import { EditorState, type Extension } from '@codemirror/state'
 import type { EditorView, KeyBinding } from '@codemirror/view'
 import { Workspace, errorMessage, type FileContent } from '../../api/backend'
@@ -29,7 +30,7 @@ import { markdownMode, setMarkdownMode, usePreview, type MarkdownMode } from '..
 import { editorAi } from '../../store/editorAi'
 import { formatKeys } from '../../lib/commands'
 
-const MarkdownPreview = lazy(() => import('../preview/MarkdownPreview').then((m) => ({ default: m.MarkdownPreview })))
+const MarkdownPreview = lazyPreload(() => import('../preview/MarkdownPreview').then((m) => ({ default: m.MarkdownPreview })))
 const PREVIEW_DELAY_MS = 150
 
 interface Props {

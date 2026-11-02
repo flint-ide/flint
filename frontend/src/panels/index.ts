@@ -2,22 +2,22 @@
 // activity bar, the sidebar and the "Show …" command follow from it. A feature
 // module contributes its panels itself (lib/features.ts); usePanels and
 // currentPanels are both lists together.
-import { lazy } from 'react'
+import { lazyPreload } from '../lib/lazyPreload'
 import { FileTree } from '../components/sidebar/FileTree'
 import { SearchPanel } from '../components/sidebar/SearchPanel'
 import { ScratchPanel } from '../components/sidebar/ScratchPanel'
 import { definePanels, mergePanels, type PanelSpec } from './registry'
 import { useContributions, type Contributions } from '../lib/contributions'
 
-// Light panels are imported directly; the rest are fetched when first opened, so
-// their code (and their dependencies) is not parsed at startup.
-const CommitPanel = lazy(() => import('../components/sidebar/CommitPanel').then((m) => ({ default: m.CommitPanel })))
-const PullRequestsPanel = lazy(() => import('../components/github/PullRequestsPanel').then((m) => ({ default: m.PullRequestsPanel })))
-const DatabasePanel = lazy(() => import('../components/sidebar/DatabasePanel').then((m) => ({ default: m.DatabasePanel })))
-const AwsPanel = lazy(() => import('../components/sidebar/AwsPanel').then((m) => ({ default: m.AwsPanel })))
-const TasksPanel = lazy(() => import('../components/tasks/TasksPanel').then((m) => ({ default: m.TasksPanel })))
-const KubePanel = lazy(() => import('../components/sidebar/KubePanel').then((m) => ({ default: m.KubePanel })))
-const UsagePanel = lazy(() => import('../components/usage/UsagePanel').then((m) => ({ default: m.UsagePanel })))
+// Light panels are imported directly; the rest are not parsed at startup but
+// fetched in the background once the app is idle (or when first opened).
+const CommitPanel = lazyPreload(() => import('../components/sidebar/CommitPanel').then((m) => ({ default: m.CommitPanel })))
+const PullRequestsPanel = lazyPreload(() => import('../components/github/PullRequestsPanel').then((m) => ({ default: m.PullRequestsPanel })))
+const DatabasePanel = lazyPreload(() => import('../components/sidebar/DatabasePanel').then((m) => ({ default: m.DatabasePanel })))
+const AwsPanel = lazyPreload(() => import('../components/sidebar/AwsPanel').then((m) => ({ default: m.AwsPanel })))
+const TasksPanel = lazyPreload(() => import('../components/tasks/TasksPanel').then((m) => ({ default: m.TasksPanel })))
+const KubePanel = lazyPreload(() => import('../components/sidebar/KubePanel').then((m) => ({ default: m.KubePanel })))
+const UsagePanel = lazyPreload(() => import('../components/usage/UsagePanel').then((m) => ({ default: m.UsagePanel })))
 
 // Command ids and titles predating the registry are kept: keymap overrides are stored by id.
 export const PANELS = definePanels([

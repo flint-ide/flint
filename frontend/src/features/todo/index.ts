@@ -1,12 +1,12 @@
 // The TODO list feature (Go: internal/features/todo): the TODO panel, its
 // Settings page and the "todoExclude" settings key.
-import { lazy } from 'react'
+import { lazyPreload } from '../../lib/lazyPreload'
 import { defineFeature } from '../../lib/features'
 import { todoSettings } from './settings'
 
-// Fetched when first opened, so their code is not parsed at startup.
-const TodoPanel = lazy(() => import('./TodoPanel').then((m) => ({ default: m.TodoPanel })))
-const TodoSection = lazy(() => import('./TodoSection').then((m) => ({ default: m.TodoSection })))
+// Not parsed at startup; fetched in the background once the app is idle (or when first opened).
+const TodoPanel = lazyPreload(() => import('./TodoPanel').then((m) => ({ default: m.TodoPanel })))
+const TodoSection = lazyPreload(() => import('./TodoSection').then((m) => ({ default: m.TodoSection })))
 
 export default defineFeature({
   id: 'todo',

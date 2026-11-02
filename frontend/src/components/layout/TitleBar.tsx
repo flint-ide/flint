@@ -1,4 +1,5 @@
-import { Suspense, lazy, useEffect, useState, type CSSProperties } from 'react'
+import { Suspense, useEffect, useState, type CSSProperties } from 'react'
+import { lazyPreload } from '../../lib/lazyPreload'
 import * as AppAPI from '../../../bindings/flint/appapi'
 import { EventsOn, WindowIsFullscreen, WindowToggleMaximise } from '../../wails/runtime'
 import { Workspace } from '../../api/backend'
@@ -16,7 +17,7 @@ import { rootLabels } from '../../lib/workspaceRoots'
 import { formatKeys } from '../../lib/commands'
 import { modifierName } from '../../lib/platform'
 
-const BranchesPopup = lazy(() => import('../git/BranchesPopup').then((m) => ({ default: m.BranchesPopup })))
+const BranchesPopup = lazyPreload(() => import('../git/BranchesPopup').then((m) => ({ default: m.BranchesPopup })))
 
 // Fallbacks match AppKit's compact unified title bar (measured: 40pt, buttons at x=12).
 const DEFAULT_HEIGHT = 40

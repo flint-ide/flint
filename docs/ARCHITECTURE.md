@@ -122,8 +122,8 @@ flowchart LR
 
 ### Build
 
-- `cmd/webbuild` (Go, `github.com/evanw/esbuild/pkg/api`) bundles TSX and CSS into `frontend/dist` in about 0.1 s, with code splitting. About 350 KB of JS loads at startup; the editor (CodeMirror), terminal (xterm.js), languages, chat and panels load on first use.
-- Sidebar panels (Commit, Databases, Docker, AWS, Kubernetes, TODO, Pull Requests), dialogs and the heavier tab views are `React.lazy` components, so their code is fetched only when first opened.
+- `cmd/webbuild` (Go, `github.com/evanw/esbuild/pkg/api`) bundles TSX and CSS into `frontend/dist` in about 0.1 s, with code splitting. About 350 KB of JS loads at startup; the editor (CodeMirror), terminal (xterm.js), languages, chat and panels are not parsed at startup.
+- Sidebar panels (Commit, Databases, Docker, AWS, Kubernetes, TODO, Pull Requests), dialogs and the heavier tab views are `lazyPreload` components (`lib/lazyPreload.ts`): `React.lazy` whose code is not parsed at startup but fetched in the background, one chunk per idle period, starting 1.5 s after launch. The first click on a panel or dialog then renders in the same frame instead of waiting for its code (about 300 ms for the branch popup before); idle memory grows by about 2 MB. Languages still load when a file of that language is first opened.
 - `wails3 task build` (`Taskfile.yml`) runs it with `--typecheck` (first `tsc --noEmit`, because esbuild only strips types).
 - `wails3 task dev` runs `webbuild --watch`: a rebuild after every change and a page reload through esbuild's SSE stream (`/esbuild`), with no HMR. The dev server listens on `localhost:5173` (`FRONTEND_DEVSERVER_URL`), and Go rebuilds on change (`build/config.yml`).
 - `cmd/webbuild` also writes the Content Security Policy into `index.html` (see [Security model](#security-model)).
@@ -182,7 +182,7 @@ Color themes are data: a manifest's `contributes.themes` is checked with `settin
 `src/panels/index.ts` lists Flint's own sidebar panels, and feature modules contribute theirs (`panels` in `lib/features.ts`). The activity bar, the sidebar and one palette command per panel are derived from both lists, merged by `order` (`usePanels`, `src/panels/registry.ts`). To add a panel without a module:
 
 1. Write the component (for example `components/sidebar/GcpPanel.tsx`). It receives `focusToken`, which `focusPanel(id)` bumps when a command asks the panel to focus its input.
-2. Add one entry to `PANELS`: `{ id: 'gcp', title: 'Google Cloud', icon: '◇', order: 95, component: GcpPanel }`. Wrap the component in `React.lazy` unless it is small, so its code is fetched on first open rather than at startup.
+2. Add one entry to `PANELS`: `{ id: 'gcp', title: 'Google Cloud', icon: '◇', order: 95, component: GcpPanel }`. Wrap the component in `lazyPreload` unless it is small, so its code is fetched after startup rather than during it.
 
 That entry also registers "Show Google Cloud" (`view.gcp`) in the palette. Optional fields: `command` (another id, title, keywords or a default shortcut, or `false` for no command), `shortcutCommand` (a command whose shortcut the tooltip shows, read on hover so it follows rebinding) and `when` (hides the button and the command). Panel ids are not persisted today; an unknown id still falls back to the Files panel. Keep the command id of an existing panel when you edit it, since keymap overrides are stored by command id.
 

@@ -1,4 +1,5 @@
-import { Suspense, lazy, memo, useLayoutEffect } from 'react'
+import { Suspense, memo, useLayoutEffect } from 'react'
+import { lazyPreload } from '../../lib/lazyPreload'
 import { useEditor, type ContributedTab, type FileTab, type Tab } from '../../store/editor'
 import { useContributions } from '../../lib/contributions'
 import { Icon } from '../ui/Icon'
@@ -24,23 +25,23 @@ import { formatKeys } from '../../lib/commands'
 
 // CodeMirror, the SQL console and the agent chat load on first use, keeping startup
 // to the layout plus the terminal.
-const FileView = lazy(() => import('./FileView').then((m) => ({ default: m.FileView })))
-const ImageView = lazy(() => import('../preview/ImageView').then((m) => ({ default: m.ImageView })))
-const ScratchView = lazy(() => import('./ScratchView').then((m) => ({ default: m.ScratchView })))
-const DiffView = lazy(() => import('./DiffView').then((m) => ({ default: m.DiffView })))
-const MergeView = lazy(() => import('./MergeView').then((m) => ({ default: m.MergeView })))
-const HistoryView = lazy(() => import('./HistoryView').then((m) => ({ default: m.HistoryView })))
-const AgentChat = lazy(() => import('../agent/AgentChat').then((m) => ({ default: m.AgentChat })))
-const RunView = lazy(() => import('../run/RunView').then((m) => ({ default: m.RunView })))
-const DebugView = lazy(() => import('../debug/DebugView').then((m) => ({ default: m.DebugView })))
-const ProfileView = lazy(() => import('../profile/ProfileView').then((m) => ({ default: m.ProfileView })))
-const SettingsView = lazy(() => import('../settings/SettingsView').then((m) => ({ default: m.SettingsView })))
-const HttpResponseView = lazy(() => import('../http/HttpResponseView').then((m) => ({ default: m.HttpResponseView })))
-const PullRequestView = lazy(() => import('../github/PullRequestView').then((m) => ({ default: m.PullRequestView })))
-const PullRequestDiffView = lazy(() => import('../github/PullRequestDiffView').then((m) => ({ default: m.PullRequestDiffView })))
-const CILogView = lazy(() => import('../github/CILogView').then((m) => ({ default: m.CILogView })))
+const FileView = lazyPreload(() => import('./FileView').then((m) => ({ default: m.FileView })), { early: true })
+const ImageView = lazyPreload(() => import('../preview/ImageView').then((m) => ({ default: m.ImageView })))
+const ScratchView = lazyPreload(() => import('./ScratchView').then((m) => ({ default: m.ScratchView })))
+const DiffView = lazyPreload(() => import('./DiffView').then((m) => ({ default: m.DiffView })))
+const MergeView = lazyPreload(() => import('./MergeView').then((m) => ({ default: m.MergeView })))
+const HistoryView = lazyPreload(() => import('./HistoryView').then((m) => ({ default: m.HistoryView })))
+const AgentChat = lazyPreload(() => import('../agent/AgentChat').then((m) => ({ default: m.AgentChat })))
+const RunView = lazyPreload(() => import('../run/RunView').then((m) => ({ default: m.RunView })))
+const DebugView = lazyPreload(() => import('../debug/DebugView').then((m) => ({ default: m.DebugView })))
+const ProfileView = lazyPreload(() => import('../profile/ProfileView').then((m) => ({ default: m.ProfileView })))
+const SettingsView = lazyPreload(() => import('../settings/SettingsView').then((m) => ({ default: m.SettingsView })))
+const HttpResponseView = lazyPreload(() => import('../http/HttpResponseView').then((m) => ({ default: m.HttpResponseView })))
+const PullRequestView = lazyPreload(() => import('../github/PullRequestView').then((m) => ({ default: m.PullRequestView })))
+const PullRequestDiffView = lazyPreload(() => import('../github/PullRequestDiffView').then((m) => ({ default: m.PullRequestDiffView })))
+const CILogView = lazyPreload(() => import('../github/CILogView').then((m) => ({ default: m.CILogView })))
 // xterm.js is the biggest dependency; output that arrives first waits in store/terminal.
-const TerminalView = lazy(() => import('../terminal/TerminalView').then((m) => ({ default: m.TerminalView })))
+const TerminalView = lazyPreload(() => import('../terminal/TerminalView').then((m) => ({ default: m.TerminalView })))
 
 /** Closes a tab, asking first when work could be lost. */
 export async function requestCloseTab(tab: Tab): Promise<void> {

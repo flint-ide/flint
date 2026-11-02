@@ -28,6 +28,7 @@ const (
 	PermWorkspaceRead = "workspace.read"
 	PermSecrets       = "secrets"
 	PermAgentAsk      = "agent.ask"
+	PermTerminal      = "terminal"
 	permNetwork       = "network:"
 )
 
@@ -91,6 +92,9 @@ func (m *Manifest) checkRun() error {
 	if err := checkArgs(m.Run.Args); err != nil {
 		return err
 	}
+	if err := checkRunEnv(m.Run.Env); err != nil {
+		return err
+	}
 	for _, o := range []*RunOS{m.Run.Darwin, m.Run.Linux} {
 		if o == nil {
 			continue
@@ -142,7 +146,7 @@ func (m *Manifest) checkPermissions() error {
 		}
 		seen[p] = true
 		switch {
-		case p == PermWorkspaceRead || p == PermSecrets || p == PermAgentAsk:
+		case p == PermWorkspaceRead || p == PermSecrets || p == PermAgentAsk || p == PermTerminal:
 		case strings.HasPrefix(p, permNetwork):
 			for _, h := range strings.Split(strings.TrimPrefix(p, permNetwork), ",") {
 				if !hostPattern.MatchString(h) {

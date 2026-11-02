@@ -53,7 +53,18 @@ func (e *ext) start() (*proc, error) {
 	}
 	cmd := exec.Command(path, args...)
 	cmd.Dir = e.dir
-	cmd.Env = append(e.h.o.Environ(), "FLINT_EXTENSION_ID="+e.id, "FLINT_EXTENSION_DIR="+e.dir, "FLINT_VERSION="+e.h.o.App.Version())
+	data, err := e.dataDir()
+	if err != nil {
+		return nil, err
+	}
+	cmd.Env = append(e.h.o.Environ(), "FLINT_EXTENSION_ID="+e.id, "FLINT_EXTENSION_DIR="+e.dir, "FLINT_EXTENSION_DATA="+data, "FLINT_VERSION="+e.h.o.App.Version())
+	// run.env: the user's values of the variables the manifest names (Environ
+	// waited for the login shell's environment).
+	for _, name := range e.m.Run.Env {
+		if v, ok := os.LookupEnv(name); ok {
+			cmd.Env = append(cmd.Env, name+"="+v)
+		}
+	}
 	proctree.Isolate(cmd)
 	inR, inW, err := os.Pipe()
 	if err != nil {

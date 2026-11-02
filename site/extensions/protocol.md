@@ -35,8 +35,8 @@ Everything an extension and Flint say to each other, for extension contract **1*
 | `publisher`, `description` | string | At most 60 and 500 characters |
 | `run` | object | Required. `command`: a clean relative path inside the folder to an executable file (symbolic links must stay inside the folder); `args`: up to 32 fixed arguments. `darwin` and `linux` (each `{ command, args }`) replace both on that platform. Never run through a shell or `PATH` |
 | `activation` | string[] | `onStartup` starts the process once Flint's window is up. `onCommand:<id>`, `onView:<id>`, `onAgentTool:<name>` must name the extension's own contributions; using any contribution starts the extension anyway |
-| `permissions` | string[] | `workspace.read`, `secrets`, `agent.ask`, `network:<host>[,<host>…]` (shown, not enforced) |
-| `contributes` | object | Below. Contribution points this Flint doesn't know (`fileMenu`, `tabViews`) are ignored with a warning in Settings |
+| `permissions` | string[] | `workspace.read`, `secrets`, `agent.ask`, `terminal`, `network:<host>[,<host>…]` (shown, not enforced) |
+| `contributes` | object | Below. Contribution points this Flint doesn't know (`fileMenu`) are ignored with a warning in Settings |
 
 Every contributed id must start with `<id>.` followed by letters, digits, dots, dashes or underscores.
 
@@ -119,7 +119,10 @@ The process gets only `PATH` (with the login shell's additions), `HOME`, `USER`,
 |---|---|
 | `FLINT_EXTENSION_ID` | The extension's id |
 | `FLINT_EXTENSION_DIR` | Its installed folder (also the working directory) |
+| `FLINT_EXTENSION_DATA` | A private folder for its own data (`<config>/extension-data/<id>`, mode 0700), created before it starts and kept when it is uninstalled |
 | `FLINT_VERSION` | Flint's version |
+
+Other variables of the user's environment reach the program only when the manifest names them in `run.env` (at most 30 upper-case names, e.g. `["KUBECONFIG", "AWS_CONFIG_FILE", "DOCKER_HOST"]`): Flint copies their values from its own environment, which includes what the login shell sets. `PATH`, `HOME`, `SHELL`, `USER`, `LOGNAME`, `TMPDIR`, loader variables and `FLINT_*` can't be requested. The install dialog lists the names.
 
 ### Timeouts
 
@@ -279,12 +282,14 @@ A page's `flint.request(method, params)`. The result (any JSON, ≤ 4 MiB) resol
 | `secrets/set` | `{ "key", "value" }` → `{}` | `secrets` |
 | `secrets/delete` | `{ "key" }` → `{}` | `secrets` |
 | `agent/ask` | `{ "prompt", "attachments"?: [{ "path" }] }` → `null` | `agent.ask` |
+| `window/openTerminal` | `{ "title"?, "cwd"?, "env"?, "command"?, "tag"? }` → `null`; a terminal tab in `cwd` (a folder in a trusted project; default: the active project) that types `command` (argv, quoted by Flint) | `terminal` |
 
 - **Paths** are absolute and must be inside a trusted project folder after symbolic links are resolved; otherwise the request fails with `-32001`.
 - **`workspace/readFile`** returns UTF-8 text up to 4 MiB. Files inside `.git` and credential files (`.env`, `.env.*`, `.envrc`, `.netrc`, `.npmrc`, `.pypirc`, `.pgpass`, `id_rsa` and other SSH keys, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.keystore`, `*.jks`) are refused.
 - **`window/openUrl`** accepts `http` and `https` only. The first link to a site asks the user; after that, links to the same site open without asking until Flint quits. A refusal is error `-32800`.
 - **`window/showMessageRequest`** shows a native question with the actions and Cancel; `action` is missing when the user cancels.
 - **Secrets** are kept in the system keychain (service `flint-extensions`, account `<id>:<key>`). Keys are 1–128 letters, digits, dots, dashes or underscores; values at most 64 KiB. An extension can't reach another's secrets.
+- **`window/openTerminal`** opens a normal terminal tab, so the user sees what runs and can stop it. `env` (≤ 50 variables) may not set `PATH`, `HOME`, `SHELL`, the shell's startup variables, loader variables or `FLINT_*`; arguments (≤ 64) and values are at most 4,096 characters without control characters.
 - **`agent/ask`** puts the prompt (≤ 20,000 characters) and the attached files in the agent chat's draft. It never sends.
 
 There is no method to run commands and no proxy for network requests: the extension is its own program and does its own I/O.

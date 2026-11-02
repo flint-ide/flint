@@ -51,8 +51,11 @@ type Manifest struct {
 type Run struct {
 	Command string   `json:"command"`
 	Args    []string `json:"args,omitempty"`
-	Darwin  *RunOS   `json:"darwin,omitempty"`
-	Linux   *RunOS   `json:"linux,omitempty"`
+	// Env names variables of the user's environment (the login shell's) the
+	// program gets besides Flint's minimal set, e.g. KUBECONFIG (runenv.go).
+	Env    []string `json:"env,omitempty"`
+	Darwin *RunOS   `json:"darwin,omitempty"`
+	Linux  *RunOS   `json:"linux,omitempty"`
 }
 
 // RunOS is a platform's Run.

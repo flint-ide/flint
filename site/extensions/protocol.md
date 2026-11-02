@@ -122,6 +122,8 @@ The process gets only `PATH` (with the login shell's additions), `HOME`, `USER`,
 | `FLINT_EXTENSION_DATA` | A private folder for its own data (`<config>/extension-data/<id>`, mode 0700), created before it starts and kept when it is uninstalled |
 | `FLINT_VERSION` | Flint's version |
 
+Other variables of the user's environment reach the program only when the manifest names them in `run.env` (at most 30 upper-case names, e.g. `["KUBECONFIG", "AWS_CONFIG_FILE", "DOCKER_HOST"]`): Flint copies their values from its own environment, which includes what the login shell sets. `PATH`, `HOME`, `SHELL`, `USER`, `LOGNAME`, `TMPDIR`, loader variables and `FLINT_*` can't be requested. The install dialog lists the names.
+
 ### Timeouts
 
 | Request | Timeout |

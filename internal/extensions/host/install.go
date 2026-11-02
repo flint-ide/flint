@@ -114,6 +114,9 @@ func installMessage(m *manifest.Manifest) string {
 		return b.String()
 	}
 	fmt.Fprintf(&b, "\nProgram: %s\n", m.CommandLine(runtime.GOOS))
+	if len(m.Run.Env) > 0 {
+		fmt.Fprintf(&b, "Reads from your environment: %s\n", strings.Join(m.Run.Env, ", "))
+	}
 	if m.HasWebviews() {
 		b.WriteString("Shows its own UI in Flint (webviews, in a sandboxed frame without network)\n")
 	}

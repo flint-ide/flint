@@ -1,4 +1,4 @@
-import { createStore } from '../lib/store'
+import { createStore, unchanged } from '../lib/store'
 import * as Terminal from '../../bindings/flint/terminalapi'
 import { EventsOn } from '../wails/runtime'
 import { createReorderer } from '../lib/reorder'
@@ -114,6 +114,9 @@ function updateTab(id: string, change: (t: TerminalTab) => Partial<TerminalTab>)
   if (!tab) return
   const next = { ...tab, ...change(tab) }
   if (!next.pinned) next.title = terminalTitle(next)
+  // Programs repeat their title (shells at every prompt, agents while they work):
+  // a new tabs array would re-render the tab bar and save the session for nothing.
+  if (unchanged(tab, next)) return
   useTerminal.setState((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? next : t)) }))
   if (next.title !== tab.title) useEditor.getState().retitleTab(terminalTabId(id), next.title)
 }

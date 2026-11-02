@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -10,6 +11,8 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { modKey } from '../../lib/platform'
+import { useListCursor } from '../../lib/useListCursor'
+import { useEventCallback } from '../../lib/useEventCallback'
 
 // The one popover menu used across Flint (title bar, "+" menu, selects, settings,
 // right-click context menus via store/contextMenu). Rendered in a portal with fixed
@@ -126,13 +129,7 @@ export interface MenuProps {
 export function Menu({ anchor, atPoint, items, align, searchable, placeholder, minWidth, emptyText, onClose }: MenuProps) {
   const menu = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
-  const [cursor, setCursorState] = useState(-1)
-  // Mirror in a ref so key handlers see the latest position even between renders.
-  const cursorRef = useRef(-1)
-  const setCursor = (i: number) => {
-    cursorRef.current = i
-    setCursorState(i)
-  }
+  const { listRef, cursor, setCursor, hover } = useListCursor(-1, CURSOR_ROW)
   const [pos, setPos] = useState<{ top: number; left: number; maxHeight: number; width: number } | null>(null)
   const withSearch = searchable ?? items.filter(isItem).length >= AUTO_SEARCH_AT
 
@@ -195,23 +192,20 @@ export function Menu({ anchor, atPoint, items, align, searchable, placeholder, m
     }
   }, [anchor, onClose])
 
-  useEffect(() => {
-    menu.current?.querySelector<HTMLElement>('[data-cursor="true"]')?.scrollIntoView({ block: 'nearest' })
-  }, [cursor])
 
   useEffect(() => {
     if (!withSearch) menu.current?.focus()
   }, [withSearch, pos])
 
-  const choose = (i: number, e: { altKey: boolean; metaKey: boolean }) => {
+  const choose = useEventCallback((i: number, e: { altKey: boolean; metaKey: boolean }) => {
     const it = visible[i]
     if (!it || !isItem(it) || it.disabled) return
     onClose()
     it.onSelect(e)
-  }
+  })
 
   const onKeyDown = (e: ReactKeyboardEvent) => {
-    const cur = cursorRef.current
+    const cur = cursor
     const at = selectable.indexOf(cur)
     if (e.key === 'ArrowDown') {
       setCursor(selectable[Math.min(at + 1, selectable.length - 1)] ?? -1)
@@ -248,46 +242,58 @@ export function Menu({ anchor, atPoint, items, align, searchable, placeholder, m
           onChange={(e) => setQuery(e.target.value)}
         />
       )}
-      <div className="dd-items">
+      <div className="dd-items" ref={listRef}>
         {visible.length === 0 && <div className="dd-empty">{query ? 'No matches' : emptyText}</div>}
         {visible.map((it, i) => {
           if (it.type === 'separator') return <div key={`s${i}`} className="dd-separator" />
           if (it.type === 'section') return <div key={`h${i}`} className="dd-section">{it.label}</div>
-          return (
-            <div
-              key={it.key ?? `${it.label}${i}`}
-              role="menuitem"
-              aria-disabled={it.disabled}
-              data-cursor={i === cursor}
-              className={`dd-item${it.danger ? ' danger' : ''}${it.disabled ? ' disabled' : ''}`}
-              onMouseMove={() => !it.disabled && setCursor(i)}
-              onClick={(e) => choose(i, { altKey: e.altKey, metaKey: modKey(e) })}
-            >
-              <span className="dd-check">{it.checked ? '✓' : ''}</span>
-              {it.icon && <span className="dd-icon">{it.icon}</span>}
-              <span className="dd-label">{it.label}</span>
-              {it.hint && <span className="dd-hint">{it.hint}</span>}
-              {it.kbd && <kbd>{it.kbd}</kbd>}
-              {it.action && (
-                <button
-                  className="dd-action"
-                  title={it.action.title}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    it.action!.onClick()
-                  }}
-                >
-                  {it.action.label}
-                </button>
-              )}
-            </div>
-          )
+          return <MenuRow key={it.key ?? `${it.label}${i}`} item={it} index={i} current={i === cursor} onHover={hover} onPick={choose} />
         })}
       </div>
     </div>,
     document.body,
   )
 }
+
+const CURSOR_ROW = '[data-cursor="true"]'
+
+/** One menu item; memoized so moving the highlight re-renders only two rows. */
+const MenuRow = memo(function MenuRow({ item, index, current, onHover, onPick }: {
+  item: Item
+  index: number
+  current: boolean
+  onHover: (i: number) => void
+  onPick: (i: number, e: { altKey: boolean; metaKey: boolean }) => void
+}) {
+  return (
+    <div
+      role="menuitem"
+      aria-disabled={item.disabled}
+      data-cursor={current}
+      className={`dd-item${item.danger ? ' danger' : ''}${item.disabled ? ' disabled' : ''}`}
+      onMouseMove={() => !item.disabled && onHover(index)}
+      onClick={(e) => onPick(index, { altKey: e.altKey, metaKey: modKey(e) })}
+    >
+      <span className="dd-check">{item.checked ? '✓' : ''}</span>
+      {item.icon && <span className="dd-icon">{item.icon}</span>}
+      <span className="dd-label">{item.label}</span>
+      {item.hint && <span className="dd-hint">{item.hint}</span>}
+      {item.kbd && <kbd>{item.kbd}</kbd>}
+      {item.action && (
+        <button
+          className="dd-action"
+          title={item.action.title}
+          onClick={(e) => {
+            e.stopPropagation()
+            item.action!.onClick()
+          }}
+        >
+          {item.action.label}
+        </button>
+      )}
+    </div>
+  )
+})
 
 function isItem(it: DropdownItem): it is Item {
   return it.type === undefined || it.type === 'item'

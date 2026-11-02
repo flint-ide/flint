@@ -69,7 +69,7 @@ export function select<T, U>(prev: Memo<T, U> | null, state: T, selector: (state
 const identity = <T,>(s: T): T => s
 
 /** Whether merging partial into state would change nothing (so listeners need no event). */
-function unchanged<T extends object>(state: T, partial: Partial<T>): boolean {
+export function unchanged<T extends object>(state: T, partial: Partial<T>): boolean {
   for (const key in partial) {
     if (Object.prototype.hasOwnProperty.call(partial, key) && !Object.is(partial[key], state[key])) return false
   }

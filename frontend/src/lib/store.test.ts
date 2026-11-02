@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { createBus } from './bus'
-import { createStore, select } from './store'
+import { createStore, select, unchanged } from './store'
 
 describe('createBus', () => {
   it('delivers events to subscribers until they unsubscribe', () => {
@@ -154,5 +154,18 @@ describe('select', () => {
     const state = { n: 2 }
     const first = select(null, state, (s) => s.n)
     assert.equal(select(first, state, (s) => s.n * 10).value, 20)
+  })
+})
+
+describe('unchanged', () => {
+  it('is true when every key of the partial is Object.is-equal', () => {
+    const tags = ['a']
+    assert.equal(unchanged({ title: 'x', tags, n: 1 }, { title: 'x', tags }), true)
+    assert.equal(unchanged({ n: NaN }, { n: NaN }), true)
+  })
+
+  it('is false when a key differs or is a new reference', () => {
+    assert.equal(unchanged({ title: 'x' }, { title: 'y' }), false)
+    assert.equal(unchanged({ tags: ['a'] }, { tags: ['a'] }), false)
   })
 })

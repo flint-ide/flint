@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef } from 'react'
+import { Suspense, lazy, useEffect, useRef, type ReactNode, type RefObject } from 'react'
 import { EventsOn } from './wails/runtime'
 import { useWorkspace } from './store/workspace'
 import { useEditor } from './store/editor'
@@ -70,7 +70,6 @@ export default function App() {
   const error = useWorkspace((s) => s.error)
   const editingRun = useRun((s) => s.editing)
   const ready = useWorkspace((s) => s.ready)
-  const [sidebarWidth, setSidebarWidth] = usePersistentNumber('flint.sidebarWidth', 280)
   const workbench = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -125,30 +124,22 @@ subscribeUsageEvents()
 
   useGlobalShortcuts()
 
-  const onSidebarResize = (ratio: number) => {
-    const width = workbench.current?.getBoundingClientRect().width ?? 1200
-    setSidebarWidth(Math.min(600, Math.max(180, ratio * width - ACTIVITY_BAR)))
-  }
-
   return (
     <div className="app">
       <TitleBar />
       <div className="workbench" ref={workbench}>
         <ActivityBar onTerminal={() => toggleTerminal(activeRoot())} />
         {sidebarVisible && (
-          <>
-            <aside className="sidebar" style={{ width: sidebarWidth }}>
-              <ErrorBoundary label="Sidebar">
-              {panel && (
-                // key: switching panels unmounts the previous one, as separate elements did.
-                <Suspense key={panel.id} fallback={null}>
-                  <panel.component focusToken={focusToken} />
-                </Suspense>
-              )}
-              </ErrorBoundary>
-            </aside>
-            <Splitter direction="horizontal" onResize={onSidebarResize} />
-          </>
+          <ResizableSidebar workbench={workbench}>
+            <ErrorBoundary label="Sidebar">
+            {panel && (
+              // key: switching panels unmounts the previous one, as separate elements did.
+              <Suspense key={panel.id} fallback={null}>
+                <panel.component focusToken={focusToken} />
+              </Suspense>
+            )}
+            </ErrorBoundary>
+          </ResizableSidebar>
         )}
         {/* Files, terminals and agent chats share one tab area. */}
         <main className="main">
@@ -203,6 +194,26 @@ subscribeUsageEvents()
  * and runs their shortcuts from one capturing keydown listener, so they fire
  * before editors and terminals see the keys (see lib/commands.ts).
  */
+/**
+ * The sidebar and its splitter. The width lives here: a drag re-renders only this
+ * frame, while the panel (children, made by App) and the rest of the shell stay put.
+ */
+function ResizableSidebar({ workbench, children }: { workbench: RefObject<HTMLDivElement | null>; children: ReactNode }) {
+  const [width, setWidth] = usePersistentNumber('flint.sidebarWidth', 280)
+  const onResize = (ratio: number) => {
+    const total = workbench.current?.getBoundingClientRect().width ?? 1200
+    setWidth(Math.min(600, Math.max(180, ratio * total - ACTIVITY_BAR)))
+  }
+  return (
+    <>
+      <aside className="sidebar" style={{ width }}>
+        {children}
+      </aside>
+      <Splitter direction="horizontal" onResize={onResize} />
+    </>
+  )
+}
+
 function useGlobalShortcuts() {
   useEffect(() => {
     setCommandErrorHandler((err) => showToast(errorMessage(err), 'error'))

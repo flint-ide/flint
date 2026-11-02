@@ -87,11 +87,17 @@ export async function requestCloseTab(tab: Tab): Promise<void> {
   useEditor.getState().closeTab(tab.id)
 }
 
+/** Ids of the terminals whose program exited, one per line. */
+function exitedTerminals(tabs: readonly { id: string; exitCode?: number | null }[]): string {
+  return tabs.filter((t) => t.exitCode != null).map((t) => t.id).join('\n')
+}
+
 export function EditorArea() {
   const tabs = useEditor((s) => s.tabs)
   const activeId = useEditor((s) => s.activeId)
   const setActive = useEditor((s) => s.setActive)
-  const terminals = useTerminal((s) => s.tabs)
+  // Only which terminals exited (a string, so retitles and cwd changes don't re-render the tabs).
+  const exited = useTerminal((s) => exitedTerminals(s.tabs))
   // Busy flags and chat transcripts are selected per tab below: streamed agent tokens
   // and run output must not re-render the whole editor area.
   const debugActive = useDebug((s) => s.session?.status === 'running' || s.session?.status === 'starting')
@@ -118,7 +124,7 @@ export function EditorArea() {
             key={tab.id}
             role="tab"
             aria-selected={tab.id === activeId}
-            className={`tab${tab.id === activeId ? ' active' : ''}${tab.kind === 'terminal' && terminals.find((t) => t.id === tab.termId)?.exitCode != null ? ' exited' : ''}`}
+            className={`tab${tab.id === activeId ? ' active' : ''}${tab.kind === 'terminal' && exited.split('\n').includes(tab.termId) ? ' exited' : ''}`}
             title={tab.kind === 'file' ? tab.path : tab.title}
             onClick={() => setActive(tab.id)}
             onMouseDown={(e) => e.button === 1 && void requestCloseTab(tab)}

@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { formatKeys, isAvailable, listCommands, runCommand, shownKeys, type Command } from '../lib/commands'
 import { pushRecent, rankCommands } from '../lib/commandSearch'
 import { useWorkspace } from '../store/workspace'
 import { Modal } from './layout/Modal'
+import { useListCursor } from '../lib/useListCursor'
+import { useEventCallback } from '../lib/useEventCallback'
 
 const RECENT_KEY = 'flint.recentCommands'
 
@@ -31,27 +33,23 @@ export function CommandPalette() {
   // Where focus goes back to (a terminal, an editor) unless the command moves it.
   const [previousFocus] = useState(() => document.activeElement)
   const [query, setQuery] = useState('')
-  const [cursor, setCursor] = useState(0)
-  const list = useRef<HTMLDivElement>(null)
+  const { listRef, cursor, setCursor, hover } = useListCursor()
 
   const rows = useMemo(() => rankCommands(commands, query, recent), [commands, query, recent])
 
-  useEffect(() => setCursor(0), [query])
-  useEffect(() => {
-    list.current?.querySelector('.selected')?.scrollIntoView({ block: 'nearest' })
-  }, [cursor])
+  useEffect(() => setCursor(0), [query, setCursor])
 
   const close = () => {
     useWorkspace.getState().setPaletteOpen(false)
     if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus()
   }
 
-  const choose = (cmd: Command | undefined) => {
+  const choose = useEventCallback((cmd: Command | undefined) => {
     if (!cmd) return
     close()
     saveRecent(pushRecent(recent, cmd.id))
     runCommand(cmd)
-  }
+  })
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown' || (e.ctrlKey && e.key === 'n')) {
@@ -79,29 +77,50 @@ export function CommandPalette() {
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={onKeyDown}
       />
-      <div className="quick-list" ref={list}>
-        {rows.map(({ item, positions }, i) => {
-          const keys = shownKeys(item) // the user's keymap, else the default
-          return (
-            <div
-              key={item.id}
-              className={`quick-item${i === cursor ? ' selected' : ''}${i === firstRest && i > 0 ? ' after-recent' : ''}`}
-              onMouseMove={() => setCursor(i)}
-              onClick={() => choose(item)}
-            >
-              <span className="file-name">
-                <Highlighted text={item.title} positions={positions} />
-              </span>
-              {item.category && <span className="muted path-hint">{item.category}</span>}
-              {keys && <kbd>{formatKeys(keys)}</kbd>}
-            </div>
-          )
-        })}
+      <div className="quick-list" ref={listRef}>
+        {rows.map(({ item, positions }, i) => (
+          <CommandRow
+            key={item.id}
+            command={item}
+            positions={positions}
+            index={i}
+            selected={i === cursor}
+            afterRecent={i === firstRest && i > 0}
+            onHover={hover}
+            onPick={choose}
+          />
+        ))}
         {rows.length === 0 && <div className="placeholder muted">No matching actions</div>}
       </div>
     </Modal>
   )
 }
+
+/** One action; memoized so moving the highlight re-renders only two rows. */
+const CommandRow = memo(function CommandRow({ command, positions, index, selected, afterRecent, onHover, onPick }: {
+  command: Command
+  positions: number[]
+  index: number
+  selected: boolean
+  afterRecent: boolean
+  onHover: (i: number) => void
+  onPick: (cmd: Command) => void
+}) {
+  const keys = shownKeys(command) // the user's keymap, else the default
+  return (
+    <div
+      className={`quick-item${selected ? ' selected' : ''}${afterRecent ? ' after-recent' : ''}`}
+      onMouseMove={() => onHover(index)}
+      onClick={() => onPick(command)}
+    >
+      <span className="file-name">
+        <Highlighted text={command.title} positions={positions} />
+      </span>
+      {command.category && <span className="muted path-hint">{command.category}</span>}
+      {keys && <kbd>{formatKeys(keys)}</kbd>}
+    </div>
+  )
+})
 
 /** The title with matched letters in bold (rendered as text, no HTML injection). */
 function Highlighted({ text, positions }: { text: string; positions: number[] }) {

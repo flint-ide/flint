@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { Database, errorMessage, historyFilter, type HistoryEntry } from '../../api/backend'
 import { formatDuration } from '../../lib/format'
 import { historyKindLabel, relativeTime, sqlPreview } from '../../lib/queryHistory'
 import { confirmAction, showToast } from '../../store/dialog'
 import { Modal } from '../layout/Modal'
 import { formatKeys } from '../../lib/commands'
+import { useListCursor } from '../../lib/useListCursor'
+import { useEventCallback } from '../../lib/useEventCallback'
 
 const FILTER_DEBOUNCE_MS = 80
 const LIST_LIMIT = 300
@@ -29,9 +31,8 @@ export function QueryHistory({ connId, connName, driver, database, onInsert, onR
   const [allDatabases, setAllDatabases] = useState(false)
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null)
   const [error, setError] = useState('')
-  const [cursor, setCursor] = useState(0)
+  const { listRef, cursor, setCursor, hover } = useListCursor()
   const [reload, setReload] = useState(0)
-  const list = useRef<HTMLDivElement>(null)
   const now = Date.now()
 
   useEffect(() => {
@@ -50,20 +51,12 @@ export function QueryHistory({ connId, connName, driver, database, onInsert, onR
       cancelled = true
       clearTimeout(timer)
     }
-  }, [connId, database, allDatabases, query, reload])
-
-  useEffect(() => {
-    list.current?.querySelector('.selected')?.scrollIntoView({ block: 'nearest' })
-  }, [cursor])
+  }, [connId, database, allDatabases, query, reload, setCursor])
 
   const rows = entries ?? []
   const current = rows[cursor]
-  const canRun = (e: HistoryEntry | undefined) => !!e && e.kind !== 'edit'
-
-  const copy = async (e: HistoryEntry) => {
-    await navigator.clipboard.writeText(e.sql)
-    showToast('Copied SQL')
-  }
+  const insert = useEventCallback(onInsert)
+  const run = useEventCallback(onRun)
 
   const clear = async () => {
     if (!(await confirmAction(`Clear the query history of ${connName}?`, 'Clear History'))) return
@@ -109,39 +102,22 @@ export function QueryHistory({ connId, connName, driver, database, onInsert, onR
           All databases
         </label>
       </div>
-      <div className="quick-list history-list" ref={list}>
+      <div className="quick-list history-list" ref={listRef}>
         {error && <div className="placeholder error">{error}</div>}
-        {rows.map((entry, i) => {
-          const badge = historyKindLabel(entry.kind, driver)
-          return (
-            <div
-              key={entry.id}
-              className={`history-item${i === cursor ? ' selected' : ''}${entry.error ? ' failed' : ''}`}
-              onMouseMove={() => setCursor(i)}
-              onDoubleClick={() => onInsert(entry)}
-              title={entry.sql.length > 2000 ? `${entry.sql.slice(0, 2000)}…` : entry.sql}
-            >
-              <div className="history-sql">
-                {badge && <span className="history-badge">{badge}</span>}
-                <code>{sqlPreview(entry.sql)}</code>
-              </div>
-              <div className="history-meta">
-                <span>{relativeTime(entry.at, now)}</span>
-                <span>{formatDuration(entry.durationMs)}</span>
-                {!entry.error && entry.kind !== 'explain' && entry.kind !== 'explain-analyze' && <span>{entry.rows.toLocaleString()} rows</span>}
-                {allDatabases && <span>{entry.database || 'default'}</span>}
-                {entry.truncated && <span title="Stored truncated (very long statement)">truncated</span>}
-                {entry.error && <span className="history-error">{entry.error}</span>}
-                <span className="spacer" />
-                <span className="row-actions">
-                  <button className="link" onClick={() => onInsert(entry)} title="Insert into the editor (↵)">Insert</button>
-                  {canRun(entry) && <button className="link" onClick={() => onRun(entry)} title={`Run again (${formatKeys('Mod+Enter')})`}>Run</button>}
-                  <button className="link" onClick={() => void copy(entry)} title={`Copy (${formatKeys('Mod+C')})`}>Copy</button>
-                </span>
-              </div>
-            </div>
-          )
-        })}
+        {rows.map((entry, i) => (
+          <HistoryRow
+            key={entry.id}
+            entry={entry}
+            index={i}
+            selected={i === cursor}
+            badge={historyKindLabel(entry.kind, driver)}
+            when={relativeTime(entry.at, now)}
+            showDatabase={allDatabases}
+            onHover={hover}
+            onInsert={insert}
+            onRun={run}
+          />
+        ))}
         {entries && rows.length === 0 && !error && (
           <div className="placeholder muted">{query ? 'No matching statements' : 'No statements run yet'}</div>
         )}
@@ -154,3 +130,52 @@ export function QueryHistory({ connId, connName, driver, database, onInsert, onR
     </Modal>
   )
 }
+
+const canRun = (e: HistoryEntry | undefined) => !!e && e.kind !== 'edit'
+
+async function copy(e: HistoryEntry): Promise<void> {
+  await navigator.clipboard.writeText(e.sql)
+  showToast('Copied SQL')
+}
+
+/** One statement; memoized so moving the highlight re-renders only two rows. */
+const HistoryRow = memo(function HistoryRow({ entry, index, selected, badge, when, showDatabase, onHover, onInsert, onRun }: {
+  entry: HistoryEntry
+  index: number
+  selected: boolean
+  badge: string
+  /** Relative time, computed by the list so equal text keeps the row memoized. */
+  when: string
+  showDatabase: boolean
+  onHover: (i: number) => void
+  onInsert: (entry: HistoryEntry) => void
+  onRun: (entry: HistoryEntry) => void
+}) {
+  return (
+    <div
+      className={`history-item${selected ? ' selected' : ''}${entry.error ? ' failed' : ''}`}
+      onMouseMove={() => onHover(index)}
+      onDoubleClick={() => onInsert(entry)}
+      title={entry.sql.length > 2000 ? `${entry.sql.slice(0, 2000)}…` : entry.sql}
+    >
+      <div className="history-sql">
+        {badge && <span className="history-badge">{badge}</span>}
+        <code>{sqlPreview(entry.sql)}</code>
+      </div>
+      <div className="history-meta">
+        <span>{when}</span>
+        <span>{formatDuration(entry.durationMs)}</span>
+        {!entry.error && entry.kind !== 'explain' && entry.kind !== 'explain-analyze' && <span>{entry.rows.toLocaleString()} rows</span>}
+        {showDatabase && <span>{entry.database || 'default'}</span>}
+        {entry.truncated && <span title="Stored truncated (very long statement)">truncated</span>}
+        {entry.error && <span className="history-error">{entry.error}</span>}
+        <span className="spacer" />
+        <span className="row-actions">
+          <button className="link" onClick={() => onInsert(entry)} title="Insert into the editor (↵)">Insert</button>
+          {canRun(entry) && <button className="link" onClick={() => onRun(entry)} title={`Run again (${formatKeys('Mod+Enter')})`}>Run</button>}
+          <button className="link" onClick={() => void copy(entry)} title={`Copy (${formatKeys('Mod+C')})`}>Copy</button>
+        </span>
+      </div>
+    </div>
+  )
+})

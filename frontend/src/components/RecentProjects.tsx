@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Workspace, errorMessage } from '../api/backend'
 import { Git } from '../store/git'
 import { useWorkspace } from '../store/workspace'
@@ -6,6 +6,7 @@ import { showToast } from '../store/dialog'
 import { Modal } from './layout/Modal'
 import { FileIcon } from './icons/FileIcon'
 import { formatKeys } from '../lib/commands'
+import { useListCursor } from '../lib/useListCursor'
 
 const tildify = (p: string) => p.replace(/^\/Users\/[^/]+/, '~')
 
@@ -24,8 +25,7 @@ export function RecentProjects() {
   const close = () => useWorkspace.getState().setRecentOpen(false)
   const [recent, setRecent] = useState<string[]>([])
   const [query, setQuery] = useState('')
-  const [cursor, setCursor] = useState(0)
-  const list = useRef<HTMLDivElement>(null)
+  const { listRef, cursor, setCursor, hover } = useListCursor()
 
   useEffect(() => {
     void Workspace.RecentFolders().then((r) => setRecent(r ?? []))
@@ -38,10 +38,7 @@ export function RecentProjects() {
     return [null, ...(root ? [ADD] : []), ...matches]
   }, [recent, query, root])
 
-  useEffect(() => setCursor(query ? Math.max(0, rows.findIndex((r) => r !== null && r !== ADD)) : 0), [query, rows])
-  useEffect(() => {
-    list.current?.querySelector('.selected')?.scrollIntoView({ block: 'nearest' })
-  }, [cursor])
+  useEffect(() => setCursor(query ? Math.max(0, rows.findIndex((r) => r !== null && r !== ADD)) : 0), [query, rows, setCursor])
 
   const browse = async () => {
     close()
@@ -89,17 +86,17 @@ export function RecentProjects() {
           e.preventDefault()
         }}
       />
-      <div className="quick-list" ref={list}>
+      <div className="quick-list" ref={listRef}>
         {rows.map((path, i) =>
           path === ADD ? (
-            <div key="add" className={`quick-item${i === cursor ? ' selected' : ''}`} onMouseMove={() => setCursor(i)} onClick={() => void addProject()}>
+            <div key="add" className={`quick-item${i === cursor ? ' selected' : ''}`} onMouseMove={() => hover(i)} onClick={() => void addProject()}>
               <FileIcon name="folder" isDir />
               <span className="file-name">Add Project to Workspace…</span>
               <span className="muted path-hint">open it next to {root?.split('/').pop()}</span>
               <kbd>{formatKeys('Mod+Shift+O')}</kbd>
             </div>
           ) : path === null ? (
-            <div key="browse" className={`quick-item${i === cursor ? ' selected' : ''}`} onMouseMove={() => setCursor(i)} onClick={() => void browse()}>
+            <div key="browse" className={`quick-item${i === cursor ? ' selected' : ''}`} onMouseMove={() => hover(i)} onClick={() => void browse()}>
               <FileIcon name="folder" isDir open />
               <span className="file-name">Browse…</span>
               <span className="muted path-hint">choose a folder</span>
@@ -109,7 +106,7 @@ export function RecentProjects() {
             <div
               key={path}
               className={`quick-item${i === cursor ? ' selected' : ''}${roots.includes(path) ? ' current' : ''}`}
-              onMouseMove={() => setCursor(i)}
+              onMouseMove={() => hover(i)}
               onClick={(e) => void choose(path, e)}
               title={path}
             >

@@ -5,6 +5,7 @@ import { useAgentChat, type ChatSession } from '../../store/agentChat'
 import { expandPrompt, loadPrompts, type Prompt, type PromptLibrary } from '../../store/prompts'
 import { useWorkspace } from '../../store/workspace'
 import { PromptArgsForm, PromptList } from './PromptList'
+import { useListCursor } from '../../lib/useListCursor'
 
 export interface PromptPicker {
   /** Handles the chat input's key first; true when the picker used it. */
@@ -26,7 +27,7 @@ export function usePromptPicker(session: ChatSession, input: RefObject<HTMLTextA
   const open = query !== null
   const [library, setLibrary] = useState<PromptLibrary | null>(null)
   const [dismissed, setDismissed] = useState<string | null>(null)
-  const [cursor, setCursor] = useState(0)
+  const { listRef, cursor, setCursor, hover } = useListCursor()
   const [asking, setAsking] = useState<Prompt | null>(null)
 
   // Read fresh from disk each time the picker opens, so edited files show up.
@@ -42,7 +43,7 @@ export function usePromptPicker(session: ChatSession, input: RefObject<HTMLTextA
     () => (library && query !== null ? matchPrompts(library.prompts, query, session.agent) : []),
     [library, query, session.agent],
   )
-  useEffect(() => setCursor(0), [query])
+  useEffect(() => setCursor(0), [query, setCursor])
 
   const shown = open && library !== null && dismissed !== session.draft
 
@@ -89,7 +90,7 @@ export function usePromptPicker(session: ChatSession, input: RefObject<HTMLTextA
     element = (
       <div className="prompt-picker">
         {matches.length > 0 ? (
-          <PromptList prompts={matches} cursor={cursor} onHover={setCursor} onPick={choose} empty="" />
+          <PromptList listRef={listRef} prompts={matches} cursor={cursor} onHover={hover} onPick={choose} empty="" />
         ) : (
           <div className="prompt-picker-note muted">
             {query

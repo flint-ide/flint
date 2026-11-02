@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { Workspace } from '../api/backend'
 import { highlight, matchPath, type FileMatch } from '../lib/highlight'
 import { useWorkspace } from '../store/workspace'
 import { useEditor } from '../store/editor'
 import { Modal } from './layout/Modal'
 import { FileIcon } from './icons/FileIcon'
+import { useListCursor } from '../lib/useListCursor'
+import { useEventCallback } from '../lib/useEventCallback'
 
 const MAX_RESULTS = 60
 const STALE_MS = 15_000
@@ -20,8 +22,7 @@ export function QuickOpen() {
   const openFile = useEditor((s) => s.openFile)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<FileMatch[]>([])
-  const [cursor, setCursor] = useState(0)
-  const list = useRef<HTMLDivElement>(null)
+  const { listRef, cursor, setCursor, hover } = useListCursor()
 
   // Use the cached index immediately and refresh once in the background if it's stale.
   // Not re-run on file changes: agents may churn files while the picker is open.
@@ -41,17 +42,14 @@ export function QuickOpen() {
     }
   }, [roots, query, filesLoadedAt])
 
-  useEffect(() => setCursor(0), [query])
-  useEffect(() => {
-    list.current?.querySelector('.selected')?.scrollIntoView({ block: 'nearest' })
-  }, [cursor])
+  useEffect(() => setCursor(0), [query, setCursor])
 
   const close = () => setQuickOpen(false)
-  const choose = (m: FileMatch | undefined) => {
+  const choose = useEventCallback((m: FileMatch | undefined) => {
     if (!m || !root) return
     openFile(matchPath(m, root))
     close()
-  }
+  })
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown' || (e.ctrlKey && e.key === 'n')) {
@@ -77,24 +75,30 @@ export function QuickOpen() {
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={onKeyDown}
       />
-      <div className="quick-list" ref={list}>
-        {results.map((r, i) => {
-          const slash = r.path.lastIndexOf('/')
-          return (
-            <div
-              key={`${r.root}:${r.path}`}
-              className={`quick-item${i === cursor ? ' selected' : ''}`}
-              onMouseMove={() => setCursor(i)}
-              onClick={() => choose(r)}
-            >
-              <FileIcon name={r.path.slice(slash + 1)} />
-              <span className="file-name">{r.path.slice(slash + 1)}</span>
-              {/* highlight() escapes the path and only adds <b> tags */}
-              <span className="muted path-hint" dangerouslySetInnerHTML={{ __html: highlight(r) }} />
-            </div>
-          )
-        })}
+      <div className="quick-list" ref={listRef}>
+        {results.map((r, i) => (
+          <MatchRow key={`${r.root}:${r.path}`} match={r} index={i} selected={i === cursor} onHover={hover} onPick={choose} />
+        ))}
       </div>
     </Modal>
   )
 }
+
+/** One result; memoized so moving the highlight re-renders only two rows. */
+const MatchRow = memo(function MatchRow({ match, index, selected, onHover, onPick }: {
+  match: FileMatch
+  index: number
+  selected: boolean
+  onHover: (i: number) => void
+  onPick: (m: FileMatch) => void
+}) {
+  const name = match.path.slice(match.path.lastIndexOf('/') + 1)
+  return (
+    <div className={`quick-item${selected ? ' selected' : ''}`} onMouseMove={() => onHover(index)} onClick={() => onPick(match)}>
+      <FileIcon name={name} />
+      <span className="file-name">{name}</span>
+      {/* highlight() escapes the path and only adds <b> tags */}
+      <span className="muted path-hint" dangerouslySetInnerHTML={{ __html: highlight(match) }} />
+    </div>
+  )
+})

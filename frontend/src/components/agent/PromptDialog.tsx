@@ -6,6 +6,7 @@ import {
 } from '../../store/prompts'
 import { Modal } from '../layout/Modal'
 import { PromptArgsForm, PromptList } from './PromptList'
+import { useListCursor } from '../../lib/useListCursor'
 
 /** The Run Prompt… and New Prompt… dialogs (palette commands). */
 export function PromptDialog() {
@@ -20,14 +21,14 @@ export function PromptDialog() {
 function RunPrompt({ root }: { root: string }) {
   const [library, setLibrary] = useState<PromptLibrary | null>(null)
   const [query, setQuery] = useState('')
-  const [cursor, setCursor] = useState(0)
+  const { listRef, cursor, setCursor, hover } = useListCursor()
   const [asking, setAsking] = useState<Prompt | null>(null)
   useEffect(() => {
     void loadPrompts(root).then(setLibrary)
   }, [root])
   // Every agent's prompts: one limited to an agent opens a chat with it.
   const rows = useMemo(() => (library ? matchPrompts(library.prompts, query.replace(/^\//, ''), '') : []), [library, query])
-  useEffect(() => setCursor(0), [query])
+  useEffect(() => setCursor(0), [query, setCursor])
 
   const run = (p: Prompt, args: Record<string, string>) => {
     closePromptDialog()
@@ -61,9 +62,10 @@ function RunPrompt({ root }: { root: string }) {
             }}
           />
           <PromptList
+            listRef={listRef}
             prompts={rows}
             cursor={cursor}
-            onHover={setCursor}
+            onHover={hover}
             onPick={choose}
             empty={library ? 'No matching prompts' : 'Loading…'}
           />

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -20,7 +21,7 @@ import (
 	"flint/internal/config"
 	"flint/internal/dap"
 	"flint/internal/db"
-	"flint/internal/diag"
+	"flint/internal/feature"
 	"flint/internal/fuzzy"
 	"flint/internal/git"
 	"flint/internal/github"
@@ -33,7 +34,6 @@ import (
 	"flint/internal/scratch"
 	"flint/internal/settings"
 	"flint/internal/terminal"
-	"flint/internal/update"
 	"flint/internal/usage"
 	"flint/internal/watcher"
 )
@@ -52,14 +52,15 @@ type appState struct {
 	TrustedFolders []string `json:"trustedFolders,omitempty"`
 	// ToolCheckShown: the tool check has opened on its own once (first launch).
 	ToolCheckShown bool `json:"toolCheckShown,omitempty"`
-	// Update remembers the release check (api_update.go): when GitHub was last
-	// asked, its answer, and the release the user skipped.
-	Update update.State `json:"update,omitzero"`
 	// AgentTasks are the agent tasks per repository (tasks_state.go).
 	AgentTasks agenttask.Store `json:"agentTasks,omitempty"`
 	// Accounts are the signed-in accounts (api_accounts.go): login, avatar,
 	// host and scopes only. Their tokens are in the keyring.
 	Accounts []accounts.Account `json:"accounts,omitempty"`
+
+	// features are the state.json keys feature modules keep, as written
+	// (features.go); replaced, never changed in place.
+	features map[string]json.RawMessage
 }
 
 // App holds the services shared by all bound APIs.
@@ -79,8 +80,7 @@ type App struct {
 	runEvents   *runEvents
 	debugs      *dap.Manager // debug sessions (dlv dap)
 	debugEvents *debugEvents
-	dockerAPI   *DockerAPI // bound API that also owns the docker events stream
-	profiles    *profiles  // temporary profiles and recordings in progress
+	profiles    *profiles // temporary profiles and recordings in progress
 	lsp         *lsp.Manager
 	agents      *agentsession.Manager
 	mcp         *mcpserver.Server  // Flint's MCP server for its agents (api_mcp.go)
@@ -91,6 +91,7 @@ type App struct {
 	usageChats  usageChats
 	files       fuzzy.Index      // quick-open file list of the open folder
 	http        *httpfile.Client // requests of .http files, sent only on demand
+	features    *feature.Set     // the feature modules (features.go)
 
 	projMu   sync.Mutex
 	roots    []string                    // open project folders, the primary one first
@@ -105,10 +106,6 @@ type App struct {
 	accounts *accounts.Store    // tokens of signed-in accounts (keyring)
 	registry *accounts.Registry // account providers (GitHub)
 	github   *github.Client     // pull requests and CI (api_github.go, api_ci.go)
-
-	updates       *update.Client // GitHub's latest-release endpoint
-	updateMu      sync.Mutex
-	pendingUpdate *update.Result // a newer release the UI should offer; nil = none
 
 	closeMu      sync.Mutex
 	quitting     bool
@@ -144,20 +141,22 @@ func NewApp() (*App, error) {
 		scratch:   scratches,
 		sessions:  restore.New(filepath.Join(dir, "sessions")),
 		http:      httpfile.NewClient(),
-		updates:   update.New(diag.Version(version)),
 	}
 	a.db.SetHistory(db.OpenHistory(filepath.Join(dir, "history"), db.DefaultHistoryLimit))
 	a.terminals = terminal.NewManager(newTerminalEvents(a))
 	a.runEvents = newRunEvents(a)
 	a.runs = runner.NewManager(a.runEvents)
 	a.debugEvents = newDebugEvents(a)
-	a.dockerAPI = &DockerAPI{app: a}
 	a.debugs = dap.NewManager(a.debugEvents)
 	a.lsp = lsp.NewManager()
 	a.lsp.Trusted = a.isTrusted
 	a.lsp.Config = func(language string) lsp.ServerConfig { return a.currentSettings().ServerConfig(language) }
 	git.Untrusted = func(dir string) bool { return !a.isTrusted(dir) }
 	a.profiles = newProfiles()
+	// Before anything reads settings or state: their sections and keys.
+	if err := registerFeatures(); err != nil {
+		return nil, err
+	}
 	if err := config.LoadJSON(a.statePath(), &a.state); err != nil {
 		return nil, err
 	}
@@ -170,6 +169,7 @@ func NewApp() (*App, error) {
 	a.openUsage()
 	a.wireAccounts()
 	a.mcp, a.mcpSources = newMCP(a)
+	a.features = feature.New(features, featureHost{a})
 	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
 	a.agents = newAgentManager(a)
 	return a, nil
@@ -177,19 +177,18 @@ func NewApp() (*App, error) {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	go a.watchForUpdates(ctx)
+	a.features.Start(ctx)
 }
 
 func (a *App) shutdown() {
 	// Language servers and agents each have grace periods; stop them in parallel
 	// so quitting stays fast.
 	var wg sync.WaitGroup
-	for _, stop := range []func(){
+	for _, stop := range append([]func(){
 		a.terminals.CloseAll,
 		a.runs.CloseAll,
 		a.debugs.CloseAll,
 		a.http.CancelAll,
-		a.dockerAPI.close,
 		a.lsp.Shutdown,
 		func() { _ = a.agents.Close() },
 		func() { _ = a.mcp.Close() },
@@ -197,7 +196,7 @@ func (a *App) shutdown() {
 		a.profiles.closeAll,
 		a.closeProject,
 		a.closeUsage,
-	} {
+	}, a.features.Closers()...) {
 		wg.Add(1)
 		go func(stop func()) {
 			defer wg.Done()

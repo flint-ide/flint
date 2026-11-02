@@ -1,5 +1,6 @@
 // Command docsite builds Flint's user documentation (site/*.md) into a
-// static website for GitHub Pages: one page per Markdown file, the sidebar
+// static website for GitHub Pages: one page per Markdown file (partials in
+// _dirs are pulled into pages instead, include.go), the sidebar
 // from site/_nav.md, a search index, and the theme in theme/. It uses only
 // goldmark (already a Flint dependency) and the standard library, and fails
 // on broken links between pages.
@@ -99,14 +100,18 @@ func build(srcDir, outDir string) (int, error) {
 			images[rel] = p
 			return nil
 		}
-		if !strings.HasSuffix(p, ".md") || d.Name() == "_nav.md" {
+		if !strings.HasSuffix(p, ".md") || d.Name() == "_nav.md" || isPartial(rel) {
 			return nil
 		}
 		data, err := os.ReadFile(p)
 		if err != nil {
 			return err
 		}
-		page, err := render(rel, string(data))
+		text, err := expandIncludes(p, string(data))
+		if err != nil {
+			return err
+		}
+		page, err := render(rel, text)
 		if err != nil {
 			return err
 		}

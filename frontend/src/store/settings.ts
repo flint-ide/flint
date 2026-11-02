@@ -4,11 +4,13 @@
 //
 // The last settings are cached in localStorage and applied when this module loads,
 // before React's first paint, so a light theme doesn't flash dark on startup; the
-// backend's copy replaces them a moment later.
+// backend's copy replaces them a moment later. Sections of feature modules
+// (lib/settingsSections.ts) are registered after this module loaded and are
+// filled in from the same JSON then.
 import { createStore } from '../lib/store'
 import * as SettingsAPI from '../../bindings/flint/settingsapi'
-import { settings as models } from '../wails/models'
-import { coerceSettings, DEFAULT_SETTINGS, editorCssVars, resolveTheme, themeCssVars, type AppSettings, type ResolvedTheme } from '../lib/settings'
+import { coerceSettings, editorCssVars, resolveTheme, themeCssVars, type AppSettings, type ResolvedTheme } from '../lib/settings'
+import { onSectionsChanged } from '../lib/settingsSections'
 import { setKeyOverrides } from '../lib/commands'
 import { errorMessage } from '../api/backend'
 import { showToast } from './dialog'
@@ -30,7 +32,9 @@ interface SettingsState {
 }
 
 const darkQuery = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null
-const initial = readCache()
+// The JSON the settings were last coerced from: sections registered later read their key from it.
+let lastRaw: unknown = readRawCache()
+const initial = coerceSettings(lastRaw)
 const initialDark = darkQuery?.matches ?? true
 
 export const useSettings = createStore<SettingsState>((set, get) => ({
@@ -57,6 +61,7 @@ function resolved(s: AppSettings, systemDark: boolean): ResolvedTheme {
  * pending edits are written first by the caller (flushSettings).
  */
 export function replaceSettings(saved: unknown): void {
+  lastRaw = saved
   const settings = coerceSettings(saved)
   lastSaved = settings
   writeCache(settings)
@@ -66,7 +71,8 @@ export function replaceSettings(saved: unknown): void {
 /** Fetches the settings from the backend (once, at startup). */
 export async function loadSettings(): Promise<void> {
   try {
-    const settings = coerceSettings(await SettingsAPI.Get())
+    lastRaw = await SettingsAPI.Get()
+    const settings = coerceSettings(lastRaw)
     lastSaved = settings
     writeCache(settings)
     useSettings.setState((s) => ({ settings, loaded: true, theme: resolved(settings, s.systemDark) }))
@@ -95,7 +101,7 @@ export function flushSettings(): Promise<void> {
   const next = useSettings.getState().settings
   saving = saving.then(async () => {
     try {
-      await SettingsAPI.Save(models.Settings.createFrom(next))
+      await SettingsAPI.Save(next)
       lastSaved = next
       writeCache(next)
     } catch (err) {
@@ -109,12 +115,12 @@ export function flushSettings(): Promise<void> {
   return saving
 }
 
-function readCache(): AppSettings {
+function readRawCache(): unknown {
   try {
     const raw = localStorage.getItem(CACHE_KEY)
-    return raw ? coerceSettings(JSON.parse(raw)) : DEFAULT_SETTINGS
+    return raw ? JSON.parse(raw) : {}
   } catch {
-    return DEFAULT_SETTINGS
+    return {}
   }
 }
 
@@ -140,6 +146,14 @@ function applyToDocument(s: AppSettings, theme: ResolvedTheme): void {
   for (const [name, value] of Object.entries(custom)) root.style.setProperty(name, value)
   customVars = Object.keys(custom)
 }
+
+// Newly registered sections get their values from the last JSON; keys already in the state stay.
+onSectionsChanged(() => {
+  const prev = useSettings.getState().settings
+  const settings = { ...coerceSettings(lastRaw), ...prev }
+  if (lastSaved === prev) lastSaved = settings
+  useSettings.setState({ settings })
+})
 
 if (typeof document !== 'undefined') {
   applyToDocument(initial, useSettings.getState().theme)

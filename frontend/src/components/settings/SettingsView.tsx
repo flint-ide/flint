@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import { useSettings } from '../../store/settings'
-import { DEFAULT_SETTINGS, FONT_SIZE, LINE_HEIGHT, parseExcludes, type FontSettings, type ThemeMode } from '../../lib/settings'
-import * as TodoAPI from '../../../bindings/flint/todoapi'
+import { DEFAULT_SETTINGS, FONT_SIZE, LINE_HEIGHT, type FontSettings, type ThemeMode } from '../../lib/settings'
+import { byOrder, useContributions } from '../../lib/contributions'
 import { KeymapSection } from './KeymapSection'
-import { checkForUpdates, useUpdate } from '../../store/update'
 import { AgentsSection } from './AgentsSection'
 import { LanguageServersSection } from './LanguageServersSection'
 import { RefreshSection } from './RefreshSection'
@@ -13,32 +12,28 @@ import { EditorAiSection } from './EditorAiSection'
 import { UsageSection } from './UsageSection'
 import { CISection } from './CISection'
 import { AccountsSection } from './AccountsSection'
-import { DockerSection } from './DockerSection'
 import { NumberField, Row, TextField } from './fields'
 import { openVSCodeImport } from '../../store/vscodeImport'
 import { isMac } from '../../lib/platform'
 
-type Section =
-  | 'appearance' | 'editor' | 'terminal' | 'accounts' | 'agents' | 'agentContext' | 'usage' | 'editorAi' | 'lsp' | 'refresh' | 'docker' | 'ci' | 'todo'
-  | 'keymap' | 'updates' | 'import'
+type Section = 'appearance' | 'editor' | 'terminal' | 'accounts' | 'agents' | 'agentContext' | 'usage' | 'editorAi' | 'lsp' | 'refresh' | 'ci' | 'keymap' | 'import'
 
-const SECTIONS: { id: Section; label: string }[] = [
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'editor', label: 'Editor' },
-  { id: 'terminal', label: 'Terminal' },
-  { id: 'accounts', label: 'Accounts' },
-  { id: 'agents', label: 'Agents' },
-  { id: 'agentContext', label: 'Agent Context' },
-  { id: 'usage', label: 'Usage' },
-  { id: 'editorAi', label: 'AI in the Editor' },
-  { id: 'lsp', label: 'Language Servers' },
-  { id: 'refresh', label: 'Refresh' },
-  { id: 'docker', label: 'Docker' },
-  { id: 'ci', label: 'CI' },
-  { id: 'todo', label: 'TODO List' },
-  { id: 'keymap', label: 'Keymap' },
-  { id: 'updates', label: 'Updates' },
-  { id: 'import', label: 'Import' },
+// Flint's own pages. Feature modules add theirs between them by order (lib/features.ts:
+// Docker 110, TODO List 130, Updates 150), so keep the gaps.
+const SECTIONS: { id: Section; label: string; order: number }[] = [
+  { id: 'appearance', label: 'Appearance', order: 10 },
+  { id: 'editor', label: 'Editor', order: 20 },
+  { id: 'terminal', label: 'Terminal', order: 30 },
+  { id: 'accounts', label: 'Accounts', order: 40 },
+  { id: 'agents', label: 'Agents', order: 50 },
+  { id: 'agentContext', label: 'Agent Context', order: 60 },
+  { id: 'usage', label: 'Usage', order: 70 },
+  { id: 'editorAi', label: 'AI in the Editor', order: 80 },
+  { id: 'lsp', label: 'Language Servers', order: 90 },
+  { id: 'refresh', label: 'Refresh', order: 100 },
+  { id: 'ci', label: 'CI', order: 120 },
+  { id: 'keymap', label: 'Keymap', order: 140 },
+  { id: 'import', label: 'Import', order: 160 },
 ]
 
 // Offered in the font pickers; any installed font can be typed instead.
@@ -46,11 +41,14 @@ const MONO_FONTS = ['JetBrains Mono', 'SF Mono', 'Menlo', 'Monaco', 'Fira Code',
 
 /** The Settings tab (⌘,). Every change applies and saves right away. */
 export function SettingsView({ active }: { active: boolean }) {
-  const [section, setSection] = useState<Section>('appearance')
+  const [section, setSection] = useState<string>('appearance')
+  const contributed = useContributions((s) => s.settingsPages)
+  const pages = useMemo(() => byOrder<{ id: string; label: string; order: number }>([...SECTIONS, ...contributed]), [contributed])
+  const page = contributed.find((p) => p.id === section)
   return (
     <div className="settings-view">
       <nav className="settings-nav" aria-label="Settings sections">
-        {SECTIONS.map((s) => (
+        {pages.map((s) => (
           <button key={s.id} className={section === s.id ? 'active' : ''} onClick={() => setSection(s.id)}>
             {s.label}
           </button>
@@ -72,12 +70,14 @@ export function SettingsView({ active }: { active: boolean }) {
             <WatchSection />
           </>
         )}
-        {section === 'docker' && <DockerSection />}
         {section === 'ci' && <CISection />}
-        {section === 'todo' && <TodoSection />}
         {section === 'keymap' && <KeymapSection active={active} />}
-        {section === 'updates' && <UpdatesSection />}
         {section === 'import' && <ImportSection />}
+        {page && (
+          <Suspense fallback={null}>
+            <page.component active={active} />
+          </Suspense>
+        )}
       </div>
     </div>
   )
@@ -159,67 +159,6 @@ function TerminalSection() {
       <h2>Terminal</h2>
       <FontRows font={terminal} defaults={DEFAULT_SETTINGS.terminal} onChange={(f) => update({ terminal: f })} />
       <p className="muted settings-note">Applies to terminals and run consoles (one point smaller there).</p>
-    </section>
-  )
-}
-
-function UpdatesSection() {
-  const enabled = useSettings((s) => s.settings.checkForUpdates)
-  const checking = useUpdate((s) => s.checking)
-  const update = useSettings((s) => s.update)
-  return (
-    <section>
-      <h2>Updates</h2>
-      <Row label="Check for new releases" hint="Once a day Flint asks GitHub which release is the latest and shows a notice in the status bar when there is a newer one.">
-        <input type="checkbox" checked={enabled} onChange={(e) => update({ checkForUpdates: e.target.checked })} />
-      </Row>
-      <div className="settings-actions">
-        <button disabled={checking} onClick={() => void checkForUpdates()}>{checking ? 'Checking…' : 'Check Now'}</button>
-      </div>
-      <p className="muted settings-note">
-        The check is one anonymous request to api.github.com for the latest release of flint-ide/flint, with Flint's version in the User-Agent and no
-        account, token, cookie or identifier. Flint never downloads or installs anything itself: Download opens the release page in your browser.
-        With the check off, GitHub is asked only when you choose Check Now or Help ▸ Check for Updates….
-      </p>
-    </section>
-  )
-}
-
-function TodoSection() {
-  const saved = useSettings((s) => s.settings.todoExclude.join('\n'))
-  const update = useSettings((s) => s.update)
-  const [draft, setDraft] = useState(saved)
-  const [auto, setAuto] = useState<string[]>([])
-  useEffect(() => setDraft(saved), [saved])
-  useEffect(() => {
-    TodoAPI.AutoExcluded().then(setAuto, () => setAuto([]))
-  }, [])
-  const { patterns, invalid } = parseExcludes(draft)
-  const commit = () => {
-    if (invalid.length === 0 && patterns.join('\n') !== saved) update({ todoExclude: patterns })
-  }
-  return (
-    <section>
-      <h2>TODO List</h2>
-      <Row label="Excluded folders" hint="One per line, as in .gitignore: docs/legacy, /generated, *.min.js. Saved when you leave the field.">
-        <div className="settings-control settings-control-stack">
-          <textarea
-            className={`settings-textarea${invalid.length ? ' invalid' : ''}`}
-            value={draft}
-            spellCheck={false}
-            placeholder={'docs/legacy\n*.min.js'}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={commit}
-          />
-          {invalid.length > 0 && <span className="error">Not allowed: {invalid.join(', ')} (no leading ! or commas)</span>}
-        </div>
-      </Row>
-      <h3>Always skipped</h3>
-      <p className="muted settings-note">
-        Dependency, cache and build folders at any depth{auto.length ? `: ${auto.join(', ')}` : ''}. Also Python environments of any name (a folder
-        with pyvenv.cfg or conda-meta, e.g. .env), folders tagged with CACHEDIR.TAG (Cargo's target, tool caches), and target, build or _build next to
-        Cargo.toml, pom.xml, build.gradle or mix.exs. Files ignored by .gitignore are skipped too.
-      </p>
     </section>
   )
 }

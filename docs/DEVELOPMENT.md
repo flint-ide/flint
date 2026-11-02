@@ -83,9 +83,33 @@ The TypeScript bindings in `frontend/bindings` are generated from the Go service
 wails3 task bindings
 ```
 
-Regenerate them whenever you change the exported methods or types of a service (`api_*.go`, or types they return from `internal/*`), and commit the result. `wails3 task build` and `make dev` regenerate them automatically. CI fails if `frontend/bindings` is stale.
+Regenerate them whenever you change the exported methods or types of a service (`api_*.go`, a feature module's service in `internal/features/*`, or types they return from `internal/*`), and commit the result. `wails3 task build` and `make dev` regenerate them automatically. CI fails if `frontend/bindings` is stale.
 
 Do not edit files in `frontend/bindings` by hand. `frontend/src/wails/` is a small compatibility layer over the bindings and the Wails runtime; application code imports from there or from the bindings directly.
+
+## Add a feature
+
+A feature with a backend, settings, a tool, a panel or a Settings page is a feature module ([design](design/extensions.md)). Copy the closest existing one: `docker` (service, settings object, tool, panel, Settings page), `todo` (a settings key holding a list) or `update` (a boolean key, a `state.json` key, a Start hook, a status bar item, a command). The steps below use a made-up `gcp` feature.
+
+**Go: `internal/features/gcp/`**
+
+1. `api.go`: the service, a struct holding a `feature.Host`. Its exported methods become frontend calls. Reach the app only through the host: `h.Context()`, `h.Settings()`, `h.Roots()`, `h.Emit(...)`.
+2. `settings.go` (if it has settings): the value type with JSON tags and `var Section = &settings.Section[Settings]{Key: "gcp", Default: …, Normalize: …, Check: …}`. Read it with `Section.Get(h.Settings())`. The key must be new; a test refuses built-in keys.
+3. `module.go`: `var Module = feature.Module{ID: "gcp", Settings: …, Tools: …, New: func(h feature.Host) feature.Instance { … }}`. Write `application.NewService(&API{…})` out in `New` (the bindings generator looks for that call). Start background work in `Start`, never in `New`, and stop it in `Close`.
+4. Tests against `featuretest.New(t.Context())`, a fake host.
+5. One line in `features.go`: `gcp.Module,`.
+
+**Frontend: `frontend/src/features/gcp/`**
+
+1. `settings.ts` (if it has settings): the type, its default and a `coerce` for untrusted JSON; `declare module '../../lib/settingsSections' { interface FeatureSettings { gcp: GcpSettings } }`; and `export const gcpSettings = defineSection('gcp', DEFAULT_GCP, coerceGcp)`. `useSettings((s) => s.settings.gcp)` is then typed.
+2. Components and a store, as in any feature. Import the bindings from `../../../bindings/flint/internal/features/gcp/api`.
+3. `index.ts`: `export default defineFeature({ id: 'gcp', settings, panels, commands, settingsPages, statusItems, tabKinds, fileMenu, activate })`. Panels, Settings pages and tab views use `lazy(...)` so their code stays out of startup. `order` places a panel on the activity bar and a page in Settings (Flint's pages use 10, 20 … 160).
+4. One line in `frontend/src/features/index.ts`.
+
+**Docs and checks**
+
+1. For each settings key, add `site/reference/_settings/<key>.md`. Its first line is the key's row in the Keys table, and the rest is its section. Links are relative to `site/reference/settings.md`.
+2. Regenerate the bindings (`wails3 task bindings`), then run `go test ./...` and the frontend tests. `features_test.go` fails when the Go and frontend keys differ or a key has no reference file. `installFeatures` throws at startup on a duplicate id.
 
 ## Building the app
 

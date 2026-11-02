@@ -223,7 +223,6 @@ func (s Settings) Clone() Settings {
 	for id, keys := range s.Keymap {
 		out.Keymap[id] = keys
 	}
-	out.TodoExclude = cloneArgs(s.TodoExclude)
 	out.WatchExclude = cloneArgs(s.WatchExclude)
 	out.Agents = cloneAgents(s.Agents)
 	out.CustomAgents = cloneCustomAgents(s.CustomAgents)
@@ -231,6 +230,7 @@ func (s Settings) Clone() Settings {
 	out.CustomTheme = s.CustomTheme.clone()
 	out.Usage = s.Usage.clone()
 	out.GitHub.Scopes = cloneArgs(s.GitHub.Scopes)
+	out.sections = cloneSections(s.sections)
 	return out
 }
 

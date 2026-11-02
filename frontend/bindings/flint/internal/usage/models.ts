@@ -191,37 +191,6 @@ export class Group {
 }
 
 /**
- * Price is what a model costs, in USD per million tokens. CacheRead prices
- * cached input; 0 leaves cached tokens out of estimates (they cost a
- * fraction of fresh input, so the input price would overstate them).
- */
-export class Price {
-    "in": number;
-    "out": number;
-    "cacheRead"?: number;
-
-    /** Creates a new Price instance. */
-    constructor($$source: Partial<Price> = {}) {
-        if (!("in" in $$source)) {
-            this["in"] = 0;
-        }
-        if (!("out" in $$source)) {
-            this["out"] = 0;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new Price instance from a string or object.
-     */
-    static createFrom($$source: any = {}): Price {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new Price($$parsedSource as Partial<Price>);
-    }
-}
-
-/**
  * Query narrows a summary or an export. Empty fields match everything.
  */
 export class Query {

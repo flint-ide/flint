@@ -103,9 +103,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `defaultAgent` | string | `""` | Agent for new chats, commit messages and conflict resolution: `"claude"`, `"codex"` or the `id` of a custom agent. Empty means the first installed agent. Conflict resolution always uses Claude Code or Codex. |
 | `autoSave` | boolean | `false` | Save modified files when the Flint window loses focus. |
 | `notifyInBackground` | boolean | `true` | Show a macOS notification and a Dock badge when a run, a test run or an agent finishes while Flint is in the background. |
-| `checkForUpdates` | boolean | `true` | Once a day, ask GitHub whether a newer Flint release exists and show a notice in the status bar. When `false`, Flint makes no request on its own; **Help ▸ Check for Updates…** still works. See [Update check](privacy-and-security.md#update-check). |
 | `keymap` | object | `{}` | Shortcut overrides: command id → shortcut. See [keymap](#keymap). |
-| `todoExclude` | array of strings | `[]` | Extra folders or globs the TODO list skips. See [todoExclude](#todoexclude). |
 | `agents` | object | `{}` | Agent CLIs by name (`"claude"`, `"codex"`). See [agents](#agents). |
 | `customAgents` | array | `[]` | Other agents, spoken to over the Agent Client Protocol. See [customAgents](#customagents). |
 | `languageServers` | object | `{}` | Language servers by language (`"go"`, `"typescript"`, `"python"`, `"rust"`). See [languageServers](#languageservers). |
@@ -119,7 +117,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
 | `ci` | object | see below | Following your pull requests' CI: poll interval, Fix with agent's log excerpt, notifications. See [ci](#ci). |
 | `github` | object | see below | The GitHub host, the OAuth App Sign in with GitHub uses, scopes and the retry wait. See [github](#github). |
-| `docker` | object | see below | How the Docker panel finds the engine and how much log it starts with. See [docker](#docker). |
+<!-- include-rows _settings/*.md -->
 
 ### Font objects
 
@@ -178,15 +176,6 @@ The easiest way to find a command id is Settings ▸ Keymap: hover a command's n
 | Edit Selection with Agent | `agent.inlineEdit` |
 | Run | `run.selected` |
 | Debug | `debug.selected` |
-
-### todoExclude
-
-A list of patterns in `.gitignore` style, such as `"docs/legacy"`, `"/generated"` or `"*.min.js"`. These are added to the folders the TODO list always skips. Each pattern:
-
-- can't be empty, start with `!` or contain a comma;
-- is at most 200 characters long.
-
-Up to 100 patterns are kept; duplicates are removed.
 
 ### agents
 
@@ -351,16 +340,8 @@ Used by [Pull requests](../guides/git-and-github.md#pull-requests) and [When CI 
 
 Flint caps a GitHub answer at 32 MB, a file side of a diff at 4 MB and the pages one listing follows at 30; these limits are not settings.
 
-### docker
-
-Used by the [Docker panel](../guides/docker.md).
-
-| Key | Type | Range | Default | Meaning |
-|---|---|---|---|---|
-| `host` | string | | `""` | Where the Docker Engine is: `unix:///path/docker.sock`, `tcp://host:2376` or `https://host:2376`. Empty finds it like the docker CLI: `DOCKER_HOST`, then the current docker context, then the default sockets (Docker Desktop, Colima, OrbStack, Rancher Desktop, `/var/run/docker.sock`). With `DOCKER_TLS_VERIFY` set, `tcp://` uses TLS with the certificates in `DOCKER_CERT_PATH` (default `~/.docker`). Plain `tcp://` without TLS works but Flint warns in the panel. `ssh://` hosts are not supported. |
-| `logTailLines` | integer | 1–10000 | `500` | Past lines a container's log tab starts with before it follows new output. |
-
-Response bodies from the engine are capped at 32 MiB; this limit is not a setting.
+<!-- Keys of feature modules: one file per key in _settings/ (first line: the table row; the rest: its section), pulled in by cmd/docsite. -->
+<!-- include-sections _settings/*.md -->
 
 ## Related settings stored elsewhere
 

@@ -438,6 +438,8 @@ func TestCrashesAndGiveUp(t *testing.T) {
 	if err := f.exec(t, "status", nil); err == nil || !strings.Contains(err.Error(), "stopped after crashing") {
 		t.Errorf("a failed extension runs: %v", err)
 	}
+	// The toast follows the state change.
+	waitFor(t, "the message", func() bool { return len(f.app.eventsLike(EventMessage)) > 0 })
 	if m := f.app.eventsLike(EventMessage); len(m) != 1 || !strings.Contains(m[0], "stopped after crashing 3 times") {
 		t.Errorf("messages = %v", m)
 	}

@@ -104,8 +104,10 @@ func (e *ext) start() (*proc, error) {
 		}
 		p.conn.Close(fmt.Errorf("%s stopped (%s)", e.name(), reason))
 		_ = inW.Close()
-		close(p.exited)
+		// Record the exit before announcing it, so whoever waits in stop
+		// sees the extension stopped, not still running.
 		e.exited(p, reason)
+		close(p.exited)
 	}()
 	if err := e.initialize(p); err != nil {
 		p.stop(e.h.o.StopTimeout)

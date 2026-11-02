@@ -7,7 +7,6 @@ const TOOLS: { key: McpToolKey; label: string; hint: string }[] = [
   { key: 'editor', label: 'Open editors and selection', hint: 'Which files are open, the active one, and the selected text.' },
   { key: 'terminals', label: 'Terminal output', hint: 'Recent output printed in the project by terminals and run consoles. Off by default; the agent asks before each call.' },
   { key: 'tests', label: 'Test results', hint: 'The last test run: totals and failed tests with their output.' },
-  { key: 'kubernetes', label: 'Kubernetes status', hint: 'Failing apps, pods and warning events of the current context. No secrets or logs. Off by default; the agent asks before each call.' },
 ]
 
 /** Settings ▸ Agent Context: Flint's own MCP server for the agents it starts. */

@@ -61,8 +61,8 @@ func TestMCPServerFollowsTrustAndSettings(t *testing.T) {
 	}
 
 	_, body = mcpPost(t, srv.URL, srv.Token, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`)
-	if strings.Contains(body, "get_kubernetes_status") || strings.Contains(body, "get_terminal_output") || !strings.Contains(body, "get_editor_state") {
-		t.Fatalf("terminal output and cluster status must be opt-in: %s", body)
+	if strings.Contains(body, "get_terminal_output") || !strings.Contains(body, "get_editor_state") {
+		t.Fatalf("terminal output must be opt-in: %s", body)
 	}
 	on := settings.Default()
 	on.MCPServer.Tools.Terminals = true

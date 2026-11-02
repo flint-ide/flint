@@ -1,31 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { coerceSettings, DEFAULT_SETTINGS } from './settings'
-import {
-  clampRefresh, coerceAgents, coerceServers, DEFAULT_REFRESH, EMPTY_AGENT, formatArgs, isDefaultAgent, isDefaultServer,
-  parseArgs, refreshMs, withAgent, withServer,
-} from './toolSettings'
-
-describe('refresh intervals', () => {
-  it('clamps into the same bounds as Go', () => {
-    assert.equal(clampRefresh('kubernetesSeconds', 1), 2)
-    assert.equal(clampRefresh('kubernetesSeconds', 10_000), 600)
-    assert.equal(clampRefresh('awsSeconds', 4), 5)
-    assert.equal(clampRefresh('awsSeconds', 7.6), 8)
-  })
-
-  it('uses the default for missing or non-numeric values', () => {
-    assert.equal(clampRefresh('awsSeconds', undefined), DEFAULT_REFRESH.awsSeconds)
-    assert.equal(clampRefresh('kubernetesSeconds', '9'), DEFAULT_REFRESH.kubernetesSeconds)
-    assert.equal(clampRefresh('kubernetesSeconds', Number.NaN), DEFAULT_REFRESH.kubernetesSeconds)
-    assert.equal(clampRefresh('kubernetesSeconds', 0), DEFAULT_REFRESH.kubernetesSeconds)
-  })
-
-  it('converts to milliseconds', () => {
-    assert.equal(refreshMs({ kubernetesSeconds: 5, awsSeconds: 30 }, 'kubernetesSeconds'), 5000)
-    assert.equal(refreshMs({ kubernetesSeconds: 0, awsSeconds: 99_999 }, 'awsSeconds'), 3_600_000)
-  })
-})
+import { coerceSettings } from './settings'
+import { coerceAgents, coerceServers, EMPTY_AGENT, formatArgs, isDefaultAgent, isDefaultServer, parseArgs, withAgent, withServer } from './toolSettings'
 
 describe('extra arguments', () => {
   it('takes one argument per line, so values may contain spaces', () => {
@@ -66,9 +42,9 @@ describe('agent and language-server entries', () => {
   })
 
   it('fills the new keys of settings saved by an older version', () => {
-    const s = coerceSettings({ theme: 'light' })
+    const s = coerceSettings({ theme: 'light', refresh: { kubernetesSeconds: 5 } })
     assert.deepEqual(s.agents, {})
     assert.deepEqual(s.languageServers, {})
-    assert.deepEqual(s.refresh, DEFAULT_SETTINGS.refresh)
+    assert.equal('refresh' in s, false, 'the refresh intervals went with the Kubernetes and AWS panels')
   })
 })

@@ -15,9 +15,7 @@ import (
 	"flint/internal/diag"
 	"flint/internal/feature"
 	"flint/internal/features/database"
-	"flint/internal/features/docker"
 	"flint/internal/features/extensions"
-	"flint/internal/features/kubernetes"
 	"flint/internal/features/todo"
 	"flint/internal/features/update"
 	"flint/internal/mcptools"
@@ -30,8 +28,6 @@ import (
 // listed in frontend/src/features/index.ts.
 var features = []feature.Module{
 	database.Module,
-	docker.Module,
-	kubernetes.Module,
 	todo.Module,
 	update.Module,
 	extensions.Module,

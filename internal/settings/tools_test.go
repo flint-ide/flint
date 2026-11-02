@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -46,9 +47,6 @@ func TestValidateToolSettings(t *testing.T) {
 		{"tsserver path", func(s *Settings) {
 			s.LanguageServers = map[string]LanguageServerSettings{"typescript": {Args: []string{"--tsserver-path", "/x"}}}
 		}, "own TypeScript"},
-		{"refresh bounds", func(s *Settings) { s.Refresh = Refresh{KubernetesSeconds: 2, AWSSeconds: 3600} }, ""},
-		{"kubernetes too fast", func(s *Settings) { s.Refresh.KubernetesSeconds = 1 }, "Kubernetes refresh"},
-		{"aws too slow", func(s *Settings) { s.Refresh.AWSSeconds = 3601 }, "AWS refresh"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -77,7 +75,7 @@ func TestLoadToolSettingsForgiving(t *testing.T) {
 		},
 		"languageServers": {"go": {"command": "./gopls", "args": ["-remote=auto"]}, "rust": {"disabled": true}, "cobol": {}},
 		"refresh": {"kubernetesSeconds": 1, "awsSeconds": 99999}
-	}`)
+	}`) // "refresh" was removed with the built-in Kubernetes and AWS panels
 	got, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
@@ -98,9 +96,6 @@ func TestLoadToolSettingsForgiving(t *testing.T) {
 	if !reflect.DeepEqual(got.LanguageServers, wantServers) {
 		t.Errorf("LanguageServers = %+v, want %+v", got.LanguageServers, wantServers)
 	}
-	if want := (Refresh{KubernetesSeconds: MinKubernetesSeconds, AWSSeconds: MaxAWSSeconds}); got.Refresh != want {
-		t.Errorf("Refresh = %+v, want clamped %+v", got.Refresh, want)
-	}
 	if err := Validate(got); err != nil {
 		t.Errorf("normalized settings fail Validate: %v", err)
 	}
@@ -111,8 +106,8 @@ func TestLoadOlderFileGetsToolDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Refresh != defaultRefresh() || len(got.Agents) != 0 || len(got.LanguageServers) != 0 {
-		t.Errorf("tool settings = %+v %+v %+v, want defaults", got.Refresh, got.Agents, got.LanguageServers)
+	if len(got.Agents) != 0 || len(got.LanguageServers) != 0 {
+		t.Errorf("tool settings = %+v %+v, want defaults", got.Agents, got.LanguageServers)
 	}
 }
 
@@ -120,10 +115,8 @@ func TestToolSettingsRoundtripAndViews(t *testing.T) {
 	in := Default()
 	in.Agents = map[string]AgentSettings{"claude": {Path: "/opt/claude", Model: "sonnet", Args: []string{"--add-dir", "/tmp"}}}
 	in.LanguageServers = map[string]LanguageServerSettings{"python": {Command: "pylsp"}}
-	in.Refresh = Refresh{KubernetesSeconds: 10, AWSSeconds: 60}
 	path := filepath.Join(t.TempDir(), FileName)
-	saved, err := Save(path, in)
-	if err != nil {
+	if _, err := Save(path, in); err != nil {
 		t.Fatal(err)
 	}
 	loaded, err := Load(path)
@@ -131,7 +124,7 @@ func TestToolSettingsRoundtripAndViews(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Normalize fills missing argument lists in; compare what matters.
-	if loaded.AgentConfig("claude").Model != "sonnet" || loaded.ServerConfig("python").Command != "pylsp" || loaded.Refresh != saved.Refresh {
+	if loaded.AgentConfig("claude").Model != "sonnet" || loaded.ServerConfig("python").Command != "pylsp" {
 		t.Errorf("Load() = %+v", loaded)
 	}
 	cfg := loaded.AgentConfig("claude")
@@ -169,5 +162,31 @@ func TestCloneIsDeep(t *testing.T) {
 	c.Agents["codex"] = AgentSettings{}
 	if s.Agents["claude"].Args[0] != "a" || len(s.Agents) != 1 {
 		t.Errorf("Clone shares state: %+v", s.Agents)
+	}
+}
+
+// Keys of the built-ins that moved to extensions (Docker, Kubernetes, AWS
+// Profiles) still load, and saving drops them.
+func TestLoadRemovedKeys(t *testing.T) {
+	path := write(t, `{"theme": "light", "refresh": {"kubernetesSeconds": 5, "awsSeconds": 30},
+		"mcpServer": {"tools": {"kubernetes": true, "terminals": true}}, "docker": {"host": "unix:///x"}}`)
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Theme != "light" || !got.MCPServer.Tools.Terminals {
+		t.Fatalf("Load() = %+v", got)
+	}
+	if _, err := Save(path, got); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{`"refresh"`, `"kubernetes"`, `"docker"`} {
+		if strings.Contains(string(data), key) {
+			t.Errorf("saved file still has %s:\n%s", key, data)
+		}
 	}
 }

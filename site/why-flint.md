@@ -47,7 +47,7 @@ Flint drives the CLIs you already use, with the same `PATH` and logins as your t
 - **Run, test, debug and profile**: run configurations, a test tree, the Go debugger (Delve) and flame graphs.
 - **Databases**: PostgreSQL and ClickHouse with a visual EXPLAIN.
 - **An HTTP client** for `.http` files.
-- **Infrastructure**: Docker and Compose, Kubernetes (apps by Flux, Argo CD and Helm, with *Diagnose with AI*), AWS profiles.
+- **Infrastructure**, as extensions you install: Docker and Compose, Kubernetes (apps by Flux, Argo CD and Helm, with *Diagnose with AI*), AWS profiles.
 - **Real terminals.**
 
 ### Fast and light

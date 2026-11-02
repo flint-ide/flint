@@ -1,6 +1,6 @@
 # Use Docker
 
-Recipes for the Docker panel. For what it shows, see [Docker](../guides/docker.md).
+Recipes for the Docker panel, which comes with the Docker extension. To install it, see [Docker](../guides/docker.md).
 
 ## Open the Docker panel
 

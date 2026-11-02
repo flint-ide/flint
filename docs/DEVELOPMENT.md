@@ -19,7 +19,6 @@ This guide covers building, running and testing Flint from source. For how the c
 Optional tools, used by the features that need them:
 
 - `ripgrep` (`brew install ripgrep`): fast search and `⌘P`; without it a slower Go fallback is used
-- `kubectl`, `aws` (and `saml2aws` if you use it): the infrastructure panels; `docker` only for Compose up/down/pull (the Docker panel talks to the Engine API)
 - `dlv` (`go install github.com/go-delve/delve/cmd/dlv@latest`): the debugger
 - language servers (`gopls`, `rust-analyzer`, `vtsls` or `typescript-language-server`, `basedpyright` or `pyright`)
 - `claude` and/or `codex`: the agent chat
@@ -89,7 +88,7 @@ Do not edit files in `frontend/bindings` by hand. `frontend/src/wails/` is a sma
 
 ## Add a feature
 
-A feature with a backend, settings, a tool, a panel or a Settings page is a feature module ([design](design/extensions.md)). Copy the closest existing one: `docker` (service, settings object, tool, panel, Settings page), `todo` (a settings key holding a list) or `update` (a boolean key, a `state.json` key, a Start hook, a status bar item, a command). The steps below use a made-up `gcp` feature.
+A feature with a backend, settings, a tool, a panel or a Settings page is a feature module ([design](design/extensions.md)). Copy the closest existing one: `todo` (a service, a settings key holding a list, a panel, a Settings page) or `update` (a boolean key, a `state.json` key, a Start hook, a status bar item, a command). A feature that only needs commands, panels, settings, terminals or agent tools can be an extension instead, like Docker, Kubernetes and AWS Profiles in [flint-ide/extensions](https://github.com/flint-ide/extensions). The steps below use a made-up `gcp` feature.
 
 **Go: `internal/features/gcp/`**
 

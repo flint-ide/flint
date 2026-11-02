@@ -4,7 +4,7 @@ Flint is a fast, AI-first IDE for macOS. Coding agents such as Claude Code and C
 
 ![A tour of Flint: go to a file, search the project, review a change in the Commit panel, and hand a failing Kubernetes deploy to the agent](images/tour.gif)
 
-Flint is a single native process that uses the macOS system WebView (WKWebView) instead of Electron. It starts quickly and stays light on CPU and memory, and it uses the tools you already have installed (git, ripgrep, kubectl, aws, your agent CLIs) with the same `PATH` and logins as your terminal.
+Flint is a single native process that uses the macOS system WebView (WKWebView) instead of Electron. It starts quickly and stays light on CPU and memory, and it uses the tools you already have installed (git, ripgrep, your agent CLIs) with the same `PATH` and logins as your terminal.
 
 ## Start here
 
@@ -53,6 +53,8 @@ See [Run, debug and test](guides/run-debug-test.md).
 See [Databases](guides/databases.md) and [HTTP client](guides/http-client.md).
 
 ### Infrastructure
+
+These come as [extensions](guides/extensions.md) you install from [flint-ide/extensions](https://github.com/flint-ide/extensions):
 
 - Kubernetes apps with rollout state, pod problems, events and *Diagnose with AI*.
 - AWS profiles with credential status and one-click refresh.

@@ -19,7 +19,7 @@ Apart from the update check, data leaves your Mac only when you do something tha
 | Settings ▸ Accounts | Your avatar, loaded by the window | `avatars.githubusercontent.com` |
 | Help ▸ Report an Issue… | A prefilled issue that you review in your browser before submitting | GitHub, only when you submit |
 | HTTP client | The request you send | The server in the request |
-| Databases, Kubernetes, AWS, Docker | The commands and queries you run | Your servers and cloud accounts, through your own credentials |
+| Databases, and the Kubernetes, AWS and Docker extensions | The commands and queries you run | Your servers and cloud accounts, through your own credentials |
 | Markdown preview | Requests for remote images, only after you click **Load remote images** | The image hosts |
 | Update check (on its own once a day, or Help ▸ Check for Updates…) | One anonymous request for the latest release, described below | GitHub's API (`api.github.com`) |
 
@@ -38,10 +38,8 @@ Flint looks for a newer release so it can tell you about it. It never downloads 
 ## Secrets
 
 - **Database passwords** are stored only in the macOS Keychain (service `flint-db`), never in files.
-- **AWS keys and tokens** are read only by Flint's native process to check that they exist and when they expire. They never reach the user interface.
 - **GitHub tokens** (from Sign in with GitHub, or imported once from the GitHub CLI after you confirm) are stored only in the Keychain (service `flint-accounts`, account `github:<host>`). The token is used by Flint's native process only: it never reaches the user interface, the log or an error message, and it is sent only to the GitHub API of the configured host, never to a redirect on another host (job logs are downloaded from their redirect without it). `state.json` keeps the account's login, avatar, host and scopes, no token. **Sign Out** deletes the token; revoke it on GitHub's authorized apps page.
 - **`GH_TOKEN` / `GITHUB_TOKEN`** (or `GH_ENTERPRISE_TOKEN` for an Enterprise Server) in Flint's environment is used while no account is signed in and is never stored.
-- **Kubernetes terminals** use an override file with only the context and namespace; no credentials are copied.
 - **HTTP client** headers and variable values are never written to the log. Responses and cookies stay in memory.
 - **Terminal sessions** are saved with recognized credentials removed from the output.
 - Settings, connections, query history, sessions and the log are readable only by your user.

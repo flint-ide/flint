@@ -1,6 +1,6 @@
 # Extensions: feature modules (level 1) and external extensions (level 2)
 
-Status: level 1 implemented (Docker, TODO list and the release check migrated). Level 2 implemented in its first version (contract 1), color themes included: see [what is implemented and the decisions taken](#level-2-implemented-v1). The richer component catalog, tab views, editor decorations and file icons are designed, not implemented ([plan](#implementation-plan-level-2)).
+Status: level 1 implemented (Docker, TODO list and the release check migrated; Docker, Kubernetes and AWS Profiles have since moved on to level-2 extensions, see [Separate packages](#separate-packages-database-kubernetes-docker-aws)). Level 2 implemented in its first version (contract 1), color themes included: see [what is implemented and the decisions taken](#level-2-implemented-v1). The richer component catalog, tab views, editor decorations and file icons are designed, not implemented ([plan](#implementation-plan-level-2)).
 
 Flint should be easy to extend through an explicit contract. Two levels:
 
@@ -35,7 +35,7 @@ frontend/src/features/index.ts the frontend list: one line per feature
 
 Contract code: `internal/feature` (Go), `frontend/src/lib/features.ts`, `lib/contributions.ts` and `lib/settingsSections.ts` (TypeScript), and the generic section support in `internal/settings/section.go`.
 
-The migrated features are working examples: `docker` (service, settings section, tool, panel, Settings page), `todo` (service, a settings key holding an array, panel, Settings page) and `update` (service, a boolean key, a `state.json` key, a Start hook, a status bar item, a command, an activate hook).
+The migrated features are working examples: `todo` (service, a settings key holding an array, panel, Settings page) and `update` (service, a boolean key, a `state.json` key, a Start hook, a status bar item, a command, an activate hook).
 
 ### Go contract
 
@@ -126,7 +126,7 @@ A key can move between `Settings` and a section without a migration. The tests i
 
 #### Tools
 
-`tools.Register` adds a feature's tools to the table behind the tool check and the bug report. `tools.Install(mac, linux)` picks the install command, `Tool.Find(bin, versionArgs...)` adds a binary, and `Order` places a tool within its group (Docker 10, kubectl 20, AWS CLI 30 keep the infra group's order).
+`tools.Register` adds a feature's tools to the table behind the tool check and the bug report. `tools.Install(mac, linux)` picks the install command, `Tool.Find(bin, versionArgs...)` adds a binary, and `Order` places a tool within its group. No built-in feature registers a tool now (Docker and kubectl went with their extensions).
 
 #### State
 
@@ -134,7 +134,7 @@ A key can move between `Settings` and a section without a migration. The tests i
 
 #### Agent tools
 
-`Instance.AgentTools` are appended to the MCP server's tool list (`api_mcp.go`). The server's gates still apply: the server must be on and the root trusted. A feature decides from its own settings which of its tools to offer. No migrated feature uses this yet; Kubernetes' `get_kubernetes_status` is the natural first one (see the migration list).
+`Instance.AgentTools` are appended to the MCP server's tool list (`api_mcp.go`). The server's gates still apply: the server must be on and the root trusted. A feature decides from its own settings which of its tools to offer. The extension host uses it to offer the extensions' tools; Kubernetes' `get_kubernetes_status` became the Kubernetes extension's tool.
 
 #### Bindings
 
@@ -157,7 +157,7 @@ interface FeatureModule {
 }
 ```
 
-Example (`features/docker/index.ts`):
+Example (the former `features/docker/index.ts`, from before Docker became an extension):
 
 ```ts
 const DockerPanel = lazy(() => import('./DockerPanel').then((m) => ({ default: m.DockerPanel })))
@@ -220,7 +220,7 @@ The settings reference no longer lists feature keys by hand. Each key has a part
 
 | Feature | Go | Frontend |
 |---|---|---|
-| Docker | `api_docker.go` → `internal/features/docker` (`API`, `Overview`); `settings.Docker` → `docker.Section`; the tool entry → `Module.Tools`; terminal streams through `Host.StartStream` | panel, Settings page, store, tree logic and settings moved to `features/docker`; `TerminalView` imports the new binding |
+| Docker (since removed: now the `flint.docker` extension) | `api_docker.go` → `internal/features/docker` (`API`, `Overview`); `settings.Docker` → `docker.Section`; the tool entry → `Module.Tools`; terminal streams through `Host.StartStream` | panel, Settings page, store, tree logic and settings moved to `features/docker`; `TerminalView` imports the new binding |
 | TODO list | `api_todo.go` → `internal/features/todo`; `Settings.TodoExclude` → `todo.Exclude` (`settings.CleanExcludes` / `CheckExcludes` stay shared with `watchExclude`) | panel, store and logic moved; the Settings page left `SettingsView` |
 | Release check | `api_update.go` → `internal/features/update`; `Settings.CheckForUpdates` → `update.Enabled`; `appState.Update` → the state key `update`; the daily loop → a Start hook | widget left `StatusBar` (status item); page left `SettingsView`; `help.checkForUpdates` and the Help menu event moved to the module |
 
@@ -660,23 +660,24 @@ Code: `internal/extensions/{manifest,rpc,host}`, the module `internal/features/e
 
 ---
 
-## Separate packages: Database, Kubernetes, Docker
+## Separate packages: Database, Kubernetes, Docker, AWS
 
-These three leave Flint's core and become level-2 extensions, installed separately (**Settings ▸ Extensions ▸ Install from Folder…**, or from the packages that ship with Flint and are listed under **Available**). Each package is a folder with `flint-extension.json`, a Go program built from the packages that are Flint's today (`internal/db`, `internal/kube`, `internal/docker`), and single-file webview UIs built from today's React code. The sources live in the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository, one folder per extension (`database/`, `kubernetes/`, `docker/`), next to `stats` and the webview example `notes`. Each is its own Go module; the Go packages they need from Flint (`internal/db`, `internal/kube`, `internal/docker`) move there with them. Flint keeps copies of `stats` and `notes` under `examples/extensions` for its conformance tests.
+These four leave Flint's core and become level-2 extensions, installed separately (**Settings ▸ Extensions ▸ Install from Folder…**, or from the packages that ship with Flint and are listed under **Available**). Each package is a folder with `flint-extension.json`, a Go program built from the packages that are Flint's today (`internal/db`, `internal/kube`, `internal/docker`, `internal/awsprof`), and single-file webview UIs built from today's React code. The sources live in the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository, one folder per extension (`database/`, `kubernetes/`, `docker/`, `aws/`), next to `stats` and the webview example `notes`. Each is its own Go module; the Go packages they need from Flint (`internal/db`, `internal/kube`, `internal/docker`, `internal/awsprof`) move there with them. Flint keeps copies of `stats` and `notes` under `examples/extensions` for its conformance tests.
 
 | Package | Process | Webviews | Other contributions | Needs from the contract |
 |---|---|---|---|---|
 | `flint.database` | connections, keychain passwords (same keyring service, so saved passwords keep working), queries, schema, EXPLAIN, row edits, history; data in `FLINT_EXTENSION_DATA` | panel: connections and schema tree with its menus; tab: SQL console (editor with completions from the schema, results grid with local sort and filters, editing, EXPLAIN) | commands (New SQL Console, New Connection, Run, Explain, History) | webviews, tab views with restore, per-extension data folder, a one-time import of `connections.json` and `history/` |
-| `flint.kubernetes` | kubectl calls, kubeconfig overrides for terminals | panel: contexts, namespaces, apps, workloads | agent tool `kubernetes_status`, command to open a terminal in a context | webviews, **terminal tabs** (`window/openTerminal { title, cwd?, env, command? }`) |
-| `flint.docker` | Engine API client | panel: containers, Compose projects | Compose actions | webviews, **stream tabs** (`window/openStream`: the process writes a log or a shell's output, Flint shows it in a terminal tab and sends input back) |
+| `flint.kubernetes` (**done**) | kubectl calls, kubeconfig overrides for terminals | panel: contexts, namespaces, apps, workloads | agent tool `kubernetes_status`, command to open a terminal in a context | webviews, **terminal tabs** (`window/openTerminal { title, cwd?, env, command? }`), `run.env` (`KUBECONFIG`, AWS variables) |
+| `flint.docker` (**done**) | Engine API client | panel: containers, Compose projects | Compose actions; logs and shells are terminal tabs running `docker logs -f` / `docker exec -it` | webviews, terminal tabs, `run.env` (`DOCKER_HOST` and the TLS variables) |
+| `flint.aws` (**done**) | AWS CLI profiles, credential status, login and refresh | panel: profiles and their expiry | Log In and Open Terminal as a profile as terminal tabs | webviews, terminal tabs, `run.env` (`AWS_CONFIG_FILE`, `AWS_SHARED_CREDENTIALS_FILE` and the like) |
 
 Order, one pull request each, each leaving Flint shippable:
 
 1. **Done.** Database and Kubernetes moved into level-1 modules (`internal/features/{database,kubernetes}`, `frontend/src/features/{database,kubernetes}`), so their code has one home; optional modules can be switched off (`features.enabled`).
 2. **Webviews and tab views** in the contract (above), with `examples/extensions/webview` and a conformance test.
 3. **`flint.database`**: the package, the data import, then removing `internal/features/database` and its frontend from core. SQL consoles become the extension's tab views; existing SQL scratchpads are offered for import.
-4. **Terminal tabs** in the contract, then **`flint.kubernetes`**; `get_kubernetes_status` becomes the extension's tool.
-5. **Stream tabs**, then **`flint.docker`**.
+4. **Done.** **Terminal tabs** and `run.env` in the contract; **`flint.kubernetes`**, **`flint.docker`** and **`flint.aws`** moved to flint-ide/extensions and their built-ins (`internal/features/{docker,kubernetes}`, `internal/{docker,kube,awsprof}`, `api_aws.go`, `mcptools/kube.go`, the `refresh` key and `mcpServer.tools.kubernetes`) left core. `get_kubernetes_status` became the extension's tool.
+5. **Not needed.** Stream tabs were planned for Docker's logs and shells; the Docker extension runs the docker CLI in terminal tabs instead, so the contract has no `window/openStream`. `feature.Host.StartStream` and `internal/terminal`'s stream sessions remain without a built-in user.
 6. **Available packages**: Settings ▸ Extensions lists the packages bundled with Flint (in the app's resources) with an **Install** button that copies them like Install from Folder.
 
 ## What remains to migrate
@@ -685,8 +686,6 @@ Each line moves to `internal/features/<id>` plus `frontend/src/features/<id>`, t
 
 | Feature | Go today | Frontend today | Contribution points it will use |
 |---|---|---|---|
-| Kubernetes | `api_kube.go`, `mcptools/kube.go`, `refresh.kubernetesSeconds`, `mcpServer.tools.kubernetes` | `KubePanel`, `store/kube.ts` | service, tool (kubectl), agent tool (`get_kubernetes_status`), panel; the refresh key would move into a `kubernetes` section with a fallback read of `refresh` |
-| AWS profiles | `api_aws.go`, `refresh.awsSeconds` | `AwsPanel`, `store/aws.ts` | service, tool (aws), panel |
 | GitHub, accounts and CI | `api_github.go`, `api_accounts.go`, `api_ci.go`, `github` and `ci` keys (reworked by #47, now merged) | pull request panel and tabs, `CIWidget`, `AccountsSection`, `CISection` | services, `github` and `ci` sections, panel, tab kinds (`pr`, `prdiff`, `cilog`), status item |
 | Usage | `api_usage.go`, `usage_state.go`, `usage` key | `UsagePanel`, `UsageSection`, the agent usage status widget | service, section, panel, page, status item, Start/Close (`openUsage` / `closeUsage`) |
 | HTTP client | `api_http.go` | `httpClient` store, `HttpResponseView` (`http` tab), commands in `featureCommands.ts` | service, tab kind, commands |
@@ -701,7 +700,6 @@ Stays in core: workspace, files, search, git, editor, terminals, run and debug, 
 Points not yet in the contract, to add when a migration needs them:
 
 - **Native menu items.** The Help ▸ Check for Updates… item is still built in `menu.go` and emits an event the update module listens for.
-- **Terminal stream sources.** Docker log and shell tabs are terminal tabs with a `docker` source that `TerminalView` knows about.
 - **Ordering among status items.** Flint's own status items are not in the registry; contributed items come after them.
 - **Session restore for contributed tabs.** Their `data` is JSON, so saving them is a small step, but a view must be able to rebuild itself from it. Needed by [tab views](#tab-views).
 - **File icons and editor decorations.** New points for [file icons](#themes-and-file-icons) and [decoration sets](#editor-decorations); both are useful to feature modules too.

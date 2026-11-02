@@ -10,7 +10,7 @@ import (
 )
 
 // Partials are Markdown files under a directory whose name starts with "_"
-// (site/reference/_settings/docker.md): not pages of their own, but pieces a
+// (site/reference/_settings/features.md): not pages of their own, but pieces a
 // page pulls in, so a feature documents its settings key in its own file
 // instead of in a shared page. Two directives, each alone on a line:
 //

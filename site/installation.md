@@ -122,10 +122,9 @@ The check only runs each tool's version command, outside your projects, and inst
 | `vtsls` or `typescript-language-server` | TypeScript and JavaScript language features (`npm i -g @vtsls/language-server`, or `npm i -g typescript-language-server typescript`). |
 | `basedpyright` or `pyright` | Python language features (`pipx install basedpyright`, or `npm i -g pyright`). |
 | `dlv` (Delve) | The Go debugger (`go install github.com/go-delve/delve/cmd/dlv@latest`). |
-| `kubectl` (`brew install kubectl`) | The Kubernetes panel. |
-| `docker` | Optional. Only Compose `up`, `down` and `pull` in the Docker panel need it; listing, logs, shell, start, stop and restart talk to the Docker Engine directly (Docker Desktop, Colima, OrbStack or a plain daemon). `brew install --cask docker-desktop` installs Docker Desktop. |
-| `aws` (`brew install awscli`), and `saml2aws` if you use it | The AWS profiles panel and credential refresh. |
 | `node` (`brew install node`) | Only needed for the language servers installed with `npm`. |
+
+The Docker, Kubernetes and AWS Profiles extensions need `docker`, `kubectl` and `aws` respectively; see [Docker](guides/docker.md), [Kubernetes](guides/kubernetes.md) and [AWS](guides/aws.md).
 
 > **Note:** The Go debugger also needs macOS developer mode: run `sudo DevToolsSecurity -enable` once. On Linux, the install commands the Tools window shows are the Debian/Ubuntu (`apt`), npm or snap ones; use your distribution's packages where they differ.
 

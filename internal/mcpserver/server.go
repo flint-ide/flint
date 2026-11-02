@@ -34,7 +34,7 @@ const (
 	maxBody         = 1 << 20  // bytes of one request
 	maxToolOutput   = 64 << 10 // bytes of one tool answer
 	maxTokens       = 256      // live tokens (agent sessions)
-	maxConcurrent   = 4        // tool calls running at once per project (they may start kubectl)
+	maxConcurrent   = 4        // tool calls running at once per project (an extension's may start a process)
 	callTimeout     = 30 * time.Second
 	shutdownTimeout = 2 * time.Second
 	endpointPath    = "/mcp"

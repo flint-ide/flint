@@ -4,6 +4,7 @@ You merged a change, the deployment started, and something is wrong: the rollout
 
 ## Before you start
 
+- Install the [Kubernetes extension](../guides/kubernetes.md) (and, for EKS, the [AWS Profiles extension](../guides/aws.md)).
 - Install `kubectl` and make sure you can reach the cluster from Terminal.
 - For EKS, have the AWS profile from your kubeconfig set up (see [AWS](../guides/aws.md)).
 - If you deploy with Flux, install the `flux` CLI for the Reconcile action.

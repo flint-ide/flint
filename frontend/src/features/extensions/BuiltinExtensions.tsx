@@ -4,7 +4,7 @@ import { coerceToggles, featureOn, pendingRestart, withFeature } from '../../lib
 import { useSettings } from '../../store/settings'
 
 /**
- * Settings ▸ Extensions ▸ Built-in: the optional features (Database, Docker, Kubernetes)
+ * Settings ▸ Extensions ▸ Built-in: the optional features (Database)
  * switched on or off. Go builds a feature only at launch, so a switch applies after a
  * restart; until then the card says so.
  */

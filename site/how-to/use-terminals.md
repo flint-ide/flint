@@ -14,20 +14,12 @@ With several projects in the window, the new terminal starts in the active tab's
 1. Right-click the folder in the file tree.
 2. Choose **Open in Terminal**.
 
-## Open a terminal as an AWS profile
+## Open a terminal as an AWS profile or in a Kubernetes context
 
-1. Open the AWS Profiles panel (`☁` on the activity bar).
-2. Double-click the profile, or click `❯_` on its row.
+The [AWS Profiles](../guides/aws.md) and [Kubernetes](../guides/kubernetes.md) extensions open these:
 
-The terminal has `AWS_PROFILE` and `AWS_REGION` set, and its tab is named `aws:<profile> · …`. It keeps the profile after a restart.
-
-## Open a terminal in a Kubernetes context
-
-1. Open the Kubernetes panel (`☸` on the activity bar).
-2. Choose the context and namespace at the top.
-3. Click `❯_`.
-
-`kubectl` in this terminal uses that context and namespace. Your kubeconfig's current context doesn't change. The tab is named `k8s:<cluster>/<namespace>`.
+- AWS Profiles panel: double-click a profile, or click `❯_` on its row. The terminal has `AWS_PROFILE` and `AWS_REGION` set.
+- Kubernetes panel: choose the context and namespace, then click `❯_`. `kubectl` in this terminal uses them; your kubeconfig's current context doesn't change.
 
 ## Open a file from terminal output
 

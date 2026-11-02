@@ -67,15 +67,16 @@ describe('editorContext', () => {
 })
 
 describe('MCP server settings', () => {
-  it('defaults to on, with terminal output and cluster status opt-in', () => {
+  it('defaults to on, with terminal output opt-in', () => {
     assert.deepEqual(coerceSettings({}).mcpServer, DEFAULT_MCP_SERVER)
     assert.equal(sharesEditor(DEFAULT_MCP_SERVER), true)
-    assert.deepEqual(DEFAULT_MCP_SERVER.tools, { diagnostics: true, editor: true, terminals: false, tests: true, kubernetes: false })
+    assert.deepEqual(DEFAULT_MCP_SERVER.tools, { diagnostics: true, editor: true, terminals: false, tests: true })
   })
   it('keeps valid values and replaces invalid ones', () => {
-    const m = coerceMcpServer({ enabled: false, tools: { kubernetes: false, editor: 'no' }, terminalLines: 99999 })
+    // "kubernetes" was a tool before the Kubernetes extension: it is dropped.
+    const m = coerceMcpServer({ enabled: false, tools: { kubernetes: true, editor: 'no' }, terminalLines: 99999 })
     assert.equal(m.enabled, false)
-    assert.equal(m.tools.kubernetes, false)
+    assert.equal('kubernetes' in m.tools, false)
     assert.equal(m.tools.editor, true)
     assert.equal(m.terminalLines, 2000)
     assert.equal(coerceMcpServer({ terminalLines: 'x' }).terminalLines, 200)

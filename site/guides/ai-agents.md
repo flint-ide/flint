@@ -71,7 +71,7 @@ Open chats are part of the project session. After a restart you see the transcri
 | **Fix with agent** on a language server problem | Path, line and column, severity, source, message and the surrounding lines |
 | **Fix all N in file** (`⌥⇧⌘L`) | Every problem in the file |
 | **Fix with agent** in the Tests tab, or "Fix Failed Tests with Agent" | The failed tests and their output |
-| **Diagnose with AI** in the Kubernetes panel | Rollout state, problems, events and recent logs, with secrets redacted |
+| **Diagnose with AI** in the [Kubernetes extension](kubernetes.md)'s panel | Rollout state, problems, events and recent logs, with secrets redacted |
 
 Context goes to the chat of the project it belongs to: the active or most recently used chat there, or a new chat with the default agent if there is none. It lands in the draft so you can add your own words before sending. `⌥`-click sends it immediately.
 
@@ -149,18 +149,17 @@ An agent chat in Flint can also look things up by itself. Flint runs a small [MC
 | `get_editor_state` | The files open in the editor (and which have unsaved changes), the active file, and your selection with its text, or the cursor position. Ask about "this function" and the agent can see which one. | On |
 | `get_test_results` | The last test run in Flint: totals, and each failed test with its location and output. | On |
 | `get_terminal_output` | The recent output your terminals and run consoles printed while they were in the project (dev servers, builds), as plain text without colors. | Off |
-| `get_kubernetes_status` | What is failing in a namespace of the current Kubernetes context: unhealthy apps, workloads that didn't roll out, failing pods with their reason, failed jobs and warning events. No secrets and no logs. | Off |
 
 The tools only read. Claude Code shows them as `mcp__flint__…`.
 
 - Diagnostics, editor state and test results show only the project's own state. With the default approval policy ("Read and search the project" on) Claude Code runs them without asking, so the agent can look at what you are looking at without a prompt each time.
-- Terminal output and Kubernetes status can show anything you saw: a token printed in a terminal, another cluster's names. They are off until you turn them on, and then the agent asks before each call, even with "Read and search" on. This keeps Flint's rule that nothing goes to an AI provider without you seeing it.
+- Terminal output can show anything you saw, such as a token printed in a terminal. It is off until you turn it on, and then the agent asks before each call, even with "Read and search" on. This keeps Flint's rule that nothing goes to an AI provider without you seeing it.
 - Codex and custom agents decide about all of them with their own rules.
 
 How it is protected:
 
 - The server listens only on `127.0.0.1`, on a port the system picks. It starts with the first chat and closes when you switch it off or quit.
-- Each chat gets its own random token, which stops working when the chat's agent stops or its project is closed. An agent only ever sees its own project (the Kubernetes tool is the exception: it reads the current context, like `kubectl` does). Requests without a valid token, or from a web page, are refused.
+- Each chat gets its own random token, which stops working when the chat's agent stops or its project is closed. An agent only ever sees its own project. Requests without a valid token, or from a web page, are refused.
 - Terminal output is kept by where it was printed: output from before a terminal moved into the project (with `cd`) isn't shown. A command that changes folders and prints in one go (`cd ~ && cat secrets`) can still land in the project's part, because Flint learns the new folder just after the output.
 - The token reaches the agent through the `FLINT_MCP_TOKEN` environment variable (Claude Code expands it in the server's `Authorization` header; Codex reads it with `bearer_token_env_var`) or the ACP connection, never on a command line. Programs the agent runs inherit the variable, so they can use the tools too while the chat lasts.
 - Answers are bounded in size, and credentials (keys, tokens, passwords in URLs) are redacted before they reach the agent.

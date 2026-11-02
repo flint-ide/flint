@@ -79,7 +79,6 @@ func main() {
 			application.NewService(&UsageAPI{app: flint}),
 			application.NewService(&ImportAPI{app: flint}),
 			application.NewService(newAlertsAPI(flint)),
-			application.NewService(newAWSAPI(flint)),
 			application.NewService(&DiagnosticsAPI{app: flint}),
 			application.NewService(newCompletionsAPI(flint)),
 		}, flint.featureServices()...),

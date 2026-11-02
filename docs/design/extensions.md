@@ -662,7 +662,7 @@ Code: `internal/extensions/{manifest,rpc,host}`, the module `internal/features/e
 
 ## Separate packages: Database, Kubernetes, Docker
 
-These three leave Flint's core and become level-2 extensions, installed separately (**Settings ▸ Extensions ▸ Install from Folder…**, or from the packages that ship with Flint and are listed under **Available**). Each package is a folder with `flint-extension.json`, a Go program built from the packages that are Flint's today (`internal/db`, `internal/kube`, `internal/docker`), and single-file webview UIs built from today's React code. The sources live in `extensions/<name>/` in this repository and are built by `task extensions` into `build/extensions/<id>/`.
+These three leave Flint's core and become level-2 extensions, installed separately (**Settings ▸ Extensions ▸ Install from Folder…**, or from the packages that ship with Flint and are listed under **Available**). Each package is a folder with `flint-extension.json`, a Go program built from the packages that are Flint's today (`internal/db`, `internal/kube`, `internal/docker`), and single-file webview UIs built from today's React code. The sources live in the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository, one folder per extension (`database/`, `kubernetes/`, `docker/`), next to `stats` and the webview example `notes`. Each is its own Go module; the Go packages they need from Flint (`internal/db`, `internal/kube`, `internal/docker`) move there with them. Flint keeps copies of `stats` and `notes` under `examples/extensions` for its conformance tests.
 
 | Package | Process | Webviews | Other contributions | Needs from the contract |
 |---|---|---|---|---|

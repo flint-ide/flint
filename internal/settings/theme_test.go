@@ -40,6 +40,11 @@ func TestValidateCustomTheme(t *testing.T) {
 		"bad base":          func(c *CustomTheme) { c.Base = "system" },
 		"control char name": func(c *CustomTheme) { c.Name = "a\nb" },
 		"long name":         func(c *CustomTheme) { c.Name = strings.Repeat("x", 101) },
+		"unknown terminal":  func(c *CustomTheme) { c.Terminal = map[string]string{"orange": "#f80"} },
+		"terminal css var":  func(c *CustomTheme) { c.Terminal = map[string]string{"--bg": "#000"} },
+		"terminal not hex":  func(c *CustomTheme) { c.Terminal = map[string]string{"red": "rgb(255,0,0)"} },
+		"control source":    func(c *CustomTheme) { c.Source = "a\x00b" },
+		"long source":       func(c *CustomTheme) { c.Source = strings.Repeat("x", MaxThemeSourceLen+1) },
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -74,6 +79,74 @@ func TestLoadDropsInvalidCustomColors(t *testing.T) {
 	}
 	if err := Validate(got); err != nil {
 		t.Errorf("normalized settings fail Validate: %v", err)
+	}
+}
+
+func TestTerminalColorsSaveAndLoad(t *testing.T) {
+	s := Default()
+	s.Theme = ThemeCustom
+	s.CustomTheme = validCustom()
+	s.CustomTheme.Terminal = map[string]string{"red": "#bf616a", "brightBlue": "#81a1c1", "background": "#2e3440"}
+	s.CustomTheme.Source = "acme.nord.dark"
+	path := write(t, "{}")
+	if _, err := Save(path, s); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.CustomTheme.Terminal["red"] != "#bf616a" || len(got.CustomTheme.Terminal) != 3 || got.CustomTheme.Source != "acme.nord.dark" {
+		t.Errorf("Load() = %+v", got.CustomTheme)
+	}
+}
+
+func TestLoadDropsInvalidTerminalColors(t *testing.T) {
+	path := write(t, `{"theme":"custom","customTheme":{"name":"X","base":"dark","colors":{},"terminal":{"red":"#f00","pink":"#f0f","blue":"blue"},"source":"x\u0000y"}}`)
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.CustomTheme.Terminal) != 1 || got.CustomTheme.Terminal["red"] != "#f00" {
+		t.Errorf("Terminal = %v, want only red", got.CustomTheme.Terminal)
+	}
+	if got.CustomTheme.Source != "" {
+		t.Errorf("Source = %q, want it dropped", got.CustomTheme.Source)
+	}
+	if err := Validate(got); err != nil {
+		t.Errorf("normalized settings fail Validate: %v", err)
+	}
+}
+
+func TestCloneCopiesTerminalColors(t *testing.T) {
+	s := Default()
+	s.CustomTheme = validCustom()
+	s.CustomTheme.Terminal = map[string]string{"red": "#f00"}
+	c := s.Clone()
+	c.CustomTheme.Terminal["red"] = "#000"
+	if s.CustomTheme.Terminal["red"] != "#f00" {
+		t.Error("Clone shares the terminal map")
+	}
+}
+
+// The frontend's terminal palette has exactly these colors (lib/terminalTheme.ts).
+func TestTerminalColorsMatchFrontend(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join("..", "..", "frontend", "src", "lib", "terminalTheme.ts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := strings.Index(string(src), "TERMINAL_COLOR_NAMES")
+	end := strings.Index(string(src[start:]), "])")
+	if start < 0 || end < 0 {
+		t.Fatal("TERMINAL_COLOR_NAMES not found in lib/terminalTheme.ts")
+	}
+	got := regexp.MustCompile(`'([A-Za-z]+)'`).FindAllStringSubmatch(string(src[start:start+end]), -1)
+	var names []string
+	for _, m := range got {
+		names = append(names, m[1])
+	}
+	if !slices.Equal(names, TerminalColors) {
+		t.Errorf("frontend TERMINAL_COLOR_NAMES = %v\nGo TerminalColors = %v", names, TerminalColors)
 	}
 }
 

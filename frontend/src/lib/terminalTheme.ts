@@ -61,23 +61,41 @@ export interface TerminalOptions {
 }
 
 /**
+ * The colors a custom theme may set in its terminal map: the keys of
+ * TerminalColors (Go's settings.TerminalColors; a Go test keeps them equal).
+ */
+export const TERMINAL_COLOR_NAMES: readonly (keyof TerminalColors)[] = Object.freeze([
+  'background', 'foreground', 'cursor', 'cursorAccent', 'selectionBackground',
+  'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white',
+  'brightBlack', 'brightRed', 'brightGreen', 'brightYellow',
+  'brightBlue', 'brightMagenta', 'brightCyan', 'brightWhite',
+])
+
+/**
  * Options for an xterm instance; sizeDelta makes secondary consoles (runs) a bit
  * smaller. A custom theme's colors (CSS variables) recolor the background,
- * text, cursor and selection; ANSI colors stay those of its base palette.
+ * text, cursor and selection; its terminal map (ANSI colors and the like) goes
+ * on top, and whatever neither sets stays that of its base palette.
  */
-export function terminalOptions(font: FontSettings, theme: ResolvedTheme, sizeDelta = 0, custom?: Readonly<Record<string, string>>): TerminalOptions {
+export function terminalOptions(
+  font: FontSettings,
+  theme: ResolvedTheme,
+  sizeDelta = 0,
+  custom?: Readonly<Record<string, string>>,
+  terminal?: Readonly<Record<string, string>>,
+): TerminalOptions {
   return {
-    theme: custom ? customColors(TERMINAL_THEMES[theme], custom) : TERMINAL_THEMES[theme],
+    theme: custom ? customColors(TERMINAL_THEMES[theme], custom, terminal ?? {}) : TERMINAL_THEMES[theme],
     fontFamily: font.fontFamily,
     fontSize: Math.max(6, font.fontSize + sizeDelta),
     lineHeight: font.lineHeight,
   }
 }
 
-function customColors(base: Readonly<TerminalColors>, vars: Readonly<Record<string, string>>): TerminalColors {
+function customColors(base: Readonly<TerminalColors>, vars: Readonly<Record<string, string>>, terminal: Readonly<Record<string, string>>): TerminalColors {
   const pick = (name: string, fallback: string) => vars[name] ?? fallback
   const background = pick('--bg-editor', base.background)
-  return {
+  const fromVars: TerminalColors = {
     ...base,
     background,
     foreground: pick('--fg', base.foreground),
@@ -85,4 +103,8 @@ function customColors(base: Readonly<TerminalColors>, vars: Readonly<Record<stri
     cursorAccent: background,
     selectionBackground: pick('--selection', base.selectionBackground),
   }
+  const overrides = Object.fromEntries(TERMINAL_COLOR_NAMES.flatMap((name) => (terminal[name] ? [[name, terminal[name]]] : [])))
+  const out: TerminalColors = { ...fromVars, ...overrides }
+  // The cursor's text follows a terminal background the theme sets.
+  return terminal.background && !terminal.cursorAccent ? { ...out, cursorAccent: terminal.background } : out
 }

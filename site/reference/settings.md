@@ -135,23 +135,26 @@ The file is readable only by your user. It never contains secrets: database pass
 
 ### customTheme
 
-The palette used when `theme` is `"custom"`. [Import from VS Code](../how-to/customize-flint.md#import-your-settings-from-vs-code) writes it; you can also edit it by hand.
+The palette used when `theme` is `"custom"`. [Import from VS Code](../how-to/customize-flint.md#import-your-settings-from-vs-code) and [a theme from an extension](../how-to/customize-flint.md#use-a-theme-from-an-extension) write it; you can also edit it by hand.
 
 ```json
 "customTheme": {
   "name": "One Dark Pro",
   "base": "dark",
-  "colors": { "--bg-editor": "#282c34", "--fg": "#abb2bf", "--syn-keyword": "#c678dd" }
+  "colors": { "--bg-editor": "#282c34", "--fg": "#abb2bf", "--syn-keyword": "#c678dd" },
+  "terminal": { "red": "#e06c75", "brightBlue": "#61afef" }
 }
 ```
 
 | Key | Type | Meaning |
 |---|---|---|
 | `name` | string | Shown in Settings ▸ Appearance; up to 100 characters. |
-| `base` | string | `"dark"` or `"light"`: the palette the colors are laid over. It also sets the window appearance and the terminal's ANSI colors. |
+| `base` | string | `"dark"` or `"light"`: the palette the colors are laid over. It also sets the window appearance and the terminal colors that `terminal` leaves out. |
 | `colors` | object | CSS variable → hex color (`#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`). Variables not listed keep the base palette's color. |
+| `terminal` | object | Optional. Terminal color → hex color: `background`, `foreground`, `cursor`, `cursorAccent`, `selectionBackground`, the ANSI colors `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white` and their `bright…` forms (`brightBlack` … `brightWhite`). Without it, terminals take the background, text, accent and selection from `colors` and the ANSI colors from `base`. |
+| `source` | string | Optional. The id of the extension theme it was taken from (`"acme.nord.dark"`), so Settings ▸ Appearance can show which one is in use. |
 
-Accepted variables: `--bg`, `--bg-sidebar`, `--bg-editor`, `--bg-raised`, `--bg-hover`, `--bg-active`, `--border`, `--fg`, `--fg-muted`, `--fg-faint`, `--fg-name`, `--accent`, `--accent-dim`, `--accent-fg`, `--danger`, `--warn`, `--info`, `--ok`, `--selection`, `--selection-match`, `--search-match`, `--active-line`, `--git-added`, `--git-modified`, `--git-deleted`, `--diff-ins-bg`, `--diff-del-bg`, and the syntax colors `--syn-keyword`, `--syn-string`, `--syn-number`, `--syn-comment`, `--syn-function`, `--syn-type`, `--syn-property`, `--syn-definition` and `--syn-punct`. Other names and other color formats are dropped when the file is read and refused when it is saved.
+Accepted variables: `--bg`, `--bg-sidebar`, `--bg-editor`, `--bg-raised`, `--bg-hover`, `--bg-active`, `--border`, `--fg`, `--fg-muted`, `--fg-faint`, `--fg-name`, `--accent`, `--accent-dim`, `--accent-fg`, `--danger`, `--warn`, `--info`, `--ok`, `--selection`, `--selection-match`, `--search-match`, `--active-line`, `--git-added`, `--git-modified`, `--git-deleted`, `--diff-ins-bg`, `--diff-del-bg`, and the syntax colors `--syn-keyword`, `--syn-string`, `--syn-number`, `--syn-comment`, `--syn-function`, `--syn-type`, `--syn-property`, `--syn-definition` and `--syn-punct`. Other names and other color formats, in `colors` and in `terminal`, are dropped when the file is read and refused when it is saved.
 
 ### keymap
 

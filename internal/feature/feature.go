@@ -87,6 +87,13 @@ type Host interface {
 	// StartStream shows st in the terminal tab termID (the frontend picked the
 	// id) and lets agents read it like a terminal (get_terminal_output).
 	StartStream(termID, title string, st terminal.Stream) error
+	// PickFolder shows the native folder picker; "" when cancelled.
+	PickFolder(title string) (string, error)
+	// Ask shows a native question over the window and reports whether the
+	// user chose ok. Go shows it and reads the click, so code in the web view
+	// can neither answer nor skip it: use it before anything the user must
+	// approve (installing an extension). The server build always says yes.
+	Ask(title, message, ok string) bool
 }
 
 var idPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,39}$`)

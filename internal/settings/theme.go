@@ -21,10 +21,31 @@ type CustomTheme struct {
 	// Name is shown in Settings ▸ Appearance.
 	Name string `json:"name"`
 	// Base is the palette ("dark" or "light") the colors are laid over; it also
-	// picks the native window appearance and the terminal's ANSI colors.
+	// picks the native window appearance and the terminal colors that Terminal
+	// leaves out.
 	Base string `json:"base"`
 	// Colors maps a CSS variable ("--bg-editor") to a hex color ("#1e1e1e").
 	Colors map[string]string `json:"colors"`
+	// Terminal maps an xterm color (TerminalColors: "red", "brightBlue",
+	// "background") to a hex color. Colors left out come from Colors (the
+	// background, text, cursor and selection) or from the base palette.
+	Terminal map[string]string `json:"terminal,omitempty"`
+	// Source says where the palette came from, so Settings ▸ Appearance can
+	// mark the theme in use: an extension's theme id ("acme.nord.dark"), or ""
+	// when it was imported from VS Code or written by hand.
+	Source string `json:"source,omitempty"`
+}
+
+// MaxThemeSourceLen is the longest CustomTheme.Source, in bytes.
+const MaxThemeSourceLen = 200
+
+// TerminalColors are the xterm.js theme colors a custom theme may set
+// (frontend lib/terminalTheme.ts, TerminalColors; a test keeps them equal).
+var TerminalColors = []string{
+	"background", "foreground", "cursor", "cursorAccent", "selectionBackground",
+	"black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
+	"brightBlack", "brightRed", "brightGreen", "brightYellow",
+	"brightBlue", "brightMagenta", "brightCyan", "brightWhite",
 }
 
 // ThemeVariables are the CSS variables a custom theme may set (style.css).
@@ -58,6 +79,10 @@ func Appearance(s Settings) string {
 	return s.Theme
 }
 
+// ValidateCustomTheme is the check every custom theme passes: on save, and
+// when an extension's manifest contributes one (internal/extensions/manifest).
+func ValidateCustomTheme(c CustomTheme) error { return validateCustomTheme(c) }
+
 func validateCustomTheme(c CustomTheme) error {
 	if err := validThemeName(c.Name); err != nil {
 		return err
@@ -69,6 +94,28 @@ func validateCustomTheme(c CustomTheme) error {
 		if err := validThemeColor(name, color); err != nil {
 			return err
 		}
+	}
+	for name, color := range c.Terminal {
+		if err := validTerminalColor(name, color); err != nil {
+			return err
+		}
+	}
+	return validThemeSource(c.Source)
+}
+
+func validThemeSource(src string) error {
+	if len(src) > MaxThemeSourceLen || strings.ContainsFunc(src, unicode.IsControl) {
+		return fmt.Errorf("invalid custom theme source %q", src)
+	}
+	return nil
+}
+
+func validTerminalColor(name, color string) error {
+	if !slices.Contains(TerminalColors, name) {
+		return fmt.Errorf("custom theme: unknown terminal color %q", name)
+	}
+	if !ValidColor(color) {
+		return fmt.Errorf("custom theme: terminal %s must be a hex color, not %q", name, color)
 	}
 	return nil
 }
@@ -91,9 +138,20 @@ func validThemeColor(name, color string) error {
 }
 
 func normalizeCustomTheme(c CustomTheme) CustomTheme {
-	out := CustomTheme{Name: c.Name, Base: c.Base, Colors: map[string]string{}}
+	out := CustomTheme{Name: c.Name, Base: c.Base, Colors: map[string]string{}, Source: c.Source}
 	if validThemeName(c.Name) != nil {
 		out.Name = ""
+	}
+	if validThemeSource(c.Source) != nil {
+		out.Source = ""
+	}
+	for name, color := range c.Terminal {
+		if validTerminalColor(name, color) == nil {
+			if out.Terminal == nil {
+				out.Terminal = map[string]string{}
+			}
+			out.Terminal[name] = color
+		}
 	}
 	if c.Base != ThemeDark && c.Base != ThemeLight {
 		out.Base = ThemeDark
@@ -112,5 +170,6 @@ func (c CustomTheme) clone() CustomTheme {
 	if out.Colors == nil {
 		out.Colors = map[string]string{}
 	}
+	out.Terminal = maps.Clone(c.Terminal)
 	return out
 }

@@ -1,13 +1,13 @@
 # Extensions: feature modules (level 1) and external extensions (level 2)
 
-Status: level 1 implemented (Docker, TODO list and the release check migrated); level 2 designed, not implemented.
+Status: level 1 implemented (Docker, TODO list and the release check migrated). Level 2: the manifest, installing from a folder and color themes are implemented ([what exists today](#level-2-what-exists-today)); extension processes, declarative views, tab views and editor decorations are designed, not implemented.
 
 Flint should be easy to extend through an explicit contract. Two levels:
 
 1. **Feature modules** (level 1): features inside Flint's repository. A feature is one Go package plus one frontend directory, listed once on each side. No edits to `settings.go`, `settings.ts`, `SettingsView`, `main.go`'s service list, the tool table or the panel list.
 2. **External extensions** (level 2): separate processes in any language, installed explicitly by the user, talking JSON-RPC 2.0 over stdio and described by a manifest. Flint renders their UI from data (no extension JavaScript or HTML in the WebView). Level 2 is built on level 1: an extension's contributions land in the same registries as a feature module's.
 
-Contents: [Goals](#goals) · [Level 1](#level-1-feature-modules) · [Level 2](#level-2-external-extensions) · [Remaining migration](#what-remains-to-migrate) · [Open questions](#open-questions)
+Contents: [Goals](#goals) · [Level 1](#level-1-feature-modules) · [Level 2](#level-2-external-extensions) ([themes](#themes-and-file-icons) · [components](#component-catalog) · [tab views](#tab-views) · [editor decorations](#editor-decorations) · [today](#level-2-what-exists-today)) · [Remaining migration](#what-remains-to-migrate) · [Open questions](#open-questions)
 
 ## Goals
 
@@ -67,6 +67,8 @@ type Host interface {
 	LoadState(key string, v any) error
 	SaveState(key string, v any) error
 	StartStream(termID, title string, st terminal.Stream) error // a terminal tab agents can read too
+	PickFolder(title string) (string, error)  // native folder picker; "" when cancelled
+	Ask(title, message, ok string) bool        // native question the web view can't answer
 }
 ```
 
@@ -148,6 +150,7 @@ interface FeatureModule {
   statusItems?: readonly StatusItem[]         // { id, order, component }
   tabKinds?: readonly TabKind[]               // { id, component: ComponentType<{ tab, active }>, icon? }
   fileMenu?: readonly FileMenuItem[]          // { id, label, when?(paths), run(paths) }
+  themes?: readonly ThemeContribution[]       // { id, label, group, base, colors, terminal }
   activate?: () => void | (() => void)        // after the first render: event subscriptions
 }
 ```
@@ -171,7 +174,7 @@ Components are only types in the contract, so `React.lazy` works and so does `la
 
 #### Installation and activation
 
-- `installFeatures()` runs in `main.tsx` before the first render. It is data only: it checks the modules (`checkFeatures`: unique ids per kind), registers settings sections and hands panels, Settings pages, status items, tab kinds and file menu entries to the contribution registry under the source `feature:<id>`. The first paint is complete: no panel pops in later.
+- `installFeatures()` runs in `main.tsx` before the first render. It is data only: it checks the modules (`checkFeatures`: unique ids per kind), registers settings sections and hands panels, Settings pages, status items, tab kinds, file menu entries and themes to the contribution registry under the source `feature:<id>`. The first paint is complete: no panel pops in later.
 - `activateFeatures()` runs in App's first effect, right after Flint's own commands are registered. It registers each module's commands, plus a "Show …" command per panel, then runs `activate`. Commands and subscriptions are wired exactly when they were before.
 
 #### Settings sections (frontend)
@@ -195,6 +198,7 @@ export const dockerSettings = defineSection('docker', DEFAULT_DOCKER, coerceDock
 | Status items | `contributions.statusItems` | rendered after Flint's own items, by `order` |
 | Tab kinds | `contributions.tabKinds` + `useEditor().openContributed(view, key, title, data)` | a `kind: 'contrib'` tab with JSON `data`; `EditorArea` renders the kind's component, or "not available" when its source is gone; not saved in sessions |
 | File tree menu | `contributions.fileMenu` | appended after "Add to Agent Chat" for the right-clicked paths; failures become a toast |
+| Color themes | `contributions.themes` | Settings ▸ Appearance ▸ Color theme (shown when there is one); choosing one copies it into `customTheme` (`lib/contributedThemes.ts`) |
 | Settings sections | `lib/settingsSections.ts` | see above |
 | Hand to agent | `lib/askAgent.ts` (existing) | features call `askAgent({ prompt, attachments })`; no separate registry is needed |
 
@@ -270,13 +274,23 @@ Inside Flint, level 2 is one level-1 feature, `extensions`:
     },
     "statusItems": [{ "id": "acme.jira.count", "order": 10 }],
     "fileMenu": [{ "id": "acme.jira.link", "label": "Link to Jira Issue…", "command": "acme.jira.link" }],
-    "tabViews": [{ "id": "acme.jira.issue", "view": "form" }],
+    "tabViews": [{ "id": "acme.jira.issue", "view": "stack" }],
     "agentTools": [{
       "name": "jira_issue",
       "title": "Jira issue",
       "description": "Summary, status and description of a Jira issue by key (ABC-123).",
       "inputSchema": { "type": "object", "properties": { "key": { "type": "string" } }, "required": ["key"] }
-    }]
+    }],
+    "themes": [{
+      "id": "acme.jira.dark", "label": "Jira Dark", "base": "dark",
+      "colors": { "--bg-editor": "#1d2125", "--accent": "#579dff", "--syn-keyword": "#9f8fef" },
+      "terminal": { "background": "#1d2125", "red": "#f87168", "brightBlue": "#85b8ff" }
+    }],
+    "fileIcons": {
+      "names": { "jira.yml": { "label": "JI", "bg": "#0c66e4" } },
+      "extensions": { "jql": { "label": "JQL", "bg": "#0c66e4" } }
+    },
+    "decorations": [{ "id": "acme.jira.refs", "label": "Jira issue references", "languages": ["go", "typescript"] }]
   }
 }
 ```
@@ -285,7 +299,10 @@ Rules, checked at discovery, where a violation disables the extension and is sho
 
 - `contract` is the integer major version of this protocol (below).
 - `id` is `publisher.name` with lower-case letters, digits and dashes, unique across installed extensions. Every contributed id must start with `<id>.`, so an extension can't shadow Flint's own ids or another extension's (`git.push`, `view.docker`).
-- `run.command` is a path inside the extension directory. It is never resolved through `PATH` or run through a shell. Arguments are a fixed list.
+- `run.command` is a path inside the extension directory, written as a clean relative path with forward slashes. It is never resolved through `PATH` or run through a shell. Arguments are a fixed list. `run` may be left out when the extension contributes only data (themes, file icons, settings): such an extension never runs code.
+- `activation` events must name something the manifest contributes (`onCommand:<command id>`, `onView:<panel or tab view id>`, `onAgentTool:<name>`, `onLanguage:<language>` for a decoration set's language) or be `onStartup`.
+- Every list is bounded (100 entries per kind, 50 themes) and every string has a maximum length; text may not contain control characters. The manifest is at most 1 MiB.
+- Settings may use only the schema subset below. An unknown keyword is an error rather than ignored, so an extension never relies on a check Flint would skip. Unknown top-level fields are ignored, so a newer manifest with a new optional field still installs (additive changes within a contract).
 - Shortcuts are allowed but never override Flint's defaults or the user's keymap: on a conflict the extension's shortcut is dropped and the conflict listed. Users rebind extension commands in Settings ▸ Keymap like any command.
 - Icons come from Flint's own icon set (`components/ui/icons.ts`); extensions cannot ship SVG.
 
@@ -294,11 +311,14 @@ Rules, checked at discovery, where a violation disables the extension and is sho
 | Manifest | Level-1 point | Notes |
 |---|---|---|
 | `commands` | `registerCommand` | `run` sends `command/execute`, which activates the extension first |
-| `panels` (`view`: tree, list, table, form) | `contribute(...panels)` | the component is Flint's `DeclarativeView` for that view kind; data from `view/resolve` |
+| `panels` (`view`: any kind of the [component catalog](#component-catalog)) | `contribute(...panels)` | the component is Flint's `DeclarativeView`; data from `view/resolve` |
 | `settings` | one level-1 section, `extensions` (see below), plus a generated `SettingsPage` per extension | the page is rendered from the schema by Flint |
 | `statusItems` | `contribute(...statusItems)` | text, tooltip and command come from `status/update` notifications; hidden until the first one |
-| `tabViews` | `contribute(...tabKinds)` | opened by the extension with `window/openTab`; same view kinds as panels |
+| `tabViews` | `contribute(...tabKinds)` | see [Tab views](#tab-views); same view kinds as panels |
 | `fileMenu` | `contribute(...fileMenu)` | runs the named command with `{ paths }` |
+| `themes` | `contribute(...themes)` (implemented) | offered in Settings ▸ Appearance; choosing one copies it into `customTheme` ([Themes](#themes-and-file-icons)) |
+| `fileIcons` | `contribute(...fileIcons)` (new level-1 point) | badges in the file tree and tab strip, merged after Flint's own |
+| `decorations` | `contribute(...decorationSets)` (new level-1 point) | gutter markers, inline hints, warnings and highlights in editors ([Editor decorations](#editor-decorations)) |
 | `agentTools` | `Instance.AgentTools` of the `extensions` feature | offered on Flint's MCP server as `<short>_<name>` (see below) |
 | notifications | `showToast`, OS notification when in the background (`notifyInBackground`) | `window/showMessage` |
 | hand to agent | `askAgent` | `agent/ask`, needs the `agent.ask` permission, always ends in a draft the user sends |
@@ -332,7 +352,7 @@ Both sides send requests, responses and notifications. Ids are integers or strin
 
 | Direction | Method | Params → result |
 |---|---|---|
-| Flint → ext | `initialize` (request) | `{ contract: 1, flintVersion, extension: { id, version, dir }, settings, roots: [{ path, trusted }], platform: "darwin" \| "linux", capabilities: { views: ["tree","list","table","form"], secrets: true, agent: true } }` → `{ capabilities: { … } }` |
+| Flint → ext | `initialize` (request) | `{ contract: 1, flintVersion, extension: { id, version, dir }, settings, roots: [{ path, trusted }], platform: "darwin" \| "linux", capabilities: { views: ["tree","list","table","form","markdown","chart","cards","stack"], charts: ["line","bar","area"], decorations: ["gutter","inline","diagnostic","highlight"], secrets: true, agent: true } }` → `{ capabilities: { … } }` |
 | Flint → ext | `initialized` (notification) | `{}` |
 | Flint → ext | `shutdown` (request) | `{}` → `null`; then Flint closes stdin and, after 2 s, kills the process group |
 
@@ -341,23 +361,28 @@ Both sides send requests, responses and notifications. Ids are integers or strin
 | Method | Kind | Params → result |
 |---|---|---|
 | `command/execute` | request | `{ id, args? }` (args: `{ paths }` from the file menu) → `null` |
-| `view/resolve` | request | `{ view, parent? }` → a view model (below); `parent` lazily expands a tree node |
-| `view/action` | request | `{ view, item, action }` → `null` (context menu or button on an item) |
-| `form/submit` | request | `{ view, values }` → `{ errors?: { field: message } }` |
+| `view/resolve` | request | `{ view, key?, data?, parent? }` → a view model ([component catalog](#component-catalog)); `parent` lazily expands a tree node; `key` and `data` identify a [tab view](#tab-views)'s tab |
+| `view/action` | request | `{ view, key?, item, action, values? }` → `null` (a context menu entry, or a button on an item, a card or a form) |
+| `form/submit` | request | `{ view, key?, form?, values }` → `{ errors?: { field: message } }` (`form` names a form inside a stack) |
+| `editor/opened` | notification | `{ path, language, version }`; only for files in trusted roots whose language a decoration set lists |
+| `editor/changed` | notification | `{ path, version }`, at most every 300 ms per file while typing; the text is read with `workspace/readFile` (unsaved text: see [Editor decorations](#editor-decorations)) |
+| `editor/closed` | notification | `{ path }` |
 | `agentTool/call` | request | `{ name, root, arguments }` → `{ text }` (shown to the agent; errors become failed tool calls) |
 | `settings/changed` | notification | `{ settings }` (the extension's object, already validated) |
 | `workspace/rootsChanged` | notification | `{ roots: [{ path, trusted }] }` |
-| `view/visible` | notification | `{ view, visible }`; the extension may poll only while visible |
+| `view/visible` | notification | `{ view, key?, visible }`; the extension may poll only while visible |
 
 #### Extension → Flint
 
 | Method | Kind | Params → result | Permission |
 |---|---|---|---|
-| `view/refresh` | notification | `{ view, item? }`; Flint calls `view/resolve` again | none |
+| `view/refresh` | notification | `{ view, key?, item? }`; Flint calls `view/resolve` again (one tab when `key` is given) | none |
+| `editor/setDecorations` | notification | `{ set, path, version?, decorations }`: replaces the set's decorations in one file ([Editor decorations](#editor-decorations)) | `workspace.read` |
+| `editor/clearDecorations` | notification | `{ set, path? }`: one file, or every file | none |
 | `status/update` | notification | `{ id, text, tooltip?, command?, severity? }`, where `text` is at most 40 characters | none |
 | `window/showMessage` | notification | `{ type: "info" \| "warning" \| "error", message }` | none |
 | `window/showMessageRequest` | request | `{ type, message, actions: [title] }` → `{ action? }` | none |
-| `window/openTab` | request | `{ view, key, title, data }` → `null` | none |
+| `window/openTab` | request | `{ view, key, title, data? }` → `null`; opens or focuses the tab ([Tab views](#tab-views)) | none |
 | `window/openFile` | request | `{ path, line? }` → `null` (the path must be inside a root) | `workspace.read` |
 | `workspace/readFile` | request | `{ path }` → `{ text }` (inside a root; 4 MiB at most; never `.git/`, never ignored secrets files such as `.env`) | `workspace.read` |
 | `secrets/get`, `secrets/set`, `secrets/delete` | request | `{ key, value? }` → `{ value? }` | `secrets` |
@@ -366,23 +391,149 @@ Both sides send requests, responses and notifications. Ids are integers or strin
 
 There is no `exec` and no generic HTTP proxy. The extension is its own process and does its own network I/O, under the `network:` permission it declared (see Security).
 
-#### View models
+### Component catalog
+
+An extension describes what to show; Flint draws it with its own components, in its theme, with its keyboard handling and virtualization. Most extension UIs are dashboards, lists of results and reports, and these components cover them while keeping Flint's look and its speed. The catalog is the `kind` of a view model, the answer to `view/resolve`. The same kinds work in a sidebar panel and in an editor tab.
+
+| Kind | Draws | Built on |
+|---|---|---|
+| `tree` | nodes with icon, label, description, lazy children, context actions | the file tree's row and keyboard model |
+| `list` | a tree without children | same |
+| `table` | typed, sortable columns; row actions; selection; virtualized rows | the database results grid |
+| `form` | fields with validation and a submit button | Settings' field components (`components/settings/fields.tsx`) |
+| `markdown` | a document: headings, lists, code blocks with highlighting, tables, links | the Markdown preview, which renders no raw HTML |
+| `chart` | line, bar or area chart of up to 10 series | a small SVG chart in Flint's colors (the Usage panel's bars, generalized) |
+| `cards` | tiles with a title, a value, a trend or status, and buttons | new, in the style of the account cards |
+| `stack` | several of the above, one under another, each with an optional heading | a column layout; one level of nesting |
+| `message` | a sentence and buttons, for empty, error and sign-in states | the panels' empty state |
 
 ```jsonc
 // tree: nodes are expanded lazily with view/resolve { parent: id }
 { "kind": "tree", "items": [{ "id": "ABC-1", "label": "Fix login", "description": "In progress",
   "icon": "checkbox", "hasChildren": false, "actions": [{ "id": "open", "label": "Open in Browser" }],
   "command": { "id": "acme.jira.open", "args": { "key": "ABC-1" } } }] }
-// list: like tree, without children
-// table
-{ "kind": "table", "columns": [{ "id": "key", "title": "Key" }], "rows": [{ "id": "ABC-1", "cells": { "key": "ABC-1" } }] }
-// form: rendered with Settings' field components
-{ "kind": "form", "fields": [{ "id": "comment", "type": "string", "title": "Comment", "multiline": true }], "submit": "Add Comment" }
+
+// table: cell values are typed by their column; "badge" maps values to a severity
+{ "kind": "table",
+  "columns": [{ "id": "key", "title": "Key", "type": "text" },
+              { "id": "points", "title": "Points", "type": "number", "align": "end" },
+              { "id": "updated", "title": "Updated", "type": "date" },
+              { "id": "status", "title": "Status", "type": "badge", "badges": { "Done": "ok", "Blocked": "error" } }],
+  "rows": [{ "id": "ABC-1", "cells": { "key": "ABC-1", "points": 3, "updated": "2026-11-01T09:30:00Z", "status": "Done" },
+             "command": { "id": "acme.jira.open", "args": { "key": "ABC-1" } } }],
+  "sort": { "column": "updated", "descending": true },
+  "actions": [{ "id": "assign", "label": "Assign to Me" }] }
+
+// form: fields use the settings schema's types, plus multiline, select and a read-only markdown field
+{ "kind": "form", "id": "comment",
+  "fields": [{ "id": "comment", "type": "string", "title": "Comment", "multiline": true, "maxLength": 5000 },
+             { "id": "notify", "type": "boolean", "title": "Notify watchers", "default": true }],
+  "submit": "Add Comment" }
+
+// markdown: CommonMark and tables; links open http(s) URLs in the browser, files in a root in the editor,
+// and "command:<id>" runs one of the extension's own commands; images only from https and inline data URLs
+{ "kind": "markdown", "text": "## Release 0.3\n\n- 12 issues closed\n- [Open the board](https://acme.atlassian.net/…)" }
+
+// chart: x is a number, an ISO date or a category; colors come from Flint's chart palette, never from the extension
+{ "kind": "chart", "type": "line", "title": "Open issues",
+  "x": { "type": "date" }, "y": { "label": "Issues", "min": 0 },
+  "series": [{ "id": "open", "label": "Open", "points": [["2026-10-01", 14], ["2026-10-08", 11]] },
+             { "id": "blocked", "label": "Blocked", "points": [["2026-10-01", 2], ["2026-10-08", 3]] }] }
+
+// cards: a value with an optional trend and severity, a short body and buttons
+{ "kind": "cards", "items": [
+  { "id": "sprint", "title": "Sprint 42", "value": "18 / 25", "subtitle": "points done",
+    "trend": { "direction": "up", "text": "+5 this week" }, "severity": "ok", "icon": "checkbox",
+    "actions": [{ "id": "open-board", "label": "Open Board" }] }] }
+
+// stack: a dashboard; children are any kind but stack and message
+{ "kind": "stack", "children": [
+  { "title": "This sprint", "view": { "kind": "cards", "items": [ … ] } },
+  { "title": "Trend", "view": { "kind": "chart", … } },
+  { "title": "My issues", "view": { "kind": "table", … } }] }
+
 // any kind may instead be a message
 { "kind": "message", "text": "Sign in to Jira first.", "actions": [{ "id": "signin", "label": "Sign In" }] }
 ```
 
-Sizes are bounded: 5,000 items per response and 2,000 characters per label. Text is always text, never HTML or Markdown, except that a form may set `"markdown": true` on a read-only field, which Flint renders with its sanitizing preview.
+Rules:
+
+- **Text is text.** Labels, cells and card values are plain text. Only `markdown` views and read-only form fields marked `"markdown": true` are Markdown, rendered without raw HTML and with `javascript:` and other schemes dropped.
+- **Colors are Flint's.** Severities (`info`, `ok`, `warning`, `error`) and chart series map to theme variables, so every view follows the theme, a custom one included. An extension cannot set a color in a view; its theme is the place for colors.
+- **Icons are Flint's** (`components/ui/icons.ts`), by name.
+- **Buttons and menu entries** send `view/action { view, key?, item, action }`, or run a command when they carry `command`. A form's submit sends `form/submit` with the values, and the field errors in the answer appear under the fields.
+- **Bounds.** A response holds at most 5,000 rows or items in total (tables page with `view/resolve { parent: "<cursor>" }` beyond that), 10 chart series of 2,000 points, 50 cards, 10 children in a stack, 200 KiB of Markdown and 2,000 characters per label. Larger answers are cut, and the view says so.
+- **Unknown kinds or fields** within the contract are ignored by an older Flint, which shows a message for a kind it doesn't know. That is why `initialize` lists the supported kinds and chart types: an extension can fall back to a table.
+
+### Tab views
+
+Panels are narrow; reports, dashboards and long forms want an editor tab. A tab view is declared in `contributes.tabViews` and behaves like a panel with a key:
+
+- **Opening.** The extension calls `window/openTab { view, key, title, data? }` (from a command, a button, a tree item) and Flint opens the tab, or focuses it when one with the same view and key is open. A command can also open a tab without a round trip by listing it: `{ "id": "acme.jira.board", "title": "Jira Board", "opens": { "view": "acme.jira.issue", "key": "board" } }`.
+- **Content.** Flint calls `view/resolve { view, key, data }` and draws the answer with the component catalog. `view/refresh { view, key }` refreshes one tab; `view/visible { view, key, visible }` tells the extension when the tab is shown, so it may poll only then.
+- **Sessions.** Unlike today's contributed tabs, extension tabs are saved with the project's session: `{ view, key, title, data }`, with `data` at most 64 KiB of JSON. On restore the tab shows its title right away and resolves when it is first shown, which activates the extension (`onView`). A tab whose extension is gone shows "not available" with the extension's name.
+- **Level 1.** This adds session restore to contributed tab kinds (`TabKind.restore: true`), the open item in "Points not yet in the contract".
+
+### Editor decorations
+
+Linters, test runners, coverage tools and issue trackers want to mark lines in the editor. An extension declares a decoration set and then publishes decorations for files:
+
+```json
+"decorations": [{ "id": "acme.lint.issues", "label": "Acme Lint", "languages": ["go"] }]
+```
+
+```jsonc
+// editor/setDecorations: replaces everything the set shows in this file
+{ "set": "acme.lint.issues", "path": "/Users/me/app/main.go", "version": 7, "decorations": [
+  { "kind": "diagnostic", "line": 12, "from": 4, "to": 9, "severity": "warning", "message": "err is shadowed",
+    "actions": [{ "id": "fix", "label": "Rename to err2" }] },
+  { "kind": "gutter", "line": 30, "icon": "check", "severity": "ok", "hover": "Covered by 3 tests" },
+  { "kind": "inline", "line": 41, "text": "ABC-123 · In progress", "command": { "id": "acme.jira.open", "args": { "key": "ABC-123" } } },
+  { "kind": "highlight", "line": 50, "endLine": 58, "severity": "info" }] }
+```
+
+| Kind | Shows | Built on |
+|---|---|---|
+| `diagnostic` | an underline with a message, in the lint gutter and the Problems list, merged with the language server's | `@codemirror/lint`, as LSP diagnostics are today; the source is the extension's name |
+| `gutter` | an icon in a gutter column of its own, with a hover | the git and blame gutters |
+| `inline` | dim text after the end of a line (an inlay hint), clickable when it has a command | the ghost text widget |
+| `highlight` | a background over lines or a range, in a severity's color | `Decoration.mark` / line decorations with theme classes |
+
+How it works:
+
+- **Which files.** Flint sends `editor/opened`, `editor/changed` and `editor/closed` only for files in trusted roots whose language one of the extension's sets lists, and only while the extension is enabled. A set's language is also an activation event (`onLanguage:go`). The notifications carry the path and a version, not the text: the extension reads saved files with `workspace/readFile`, so publishing decorations needs `workspace.read`. Unsaved text is passed only to extensions that declare `"unsavedText": true` on the set, which the install dialog shows.
+- **Versions.** A `version` older than the editor's current one is dropped, so slow extensions never paint stale marks. Positions are clamped to the document, and Flint maps published decorations through later edits until the next update arrives.
+- **Cost.** Updates for one file are applied in one transaction, at most every 50 ms; files not open in an editor are not decorated. Each set may hold 5,000 decorations per file; text is plain and at most 200 characters (`inline`) or 2,000 (`message`, `hover`).
+- **Control.** Settings ▸ Extensions turns each set on or off, and a palette command hides all extension decorations in the current editor. `editor/clearDecorations` removes a set's decorations from one file or all. When the extension stops, its decorations stay until the file changes; when it is disabled or uninstalled they are removed.
+- **Actions.** A diagnostic's actions appear as quick fixes (`⌥↩`) and send `view/action { view: set, item: "<path>:<line>", action }`. Edits are not part of the protocol: an extension that fixes code does so through the agent (`agent/ask`) or by writing the file itself, which the editor then reloads.
+- **Level 1.** A new contribution point, `decorationSets`, with a registry in `lib/editorDecorations.ts` that a feature module can use too (coverage from `go test -cover` is a natural first one).
+
+### Themes and file icons
+
+A theme is data and runs no code, so it needs neither a program nor a permission.
+
+```json
+"themes": [{ "id": "me.nord.dark", "label": "Nord", "base": "dark",
+  "colors": { "--bg-editor": "#2e3440", "--fg": "#d8dee9", "--accent": "#88c0d0" },
+  "terminal": { "background": "#2e3440", "red": "#bf616a", "brightBlue": "#81a1c1" } }]
+```
+
+- `colors` are the CSS variables of a custom theme (`settings.ThemeVariables`) and `terminal` the xterm colors (`settings.TerminalColors`: background, foreground, cursor, cursor accent, selection and the 16 ANSI colors), all hex. The manifest is checked with `settings.ValidateCustomTheme`, the same function that checks `customTheme` on save and an imported VS Code theme, so a theme with an unknown name or a non-hex value is refused at install time and can't reach the page's style.
+- Choosing a theme (Settings ▸ Appearance ▸ Color theme, or **Use …** in Settings ▸ Extensions) copies it into `customTheme` with `source` set to its id, and sets `theme` to `custom`. Saving checks it again in Go. The boot script needs nothing new: the first paint already uses the cached custom theme, and uninstalling the extension leaves the copy in place.
+- `customTheme.terminal` is new and also filled by the VS Code import (`terminal.ansi*`, `terminal.background` and so on). Without it, terminals keep taking the background, text, accent and selection from `colors` and the ANSI colors from the base palette.
+- **File icons** follow the same idea. Flint's file icons are a badge (a label of up to 4 characters, a background and a text color) on an outlined page (`components/icons/FileIcon.tsx`). An extension contributes badges by file name and extension, `{ "label": "JQL", "bg": "#0c66e4", "fg": "#ffffff" }`, checked as hex colors and short plain text. Flint's own mappings win for names it knows; extensions fill the gaps. No SVG and no images, so icons stay crisp, consistent and safe.
+
+### Level 2: what exists today
+
+Implemented in this step, with no extension process yet:
+
+- `internal/extensions/manifest`: parsing and every rule above for `contract`, `id`, `name`, `version`, `run`, `activation`, `permissions` and `contributes` (commands, panels, settings and its schema subset, status items, file menu, tab views, agent tools, themes), with table tests and a fuzz test. `fileIcons`, `decorations` and `onLanguage:` activation are not accepted yet (unknown fields are ignored; `onLanguage:` is refused) and come with their features.
+- `internal/extensions/installed`: discovery of `<config>/extensions/<id>/` (manifests only), install by copying a folder (a symlinked folder is resolved first; inside it regular files only, no symlinks or FIFOs, at most 5,000 files and folders, 32 levels deep and 256 MiB, `.git` left out; read through an `os.Root`, with each opened file checked against what the walk listed, so a folder changed during the copy can't swap in a symlink or a growing file; an older version replaced atomically; refused if the manifest changed after the user approved it) and removal.
+- `internal/features/extensions`: the level-1 module with `ExtensionsAPI.List`, `InstallFromFolder` and `Uninstall`. Install and uninstall ask through `Host.Ask`, a native dialog that code in the web view can't answer; the install dialog lists the contributions, the program that would run on this platform with its arguments, the permissions, and the installed version it replaces. Uninstall shows its dialog only for the exact folder name of an installed extension, since the id comes from the web view. `feature.Host` gained `PickFolder` and `Ask` for this.
+- `frontend/src/features/extensions`: Settings ▸ Extensions (install, list with errors, contributions, permissions, themes with **Use …**, uninstall), the palette command "Install Extension from Folder…" and the contribution of each extension's themes under `extension:<id>`. Level 1 gained the `themes` contribution point, which Settings ▸ Appearance reads.
+- `settings.CustomTheme` gained `terminal` and `source`, checked and normalized like `colors`.
+
+Extensions with a program can be installed and are listed with what they would add, and the install dialog says that this version doesn't start programs.
 
 ### Activation and limits
 
@@ -437,12 +588,17 @@ for line in sys.stdin:
 
 ### Implementation plan (level 2)
 
-1. `internal/extensions/manifest`: parsing, validation, the schema subset and id rules, with table tests.
-2. `internal/extensions/rpc`: newline-delimited JSON-RPC over pipes, with bounded messages, cancellation and timeouts, fuzzed.
-3. `internal/extensions/host`: discovery, lazy start, idle stop, crash policy, permissions and keyring access, tested with an extension written in Go under `testdata`.
-4. `internal/features/extensions`: the level-1 module, with the `extensions` settings section, agent tools, a Start hook (discovery after launch) and a Close hook (stop all).
-5. `frontend/src/features/extensions`: `DeclarativeView` (tree, list, table, form, message), the Settings ▸ Extensions page (installed list, permissions, state, enable and disable), and contribution install and withdrawal per extension.
-6. Docs: a user guide page and a protocol reference generated from the Go types.
+Each step is one pull request that leaves Flint shippable.
+
+1. **Done.** `internal/extensions/manifest`, `internal/extensions/installed`, the `extensions` module, Settings ▸ Extensions, theme contributions and terminal colors in custom themes ([what exists today](#level-2-what-exists-today)).
+2. **File icons.** `fileIcons` in the manifest, a `fileIcons` contribution point and its use in `FileIcon.tsx`. Data only, like themes.
+3. `internal/extensions/rpc`: newline-delimited JSON-RPC over pipes, with bounded messages, cancellation and timeouts, fuzzed.
+4. `internal/extensions/host`: lazy start, idle stop, crash policy, permissions and keyring access, tested with an extension written in Go under `testdata`; the `extensions` settings section (enabled flags and per-extension values); project extensions in trusted folders; `flint --install-extension <dir>`.
+5. **Declarative views, part 1.** `DeclarativeView` with `tree`, `list`, `table`, `form` and `message`, panels, commands, status items and the file menu. This is the first step where extension programs run.
+6. **Declarative views, part 2.** `markdown`, `chart`, `cards` and `stack`, and tab views with session restore (`TabKind.restore`).
+7. **Editor decorations.** The `decorationSets` point and `lib/editorDecorations.ts`, the `editor/*` notifications, quick-fix actions, per-set toggles.
+8. **Agent tools** on Flint's MCP server, with their toggle in Settings ▸ Agent Context.
+9. Docs: a guide for extension authors and a protocol reference generated from the Go types; a conformance extension in `testdata` run in CI.
 
 ---
 
@@ -470,7 +626,8 @@ Points not yet in the contract, to add when a migration needs them:
 - **Native menu items.** The Help ▸ Check for Updates… item is still built in `menu.go` and emits an event the update module listens for.
 - **Terminal stream sources.** Docker log and shell tabs are terminal tabs with a `docker` source that `TerminalView` knows about.
 - **Ordering among status items.** Flint's own status items are not in the registry; contributed items come after them.
-- **Session restore for contributed tabs.** Their `data` is JSON, so saving them is a small step, but a view must be able to rebuild itself from it.
+- **Session restore for contributed tabs.** Their `data` is JSON, so saving them is a small step, but a view must be able to rebuild itself from it. Needed by [tab views](#tab-views).
+- **File icons and editor decorations.** New points for [file icons](#themes-and-file-icons) and [decoration sets](#editor-decorations); both are useful to feature modules too.
 
 ## Open questions
 

@@ -156,9 +156,11 @@ The registry in `src/lib/commands.ts` (`registerCommand({ id, title, category, k
 A feature that is more than a panel (a backend service, settings, a tool, a Settings page, a status item) is a **feature module**: one Go package in `internal/features/<id>` and one directory in `frontend/src/features/<id>`, listed once in `features.go` and once in `frontend/src/features/index.ts`. The module declares everything it adds, and the registries take it from there:
 
 - Go (`internal/feature`): a `Module` with its settings sections (`settings.Section[T]`, keys in the same flat `settings.json`), external tools (`tools.Register`), `state.json` keys, and a `New(Host)` that returns its Wails services, MCP tools for agents and `Start` / `Close` hooks. `Host` is the module's only view of `App`.
-- Frontend (`lib/features.ts`): a `FeatureModule` with settings sections (typed by augmenting `FeatureSettings` in `lib/settingsSections.ts`), panels, commands, Settings pages, status items, tab kinds and file-tree menu entries. `features/install.ts` registers the data before the first render and the commands and `activate` hooks after Flint's own commands. `lib/contributions.ts` holds what was contributed, by source, so a source can be withdrawn later (external extensions).
+- Frontend (`lib/features.ts`): a `FeatureModule` with settings sections (typed by augmenting `FeatureSettings` in `lib/settingsSections.ts`), panels, commands, Settings pages, status items, tab kinds, file-tree menu entries and color themes. `features/install.ts` registers the data before the first render and the commands and `activate` hooks after Flint's own commands. `lib/contributions.ts` holds what was contributed, by source, so a source can be withdrawn later (external extensions).
 
 Docker, the TODO list and the release check are modules; the design, the list of features still to migrate and the plan for external extensions are in [design/extensions.md](design/extensions.md). How to add one: [Add a feature](DEVELOPMENT.md#add-a-feature).
+
+External extensions are the `extensions` module. Today it reads and checks manifests (`internal/extensions/manifest`), installs and removes extension folders in `<config>/extensions` (`internal/extensions/installed`, behind a native confirmation through `Host.Ask`) and contributes their color themes under the source `extension:<id>`. Choosing a theme copies it into `customTheme`, so it passes the same Go check as any custom theme. Extension programs (JSON-RPC over stdio) are not started yet.
 
 ### Sidebar panels
 
@@ -343,7 +345,9 @@ main.go, app.go, api_*.go   Wails services (thin layer over internal/*)
 features.go                 the feature modules list and the Host they get from App
 menu.go, wails_app.go       application menu, window and event wiring
 internal/feature            the feature-module contract: Module, Instance, Host; featuretest: a fake Host
-internal/features/<id>      feature modules: docker, todo, update (service, settings sections, tools, hooks)
+internal/features/<id>      feature modules: docker, todo, update, extensions (service, settings sections, tools, hooks)
+internal/extensions         external extensions: manifest (flint-extension.json parsing and checks),
+                            installed (discover, install from a folder, remove; never starts a program)
 cmd/webbuild                frontend bundler (esbuild Go API), --watch, --test, CSP
 build/                      Wails config (config.yml), Info.plist, app icon
 scripts/flint               the `flint [folder]` command installed by `make install`
@@ -397,7 +401,7 @@ internal/usage              agent usage per day × project × agent × model × 
 frontend/bindings           generated TypeScript bindings of the Go services (do not edit)
 frontend/src/wails          compatibility layer over the bindings and the Wails runtime
 frontend/src                React: store (createStore + event bus), components, lib, commands, panels (sidebar registry),
-                            features (feature modules: docker, todo, update; install.ts hands them to the registries)
+                            features (feature modules: docker, todo, update, extensions; install.ts hands them to the registries)
 ```
 
 For data storage details see [Where Flint stores data](#where-flint-stores-data).

@@ -5468,3 +5468,15 @@ body.file-drop-target-active::after {
 .status-extension.error {
   color: var(--danger);
 }
+
+/* ---------- extension webviews ---------- */
+
+.extension-webview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  border: none;
+  background: var(--bg-editor);
+}

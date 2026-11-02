@@ -26,6 +26,8 @@ function deps(existing: readonly Command[] = []): Deps & { ran: string[]; shown:
     shown,
     existing,
     panel: () => () => null,
+    webviewPanel: () => () => null,
+    webviewTab: () => () => null,
     statusItem: () => () => null,
     settingsPage: () => () => null,
     run: async (ext, command) => void ran.push(`${ext} ${command}`),
@@ -108,3 +110,31 @@ describe('extension themes', () => {
     assert.notEqual(contributionKey(withThemes), contributionKey(info))
   })
 })
+
+describe('webview contributions', () => {
+  it('draws webview panels with the frame and turns tab views into restorable tab kinds', () => {
+    const marks: string[] = []
+    const d = {
+      ...deps(),
+      webviewPanel: (_e: unknown, p: { id: string }) => (marks.push(`panel ${p.id}`), () => null),
+      webviewTab: (_e: unknown, v: string) => (marks.push(`tab ${v}`), () => null),
+    }
+    const parts = extensionParts(
+      {
+        ...info,
+        panels: [{ id: 'acme.jira.board', title: 'Board', icon: 'database', order: 1, view: 'webview' }],
+        tabViews: [
+          { id: 'acme.jira.issue', title: 'Issue', icon: 'database', view: 'webview', restore: true },
+          { id: 'acme.jira.future', title: 'Later', view: 'canvas' },
+        ],
+      },
+      d,
+    )
+    assert.deepEqual(marks, ['panel acme.jira.board', 'tab acme.jira.issue'])
+    assert.deepEqual(
+      parts.contributions.tabKinds?.map((k) => [k.id, k.icon, k.restore]),
+      [['acme.jira.issue', 'database', true]],
+    )
+  })
+})
+

@@ -46,7 +46,35 @@ At most 100. `{ "id", "title" (≤ 100), "category"? (≤ 40, default: the exten
 
 ### contributes.panels
 
-At most 10. `{ "id", "title" (≤ 40), "icon", "order", "view" }`. `icon` is a name from Flint's icon set (`files`, `search`, `branch`, `fork`, `updown`, `database`, `pencil`, `checkbox`, `ship`, `cloud`, `helm`, `terminal`, `sum`, `puzzle`); an unknown name shows `puzzle`. `order` places the panel among other extensions' panels, after Flint's. `view` is `tree` or `list`. Each panel also gets a **Show …** command, `view.<panel id>`.
+At most 10. `{ "id", "title" (≤ 40), "icon", "order", "view" }`. `icon` is a name from Flint's icon set (`files`, `search`, `branch`, `fork`, `updown`, `database`, `pencil`, `checkbox`, `ship`, `cloud`, `helm`, `terminal`, `sum`, `puzzle`); an unknown name shows `puzzle`. `order` places the panel among other extensions' panels, after Flint's. `view` is `tree`, `list` or `webview`; a `webview` panel also has `"webview": { "html": "<path>" }` (see [Webviews](#webviews)). Each panel also gets a **Show …** command, `view.<panel id>`.
+
+### contributes.tabViews
+
+At most 50. `{ "id", "title" (≤ 60), "icon"?, "view": "webview", "webview": { "html" }, "restore"? }`. Kinds of editor tabs the extension opens with `window/openTab` (or `flint.openTab` from a page). With `restore: true`, open tabs are saved with the session (`{ view, key, title, data }`, `data` ≤ 64 KiB) and reopened at the next start.
+
+### Webviews
+
+A `webview` panel or tab view shows the extension's own UI: **one self-contained HTML file** in the extension's folder (≤ 32 MiB; inline every script, style, font and image, e.g. with a single-file build). Flint loads it into a sandboxed frame with an opaque origin and this policy, put first in `<head>`:
+
+```
+default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:;
+font-src data:; media-src data: blob:; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'
+```
+
+The page has no network and nothing to load: it talks to its process through `window.flint`, which Flint defines before the page's scripts run:
+
+| | |
+|---|---|
+| `flint.request(method, params?)` → `Promise` | sends `webview/request { view, key?, method, params }` to the process (starting it); resolves with the result, rejects with the error message; 30 s, 4 MiB |
+| `flint.onMessage(fn)` → unsubscribe | the `message` of each `webview/post` the process sends to this view (and key) |
+| `flint.view`, `flint.key`, `flint.data` | the panel or tab (`key` is `""` for a panel; `data` is the tab's saved data) |
+| `flint.theme`, `flint.onTheme(fn)` | Flint's theme: CSS variables (`--bg-editor`, `--fg`, `--accent`, `--font-mono`, …), also set on `:root`, and `dark`; `<html data-theme>` is `dark` or `light` |
+| `flint.openTab(view, key, title, data?)` | opens or focuses one of the extension's tab views |
+| `flint.setTitle(title)`, `flint.setDirty(bool)`, `flint.setData(json)` | the tab's title, unsaved dot and saved data |
+| `flint.runCommand(id, args?)`, `flint.copy(text)`, `flint.showMessage(type, text)` | one of its own commands; the clipboard; a toast |
+| `flint.openFile(path, line?)` | opens a file in a project; needs `workspace.read` |
+
+Shortcuts with ⌘/Ctrl/Alt, F-keys and Escape that the page doesn't `preventDefault()` reach Flint's keymap; ⌘A/C/V/X/Z/Y stay with the page. The example `examples/extensions/notes` uses all of this.
 
 ### contributes.statusItems
 
@@ -215,7 +243,16 @@ Sent when a folder is opened, attached, removed, trusted or untrusted.
 { "jsonrpc": "2.0", "method": "view/visible", "params": { "view": "acme.jira.issues", "visible": true } }
 ```
 
-If the extension refreshes a view on a timer, it should do so only while the view is visible.
+If the extension refreshes a view on a timer, it should do so only while the view is visible. For a tab view, `key` names the tab.
+
+### webview/request
+
+A page's `flint.request(method, params)`. The result (any JSON, ≤ 4 MiB) resolves the page's promise; an error rejects it with the error's message. Timeout: 30 s.
+
+```json
+{ "jsonrpc": "2.0", "id": 9, "method": "webview/request",
+  "params": { "view": "example.notes.note", "key": "2", "method": "save", "params": { "title": "Plan", "text": "…" } } }
+```
 
 ## Extension → Flint
 
@@ -226,6 +263,7 @@ If the extension refreshes a view on a timer, it should do so only while the vie
 | `status/update` | `{ "id", "text", "tooltip"?, "command"?, "severity"? }` | `id` is a declared status item; `text` ≤ 40 characters (`""` hides the item); `command` one of the extension's commands, run on click; `severity` `info`, `warning` or `error` |
 | `view/refresh` | `{ "view", "item"? }` | Flint resolves the panel again, with the nodes the user expanded |
 | `window/showMessage` | `{ "type": "info" \| "warning" \| "error", "message" }` | A toast, prefixed with the extension's name; ≤ 1,000 characters; at most 5 per 10 seconds |
+| `webview/post` | `{ "view", "key"?, "message" }` | `message` (any JSON, ≤ 4 MiB) reaches `flint.onMessage` in the view's frames: the tab with that key, or every frame of the view without one |
 | `log` | `{ "level", "message" }` | A line in the extension's log |
 
 ### Requests
@@ -235,6 +273,7 @@ If the extension refreshes a view on a timer, it should do so only while the vie
 | `window/showMessageRequest` | `{ "type", "message", "actions": [title, …] }` (1–3 actions) → `{ "action"? }` | none |
 | `window/openFile` | `{ "path", "line"? }` → `null` | `workspace.read` |
 | `window/openUrl` | `{ "url" }` → `null` | none |
+| `window/openTab` | `{ "view", "key", "title"?, "data"? }` → `null`; opens or focuses a tab of a declared tab view (`data` ≤ 64 KiB) | none |
 | `workspace/readFile` | `{ "path" }` → `{ "text" }` | `workspace.read` |
 | `secrets/get` | `{ "key" }` → `{ "value"? }` | `secrets` |
 | `secrets/set` | `{ "key", "value" }` → `{}` | `secrets` |

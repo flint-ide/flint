@@ -126,3 +126,20 @@ describe('chatsNeedSave', () => {
     assert.equal(chatsNeedSave({ s: a }, { s: session({}, { dormant: true }) }), true)
   })
 })
+
+describe('parseSnapshot: extension tabs', () => {
+  it('keeps tab views with a key and drops malformed ones', () => {
+    const raw = JSON.stringify({
+      version: 1,
+      active: 0,
+      tabs: [
+        { kind: 'contrib', view: 'flint.database.console', key: 'c1', title: 'Prod', data: { sql: 'select 1' } },
+        { kind: 'contrib', view: 'flint.database.console', key: '', title: 'no key' },
+        { kind: 'contrib', view: 'not an id', key: 'k', title: 'x' },
+      ],
+    })
+    const snap = parseSnapshot(raw)
+    assert.deepEqual(snap?.tabs, [{ kind: 'contrib', view: 'flint.database.console', key: 'c1', title: 'Prod', data: { sql: 'select 1' } }])
+  })
+})
+

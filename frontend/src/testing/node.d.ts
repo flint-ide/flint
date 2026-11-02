@@ -26,7 +26,14 @@ declare module 'node:assert/strict' {
     notDeepEqual(actual: unknown, expected: unknown, message?: string): void
     throws(fn: () => unknown, expected?: RegExp | (new (...args: never[]) => Error), message?: string): void
     match(value: string, regexp: RegExp, message?: string): void
+    rejects(promise: Promise<unknown>, expected?: RegExp | (new (...args: never[]) => Error), message?: string): Promise<void>
   }
   const assert: Assert
   export default assert
+}
+
+declare module 'node:vm' {
+  export function runInNewContext(code: string, context?: Record<string, unknown>): unknown
+  const vm: { runInNewContext: typeof runInNewContext }
+  export default vm
 }

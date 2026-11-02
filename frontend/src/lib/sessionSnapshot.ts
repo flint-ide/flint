@@ -34,6 +34,8 @@ export type SavedTab =
   | { kind: 'history'; path: string }
   | { kind: 'terminal'; title: string; cwd: string; output: string; project?: string; pinned?: boolean; env?: Record<string, string>; tag?: string }
   | { kind: 'chat'; title: string; chat: SavedChat }
+  /** A tab of a kind that restores (an extension's tab view): reopened from its key and data. */
+  | { kind: 'contrib'; view: string; key: string; title: string; data?: unknown }
 
 export interface Snapshot {
   version: number
@@ -85,8 +87,13 @@ function parseRunConfigs(raw: unknown): Record<string, string> {
   )
 }
 
-const KINDS = new Set(['file', 'scratch', 'diff', 'history', 'terminal', 'chat'])
-const isTab = (t: unknown): t is SavedTab => typeof t === 'object' && t !== null && KINDS.has((t as SavedTab).kind)
+const KINDS = new Set(['file', 'scratch', 'diff', 'history', 'terminal', 'chat', 'contrib'])
+/** Saved data of a contributed tab is at most this much JSON. */
+export const MAX_TAB_DATA = 64 << 10
+const isContrib = (t: Record<string, unknown>) =>
+  typeof t.view === 'string' && /^[a-z0-9][a-z0-9.-]*\.[a-zA-Z0-9._-]+$/.test(t.view) && typeof t.key === 'string' && t.key !== '' && t.key.length <= 256 && typeof t.title === 'string'
+const isTab = (t: unknown): t is SavedTab =>
+  typeof t === 'object' && t !== null && KINDS.has((t as SavedTab).kind) && ((t as SavedTab).kind !== 'contrib' || isContrib(t as Record<string, unknown>))
 
 /** The parts of a chat session autosave looks at. */
 export interface AutosavedChat {

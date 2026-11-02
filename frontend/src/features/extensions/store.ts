@@ -18,6 +18,8 @@ import { useWorkspace } from '../../store/workspace'
 import type { PanelProps } from '../../panels/registry'
 import { contributes, contributionKey, extensionParts, type ExtensionInfo } from './model'
 import { ExtensionStatusItem } from './ExtensionStatusItem'
+import { deliverWebview, tabKeyOf } from './webviewEvents'
+import type { ContributedTab } from '../../lib/features'
 
 export type { Info, View }
 
@@ -46,6 +48,7 @@ export const refreshKey = (ext: string, view: string) => `${ext}\n${view}`
 // ---------- contributions ----------
 
 const ExtensionPanel = lazy(() => import('./ExtensionPanel').then((m) => ({ default: m.ExtensionPanel })))
+const WebviewFrame = lazy(() => import('./WebviewFrame').then((m) => ({ default: m.WebviewFrame })))
 const ExtensionSettingsPage = lazy(() => import('./ExtensionSettingsPage').then((m) => ({ default: m.ExtensionSettingsPage })))
 
 // One component per contribution, made once per extension version: React keeps
@@ -54,6 +57,19 @@ function panelComponent(ext: ExtensionInfo, panel: ExtensionInfo['panels'][numbe
   const Panel = () => createElement(ExtensionPanel, { ext: ext.id, view: panel.id, title: panel.title, kind: panel.view })
   Panel.displayName = `ExtensionPanel(${panel.id})`
   return Panel
+}
+
+function webviewPanelComponent(ext: ExtensionInfo, panel: ExtensionInfo['panels'][number]): ComponentType<PanelProps> {
+  const Panel = () => createElement(WebviewFrame, { ext: ext.id, view: panel.id, tabKey: '', data: null, active: true })
+  Panel.displayName = `ExtensionWebview(${panel.id})`
+  return Panel
+}
+
+function webviewTabComponent(ext: ExtensionInfo, view: string): ComponentType<{ tab: ContributedTab; active: boolean }> {
+  const Tab = ({ tab, active }: { tab: ContributedTab; active: boolean }) =>
+    createElement(WebviewFrame, { ext: ext.id, view, tabKey: tabKeyOf(tab), data: tab.data, active, tabId: tab.id })
+  Tab.displayName = `ExtensionTab(${view})`
+  return Tab
 }
 
 function statusComponent(ext: ExtensionInfo, item: string): ComponentType {
@@ -86,6 +102,8 @@ function syncContributions(list: readonly Info[]): void {
     if (installed.has(id)) continue
     const parts = extensionParts(info as ExtensionInfo, {
       panel: panelComponent,
+      webviewPanel: webviewPanelComponent,
+      webviewTab: webviewTabComponent,
       statusItem: statusComponent,
       settingsPage: settingsComponent,
       run: (ext, command) => API.Execute(ext, command, null),
@@ -214,6 +232,10 @@ export function subscribeExtensions(): () => void {
     EventsOn('extensions:message', (e: MessageEvent) => showToast(`${e.name}: ${e.message}`, e.type === 'error' ? 'error' : 'info')),
     EventsOn('extensions:openFile', (e: { path: string; line?: number }) =>
       useEditor.getState().openFile(e.path, e.line ? { line: e.line, from: 0, to: 0 } : undefined),
+    ),
+    EventsOn('extensions:webview', (e: { extension: string; view: string; key?: string; message: unknown }) => void deliverWebview(e)),
+    EventsOn('extensions:openTab', (e: { extension: string; view: string; key: string; title: string; data?: unknown }) =>
+      useEditor.getState().openContributed(e.view, e.key, e.title, e.data ?? null),
     ),
     EventsOn('extensions:ask', (e: { prompt: string; attachments?: string[] }) =>
       void askAgent({ prompt: e.prompt, attachments: (e.attachments ?? []).map((path) => ({ path })) }),

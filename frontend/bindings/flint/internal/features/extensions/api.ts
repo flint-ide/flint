@@ -95,11 +95,32 @@ export function SetVisible(id: string, view: string, visible: boolean): $Cancell
 }
 
 /**
+ * SetWebviewVisible tells the host a webview panel or tab was shown or hidden.
+ */
+export function SetWebviewVisible(id: string, view: string, key: string, visible: boolean): $CancellablePromise<void> {
+    return $Call.ByID(1782850794, id, view, key, visible);
+}
+
+/**
  * Uninstall removes an extension after a native confirmation; false when
  * the user cancelled.
  */
 export function Uninstall(id: string): $CancellablePromise<boolean> {
     return $Call.ByID(4215234639, id);
+}
+
+/**
+ * WebviewHTML returns a webview's HTML file, to show in a sandboxed frame.
+ */
+export function WebviewHTML(id: string, view: string): $CancellablePromise<string> {
+    return $Call.ByID(1138719235, id, view);
+}
+
+/**
+ * WebviewRequest relays a webview's flint.request to its extension's process.
+ */
+export function WebviewRequest(id: string, view: string, key: string, method: string, params: json$0.RawMessage): $CancellablePromise<json$0.RawMessage> {
+    return $Call.ByID(4078688051, id, view, key, method, params);
 }
 
 // Private type creation functions

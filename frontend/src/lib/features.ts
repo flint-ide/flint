@@ -63,6 +63,8 @@ export interface TabKind {
   component: ComponentType<{ tab: ContributedTab; active: boolean }>
   /** Tab strip icon; none shows the title only. */
   icon?: IconName
+  /** Open tabs are saved with the session ({ view, key, title, data }) and reopened. */
+  restore?: boolean
 }
 
 /** An entry of the file tree's context menu, for the right-clicked paths. */

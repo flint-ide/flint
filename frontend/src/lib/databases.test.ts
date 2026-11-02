@@ -1,6 +1,18 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { databaseChoices, defaultDatabase, defaultDatabaseName, isSchemaKeyOf, resolveDatabase, schemaKey } from './databases'
+import {
+  connectionUrl,
+  countQuery,
+  databaseChoices,
+  defaultDatabase,
+  defaultDatabaseName,
+  isSchemaKeyOf,
+  previewQuery,
+  qualifiedTable,
+  quoteIdent,
+  resolveDatabase,
+  schemaKey,
+} from './databases'
 
 describe('defaultDatabase', () => {
   it('prefers the profile database', () => {
@@ -67,5 +79,47 @@ describe('databaseChoices', () => {
 
   it('adds nothing for an empty choice', () => {
     assert.deepEqual(databaseChoices(undefined, ''), [])
+  })
+})
+
+describe('quoteIdent', () => {
+  it('leaves plain lowercase names bare', () => {
+    assert.equal(quoteIdent('postgres', 'users'), 'users')
+    assert.equal(quoteIdent('clickhouse', 'events_2024'), 'events_2024')
+  })
+
+  it('quotes with the dialect quote and doubles it inside', () => {
+    assert.equal(quoteIdent('postgres', 'Users'), '"Users"')
+    assert.equal(quoteIdent('postgres', 'a"b'), '"a""b"')
+    assert.equal(quoteIdent('clickhouse', 'my-table'), '`my-table`')
+    assert.equal(quoteIdent('clickhouse', 'a`b'), '`a``b`')
+  })
+})
+
+describe('table queries', () => {
+  const t = { schema: 'public', name: 'Order' }
+
+  it('qualifies the table with its schema', () => {
+    assert.equal(qualifiedTable('postgres', t), 'public."Order"')
+  })
+
+  it('builds the preview and count statements', () => {
+    assert.equal(previewQuery('postgres', t), 'SELECT *\nFROM public."Order"\nLIMIT 100;\n')
+    assert.equal(countQuery('clickhouse', { schema: 'logs', name: 'hits' }), 'SELECT count(*)\nFROM logs.hits;\n')
+  })
+})
+
+describe('connectionUrl', () => {
+  it('builds a password-less URL with the default database', () => {
+    const conn = { driver: 'postgres', host: 'db.local', port: 5432, user: 'app', database: '' }
+    assert.equal(connectionUrl(conn), 'postgresql://app@db.local:5432/postgres')
+  })
+
+  it('escapes the user and database and omits an empty user', () => {
+    assert.equal(
+      connectionUrl({ driver: 'clickhouse', host: 'ch', port: 9000, user: 'a@b', database: 'my db' }),
+      'clickhouse://a%40b@ch:9000/my%20db',
+    )
+    assert.equal(connectionUrl({ driver: 'clickhouse', host: 'ch', port: 9000, user: '', database: 'x' }), 'clickhouse://ch:9000/x')
   })
 })

@@ -65,14 +65,32 @@ aws_session_token = TOKEN2
 aws_expiration = 2026-10-30T08:00:00.000Z
 `
 
+// saml2awsFixture: IdP accounts of ~/.saml2aws. "corp" logs in to saml-prod; none is named
+// "default", so saml2aws without --idp-account fails with "URL empty in idp account".
+const saml2awsFixture = `
+[shared]
+url                  = https://myapps.microsoft.com/signin/a
+password             = SECRET-DO-NOT-LEAK
+aws_profile          = default
+
+[corp]
+url                  = https://myapps.microsoft.com/signin/b
+aws_profile          = saml-prod
+`
+
 func writeFixture(t *testing.T) Files {
 	t.Helper()
 	dir := t.TempDir()
-	f := Files{Config: filepath.Join(dir, "config"), Credentials: filepath.Join(dir, "credentials"), SSOCache: filepath.Join(dir, "sso")}
+	f := Files{
+		Config:      filepath.Join(dir, "config"),
+		Credentials: filepath.Join(dir, "credentials"),
+		SSOCache:    filepath.Join(dir, "sso"),
+		SAML2AWS:    filepath.Join(dir, "saml2aws"),
+	}
 	if err := os.MkdirAll(f.SSOCache, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	for path, data := range map[string]string{f.Config: configFixture, f.Credentials: credentialsFixture} {
+	for path, data := range map[string]string{f.Config: configFixture, f.Credentials: credentialsFixture, f.SAML2AWS: saml2awsFixture} {
 		if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -123,11 +141,47 @@ func TestLoadDescribesEveryKind(t *testing.T) {
 	if p := byName["new-sso"]; p.Region != "us-east-1" || strings.Join(p.Login, " ") != "aws sso login --profile new-sso" {
 		t.Errorf("new-sso region/login %+v", p)
 	}
-	if got := strings.Join(byName["saml-prod"].Login, " "); got != "saml2aws login --profile saml-prod --role arn:aws:iam::444444444444:role/Ops" {
+	if got := strings.Join(byName["saml-prod"].Login, " "); got != "saml2aws login --idp-account corp --profile saml-prod --role arn:aws:iam::444444444444:role/Ops" {
 		t.Errorf("saml2aws login %q", got)
 	}
 	if byName["deploy"].Source != "default" || len(byName["azure-dev"].Login) != 0 || len(byName["azure-old"].Login) != 0 {
 		t.Errorf("deploy/azure %+v %+v", byName["deploy"], byName["azure-dev"])
+	}
+}
+
+func TestSAML2AWSLoginWithoutItsConfig(t *testing.T) {
+	f := writeFixture(t)
+	f.SAML2AWS = filepath.Join(t.TempDir(), "missing")
+	got, err := Load(f, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range got {
+		if p.Name == "saml-prod" && strings.Join(p.Login, " ") != "saml2aws login --profile saml-prod --role arn:aws:iam::444444444444:role/Ops" {
+			t.Errorf("login without ~/.saml2aws %q", p.Login)
+		}
+	}
+}
+
+func TestIDPAccounts(t *testing.T) {
+	got := idpAccounts(parseINI([]byte(`
+[by-name]
+aws_profile = other
+[first]
+aws_profile = prod
+[second]
+aws_profile = prod
+[stage]
+aws_profile =
+`)))
+	want := map[string]string{"other": "by-name", "prod": "first", "by-name": "by-name", "first": "first", "second": "second", "stage": "stage"}
+	if len(got) != len(want) {
+		t.Fatalf("idpAccounts = %v", got)
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("idpAccounts[%q] = %q, want %q", k, got[k], v)
+		}
 	}
 }
 

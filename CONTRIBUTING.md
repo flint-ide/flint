@@ -37,7 +37,7 @@ Every change in behavior needs tests.
 
 - **Go**: table-driven tests next to the code (`*_test.go`). Run `make test` (it uses `-race`). Database code that talks to a real server goes behind the `integration` build tag (`make test-db-up && make test-integration`).
 - **Frontend**: pure logic belongs in `frontend/src/lib` and is tested with `node:test` and `node:assert` in `*.test.ts` files next to it. Keep components thin so the logic can be tested without a DOM.
-- Tests must not touch the network or your real configuration. Use `FLINT_CONFIG_DIR` for a temporary config directory, and fakes on `PATH` for external CLIs (see the fake `gh` in `internal/github`).
+- Tests must not touch the network or your real configuration. Use `FLINT_CONFIG_DIR` for a temporary config directory, fakes on `PATH` for external CLIs, and local fakes for network APIs (see the fake GitHub in `internal/github/githubtest`).
 
 ## Code style
 

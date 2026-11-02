@@ -14,6 +14,9 @@ import { debugTestsInFile } from '../../store/debug'
 import { testLang } from '../../lib/testFiles'
 import { formatKeys } from '../../lib/commands'
 import { fileManagerName } from '../../lib/platform'
+import { fileMenuFor, useContributions } from '../../lib/contributions'
+import { showToast } from '../../store/dialog'
+import { errorMessage } from '../../api/backend'
 
 export interface MenuActions {
   /** Starts inline creation of a file or folder in dir. */
@@ -64,6 +67,9 @@ export function fileTreeMenu(roots: string[], targets: TreeEntry[], actions: Men
     )
   }
   items.push({ label: 'Add to Agent Chat', onSelect: () => void attachPathsToAgent(paths) })
+  // Entries feature modules contribute (lib/features.ts FileMenuItem).
+  const contributed = fileMenuFor(useContributions.getState().fileMenu, paths, (err) => showToast(errorMessage(err), 'error'))
+  if (contributed.length > 0) items.push({ type: 'separator' }, ...contributed)
   const lang = single && !single.isDir ? testLang(single.path) : null
   if (lang) {
     items.push({ type: 'separator' }, { label: 'Run Tests', hint: single!.name, onSelect: () => void runTestsInFile(single!.path) })

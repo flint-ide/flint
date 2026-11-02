@@ -1,13 +1,12 @@
 package github
 
 import (
-	"context"
 	"errors"
-	"os"
-	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
+
+	"flint/internal/cilog"
+	"flint/internal/github/githubtest"
 )
 
 func TestActionsIDs(t *testing.T) {
@@ -40,205 +39,183 @@ func TestActionsIDs(t *testing.T) {
 }
 
 func TestBranchChecks(t *testing.T) {
-	f := newFake(t)
-	f.on("repo view", repoJSON)
-	f.onFixture("pr view", "pr_view_ci.json")
-	c := f.client()
-	got, err := c.BranchChecks(context.Background(), t.TempDir(), "feat/rate-limit")
+	fx := newFixture(t)
+	bc, err := fx.c.BranchChecks(ctx(), fx.dir, "feat/rate-limit")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.PR == nil || got.PR.Number != 29 || got.PR.HeadSHA != "785d8f7a66d3403ed32421b45c87ede4fbda8bda" || got.PR.HeadRef != "feat/rate-limit" {
-		t.Fatalf("PR = %+v", got.PR)
+	if bc.PR == nil || bc.PR.Number != 7 || bc.PR.State != "OPEN" || bc.PR.HeadSHA != githubtest.HeadSHA || bc.PR.CrossRepository {
+		t.Fatalf("pr = %+v", bc.PR)
 	}
-	if got.Counts != (CheckCounts{Success: 2, Failure: 1, Pending: 1}) {
-		t.Errorf("counts = %+v", got.Counts)
+	if bc.Counts != (CheckCounts{Success: 1, Failure: 1, Pending: 1}) || len(bc.Checks) != 3 {
+		t.Fatalf("checks = %+v %+v", bc.Counts, bc.Checks)
 	}
-	failed := got.Checks[0]
-	if failed.State != "failure" || failed.RunID != 41307693761 || failed.JobID != 124851367741 || failed.Workflow != "CI" {
+	var failed Check
+	for _, c := range bc.Checks {
+		if c.State == "failure" {
+			failed = c
+		}
+	}
+	if failed.RunID != githubtest.RunID || failed.JobID != githubtest.FailedJob || failed.Workflow != "CI" || failed.Conclusion != "FAILURE" {
 		t.Errorf("failed check = %+v", failed)
-	}
-	if got.Checks[3].RunID != 0 {
-		t.Errorf("a commit status has no run: %+v", got.Checks[3])
-	}
-	calls := f.calls()
-	last := calls[len(calls)-1].args
-	want := []string{"pr", "view", "--repo=acme/flint", "--json=number,title,url,state,headRefName,headRefOid,isCrossRepository,statusCheckRollup", "--", "feat/rate-limit"}
-	if !slices.Equal(last, want) {
-		t.Errorf("args = %q, want %q", last, want)
 	}
 }
 
-// gh pr view reads "123" as pull request #123: another branch's pull request
-// must not be shown as this branch's.
-func TestBranchChecksNumericBranch(t *testing.T) {
-	f := newFake(t)
-	f.on("repo view", repoJSON)
-	f.onFixture("pr view", "pr_view_ci.json") // headRefName feat/rate-limit
-	got, err := f.client().BranchChecks(context.Background(), t.TempDir(), "29")
-	if err != nil || got.PR != nil || len(got.Checks) != 0 {
-		t.Errorf("BranchChecks(\"29\") = %+v, %v; want no pull request", got, err)
+func TestBranchChecksPollsConditionally(t *testing.T) {
+	fx := newFixture(t)
+	if _, err := fx.c.BranchChecks(ctx(), fx.dir, "feat/rate-limit"); err != nil {
+		t.Fatal(err)
+	}
+	before := fx.fake.NotModified()
+	again, err := fx.c.BranchChecks(ctx(), fx.dir, "feat/rate-limit")
+	if err != nil || again.PR == nil || len(again.Checks) != 3 {
+		t.Fatalf("second poll = %+v, %v", again, err)
+	}
+	if got := fx.fake.NotModified() - before; got != 4 {
+		t.Errorf("304 answers on the second poll = %d, want 4 (pulls, check runs, status, workflow runs)", got)
 	}
 }
 
 func TestBranchChecksCrossRepository(t *testing.T) {
-	f := newFake(t)
-	f.on("repo view", repoJSON)
-	f.on("pr view", `{"number":3,"title":"t","url":"u","state":"OPEN","headRefName":"patch-1","headRefOid":"abc","isCrossRepository":true,"statusCheckRollup":[]}`)
-	got, err := f.client().BranchChecks(context.Background(), t.TempDir(), "patch-1")
-	if err != nil || got.PR == nil || !got.PR.CrossRepository {
-		t.Errorf("BranchChecks = %+v, %v; want a cross-repository pull request", got.PR, err)
+	fx := newFixture(t)
+	// bob pushes main to his fork; the project has a remote for it.
+	runGit(t, fx.dir, "remote", "add", "bob", fx.fake.Web+"/bob/widgets.git")
+	fx.c.Reset()
+	bc, err := fx.c.BranchChecks(ctx(), fx.dir, "main")
+	if err != nil || bc.PR == nil || bc.PR.Number != 8 || !bc.PR.CrossRepository {
+		t.Fatalf("fork branch = %+v, %v", bc.PR, err)
 	}
 }
 
 func TestBranchChecksNoPullRequest(t *testing.T) {
-	f := newFake(t)
-	f.on("repo view", repoJSON)
-	f.onExit("pr view", "", `no pull requests found for branch "wip"`, 1)
-	got, err := f.client().BranchChecks(context.Background(), t.TempDir(), "wip")
-	if err != nil || got.PR != nil || len(got.Checks) != 0 {
-		t.Errorf("BranchChecks = %+v, %v; want no pull request", got, err)
+	fx := newFixture(t)
+	bc, err := fx.c.BranchChecks(ctx(), fx.dir, "no-pr")
+	if err != nil || bc.PR != nil || bc.Checks == nil {
+		t.Fatalf("= %+v, %v", bc, err)
 	}
 }
 
 func TestBranchChecksRejectsBadBranches(t *testing.T) {
-	f := newFake(t)
-	f.on("repo view", repoJSON)
-	c := f.client()
-	for _, b := range []string{"", "-x", "--repo=evil/x", "a b", "a\nb", "a..b", strings.Repeat("a", 300)} {
-		if _, err := c.BranchChecks(context.Background(), t.TempDir(), b); err == nil {
-			t.Errorf("branch %q accepted", b)
+	fx := newFixture(t)
+	for _, b := range []string{"", "-x", "a b", "a..b", "a:b", "a\nb", strings.Repeat("x", 300)} {
+		if _, err := fx.c.BranchChecks(ctx(), fx.dir, b); err == nil {
+			t.Errorf("%q accepted", b)
 		}
 	}
-	for _, call := range f.calls() {
-		if call.args[0] == "pr" {
-			t.Errorf("gh ran for a bad branch: %v", call)
-		}
+	if len(fx.fake.Requests()) != 0 {
+		t.Error("asked GitHub about an invalid branch")
 	}
 }
 
 func TestRun(t *testing.T) {
-	f := newFake(t)
-	f.on("repo view", repoJSON)
-	f.onFixture("run view 41307693761 --repo=acme/flint --json", "run_view.json")
-	run, err := f.client().Run(context.Background(), t.TempDir(), 41307693761)
+	fx := newFixture(t)
+	run, err := fx.c.Run(ctx(), fx.dir, githubtest.RunID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if run.ID != 41307693761 || run.Workflow != "CI" || run.Branch != "feat/rate-limit" || run.SHA == "" || run.Attempt != 1 || len(run.Jobs) != 2 {
+	if run.Workflow != "CI" || run.Attempt != 1 || run.Branch != "feat/rate-limit" || len(run.Jobs) != 2 {
 		t.Fatalf("run = %+v", run)
 	}
 	j := run.Jobs[0]
-	if j.ID != 124851367741 || j.Conclusion != "failure" || len(j.Steps) != 5 {
-		t.Fatalf("job = %+v", j)
-	}
-	if s := j.FailedStep(); s == nil || s.Name != "go test" || s.Number != 12 {
-		t.Errorf("failed step = %+v", s)
-	}
-	if s := run.Jobs[1].FailedStep(); s != nil {
-		t.Errorf("a passing job has failed step %+v", s)
+	if !j.Failed() || j.FailedStep() == nil || j.FailedStep().Name != "go test" || run.Jobs[1].Failed() {
+		t.Errorf("jobs = %+v", run.Jobs)
 	}
 }
 
 func TestFailedLog(t *testing.T) {
-	f := newFake(t)
-	f.on("repo view", repoJSON)
-	f.onFixture("--log-failed", "log_failed.txt")
-	c := f.client()
-	dir := t.TempDir()
-	log, cut, err := c.FailedLog(context.Background(), dir, 41307693761, 0)
-	if err != nil || cut {
-		t.Fatal(cut, err)
-	}
-	want, _ := os.ReadFile(filepath.Join("testdata", "log_failed.txt"))
-	if log != string(want) {
-		t.Errorf("log differs:\n%s", log)
-	}
-	if _, _, err := c.FailedLog(context.Background(), dir, 41307693761, 124851367741); err != nil {
-		t.Fatal(err)
-	}
-	calls := f.calls()
-	if got := calls[len(calls)-2].args; !slices.Equal(got, []string{"run", "view", "41307693761", "--repo=acme/flint", "--log-failed"}) {
-		t.Errorf("run log args = %q", got)
-	}
-	if got := calls[len(calls)-1].args; !slices.Equal(got, []string{"run", "view", "41307693761", "--repo=acme/flint", "--job=124851367741", "--log-failed"}) {
-		t.Errorf("job log args = %q", got)
-	}
-}
-
-// A log longer than maxLogBytes keeps its end, says so, and starts at a whole line.
-func TestFailedLogReportsTheCut(t *testing.T) {
-	f := newFake(t)
-	f.on("repo view", repoJSON)
-	line := "job\tstep\t2026-01-01T00:00:00.0000000Z " + strings.Repeat("x", 200) + "\n"
-	big := strings.Repeat(line, maxLogBytes/len(line)+50) + "job\tstep\t2026-01-01T00:00:00.0000000Z the end\n"
-	f.on("--log-failed", big)
-	log, cut, err := f.client().FailedLog(context.Background(), t.TempDir(), 1, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !cut || len(log) > maxLogBytes || !strings.HasSuffix(log, "the end\n") {
-		t.Errorf("cut = %v, %d bytes, ends %q", cut, len(log), log[max(0, len(log)-20):])
-	}
-	if !strings.HasPrefix(log, "job\tstep\t") {
-		t.Errorf("starts with a partial line: %q", log[:40])
-	}
-}
-
-func TestFailedLogKeepsTheTail(t *testing.T) {
-	var b tailBuffer
-	b.max = 10
-	for _, s := range []string{"0123456789", "abcdef", "XYZ"} {
-		if _, err := b.Write([]byte(s)); err != nil {
-			t.Fatal(err)
+	fx := newFixture(t)
+	for _, job := range []int64{githubtest.FailedJob, 0} {
+		log, cut, err := fx.c.FailedLog(ctx(), fx.dir, githubtest.RunID, job)
+		if err != nil || cut {
+			t.Fatalf("job %d: cut=%v err=%v", job, cut, err)
+		}
+		steps := cilog.Parse(log)
+		if len(steps) != 1 || steps[0].Job != "Build and test (macOS)" || steps[0].Step != "go test" {
+			t.Fatalf("job %d: steps = %+v\n%s", job, steps, log)
+		}
+		text := strings.Join(steps[0].Lines, "\n")
+		if !strings.Contains(text, "--- FAIL: TestStopDoesNotWaitForAClientThatStoppedReading") || strings.Contains(text, "Current runner version") || strings.Contains(text, "orphan processes") {
+			t.Errorf("job %d: lines = %s", job, text)
 		}
 	}
-	if got := b.String(); got != "9abcdefXYZ" {
-		t.Errorf("tail = %q, want %q", got, "9abcdefXYZ")
+	// The redirected log host never saw the token.
+	logs := fx.fake.LogRequests()
+	if len(logs) != 2 {
+		t.Fatalf("log requests = %+v", logs)
 	}
-	if !b.cut {
-		t.Error("cut not reported")
+	for _, r := range logs {
+		if r.Auth != "" {
+			t.Errorf("token sent to the log host: %q", r.Auth)
+		}
+	}
+}
+
+func TestFailedLogValidatesJob(t *testing.T) {
+	fx := newFixture(t)
+	if _, _, err := fx.c.FailedLog(ctx(), fx.dir, 999, githubtest.FailedJob); err == nil {
+		t.Error("a job of another run accepted")
+	}
+	_, _, err := fx.c.FailedLog(ctx(), fx.dir, githubtest.RunID, githubtest.PassedJob)
+	if err == nil || !strings.Contains(err.Error(), "no log") {
+		t.Errorf("expired log: %v", err)
 	}
 }
 
 func TestRerunFailed(t *testing.T) {
-	f := newFake(t)
-	f.on("repo view", repoJSON)
-	f.on("run rerun", "")
-	if err := f.client().RerunFailed(context.Background(), t.TempDir(), 41307693761); err != nil {
+	fx := newFixture(t)
+	if err := fx.c.RerunFailed(ctx(), fx.dir, githubtest.RunID); err != nil {
 		t.Fatal(err)
 	}
-	calls := f.calls()
-	if got := calls[len(calls)-1].args; !slices.Equal(got, []string{"run", "rerun", "41307693761", "--repo=acme/flint", "--failed"}) {
-		t.Errorf("args = %q", got)
+	if fx.fake.Reruns() != 1 {
+		t.Error("rerun not requested")
 	}
 }
 
 func TestRunIDsValidated(t *testing.T) {
-	f := newFake(t)
-	f.on("repo view", repoJSON)
-	c := f.client()
-	ctx := context.Background()
-	dir := t.TempDir()
+	fx := newFixture(t)
 	for _, id := range []int64{0, -1, 1 << 53} {
-		if _, err := c.Run(ctx, dir, id); !errors.Is(err, ErrBadID) {
-			t.Errorf("Run(%d) = %v", id, err)
+		if _, err := fx.c.Run(ctx(), fx.dir, id); !errors.Is(err, ErrBadID) {
+			t.Errorf("Run(%d): %v", id, err)
 		}
-		if _, _, err := c.FailedLog(ctx, dir, id, 0); !errors.Is(err, ErrBadID) {
-			t.Errorf("FailedLog(%d) = %v", id, err)
+		if err := fx.c.RerunFailed(ctx(), fx.dir, id); !errors.Is(err, ErrBadID) {
+			t.Errorf("RerunFailed(%d): %v", id, err)
 		}
-		if id != 0 {
-			if _, _, err := c.FailedLog(ctx, dir, 1, id); !errors.Is(err, ErrBadID) {
-				t.Errorf("FailedLog(job %d) = %v", id, err)
-			}
+		if _, _, err := fx.c.FailedLog(ctx(), fx.dir, id, 1); !errors.Is(err, ErrBadID) {
+			t.Errorf("FailedLog(run %d): %v", id, err)
 		}
-		if err := c.RerunFailed(ctx, dir, id); !errors.Is(err, ErrBadID) {
-			t.Errorf("RerunFailed(%d) = %v", id, err)
+		if id == 0 {
+			continue // job 0 means all failed jobs
+		}
+		if _, _, err := fx.c.FailedLog(ctx(), fx.dir, 1, id); !errors.Is(err, ErrBadID) {
+			t.Errorf("FailedLog(job %d): %v", id, err)
 		}
 	}
-	for _, call := range f.calls() {
-		if call.args[0] == "run" {
-			t.Errorf("gh ran with a bad id: %v", call)
-		}
+	if len(fx.fake.Requests()) != 0 {
+		t.Error("asked GitHub with an invalid id")
+	}
+}
+
+func TestFailedStepsSplitsByTime(t *testing.T) {
+	job := Job{Name: "build", Steps: []Step{
+		{Name: "setup", Conclusion: "success", StartedAt: "2026-11-01T10:00:00Z", CompletedAt: "2026-11-01T10:00:05Z"},
+		{Name: "test", Conclusion: "failure", StartedAt: "2026-11-01T10:00:06Z", CompletedAt: "2026-11-01T10:00:09Z"},
+		{Name: "post", Conclusion: "success", StartedAt: "2026-11-01T10:00:20Z", CompletedAt: "2026-11-01T10:00:21Z"},
+	}}
+	raw := "\uFEFF2026-11-01T10:00:01.5Z setting up\n" +
+		"2026-11-01T10:00:06.1Z ##[group]Run go test\n" +
+		"2026-11-01T10:00:09.9Z FAIL x\n" +
+		"  continuation\n" +
+		"2026-11-01T10:00:20.0Z cleanup\n"
+	got := failedSteps(job, raw)
+	want := "build\ttest\t2026-11-01T10:00:06.1Z ##[group]Run go test\n" +
+		"build\ttest\t2026-11-01T10:00:09.9Z FAIL x\n" +
+		"  continuation\n"
+	if got != want {
+		t.Fatalf("failedSteps =\n%q\nwant\n%q", got, want)
+	}
+	// No step times: the whole log stands for the job.
+	bare := failedSteps(Job{Name: "b\tx"}, "2026-11-01T10:00:01Z a\n")
+	if bare != "b x\t\t2026-11-01T10:00:01Z a\n" {
+		t.Errorf("no steps: %q", bare)
 	}
 }

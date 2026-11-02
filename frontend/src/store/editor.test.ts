@@ -149,3 +149,17 @@ describe('editor tabs follow the file tree', () => {
     assert.equal(st().activeId, 'file:/p/keep.go')
   })
 })
+
+describe('contributed tabs', () => {
+  it('opens one tab per view and key, replacing title and data when opened again', () => {
+    st().openFile('/p/a.go')
+    st().openContributed('acme.report', 'r1', 'Report 1', { rows: 1 })
+    assert.equal(st().activeId, 'contrib:acme.report:r1')
+    st().setActive('file:/p/a.go')
+    st().openContributed('acme.report', 'r1', 'Report 1 (2)', { rows: 2 })
+    const tabs = st().tabs.filter((t) => t.kind === 'contrib')
+    assert.equal(tabs.length, 1)
+    assert.deepEqual(tabs[0], { id: 'contrib:acme.report:r1', kind: 'contrib', view: 'acme.report', title: 'Report 1 (2)', data: { rows: 2 }, dirty: false })
+    assert.equal(st().activeId, 'contrib:acme.report:r1')
+  })
+})

@@ -45,18 +45,14 @@ export function CheckLanguageServer(language: string, l: settings$0.LanguageServ
  * Defaults returns the built-in settings, for "reset to default".
  */
 export function Defaults(): $CancellablePromise<settings$0.Settings> {
-    return $Call.ByID(4043453211).then(($result: any) => {
-        return $$createType0($result);
-    });
+    return $Call.ByID(4043453211);
 }
 
 /**
  * Get returns the current settings (defaults for anything not configured).
  */
 export function Get(): $CancellablePromise<settings$0.Settings> {
-    return $Call.ByID(283589915).then(($result: any) => {
-        return $$createType0($result);
-    });
+    return $Call.ByID(283589915);
 }
 
 /**
@@ -70,7 +66,7 @@ export function Get(): $CancellablePromise<settings$0.Settings> {
  */
 export function ProbeCustomAgent(id: string): $CancellablePromise<acpdriver$0.AgentInfo> {
     return $Call.ByID(3601295811, id).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType0($result);
     });
 }
 
@@ -81,11 +77,8 @@ export function ProbeCustomAgent(id: string): $CancellablePromise<acpdriver$0.Ag
  * registered again (running chats keep theirs).
  */
 export function Save(next: settings$0.Settings): $CancellablePromise<settings$0.Settings> {
-    return $Call.ByID(2801417772, next).then(($result: any) => {
-        return $$createType0($result);
-    });
+    return $Call.ByID(2801417772, next);
 }
 
 // Private type creation functions
-const $$createType0 = settings$0.Settings.createFrom;
-const $$createType1 = acpdriver$0.AgentInfo.createFrom;
+const $$createType0 = acpdriver$0.AgentInfo.createFrom;

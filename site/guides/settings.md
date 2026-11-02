@@ -12,7 +12,7 @@ The tab has fifteen sections: Appearance, Editor, Terminal, Agents, Agent Contex
 
 ## Appearance
 
-**Theme**: Dark, Light or System, and Custom once you have [imported a theme from VS Code](../how-to/customize-flint.md#import-your-settings-from-vs-code). System follows the macOS appearance and switches when macOS does. Custom lays the imported colors over the dark or light palette; the hint under the label names the theme. The title bar and window buttons follow the theme, and Flint starts in the theme you used last, so a light theme never flashes dark on launch.
+**Theme**: Dark, Light or System, and Custom once you have [imported a theme from VS Code](../how-to/customize-flint.md#import-your-settings-from-vs-code) or [chosen one from an extension](../how-to/customize-flint.md#use-a-theme-from-an-extension). **Color theme**, shown when an installed extension has themes, picks one of them. System follows the macOS appearance and switches when macOS does. Custom lays the imported colors over the dark or light palette; the hint under the label names the theme. The title bar and window buttons follow the theme, and Flint starts in the theme you used last, so a light theme never flashes dark on launch.
 
 ## Editor
 
@@ -27,6 +27,16 @@ The font settings apply to all editors: files, diffs and scratchpads. **Reset to
 ## Terminal
 
 Font family, size (default 13) and line height (default 1.2) for terminals and run consoles. Run consoles use a size one point smaller. Terminals resize immediately when you change these.
+
+## Accounts
+
+The GitHub account pull requests and CI use ([Signing in](git-and-github.md#signing-in)):
+
+- The signed-in account (avatar, login, host, scopes, and whether it came from Sign in with GitHub or the GitHub CLI), with **Sign Out**, which deletes the token from the keyring. Revoking it at GitHub is done on GitHub's authorized apps page (linked).
+- **Sign in with GitHub** and **Use the GitHub CLI's Token** when no account is signed in; a token from `GH_TOKEN` / `GITHUB_TOKEN` in Flint's environment is shown as such.
+- **Host**: `github.com` or your GitHub Enterprise Server.
+- **OAuth App client ID**: the app Sign in with GitHub uses (see the section's instructions for registering one with Device Flow enabled).
+- **Scopes** (default `repo, read:org, workflow`) and **Wait for GitHub's retry-after up to** (default 60 seconds).
 
 ## Agents
 
@@ -127,6 +137,10 @@ The command palette uses your shortcuts too.
 - **Check Now**: checks right away, even when the daily check is off, and tells you if you are up to date. **Help ▸ Check for Updates…** does the same.
 
 Flint never downloads or installs updates itself. See [Update check](../reference/privacy-and-security.md#update-check) for exactly what is sent.
+
+## Extensions
+
+Installed extensions, their state, permissions and log, with **Install from Folder…**, an on/off switch, **Use …** for each color theme and **Uninstall…**. See [Extensions](extensions.md) and [Use a theme from an extension](../how-to/customize-flint.md#use-a-theme-from-an-extension).
 
 ## Import
 

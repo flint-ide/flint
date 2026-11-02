@@ -1,6 +1,7 @@
 // The shape of settings.json (internal/settings in Go) and the pure parts of
 // applying it: theme resolution and the CSS variables editors read. Framework-free,
 // so it is testable with node:test; store/settings.ts does the applying.
+// Keys that feature modules own are not listed here: see lib/settingsSections.ts.
 
 import {
   coerceAgents, coerceRefresh, coerceServers, DEFAULT_REFRESH,
@@ -17,7 +18,9 @@ import { coerceUsage, DEFAULT_USAGE, type UsageSettings } from './usageSettings'
 import { coercePromptSettings, DEFAULT_PROMPT_SETTINGS, type PromptSettings } from './prompts'
 import { coerceAgentReview, DEFAULT_AGENT_REVIEW, type AgentReviewSettings } from './reviewSettings'
 import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
-import { coerceDocker, DEFAULT_DOCKER, type DockerSettings } from './dockerSettings'
+import { coerceGitHub, DEFAULT_GITHUB, type GitHubSettings } from './githubSettings'
+import { coerceSections, type FeatureSettings } from './settingsSections'
+import { TERMINAL_COLOR_NAMES } from './terminalTheme'
 
 import type { ResolvedTheme, ThemeMode } from './themeMode'
 
@@ -40,9 +43,14 @@ export interface CustomTheme {
   base: ResolvedTheme
   /** CSS variable ('--bg-editor') → hex color; Go allows only style.css's theme variables. */
   colors: Record<string, string>
+  /** xterm color ('red', 'brightBlue', 'background') → hex color; see TERMINAL_COLOR_NAMES. */
+  terminal: Record<string, string>
+  /** The extension theme it was taken from ('acme.nord.dark'), or '' (imported or hand-written). */
+  source: string
 }
 
-export interface AppSettings {
+/** The keys of settings.json that Flint itself owns. */
+export interface CoreSettings {
   version: number
   theme: ThemeMode
   editor: EditorSettings
@@ -54,12 +62,8 @@ export interface AppSettings {
   autoSave: boolean
   /** Notification and Dock badge when work finishes while Flint is in the background. */
   notifyInBackground: boolean
-  /** Ask GitHub once a day whether a newer Flint release exists. */
-  checkForUpdates: boolean
   /** Shortcut overrides: command id → keys ('' = none). */
   keymap: Record<string, string>
-  /** Extra folders / globs the TODO list skips, gitignore-style. */
-  todoExclude: string[]
   /** Folder names (or globs over one) the Linux file watcher skips, on top of dependency folders. */
   watchExclude: string[]
   /** Agent CLIs by name ('claude', 'codex'); missing = defaults. */
@@ -86,23 +90,26 @@ export interface AppSettings {
   agentReview: AgentReviewSettings
   /** Following your pull requests' CI: poll interval, log excerpt size, notifications. */
   ci: CISettings
-  /** How the Docker panel reaches the engine (lib/dockerSettings.ts). */
-  docker: DockerSettings
+  /** GitHub host, the OAuth App Flint signs in with, scopes and the retry wait (lib/githubSettings.ts). */
+  github: GitHubSettings
 }
 
-/** Mirrors settings.Default() in Go (used until the backend answers). */
-export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
+/** The whole settings.json: Flint's keys plus the sections features registered. */
+export type AppSettings = CoreSettings & FeatureSettings
+
+/** Mirrors settings.Default() in Go for Flint's own keys (used until the backend answers). */
+export const DEFAULT_SETTINGS: CoreSettings = Object.freeze({
   version: 1,
   theme: 'dark',
   editor: Object.freeze({ fontFamily: `'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace`, fontSize: 13, lineHeight: 1.55, vimMode: false }),
   terminal: Object.freeze({ fontFamily: `"JetBrains Mono", "SF Mono", Menlo, monospace`, fontSize: 13, lineHeight: 1.2 }),
-  customTheme: Object.freeze({ name: '', base: 'dark', colors: Object.freeze({}) as Record<string, string> }) as CustomTheme,
+  customTheme: Object.freeze({
+    name: '', base: 'dark', colors: Object.freeze({}) as Record<string, string>, terminal: Object.freeze({}) as Record<string, string>, source: '',
+  }) as CustomTheme,
   defaultAgent: '',
   autoSave: false,
   notifyInBackground: true,
-  checkForUpdates: true,
   keymap: Object.freeze({}) as Record<string, string>,
-  todoExclude: Object.freeze([]) as unknown as string[],
   watchExclude: Object.freeze(['dist', '.cache']) as unknown as string[],
   agents: Object.freeze({}) as Record<string, AgentSettings>,
   customAgents: Object.freeze([]) as unknown as CustomAgent[],
@@ -116,8 +123,11 @@ export const DEFAULT_SETTINGS: AppSettings = Object.freeze({
   prompts: DEFAULT_PROMPT_SETTINGS,
   agentReview: DEFAULT_AGENT_REVIEW,
   ci: DEFAULT_CI,
-  docker: DEFAULT_DOCKER,
-}) as AppSettings
+  github: DEFAULT_GITHUB,
+}) as CoreSettings
+
+/** Flint's own keys; a feature's section may not use one. */
+export const CORE_KEYS: readonly string[] = Object.freeze(Object.keys(DEFAULT_SETTINGS))
 
 /** Same limits as Go's settings.Validate, for the inputs. */
 export const FONT_SIZE = { min: 8, max: 32 }
@@ -145,7 +155,7 @@ export function parseExcludes(text: string, valid: (p: string) => boolean = vali
 }
 
 /** The custom theme's CSS variables, set on :root over the base palette (none unless Theme is Custom). */
-export function themeCssVars(s: AppSettings): Record<string, string> {
+export function themeCssVars(s: CoreSettings): Record<string, string> {
   return s.theme === 'custom' ? s.customTheme.colors : {}
 }
 
@@ -160,25 +170,34 @@ export const THEME_VARIABLES: readonly string[] = Object.freeze([
   '--syn-keyword', '--syn-string', '--syn-number', '--syn-comment', '--syn-function',
   '--syn-type', '--syn-property', '--syn-definition', '--syn-punct',
 ])
-const THEME_VARIABLE_SET = new Set(THEME_VARIABLES)
+const THEME_VARIABLE_SET: ReadonlySet<string> = new Set(THEME_VARIABLES)
+const TERMINAL_COLOR_SET: ReadonlySet<string> = new Set(TERMINAL_COLOR_NAMES)
+const MAX_THEME_SOURCE_LEN = 200 // Go's settings.MaxThemeSourceLen
+// Go's unicode.IsControl: C0, DEL and C1.
+const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/
+const utf8Length = (s: string) => new TextEncoder().encode(s).length
 
-function customTheme(v: unknown, def: CustomTheme): CustomTheme {
+/** The hex colors of v whose names are allowed; anything else is dropped. */
+export function coerceColorMap(v: unknown, allowed: ReadonlySet<string>): Record<string, string> {
+  if (!isObject(v)) return {}
+  return Object.fromEntries(Object.entries(v).filter(([name, color]) => allowed.has(name) && typeof color === 'string' && HEX_COLOR.test(color))) as Record<string, string>
+}
+
+/** A custom theme from untrusted JSON, filtered like Go's normalizeCustomTheme. */
+export function coerceCustomTheme(v: unknown, def: CustomTheme = DEFAULT_SETTINGS.customTheme): CustomTheme {
   if (!isObject(v)) return def
-  const colors: Record<string, string> = {}
-  if (isObject(v.colors)) {
-    for (const [name, color] of Object.entries(v.colors)) {
-      if (THEME_VARIABLE_SET.has(name) && typeof color === 'string' && HEX_COLOR.test(color)) colors[name] = color
-    }
-  }
+  const source = typeof v.source === 'string' && utf8Length(v.source) <= MAX_THEME_SOURCE_LEN && !CONTROL_CHARS.test(v.source) ? v.source : ''
   return {
     name: typeof v.name === 'string' ? v.name : '',
     base: v.base === 'light' ? 'light' : 'dark',
-    colors,
+    colors: coerceColorMap(v.colors, THEME_VARIABLE_SET),
+    terminal: coerceColorMap(v.terminal, TERMINAL_COLOR_SET),
+    source,
   }
 }
 
 /** CSS custom properties on :root that the editors read (style.css, lib/editorSetup.ts). */
-export function editorCssVars(s: AppSettings): Record<string, string> {
+export function editorCssVars(s: CoreSettings): Record<string, string> {
   return {
     '--editor-font': s.editor.fontFamily,
     '--editor-font-size': `${s.editor.fontSize}px`,
@@ -201,9 +220,14 @@ function font(v: unknown, def: FontSettings): FontSettings {
 /**
  * Settings from untrusted JSON (the backend, or the copy cached in localStorage
  * for the first paint): missing or invalid values get defaults, like Go's Normalize.
+ * Registered sections are coerced by their own feature (lib/settingsSections.ts).
  */
 export function coerceSettings(v: unknown): AppSettings {
-  if (!isObject(v)) return DEFAULT_SETTINGS
+  const obj = isObject(v) ? v : {}
+  return { ...coerceCore(obj), ...coerceSections(obj) }
+}
+
+function coerceCore(v: Record<string, unknown>): CoreSettings {
   const d = DEFAULT_SETTINGS
   const keymap: Record<string, string> = {}
   if (isObject(v.keymap)) {
@@ -217,13 +241,11 @@ export function coerceSettings(v: unknown): AppSettings {
       vimMode: isObject(v.editor) && typeof v.editor.vimMode === 'boolean' ? v.editor.vimMode : d.editor.vimMode,
     },
     terminal: font(v.terminal, d.terminal),
-    customTheme: customTheme(v.customTheme, d.customTheme),
+    customTheme: coerceCustomTheme(v.customTheme, d.customTheme),
     defaultAgent: typeof v.defaultAgent === 'string' ? v.defaultAgent : d.defaultAgent,
     autoSave: typeof v.autoSave === 'boolean' ? v.autoSave : d.autoSave,
     notifyInBackground: typeof v.notifyInBackground === 'boolean' ? v.notifyInBackground : d.notifyInBackground,
-    checkForUpdates: typeof v.checkForUpdates === 'boolean' ? v.checkForUpdates : d.checkForUpdates,
     keymap,
-    todoExclude: Array.isArray(v.todoExclude) ? v.todoExclude.filter((p): p is string => typeof p === 'string' && validExclude(p)) : [],
     watchExclude: Array.isArray(v.watchExclude) ? v.watchExclude.filter((p): p is string => typeof p === 'string' && validWatchExclude(p)) : d.watchExclude,
     agents: coerceAgents(v.agents),
     customAgents: coerceCustomAgents(v.customAgents),
@@ -237,6 +259,6 @@ export function coerceSettings(v: unknown): AppSettings {
     prompts: coercePromptSettings(v.prompts),
     agentReview: coerceAgentReview(v.agentReview),
     ci: coerceCI(v.ci),
-    docker: coerceDocker(v.docker),
+    github: coerceGitHub(v.github),
   }
 }

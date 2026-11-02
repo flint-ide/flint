@@ -80,7 +80,7 @@ function TaskRow({ t, changes, open, busy }: RowProps) {
         {a.diff && <button className="link" onClick={() => toggleChanges(t)}>{open ? 'Hide diff' : 'Show diff'}</button>}
         {a.askAgent && <button className="link" onClick={() => void askAgentAboutTask(t)} title="Put the error in the task's chat for the agent">✦ Ask agent</button>}
         {a.merge && <button className="link" disabled={busy} onClick={() => void mergeTask(t)} title={`Merge into ${t.base} where it is checked out`}>Merge</button>}
-        {a.pr && <button className="link" disabled={busy} onClick={() => void createTaskPullRequest(t)} title="Push the branch and create a pull request with gh">Create PR</button>}
+        {a.pr && <button className="link" disabled={busy} onClick={() => void createTaskPullRequest(t)} title="Push the branch and create a pull request on GitHub (asks first)">Create PR</button>}
         {t.pullRequest && <button className="link" onClick={() => BrowserOpenURL(t.pullRequest)} title={t.pullRequest}>PR ↗</button>}
         <TaskCIFix t={t} />
         <span className="spacer" />

@@ -4,7 +4,7 @@ Flint is a fast, AI-first IDE for macOS. Coding agents such as Claude Code and C
 
 ![A tour of Flint: go to a file, search the project, review a change in the Commit panel, and hand a failing Kubernetes deploy to the agent](images/tour.gif)
 
-Flint is a single native process that uses the macOS system WebView (WKWebView) instead of Electron. It starts quickly and stays light on CPU and memory, and it uses the tools you already have installed (git, ripgrep, gh, kubectl, aws, your agent CLIs) with the same `PATH` and logins as your terminal.
+Flint is a single native process that uses the macOS system WebView (WKWebView) instead of Electron. It starts quickly and stays light on CPU and memory, and it uses the tools you already have installed (git, ripgrep, kubectl, aws, your agent CLIs) with the same `PATH` and logins as your terminal.
 
 ## Start here
 
@@ -35,7 +35,7 @@ See [AI agents](guides/ai-agents.md) and [Build a feature with an agent](use-cas
 ### Git and GitHub
 
 - Commit panel, side-by-side diffs, blame, file history, stash, branches and worktrees.
-- Review pull requests through the GitHub CLI: CI status, inline comments, replies and reviews.
+- Review pull requests with your GitHub account (Sign in with GitHub): CI status, inline comments, replies and reviews.
 
 See [Git and GitHub](guides/git-and-github.md).
 

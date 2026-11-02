@@ -4,7 +4,7 @@ A teammate asked for your review. This walkthrough takes you from the pull reque
 
 ## Before you start
 
-- Install the GitHub CLI (`brew install gh`) and sign in with `gh auth login`. Flint uses `gh` for everything, so GitHub Enterprise and `GH_TOKEN` work as they do in your terminal.
+- Sign in to GitHub in **Settings ▸ Accounts** (or click **Sign in with GitHub** in the Pull Requests view). If you use the GitHub CLI, **Use the GitHub CLI's Token** takes its token in one click. For GitHub Enterprise, set the host there first.
 - Open the repository in Flint. It needs a GitHub remote.
 
 ## 1. Find the pull request
@@ -61,7 +61,7 @@ While you have a pending review, the bar shows how many comments it holds. **Dis
 Sometimes you need to run the code.
 
 1. Make sure you have no uncommitted changes to tracked files. Check out refuses otherwise, to protect your work.
-2. Click **Check out** in the pull request tab. Flint runs `gh pr checkout`.
+2. Click **Check out** in the pull request tab. Flint fetches `pull/N/head` and switches to the pull request's branch.
 3. Run the tests from the gutter or start a run configuration with `⌃R`.
 
 To understand a tricky part, select it and press `⌘L` to ask the agent about it.

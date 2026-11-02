@@ -10,7 +10,6 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"flint/internal/diag"
-	"flint/internal/github"
 	"flint/internal/shellenv"
 )
 
@@ -33,7 +32,6 @@ func main() {
 	}
 
 	gitAPI := &GitAPI{app: flint}
-	gh := github.New()
 	lspAPI := &LSPAPI{app: flint}
 	lspAPI.wire()
 	app := application.New(application.Options{
@@ -53,7 +51,8 @@ func main() {
 		SingleInstance: singleInstance(flint),
 		// ⌘Q asks the frontend first, like closing the window (see beforeClose).
 		ShouldQuit: func() bool { return !flint.beforeClose() },
-		Services: []application.Service{
+		// Flint's own services, then the feature modules' (features.go).
+		Services: append([]application.Service{
 			application.NewService(&lifecycle{app: flint}), // first: the others use App.ctx
 			application.NewService(&WorkspaceAPI{app: flint}),
 			application.NewService(&SearchAPI{app: flint}),
@@ -72,22 +71,20 @@ func main() {
 			application.NewService(&PromptsAPI{app: flint, git: gitAPI}),
 			application.NewService(&EditorContextAPI{app: flint}),
 			application.NewService(&DiffAPI{}),
-			application.NewService(&TodoAPI{app: flint}),
-			application.NewService(flint.dockerAPI),
 			application.NewService(&HTTPAPI{app: flint}),
 			application.NewService(&PreviewAPI{app: flint}),
 			application.NewService(&SettingsAPI{app: flint}),
-			application.NewService(&GitHubAPI{app: flint, git: gitAPI, gh: gh}),
-			application.NewService(&TaskAPI{app: flint, git: gitAPI, pr: gh}),
+			application.NewService(&GitHubAPI{app: flint, git: gitAPI, gh: flint.github}),
+			application.NewService(&AccountsAPI{app: flint}),
+			application.NewService(&TaskAPI{app: flint, git: gitAPI, pr: flint.github}),
 			application.NewService(&UsageAPI{app: flint}),
 			application.NewService(&ImportAPI{app: flint}),
 			application.NewService(newAlertsAPI(flint)),
 			application.NewService(newAWSAPI(flint)),
 			application.NewService(&KubeAPI{app: flint}),
 			application.NewService(&DiagnosticsAPI{app: flint}),
-			application.NewService(&UpdateAPI{app: flint}),
 			application.NewService(newCompletionsAPI(flint)),
-		},
+		}, flint.featureServices()...),
 	})
 	flint.wails = app
 	app.Menu.Set(flint.buildMenu())

@@ -9,6 +9,7 @@ import {
   openPullRequestFile,
   usePullRequests,
 } from '../../store/pullRequests'
+import { GitHubError } from '../accounts/GitHubError'
 import { ROLLUP_GLYPH, checksSummary, countChecks, reviewStateLabel, rollup, stateBadge, threadCounts, timeAgo } from '../../lib/prReview'
 import { HtmlBody } from './ReviewThread'
 import { ReviewBar } from './ReviewBar'
@@ -34,7 +35,7 @@ export function PullRequestView({ tab, active }: { tab: PullRequestTab; active: 
   if (!d) {
     return (
       <div className="pr-view">
-        {entry?.error ? <div className="placeholder error selectable">{entry.error}</div> : <div className="placeholder">Loading #{tab.number}…</div>}
+        {entry?.error ? <GitHubError message={entry.error} /> : <div className="placeholder">Loading #{tab.number}…</div>}
       </div>
     )
   }
@@ -50,7 +51,7 @@ export function PullRequestView({ tab, active }: { tab: PullRequestTab; active: 
             <span className="spacer" />
             <button className="icon" title="Refresh" disabled={entry.loading} onClick={() => void loadDetails(tab.root, tab.number, true)}>↻</button>
             {d.state === 'OPEN' && (
-              <button disabled={!!busy} onClick={() => void checkoutPullRequest(tab.root, d.number, d.headRef)} title="gh pr checkout (refused while files have local changes)">
+              <button disabled={!!busy} onClick={() => void checkoutPullRequest(tab.root, d.number, d.headRef)} title="git fetch pull/N/head and switch to its branch (refused while files have local changes)">
                 {busy === 'checkout' ? 'Checking out…' : 'Check out'}
               </button>
             )}
@@ -74,7 +75,7 @@ export function PullRequestView({ tab, active }: { tab: PullRequestTab; active: 
               ))}
             </div>
           )}
-          {entry.error && <div className="error selectable">{entry.error}</div>}
+          {entry.error && <GitHubError message={entry.error} className="" />}
         </div>
 
         <Checks root={tab.root} details={d} />

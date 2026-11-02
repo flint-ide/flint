@@ -19,7 +19,9 @@ Most of Flint's data lives in:
 | `scratch/` | Scratchpads: SQL consoles and notes, with the connection and database each console uses. |
 | `history/` | Query history, one file per database connection. |
 | `usage.json` | [Agent usage](../guides/ai-agents.md#usage-and-budgets): totals per day, project, agent, model, agent task and chat (tokens, cache tokens, reported cost, turns); each chat's name, made from its first message with recognized credentials removed; which budget warnings were already shown; and the budgets you chose to continue past. Written a couple of seconds after each turn and when Flint quits. Kept for `usage.retentionDays` days (default 90), at most 20,000 rows and 500 chats. A file that can't be decoded is renamed `usage.json.bad-<date-time>` and Flint starts a new one; a file that can't be read, or that a newer Flint wrote, is left alone and nothing new is saved until that is fixed (the Usage panel says so). |
+| `extensions/` | [Extensions](../how-to/customize-flint.md#use-a-theme-from-an-extension) you installed, one folder per extension, named by its id. Uninstalling deletes the folder. |
 | `prompts/` | Your personal [prompts](../guides/ai-agents.md#prompt-library), one Markdown file each. Project prompts live in the repository's `.flint/prompts`. |
+| `extensions/` | Installed [extensions](../guides/extensions.md), one folder per extension id, copied there when you install one and deleted when you uninstall it. Their settings are in `settings.json` under `extensions`; their secrets in the keychain. |
 
 ### Project sessions
 
@@ -63,7 +65,7 @@ The log rotates at 5 MB, keeping one old file (`flint.log.1`). Secrets and your 
 | What | Where |
 |---|---|
 | Agent conversation history | The agent CLIs: `~/.claude/projects/…` and `~/.codex/sessions/…`. Flint resumes conversations from there after a restart. |
-| GitHub sign-in | `gh` (macOS keyring or `GH_TOKEN`). Flint never sees the token. |
+| GitHub token | The Keychain (service `flint-accounts`), written by Sign in with GitHub or the GitHub CLI import; `GH_TOKEN` is read from the environment and never stored. The account's login, avatar, host and scopes are in `state.json`. |
 | AWS credentials | `~/.aws/` and the AWS tools. Flint only checks that credentials exist and when they expire. |
 | Kubernetes credentials | Your kubeconfig. Flint's Kubernetes terminals add an override file with only the context and namespace. |
 | Language server caches | The servers' own folders, for example `~/Library/Caches/gopls`. |

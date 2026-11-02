@@ -9,6 +9,8 @@ import { Select } from '../ui/Select'
 import { useWindowFocus } from './useWindowFocus'
 import { CIBanner } from './CIStatus'
 import { useCurrentCI } from '../../store/ci'
+import { onAccountsChanged } from '../../store/accounts'
+import { SignInWithGitHub } from '../accounts/SignInWithGitHub'
 
 const WHO: { value: Who; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -23,7 +25,7 @@ const STATES: { value: ListState; label: string }[] = [
   { value: 'all', label: 'All states' },
 ]
 
-/** Pull requests of the active project's GitHub repository (gh pr list). */
+/** Pull requests of the active project's GitHub repository (GitHub's API, internal/github). */
 export function PullRequestsPanel() {
   const primary = useWorkspace((s) => s.roots[0] ?? null)
   // The project the Commit panel follows (the active tab's), else the primary one.
@@ -39,6 +41,7 @@ export function PullRequestsPanel() {
   // Loaded when shown and on window focus; the panel unmounts when hidden, so nothing polls.
   useEffect(() => void loadPullRequests(root), [root])
   useWindowFocus(() => void loadPullRequests(root))
+  useEffect(() => onAccountsChanged(() => void loadPullRequests(root, true)), [root])
 
   const repo = status?.state === 'ok' ? status.repo : null
 
@@ -73,16 +76,17 @@ export function PullRequestsPanel() {
 }
 
 function StatusMessage({ state, message, onRetry }: { state: string; message: string; onRetry: () => void }) {
-  const hint =
-    state === 'missing'
-      ? 'Pull requests are read and reviewed through the GitHub CLI.'
-      : state === 'unauthenticated'
-        ? 'Flint never stores tokens: gh logs in once, in a terminal.'
-        : null
+  if (state === 'unauthenticated') {
+    return (
+      <div className="placeholder">
+        <SignInWithGitHub intro="Sign in to GitHub to see and review this project's pull requests. Flint keeps the token in the system keyring." />
+        <button className="link" onClick={onRetry}>Retry</button>
+      </div>
+    )
+  }
   return (
     <div className="placeholder">
       <span className={state === 'error' ? 'error selectable' : 'selectable'}>{message}</span>
-      {hint && <span className="muted">{hint}</span>}
       <button className="link" onClick={onRetry}>Retry</button>
     </div>
   )

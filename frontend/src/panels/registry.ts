@@ -59,6 +59,15 @@ export function definePanels<const T extends readonly PanelSpec[]>(specs: T): re
   return [...specs].sort((a, b) => a.order - b.order)
 }
 
+/**
+ * Flint's panels plus contributed ones (features, extensions), ordered like
+ * definePanels; a contributed id that is already taken fails loudly.
+ */
+export function mergePanels<S extends PanelSpec>(core: readonly S[], extra: readonly PanelSpec[]): readonly PanelSpec[] {
+  if (extra.length === 0) return core
+  return definePanels([...core, ...extra])
+}
+
 /** The panel for a stored id, else the fallback (else the first panel). */
 export function resolvePanel<S extends PanelSpec>(panels: readonly S[], id: string): S | undefined {
   return panels.find((p) => p.id === id) ?? panels.find((p) => p.id === FALLBACK_PANEL) ?? panels[0]

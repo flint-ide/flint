@@ -1,58 +1,78 @@
 package github
 
 import (
-	"context"
-	"slices"
 	"strings"
 	"testing"
+
+	"flint/internal/accounts"
 )
 
 func TestCreatePullRequest(t *testing.T) {
-	f := newFake(t)
-	f.on("pr create", "Creating pull request for agent/x into main\n\nhttps://github.com/acme/flint/pull/12\n")
-	c := f.client()
-	url, err := c.CreatePullRequest(context.Background(), t.TempDir(), NewPullRequest{
-		Base: "main", Head: "agent/x", Title: "--fill Add a button", Body: "Body with @file and --flags",
+	fx := newFixture(t)
+	url, err := fx.c.CreatePullRequest(ctx(), fx.dir, NewPullRequest{
+		Base: "main", Head: "agent/fix", Title: "  Fix the bug ", Body: "--body-file=/etc/passwd\nDo it", HeadRemote: "origin",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if url != "https://github.com/acme/flint/pull/12" {
+	if !strings.HasPrefix(url, fx.fake.RepoURL()+"/pull/") {
 		t.Errorf("url = %q", url)
 	}
-	calls := f.calls()
-	if len(calls) != 1 {
-		t.Fatalf("calls = %v", calls)
+	got := fx.fake.Created()
+	if len(got) != 1 || got[0]["head"] != "agent/fix" || got[0]["title"] != "Fix the bug" || got[0]["body"] != "--body-file=/etc/passwd\nDo it" {
+		t.Fatalf("created = %+v", got)
 	}
-	want := []string{"pr", "create", "--base=main", "--head=agent/x", "--title=--fill Add a button", "--body-file=-"}
-	if !slices.Equal(calls[0].args, want) {
-		t.Errorf("args = %q\nwant %q", calls[0].args, want)
+}
+
+func TestCreatePullRequestFromFork(t *testing.T) {
+	fx := newFixture(t)
+	runGit(t, fx.dir, "remote", "add", "mine", fx.fake.Web+"/octocat/widgets.git")
+	if _, err := fx.c.CreatePullRequest(ctx(), fx.dir, NewPullRequest{Base: "main", Head: "agent/fix", Title: "t", HeadRemote: "mine"}); err != nil {
+		t.Fatal(err)
 	}
-	if calls[0].stdin != "Body with @file and --flags" {
-		t.Errorf("body on stdin = %q", calls[0].stdin)
+	if got := fx.fake.Created(); got[0]["head"] != "octocat:agent/fix" {
+		t.Fatalf("head = %v", got[0]["head"])
 	}
 }
 
 func TestCreatePullRequestValidates(t *testing.T) {
-	c := newFake(t).client()
+	fx := newFixture(t)
 	for _, pr := range []NewPullRequest{
-		{Base: "", Head: "x", Title: "t"},
-		{Base: "main", Head: "-x", Title: "t"},
-		{Base: "main", Head: "x", Title: " "},
+		{Base: "main", Head: "x", Title: ""},
 		{Base: "main", Head: "x", Title: "a\nb"},
-		{Base: "main", Head: "x", Title: strings.Repeat("t", 300)},
+		{Base: "-main", Head: "x", Title: "t"},
+		{Base: "main", Head: "a b", Title: "t"},
+		{Base: "main", Head: "x", Title: strings.Repeat("t", 257)},
 	} {
-		if _, err := c.CreatePullRequest(context.Background(), t.TempDir(), pr); err == nil {
+		if _, err := fx.c.CreatePullRequest(ctx(), fx.dir, pr); err == nil {
 			t.Errorf("%+v accepted", pr)
 		}
+	}
+	if len(fx.fake.Requests()) != 0 {
+		t.Error("GitHub asked for an invalid pull request")
 	}
 }
 
 func TestCreatePullRequestError(t *testing.T) {
-	f := newFake(t)
-	f.onExit("pr create", "", "a pull request for branch \"agent/x\" into branch \"main\" already exists:\nhttps://github.com/acme/flint/pull/3", 1)
-	_, err := f.client().CreatePullRequest(context.Background(), t.TempDir(), NewPullRequest{Base: "main", Head: "agent/x", Title: "t"})
-	if err == nil || !strings.Contains(err.Error(), "already exists") {
-		t.Errorf("err = %v", err)
+	fx := newFixture(t)
+	_, err := fx.c.CreatePullRequest(ctx(), fx.dir, NewPullRequest{Base: "main", Head: "feat/rate-limit", Title: "t"})
+	if err == nil || !strings.Contains(err.Error(), "A pull request already exists for acme:feat/rate-limit") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestIdentify(t *testing.T) {
+	fx := newFixture(t)
+	a, err := fx.c.Identify(ctx(), fx.auth.Endpoints, fx.fake.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := accounts.Account{Provider: "github", Host: fx.auth.Host, Login: "octocat", Name: "The Octocat",
+		AvatarURL: "https://avatars.githubusercontent.com/u/583231?v=4", Scopes: []string{"repo", "read:org", "workflow"}}
+	if a.Login != want.Login || a.Host != want.Host || a.AvatarURL != want.AvatarURL || strings.Join(a.Scopes, ",") != "repo,read:org,workflow" {
+		t.Fatalf("account = %+v", a)
+	}
+	if _, err := fx.c.Identify(ctx(), fx.auth.Endpoints, "wrong-token"); err == nil || strings.Contains(err.Error(), "wrong-token") {
+		t.Errorf("bad token: %v", err)
 	}
 }

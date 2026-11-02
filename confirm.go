@@ -37,3 +37,34 @@ func (a *App) askNative(title, message, ok string) bool {
 	}
 	return false
 }
+
+// chooseNative shows a native question with buttons (plus Cancel, the
+// default) and returns the button chosen, "" for Cancel.
+func (a *App) chooseNative(title, message string, buttons []string) string {
+	if a.wails == nil {
+		return ""
+	}
+	answer := make(chan string, 1)
+	d := a.wails.Dialog.Question().SetTitle(title).SetMessage(message)
+	for _, b := range buttons {
+		d.AddButton(b).OnClick(func() { answer <- b })
+	}
+	cancel := d.AddButton("Cancel").OnClick(func() { answer <- "" })
+	d.SetDefaultButton(cancel)
+	d.SetCancelButton(cancel)
+	if a.window != nil {
+		d.AttachToWindow(a.window)
+	}
+	d.Show()
+	var quit <-chan struct{}
+	if a.ctx != nil {
+		quit = a.ctx.Done()
+	}
+	select {
+	case b := <-answer:
+		return b
+	case <-quit:
+	case <-time.After(confirmWait):
+	}
+	return ""
+}

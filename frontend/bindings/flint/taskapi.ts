@@ -43,7 +43,7 @@ export function Create(req: $models.NewTask): $CancellablePromise<$models.TaskVi
 
 /**
  * CreatePullRequest pushes the task's branch and opens a pull request into
- * its base with gh, after the user confirmed in a native dialog (it
+ * its base through the GitHub API, after the user confirmed in a native dialog (it
  * publishes the branch and the description). It returns the URL.
  */
 export function CreatePullRequest(id: string): $CancellablePromise<string> {

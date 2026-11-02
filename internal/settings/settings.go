@@ -1,9 +1,8 @@
 // Package settings holds the user's preferences (settings.json in the config
 // directory): theme (and a custom palette), editor fonts and Vim mode, terminal
-// fonts, the default agent, agent CLIs,
-// custom ACP agents,
-// language servers, refresh intervals, keyboard shortcut overrides and whether
-// to look for new releases. Loading is forgiving (a hand-edited file never stops Flint
+// fonts, the default agent, agent CLIs, custom ACP agents, language servers,
+// refresh intervals and keyboard shortcut overrides, plus the sections features
+// register for their own keys (section.go). Loading is forgiving (a hand-edited file never stops Flint
 // from starting: bad values fall back to defaults, unknown keys are ignored);
 // saving is strict. Nothing secret belongs here: credentials live in the Keychain.
 package settings
@@ -84,16 +83,9 @@ type Settings struct {
 	// NotifyInBackground shows a notification and a Dock badge when a run, a
 	// test run or an agent finishes while Flint is in the background.
 	NotifyInBackground bool `json:"notifyInBackground"`
-	// CheckForUpdates asks GitHub once a day whether a newer Flint release
-	// exists (internal/update). Off means Flint never asks on its own; the
-	// "Check for Updates…" command still works.
-	CheckForUpdates bool `json:"checkForUpdates"`
 	// Keymap overrides command shortcuts: command id → "Mod+Shift+X", or "" to
 	// remove the shortcut. Commands not listed keep their default keys.
 	Keymap map[string]string `json:"keymap"`
-	// TodoExclude are extra folders or globs the TODO list skips ("docs/legacy",
-	// "*.min.js"), on top of the dependency folders it recognises itself.
-	TodoExclude []string `json:"todoExclude"`
 	// WatchExclude are folder names (or globs over one) the file watcher
 	// doesn't watch on Linux, on top of the dependency folders (watch.go).
 	WatchExclude []string `json:"watchExclude"`
@@ -121,8 +113,11 @@ type Settings struct {
 	AgentReview AgentReview `json:"agentReview"`
 	// CI configures following your pull requests' checks (ci.go).
 	CI CI `json:"ci"`
-	// Docker configures how the Docker panel reaches the engine (docker.go).
-	Docker Docker `json:"docker"`
+	// GitHub configures the GitHub host, sign-in and API limits (github.go).
+	GitHub GitHub `json:"github"`
+
+	// sections are the values of the keys features own (section.go), by key.
+	sections map[string]any
 }
 
 // Default returns the settings Flint uses when nothing is configured.
@@ -141,9 +136,7 @@ func Default() Settings {
 			LineHeight: 1.2,
 		},
 		NotifyInBackground: true,
-		CheckForUpdates:    true,
 		Keymap:             map[string]string{},
-		TodoExclude:        []string{},
 		WatchExclude:       defaultWatchExclude(),
 		Agents:             map[string]AgentSettings{},
 		CustomAgents:       []CustomAgent{},
@@ -157,8 +150,9 @@ func Default() Settings {
 		Prompts:            defaultPrompts(),
 		AgentReview:        defaultAgentReview(),
 		CI:                 defaultCI(),
-		Docker:             defaultDocker(),
+		GitHub:             defaultGitHub(),
 		CustomTheme:        defaultCustomTheme(),
+		sections:           sectionDefaults(),
 	}
 }
 
@@ -218,7 +212,6 @@ func Normalize(s Settings) Settings {
 			out.Keymap[id] = keys
 		}
 	}
-	out.TodoExclude = CleanExcludes(s.TodoExclude)
 	out.WatchExclude = cleanWatchExcludes(s.WatchExclude)
 	out.Agents = normalizeAgents(s.Agents)
 	out.LanguageServers = normalizeLanguageServers(s.LanguageServers)
@@ -230,7 +223,8 @@ func Normalize(s Settings) Settings {
 	out.Usage = normalizeUsage(s.Usage)
 	out.AgentReview = normalizeAgentReview(s.AgentReview, out.CustomAgents)
 	out.CI = normalizeCI(s.CI)
-	out.Docker = normalizeDocker(s.Docker)
+	out.GitHub = normalizeGitHub(s.GitHub)
+	out.sections = normalizeSections(s)
 	return out
 }
 
@@ -292,14 +286,6 @@ func Validate(s Settings) error {
 			return err
 		}
 	}
-	if len(s.TodoExclude) > maxExcludes {
-		return fmt.Errorf("too many TODO exclude patterns (max %d)", maxExcludes)
-	}
-	for _, p := range s.TodoExclude {
-		if err := validExclude(p); err != nil {
-			return err
-		}
-	}
 	if err := validateWatchExcludes(s.WatchExclude); err != nil {
 		return err
 	}
@@ -330,10 +316,27 @@ func Validate(s Settings) error {
 	if err := CheckCI(s.CI); err != nil {
 		return err
 	}
-	if err := CheckDocker(s.Docker); err != nil {
+	if err := CheckGitHub(s.GitHub); err != nil {
+		return err
+	}
+	if err := checkSections(s); err != nil {
 		return err
 	}
 	return validateRefresh(s.Refresh)
+}
+
+// CheckExcludes reports the first pattern of a list that would not be saved;
+// what names the list in the error ("TODO" → "too many TODO exclude patterns").
+func CheckExcludes(what string, patterns []string) error {
+	if len(patterns) > maxExcludes {
+		return fmt.Errorf("too many %s exclude patterns (max %d)", what, maxExcludes)
+	}
+	for _, p := range patterns {
+		if err := validExclude(p); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // validExclude accepts one gitignore-style glob. Search options join excludes

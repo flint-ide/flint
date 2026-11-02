@@ -30,7 +30,7 @@ The log is at `~/Library/Logs/Flint/flint.log`. It records Flint's own messages,
 ## What is included
 
 - The versions of Flint, macOS, Go and Wails.
-- The versions of installed tools: git, rg, gh, docker, kubectl, aws, dlv, gopls, node, claude and codex.
+- The versions of installed tools: git, rg, docker, kubectl, aws, dlv, gopls, node, claude and codex.
 - The last 150 lines of the log.
 
 ## What is redacted

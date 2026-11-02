@@ -44,7 +44,7 @@ If generated or legacy folders clutter the list, exclude them in Settings ▸ TO
 
 - Click **Blame** in the status bar on an important file. Hover a line to see who changed it, when, and the commit message; click it to open that commit's change.
 - Right-click a file and choose **Show History** to read its commits (renames included) with the diff of each.
-- Open the Pull Requests view (`⇅`) to see what is being worked on right now (requires `gh`).
+- Open the Pull Requests view (`⇅`) to see what is being worked on right now (sign in with GitHub first).
 
 ## 6. Ask the agent to explain the architecture
 

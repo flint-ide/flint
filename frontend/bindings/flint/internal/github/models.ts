@@ -795,8 +795,7 @@ export class PullRequestRef {
 }
 
 /**
- * Repo is the GitHub repository a project folder belongs to (as gh resolves it:
- * remotes, `gh repo set-default`, enterprise hosts).
+ * Repo is the GitHub repository a project folder belongs to.
  */
 export class Repo {
     "owner": string;
@@ -804,6 +803,11 @@ export class Repo {
     "nameWithOwner": string;
     "url": string;
     "defaultBranch": string;
+
+    /**
+     * Remote is the git remote that points to it.
+     */
+    "remote": string;
 
     /** Creates a new Repo instance. */
     constructor($$source: Partial<Repo> = {}) {
@@ -821,6 +825,9 @@ export class Repo {
         }
         if (!("defaultBranch" in $$source)) {
             this["defaultBranch"] = "";
+        }
+        if (!("remote" in $$source)) {
+            this["remote"] = "";
         }
 
         Object.assign(this, $$source);
@@ -880,11 +887,16 @@ export class Review {
  */
 export class Status {
     /**
-     * State: "ok", "missing" (no gh), "unauthenticated", "not-github" or "error".
+     * State: "ok", "unauthenticated", "not-github" or "error".
      */
     "state": string;
     "message": string;
     "repo": Repo;
+
+    /**
+     * Host is the GitHub host Flint is configured for.
+     */
+    "host": string;
 
     /** Creates a new Status instance. */
     constructor($$source: Partial<Status> = {}) {
@@ -896,6 +908,9 @@ export class Status {
         }
         if (!("repo" in $$source)) {
             this["repo"] = (new Repo());
+        }
+        if (!("host" in $$source)) {
+            this["host"] = "";
         }
 
         Object.assign(this, $$source);

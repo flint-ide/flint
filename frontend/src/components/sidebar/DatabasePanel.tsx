@@ -5,7 +5,8 @@ import { useDatabase } from '../../store/database'
 import { useScratch } from '../../store/scratch'
 import { confirmAction } from '../../store/dialog'
 import { ConnectionForm } from './ConnectionForm'
-import { DatabasesNode } from './DatabaseTree'
+import { copyText, DatabasesNode, onMenu } from './DatabaseTree'
+import { connectionMenu } from './databaseMenu'
 import { keyringName } from '../../lib/platform'
 
 /** Connections list; each expands into its server's databases, each with a lazily loaded schema tree. */
@@ -54,16 +55,20 @@ function ConnectionNode({ conn, onEdit }: { conn: Connection; onEdit: () => void
     }
   }
 
+  const newConsole = () => void createScratch('sql', conn.id)
+  const refresh = () => void loadDatabases(conn.id, true)
+  const menu = onMenu(() => connectionMenu(conn, { newConsole, refresh, edit: onEdit, remove: () => void remove(), copy: copyText }))
+
   return (
     <div className="conn-node">
-      <div className="tree-row static conn-row" onClick={toggle}>
+      <div className="tree-row static conn-row" onClick={toggle} onContextMenu={menu}>
         <span className="twisty">{open ? '▾' : '▸'}</span>
         <span className={`driver-badge ${conn.driver}`}>{conn.driver === 'clickhouse' ? 'CH' : 'PG'}</span>
         <span className="conn-name" title={`${conn.user}@${conn.host}:${conn.port}/${defaultDatabase(conn)}`}>{conn.name}</span>
         {conn.readOnly && <span className="badge" title="Read-only">RO</span>}
         <span className="row-actions" onClick={(e) => e.stopPropagation()}>
-          <button className="icon" title="New SQL console" onClick={() => void createScratch('sql', conn.id)}>⌨</button>
-          <button className="icon" title="Refresh databases" onClick={() => void loadDatabases(conn.id, true)}>↻</button>
+          <button className="icon" title="New SQL console" onClick={newConsole}>⌨</button>
+          <button className="icon" title="Refresh databases" onClick={refresh}>↻</button>
           <button className="icon" title="Edit" onClick={onEdit}>✎</button>
           <button className="icon" title="Delete" onClick={() => void remove()}>✕</button>
         </span>

@@ -7,7 +7,7 @@ These five principles decide trade-offs in Flint. When a change conflicts with o
 Every dependency is code that runs with the user's privileges, on their source code and credentials. Fewer dependencies mean a smaller attack surface, fewer supply-chain risks and fewer updates to review.
 
 - Prefer the Go standard library and a small amount of our own code over a module that does more than we need.
-- Prefer driving an existing CLI (`git`, `gh`, `kubectl`, `docker`, `aws`, `rg`, `dlv`) over embedding its SDK: the user already has and trusts it, and its auth works unchanged.
+- Prefer driving an existing CLI (`git`, `kubectl`, `docker`, `aws`, `rg`, `dlv`) over embedding its SDK: the user already has and trusts it, and its auth works unchanged. GitHub is the exception: its API is plain HTTPS and JSON, so Flint calls it with the standard library (`internal/github`) instead of requiring `gh`, and imports `gh`'s token in one click for those who have it.
 - Runtime npm packages are limited to the editor, terminal and React. A new one needs a reason in the issue, and is installed with `npm ci --ignore-scripts`. Build tooling stays in Go (`cmd/webbuild` uses esbuild's Go API; no Node toolchain at runtime, no `npx`).
 - Pin what we depend on: Go modules via `go.sum`, npm via `package-lock.json`, GitHub Actions by commit SHA. Dependabot proposes updates; `govulncheck` and `npm audit` gate CI.
 
@@ -29,11 +29,12 @@ The simplest design that works is the easiest to secure, review and change.
 Adding a language, an agent, a panel, a database or a run type should mean adding one unit, not editing a dozen files.
 
 - Features register themselves in a registry (commands and shortcuts in `lib/commands.ts`, sidebar panels in `panels/index.ts`, agent drivers, LSP server specs, run-configuration detectors) instead of being listed in several places.
+- A feature with its own backend, settings or tools is a feature module: a package in `internal/features/<id>` and a directory in `frontend/src/features/<id>`, listed once on each side. It declares its settings keys, tools, services, lifecycle hooks, panels, commands, Settings pages and status items as data, so unrelated features never edit the same file ([design/extensions.md](design/extensions.md), [Add a feature](DEVELOPMENT.md#add-a-feature)). External extensions will map onto the same contribution points.
 - Backends talk to the UI through Wails services and events with stable, typed contracts (generated bindings).
 - A new external tool is a package under `internal/` with a narrow API, validated inputs and its own tests.
 - What differs per operating system lives behind one small API with a file per system (`_darwin.go`, `_linux.go`, and an `_other.go` fallback that says honestly what isn't supported) and, in the UI, in `lib/platform.ts`; feature code doesn't branch on the system or hard-code ⌘ (see [Platforms](ARCHITECTURE.md#platforms)).
 
-**In practice:** a contributor should be able to add a feature by reading one existing feature of the same kind.
+**In practice:** a contributor should be able to add a feature by reading one existing feature of the same kind; for a feature module, copy `docker`, `todo` or `update`.
 
 ## 4. AI-first
 

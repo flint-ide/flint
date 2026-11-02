@@ -1,6 +1,8 @@
 import { Suspense, memo, useLayoutEffect } from 'react'
 import { lazyPreload } from '../../lib/lazyPreload'
-import { useEditor, type FileTab, type Tab } from '../../store/editor'
+import { useEditor, type ContributedTab, type FileTab, type Tab } from '../../store/editor'
+import { useContributions } from '../../lib/contributions'
+import { Icon } from '../ui/Icon'
 import { usePreview } from '../../store/preview'
 import { isImage } from '../../lib/previewFiles'
 import { confirmAction } from '../../store/dialog'
@@ -86,11 +88,17 @@ export async function requestCloseTab(tab: Tab): Promise<void> {
   useEditor.getState().closeTab(tab.id)
 }
 
+/** Ids of the terminals whose program exited, one per line. */
+function exitedTerminals(tabs: readonly { id: string; exitCode?: number | null }[]): string {
+  return tabs.filter((t) => t.exitCode != null).map((t) => t.id).join('\n')
+}
+
 export function EditorArea() {
   const tabs = useEditor((s) => s.tabs)
   const activeId = useEditor((s) => s.activeId)
   const setActive = useEditor((s) => s.setActive)
-  const terminals = useTerminal((s) => s.tabs)
+  // Only which terminals exited (a string, so retitles and cwd changes don't re-render the tabs).
+  const exited = useTerminal((s) => exitedTerminals(s.tabs))
   // Busy flags and chat transcripts are selected per tab below: streamed agent tokens
   // and run output must not re-render the whole editor area.
   const debugActive = useDebug((s) => s.session?.status === 'running' || s.session?.status === 'starting')
@@ -117,7 +125,7 @@ export function EditorArea() {
             key={tab.id}
             role="tab"
             aria-selected={tab.id === activeId}
-            className={`tab${tab.id === activeId ? ' active' : ''}${tab.kind === 'terminal' && terminals.find((t) => t.id === tab.termId)?.exitCode != null ? ' exited' : ''}`}
+            className={`tab${tab.id === activeId ? ' active' : ''}${tab.kind === 'terminal' && exited.split('\n').includes(tab.termId) ? ' exited' : ''}`}
             title={tab.kind === 'file' ? tab.path : tab.title}
             onClick={() => setActive(tab.id)}
             onMouseDown={(e) => e.button === 1 && void requestCloseTab(tab)}
@@ -167,6 +175,7 @@ const TabPanel = memo(function TabPanel({ tab, active }: { tab: Tab; active: boo
           {tab.kind === 'pr' && <PullRequestView tab={tab} active={active} />}
           {tab.kind === 'prdiff' && <PullRequestDiffView tab={tab} active={active} />}
           {tab.kind === 'cilog' && <CILogView tab={tab} />}
+          {tab.kind === 'contrib' && <ContributedTabView tab={tab} active={active} />}
         </Suspense>
       </ErrorBoundary>
     </div>
@@ -183,6 +192,18 @@ function FileOrImage({ tab, active }: { tab: FileTab; active: boolean }) {
 function TerminalTabView({ termId, active }: { termId: string; active: boolean }) {
   const tab = useTerminal((s) => s.tabs.find((t) => t.id === termId))
   return tab ? <TerminalView tab={tab} active={active} /> : null
+}
+
+/** A tab of a kind a feature contributed; its view may be gone (an extension that stopped). */
+function ContributedTabView({ tab, active }: { tab: ContributedTab; active: boolean }) {
+  const kind = useContributions((s) => s.tabKinds.find((k) => k.id === tab.view))
+  if (!kind) return <p className="muted empty">{tab.title} is not available.</p>
+  return <kind.component tab={tab} active={active} />
+}
+
+function ContributedTabIcon({ view }: { view: string }) {
+  const icon = useContributions((s) => s.tabKinds.find((k) => k.id === view)?.icon)
+  return icon ? <Icon name={icon} /> : null
 }
 
 function ChatTabView({ sessionId, active }: { sessionId: string; active: boolean }) {
@@ -210,6 +231,8 @@ function TabIcon({ tab, debugActive }: { tab: Tab; debugActive: boolean }) {
       return <TabKindIcon kind={tab.kind === 'pr' ? 'pr' : 'diff'} />
     case 'cilog':
       return <TabKindIcon kind="run" />
+    case 'contrib':
+      return <ContributedTabIcon view={tab.view} />
     default:
       return <TabKindIcon kind={tab.kind} busy={false} />
   }

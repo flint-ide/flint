@@ -6,7 +6,6 @@ export {
     Chat,
     DayTotals,
     Group,
-    Price,
     Query,
     Summary,
     Totals

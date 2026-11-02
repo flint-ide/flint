@@ -57,7 +57,7 @@ The full reference, with every detail and all keyboard shortcuts, is in [docs/FE
 
 **Git and GitHub**
 - IntelliJ-style Commit panel, side-by-side diffs, gutter markers, blame, file history, stash, branches and worktrees
-- Pull request review through `gh`: PR list with CI and review state, inline comment threads in the diff, replies, resolve, and submitting reviews
+- Pull request review with your GitHub account (Sign in with GitHub, or the GitHub CLI's token in one click; GitHub Enterprise too): PR list with CI and review state, inline comment threads in the diff, replies, resolve, and submitting reviews
 
 **Run, debug, test and profile**
 - Run configurations in `.flint/run.json` (command, go, npm, make), with auto-detection
@@ -127,7 +127,6 @@ To build Flint:
 Optional tools, used by the features that need them:
 
 - `ripgrep` (`brew install ripgrep`): fast search and `⌘P` (a slower Go fallback is used without it)
-- `gh`: pull request review
 - `kubectl`: Kubernetes panel
 - `docker`: optional, only Compose up/down/pull (the Docker panel uses the Engine API)
 - `aws` (and `saml2aws` if you use it): AWS profiles panel

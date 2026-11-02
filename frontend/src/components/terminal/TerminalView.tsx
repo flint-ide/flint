@@ -15,14 +15,14 @@ import {
 } from '../../store/terminal'
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
-import * as DockerBackend from '../../../bindings/flint/dockerapi'
+import * as DockerBackend from '../../../bindings/flint/internal/features/docker/api'
 import { findPathLinks, resolvePath } from '../../lib/pathLinks'
 import { showToast } from '../../store/dialog'
 import { errorMessage } from '../../api/backend'
 import { focusSoon } from '../../lib/focusSoon'
 import { fitTerminal } from '../../lib/terminalFit'
 import { registerUrlLinks } from '../../lib/terminalLinks'
-import { terminalClipboardKey } from '../../lib/terminalKeys'
+import { NEWLINE_SEQUENCE, isNewlineKey, terminalClipboardKey } from '../../lib/terminalKeys'
 import { sendTerminalSelectionToAgent } from '../../lib/agentContext'
 import type { DropdownItem } from '../ui/Dropdown'
 import { openContextMenu } from '../../store/contextMenu'
@@ -64,12 +64,15 @@ export function TerminalView({ tab, active }: Props) {
     term.current = xterm
 
     xterm.attachCustomKeyEventHandler((e) => {
-      if (e.type !== 'keydown') return true
       // Shift+Enter inserts a newline in claude / codex prompts (ESC + CR, like Option+Enter).
-      if (e.key === 'Enter' && e.shiftKey && !e.metaKey) {
-        sendInput(tab.id, '\x1b\r')
+      // The whole key is swallowed: the keypress after an unhandled keydown would
+      // otherwise reach xterm, which sends a plain CR and submits the prompt.
+      if (isNewlineKey(e)) {
+        if (e.type === 'keydown') sendInput(tab.id, NEWLINE_SEQUENCE)
+        e.preventDefault()
         return false
       }
+      if (e.type !== 'keydown') return true
       // Linux terminals copy and paste with Ctrl+Shift+C / V; Ctrl+C stays an interrupt.
       if (!isMac()) {
         const action = terminalClipboardKey(e, xterm.hasSelection())

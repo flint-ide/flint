@@ -10,8 +10,7 @@ import { useLsp } from '../../store/lsp'
 import { showToast } from '../../store/dialog'
 import { useGit } from '../../store/git'
 import { showFileHistory, toggleBlame, useGitHistory } from '../../store/gitHistory'
-import { dismissUpdate, downloadUpdate, skipUpdate, useUpdate } from '../../store/update'
-import { offerText } from '../../lib/update'
+import { useContributions } from '../../lib/contributions'
 import { useSettings } from '../../store/settings'
 import { useCompletionStatus } from '../../store/editorAi'
 import { useVimStatus } from '../../store/vimStatus'
@@ -38,7 +37,7 @@ export function StatusBar() {
       <AgentUsageWidget roots={roots} />
       <CompletionsWidget />
       <LspWidget path={active?.kind === 'file' ? active.path : null} />
-      <UpdateWidget />
+      <ContributedItems />
     </footer>
   )
 }
@@ -51,24 +50,15 @@ function VimModeWidget() {
   return <span className="status-vim" title="Vim mode (Settings ▸ Editor)">-- {mode} --</span>
 }
 
-/** A newer Flint release (found by the daily check or "Check for Updates…"). */
-function UpdateWidget() {
-  const offer = useUpdate((s) => s.offer)
-  if (!offer) return null
-  const title = offer.latest.name && offer.latest.name !== offer.latest.tag ? `${offer.latest.name} — ` : ''
+/** Items of feature modules (lib/features.ts), after Flint's own; each renders nothing when it has nothing to show. */
+function ContributedItems() {
+  const items = useContributions((s) => s.statusItems)
   return (
-    <span className="status-update" role="status">
-      <span className="truncate" title={`${title}${offerText(offer)}`}>Flint {offer.latest.tag} available</span>
-      <button className="status-action on" title="Open the release page in your browser" onClick={downloadUpdate}>
-        Download
-      </button>
-      <button className="status-action" title="Don't tell me about this version again" onClick={() => void skipUpdate()}>
-        Skip This Version
-      </button>
-      <button className="status-action" title="Hide until Flint restarts" aria-label="Dismiss" onClick={dismissUpdate}>
-        ✕
-      </button>
-    </span>
+    <>
+      {items.map((item) => (
+        <item.component key={item.id} />
+      ))}
+    </>
   )
 }
 

@@ -26,7 +26,6 @@ import { showToast } from '../store/dialog'
 import { trustFolder, untrustFolder } from '../store/trust'
 import { copyDiagnostics, reportIssue, showLogs } from '../store/diagnostics'
 import { openToolCheck } from '../store/toolCheck'
-import { checkForUpdates } from '../store/update'
 import { openInlineEditInActiveEditor } from '../store/editorAi'
 import { useSettings } from '../store/settings'
 import { openVSCodeImport } from '../store/vscodeImport'
@@ -106,10 +105,9 @@ function appCommands(): Command[] {
     { id: 'help.showLogs', title: `Show Logs in ${fileManagerName()}`, category: 'Help', keywords: 'log file debug', run: showLogs },
     {
       id: 'help.checkTools', title: 'Check Tools…', category: 'Help',
-      keywords: 'install setup missing path version git ripgrep gh claude codex kubectl docker aws delve language server',
+      keywords: 'install setup missing path version git ripgrep claude codex kubectl docker aws delve language server',
       run: openToolCheck,
     },
-    { id: 'help.checkForUpdates', title: 'Check for Updates…', category: 'Help', keywords: 'update upgrade release version new download', run: () => void checkForUpdates() },
 
     // Navigate
     { id: 'nav.goToFile', title: 'Go to File…', category: 'Navigate', keys: 'Mod+P', keywords: 'open quick', run: () => ws().setQuickOpen(true) },
@@ -192,7 +190,7 @@ function appCommands(): Command[] {
 
     // View
     { id: 'view.toggleSidebar', title: 'Toggle Sidebar', category: 'View', keys: 'Mod+B', keysIgnoredIn: IN_EDITOR, keywords: 'panel hide show', run: () => ws().toggleSidebar() },
-    // One "Show <panel>" per sidebar panel (panels/index.ts).
+    // One "Show <panel>" per built-in sidebar panel (panels/index.ts); features register their own.
     ...panelCommands(PANELS, (id) => ws().setSidebar(id)),
 
     // Project

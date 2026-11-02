@@ -3,7 +3,8 @@
 // desktop app, so checks are read when a branch starts being followed, when the
 // window regains focus, after git changes the branch or its refs, and — only
 // while some check is still running — again after settings.ci.pollSeconds,
-// backing off while nothing changes. Everything is read through gh (Go).
+// backing off while nothing changes. Everything is read through GitHub's API (Go),
+// with conditional requests that cost no rate limit while nothing changes.
 import { createStore } from '../lib/store'
 import { GitHub, errorMessage } from '../api/backend'
 import type { github } from '../wails/models'
@@ -11,6 +12,8 @@ import { ciFixPrompt, ciNotice, ciState, ciTransition, checkName, failedRuns, po
 import { askAgent } from '../lib/askAgent'
 import { alertDone } from './alerts'
 import { showToast } from './dialog'
+import { onAccountsChanged, requestGitHubSignIn } from './accounts'
+import { isSignInError } from '../lib/githubSettings'
 import { pullRequestTabId, useEditor } from './editor'
 import { useGit } from './git'
 import { useSettings } from './settings'
@@ -18,7 +21,7 @@ import { showFolder, useTasks } from './agentTasks'
 import type { TaskView } from '../lib/agentTasks'
 
 export interface CIEntry {
-  /** Folder gh runs in (a work-tree root). */
+  /** Folder of the repository (a work-tree root). */
   root: string
   branch: string
   data: github.BranchChecks | null
@@ -183,8 +186,13 @@ export function followCI(): () => void {
     }
   }
   window.addEventListener('focus', onFocus)
+  // Signed in or out: read everything again with the new account.
+  const offAccounts = onAccountsChanged(() => {
+    for (const key of owners.keys()) void refresh(key)
+  })
   return () => {
     following = false
+    offAccounts()
     offGit()
     offTasks()
     window.removeEventListener('focus', onFocus)
@@ -201,7 +209,7 @@ export function useCurrentCI(): CIEntry | null {
 
 /** What Fix with agent works on. */
 export interface FixTarget {
-  /** Folder gh runs in and the agent works in. */
+  /** Folder of the repository, where the agent works. */
   root: string
   pr: { number: number; title: string; url: string; crossRepository?: boolean } | null
   checks: readonly github.Check[]
@@ -235,7 +243,9 @@ export async function fixCIWithAgent(target: FixTarget, only?: { runId: number; 
     if (target.task && !(await showFolder(target.task.worktree))) return
     await askAgent({ prompt, root: target.root })
   } catch (err) {
-    showToast(`Couldn't read the CI log: ${errorMessage(err)}`, 'error')
+    const msg = errorMessage(err)
+    if (isSignInError(msg)) requestGitHubSignIn()
+    else showToast(`Couldn't read the CI log: ${msg}`, 'error')
   } finally {
     set((s) => {
       const { [busyKey]: _done, ...busy } = s.busy
@@ -257,6 +267,7 @@ export async function rerunFailedJobs(root: string, runId: number, label: string
     for (const [key, entry] of Object.entries(get().entries)) if (entry.root === root) void refresh(key)
   } catch (err) {
     const msg = errorMessage(err)
-    if (!msg.includes('cancelled')) showToast(msg, 'error')
+    if (isSignInError(msg)) requestGitHubSignIn()
+    else if (!msg.includes('cancelled')) showToast(msg, 'error')
   }
 }

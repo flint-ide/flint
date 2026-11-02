@@ -58,7 +58,6 @@ func TestLoadReplacesInvalidValues(t *testing.T) {
 		"editor": {"fontFamily": "x; } body { display:none", "fontSize": 99, "lineHeight": 0.2},
 		"terminal": {"fontSize": "big", "lineHeight": 1.4},
 		"defaultAgent": "gpt",
-		"checkForUpdates": "no",
 		"keymap": {"a.ok": "Mod+K", "a.removed": "", "a.bad": "Mod+", "": "Mod+J", "a.spaces": "Mod+Shift+ X"}
 	}`)
 	got, err := Load(path)
@@ -77,9 +76,6 @@ func TestLoadReplacesInvalidValues(t *testing.T) {
 	}
 	if got.DefaultAgent != "" {
 		t.Errorf("DefaultAgent = %q, want empty", got.DefaultAgent)
-	}
-	if !got.CheckForUpdates {
-		t.Error("CheckForUpdates = false, want the default (true) for a non-boolean")
 	}
 	want := map[string]string{"a.ok": "Mod+K", "a.removed": ""}
 	if !reflect.DeepEqual(got.Keymap, want) {
@@ -118,10 +114,6 @@ func TestValidate(t *testing.T) {
 		{"bare key", func(s *Settings) { s.Keymap = map[string]string{"debug.step": "F8"} }, ""},
 		{"unknown modifier", func(s *Settings) { s.Keymap = map[string]string{"x.y": "Hyper+K"} }, "invalid shortcut"},
 		{"empty id", func(s *Settings) { s.Keymap = map[string]string{"": "Mod+K"} }, "command id"},
-		{"todo excludes", func(s *Settings) { s.TodoExclude = []string{"docs/legacy", "*.min.js", "/gen/"} }, ""},
-		{"negated exclude", func(s *Settings) { s.TodoExclude = []string{"!src"} }, "exclude pattern"},
-		{"comma in exclude", func(s *Settings) { s.TodoExclude = []string{"a,b"} }, "exclude pattern"},
-		{"blank exclude", func(s *Settings) { s.TodoExclude = []string{" "} }, "exclude pattern"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -150,7 +142,6 @@ func TestSaveRoundtrip(t *testing.T) {
 	in.Terminal.FontSize = 15
 	in.DefaultAgent = "claude"
 	in.AutoSave = true
-	in.CheckForUpdates = false
 	in.Keymap = map[string]string{"git.push": "", "app.settings": "Mod+,"}
 	saved, err := Save(path, in)
 	if err != nil {
@@ -211,12 +202,19 @@ func TestSaveWritesEmptyKeymapObject(t *testing.T) {
 	}
 }
 
-func TestNormalizeCleansTodoExcludes(t *testing.T) {
-	s := Default()
-	s.TodoExclude = []string{" docs ", "docs", "", "!x", "a,b", "gen/"}
-	got := Normalize(s).TodoExclude
+func TestCleanAndCheckExcludes(t *testing.T) {
+	got := CleanExcludes([]string{" docs ", "docs", "", "!x", "a,b", "gen/"})
 	if want := []string{"docs", "gen/"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("TodoExclude = %q, want %q", got, want)
+		t.Fatalf("CleanExcludes = %q, want %q", got, want)
+	}
+	for list, want := range map[string]string{"docs/legacy|*.min.js|/gen/": "", "!src": "exclude pattern", "a,b": "exclude pattern", " ": "exclude pattern"} {
+		err := CheckExcludes("TODO", strings.Split(list, "|"))
+		if (want == "") != (err == nil) || (err != nil && !strings.Contains(err.Error(), want)) {
+			t.Errorf("CheckExcludes(%q) = %v, want %q", list, err, want)
+		}
+	}
+	if err := CheckExcludes("TODO", make([]string, maxExcludes+1)); err == nil || !strings.Contains(err.Error(), "too many TODO") {
+		t.Errorf("too many: %v", err)
 	}
 }
 

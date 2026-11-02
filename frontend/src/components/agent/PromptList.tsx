@@ -1,21 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState, type RefObject } from 'react'
 import { sourceLabel } from '../../lib/prompts'
 import type { Prompt } from '../../store/prompts'
 
 /** Rows of prompts: /name, description and where it comes from. */
-export function PromptList({ prompts, cursor, onHover, onPick, empty }: {
+export function PromptList({ listRef, prompts, cursor, onHover, onPick, empty }: {
+  /** From useListCursor, which scrolls the highlighted row into view. */
+  listRef: RefObject<HTMLDivElement | null>
   prompts: Prompt[]
   cursor: number
   onHover: (i: number) => void
   onPick: (p: Prompt) => void
   empty: string
 }) {
-  const list = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    list.current?.querySelector('.selected')?.scrollIntoView({ block: 'nearest' })
-  }, [cursor])
   return (
-    <div className="quick-list prompt-list" ref={list} role="listbox">
+    <div className="quick-list prompt-list" ref={listRef} role="listbox">
       {prompts.map((p, i) => (
         <div
           key={p.name}

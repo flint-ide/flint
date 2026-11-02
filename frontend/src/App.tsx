@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef } from 'react'
+import { Suspense, useEffect, useRef, type ReactNode, type RefObject } from 'react'
 import { lazyPreload, preloadInBackground } from './lib/lazyPreload'
 import { EventsOn } from './wails/runtime'
 import { useWorkspace } from './store/workspace'
@@ -25,7 +25,6 @@ import { TrustBanner } from './components/layout/TrustBanner'
 import { copyDiagnostics, reportIssue, showLogs } from './store/diagnostics'
 import { subscribeAlerts } from './store/alerts'
 import { openToolCheck, openToolCheckOnFirstRun, useToolCheck } from './store/toolCheck'
-import { checkForUpdates, subscribeUpdates } from './store/update'
 import { useVSCodeImport } from './store/vscodeImport'
 import { usePrompts } from './store/prompts'
 import type { DroppedPath } from './lib/drop'
@@ -41,7 +40,8 @@ import { ErrorBoundary } from './components/layout/ErrorBoundary'
 import { StatusBar } from './components/layout/StatusBar'
 import { TitleBar } from './components/layout/TitleBar'
 import { EditorArea } from './components/editor/EditorArea'
-import { PANELS } from './panels'
+import { usePanels } from './panels'
+import { activateFeatures } from './features/install'
 import { resolvePanel } from './panels/registry'
 import { usePersistentNumber } from './lib/usePersistentNumber'
 
@@ -58,7 +58,7 @@ const ImportVSCodeDialog = lazyPreload(() => import('./components/settings/Impor
 export default function App() {
   const sidebar = useWorkspace((s) => s.sidebar)
   // An unknown id (a panel that was removed or renamed) shows the Files panel.
-  const panel = resolvePanel(PANELS, sidebar)
+  const panel = resolvePanel(usePanels(), sidebar)
   const focusToken = useWorkspace((s) => (panel ? (s.panelFocus[panel.id] ?? 0) : 0))
   const sidebarVisible = useWorkspace((s) => s.sidebarVisible)
   const quickOpen = useWorkspace((s) => s.quickOpen)
@@ -71,7 +71,6 @@ export default function App() {
   const error = useWorkspace((s) => s.error)
   const editingRun = useRun((s) => s.editing)
   const ready = useWorkspace((s) => s.ready)
-  const [sidebarWidth, setSidebarWidth] = usePersistentNumber('flint.sidebarWidth', 280)
   const workbench = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -88,7 +87,6 @@ subscribeUsageEvents()
     subscribeSessionAutosave()
     subscribeAutoSave()
     subscribeAlerts()
-    subscribeUpdates()
     subscribeEditorContext()
     // Native File menu: Open Folder… / Open Recent ▸ <folder>.
     EventsOn('menu:open-recent', () => useWorkspace.getState().setRecentOpen(true))
@@ -99,7 +97,6 @@ subscribeUsageEvents()
     EventsOn('menu:copy-diagnostics', () => void copyDiagnostics())
     EventsOn('menu:show-logs', showLogs)
     EventsOn('menu:check-tools', openToolCheck)
-    EventsOn('menu:check-updates', () => void checkForUpdates())
     EventsOn('files:dropped', (dropped: DroppedPath[]) => void openDropped(dropped))
     void useDatabase.getState().loadConnections()
     void useScratch.getState().load()
@@ -131,30 +128,22 @@ subscribeUsageEvents()
 
   useGlobalShortcuts()
 
-  const onSidebarResize = (ratio: number) => {
-    const width = workbench.current?.getBoundingClientRect().width ?? 1200
-    setSidebarWidth(Math.min(600, Math.max(180, ratio * width - ACTIVITY_BAR)))
-  }
-
   return (
     <div className="app">
       <TitleBar />
       <div className="workbench" ref={workbench}>
         <ActivityBar onTerminal={() => toggleTerminal(activeRoot())} />
         {sidebarVisible && (
-          <>
-            <aside className="sidebar" style={{ width: sidebarWidth }}>
-              <ErrorBoundary label="Sidebar">
-              {panel && (
-                // key: switching panels unmounts the previous one, as separate elements did.
-                <Suspense key={panel.id} fallback={null}>
-                  <panel.component focusToken={focusToken} />
-                </Suspense>
-              )}
-              </ErrorBoundary>
-            </aside>
-            <Splitter direction="horizontal" onResize={onSidebarResize} />
-          </>
+          <ResizableSidebar workbench={workbench}>
+            <ErrorBoundary label="Sidebar">
+            {panel && (
+              // key: switching panels unmounts the previous one, as separate elements did.
+              <Suspense key={panel.id} fallback={null}>
+                <panel.component focusToken={focusToken} />
+              </Suspense>
+            )}
+            </ErrorBoundary>
+          </ResizableSidebar>
         )}
         {/* Files, terminals and agent chats share one tab area. */}
         <main className="main">
@@ -205,17 +194,40 @@ subscribeUsageEvents()
 }
 
 /**
- * Registers the app's commands and runs their shortcuts from one capturing keydown
- * listener, so they fire before editors and terminals see the keys (see lib/commands.ts).
+ * Registers the app's commands, then the feature modules' (features/install.ts),
+ * and runs their shortcuts from one capturing keydown listener, so they fire
+ * before editors and terminals see the keys (see lib/commands.ts).
  */
+/**
+ * The sidebar and its splitter. The width lives here: a drag re-renders only this
+ * frame, while the panel (children, made by App) and the rest of the shell stay put.
+ */
+function ResizableSidebar({ workbench, children }: { workbench: RefObject<HTMLDivElement | null>; children: ReactNode }) {
+  const [width, setWidth] = usePersistentNumber('flint.sidebarWidth', 280)
+  const onResize = (ratio: number) => {
+    const total = workbench.current?.getBoundingClientRect().width ?? 1200
+    setWidth(Math.min(600, Math.max(180, ratio * total - ACTIVITY_BAR)))
+  }
+  return (
+    <>
+      <aside className="sidebar" style={{ width }}>
+        {children}
+      </aside>
+      <Splitter direction="horizontal" onResize={onResize} />
+    </>
+  )
+}
+
 function useGlobalShortcuts() {
   useEffect(() => {
     setCommandErrorHandler((err) => showToast(errorMessage(err), 'error'))
     const unregister = registerAppCommands()
+    const deactivate = activateFeatures()
     const onKey = (e: KeyboardEvent) => void handleGlobalKey(e)
     window.addEventListener('keydown', onKey, true)
     return () => {
       window.removeEventListener('keydown', onKey, true)
+      deactivate()
       unregister()
     }
   }, [])

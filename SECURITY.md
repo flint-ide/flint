@@ -38,13 +38,14 @@ In scope:
 - **Code execution from opening an untrusted folder**: anything a repository can do to run code when it is opened, browsed or searched in Flint, especially in Restricted Mode, and any git filter, textconv driver or fsmonitor run by Flint's own background git calls.
 - **XSS in the webview**: script execution through rendered content (Markdown, pull request descriptions and comments, HTTP responses, terminal output, file names), or bypasses of the Content Security Policy. Script execution in the webview gives access to every Go binding, so it is treated as code execution.
 - **Secret leakage**: credentials, tokens or passwords written to logs, bug reports, diagnostics, session files, agent prompts, or exposed to the UI when they should stay in Go or the Keychain.
-- **Command injection**: user- or repository-controlled values reaching a CLI (git, gh, docker, kubectl, aws, agents) as flags or shell code.
+- **Command injection**: user- or repository-controlled values reaching a CLI (git, docker, kubectl, aws, agents) as flags or shell code.
+- **Token handling**: a GitHub token reaching the web view, the log, an error message, or any host other than the configured GitHub API.
 
 Out of scope:
 
 - **The dev-only server mode** (`make server` / `wails3 task server`). It exposes every binding on localhost with no authentication by design and must not be used outside development.
 - Issues that require local administrator access, or an attacker who already controls your user account.
-- Behavior of third-party tools Flint launches (git, gh, kubectl, language servers, agents) that is not caused by how Flint calls them.
+- Behavior of third-party tools Flint launches (git, kubectl, language servers, agents) that is not caused by how Flint calls them.
 - Actions an agent takes after you approve them, or in a folder you chose to trust.
 
 The threat model is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#security-model).

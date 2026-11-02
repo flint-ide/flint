@@ -7,7 +7,7 @@ import (
 	"flint/internal/github"
 )
 
-// GitHubAPI reviews pull requests of a project's GitHub repository through gh.
+// GitHubAPI reviews pull requests of a project's GitHub repository through the GitHub API.
 // dir is any folder of the project (the frontend passes the active project's root).
 type GitHubAPI struct {
 	app *App
@@ -17,7 +17,7 @@ type GitHubAPI struct {
 	ciGH ciGitHub
 }
 
-// Check reports whether gh is installed and logged in and which repository dir is.
+// Check reports whether Flint is signed in to GitHub and which repository dir is.
 func (g *GitHubAPI) Check(dir string, force bool) github.Status {
 	return g.gh.Check(g.app.ctx, dir, force)
 }
@@ -62,7 +62,7 @@ func (g *GitHubAPI) DiscardReview(dir string, number int) error {
 	return g.gh.DiscardReview(g.app.ctx, dir, number)
 }
 
-// Checkout checks the pull request's branch out in the project (gh pr checkout),
+// Checkout checks the pull request's branch out in the project (git fetch pull/N/head),
 // refusing while tracked files have local changes.
 func (g *GitHubAPI) Checkout(dir string, number int) error {
 	st, err := g.git.Status(dir)

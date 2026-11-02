@@ -1,15 +1,23 @@
-// Package tools is the list of external programs Flint drives (git, rg, gh,
+// Package tools is the list of external programs Flint drives (git, rg,
 // agents, cloud CLIs, language servers) and a check of which are installed.
+// GitHub needs no program: Flint talks to its API (internal/github).
 // One table feeds both the first-run tool check and the bug report, so the
 // two never disagree about what Flint needs.
 package tools
 
 import (
+	"cmp"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"sync"
 
 	"flint/internal/lsp"
 )
+
+// Install picks the install command for this system: Homebrew on macOS, the
+// Debian/Ubuntu package on Linux (for tools that features register).
+func Install(mac, linux string) string { return install(mac, linux) }
 
 // install picks the install command for this system: Homebrew on macOS, the
 // Debian/Ubuntu package (or the vendor's npm/snap package) on Linux.
@@ -45,6 +53,9 @@ type Tool struct {
 	Required bool   // Flint is of little use without it
 	Install  string // a command to paste into Terminal
 	Docs     string // site page (relative to DocsBase, optionally with #anchor)
+	// Order places the tool within its group (ascending); ties keep list
+	// order, built-in tools before registered ones.
+	Order int
 
 	// candidates are tried in order; the first on PATH is reported.
 	candidates []candidate
@@ -85,8 +96,48 @@ const (
 	agentDocs = "guides/ai-agents.md#supported-agents"
 )
 
-// All is every tool, in display order within its group.
+// Find adds a binary to look for (after those already set) and the arguments
+// that make it print its version; none means it is only looked up, not run.
+func (t Tool) Find(bin string, versionArgs ...string) Tool {
+	t.candidates = append(slices.Clone(t.candidates), candidate{bin, versionArgs})
+	return t
+}
+
+var (
+	registeredMu sync.Mutex
+	registered   []Tool // by feature modules (internal/feature)
+)
+
+// Register adds tools that features need to the check and the bug report.
+// A tool whose id is already known replaces nothing: it panics, as two
+// features describing one program differently is a programming error.
+func Register(list ...Tool) {
+	registeredMu.Lock()
+	defer registeredMu.Unlock()
+	for _, t := range list {
+		if t.ID == "" || slices.ContainsFunc(append(builtin(), registered...), func(o Tool) bool { return o.ID == t.ID }) {
+			panic("tools: duplicate or empty tool id " + t.ID)
+		}
+		registered = append(registered, t)
+	}
+}
+
+var groupOrder = []string{GroupCore, GroupAgents, GroupLanguages, GroupInfra}
+
+// All is every tool, built-in and registered, grouped and in display order
+// within each group.
 func All() []Tool {
+	registeredMu.Lock()
+	list := append(builtin(), registered...)
+	registeredMu.Unlock()
+	slices.SortStableFunc(list, func(a, b Tool) int {
+		return cmp.Or(cmp.Compare(slices.Index(groupOrder, a.Group), slices.Index(groupOrder, b.Group)), cmp.Compare(a.Order, b.Order))
+	})
+	return list
+}
+
+// builtin is the tools of Flint itself, in display order within each group.
+func builtin() []Tool {
 	return []Tool{
 		{
 			ID: "git", Name: "Git", Group: GroupCore, Required: true,
@@ -99,12 +150,6 @@ func All() []Tool {
 			Feature: "Fast project search, Go to File and the TODO list",
 			Install: install("brew install ripgrep", "sudo apt install ripgrep"), Docs: "how-to/search-and-replace.md#make-search-faster",
 			candidates: one("rg", "--version"),
-		},
-		{
-			ID: "gh", Name: "GitHub CLI", Group: GroupCore,
-			Feature: "Pull request review",
-			Install: install("brew install gh", "sudo apt install gh"), Docs: "guides/git-and-github.md#pull-requests",
-			candidates: one("gh", "--version"),
 		},
 		{
 			ID: "claude", Name: "Claude Code", Group: GroupAgents,
@@ -155,20 +200,15 @@ func All() []Tool {
 			Install: install("brew install node", "sudo apt install nodejs npm"), Docs: langDocs,
 			candidates: one("node", "--version"),
 		},
+		// Docker is registered by its feature (internal/features/docker).
 		{
-			ID: "docker", Name: "Docker", Group: GroupInfra,
-			Feature: "Compose up, down and pull (the Docker panel itself talks to the Engine API)",
-			Install: install("brew install --cask docker-desktop", "sudo apt install docker.io"), Docs: "guides/docker.md",
-			candidates: one("docker", "--version"),
-		},
-		{
-			ID: "kubectl", Name: "kubectl", Group: GroupInfra,
+			ID: "kubectl", Name: "kubectl", Group: GroupInfra, Order: 20,
 			Feature: "Kubernetes panel",
 			Install: install("brew install kubectl", "sudo snap install kubectl --classic"), Docs: "guides/kubernetes.md",
 			candidates: one("kubectl", "version", "--client=true"),
 		},
 		{
-			ID: "aws", Name: "AWS CLI", Group: GroupInfra,
+			ID: "aws", Name: "AWS CLI", Group: GroupInfra, Order: 30,
 			Feature: "AWS profiles panel, login and credential refresh",
 			Install: install("brew install awscli", "sudo snap install aws-cli --classic"), Docs: "guides/aws.md",
 			candidates: one("aws", "--version"),

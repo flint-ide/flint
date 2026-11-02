@@ -50,6 +50,11 @@ func (a *App) updateSettings(change func(settings.Settings) settings.Settings) (
 	}
 	a.usage.SetRetention(saved.Usage.RetentionDays)
 	a.mcpSettingsChanged(prev.MCPServer, saved.MCPServer)
+	a.features.SettingsChanged(prev, saved)
+	if prev.GitHub.Host != saved.GitHub.Host && a.github != nil {
+		a.github.Reset() // another host: other repositories, another account
+		a.emit(eventAccountsChanged)
+	}
 	for _, language := range settings.ChangedLanguageServers(prev, saved) {
 		a.lsp.Reconfigure(language)
 	}

@@ -437,7 +437,7 @@ func (t *TaskAPI) UpdateFromBase(id string) ([]string, error) {
 }
 
 // CreatePullRequest pushes the task's branch and opens a pull request into
-// its base with gh, after the user confirmed in a native dialog (it
+// its base through the GitHub API, after the user confirmed in a native dialog (it
 // publishes the branch and the description). It returns the URL.
 func (t *TaskAPI) CreatePullRequest(id string) (string, error) {
 	task, err := t.liveTask(id)
@@ -466,11 +466,15 @@ func (t *TaskAPI) CreatePullRequest(id string) (string, error) {
 	if !t.app.askUser("Create a pull request?", msg, "Push and Create") {
 		return "", errPRDeclined
 	}
+	remote, err := wr.PushRemote(ctx)
+	if err != nil {
+		return "", err
+	}
 	if err := wr.PushBranch(ctx, task.Branch); err != nil {
 		return "", err
 	}
 	url, err := t.pr.CreatePullRequest(ctx, task.Worktree, github.NewPullRequest{
-		Base: task.Base, Head: task.Branch, Title: task.Title, Body: task.Prompt,
+		Base: task.Base, Head: task.Branch, Title: task.Title, Body: task.Prompt, HeadRemote: remote,
 	})
 	if err != nil {
 		return "", err
@@ -493,6 +497,17 @@ func (a *App) askUser(title, message, ok string) bool {
 		return a.ask(title, message, ok)
 	}
 	return a.askNative(title, message, ok)
+}
+
+// chooseUser asks a native question with buttons, one dialog at a time;
+// "" when dismissed (or in tests, which have a.ask only).
+func (a *App) chooseUser(title, message string, buttons []string) string {
+	a.confirmMu.Lock()
+	defer a.confirmMu.Unlock()
+	if a.ask != nil {
+		return ""
+	}
+	return a.chooseNative(title, message, buttons)
 }
 
 // RemoveCheck tells what removing a task would lose, for the confirmation.

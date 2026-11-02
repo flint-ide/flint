@@ -59,6 +59,9 @@ type Files struct {
 	Config      string
 	Credentials string
 	SSOCache    string
+	// SAML2AWS is saml2aws's config (~/.saml2aws, SAML2AWS_CONFIGFILE): its IdP
+	// accounts tell which one logs in to a profile.
+	SAML2AWS string
 }
 
 // DefaultFiles follows the AWS CLI's lookup.
@@ -71,12 +74,16 @@ func DefaultFiles() (Files, error) {
 		Config:      filepath.Join(home, ".aws", "config"),
 		Credentials: filepath.Join(home, ".aws", "credentials"),
 		SSOCache:    filepath.Join(home, ".aws", "sso", "cache"),
+		SAML2AWS:    filepath.Join(home, ".saml2aws"),
 	}
 	if p := os.Getenv("AWS_CONFIG_FILE"); p != "" {
 		f.Config = p
 	}
 	if p := os.Getenv("AWS_SHARED_CREDENTIALS_FILE"); p != "" {
 		f.Credentials = p
+	}
+	if p := os.Getenv("SAML2AWS_CONFIGFILE"); p != "" {
+		f.SAML2AWS = p
 	}
 	return f, nil
 }
@@ -117,11 +124,39 @@ func Load(files Files, now time.Time) ([]Profile, error) {
 	if i := slices.Index(names, "default"); i > 0 {
 		names = append([]string{"default"}, slices.Delete(names, i, i+1)...)
 	}
+	// Only a convenience for the saml2aws login: an unreadable file leaves it as before.
+	var accounts map[string]string
+	if files.SAML2AWS != "" {
+		if idp, err := readINI(files.SAML2AWS); err == nil {
+			accounts = idpAccounts(idp)
+		}
+	}
 	out := make([]Profile, 0, len(names))
 	for _, name := range names {
-		out = append(out, describe(name, settings[name], keys[name], sessions, files.SSOCache, now))
+		out = append(out, describe(name, settings[name], keys[name], sessions, files.SSOCache, accounts[name], now))
 	}
 	return out, nil
+}
+
+// idpAccounts maps AWS profiles to the saml2aws IdP account that logs in to them:
+// the account whose aws_profile is the profile (the first one wins), else an
+// account named like the profile. Without --idp-account saml2aws uses "default",
+// which fails with "URL empty in idp account" when there is no such account.
+func idpAccounts(sections []section) map[string]string {
+	out := map[string]string{}
+	for _, s := range sections {
+		if profile := s.values["aws_profile"]; profile != "" {
+			if _, seen := out[profile]; !seen {
+				out[profile] = s.name
+			}
+		}
+	}
+	for _, s := range sections {
+		if _, seen := out[s.name]; !seen {
+			out[s.name] = s.name
+		}
+	}
+	return out
 }
 
 func readINI(path string) ([]section, error) {
@@ -137,7 +172,7 @@ func readINI(path string) ([]section, error) {
 
 // describe works out a profile's kind and status from its settings (config)
 // and keys (credentials).
-func describe(name string, conf, keys map[string]string, sessions map[string]map[string]string, ssoCache string, now time.Time) Profile {
+func describe(name string, conf, keys map[string]string, sessions map[string]map[string]string, ssoCache, idpAccount string, now time.Time) Profile {
 	get := func(k string) string {
 		if v := keys[k]; v != "" {
 			return v
@@ -170,7 +205,11 @@ func describe(name string, conf, keys map[string]string, sessions map[string]map
 		p.Account, p.Role = fromARN(keys["x_principal_arn"])
 		if keys["x_principal_arn"] != "" && p.Account != "" && p.Role != "" {
 			// Written by saml2aws: log in again into the same role.
-			p.Login = []string{"saml2aws", "login", "--profile", name, "--role", "arn:aws:iam::" + p.Account + ":role/" + p.Role}
+			p.Login = []string{"saml2aws", "login"}
+			if idpAccount != "" {
+				p.Login = append(p.Login, "--idp-account", idpAccount)
+			}
+			p.Login = append(p.Login, "--profile", name, "--role", "arn:aws:iam::"+p.Account+":role/"+p.Role)
 		}
 	case keys["aws_access_key_id"] != "":
 		p.Kind, p.Status = KindKeys, StatusStatic

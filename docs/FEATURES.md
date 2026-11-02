@@ -252,6 +252,7 @@ PR review inside the IDE through GitHub's REST and GraphQL APIs (`internal/githu
 - Passwords are stored in the macOS Keychain, not in files.
 - Under each connection, a "Databases (N)" node lists all databases on the server, as in pgAdmin. Postgres excludes templates, and databases without the `CONNECT` privilege get a red cross. ClickHouse shows what `SHOW DATABASES` returns.
 - Expanding a database opens a separate pool to it (same host, user and password) and shows its schemas and tables.
+- Right-click in the tree opens a context menu at every level: a connection (new SQL console, refresh, edit, copy its name or a password-less connection URL, delete), a database (new SQL console, refresh schema, copy name), a schema (copy name), a table (preview data, count rows, copy its name, qualified name or column list, quoted for the dialect) and a column (copy name, or name and type).
 - Flint closes pools for non-default databases after one minute of inactivity, and immediately before a modifying statement (for example `DROP DATABASE`) so its own connections do not block the server.
 - The SQL console has a database selector next to the connection, and the scratchpad remembers the choice.
 - The database in a profile is only a default and is optional. Without it Flint connects to `postgres` (ClickHouse: `default`).

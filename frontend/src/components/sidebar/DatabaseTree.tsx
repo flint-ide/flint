@@ -1,9 +1,30 @@
-import { useEffect, useState } from 'react'
-import type { Connection, DatabaseInfo, Table } from '../../api/backend'
-import { defaultDatabase, resolveDatabase, schemaKey } from '../../lib/databases'
+import { useEffect, useState, type MouseEvent } from 'react'
+import { errorMessage, type Connection, type DatabaseInfo, type Table } from '../../api/backend'
+import { defaultDatabase, previewQuery, resolveDatabase, schemaKey } from '../../lib/databases'
 import { useDatabase } from '../../store/database'
 import { useScratch } from '../../store/scratch'
+import { openContextMenu } from '../../store/contextMenu'
+import { showToast } from '../../store/dialog'
 import { DatabaseIcon } from '../icons/DatabaseIcon'
+import type { DropdownItem } from '../ui/Dropdown'
+import { columnMenu, databaseMenu, schemaMenu, tableMenu } from './databaseMenu'
+
+/** Copies text for a "Copy …" item of the panel's menus and confirms it in a toast. */
+export function copyText(text: string): void {
+  navigator.clipboard.writeText(text).then(
+    () => showToast(`Copied ${text.length > 60 ? `${text.slice(0, 57)}…` : text}`),
+    (err: unknown) => showToast(`Copy failed: ${errorMessage(err)}`, 'error'),
+  )
+}
+
+/** A right-click handler opening the menu built at click time. */
+export function onMenu(build: () => DropdownItem[]) {
+  return (e: MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    openContextMenu(e.clientX, e.clientY, build())
+  }
+}
 
 /** "Databases (N)" under a connection: every database on the server, each browsable on its own. */
 export function DatabasesNode({ conn }: { conn: Connection }) {
@@ -45,9 +66,13 @@ function DatabaseNode({ conn, info }: { conn: Connection; info: DatabaseInfo }) 
     if (open && info.canConnect) void loadSchema(conn.id, database)
   }, [open, info.canConnect, conn.id, database, loadSchema])
 
+  const newConsole = () => void createScratch('sql', conn.id, undefined, scratchDatabase)
+  const refresh = () => void loadSchema(conn.id, database, true)
+  const menu = onMenu(() => databaseMenu(info, { newConsole, refresh, copy: copyText }))
+
   if (!info.canConnect) {
     return (
-      <div className="tree-row static indent-2 db-row locked" title="No CONNECT privilege on this database">
+      <div className="tree-row static indent-2 db-row locked" title="No CONNECT privilege on this database" onContextMenu={menu}>
         <span className="twisty" />
         <DatabaseIcon locked />
         <span className="schema-name">{info.name}</span>
@@ -57,13 +82,18 @@ function DatabaseNode({ conn, info }: { conn: Connection; info: DatabaseInfo }) 
 
   return (
     <div>
-      <div className="tree-row static indent-2 db-row" onClick={() => setOpen(!open)} title={isDefault ? 'Default database of this connection' : undefined}>
+      <div
+        className="tree-row static indent-2 db-row"
+        onClick={() => setOpen(!open)}
+        onContextMenu={menu}
+        title={isDefault ? 'Default database of this connection' : undefined}
+      >
         <span className="twisty">{open ? '▾' : '▸'}</span>
         <DatabaseIcon />
         <span className={`schema-name${isDefault ? ' default-db' : ''}`}>{info.name}</span>
         <span className="row-actions" onClick={(e) => e.stopPropagation()}>
-          <button className="icon" title="New SQL console in this database" onClick={() => void createScratch('sql', conn.id, undefined, scratchDatabase)}>⌨</button>
-          <button className="icon" title="Refresh schema" onClick={() => void loadSchema(conn.id, database, true)}>↻</button>
+          <button className="icon" title="New SQL console in this database" onClick={newConsole}>⌨</button>
+          <button className="icon" title="Refresh schema" onClick={refresh}>↻</button>
         </span>
       </div>
       {open && (
@@ -93,11 +123,8 @@ function SchemaTree({ conn, database, tables }: { conn: Connection; database: st
   for (const t of tables) bySchema.set(t.schema, [...(bySchema.get(t.schema) ?? []), t])
   if (bySchema.size === 0) return <div className="tree-row static muted indent-3">No tables.</div>
 
-  const preview = (t: Table) => {
-    const q = flat ? '`' : '"'
-    const ident = (s: string) => (/^[a-z_][a-z0-9_]*$/.test(s) ? s : `${q}${s.replaceAll(q, q + q)}${q}`)
-    void createScratch('sql', conn.id, `SELECT *\nFROM ${ident(t.schema)}.${ident(t.name)}\nLIMIT 100;\n`, database)
-  }
+  const query = (sql: string) => void createScratch('sql', conn.id, sql, database)
+  const preview = (t: Table) => query(previewQuery(conn.driver, t))
 
   const tableRows = (list: Table[], depth: number) =>
     list.map((t) => {
@@ -110,13 +137,18 @@ function SchemaTree({ conn, database, tables }: { conn: Connection; database: st
             title={`${t.kind} · double-click to preview`}
             onClick={() => setOpenTables({ ...openTables, [key]: !tOpen })}
             onDoubleClick={() => preview(t)}
+            onContextMenu={onMenu(() => tableMenu(conn.driver, t, { query, copy: copyText }))}
           >
             <span className="twisty">{tOpen ? '▾' : '▸'}</span>
             <span className={`table-name ${t.kind.includes('view') ? 'view' : ''}`}>{t.name}</span>
           </div>
           {tOpen &&
             t.columns.map((c) => (
-              <div key={c.name} className={`tree-row static indent-${depth + 1} column-row`}>
+              <div
+                key={c.name}
+                className={`tree-row static indent-${depth + 1} column-row`}
+                onContextMenu={onMenu(() => columnMenu(c, { copy: copyText }))}
+              >
                 <span className="col-name">{c.name}</span>
                 <span className="col-type">{c.type}</span>
               </div>
@@ -133,7 +165,11 @@ function SchemaTree({ conn, database, tables }: { conn: Connection; database: st
         const sOpen = openSchemas[schemaName] ?? bySchema.size === 1
         return (
           <div key={schemaName}>
-            <div className="tree-row static indent-3" onClick={() => setOpenSchemas({ ...openSchemas, [schemaName]: !sOpen })}>
+            <div
+              className="tree-row static indent-3"
+              onClick={() => setOpenSchemas({ ...openSchemas, [schemaName]: !sOpen })}
+              onContextMenu={onMenu(() => schemaMenu(schemaName, { copy: copyText }))}
+            >
               <span className="twisty">{sOpen ? '▾' : '▸'}</span>
               <span className="schema-name">{schemaName}</span>
               <span className="badge">{list.length}</span>

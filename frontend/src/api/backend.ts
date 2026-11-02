@@ -16,6 +16,7 @@ export type FileContent = workspace.FileContent
 export type Connection = db.Connection
 export type QueryResult = db.QueryResult
 export type Table = db.Table
+export type Column = db.Column
 export type DatabaseInfo = db.DatabaseInfo
 export type HistoryEntry = db.HistoryEntry
 export type ExplainResult = db.ExplainResult

@@ -24,7 +24,10 @@ export function ColumnFilter({ anchor, rows, col, columnName, view, onChange, on
   const [query, setQuery] = useState('')
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   // The list is computed once per opening, so values don't vanish as you untick them.
-  const values = useMemo(() => distinctValues(rows, col, view, MAX_LIST), [rows, col]) // eslint-disable-line react-hooks/exhaustive-deps
+  // One extra value tells whether the list was cut.
+  const all = useMemo(() => distinctValues(rows, col, view, MAX_LIST + 1), [rows, col]) // eslint-disable-line react-hooks/exhaustive-deps
+  const values = all.slice(0, MAX_LIST)
+  const cut = all.length > MAX_LIST
   const filter = view.filters[col]
   const needle = query.trim().toLowerCase()
   const visible = needle ? values.filter((v) => v.label.toLowerCase().includes(needle)) : values
@@ -39,23 +42,31 @@ export function ColumnFilter({ anchor, rows, col, columnName, view, onChange, on
       if (!box.current?.contains(e.target as Node) && !anchor.contains(e.target as Node)) onClose()
     }
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    // It's placed once: scrolling the grid (or resizing) would leave it behind.
+    const onScroll = (e: Event) => {
+      if (!box.current?.contains(e.target as Node)) onClose()
+    }
     window.addEventListener('mousedown', onDown, true)
     window.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onClose)
     return () => {
       window.removeEventListener('mousedown', onDown, true)
       window.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onClose)
     }
   }, [anchor, onClose])
 
-  const shownKeys = () => values.filter((v) => isKeyShown(filter, v.key)).map((v) => v.key)
-
+  /**
+   * Ticking keeps the filter's kind: a list of shown values ("in", after Select none or
+   * Show Only) stays a list, so values beyond the listed ones stay hidden; otherwise it's
+   * a list of hidden values, so unlisted ones stay shown.
+   */
   const toggle = (key: string) => {
-    const shown = new Set(shownKeys())
-    if (shown.has(key)) shown.delete(key)
-    else shown.add(key)
-    const hidden = values.filter((v) => !shown.has(v.key)).map((v) => v.key)
-    // Exclusions keep working for values beyond the list (and new rows of a re-run).
-    onChange(setFilter(view, col, hidden.length ? { mode: 'notIn', keys: hidden } : null))
+    const keys = filter?.keys ?? []
+    const next = keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]
+    onChange(setFilter(view, col, { mode: filter?.mode ?? 'notIn', keys: next }))
   }
 
   /** Shows exactly the values matching the search box (or all of them). */
@@ -97,7 +108,7 @@ export function ColumnFilter({ anchor, rows, col, columnName, view, onChange, on
             <span className="column-filter-count">{v.count.toLocaleString()}</span>
           </label>
         ))}
-        {values.length >= MAX_LIST && <div className="muted column-filter-empty">Showing the {MAX_LIST} most frequent values</div>}
+        {cut &&<div className="muted column-filter-empty">Showing the {MAX_LIST} most frequent values</div>}
       </div>
     </div>,
     document.body,

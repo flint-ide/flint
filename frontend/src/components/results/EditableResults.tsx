@@ -96,6 +96,8 @@ export function EditableResults({ result, summary, connId, database, driver, rea
   return (
     <>
       <ResultsGrid
+        // Sort and filters address columns by position: another column list starts afresh.
+        key={result.columns.map((c) => c.name).join('\u0001')}
         result={result}
         summary={summary}
         actions={actions}

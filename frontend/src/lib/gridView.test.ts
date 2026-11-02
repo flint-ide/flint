@@ -66,6 +66,15 @@ describe('compareValues', () => {
     assert.ok(compareValues('1.5', '-2') > 0)
     assert.ok(compareValues('apple', 'banana') < 0)
   })
+
+  it('ranks numbers before text, so mixed columns have one order', () => {
+    // Without ranking, "9" < "10" < "1a" < "9" would be a cycle.
+    assert.ok(compareValues('9', '10') < 0)
+    assert.ok(compareValues('10', '1a') < 0)
+    assert.ok(compareValues('9', '1a') < 0)
+    const mixed = [['1a'], ['10'], [null], ['9'], ['b']]
+    assert.deepEqual(applyView(mixed, view({ sort: [{ col: 0, dir: 'asc' }] })), [3, 1, 0, 4, 2])
+  })
 })
 
 describe('distinctValues', () => {

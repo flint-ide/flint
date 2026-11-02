@@ -31,7 +31,7 @@ describe('table statements', () => {
     assert.equal(selectStatement('postgres', t), 'SELECT id,\n       note\nFROM public."Order"\nLIMIT 100;\n')
     assert.match(insertStatement('postgres', t), /^INSERT INTO public\."Order" \(id, note\)\nVALUES \(\n {4}NULL, -- id int\n {4}NULL -- note text\n\);/)
     assert.match(updateStatement('postgres', t), /^UPDATE public\."Order"\nSET\n {4}id = NULL,\n {4}note = NULL\nWHERE false;/)
-    assert.match(updateStatement('clickhouse', t), /^ALTER TABLE public\.`Order`\nUPDATE/)
+    assert.match(updateStatement('clickhouse', t), /\nALTER TABLE public\.`Order`\nUPDATE/)
     assert.equal(deleteStatement('clickhouse', t), 'DELETE FROM public.`Order`\nWHERE false;\n')
   })
 
@@ -49,6 +49,11 @@ describe('table statements', () => {
     assert.equal(dropStatement('clickhouse', { ...t, kind: 'dictionary' }), 'DROP DICTIONARY public.`Order`;\n')
   })
 
+  it('quotes reserved words, so a column named user is not current_user', () => {
+    const r = { schema: 'public', name: 'order', columns: [{ name: 'user', type: 'text' }, { name: 'id', type: 'int' }] }
+    assert.equal(selectStatement('postgres', r), 'SELECT "user",\n       id\nFROM public."order"\nLIMIT 100;\n')
+  })
+
   it('passes the quoted relation name to the Postgres size functions', () => {
     assert.match(tableSizeQuery('postgres', t), /pg_total_relation_size\('public\."Order"'\)/)
   })
@@ -57,6 +62,6 @@ describe('table statements', () => {
 describe('row statements', () => {
   it('builds an INSERT of a result row and an IN list without duplicates', () => {
     assert.equal(insertRowStatement('postgres', 'users', ['id', 'Name'], [1, null]), 'INSERT INTO users (id, "Name") VALUES (1, NULL);')
-    assert.equal(inList('postgres', [1, 'a', 1, null]), "(1, 'a', NULL)")
+    assert.equal(inList('postgres', [1, 'a', 1, null]), "(1, 'a')")
   })
 })

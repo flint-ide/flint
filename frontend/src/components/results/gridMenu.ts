@@ -35,7 +35,10 @@ export interface CellMenuInput {
   view: GridView
   col: number
   columnName: string
+  /** The fetched value, which filters match. */
   value: unknown
+  /** The value on screen (with a staged edit), which Copy Value copies; defaults to value. */
+  shown?: unknown
   copies: CellCopies
   edit?: CellEditActions
 }
@@ -70,7 +73,8 @@ function sortItems(view: GridView, col: number, a: GridMenuActions): DropdownIte
 
 export function cellMenu(input: CellMenuInput, a: GridMenuActions): DropdownItem[] {
   const { view, col, columnName, value, copies, edit } = input
-  const shown = shortValue(value)
+  const label = shortValue(value)
+  const onScreen = 'shown' in input ? input.shown : value
   const editItems: DropdownItem[] = edit
     ? [
         { type: 'section', label: 'Edit' },
@@ -80,12 +84,12 @@ export function cellMenu(input: CellMenuInput, a: GridMenuActions): DropdownItem
     : []
   return [
     { type: 'section', label: `Filter · ${columnName}` },
-    { label: `Show Only = ${shown}`, onSelect: () => a.setView(onlyValue(view, col, value)) },
-    { label: `Exclude ≠ ${shown}`, onSelect: () => a.setView(excludeValue(view, col, value)) },
+    { label: `Show Only = ${label}`, onSelect: () => a.setView(onlyValue(view, col, value)) },
+    { label: `Exclude ≠ ${label}`, onSelect: () => a.setView(excludeValue(view, col, value)) },
     ...filterItems(view, col, a),
     ...sortItems(view, col, a),
     { type: 'section', label: 'Copy' },
-    { label: 'Copy Value', kbd: formatKeys('Mod+C'), onSelect: () => a.copy(cellText(value), 'value') },
+    { label: 'Copy Value', kbd: formatKeys('Mod+C'), onSelect: () => a.copy(cellText(onScreen), 'value') },
     { label: 'Copy Row', hint: 'TSV', onSelect: () => a.copy(copies.row(), 'row') },
     { label: 'Copy Row as JSON', onSelect: () => a.copy(copies.rowJSON(), 'row as JSON') },
     { label: 'Copy Row as INSERT', onSelect: () => a.copy(copies.rowInsert(), 'row as INSERT') },

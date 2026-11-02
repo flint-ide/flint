@@ -37,11 +37,27 @@ export function isSchemaKeyOf(key: string, connId: string): boolean {
 }
 
 /**
+ * Words that can't (or, like user and current_date, mustn't) stand bare as a column
+ * name: Postgres' reserved key words plus the ClickHouse clauses that break a column
+ * list. Quoting a few extra words is harmless; missing one silently reads current_user.
+ */
+const RESERVED = new Set(
+  (
+    'all analyse analyze and any array as asc asymmetric authorization between binary both case cast check collate collation column ' +
+    'concurrently constraint create cross current_catalog current_date current_role current_schema current_time current_timestamp ' +
+    'current_user default deferrable desc distinct do else end except false fetch final for foreign format freeze from full grant group ' +
+    'having ilike in initially inner intersect into is isnull join lateral leading left like limit localtime localtimestamp natural not ' +
+    'notnull null offset on only or order outer overlaps placing prewhere primary references returning right sample select session_user ' +
+    'settings similar some symmetric system_user table tablesample then to trailing true union unique user using variadic verbose when where window with'
+  ).split(' '),
+)
+
+/**
  * An identifier ready to paste into SQL: bare when it's plain lowercase, else quoted with the
  * dialect's quote (backtick for ClickHouse, double quote for Postgres), the quote doubled inside.
  */
 export function quoteIdent(driver: string, name: string): string {
-  if (/^[a-z_][a-z0-9_]*$/.test(name)) return name
+  if (/^[a-z_][a-z0-9_]*$/.test(name) && !RESERVED.has(name)) return name
   const q = driver === 'clickhouse' ? '`' : '"'
   return `${q}${name.replaceAll(q, q + q)}${q}`
 }

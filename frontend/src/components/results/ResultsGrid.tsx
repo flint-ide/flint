@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { useVirtualList } from '../../lib/virtualList'
 import type { QueryResult } from '../../api/backend'
 import { cellText, columnWidths, toTSV } from '../../lib/format'
@@ -72,7 +72,9 @@ export function ResultsGrid({ result, summary, actions, editing, driver = 'postg
   const totalWidth = offsets[offsets.length - 1]
   const template = `${INDEX_WIDTH}px ${widths.map((w) => `${w}px`).join(' ')}`
 
-  const order = useMemo(() => applyView(result.rows, view), [result.rows, view])
+  // Typing in the search box stays responsive on big results: the rows follow a beat later.
+  const shownView = useDeferredValue(view)
+  const order = useMemo(() => applyView(result.rows, shownView), [result.rows, shownView])
   const visualOf = useMemo(() => new Map(order.map((row, i) => [row, i])), [order])
   const edits = editing?.edits
   const insertedCount = edits?.inserted.length ?? 0
@@ -105,13 +107,22 @@ export function ResultsGrid({ result, summary, actions, editing, driver = 'postg
     prevInserted.current = insertedCount
   }, [insertedCount, base])
 
+  // A filter that hides the selected (or edited) row drops the selection, so keys
+  // and the toolbar's row actions never act on a row you can't see.
+  useEffect(() => {
+    const hidden = (c: Cell | null) => c !== null && c.row < base && !visualOf.has(c.row)
+    setSelected((c) => (hidden(c) ? null : c))
+    setEditingCell((c) => (hidden(c) ? null : c))
+  }, [visualOf, base])
+
   const valueAt = (row: number, col: number): unknown => (edits ? displayValue(result, edits, row, col) : result.rows[row][col])
   const editableColumn = (col: number): TargetColumn | null => {
     const c = editing?.columns[col]
     return c?.editable ? c : null
   }
-  const shownRows = () => order.map((i) => result.rows[i])
   const rowValues = (row: number) => result.columns.map((_, c) => valueAt(row, c))
+  /** The shown rows (sorted, filtered) with staged edits, as copied. */
+  const shownResult = () => ({ columns: result.columns, rows: order.map(rowValues) })
 
   const copy = async (text: string, what: string) => {
     try {
@@ -198,7 +209,7 @@ export function ResultsGrid({ result, summary, actions, editing, driver = 'postg
     },
     copy: (text, what) => void copy(text, what),
   }
-  const columnValues = (col: number) => order.map((i) => result.rows[i][col])
+  const columnValues = (col: number) => order.map((i) => valueAt(i, col))
 
   const onCellMenu = (cell: Cell, e: MouseEvent) => {
     e.preventDefault()
@@ -210,11 +221,18 @@ export function ResultsGrid({ result, summary, actions, editing, driver = 'postg
         view,
         col: cell.col,
         columnName: name,
-        value: valueAt(cell.row, cell.col),
+        // Filters match the fetched values, so they're built from the original.
+        value: cell.row < base ? result.rows[cell.row][cell.col] : valueAt(cell.row, cell.col),
+        shown: valueAt(cell.row, cell.col),
         copies: {
           row: () => rowValues(cell.row).map((v) => (v === null ? 'NULL' : cellText(v))).join('\t'),
           rowJSON: () => JSON.stringify(Object.fromEntries(columns.map((c, i) => [c, rowValues(cell.row)[i]])), null, 2),
-          rowInsert: () => insertRowStatement(driver, tableName ?? 'table_name', columns, rowValues(cell.row)),
+          rowInsert: () => {
+            // DEFAULT cells of a new row are left out, so the column default applies.
+            const values = rowValues(cell.row)
+            const set = columns.flatMap((c, i) => (values[i] === undefined ? [] : [[c, values[i]] as const]))
+            return insertRowStatement(driver, tableName ?? 'table_name', set.map(([c]) => c), set.map(([, v]) => v))
+          },
           column: () => columnValues(cell.col).map((v) => (v === null ? 'NULL' : cellText(v))).join('\n'),
           columnIn: () => inList(driver, columnValues(cell.col)),
         },
@@ -248,7 +266,6 @@ export function ResultsGrid({ result, summary, actions, editing, driver = 'postg
 
   const editorColumn = editingCell && editableColumn(editingCell.col)
   const filtered = isFiltered(view)
-  const shown = { columns: result.columns, rows: shownRows() }
 
   return (
     <div className="results-grid">
@@ -280,8 +297,8 @@ export function ResultsGrid({ result, summary, actions, editing, driver = 'postg
           }}
         />
         {actions?.(selected?.row ?? null)}
-        <button className="link" onClick={() => copy(toTSV(shown), 'as TSV')}>Copy TSV</button>
-        <button className="link" onClick={() => copy(JSON.stringify(toObjects(shown), null, 2), 'as JSON')}>
+        <button className="link" onClick={() => copy(toTSV(shownResult()), 'as TSV')}>Copy TSV</button>
+        <button className="link" onClick={() => copy(JSON.stringify(toObjects(shownResult()), null, 2), 'as JSON')}>
           Copy JSON
         </button>
       </div>

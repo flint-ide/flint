@@ -36,7 +36,9 @@ export function insertStatement(driver: string, t: TableWithColumns): string {
 /** UPDATE template (ClickHouse: ALTER TABLE … UPDATE, a mutation); WHERE false until edited. */
 export function updateStatement(driver: string, t: TableWithColumns): string {
   const sets = t.columns.map((c) => `    ${quoteIdent(driver, c.name)} = NULL`).join(',\n')
-  if (driver === 'clickhouse') return `ALTER TABLE ${qualifiedTable(driver, t)}\nUPDATE\n${sets}\nWHERE false;\n`
+  if (driver === 'clickhouse') {
+    return `-- Remove the key columns (ORDER BY, PARTITION BY): ClickHouse can't update them.\nALTER TABLE ${qualifiedTable(driver, t)}\nUPDATE\n${sets}\nWHERE false;\n`
+  }
   return `UPDATE ${qualifiedTable(driver, t)}\nSET\n${sets}\nWHERE false;\n`
 }
 
@@ -125,8 +127,8 @@ export function insertRowStatement(driver: string, table: string, columns: reado
   return `INSERT INTO ${table} (${cols}) VALUES (${row.map((v) => sqlLiteral(driver, v)).join(', ')});`
 }
 
-/** A column's values as an IN list, e.g. for a follow-up WHERE. */
+/** A column's distinct values as an IN list, e.g. for a follow-up WHERE; NULL never matches IN, so it's left out. */
 export function inList(driver: string, values: readonly unknown[]): string {
-  const unique = [...new Map(values.map((v) => [sqlLiteral(driver, v), true])).keys()]
+  const unique = [...new Set(values.filter((v) => v !== null && v !== undefined).map((v) => sqlLiteral(driver, v)))]
   return `(${unique.join(', ')})`
 }

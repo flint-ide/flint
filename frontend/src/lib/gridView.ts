@@ -52,55 +52,72 @@ export function isFiltered(view: GridView): boolean {
 
 const NUMERIC = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/
 
-/** Orders two non-null values: numbers (also numeric text, e.g. big ints) by value, else naturally. */
-export function compareValues(a: unknown, b: unknown): number {
-  if (typeof a === 'number' && typeof b === 'number') return a - b
-  if (typeof a === 'boolean' && typeof b === 'boolean') return Number(a) - Number(b)
-  const sa = cellText(a)
-  const sb = cellText(b)
-  if (NUMERIC.test(sa) && NUMERIC.test(sb)) {
-    const d = Number(sa) - Number(sb)
+/**
+ * A value's sort key, computed once per row: numbers (also numeric text such as big
+ * ints and decimals) rank before text and compare by value; text compares by code
+ * point. Ranking the two kinds keeps the order total on mixed columns.
+ */
+interface SortKeyOf {
+  num: number | null
+  text: string
+}
+
+function sortKey(v: unknown): SortKeyOf {
+  if (typeof v === 'number') return { num: v, text: '' }
+  if (typeof v === 'boolean') return { num: Number(v), text: '' }
+  const text = cellText(v)
+  return NUMERIC.test(text) ? { num: Number(text), text } : { num: null, text }
+}
+
+function compareKeys(a: SortKeyOf, b: SortKeyOf): number {
+  if (a.num !== null && b.num !== null) {
+    const d = a.num - b.num
     if (d !== 0) return d
+  } else if (a.num !== null || b.num !== null) {
+    return a.num !== null ? -1 : 1
   }
-  return sa < sb ? -1 : sa > sb ? 1 : 0
+  return a.text < b.text ? -1 : a.text > b.text ? 1 : 0
 }
 
-function compareCells(a: unknown, b: unknown, dir: SortDir): number {
-  const an = a === null || a === undefined
-  const bn = b === null || b === undefined
-  // NULLs last when ascending, first when descending (Postgres' default).
-  if (an || bn) return an === bn ? 0 : (an ? 1 : -1) * (dir === 'asc' ? 1 : -1)
-  const c = compareValues(a, b)
-  return dir === 'asc' ? c : -c
+/** Orders two non-null values the way a sorted column does. */
+export function compareValues(a: unknown, b: unknown): number {
+  return compareKeys(sortKey(a), sortKey(b))
 }
 
-function matchesFilter(row: readonly unknown[], col: number, f: ColumnFilter): boolean {
-  const hit = f.keys.includes(valueKey(row[col]))
-  return f.mode === 'in' ? hit : !hit
-}
-
-function matchesSearch(row: readonly unknown[], needle: string): boolean {
-  return row.some((v) => (v === null ? 'null' : cellText(v).toLowerCase()).includes(needle))
-}
-
-function rowMatches(row: readonly unknown[], view: GridView, skipCol: number): boolean {
-  for (const [c, f] of Object.entries(view.filters)) {
-    const col = Number(c)
-    if (col !== skipCol && !matchesFilter(row, col, f)) return false
-  }
+/** A row predicate built once per pass: filter key sets and the lowercased needle. */
+function matcher(view: GridView, skipCol: number): (row: readonly unknown[]) => boolean {
+  const filters = Object.entries(view.filters)
+    .map(([c, f]) => ({ col: Number(c), keep: f.mode === 'in', keys: new Set(f.keys) }))
+    .filter((f) => f.col !== skipCol)
   const needle = view.search.trim().toLowerCase()
-  return needle === '' || matchesSearch(row, needle)
+  return (row) => {
+    for (const f of filters) if (f.keys.has(valueKey(row[f.col])) !== f.keep) return false
+    return needle === '' || row.some((v) => (v === null || v === undefined ? 'null' : cellText(v).toLowerCase()).includes(needle))
+  }
 }
 
 /** Indices of rows shown by the view, in display order (a stable sort). */
 export function applyView(rows: Rows, view: GridView): number[] {
+  const matches = matcher(view, -1)
   const indices: number[] = []
-  for (let i = 0; i < rows.length; i++) if (rowMatches(rows[i], view, -1)) indices.push(i)
+  for (let i = 0; i < rows.length; i++) if (matches(rows[i])) indices.push(i)
   if (view.sort.length === 0) return indices
+  // Decorate once, so a 100k-row sort doesn't re-stringify values per comparison.
+  const keys = view.sort.map((k) => {
+    const col: (SortKeyOf | null)[] = new Array(rows.length)
+    for (const i of indices) {
+      const v = rows[i][k.col]
+      col[i] = v === null || v === undefined ? null : sortKey(v)
+    }
+    return { dir: k.dir === 'asc' ? 1 : -1, col }
+  })
   return indices.sort((x, y) => {
-    for (const k of view.sort) {
-      const c = compareCells(rows[x][k.col], rows[y][k.col], k.dir)
-      if (c !== 0) return c
+    for (const k of keys) {
+      const a = k.col[x]
+      const b = k.col[y]
+      // NULLs last when ascending, first when descending (Postgres' default).
+      const c = a === null || b === null ? (a === b ? 0 : a === null ? 1 : -1) : compareKeys(a, b)
+      if (c !== 0) return c * k.dir
     }
     return x - y
   })
@@ -118,8 +135,9 @@ export interface DistinctValue {
  */
 export function distinctValues(rows: Rows, col: number, view: GridView, limit = 1000): DistinctValue[] {
   const counts = new Map<string, number>()
+  const matches = matcher(view, col)
   for (const row of rows) {
-    if (!rowMatches(row, view, col)) continue
+    if (!matches(row)) continue
     const key = valueKey(row[col])
     counts.set(key, (counts.get(key) ?? 0) + 1)
   }

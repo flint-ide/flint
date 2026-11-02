@@ -12,6 +12,7 @@ Contents:
 - [HTTP client](#http-client)
 - [Infrastructure panels](#infrastructure-panels)
 - [Settings and macOS integration](#settings-and-macos-integration)
+- [Extensions](#extensions)
 - [Diagnostics](#diagnostics)
 - [Restricted Mode (workspace trust)](#restricted-mode-workspace-trust)
 - [Keyboard shortcuts](#keyboard-shortcuts)
@@ -393,6 +394,16 @@ Unhealthy apps are sorted first and expanded.
 - **Single instance**: `flint <folder>` with Flint already running hands the folder over (relative paths resolve from the calling directory) and brings the window to the front. A Flint with a different `FLINT_CONFIG_DIR` (for example a dev build) is a separate instance.
 - **Background notifications**: when a run, a test run or an agent turn finishes while Flint is not active, you get a macOS notification (clicking it shows the tab) and a badge on the Dock icon, cleared when you return to the window. Can be turned off in Settings ▸ Agents.
 - The application menu (with `Settings… ⌘,`) and the compact title bar are native Wails v3 options, with no Objective-C additions.
+
+## Extensions
+
+External extensions are separate programs in any language that talk JSON-RPC 2.0 over stdio and are described by a manifest (`flint-extension.json`); Flint draws their UI from data (guide: [site/guides/extensions.md](../site/guides/extensions.md), protocol: [site/extensions/protocol.md](../site/extensions/protocol.md), design: [design/extensions.md](design/extensions.md)).
+
+- **Install**: *Install Extension from Folder…* (palette, or Settings ▸ Extensions) copies a folder to `<config>/extensions/<id>/` after a native confirmation that shows the id, name, version, program, start mode, permissions and agent tools. Installing the same id again replaces it. No marketplace, no downloads, no project-local extensions.
+- **Contributions**, under the source `extension:<id>`: palette commands (a default shortcut is dropped when the keys are taken, and the conflict is listed), sidebar panels drawn as a tree or list (lazily expanded nodes, icons from Flint's set, a click runs a command, a context menu of item actions, `view/refresh`), a Settings page generated from a small JSON schema (string, number, integer, boolean, enum, string list; values in `settings.json` under `extensions.<id>`, kept for extensions that aren't installed), status bar items, toasts (`window/showMessage`, rate-limited), files opened in the editor, `http(s)` links (asked once per site), chat drafts (`agent/ask`) and read-only agent tools on Flint's MCP server (`<short>_<name>`, can be turned off per extension).
+- **Lifecycle**: nothing is read before the window is up and nothing runs until an extension is used (or declares `onStartup`); `initialize` handshake with contract version check; idle stop after 5 minutes; restart after a crash with a 1 s / 4 s backoff, stopped after 3 crashes in 10 minutes until *Restart*; request timeouts (5 s views, 30 s commands, 120 s tools); 4 MiB message cap; process-group kill on stop, turn-off, uninstall and quit.
+- **Security**: only trusted folders are passed or readable; `workspace.read`, `secrets` and `agent.ask` are enforced on every request (`-32001` otherwise); `.git` and credential files are never returned; secrets live in the keyring (`flint-extensions`, `<id>:<key>`); the process gets a minimal environment; declared network hosts are shown, not enforced.
+- **Settings ▸ Extensions**: each extension's state (not running, running, crashed, stopped after crashes, off, broken), version, program, permissions, agent tools, warnings and shortcut conflicts; an on/off switch, *Show Log* (stderr, log messages and lifecycle, last 256 KiB), *Restart*, *Uninstall…* and *Reload*.
 
 ## Diagnostics
 

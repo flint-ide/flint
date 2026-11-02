@@ -54,6 +54,18 @@ Query history masks passwords in `CREATE/ALTER ROLE … PASSWORD` and ClickHouse
 
 > **Note:** Redaction is pattern-based. Always review a bug report or an agent draft before sending it.
 
+## Extensions
+
+[Extensions](../guides/extensions.md) are programs you install yourself, from a folder, after a confirmation that shows the program, its permissions and the tools it offers agents. Flint never installs, updates or enables one on its own, and sends nothing about them anywhere.
+
+- An extension runs with your user's permissions. Flint can't confine the program itself, so install only extensions you trust.
+- Flint checks what an extension asks of it against the permissions in its manifest: reading files (`workspace.read`), keychain secrets (`secrets`), agent chat drafts (`agent.ask`). It never passes folders in Restricted Mode, never returns files inside `.git` or credential files such as `.env`, and asks before the first link an extension opens to each site.
+- Declared network hosts (`network:<host>`) are shown, not enforced.
+- An extension's secrets are in the keychain (service `flint-extensions`, account `<id>:<key>`), never in `settings.json`, and one extension can't read another's.
+- Its process gets a minimal environment, without tokens or keys from Flint's own environment, and runs in its own process group, which Flint kills when it stops it or quits.
+- Its tools for agents are offered only in trusted folders while Flint's MCP server is on, and can be turned off per extension.
+- Everything it shows is drawn by Flint from plain data; it can't run code in Flint's window.
+
 ## Untrusted content
 
 - Folders you open for the first time are in [Restricted Mode](../guides/restricted-mode.md) until you trust them, so opening a repository doesn't run its code.

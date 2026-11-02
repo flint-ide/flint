@@ -158,7 +158,22 @@ A feature that is more than a panel (a backend service, settings, a tool, a Sett
 - Go (`internal/feature`): a `Module` with its settings sections (`settings.Section[T]`, keys in the same flat `settings.json`), external tools (`tools.Register`), `state.json` keys, and a `New(Host)` that returns its Wails services, MCP tools for agents and `Start` / `Close` hooks. `Host` is the module's only view of `App`.
 - Frontend (`lib/features.ts`): a `FeatureModule` with settings sections (typed by augmenting `FeatureSettings` in `lib/settingsSections.ts`), panels, commands, Settings pages, status items, tab kinds and file-tree menu entries. `features/install.ts` registers the data before the first render and the commands and `activate` hooks after Flint's own commands. `lib/contributions.ts` holds what was contributed, by source, so a source can be withdrawn later (external extensions).
 
-Docker, the TODO list and the release check are modules; the design, the list of features still to migrate and the plan for external extensions are in [design/extensions.md](design/extensions.md). How to add one: [Add a feature](DEVELOPMENT.md#add-a-feature).
+Docker, the TODO list and the release check are modules; the design and the list of features still to migrate are in [design/extensions.md](design/extensions.md). How to add one: [Add a feature](DEVELOPMENT.md#add-a-feature). Besides its services, `Instance` has `SettingsChanged` and `RootsChanged` hooks, and `Host` offers `Trusted`, `ConfigDir` and the native `Confirm` / `Choose` dialogs.
+
+### External extensions
+
+Level 2 of the same contract: programs the user installs, run as child processes and drawn by Flint from data (protocol: [site/extensions/protocol.md](../site/extensions/protocol.md)). It is one feature module, `extensions`:
+
+```text
+internal/extensions/manifest   flint-extension.json: parsing, id and path rules, the settings schema subset
+internal/extensions/rpc        newline-delimited JSON-RPC 2.0, both directions, size caps, $/cancelRequest
+internal/extensions/host       discovery, lazy start, initialize, idle stop, crash policy, host methods + permissions, install/uninstall, log
+internal/features/extensions   the level-1 module: "extensions" settings section, ExtensionsAPI, MCP tools, hooks
+frontend/src/features/extensions   contributions per extension (extension:<id>), ExtensionPanel, generated Settings page, Settings ▸ Extensions
+examples/extensions/stats      an example extension in Go (stdlib), built and driven by host's conformance test
+```
+
+Nothing happens at startup: the host reads manifests on the frontend's first `ExtensionsAPI.List` (after the first render) or the first MCP tool listing, and starts a process on the first use of a contribution (or after that first `List` for `onStartup`). Each process runs in its own process group with a minimal environment; its stdout is the protocol and its stderr goes to an in-memory log. One goroutine reads each direction while the process runs; timers (idle stop, restart backoff) exist only while needed, so no extension in use means no goroutines.
 
 ### Sidebar panels
 
@@ -262,6 +277,18 @@ Any local process can reach a loopback port, and a web page can try through DNS 
 - Approval trade-off (principle 4, nothing reaches a provider unseen): diagnostics, editor state and test results only show the project's own state, are on by default and count as reads (`agentsession.MCPReadTools`), so the default policy runs them without a prompt. Terminal output and cluster status can show anything the user saw (credentials printed elsewhere, other clusters), so they are off by default and, when enabled, always ask: they are not reads, which also keeps the "reading ~/.ssh always asks" rule intact. A Claude Code session only classifies `mcp__flint__*` calls when it was given Flint's server, so a user's own server named `flint` is never auto-approved through this path.
 - Codex gets the server only when its `codex mcp add --help` lists `--url` and `--bearer-token-env-var` (asked once per binary), so an older Codex that can't parse an HTTP `mcp_servers` entry still starts. In the user's Codex arguments, `mcp_servers.flint*` and the whole `mcp_servers` table are reserved; keys are compared after TOML normalization (quotes, spaces).
 
+### External extensions
+
+An installed extension is a native program with the user's rights, so its install is the trust decision: it happens only through a native confirmation (shown by Go, which the web view can't answer) listing the program, permissions and agent tools, and Flint never installs, updates or enables one by itself. On top of that Flint limits what it does on the extension's behalf (`internal/extensions/host`):
+
+- Only trusted roots are ever sent (`initialize`, `workspace/rootsChanged`); every path an extension passes must resolve inside one. `workspace/readFile` (4 MiB, UTF-8) never returns `.git` internals or credential files.
+- `workspace.read`, `secrets` and `agent.ask` are checked on every request (`-32001`); `network:` hosts are only shown. Secrets go to the keyring under `flint-extensions` / `<id>:<key>`.
+- Everything sent back is untrusted: view models are decoded into fixed types, bounded (5,000 items, 2,000 characters) and stripped of control and bidi characters; commands referenced by items or status items must belong to the extension; toasts are rate-limited. The frontend renders text only.
+- Links: `http(s)` only, confirmed once per extension and origin per session. `agent/ask` only fills a chat draft.
+- The process gets `PATH`, `HOME`, locale, proxy and a few `FLINT_*` variables, nothing else; stdout that isn't JSON-RPC, a message over 4 MiB or more than 8 MiB/s for 5 s stops it; the process group is killed on stop and quit.
+- Agent tools are listed from manifests, offered under `<short>_<name>`, re-check the root's trust, and stay behind the MCP server's own gates. Only read-only tools exist in contract 1.
+- Project-local extensions are not supported until processes can be sandboxed.
+
 ### Untrusted rendered content
 
 Markdown files, PR descriptions and comments, HTTP responses and terminal output are untrusted. With Wails, any script running in the page can call every bound Go method, so injected markup must never execute.
@@ -308,6 +335,7 @@ Paths are the macOS ones. On Linux, `~/Library/Application Support/flint` is `$X
 | Scratchpads (SQL consoles, notes) | `~/Library/Application Support/flint/scratch/`: `index.json` (including the selected connection `connId` and database `database`; empty = the profile default) plus `<id>.sql/.md/.txt` | autosaved |
 | Query history | `~/Library/Application Support/flint/history/<connection id>.jsonl`: one JSON line per statement (database, SQL, time, duration, rows, error, kind: query / explain / edit) | last 5000 per connection, `0600`. Appended with a single `write` using `O_APPEND`; when the file grows 25% past the limit, Go rewrites it atomically without the oldest entries (a truncated last line is skipped on load). No connection profiles or passwords; passwords in statements are masked. Deleted with the profile or with "Clear History…" |
 | Agent usage | `~/Library/Application Support/flint/usage.json`: daily rows per project, agent, model, agent task and chat (tokens, cache tokens, reported cost, unpriced tokens, turns), chat names from their first message (redacted), fired budget alerts and overrides | `0600`, written atomically about 2 s after changes and on quit (`internal/usage`); kept `usage.retentionDays` days (default 90), at most 20,000 rows and 500 chats; an undecodable file is moved to `usage.json.bad-<time>`, an unreadable or newer one is never overwritten |
+| Installed extensions | `~/Library/Application Support/flint/extensions/<id>/` (manifest and program, copied on install) | their settings in `settings.json` (`extensions`), their secrets in the OS keyring (service `flint-extensions`, account `<id>:<key>`); uninstall deletes the folder only |
 | Sidebar width | WebView `localStorage` | appearance settings only |
 | Open tabs, terminals, agent conversations and attached projects (project session) | `~/Library/Application Support/flint/sessions/<hash of the main project path>.json`, one file per project | written after changes (debounced) and on exit, `0600`, max 4 MB |
 | Agent conversation history | the agent CLI itself: `~/.claude/projects/…`, `~/.codex/sessions/…` | Flint resumes them after a restart (`claude --resume`, codex `thread/resume`) |

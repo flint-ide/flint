@@ -1,6 +1,6 @@
 # Extensions: feature modules (level 1) and external extensions (level 2)
 
-Status: level 1 implemented (Docker, TODO list and the release check migrated); level 2 designed, not implemented.
+Status: level 1 implemented (Docker, TODO list and the release check migrated). Level 2 implemented in its first version (contract 1): see [what is implemented and the decisions taken](#level-2-implemented-v1); the parts of this design left for later are listed there.
 
 Flint should be easy to extend through an explicit contract. Two levels:
 
@@ -444,6 +444,30 @@ for line in sys.stdin:
 5. `frontend/src/features/extensions`: `DeclarativeView` (tree, list, table, form, message), the Settings ▸ Extensions page (installed list, permissions, state, enable and disable), and contribution install and withdrawal per extension.
 6. Docs: a user guide page and a protocol reference generated from the Go types.
 
+### Level 2: implemented (v1)
+
+Code: `internal/extensions/{manifest,rpc,host}`, the module `internal/features/extensions`, `frontend/src/features/extensions`, the example `examples/extensions/stats` (Go, standard library). Docs: [site/guides/extensions.md](../../site/guides/extensions.md) (users), [site/extensions/write-an-extension.md](../../site/extensions/write-an-extension.md) and [site/extensions/protocol.md](../../site/extensions/protocol.md) (authors; the reference is written by hand, not generated). Tests: manifest table tests, the RPC transport (with a fuzz target), the host against `host/testdata/testext` (lazy start, permissions, crashes, idle stop, timeouts, process-group kill, environment, tools, settings) and a conformance test that builds the example and drives every contribution point it uses; frontend tests for the translation into contributions, the settings section and the schema checks.
+
+**Implemented as designed:** the manifest and its rules (ids namespaced by `<id>.`, `run.command` inside the folder, no shell or `PATH`), the lifecycle (`initialize` with contract check, `initialized`, `shutdown`, then stdin closed and the process group killed after 2 s), lazy activation, idle stop after 5 minutes, the timeouts, the 4 MiB message cap and the 8 MiB/s × 5 s flood limit, 3 crashes in 10 minutes stop the extension, `$/cancelRequest`, the permissions and `-32001`, the keyring layout, the `extensions` settings section (objects of extensions that aren't installed are kept), agent tools named `<short>_<name>`, contributions under `extension:<id>` withdrawn when an extension is turned off or uninstalled.
+
+**Decisions where this design was open or is narrowed in v1:**
+
+- **Project-local extensions are not supported.** Only user-installed extensions in `<config>/extensions/<id>/`. Project ones wait for sandboxing (open question 1); a repository can't make Flint run anything.
+- **Restricted Mode is stricter than designed:** untrusted roots are not passed at all (instead of `trusted: false`), so an extension learns only of folders the user trusts. `roots` keeps the `trusted` field for compatibility; it is always `true`.
+- **Installation** is the palette command and Settings ▸ Extensions ▸ Install from Folder…; the folder picker is the frontend's, the confirmation is Go's native dialog (in the dev-only server build it says yes, like every native confirmation there). No `flint --install-extension` CLI yet. A copy skips `.git`, follows symbolic links only inside the folder, and is limited to 10,000 files and 512 MiB; the old version is stopped before it is replaced.
+- **Discovery** happens on the frontend's first `List` after the first render (and on install, uninstall, **Reload**), not on a goroutine at launch; folders aren't watched. `onStartup` extensions start after that first `List`.
+- **Contribution points in v1:** commands, panels (`tree`, `list`, plus `message`), the settings page, status items, toasts, `window/showMessageRequest` (a native question with up to three buttons), files and links, chat drafts and agent tools. `table` and `form` views, `tabViews` / `window/openTab` and `fileMenu` are not implemented: a manifest with a `table` or `form` panel is refused, and unknown contribution points are ignored with a warning in Settings.
+- **`window/openUrl`** (not in the original tables) opens `http(s)` links only, after a native confirmation once per extension and origin per session. The extension could open a browser itself, so this is about not surprising the user, not containment.
+- **Settings are checked when they are written and when they are used,** not when `settings.json` is saved: Go's save check is structural (ids, sizes). The generated page refuses invalid values, and the extension always receives schema-valid values (invalid ones become defaults). This way a newer manifest with a stricter schema can never make `settings.json` unsavable. `enabled` and `agentTools` are maps where a missing id means on.
+- **Crash policy details:** the next start waits 1 s after the first crash and 4 s after the second; an extension with a panel on screen or `onStartup` is restarted on its own after that delay, others on their next use. "Failed" lasts for the session; **Restart** (or turning it off and on) clears it. Contributions stay while an extension is crashed or failed; their use reports why.
+- **Idle stop** doesn't apply to `onStartup` extensions: the user saw "starts with Flint" when installing, so they run for the session.
+- **Agent tools are read-only only** (open question 4 stays open): there is no approval path for acting tools. They are listed from manifests (no process starts for `tools/list`), offered only for trusted roots while the MCP server is on, and can be turned off per extension in Settings ▸ Extensions (`extensions.agentTools`), not in Settings ▸ Agent Context.
+- **Environment:** `PATH` (with the login shell's additions), `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `TZ`, `LANG`, `LC_ALL`, `LC_CTYPE`, proxy variables, and `FLINT_EXTENSION_ID`, `FLINT_EXTENSION_DIR`, `FLINT_VERSION`. The working directory is the extension's folder.
+- **Logs** are in memory (the last 256 KiB per extension, stderr lines cut at 2,000 characters), shown in Settings ▸ Extensions; they are not written to Flint's log file. RSS is not shown yet.
+- **Uninstall** deletes the folder and keeps the settings and keychain secrets (the keyring API can't list an extension's keys).
+- **Level-1 contract additions** this needed: `Host.Trusted`, `ConfigDir`, `Confirm`, `Choose`, and `Instance.SettingsChanged`, `RootsChanged`.
+- **Panels appear after the first paint.** Extensions are discovered after the window is up, so their activity bar buttons arrive a moment later; a stored sidebar choice of an extension panel falls back to Files on the next start.
+
 ---
 
 ## What remains to migrate
@@ -474,10 +498,10 @@ Points not yet in the contract, to add when a migration needs them:
 
 ## Open questions
 
-1. **Sandboxing extension processes.** On macOS, `sandbox-exec` is deprecated but works, and an App Sandbox helper is heavy. On Linux, Landlock or seccomp would need cgo or a helper. v1 relies on explicit installation and honest disclosure. Is that enough for project-local extensions, or should they be disabled entirely until sandboxing exists?
+1. **Sandboxing extension processes.** On macOS, `sandbox-exec` is deprecated but works, and an App Sandbox helper is heavy. On Linux, Landlock or seccomp would need cgo or a helper. v1 relies on explicit installation and honest disclosure. *Decided for v1:* project-local extensions are disabled entirely until sandboxing exists.
 2. **Memory and CPU limits.** `setrlimit` on Linux is easy; macOS has no reliable per-process memory cap. Should Flint watch RSS and stop a runaway extension instead?
 3. **Distribution.** "Install from folder" leaves signing and updates to the user. A signed index (minisign) could come later without changing the protocol.
 4. **Agent tools that act.** v1 extension tools are read-only, like Flint's own MCP tools. Tools that change state would need the agent approval policy (`agentsession.Policy`) to apply to them.
 5. **Shared views between extensions.** A tab kind from one extension used by another is out of scope; ids are namespaced per extension.
 6. **The Wails `Settings` type is `any` in TypeScript.** If typed bindings for settings are wanted back, `SettingsAPI` could return a wrapper type, at the cost of a second representation. Today the frontend's own `AppSettings` is the typed view and nothing was lost.
-7. **Contract checks in CI.** Level 1 is checked by tests (Go and frontend keys, documentation partials, duplicate ids). Level 2 will need a conformance test extension in `testdata` that runs in CI on both platforms.
+7. **Contract checks in CI.** Level 1 is checked by tests (Go and frontend keys, documentation partials, duplicate ids). Level 2 has `host/testdata/testext` and the conformance test of `examples/extensions/stats`, which build with `go` and are skipped without it; they run wherever `go test ./...` runs, which includes CI's macOS and Linux jobs.

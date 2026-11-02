@@ -90,3 +90,16 @@ func (a *API) Action(id, view, item, action string) error {
 func (a *API) SetVisible(id, view string, visible bool) error {
 	return a.host.SetVisible(id, view, visible)
 }
+
+// WebviewHTML returns a webview's HTML file, to show in a sandboxed frame.
+func (a *API) WebviewHTML(id, view string) (string, error) { return a.host.WebviewHTML(id, view) }
+
+// WebviewRequest relays a webview's flint.request to its extension's process.
+func (a *API) WebviewRequest(id, view, key, method string, params json.RawMessage) (json.RawMessage, error) {
+	return a.host.WebviewRequest(a.ctx(), id, view, key, method, params)
+}
+
+// SetWebviewVisible tells the host a webview panel or tab was shown or hidden.
+func (a *API) SetWebviewVisible(id, view, key string, visible bool) error {
+	return a.host.SetWebviewVisible(id, view, key, visible)
+}

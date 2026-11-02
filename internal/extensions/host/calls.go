@@ -105,6 +105,23 @@ func (h *Host) SetVisible(id, view string, visible bool) error {
 	if e.m == nil || !e.m.HasPanel(view) {
 		return fmt.Errorf("no panel %q", view)
 	}
-	e.setVisible(view, visible)
+	e.setVisible(view, "", visible)
+	return nil
+}
+
+// SetWebviewVisible records that a webview panel or a tab (key) was shown or
+// hidden, like SetVisible.
+func (h *Host) SetWebviewVisible(id, view, key string, visible bool) error {
+	e, err := h.get(id)
+	if err != nil {
+		return err
+	}
+	if e.m == nil {
+		return e.usable()
+	}
+	if _, ok := e.m.WebviewOf(view); !ok {
+		return fmt.Errorf("no webview %q", view)
+	}
+	e.setVisible(view, cleanText(key, maxTabKey), visible)
 	return nil
 }

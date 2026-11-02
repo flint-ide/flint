@@ -103,6 +103,8 @@ func (e *ext) notified(method string, params json.RawMessage) {
 		err = e.viewRefresh(params)
 	case "window/showMessage":
 		err = e.showMessage(params)
+	case "webview/post":
+		err = e.webviewPost(params)
 	case "log":
 		var p struct {
 			Level   string `json:"level"`
@@ -128,6 +130,8 @@ func (e *ext) handle(ctx context.Context, method string, params json.RawMessage)
 		return e.showMessageRequest(params)
 	case "window/openFile":
 		return nil, e.openFile(params)
+	case "window/openTab":
+		return nil, e.openTab(params)
 	case "window/openUrl":
 		return nil, e.openURL(params)
 	case "workspace/readFile":

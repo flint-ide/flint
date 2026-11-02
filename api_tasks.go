@@ -499,6 +499,17 @@ func (a *App) askUser(title, message, ok string) bool {
 	return a.askNative(title, message, ok)
 }
 
+// chooseUser asks a native question with buttons, one dialog at a time;
+// "" when dismissed (or in tests, which have a.ask only).
+func (a *App) chooseUser(title, message string, buttons []string) string {
+	a.confirmMu.Lock()
+	defer a.confirmMu.Unlock()
+	if a.ask != nil {
+		return ""
+	}
+	return a.chooseNative(title, message, buttons)
+}
+
 // RemoveCheck tells what removing a task would lose, for the confirmation.
 func (t *TaskAPI) RemoveCheck(id string) (RemoveInfo, error) {
 	task, err := t.task(id)

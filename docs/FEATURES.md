@@ -12,6 +12,7 @@ Contents:
 - [HTTP client](#http-client)
 - [Infrastructure panels](#infrastructure-panels)
 - [Settings and macOS integration](#settings-and-macos-integration)
+- [Extensions](#extensions)
 - [Diagnostics](#diagnostics)
 - [Restricted Mode (workspace trust)](#restricted-mode-workspace-trust)
 - [Keyboard shortcuts](#keyboard-shortcuts)
@@ -386,7 +387,7 @@ Unhealthy apps are sorted first and expanded.
 - **Updates**: the daily release check (see [Update check](#update-check)) can be turned off; **Check Now** checks right away.
 - **Agent Context**, **Usage** and **AI in the Editor**: see [Agent context](#agent-context-flints-mcp-server), [Usage and budgets](#usage-and-budgets) and [AI in the editor](#ai-in-the-editor).
 - **Import** ("Import from VS Code…" in the palette): reads VS Code's, Cursor's or VSCodium's `settings.json`, `keybindings.json` and active color theme (from its extension, following `include`), and shows what it would change and what it skips and why (chords, `when` clauses, settings Flint doesn't have, built-in themes). Nothing is written until you confirm. An imported theme becomes `theme: "custom"`: a palette over the dark or light base, limited to Flint's own color variables and hex colors, plus the theme's terminal colors (`terminal.ansi*`, background, cursor, selection).
-- **Extensions** ("Install Extension from Folder…" in the palette): installs an extension folder (a `flint-extension.json` manifest) into `<config>/extensions/<id>` after a native dialog with its contributions, program and permissions, and lists installed extensions with what they add, or why their manifest was refused. Their color themes appear under Appearance ▸ **Color theme** and as **Use …** buttons; choosing one copies it into the custom theme (interface, editor and terminal colors), checked by the same Go rules as an imported theme. Uninstall deletes the folder after asking. Extension programs are not started yet (see [design/extensions.md](design/extensions.md)).
+- **Extensions**: see [Extensions](#extensions). Their color themes appear under Appearance ▸ **Color theme** and as **Use …** buttons on the extension; choosing one copies it into the custom theme (interface, editor and terminal colors), checked by the same Go rules as an imported theme.
 - **Trusted folders**: see [Restricted Mode](#restricted-mode-workspace-trust).
 
 ### macOS integration (Wails v3)
@@ -395,6 +396,17 @@ Unhealthy apps are sorted first and expanded.
 - **Single instance**: `flint <folder>` with Flint already running hands the folder over (relative paths resolve from the calling directory) and brings the window to the front. A Flint with a different `FLINT_CONFIG_DIR` (for example a dev build) is a separate instance.
 - **Background notifications**: when a run, a test run or an agent turn finishes while Flint is not active, you get a macOS notification (clicking it shows the tab) and a badge on the Dock icon, cleared when you return to the window. Can be turned off in Settings ▸ Agents.
 - The application menu (with `Settings… ⌘,`) and the compact title bar are native Wails v3 options, with no Objective-C additions.
+
+## Extensions
+
+External extensions are separate programs in any language that talk JSON-RPC 2.0 over stdio and are described by a manifest (`flint-extension.json`); Flint draws their UI from data (guide: [site/guides/extensions.md](../site/guides/extensions.md), protocol: [site/extensions/protocol.md](../site/extensions/protocol.md), design: [design/extensions.md](design/extensions.md)).
+
+- **Install**: *Install Extension from Folder…* (palette, or Settings ▸ Extensions) copies a folder to `<config>/extensions/<id>/` after a native confirmation that shows the id, name, version, program, start mode, permissions and agent tools. Installing the same id again replaces it. No marketplace, no downloads, no project-local extensions.
+- **Contributions**, under the source `extension:<id>`: palette commands (a default shortcut is dropped when the keys are taken, and the conflict is listed), sidebar panels drawn as a tree or list (lazily expanded nodes, icons from Flint's set, a click runs a command, a context menu of item actions, `view/refresh`), a Settings page generated from a small JSON schema (string, number, integer, boolean, enum, string list; values in `settings.json` under `extensions.<id>`, kept for extensions that aren't installed), status bar items, toasts (`window/showMessage`, rate-limited), files opened in the editor, `http(s)` links (asked once per site), chat drafts (`agent/ask`) and read-only agent tools on Flint's MCP server (`<short>_<name>`, can be turned off per extension).
+- **Lifecycle**: nothing is read before the window is up and nothing runs until an extension is used (or declares `onStartup`); `initialize` handshake with contract version check; idle stop after 5 minutes; restart after a crash with a 1 s / 4 s backoff, stopped after 3 crashes in 10 minutes until *Restart*; request timeouts (5 s views, 30 s commands, 120 s tools); 4 MiB message cap; process-group kill on stop, turn-off, uninstall and quit.
+- **Security**: only trusted folders are passed or readable; `workspace.read`, `secrets` and `agent.ask` are enforced on every request (`-32001` otherwise); `.git` and credential files are never returned; secrets live in the keyring (`flint-extensions`, `<id>:<key>`); the process gets a minimal environment; declared network hosts are shown, not enforced.
+- **Settings ▸ Extensions**: each extension's state (not running, running, crashed, stopped after crashes, off, broken), version, program, permissions, agent tools, warnings and shortcut conflicts; an on/off switch, *Show Log* (stderr, log messages and lifecycle, last 256 KiB), *Restart*, *Uninstall…* and *Reload*.
+- **Color themes** (`contributes.themes`): interface, editor and terminal colors, checked with the custom theme rules (Flint's color names, hex values) when the manifest is read. An extension with only themes has no program and runs no code. A theme is chosen under Appearance ▸ **Color theme** or with **Use …** on its card, and copied into `customTheme`, so it stays after uninstalling.
 
 ## Diagnostics
 

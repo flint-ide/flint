@@ -140,10 +140,7 @@ Flint never downloads or installs updates itself. See [Update check](../referenc
 
 ## Extensions
 
-- **Install from Folder…**: pick an extension's folder; Flint shows its name, what it adds, its program and permissions in a dialog and copies it into its extensions folder only when you choose **Install**. Installing a newer version of the same extension replaces the old one.
-- Each installed extension shows what it adds, its permissions and its folder, with **Use …** for each color theme and **Uninstall** (deletes its folder after asking). An extension whose manifest Flint can't accept is listed as disabled, with the reason.
-
-Flint applies extension color themes; extensions with a program are listed but not started yet. See [Use a theme from an extension](../how-to/customize-flint.md#use-a-theme-from-an-extension).
+Installed extensions, their state, permissions and log, with **Install from Folder…**, an on/off switch, **Use …** for each color theme and **Uninstall…**. See [Extensions](extensions.md) and [Use a theme from an extension](../how-to/customize-flint.md#use-a-theme-from-an-extension).
 
 ## Import
 

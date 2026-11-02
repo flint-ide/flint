@@ -37,7 +37,12 @@
 - [Docker](guides/docker.md)
 - [Preview and TODO list](guides/preview-and-todo.md)
 - [Restricted Mode](guides/restricted-mode.md)
+- [Extensions](guides/extensions.md)
 - [Settings](guides/settings.md)
+
+## Write extensions
+- [Write an extension](extensions/write-an-extension.md)
+- [Extension protocol](extensions/protocol.md)
 
 ## Reference
 - [Keyboard shortcuts](reference/keyboard-shortcuts.md)

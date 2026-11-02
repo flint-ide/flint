@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -49,28 +48,22 @@ type featureHost struct{ a *App }
 
 var _ feature.Host = featureHost{}
 
-func (h featureHost) Context() context.Context          { return h.a.ctx }
-func (h featureHost) Settings() settings.Settings       { return h.a.currentSettings() }
-func (h featureHost) Roots() []string                   { return h.a.projectRoots() }
+func (h featureHost) Context() context.Context    { return h.a.ctx }
+func (h featureHost) Settings() settings.Settings { return h.a.currentSettings() }
+func (h featureHost) Roots() []string             { return h.a.projectRoots() }
+func (h featureHost) Trusted(path string) bool    { return h.a.isTrusted(path) }
+func (h featureHost) ConfigDir() string           { return h.a.configDir }
+func (h featureHost) Confirm(title, msg, ok string) bool {
+	return h.a.askUser(title, msg, ok)
+}
+func (h featureHost) Choose(title, msg string, buttons []string) string {
+	return h.a.chooseUser(title, msg, buttons)
+}
 func (h featureHost) Emit(event string, data ...any)    { h.a.emit(event, data...) }
 func (h featureHost) OpenURL(link string) error         { return h.a.openURL(link) }
 func (h featureHost) Version() string                   { return diag.Version(version) }
 func (h featureHost) LoadState(key string, v any) error { return h.a.loadFeatureState(key, v) }
 func (h featureHost) SaveState(key string, v any) error { return h.a.saveFeatureState(key, v) }
-
-func (h featureHost) PickFolder(title string) (string, error) {
-	if h.a.wails == nil {
-		return "", errors.New("no window to show a folder picker in")
-	}
-	return h.a.pickFolder(title)
-}
-
-func (h featureHost) Ask(title, message, ok string) bool {
-	if h.a.ask != nil {
-		return h.a.ask(title, message, ok)
-	}
-	return h.a.askNative(title, message, ok)
-}
 
 // StartStream registers the console for agents (terminal tools) and starts
 // the terminal session.

@@ -1,233 +1,92 @@
 package extensions
 
 import (
-	"fmt"
-	"maps"
-	"path/filepath"
-	"runtime"
-	"strings"
+	"context"
+	"encoding/json"
+	"errors"
 	"sync"
 
-	"flint/internal/extensions/installed"
-	"flint/internal/extensions/manifest"
+	"flint/internal/extensions/host"
 	"flint/internal/feature"
 )
 
-// EventChanged tells the frontend that the installed extensions changed.
-const EventChanged = "extensions:changed"
-
-// API is the extensions service bound to the frontend.
+// API is the extensions service the frontend binds: the installed
+// extensions, their install and removal, and the requests their UI makes.
+// The web view decides nothing here: every install and uninstall is
+// confirmed in a native dialog, and the host checks every id against the
+// extension's manifest.
 type API struct {
-	host feature.Host
-	root func() (string, error)
-	mu   sync.Mutex // one install or uninstall at a time
+	host    *host.Host
+	fh      feature.Host
+	started sync.Once
 }
 
-// Extension is an installed extension as Settings ▸ Extensions shows it.
-type Extension struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Version     string `json:"version"`
-	Publisher   string `json:"publisher"`
-	Description string `json:"description"`
-	Dir         string `json:"dir"`
-	// Error is why the extension can't be used (a broken manifest); the
-	// other fields but ID and Dir are then empty.
-	Error       string   `json:"error,omitempty"`
-	Permissions []string `json:"permissions"`
-	// Program: the extension has a program to run for commands, views and
-	// the like, which this version of Flint does not start yet.
-	Program     bool     `json:"program"`
-	Contributes []string `json:"contributes"`
-	Themes      []Theme  `json:"themes"`
+func (a *API) ctx() context.Context {
+	if ctx := a.fh.Context(); ctx != nil {
+		return ctx
+	}
+	return context.Background()
 }
 
-// Theme is a color theme an extension contributes, already checked with
-// the custom theme rules (settings.ValidateCustomTheme).
-type Theme struct {
-	ID       string            `json:"id"`
-	Label    string            `json:"label"`
-	Base     string            `json:"base"`
-	Colors   map[string]string `json:"colors"`
-	Terminal map[string]string `json:"terminal"`
+// List describes the installed extensions. The first call, made by the
+// frontend once the window is up, also starts the onStartup ones.
+func (a *API) List() []host.Info {
+	list := a.host.List()
+	a.started.Do(func() { go a.host.StartAtLaunch() })
+	return list
 }
 
-// List returns the installed extensions, sorted by id.
-func (a *API) List() ([]Extension, error) {
-	root, err := a.root()
-	if err != nil {
-		return nil, err
-	}
-	exts, err := installed.Discover(root)
-	out := make([]Extension, 0, len(exts))
-	for _, e := range exts {
-		out = append(out, describe(e))
-	}
-	return out, err
+// Rescan reads the extensions folder again (an extension changed on disk).
+func (a *API) Rescan() []host.Info {
+	a.host.Discover()
+	return a.host.List()
 }
 
-// InstallFromFolder asks for a folder, shows its manifest and permissions in
-// a native dialog and, once the user agrees, copies it into the extensions
-// folder. nil without an error means the user cancelled.
-func (a *API) InstallFromFolder() (*Extension, error) {
-	src, err := a.host.PickFolder("Install Extension from Folder")
-	if err != nil || src == "" {
-		return nil, err
-	}
-	m, err := manifest.Load(src)
-	if err != nil {
-		return nil, fmt.Errorf("can't install %s: %w", src, err)
-	}
-	root, err := a.root()
-	if err != nil {
-		return nil, err
-	}
-	replaces, _ := a.installed(root, m.ID)
-	if !a.host.Ask(fmt.Sprintf("Install the extension %q?", m.Name), installMessage(m, src, replaces), "Install") {
+// Install copies the extension in folder dir into Flint after a native
+// confirmation; nil when the user cancelled.
+func (a *API) Install(dir string) (*host.Info, error) {
+	info, err := a.host.Install(dir)
+	if errors.Is(err, host.ErrCancelled) {
 		return nil, nil
 	}
-	a.mu.Lock()
-	ext, err := installed.Install(src, root, m)
-	a.mu.Unlock()
 	if err != nil {
-		return nil, fmt.Errorf("install %s: %w", m.ID, err)
+		return nil, err
 	}
-	a.host.Emit(EventChanged)
-	d := describe(ext)
-	return &d, nil
+	return &info, nil
 }
 
-// Uninstall deletes an extension's folder after the user confirms it in a
-// native dialog; false means they cancelled. A theme taken from it stays in
-// use: Settings keeps its own copy.
+// Uninstall removes an extension after a native confirmation; false when
+// the user cancelled.
 func (a *API) Uninstall(id string) (bool, error) {
-	root, err := a.root()
-	if err != nil {
-		return false, err
-	}
-	// The web view sends the id: only an exact folder name of an installed
-	// extension gets a dialog, so page code can't show text of its choosing.
-	ext, ok := a.installed(root, id)
-	if !ok {
-		return false, fmt.Errorf("%q is not installed", id)
-	}
-	name := ext.ID()
-	if ext.Err == nil {
-		name = ext.Manifest.Name
-	}
-	if !a.host.Ask(fmt.Sprintf("Uninstall %q?", name), fmt.Sprintf("Flint deletes the folder of %s from its extensions folder. A color theme you took from it stays selected.", ext.ID()), "Uninstall") {
+	err := a.host.Uninstall(id)
+	if errors.Is(err, host.ErrCancelled) {
 		return false, nil
 	}
-	a.mu.Lock()
-	err = installed.Remove(root, filepath.Base(ext.Dir))
-	a.mu.Unlock()
-	if err != nil {
-		return false, err
-	}
-	a.host.Emit(EventChanged)
-	return true, nil
+	return err == nil, err
 }
 
-// installed finds the extension whose folder is named exactly id.
-func (a *API) installed(root, id string) (installed.Extension, bool) {
-	exts, _ := installed.Discover(root)
-	for _, e := range exts {
-		if filepath.Base(e.Dir) == id {
-			return e, true
-		}
-	}
-	return installed.Extension{}, false
+// Restart clears a stopped-after-crashes extension; the next use starts it.
+func (a *API) Restart(id string) error { return a.host.Restart(id) }
+
+// Log is the extension's log (stderr, log messages, process events).
+func (a *API) Log(id string) (string, error) { return a.host.Log(id) }
+
+// Execute runs one of the extension's commands; args is JSON or null.
+func (a *API) Execute(id, command string, args json.RawMessage) error {
+	return a.host.Execute(a.ctx(), id, command, args)
 }
 
-func describe(e installed.Extension) Extension {
-	if e.Err != nil {
-		return Extension{ID: e.ID(), Dir: e.Dir, Error: e.Err.Error(), Permissions: []string{}, Contributes: []string{}, Themes: []Theme{}}
-	}
-	m := e.Manifest
-	out := Extension{
-		ID: m.ID, Name: m.Name, Version: m.Version, Publisher: m.Publisher, Description: m.Description, Dir: e.Dir,
-		Permissions: append([]string{}, m.Permissions...), Program: m.Run != nil, Contributes: contributions(m), Themes: []Theme{},
-	}
-	for _, t := range m.Contributes.Themes {
-		terminal := maps.Clone(t.Terminal)
-		if terminal == nil {
-			terminal = map[string]string{}
-		}
-		out.Themes = append(out.Themes, Theme{ID: t.ID, Label: t.Label, Base: t.Base, Colors: maps.Clone(t.Colors), Terminal: terminal})
-	}
-	return out
+// Resolve returns a panel's content, or a tree node's children (parent).
+func (a *API) Resolve(id, view, parent string) (host.View, error) {
+	return a.host.Resolve(a.ctx(), id, view, parent)
 }
 
-// contributions describes what a manifest adds, one phrase per kind.
-func contributions(m manifest.Manifest) []string {
-	c := m.Contributes
-	settingsCount := 0
-	if c.Settings != nil {
-		settingsCount = len(c.Settings.Properties)
-	}
-	kinds := []struct {
-		n             int
-		single, multi string
-	}{
-		{len(c.Themes), "color theme", "color themes"},
-		{len(c.Commands), "command", "commands"},
-		{len(c.Panels), "panel", "panels"},
-		{len(c.TabViews), "tab view", "tab views"},
-		{len(c.StatusItems), "status bar item", "status bar items"},
-		{len(c.FileMenu), "file menu entry", "file menu entries"},
-		{len(c.AgentTools), "agent tool", "agent tools"},
-		{settingsCount, "setting", "settings"},
-	}
-	out := []string{}
-	for _, k := range kinds {
-		switch {
-		case k.n == 1:
-			out = append(out, "1 "+k.single)
-		case k.n > 1:
-			out = append(out, fmt.Sprintf("%d %s", k.n, k.multi))
-		}
-	}
-	return out
+// Action sends the choice of an item's action ("" item: a message's).
+func (a *API) Action(id, view, item, action string) error {
+	return a.host.Action(a.ctx(), id, view, item, action)
 }
 
-// installMessage is the install dialog's text: everything the user agrees
-// to. replaces is the installed extension with the same id, if any.
-func installMessage(m manifest.Manifest, src string, replaces installed.Extension) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "%s %s (%s)", m.Name, m.Version, m.ID)
-	if m.Publisher != "" {
-		fmt.Fprintf(&b, " by %s", m.Publisher)
-	}
-	b.WriteString("\nFrom: " + src + "\n")
-	switch {
-	case replaces.Dir != "" && replaces.Err == nil:
-		old := replaces.Manifest
-		fmt.Fprintf(&b, "\nReplaces the installed %s %s", old.Name, old.Version)
-		if old.Publisher != "" {
-			fmt.Fprintf(&b, " by %s", old.Publisher)
-		}
-		b.WriteString(".\n")
-	case replaces.Dir != "":
-		b.WriteString("\nReplaces the installed, disabled extension with this id.\n")
-	}
-	if m.Description != "" {
-		b.WriteString("\n" + m.Description + "\n")
-	}
-	if list := contributions(m); len(list) > 0 {
-		b.WriteString("\nAdds: " + strings.Join(list, ", ") + "\n")
-	}
-	if m.Run != nil {
-		prog := m.Run.For(runtime.GOOS)
-		fmt.Fprintf(&b, "\nProgram: %s\nIt runs with your user's permissions when its features are used. This version of Flint doesn't start extension programs yet: only themes take effect.\n", strings.Join(append([]string{prog.Command}, prog.Args...), " "))
-		for _, ev := range m.Activation {
-			if ev == "onStartup" {
-				b.WriteString("It asks to run at startup.\n")
-			}
-		}
-	}
-	if len(m.Permissions) > 0 {
-		b.WriteString("\nPermissions: " + strings.Join(m.Permissions, ", ") + "\n")
-	}
-	b.WriteString("\nInstall only extensions you trust.")
-	return b.String()
+// SetVisible tells the host a panel was shown or hidden.
+func (a *API) SetVisible(id, view string, visible bool) error {
+	return a.host.SetVisible(id, view, visible)
 }

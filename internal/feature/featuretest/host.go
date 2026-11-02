@@ -21,36 +21,22 @@ type Host struct {
 	Ctx context.Context
 	// Version is what Version reports ("v1.0.0" by default).
 	VersionString string
-	// Folder is what PickFolder returns ("" = cancelled).
-	Folder string
-	// Answer is what Ask returns.
+
+	// Dir is ConfigDir (a test's temporary folder).
+	Dir string
+	// Answer is what Confirm returns; Choice what Choose returns.
 	Answer bool
+	Choice string
 
 	mu       sync.Mutex
 	settings settings.Settings
 	roots    []string
+	trusted  map[string]bool
+	asked    []string
 	state    map[string]json.RawMessage
 	events   []Event
 	opened   []string
 	streams  map[string]terminal.Stream
-	asked    []string
-}
-
-func (h *Host) PickFolder(string) (string, error) { return h.Folder, nil }
-
-// Ask records the question's message and returns Answer.
-func (h *Host) Ask(_, message, _ string) bool {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.asked = append(h.asked, message)
-	return h.Answer
-}
-
-// Asked returns the messages of the questions asked so far.
-func (h *Host) Asked() []string {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return append([]string{}, h.asked...)
 }
 
 // Event is one Emit call.
@@ -86,6 +72,47 @@ func (h *Host) Roots() []string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return append([]string{}, h.roots...)
+}
+
+func (h *Host) Trusted(path string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.trusted[path]
+}
+
+// SetTrusted marks folders as trusted.
+func (h *Host) SetTrusted(paths ...string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.trusted == nil {
+		h.trusted = map[string]bool{}
+	}
+	for _, p := range paths {
+		h.trusted[p] = true
+	}
+}
+
+func (h *Host) ConfigDir() string { return h.Dir }
+
+func (h *Host) Confirm(title, message, _ string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.asked = append(h.asked, title+"\n"+message)
+	return h.Answer
+}
+
+func (h *Host) Choose(title, message string, _ []string) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.asked = append(h.asked, title+"\n"+message)
+	return h.Choice
+}
+
+// Asked returns the questions Confirm and Choose were asked.
+func (h *Host) Asked() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return append([]string{}, h.asked...)
 }
 
 // SetRoots replaces the open project folders.

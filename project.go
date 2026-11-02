@@ -25,6 +25,7 @@ func (a *App) openProject(root string, w *watcher.Watcher) {
 	closeAll(prev)
 	a.files.Retain([]string{root})
 	a.forgetMCPRoots(slices.DeleteFunc(slices.Clone(prevRoots), func(r string) bool { return r == root }))
+	a.features.RootsChanged()
 }
 
 // addRoot attaches root to the workspace; nested or duplicate folders are rejected.
@@ -43,6 +44,7 @@ func (a *App) addRoot(root string, w *watcher.Watcher) error {
 		a.watchers[root] = w
 	}
 	a.projMu.Unlock()
+	a.features.RootsChanged()
 	return nil
 }
 
@@ -68,6 +70,7 @@ func (a *App) removeRoot(root string) error {
 	}
 	a.files.Retain(roots)
 	a.forgetMCPRoots([]string{root})
+	a.features.RootsChanged()
 	return nil
 }
 

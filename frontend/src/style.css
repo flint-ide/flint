@@ -5261,3 +5261,83 @@ body.file-drop-target-active::after {
   flex-direction: column;
   gap: 2px;
 }
+
+/* Extensions (features/extensions): Settings ▸ Extensions, their panels and status items. */
+.extension-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px 0;
+  margin: 10px 0;
+}
+.extension-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.extension-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.extension-state {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.extension-state.running {
+  color: var(--ok);
+}
+.extension-state.crashed,
+.extension-state.failed,
+.extension-state.invalid {
+  color: var(--danger);
+}
+.extension-description,
+.extension-warning {
+  margin: 6px 0;
+  font-size: 12px;
+}
+.extension-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+.extension-facts dt {
+  color: var(--fg-muted);
+}
+.extension-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.extension-log {
+  max-height: 260px;
+  overflow: auto;
+  margin: 0 0 10px;
+  padding: 8px;
+  font-size: 11px;
+  background: var(--bg-editor);
+  border-radius: 4px;
+  white-space: pre-wrap;
+}
+.extension-row {
+  gap: 6px;
+}
+.extension-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.status-extension {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.status-extension.warning {
+  color: var(--accent);
+}
+.status-extension.error {
+  color: var(--danger);
+}

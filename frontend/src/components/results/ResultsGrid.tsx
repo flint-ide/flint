@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { useVirtualList } from '../../lib/virtualList'
 import type { QueryResult } from '../../api/backend'
 import { cellText, columnWidths, toTSV } from '../../lib/format'
+import { applyView, emptyView, isFiltered, toggleSort, type GridView } from '../../lib/gridView'
+import { inList, insertRowStatement } from '../../lib/sqlScripts'
 import {
   displayValue,
   isCellChanged,
@@ -12,13 +14,18 @@ import {
   type StagedEdits,
   type TargetColumn,
 } from '../../lib/rowEdits'
+import { openContextMenu } from '../../store/contextMenu'
 import { showToast } from '../../store/dialog'
 import { CellEditor } from './CellEditor'
+import { ColumnFilter } from './ColumnFilter'
+import { GridHeader } from './GridHeader'
+import { cellMenu, headerMenu, type GridMenuActions } from './gridMenu'
 
 const ROW_HEIGHT = 24
 const INDEX_WIDTH = 56
 const EDITOR_MIN_WIDTH = 180
 const JSON_EDITOR_WIDTH = 380
+const PAGE_ROWS = 20
 
 /** Staged editing of the grid's rows (see EditableResults). */
 export interface GridEditing {
@@ -35,24 +42,46 @@ interface Props {
   /** Extra controls in the header bar; gets the selected row. */
   actions?: (selectedRow: number | null) => ReactNode
   editing?: GridEditing
+  /** SQL dialect for "Copy as INSERT" literals and quoting. */
+  driver?: string
+  /** Qualified table name for "Copy as INSERT" (else a placeholder). */
+  tableName?: string
 }
 
+/** A cell by its row in result.rows (inserted rows follow them) and column. */
 interface Cell {
   row: number
   col: number
 }
 
-/** Virtualized result table: only visible rows are rendered, so 100k rows stay smooth. */
-export function ResultsGrid({ result, summary, actions, editing }: Props) {
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
+
+/**
+ * Virtualized result table: only visible rows are rendered, so 100k rows stay smooth.
+ * Sorting and value filters are local: they reorder and hide the fetched rows without
+ * re-running the query. Selection and edits keep addressing rows of result.rows.
+ */
+export function ResultsGrid({ result, summary, actions, editing, driver = 'postgres', tableName }: Props) {
   const [selected, setSelected] = useState<Cell | null>(null)
   const [editingCell, setEditingCell] = useState<Cell | null>(null)
+  const [view, setView] = useState<GridView>(emptyView)
+  const [filterCol, setFilterCol] = useState<{ col: number; anchor: HTMLElement } | null>(null)
+  const search = useRef<HTMLInputElement>(null)
   const widths = useMemo(() => columnWidths(result), [result])
   const offsets = useMemo(() => widths.reduce<number[]>((acc, w, i) => [...acc, acc[i] + w], [INDEX_WIDTH]), [widths])
   const totalWidth = offsets[offsets.length - 1]
   const template = `${INDEX_WIDTH}px ${widths.map((w) => `${w}px`).join(' ')}`
 
+  const order = useMemo(() => applyView(result.rows, view), [result.rows, view])
+  const visualOf = useMemo(() => new Map(order.map((row, i) => [row, i])), [order])
   const edits = editing?.edits
-  const rowCount = result.rows.length + (edits?.inserted.length ?? 0)
+  const insertedCount = edits?.inserted.length ?? 0
+  const rowCount = order.length + insertedCount
+  const base = result.rows.length
+  /** The row shown at a display position; new rows stay after the (filtered) result. */
+  const rowAt = (vi: number) => (vi < order.length ? order[vi] : base + vi - order.length)
+  const positionOf = (row: number) => (row >= base ? order.length + row - base : (visualOf.get(row) ?? -1))
+
   const { scrollRef, totalSize, items } = useVirtualList({ count: rowCount, itemSize: ROW_HEIGHT, overscan: 20 })
   // The virtual list owns the scroller through a callback ref; keep our own handle for focus.
   const scroller = useRef<HTMLDivElement | null>(null)
@@ -65,27 +94,32 @@ export function ResultsGrid({ result, summary, actions, editing }: Props) {
   )
 
   // A row added with "+ Row" lands at the end: scroll to it and select its first cell.
-  const insertedCount = edits?.inserted.length ?? 0
   const prevInserted = useRef(insertedCount)
   useEffect(() => {
     const el = scroller.current
     if (insertedCount > prevInserted.current && el) {
       el.scrollTop = el.scrollHeight
-      setSelected({ row: rowCount - 1, col: 0 })
+      setSelected({ row: base + insertedCount - 1, col: 0 })
       el.focus()
     }
     prevInserted.current = insertedCount
-  }, [insertedCount, rowCount])
+  }, [insertedCount, base])
 
   const valueAt = (row: number, col: number): unknown => (edits ? displayValue(result, edits, row, col) : result.rows[row][col])
   const editableColumn = (col: number): TargetColumn | null => {
     const c = editing?.columns[col]
     return c?.editable ? c : null
   }
+  const shownRows = () => order.map((i) => result.rows[i])
+  const rowValues = (row: number) => result.columns.map((_, c) => valueAt(row, c))
 
   const copy = async (text: string, what: string) => {
-    await navigator.clipboard.writeText(text)
-    showToast(`Copied ${what}`)
+    try {
+      await navigator.clipboard.writeText(text)
+      showToast(`Copied ${what}`)
+    } catch (err) {
+      showToast(`Copy failed: ${err instanceof Error ? err.message : String(err)}`, 'error')
+    }
   }
 
   const startEdit = (cell: Cell): boolean => {
@@ -97,17 +131,55 @@ export function ResultsGrid({ result, summary, actions, editing }: Props) {
 
   const commitEdit = (cell: Cell, value: CellValue) => {
     if (editing) {
-      const original = cell.row < result.rows.length ? result.rows[cell.row][cell.col] : undefined
+      const original = cell.row < base ? result.rows[cell.row][cell.col] : undefined
       editing.onChange(setCell(result, editing.edits, cell.row, cell.col, sameJSON(value, original) ? toCellValue(original) : value))
     }
     setEditingCell(null)
     scroller.current?.focus()
   }
 
+  /** Scrolls so the cell at a display position is fully visible (below the sticky header). */
+  const reveal = (vi: number, col: number) => {
+    const el = scroller.current
+    if (!el) return
+    const top = (vi + 1) * ROW_HEIGHT
+    if (top < el.scrollTop + ROW_HEIGHT) el.scrollTop = top - ROW_HEIGHT
+    else if (top + ROW_HEIGHT > el.scrollTop + el.clientHeight) el.scrollTop = top + ROW_HEIGHT - el.clientHeight
+    const left = offsets[col]
+    const right = offsets[col + 1]
+    if (left < el.scrollLeft + INDEX_WIDTH) el.scrollLeft = left - INDEX_WIDTH
+    else if (right > el.scrollLeft + el.clientWidth) el.scrollLeft = right - el.clientWidth
+  }
+
+  const move = (dRow: number, dCol: number) => {
+    if (rowCount === 0) return
+    const from = selected ? positionOf(selected.row) : -1
+    const vi = clamp(from < 0 ? 0 : from + dRow, 0, rowCount - 1)
+    const col = clamp((selected?.col ?? 0) + dCol, 0, result.columns.length - 1)
+    setSelected({ row: rowAt(vi), col })
+    reveal(vi, col)
+  }
+
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (!selected) return
     const mod = e.metaKey || e.ctrlKey
-    if (mod && e.key === 'c') {
+    const step: Record<string, [number, number]> = {
+      ArrowUp: [-1, 0],
+      ArrowDown: [1, 0],
+      ArrowLeft: [0, -1],
+      ArrowRight: [0, 1],
+      PageUp: [-PAGE_ROWS, 0],
+      PageDown: [PAGE_ROWS, 0],
+    }
+    if (mod && e.key === 'f') {
+      e.preventDefault()
+      search.current?.focus()
+      search.current?.select()
+    } else if (step[e.key] && !mod) {
+      e.preventDefault()
+      move(...step[e.key])
+    } else if (!selected) {
+      return
+    } else if (mod && e.key === 'c') {
       e.preventDefault()
       void copy(cellText(valueAt(selected.row, selected.col)), 'cell')
     } else if (editing && (e.key === 'Enter' || e.key === 'F2') && !mod) {
@@ -116,6 +188,53 @@ export function ResultsGrid({ result, summary, actions, editing }: Props) {
       e.preventDefault()
       editing.onChange(toggleDelete(result, editing.edits, selected.row))
     }
+  }
+
+  const menuActions: GridMenuActions = {
+    setView,
+    openFilter: (col) => {
+      const el = scroller.current?.querySelector<HTMLElement>(`.grid-header .header-cell:nth-child(${col + 2}) .filter-button`)
+      if (el) setFilterCol({ col, anchor: el })
+    },
+    copy: (text, what) => void copy(text, what),
+  }
+  const columnValues = (col: number) => order.map((i) => result.rows[i][col])
+
+  const onCellMenu = (cell: Cell, e: MouseEvent) => {
+    e.preventDefault()
+    setSelected(cell)
+    const name = result.columns[cell.col].name
+    const columns = result.columns.map((c) => c.name)
+    const items = cellMenu(
+      {
+        view,
+        col: cell.col,
+        columnName: name,
+        value: valueAt(cell.row, cell.col),
+        copies: {
+          row: () => rowValues(cell.row).map((v) => (v === null ? 'NULL' : cellText(v))).join('\t'),
+          rowJSON: () => JSON.stringify(Object.fromEntries(columns.map((c, i) => [c, rowValues(cell.row)[i]])), null, 2),
+          rowInsert: () => insertRowStatement(driver, tableName ?? 'table_name', columns, rowValues(cell.row)),
+          column: () => columnValues(cell.col).map((v) => (v === null ? 'NULL' : cellText(v))).join('\n'),
+          columnIn: () => inList(driver, columnValues(cell.col)),
+        },
+        edit: editing && {
+          canEdit: !!editableColumn(cell.col),
+          deleted: !!edits?.deleted[cell.row],
+          edit: () => void startEdit(cell),
+          setNull: () => editing.onChange(setCell(result, editing.edits, cell.row, cell.col, null)),
+          toggleDelete: () => editing.onChange(toggleDelete(result, editing.edits, cell.row)),
+        },
+      },
+      menuActions,
+    )
+    openContextMenu(e.clientX, e.clientY, items, { minWidth: 240, onClose: () => scroller.current?.focus() })
+  }
+
+  const onHeaderMenu = (col: number, e: MouseEvent) => {
+    e.preventDefault()
+    const values = () => columnValues(col).map((v) => (v === null ? 'NULL' : cellText(v))).join('\n')
+    openContextMenu(e.clientX, e.clientY, headerMenu(view, col, result.columns[col].name, values, menuActions), { minWidth: 220 })
   }
 
   const cellClass = (row: number, col: number, v: unknown): string => {
@@ -128,36 +247,59 @@ export function ResultsGrid({ result, summary, actions, editing }: Props) {
   }
 
   const editorColumn = editingCell && editableColumn(editingCell.col)
+  const filtered = isFiltered(view)
+  const shown = { columns: result.columns, rows: shownRows() }
 
   return (
     <div className="results-grid">
       <div className="result-summary">
         {summary}
+        {filtered && (
+          <span className="filter-status" title="Rows hidden by local filters (the query wasn't re-run)">
+            {order.length.toLocaleString()} of {base.toLocaleString()} shown
+            <button className="link" onClick={() => setView({ ...view, filters: {}, search: '' })}>Clear filters</button>
+          </span>
+        )}
         <span className="spacer" />
+        <input
+          ref={search}
+          className="grid-search"
+          placeholder="Filter rows…"
+          title="Show rows containing this text in any column (local, case-insensitive)"
+          value={view.search}
+          onChange={(e) => setView({ ...view, search: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setView({ ...view, search: '' })
+              scroller.current?.focus()
+            } else if (e.key === 'Enter' || e.key === 'ArrowDown') {
+              e.preventDefault()
+              scroller.current?.focus()
+              if (!selected && rowCount > 0) setSelected({ row: rowAt(0), col: 0 })
+            }
+          }}
+        />
         {actions?.(selected?.row ?? null)}
-        <button className="link" onClick={() => copy(toTSV(result), 'as TSV')}>Copy TSV</button>
-        <button className="link" onClick={() => copy(JSON.stringify(toObjects(result), null, 2), 'as JSON')}>
+        <button className="link" onClick={() => copy(toTSV(shown), 'as TSV')}>Copy TSV</button>
+        <button className="link" onClick={() => copy(JSON.stringify(toObjects(shown), null, 2), 'as JSON')}>
           Copy JSON
         </button>
       </div>
       <div className="grid-scroller" ref={setScroller} tabIndex={0} onKeyDown={onKeyDown}>
         <div style={{ width: totalWidth, height: totalSize + ROW_HEIGHT, position: 'relative' }}>
-          <div className="grid-row grid-header" style={{ gridTemplateColumns: template, width: totalWidth }}>
-            <div className="grid-cell index">#</div>
-            {result.columns.map((c, i) => {
-              const target = editing?.columns[i]
-              const title = `${c.name} : ${c.type}${editing && !target?.editable ? ` (read-only${target?.readOnlyReason ? `: ${target.readOnlyReason}` : ''})` : target?.primaryKey ? ' (primary key)' : ''}`
-              return (
-                <div key={i} className={`grid-cell${editing && !target?.editable ? ' readonly' : ''}`} title={title}>
-                  <span className="col-name">{target?.primaryKey && <span className="pk-mark">PK</span>}{c.name}</span>
-                  <span className="col-type">{c.type}</span>
-                </div>
-              )
-            })}
-          </div>
+          <GridHeader
+            result={result}
+            view={view}
+            template={template}
+            width={totalWidth}
+            targets={editing?.columns}
+            onSort={(col, add) => setView((v) => toggleSort(v, col, add))}
+            onFilter={(col, anchor) => setFilterCol(filterCol?.col === col ? null : { col, anchor })}
+            onMenu={onHeaderMenu}
+          />
           {items.map((vr) => {
-            const row = vr.index
-            const inserted = row >= result.rows.length
+            const row = rowAt(vr.index)
+            const inserted = row >= base
             const deleted = !!edits?.deleted[row]
             return (
               <div
@@ -178,6 +320,7 @@ export function ResultsGrid({ result, summary, actions, editing }: Props) {
                       className={cellClass(row, ci, v)}
                       onClick={() => setSelected({ row, col: ci })}
                       onDoubleClick={() => startEdit({ row, col: ci }) || void copy(cellText(v), 'cell')}
+                      onContextMenu={(e) => onCellMenu({ row, col: ci }, e)}
                     >
                       {v === null ? 'NULL' : v === undefined ? 'DEFAULT' : cellText(v)}
                     </div>
@@ -186,14 +329,15 @@ export function ResultsGrid({ result, summary, actions, editing }: Props) {
               </div>
             )
           })}
-          {editingCell && editorColumn && (
+          {rowCount === 0 && base > 0 && <div className="grid-empty muted" style={{ top: ROW_HEIGHT * 2 }}>No rows match the filters.</div>}
+          {editingCell && editorColumn && positionOf(editingCell.row) >= 0 && (
             <CellEditor
               key={`${editingCell.row}:${editingCell.col}`}
               column={editorColumn}
               initial={editorInitial(valueAt(editingCell.row, editingCell.col))}
               style={{
-                left: offsets[editingCell.col + 1] - widths[editingCell.col],
-                top: (editingCell.row + 1) * ROW_HEIGHT,
+                left: offsets[editingCell.col],
+                top: (positionOf(editingCell.row) + 1) * ROW_HEIGHT,
                 minWidth: editorColumn.kind === 'json' ? JSON_EDITOR_WIDTH : Math.max(widths[editingCell.col], EDITOR_MIN_WIDTH),
               }}
               onCommit={(value) => commitEdit(editingCell, value)}
@@ -205,6 +349,17 @@ export function ResultsGrid({ result, summary, actions, editing }: Props) {
           )}
         </div>
       </div>
+      {filterCol && (
+        <ColumnFilter
+          anchor={filterCol.anchor}
+          rows={result.rows}
+          col={filterCol.col}
+          columnName={result.columns[filterCol.col].name}
+          view={view}
+          onChange={setView}
+          onClose={() => setFilterCol(null)}
+        />
+      )}
     </div>
   )
 }
@@ -226,6 +381,6 @@ function editorInitial(v: unknown): CellValue | undefined {
   return toCellValue(v)
 }
 
-function toObjects(result: QueryResult): Record<string, unknown>[] {
+function toObjects(result: Pick<QueryResult, 'columns' | 'rows'>): Record<string, unknown>[] {
   return result.rows.map((row) => Object.fromEntries(result.columns.map((c, i) => [c.name, row[i]])))
 }

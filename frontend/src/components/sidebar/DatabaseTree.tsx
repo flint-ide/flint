@@ -68,7 +68,8 @@ function DatabaseNode({ conn, info }: { conn: Connection; info: DatabaseInfo }) 
 
   const newConsole = () => void createScratch('sql', conn.id, undefined, scratchDatabase)
   const refresh = () => void loadSchema(conn.id, database, true)
-  const menu = onMenu(() => databaseMenu(info, { newConsole, refresh, copy: copyText }))
+  const query = (sql: string) => void createScratch('sql', conn.id, sql, scratchDatabase)
+  const menu = onMenu(() => databaseMenu(conn.driver, info, { newConsole, refresh, query, copy: copyText }))
 
   if (!info.canConnect) {
     return (
@@ -101,7 +102,7 @@ function DatabaseNode({ conn, info }: { conn: Connection; info: DatabaseInfo }) 
           {schema?.loading && <div className="tree-row static muted indent-3">Loading schema…</div>}
           {schema?.error && <div className="tree-row static error indent-3 selectable" title={schema.error}>{schema.error}</div>}
           {schema && !schema.loading && !schema.error && (
-            <SchemaTree conn={conn} database={scratchDatabase} tables={schema.tables} />
+            <SchemaTree conn={conn} database={scratchDatabase} tables={schema.tables} onRefresh={refresh} />
           )}
         </>
       )}
@@ -113,7 +114,7 @@ function DatabaseNode({ conn, info }: { conn: Connection; info: DatabaseInfo }) 
  * Tables of one database. Postgres groups them by schema; a ClickHouse database is its own
  * namespace, so its tables hang directly under the database.
  */
-function SchemaTree({ conn, database, tables }: { conn: Connection; database: string; tables: Table[] }) {
+function SchemaTree({ conn, database, tables, onRefresh }: { conn: Connection; database: string; tables: Table[]; onRefresh: () => void }) {
   const [openSchemas, setOpenSchemas] = useState<Record<string, boolean>>({})
   const [openTables, setOpenTables] = useState<Record<string, boolean>>({})
   const createScratch = useScratch((s) => s.create)
@@ -137,7 +138,7 @@ function SchemaTree({ conn, database, tables }: { conn: Connection; database: st
             title={`${t.kind} · double-click to preview`}
             onClick={() => setOpenTables({ ...openTables, [key]: !tOpen })}
             onDoubleClick={() => preview(t)}
-            onContextMenu={onMenu(() => tableMenu(conn.driver, t, { query, copy: copyText }))}
+            onContextMenu={onMenu(() => tableMenu(conn.driver, t, { query, copy: copyText, refresh: onRefresh }))}
           >
             <span className="twisty">{tOpen ? '▾' : '▸'}</span>
             <span className={`table-name ${t.kind.includes('view') ? 'view' : ''}`}>{t.name}</span>
@@ -147,7 +148,7 @@ function SchemaTree({ conn, database, tables }: { conn: Connection; database: st
               <div
                 key={c.name}
                 className={`tree-row static indent-${depth + 1} column-row`}
-                onContextMenu={onMenu(() => columnMenu(c, { copy: copyText }))}
+                onContextMenu={onMenu(() => columnMenu(conn.driver, t, c, { query, copy: copyText }))}
               >
                 <span className="col-name">{c.name}</span>
                 <span className="col-type">{c.type}</span>
@@ -168,7 +169,7 @@ function SchemaTree({ conn, database, tables }: { conn: Connection; database: st
             <div
               className="tree-row static indent-3"
               onClick={() => setOpenSchemas({ ...openSchemas, [schemaName]: !sOpen })}
-              onContextMenu={onMenu(() => schemaMenu(schemaName, { copy: copyText }))}
+              onContextMenu={onMenu(() => schemaMenu(conn.driver, schemaName, { query, copy: copyText }))}
             >
               <span className="twisty">{sOpen ? '▾' : '▸'}</span>
               <span className="schema-name">{schemaName}</span>

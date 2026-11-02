@@ -5,6 +5,7 @@ import { confirmAction, showToast } from '../../store/dialog'
 import { Modal } from '../layout/Modal'
 import { ResultsGrid } from './ResultsGrid'
 import { formatKeys } from '../../lib/commands'
+import { qualifiedTable } from '../../lib/databases'
 
 interface Props {
   result: QueryResult
@@ -99,6 +100,8 @@ export function EditableResults({ result, summary, connId, database, driver, rea
         summary={summary}
         actions={actions}
         editing={ability?.editable ? { columns: ability.columns, edits, onChange: setEdits } : undefined}
+        driver={driver}
+        tableName={target ? qualifiedTable(driver ?? 'postgres', { schema: target.schema, name: target.table }) : undefined}
       />
       {preview !== null && target && (
         <SubmitDialog

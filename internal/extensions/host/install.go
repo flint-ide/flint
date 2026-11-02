@@ -114,6 +114,9 @@ func installMessage(m *manifest.Manifest) string {
 		return b.String()
 	}
 	fmt.Fprintf(&b, "\nProgram: %s\n", m.CommandLine(runtime.GOOS))
+	if m.HasWebviews() {
+		b.WriteString("Shows its own UI in Flint (webviews, in a sandboxed frame without network)\n")
+	}
 	if m.RunsAtStartup() {
 		b.WriteString("Starts: when Flint starts (onStartup)\n")
 	} else {
@@ -146,6 +149,8 @@ func PermissionText(p string) string {
 		return "Keep its own secrets in the system keychain (secrets)"
 	case manifest.PermAgentAsk:
 		return "Write drafts in the agent chat for you to send (agent.ask)"
+	case manifest.PermTerminal:
+		return "Open terminal tabs that run commands it chooses (terminal)"
 	}
 	if hosts, ok := strings.CutPrefix(p, "network:"); ok {
 		return "Network access to " + strings.ReplaceAll(hosts, ",", ", ") + " (declared; not enforced by Flint)"

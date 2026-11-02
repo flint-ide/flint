@@ -132,6 +132,8 @@ func (e *ext) handle(ctx context.Context, method string, params json.RawMessage)
 		return nil, e.openFile(params)
 	case "window/openTab":
 		return nil, e.openTab(params)
+	case "window/openTerminal":
+		return nil, e.openTerminal(params)
 	case "window/openUrl":
 		return nil, e.openURL(params)
 	case "workspace/readFile":

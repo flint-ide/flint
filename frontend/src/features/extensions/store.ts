@@ -14,6 +14,9 @@ import type { Info, View } from '../../../bindings/flint/internal/extensions/hos
 import { Workspace, errorMessage } from '../../api/backend'
 import { showToast } from '../../store/dialog'
 import { useEditor } from '../../store/editor'
+import { useTerminal } from '../../store/terminal'
+import { activeRoot } from '../../store/activeRoot'
+import { shellCommand } from '../../lib/shellArgs'
 import { useWorkspace } from '../../store/workspace'
 import type { PanelProps } from '../../panels/registry'
 import { contributes, contributionKey, extensionParts, type ExtensionInfo } from './model'
@@ -216,6 +219,26 @@ interface MessageEvent {
   message: string
 }
 
+interface OpenTerminalEvent {
+  extension: string
+  title?: string
+  cwd?: string
+  env?: Record<string, string>
+  command?: string[]
+  tag?: string
+}
+
+/** window/openTerminal (checked by Go): a terminal tab typing the extension's command. */
+function openExtensionTerminal(e: OpenTerminalEvent): void {
+  const name = useExtensions.getState().list.find((i) => i.id === e.extension)?.name ?? e.extension
+  useTerminal.getState().create(e.cwd || activeRoot(), {
+    title: e.title || undefined,
+    input: e.command?.length ? shellCommand(e.command) : undefined,
+    env: e.env ?? undefined,
+    tag: e.tag || name,
+  })
+}
+
 /** Subscribes to the events Go sends about extensions; returns the unsubscribe. */
 export function subscribeExtensions(): () => void {
   const offs = [
@@ -237,6 +260,7 @@ export function subscribeExtensions(): () => void {
     EventsOn('extensions:openTab', (e: { extension: string; view: string; key: string; title: string; data?: unknown }) =>
       useEditor.getState().openContributed(e.view, e.key, e.title, e.data ?? null),
     ),
+    EventsOn('extensions:openTerminal', (e: OpenTerminalEvent) => openExtensionTerminal(e)),
     EventsOn('extensions:ask', (e: { prompt: string; attachments?: string[] }) =>
       void askAgent({ prompt: e.prompt, attachments: (e.attachments ?? []).map((path) => ({ path })) }),
     ),

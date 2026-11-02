@@ -20,8 +20,8 @@ import (
 	"flint/internal/agenttask"
 	"flint/internal/config"
 	"flint/internal/dap"
-	"flint/internal/db"
 	"flint/internal/feature"
+	"flint/internal/features/kubernetes"
 	"flint/internal/fuzzy"
 	"flint/internal/git"
 	"flint/internal/github"
@@ -73,7 +73,6 @@ type App struct {
 	configDir  string
 	argFolder  string
 
-	db          *db.Manager
 	scratch     *scratch.Store
 	terminals   *terminal.Manager
 	runs        *runner.Manager // run configurations and test runs
@@ -126,10 +125,6 @@ func NewApp() (*App, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("create config dir: %w", err)
 	}
-	store, err := db.OpenStore(dir, db.Keychain{})
-	if err != nil {
-		return nil, err
-	}
 	scratches, err := scratch.Open(dir)
 	if err != nil {
 		return nil, err
@@ -137,12 +132,10 @@ func NewApp() (*App, error) {
 	a := &App{
 		configDir: dir,
 		argFolder: folderFromArgs(os.Args[1:], ""),
-		db:        db.NewManager(store),
 		scratch:   scratches,
 		sessions:  restore.New(filepath.Join(dir, "sessions")),
 		http:      httpfile.NewClient(),
 	}
-	a.db.SetHistory(db.OpenHistory(filepath.Join(dir, "history"), db.DefaultHistoryLimit))
 	a.terminals = terminal.NewManager(newTerminalEvents(a))
 	a.runEvents = newRunEvents(a)
 	a.runs = runner.NewManager(a.runEvents)
@@ -170,6 +163,11 @@ func NewApp() (*App, error) {
 	a.wireAccounts()
 	a.mcp, a.mcpSources = newMCP(a)
 	a.features = feature.New(features, featureHost{a})
+	// get_kubernetes_status stays with the other MCP tools; without its
+	// feature there is no cluster reader, so the tool isn't offered.
+	if !a.features.Has(kubernetes.ID) {
+		a.mcpSources.Kube = nil
+	}
 	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
 	a.agents = newAgentManager(a)
 	return a, nil
@@ -192,7 +190,6 @@ func (a *App) shutdown() {
 		a.lsp.Shutdown,
 		func() { _ = a.agents.Close() },
 		func() { _ = a.mcp.Close() },
-		a.db.CloseAll,
 		a.profiles.closeAll,
 		a.closeProject,
 		a.closeUsage,

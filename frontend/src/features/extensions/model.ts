@@ -5,7 +5,7 @@
 import type { ComponentType } from 'react'
 import { canonicalKeys, keyConflicts, listCommands, type Command } from '../../lib/commands'
 import type { Contributions } from '../../lib/contributions'
-import type { SettingsPage, StatusItem, ThemeContribution } from '../../lib/features'
+import type { ContributedTab, SettingsPage, StatusItem, TabKind, ThemeContribution } from '../../lib/features'
 import { coerceCustomTheme } from '../../lib/settings'
 import type { PanelProps, PanelSpec } from '../../panels/registry'
 import { isIconName } from '../../components/ui/icons'
@@ -21,6 +21,8 @@ export interface ExtensionInfo {
   commands: readonly { id: string; title: string; category?: string; keys?: string }[]
   panels: readonly { id: string; title: string; icon: string; order: number; view: string }[]
   statusItems: readonly { id: string; order: number }[]
+  /** Tab views (webviews); missing from an older backend. */
+  tabViews?: readonly { id: string; title: string; icon?: string; view: string; restore?: boolean }[]
   settings: { title?: string; properties: readonly SchemaProperty[] } | null
   /** Color themes; Go checked them with the custom theme rules. */
   themes?: readonly { id: string; label: string; base: string; colors: Readonly<Record<string, unknown>>; terminal?: Readonly<Record<string, unknown>> | null }[]
@@ -31,6 +33,10 @@ export const EXTENSION_ORDER = 1000
 
 export interface Deps {
   panel: (ext: ExtensionInfo, panel: ExtensionInfo['panels'][number]) => ComponentType<PanelProps>
+  /** A "webview" panel's component. */
+  webviewPanel: (ext: ExtensionInfo, panel: ExtensionInfo['panels'][number]) => ComponentType<PanelProps>
+  /** A tab view's component. */
+  webviewTab: (ext: ExtensionInfo, view: string) => ComponentType<{ tab: ContributedTab; active: boolean }>
   statusItem: (ext: ExtensionInfo, item: string) => ComponentType
   settingsPage: (ext: ExtensionInfo) => ComponentType<{ active: boolean }>
   run: (ext: string, command: string) => Promise<unknown>
@@ -55,7 +61,7 @@ export function contributes(info: ExtensionInfo): boolean {
 /** Changes when what the extension contributes changes (its status texts don't count). */
 export function contributionKey(info: ExtensionInfo): string {
   if (!contributes(info)) return ''
-  return JSON.stringify([info.version, info.commands, info.panels, info.statusItems.map((s) => [s.id, s.order]), info.settings, info.themes ?? []])
+  return JSON.stringify([info.version, info.commands, info.panels, info.statusItems.map((s) => [s.id, s.order]), info.settings, info.themes ?? [], info.tabViews ?? []])
 }
 
 /**
@@ -98,7 +104,7 @@ export function extensionParts(info: ExtensionInfo, deps: Deps): Parts {
     title: p.title,
     icon: isIconName(p.icon) ? p.icon : 'puzzle',
     order: EXTENSION_ORDER + p.order,
-    component: deps.panel(info, p),
+    component: p.view === 'webview' ? deps.webviewPanel(info, p) : deps.panel(info, p),
     shortcutCommand: `view.${p.id}`,
     command: false, // its "Show …" command is below, under the extension's name
   }))
@@ -109,7 +115,10 @@ export function extensionParts(info: ExtensionInfo, deps: Deps): Parts {
   const settingsPages: SettingsPage[] = info.settings?.properties.length
     ? [{ id: `extension:${info.id}`, label: info.settings.title || info.name, order: EXTENSION_ORDER, component: deps.settingsPage(info) }]
     : []
-  return { contributions: { panels, statusItems, settingsPages, themes: themeContributions(info) }, commands, conflicts }
+  const tabKinds: TabKind[] = (info.tabViews ?? [])
+    .filter((t) => t.view === 'webview')
+    .map((t) => ({ id: t.id, icon: t.icon && isIconName(t.icon) ? t.icon : undefined, restore: !!t.restore, component: deps.webviewTab(info, t.id) }))
+  return { contributions: { panels, statusItems, settingsPages, tabKinds, themes: themeContributions(info) }, commands, conflicts }
 }
 
 /** Why an extension's default shortcut can't be used ('' when it can). */

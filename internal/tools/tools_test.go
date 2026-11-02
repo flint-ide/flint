@@ -32,6 +32,7 @@ func TestRegisteredToolsAreGroupedAndOrdered(t *testing.T) {
 		registeredMu.Unlock()
 	})
 	Register(Tool{ID: "zz-infra", Name: "Z", Group: GroupInfra, Order: 10, Install: "brew install z"}.Find("z", "--version"))
+	Register(Tool{ID: "zz-infra-late", Name: "L", Group: GroupInfra, Order: 90, Install: "brew install l"}.Find("l"))
 	Register(Tool{ID: "zz-core", Name: "Y", Group: GroupCore, Install: "brew install y"}.Find("y"))
 	var ids []string
 	for _, tool := range All() {
@@ -41,7 +42,7 @@ func TestRegisteredToolsAreGroupedAndOrdered(t *testing.T) {
 	if !(at("rg") < at("zz-core") && at("zz-core") < at("claude")) {
 		t.Errorf("core tool not at the end of its group: %v", ids)
 	}
-	if !(at("zz-infra") < at("kubectl") && at("kubectl") < at("aws")) {
+	if !(at("zz-infra") < at("aws") && at("aws") < at("zz-infra-late")) {
 		t.Errorf("Order not applied within the group: %v", ids)
 	}
 	if got := All()[at("zz-infra")].Binaries(); !slices.Equal(got, []string{"z"}) {

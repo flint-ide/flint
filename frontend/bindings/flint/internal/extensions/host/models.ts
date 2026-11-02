@@ -113,6 +113,11 @@ export class Info {
     "agentTools": ToolInfo[];
 
     /**
+     * TabViews are the kinds of tabs the extension opens (webviews).
+     */
+    "tabViews": manifest$0.TabView[];
+
+    /**
      * Themes are color themes, already checked with the custom theme rules.
      */
     "themes": manifest$0.Theme[];
@@ -176,6 +181,9 @@ export class Info {
         if (!("agentTools" in $$source)) {
             this["agentTools"] = [];
         }
+        if (!("tabViews" in $$source)) {
+            this["tabViews"] = [];
+        }
         if (!("themes" in $$source)) {
             this["themes"] = [];
         }
@@ -196,6 +204,7 @@ export class Info {
         const $$createField17_0 = $$createType8;
         const $$createField18_0 = $$createType10;
         const $$createField19_0 = $$createType12;
+        const $$createField20_0 = $$createType14;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("warnings" in $$parsedSource) {
             $$parsedSource["warnings"] = $$createField10_0($$parsedSource["warnings"]);
@@ -221,8 +230,11 @@ export class Info {
         if ("agentTools" in $$parsedSource) {
             $$parsedSource["agentTools"] = $$createField18_0($$parsedSource["agentTools"]);
         }
+        if ("tabViews" in $$parsedSource) {
+            $$parsedSource["tabViews"] = $$createField19_0($$parsedSource["tabViews"]);
+        }
         if ("themes" in $$parsedSource) {
-            $$parsedSource["themes"] = $$createField19_0($$parsedSource["themes"]);
+            $$parsedSource["themes"] = $$createField20_0($$parsedSource["themes"]);
         }
         return new Info($$parsedSource as Partial<Info>);
     }
@@ -273,8 +285,8 @@ export class Item {
      * Creates a new Item instance from a string or object.
      */
     static createFrom($$source: any = {}): Item {
-        const $$createField6_0 = $$createType14;
-        const $$createField7_0 = $$createType16;
+        const $$createField6_0 = $$createType16;
+        const $$createField7_0 = $$createType18;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("actions" in $$parsedSource) {
             $$parsedSource["actions"] = $$createField6_0($$parsedSource["actions"]);
@@ -403,8 +415,8 @@ export class View {
      * Creates a new View instance from a string or object.
      */
     static createFrom($$source: any = {}): View {
-        const $$createField1_0 = $$createType18;
-        const $$createField3_0 = $$createType14;
+        const $$createField1_0 = $$createType20;
+        const $$createField3_0 = $$createType16;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("items" in $$parsedSource) {
             $$parsedSource["items"] = $$createField1_0($$parsedSource["items"]);
@@ -428,11 +440,13 @@ const $$createType7 = manifest$0.Schema.createFrom;
 const $$createType8 = $Create.Nullable($$createType7);
 const $$createType9 = ToolInfo.createFrom;
 const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = manifest$0.Theme.createFrom;
+const $$createType11 = manifest$0.TabView.createFrom;
 const $$createType12 = $Create.Array($$createType11);
-const $$createType13 = Action.createFrom;
+const $$createType13 = manifest$0.Theme.createFrom;
 const $$createType14 = $Create.Array($$createType13);
-const $$createType15 = CommandRef.createFrom;
-const $$createType16 = $Create.Nullable($$createType15);
-const $$createType17 = Item.createFrom;
-const $$createType18 = $Create.Array($$createType17);
+const $$createType15 = Action.createFrom;
+const $$createType16 = $Create.Array($$createType15);
+const $$createType17 = CommandRef.createFrom;
+const $$createType18 = $Create.Nullable($$createType17);
+const $$createType19 = Item.createFrom;
+const $$createType20 = $Create.Array($$createType19);

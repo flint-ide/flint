@@ -50,9 +50,14 @@ export class Panel {
     "order": number;
 
     /**
-     * View is "tree" or "list".
+     * View is "tree", "list" or "webview".
      */
     "view": string;
+
+    /**
+     * Webview is a "webview" panel's HTML (webview.go).
+     */
+    "webview"?: Webview | null;
 
     /** Creates a new Panel instance. */
     constructor($$source: Partial<Panel> = {}) {
@@ -79,7 +84,11 @@ export class Panel {
      * Creates a new Panel instance from a string or object.
      */
     static createFrom($$source: any = {}): Panel {
+        const $$createField5_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("webview" in $$parsedSource) {
+            $$parsedSource["webview"] = $$createField5_0($$parsedSource["webview"]);
+        }
         return new Panel($$parsedSource as Partial<Panel>);
     }
 }
@@ -127,7 +136,7 @@ export class Property {
      * Creates a new Property instance from a string or object.
      */
     static createFrom($$source: any = {}): Property {
-        const $$createField5_0 = $$createType0;
+        const $$createField5_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("enum" in $$parsedSource) {
             $$parsedSource["enum"] = $$createField5_0($$parsedSource["enum"]);
@@ -160,12 +169,64 @@ export class Schema {
      * Creates a new Schema instance from a string or object.
      */
     static createFrom($$source: any = {}): Schema {
-        const $$createField1_0 = $$createType2;
+        const $$createField1_0 = $$createType4;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("properties" in $$parsedSource) {
             $$parsedSource["properties"] = $$createField1_0($$parsedSource["properties"]);
         }
         return new Schema($$parsedSource as Partial<Schema>);
+    }
+}
+
+/**
+ * TabView is a kind of editor tab the extension opens (window/openTab, or
+ * flint.openTab from one of its webviews).
+ */
+export class TabView {
+    "id": string;
+    "title": string;
+
+    /**
+     * Icon is a name from Flint's icon set; empty shows the title only.
+     */
+    "icon"?: string;
+
+    /**
+     * View is "webview" (the only kind of tab view this Flint draws).
+     */
+    "view": string;
+    "webview"?: Webview | null;
+
+    /**
+     * Restore: open tabs of this view are saved with the session.
+     */
+    "restore"?: boolean;
+
+    /** Creates a new TabView instance. */
+    constructor($$source: Partial<TabView> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("title" in $$source)) {
+            this["title"] = "";
+        }
+        if (!("view" in $$source)) {
+            this["view"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TabView instance from a string or object.
+     */
+    static createFrom($$source: any = {}): TabView {
+        const $$createField4_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("webview" in $$parsedSource) {
+            $$parsedSource["webview"] = $$createField4_0($$parsedSource["webview"]);
+        }
+        return new TabView($$parsedSource as Partial<TabView>);
     }
 }
 
@@ -203,8 +264,8 @@ export class Theme {
      * Creates a new Theme instance from a string or object.
      */
     static createFrom($$source: any = {}): Theme {
-        const $$createField3_0 = $$createType3;
-        const $$createField4_0 = $$createType3;
+        const $$createField3_0 = $$createType5;
+        const $$createField4_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("colors" in $$parsedSource) {
             $$parsedSource["colors"] = $$createField3_0($$parsedSource["colors"]);
@@ -216,8 +277,37 @@ export class Theme {
     }
 }
 
+/**
+ * Webview names a view's HTML file.
+ */
+export class Webview {
+    /**
+     * HTML is a clean relative path of an .html file inside the extension's folder.
+     */
+    "html": string;
+
+    /** Creates a new Webview instance. */
+    constructor($$source: Partial<Webview> = {}) {
+        if (!("html" in $$source)) {
+            this["html"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Webview instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Webview {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Webview($$parsedSource as Partial<Webview>);
+    }
+}
+
 // Private type creation functions
-const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = Property.createFrom;
-const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = $Create.Map($Create.Any, $Create.Any);
+const $$createType0 = Webview.createFrom;
+const $$createType1 = $Create.Nullable($$createType0);
+const $$createType2 = $Create.Array($Create.Any);
+const $$createType3 = Property.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = $Create.Map($Create.Any, $Create.Any);

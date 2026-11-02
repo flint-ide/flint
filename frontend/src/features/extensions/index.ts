@@ -5,14 +5,14 @@
 // extension:<id> and withdrawn when it is turned off or uninstalled.
 import { lazy } from 'react'
 import { defineFeature } from '../../lib/features'
-import { extensionsSettings } from './settings'
+import { extensionsSettings, featureToggleSettings } from './settings'
 import { installFromFolder, subscribeExtensions } from './store'
 
 const ExtensionsSection = lazy(() => import('./ExtensionsSection').then((m) => ({ default: m.ExtensionsSection })))
 
 export default defineFeature({
   id: 'extensions',
-  settings: [extensionsSettings],
+  settings: [extensionsSettings, featureToggleSettings],
   commands: [
     {
       id: 'extensions.install',

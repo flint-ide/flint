@@ -15,6 +15,7 @@ import (
 // Module declares the feature (listed in package main's features.go).
 var Module = feature.Module{
 	ID:       "docker",
+	Optional: true,
 	Settings: []settings.AnySection{Section},
 	Tools: []tools.Tool{
 		tools.Tool{

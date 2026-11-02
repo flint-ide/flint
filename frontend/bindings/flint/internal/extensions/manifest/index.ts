@@ -6,5 +6,7 @@ export {
     Panel,
     Property,
     Schema,
-    Theme
+    TabView,
+    Theme,
+    Webview
 } from "./models.js";

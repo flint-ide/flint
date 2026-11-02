@@ -3,14 +3,15 @@ import type { Extension } from '@codemirror/state'
 import type { EditorView, KeyBinding } from '@codemirror/view'
 import { Scratch, errorMessage, type Driver } from '../../api/backend'
 import { languageFor } from '../../lib/language'
-import { sqlLanguage } from '../../lib/sqlDialects'
+import { sqlLanguage } from '../../features/database/lib/sqlDialects'
 import { registerSaver, registerView, useEditor, type ScratchTab } from '../../store/editor'
 import { pendingContent, useScratch } from '../../store/scratch'
-import { useDatabase } from '../../store/database'
-import { defaultDatabaseName, resolveDatabase, schemaKey } from '../../lib/databases'
+import { useDatabase } from '../../features/database/store/database'
+import { defaultDatabaseName, resolveDatabase, schemaKey } from '../../features/database/lib/databases'
 import { showToast } from '../../store/dialog'
+import { useActiveFeatures } from '../../lib/activeFeatures'
 import { CodeEditor } from './CodeEditor'
-import { QueryPanel, useQueryRunner } from './QueryPanel'
+import { QueryPanel, useQueryRunner } from '../../features/database/console/QueryPanel'
 
 const AUTOSAVE_MS = 600
 
@@ -30,7 +31,9 @@ export function ScratchView({ tab, active }: Props) {
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const dirty = useRef(false)
   const setDirty = useEditor((s) => s.setDirty)
-  const isSQL = tab.scratchKind === 'sql'
+  // A SQL console needs the database feature; with it switched off it's plain SQL text.
+  const databaseOn = useActiveFeatures((s) => s.ids.has('database'))
+  const isSQL = tab.scratchKind === 'sql' && databaseOn
 
   const scratch = useScratch((s) => s.items.find((i) => i.id === tab.scratchId))
   const connId = scratch?.connId ?? ''
@@ -55,7 +58,7 @@ export function ScratchView({ tab, active }: Props) {
         if (pending) void Scratch.Save(tab.scratchId, pending)
       })
       .catch((err) => !cancelled && showToast(errorMessage(err), 'error'))
-    if (!isSQL) void languageFor(tab.scratchKind === 'markdown' ? 'x.md' : 'x.txt').then(setPlainLanguage)
+    if (!isSQL) void languageFor({ markdown: 'x.md', sql: 'x.sql' }[tab.scratchKind as string] ?? 'x.txt').then(setPlainLanguage)
     return () => {
       cancelled = true
     }

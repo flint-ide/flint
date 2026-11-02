@@ -36,6 +36,8 @@ type Info struct {
 	StatusItems     []StatusItemInfo   `json:"statusItems"`
 	Settings        *manifest.Schema   `json:"settings"`
 	AgentTools      []ToolInfo         `json:"agentTools"`
+	// TabViews are the kinds of tabs the extension opens (webviews).
+	TabViews []manifest.TabView `json:"tabViews"`
 	// Themes are color themes, already checked with the custom theme rules.
 	Themes []manifest.Theme `json:"themes"`
 }
@@ -62,7 +64,7 @@ func (e *ext) info() Info {
 	in := Info{
 		ID: e.id, Name: e.id, Dir: e.dir, Enabled: e.h.o.App.Enabled(e.id), State: e.state(),
 		Warnings: []string{}, Permissions: []string{}, PermissionTexts: []string{}, Commands: []manifest.Command{}, Panels: []manifest.Panel{},
-		StatusItems: []StatusItemInfo{}, AgentTools: []ToolInfo{}, Themes: []manifest.Theme{},
+		StatusItems: []StatusItemInfo{}, AgentTools: []ToolInfo{}, Themes: []manifest.Theme{}, TabViews: []manifest.TabView{},
 	}
 	if e.m == nil {
 		in.Error = errText(e.loadErr)
@@ -82,6 +84,7 @@ func (e *ext) info() Info {
 	in.RunsAtStartup = m.RunsAtStartup()
 	in.Commands = slices.Clone(m.Contributes.Commands)
 	in.Panels = slices.Clone(m.Contributes.Panels)
+	in.TabViews = slices.Clone(m.Contributes.TabViews)
 	in.Settings = m.Contributes.Settings
 	for _, k := range m.Contributes.Unsupported {
 		in.Warnings = append(in.Warnings, "contributes."+k+" is not supported by this version of Flint and is ignored")

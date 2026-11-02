@@ -2,6 +2,7 @@
 // registerCommand, see lib/commands.ts.
 import { Workspace } from '../api/backend'
 import { parseKeys, registerCommands, type Command } from '../lib/commands'
+import { pressInEditor } from './pressInEditor'
 import { attachSelectionToAgent } from '../lib/agentContext'
 import { registerFeatureCommands } from './featureCommands'
 import { registerTaskCommands } from './taskCommands'
@@ -19,8 +20,6 @@ import { rootLabels } from '../lib/workspaceRoots'
 import { useGit } from '../store/git'
 import { useScratch } from '../store/scratch'
 import { useSearch } from '../store/search'
-import { useDatabase } from '../store/database'
-import { activeSqlConsole } from '../store/sqlConsole'
 import { useAgentChat } from '../store/agentChat'
 import { showToast } from '../store/dialog'
 import { trustFolder, untrustFolder } from '../store/trust'
@@ -208,39 +207,7 @@ function appCommands(): Command[] {
     },
     { id: 'project.reloadTree', title: 'Reload File Tree', category: 'Project', keywords: 'refresh', when: () => !!ws().root, run: () => ws().reloadTree() },
 
-    // Database & scratchpads
-    { id: 'scratch.newSql', title: 'New SQL Console', category: 'Database', keys: 'Mod+N', keywords: 'scratch query', run: () => void useScratch.getState().create('sql') },
-    {
-      id: 'sql.runQuery', title: 'Run Query', category: 'Database', hintKeys: 'Mod+Enter', keywords: 'execute statement',
-      when: () => {
-        const tab = activeTab()
-        return tab?.kind === 'scratch' && tab.scratchKind === 'sql' && hasEditor()
-      },
-      run: () => pressInEditor('Mod+Enter'),
-    },
-    {
-      id: 'sql.explain', title: 'Explain Plan', category: 'Database', keys: 'Mod+Shift+E', keywords: 'query plan explain',
-      when: () => !!activeSqlConsole(),
-      run: () => activeSqlConsole()?.explain(false),
-    },
-    {
-      id: 'sql.explainAnalyze', title: 'Explain Analyze', category: 'Database', keys: 'Mod+Shift+A',
-      keywords: 'query plan explain execute timing buffers pipeline',
-      when: () => !!activeSqlConsole(),
-      run: () => activeSqlConsole()?.explain(true),
-    },
-    {
-      id: 'sql.history', title: 'Query History…', category: 'Database', keys: 'Mod+Shift+H', keywords: 'recent statements log rerun',
-      when: () => !!activeSqlConsole(),
-      run: () => activeSqlConsole()?.showHistory(),
-    },
-    {
-      id: 'db.newConnection', title: 'New Database Connection…', category: 'Database', keywords: 'postgres clickhouse add',
-      run: () => {
-        ws().setSidebar('database')
-        useDatabase.getState().setEditing('new')
-      },
-    },
+    // Scratchpads (SQL consoles and their commands come from the database feature)
     { id: 'scratch.newMarkdown', title: 'New Markdown Note', category: 'Scratchpads', keywords: 'md scratch', run: () => void useScratch.getState().create('markdown') },
     { id: 'scratch.newText', title: 'New Text Note', category: 'Scratchpads', keywords: 'txt scratch', run: () => void useScratch.getState().create('text') },
   ]
@@ -332,27 +299,3 @@ function registerWorkspaceRootCommands(): () => void {
   }
 }
 
-/**
- * Runs the active editor's own key binding (LSP, search, ⌘↵ in SQL consoles), so a
- * palette entry behaves exactly like its shortcut. CodeMirror is imported lazily:
- * it's already loaded whenever an editor exists.
- */
-async function pressInEditor(keys: string): Promise<void> {
-  const id = useEditor.getState().activeId
-  const view = id ? viewFor(id) : undefined
-  if (!view) return
-  const { runScopeHandlers } = await import('@codemirror/view')
-  const chord = parseKeys(keys)
-  const raw = keys.split('+').pop() ?? ''
-  const event = new KeyboardEvent('keydown', {
-    key: raw.length === 1 ? raw.toLowerCase() : raw, // CodeMirror names: 'b', 'F7', 'Enter'
-    metaKey: chord.meta,
-    ctrlKey: chord.ctrl,
-    altKey: chord.alt,
-    shiftKey: chord.shift,
-    bubbles: true,
-    cancelable: true,
-  })
-  view.focus()
-  runScopeHandlers(view, event, 'editor')
-}

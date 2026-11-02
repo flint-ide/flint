@@ -69,8 +69,9 @@ type Contributes struct {
 	StatusItems []StatusItem `json:"statusItems,omitempty"`
 	AgentTools  []AgentTool  `json:"agentTools,omitempty"`
 	Themes      []Theme      `json:"themes,omitempty"`
+	TabViews    []TabView    `json:"tabViews,omitempty"`
 	// Unsupported names contribution points this Flint doesn't offer yet
-	// (fileMenu, tabViews): ignored, and listed as warnings in Settings.
+	// (fileMenu): ignored, and listed as warnings in Settings.
 	Unsupported []string `json:"-"`
 }
 
@@ -90,8 +91,10 @@ type Panel struct {
 	// Icon is a name from Flint's icon set (frontend/src/components/ui/icons.ts).
 	Icon  string `json:"icon"`
 	Order int    `json:"order"`
-	// View is "tree" or "list".
+	// View is "tree", "list" or "webview".
 	View string `json:"view"`
+	// Webview is a "webview" panel's HTML (webview.go).
+	Webview *Webview `json:"webview,omitempty"`
 }
 
 // StatusItem is a status bar item whose text comes from status/update.
@@ -204,6 +207,8 @@ func Parse(data []byte) (*Manifest, error) {
 			err = json.Unmarshal(raw, &m.Contributes.AgentTools)
 		case "themes":
 			err = json.Unmarshal(raw, &m.Contributes.Themes)
+		case "tabViews":
+			err = json.Unmarshal(raw, &m.Contributes.TabViews)
 		case "settings":
 			m.Contributes.Settings, err = parseSchema(raw)
 		default:

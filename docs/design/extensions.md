@@ -476,6 +476,50 @@ Panels are narrow; reports, dashboards and long forms want an editor tab. A tab 
 - **Sessions.** Unlike today's contributed tabs, extension tabs are saved with the project's session: `{ view, key, title, data }`, with `data` at most 64 KiB of JSON. On restore the tab shows its title right away and resolves when it is first shown, which activates the extension (`onView`). A tab whose extension is gone shows "not available" with the extension's name.
 - **Level 1.** This adds session restore to contributed tab kinds (`TabKind.restore: true`), the open item in "Points not yet in the contract".
 
+### Webviews
+
+Some extensions are applications in their own right: a database client with an SQL editor, an editable result grid and query plans, or a Kubernetes dashboard. Describing those as data would move their components into Flint's core. A **webview** is the exception to "everything is data": the extension ships its own UI as **one self-contained HTML file**, and Flint shows it in an isolated frame. Database, Kubernetes and Docker are packaged this way (see [Separate packages](#separate-packages-database-kubernetes-docker)).
+
+```json
+"panels":   [{ "id": "flint.database.tree", "title": "Databases", "icon": "database", "order": 50,
+               "view": "webview", "webview": { "html": "ui/panel.html" } }],
+"tabViews": [{ "id": "flint.database.console", "title": "SQL Console", "icon": "database",
+               "view": "webview", "webview": { "html": "ui/console.html" }, "restore": true }]
+```
+
+**Isolation.** The file is read by Go (a clean relative path inside the extension folder, at most 32 MiB, valid UTF-8) and loaded as the `srcdoc` of an `<iframe sandbox="allow-scripts allow-forms allow-popups-to-escape-sandbox">` without `allow-same-origin`. Its origin is opaque, so it cannot reach Flint's page, storage, bindings or cookies. Flint inserts a Content Security Policy as the first element of `<head>`:
+
+```
+default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:;
+font-src data:; media-src data: blob:; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'
+```
+
+The page cannot load anything, from the extension folder or the network: scripts, styles, fonts and images are inlined (Vite with a single-file build does this). `connect-src 'none'` means it has no network at all, so everything goes through its own process, which declared its hosts (`network:` permission) like any extension. A second policy in the file can only narrow this one. The frame gets `allow="clipboard-write"` and nothing else.
+
+**Bridge.** Flint inserts a small script before the extension's own code. It defines `window.flint`:
+
+| API | Does |
+|---|---|
+| `flint.request(method, params)` → Promise | `webview/request { view, key?, method, params }` to the extension's process (activating it), the result or a rejected error; 30 s timeout, 4 MiB each way |
+| `flint.onMessage(fn)` | receives what the process sends with `webview/post { view, key?, message }` |
+| `flint.view`, `flint.key`, `flint.data` | which panel or tab this is (a tab's `data` is its saved JSON) |
+| `flint.theme` + `flint.onTheme(fn)` | Flint's theme variables (`--bg-editor`, `--fg`, `--accent`, `--font-mono`, …), also set on `:root`, and `dark` / `light` on `<html data-theme>`; updated live |
+| `flint.openTab(view, key, title, data?)` | opens or focuses one of the extension's own tab views |
+| `flint.setTitle(title)`, `flint.setDirty(dirty)` | the tab's title and unsaved dot |
+| `flint.setData(data)` | the JSON saved with the tab for session restore (64 KiB) |
+| `flint.runCommand(id, args?)` | runs one of the extension's own commands |
+| `flint.copy(text)` | writes the clipboard (1 MiB) |
+| `flint.showMessage(type, text)` | a toast, rate-limited like `window/showMessage` |
+| `flint.openFile(path, line?)` | opens a file in a root; needs `workspace.read` |
+
+Messages from the frame are accepted only from that frame's window, are size-checked, and can only address the extension that owns the view; ids of other extensions or of Flint are refused. Shortcuts: the bridge forwards key presses with ⌘/Ctrl/Alt that the page didn't `preventDefault()` to Flint, so the command palette, tab switching and the user's keymap keep working while a webview has focus. Escape is forwarded too.
+
+**Process side.** `webview/request` is a request from Flint to the process (`{ view, key?, method, params }` → any JSON) and `webview/post` a notification from the process (`{ view, key?, message }`, at most 4 MiB). A webview without a process (no `run`) can only use the bridge's local calls. `window/openTab` from the process opens a tab view as well.
+
+**Lifecycle.** The frame is created when the panel or tab is first shown and kept while it is open (hidden, not destroyed, when another tab or panel is shown); `view/visible` is sent as for other views. Uninstalling or turning the extension off replaces it with "not available". `restore: true` tab views are saved with the session (`{ view, key, title, data }`) and recreated on start.
+
+**What this changes in the security model.** A webview runs the extension's JavaScript inside Flint's window, but in a frame with an opaque origin, no network and no access to Flint except the bridge above. The bridge offers nothing the extension's process couldn't already do through the protocol. The install dialog lists the webviews ("shows its own UI in Flint").
+
 ### Editor decorations
 
 Linters, test runners, coverage tools and issue trackers want to mark lines in the editor. An extension declares a decoration set and then publishes decorations for files:
@@ -540,7 +584,7 @@ A theme is data and runs no code, so it needs neither a program nor a permission
 - **Permissions** gate what Flint does on an extension's behalf. Flint enforces them; a request without the permission fails with JSON-RPC error `-32001`. The permissions are `workspace.read`, `secrets`, `agent.ask` and `network:<host>[,<host>…]`. Network is declarative only: it is shown at install and in Settings, but an extension is a native process that Flint can't confine. This is said plainly in the install dialog ("runs with your user's permissions"). Sandboxing is an open question.
 - **Secrets** are stored only in the OS keyring through Flint, under service `flint-extensions` and account `<id>:<key>`. Settings and `state.json` never hold them, and an extension can't read another extension's keys.
 - **No telemetry.** Flint sends nothing about extensions anywhere, and the protocol has no telemetry channel. Extensions whose description or permissions suggest analytics endpoints are the user's call; the install dialog shows every declared network host.
-- **No WebView code.** Contributions are data rendered by Flint's components, so an extension cannot run script in the UI or read other features' state.
+- **No WebView code, except in webviews.** Contributions are data rendered by Flint's components. The one exception, [webviews](#webviews), runs the extension's script in a sandboxed frame with an opaque origin and no network, which can't read Flint's or other extensions' state.
 - **Agent tools.** Extension tools are read-only from Flint's point of view: Flint passes the arguments and returns the text. The tool names carry the extension's short name (`jira_jira_issue` → `mcp__flint__jira_jira_issue`). MCP limits tool names to 64 characters of `[A-Za-z0-9_-]`, so names are shortened and deduplicated. Each extension's tools can be turned off in Settings ▸ Agent Context.
 
 ### Versioning
@@ -615,6 +659,25 @@ Code: `internal/extensions/{manifest,rpc,host}`, the module `internal/features/e
 - **Panels appear after the first paint.** Extensions are discovered after the window is up, so their activity bar buttons arrive a moment later; a stored sidebar choice of an extension panel falls back to Files on the next start.
 
 ---
+
+## Separate packages: Database, Kubernetes, Docker
+
+These three leave Flint's core and become level-2 extensions, installed separately (**Settings ▸ Extensions ▸ Install from Folder…**, or from the packages that ship with Flint and are listed under **Available**). Each package is a folder with `flint-extension.json`, a Go program built from the packages that are Flint's today (`internal/db`, `internal/kube`, `internal/docker`), and single-file webview UIs built from today's React code. The sources live in the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository, one folder per extension (`database/`, `kubernetes/`, `docker/`), next to `stats` and the webview example `notes`. Each is its own Go module; the Go packages they need from Flint (`internal/db`, `internal/kube`, `internal/docker`) move there with them. Flint keeps copies of `stats` and `notes` under `examples/extensions` for its conformance tests.
+
+| Package | Process | Webviews | Other contributions | Needs from the contract |
+|---|---|---|---|---|
+| `flint.database` | connections, keychain passwords (same keyring service, so saved passwords keep working), queries, schema, EXPLAIN, row edits, history; data in `FLINT_EXTENSION_DATA` | panel: connections and schema tree with its menus; tab: SQL console (editor with completions from the schema, results grid with local sort and filters, editing, EXPLAIN) | commands (New SQL Console, New Connection, Run, Explain, History) | webviews, tab views with restore, per-extension data folder, a one-time import of `connections.json` and `history/` |
+| `flint.kubernetes` | kubectl calls, kubeconfig overrides for terminals | panel: contexts, namespaces, apps, workloads | agent tool `kubernetes_status`, command to open a terminal in a context | webviews, **terminal tabs** (`window/openTerminal { title, cwd?, env, command? }`) |
+| `flint.docker` | Engine API client | panel: containers, Compose projects | Compose actions | webviews, **stream tabs** (`window/openStream`: the process writes a log or a shell's output, Flint shows it in a terminal tab and sends input back) |
+
+Order, one pull request each, each leaving Flint shippable:
+
+1. **Done.** Database and Kubernetes moved into level-1 modules (`internal/features/{database,kubernetes}`, `frontend/src/features/{database,kubernetes}`), so their code has one home; optional modules can be switched off (`features.enabled`).
+2. **Webviews and tab views** in the contract (above), with `examples/extensions/webview` and a conformance test.
+3. **`flint.database`**: the package, the data import, then removing `internal/features/database` and its frontend from core. SQL consoles become the extension's tab views; existing SQL scratchpads are offered for import.
+4. **Terminal tabs** in the contract, then **`flint.kubernetes`**; `get_kubernetes_status` becomes the extension's tool.
+5. **Stream tabs**, then **`flint.docker`**.
+6. **Available packages**: Settings ▸ Extensions lists the packages bundled with Flint (in the app's resources) with an **Install** button that copies them like Install from Folder.
 
 ## What remains to migrate
 

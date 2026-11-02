@@ -243,6 +243,8 @@ interface EditorState {
   closePaths: (paths: string[]) => void
   setActive: (id: string) => void
   setDirty: (id: string, dirty: boolean) => void
+  /** Replaces a contributed tab's data (saved with the session when its kind restores). */
+  setTabData: (id: string, data: unknown) => void
 }
 
 export const fileTabId = (path: string) => `file:${path}`
@@ -459,6 +461,9 @@ export const useEditor = createStore<EditorState>((set) => ({
       if (s.tabs.some((t) => t.id === id)) return { tabs: s.tabs.map((t) => (t.id === id ? tab : t)), ...activate(s, id) }
       return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
     }),
+
+  setTabData: (id, data) =>
+    set((s) => (s.tabs.some((t) => t.id === id && t.kind === 'contrib') ? { tabs: s.tabs.map((t) => (t.id === id && t.kind === 'contrib' ? { ...t, data } : t)) } : s)),
 
   retitleTab: (id, title) =>
     set((s) => (s.tabs.some((t) => t.id === id && t.title !== title) ? { tabs: s.tabs.map((t) => (t.id === id ? { ...t, title } : t)) } : s)),

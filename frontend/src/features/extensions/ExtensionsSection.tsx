@@ -8,6 +8,7 @@ import { themeContributions, type ExtensionInfo } from './model'
 import { activeThemeId, customThemeFrom } from '../../lib/contributedThemes'
 import { useContributions } from '../../lib/contributions'
 import type { ThemeContribution } from '../../lib/features'
+import { BuiltinExtensions } from './BuiltinExtensions'
 
 const STATE_LABELS: Record<string, string> = {
   invalid: 'Broken',
@@ -32,6 +33,7 @@ export function ExtensionsSection() {
         show and checks every request against the permissions they declare, but a program runs with your user's permissions: install only ones you trust.
         One starts when you first use it and stops after five idle minutes. A theme-only extension has no program and runs no code.
       </p>
+      <BuiltinExtensions />
       <div className="settings-actions">
         <button onClick={() => void installFromFolder()}>Install from Folder…</button>
         <button onClick={() => void loadExtensions(true)}>Reload</button>

@@ -355,17 +355,21 @@ func (e *ext) initializeParams() map[string]any {
 
 // setVisible records whether one of its panels is on screen; a shown panel
 // keeps the process from stopping when idle.
-func (e *ext) setVisible(view string, visible bool) {
+func (e *ext) setVisible(view, key string, visible bool) {
 	e.mu.Lock()
 	if visible {
-		e.visible[view] = true
+		e.visible[view+"\x00"+key] = true
 	} else {
-		delete(e.visible, view)
+		delete(e.visible, view+"\x00"+key)
 	}
 	p := e.proc
 	e.mu.Unlock()
 	if p != nil {
-		_ = p.conn.Notify("view/visible", map[string]any{"view": view, "visible": visible})
+		params := map[string]any{"view": view, "visible": visible}
+		if key != "" {
+			params["key"] = key
+		}
+		_ = p.conn.Notify("view/visible", params)
 	}
 	e.touch()
 }

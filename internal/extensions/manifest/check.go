@@ -217,9 +217,18 @@ func (m *Manifest) checkContributions() error {
 		if !iconPattern.MatchString(p.Icon) {
 			return fmt.Errorf("panel %s: icon %q is not a name from Flint's icon set", p.ID, p.Icon)
 		}
-		if p.View != "tree" && p.View != "list" {
-			return fmt.Errorf(`panel %s: view %q is not supported (this Flint draws "tree" and "list")`, p.ID, p.View)
+		switch p.View {
+		case "tree", "list":
+		case "webview":
+			if err := checkWebview("panel", p.ID, p.Webview); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf(`panel %s: view %q is not supported (this Flint draws "tree", "list" and "webview")`, p.ID, p.View)
 		}
+	}
+	if err := m.checkTabViews(own); err != nil {
+		return err
 	}
 	for _, s := range c.StatusItems {
 		if err := own("status item", s.ID); err != nil {
@@ -304,7 +313,8 @@ func (m *Manifest) checkActivation() error {
 		case "onCommand":
 			_, ok = m.Command(arg)
 		case "onView":
-			ok = m.HasPanel(arg)
+			_, tab := m.TabView(arg)
+			ok = m.HasPanel(arg) || tab
 		case "onAgentTool":
 			ok = tools[arg]
 		}

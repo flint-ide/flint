@@ -1,7 +1,9 @@
 import * as SessionAPI from '../../bindings/flint/sessionapi'
 import { Scratch, errorMessage } from '../api/backend'
 import { showToast } from './dialog'
-import { SNAPSHOT_VERSION, chatsNeedSave, inside, parseSnapshot, trimChat, type SavedTab, type Snapshot } from '../lib/sessionSnapshot'
+import { MAX_TAB_DATA, SNAPSHOT_VERSION, chatsNeedSave, inside, parseSnapshot, trimChat, type SavedTab, type Snapshot } from '../lib/sessionSnapshot'
+import { tabKind } from '../lib/contributions'
+import { tabKeyOf, webviewTabId } from '../features/extensions/webviewEvents'
 import { diffTabId, fileTabId, historyTabId, revisionDiffTabId, scratchTabId, useEditor, viewFor, type Tab } from './editor'
 import { recentOutput, terminalTabId, TerminalBackend, useTerminal } from './terminal'
 import { chatTabId, useAgentChat } from './agentChat'
@@ -97,8 +99,13 @@ async function captureTab(t: Tab, roots: string[]): Promise<SavedTab | null> {
       return null // pull requests and CI logs are fetched from GitHub when opened
     case 'merge':
       return null // conflicts are reopened from the Commit panel
-    case 'contrib':
-      return null // a feature's view may not exist next time; it reopens its tabs itself
+    case 'contrib': {
+      // Only kinds that ask for it (extension tab views): others may not exist next time.
+      if (!tabKind(t.view)?.restore) return null
+      const key = tabKeyOf(t)
+      const size = JSON.stringify(t.data ?? null).length
+      return key ? { kind: 'contrib', view: t.view, key, title: t.title, ...(size <= MAX_TAB_DATA ? { data: t.data } : {}) } : null
+    }
   }
 }
 
@@ -166,6 +173,13 @@ async function apply(root: string, snap: Snapshot, roots: string[]): Promise<voi
         useAgentChat.getState().restore(t.chat)
         ids.push(chatTabId(t.chat.id))
         break
+      case 'contrib': {
+        // Shown as soon as its extension's tab kind is contributed (after the extensions load).
+        const id = webviewTabId(t.view, t.key)
+        editor.addTab({ id, kind: 'contrib', view: t.view, title: t.title, data: t.data ?? null, dirty: false })
+        ids.push(id)
+        break
+      }
     }
   }
   const active = ids[snap.active]

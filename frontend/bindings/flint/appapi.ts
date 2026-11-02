@@ -22,6 +22,17 @@ export function CancelQuit(): $CancellablePromise<void> {
 }
 
 /**
+ * Features are the ids of the feature modules running in this process; an
+ * optional one switched off in settings (features.enabled) is missing until
+ * Flint restarts with it on. The frontend installs only these modules' halves.
+ */
+export function Features(): $CancellablePromise<string[]> {
+    return $Call.ByID(3701573840).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
+/**
  * Quit closes the app after the frontend saved what it had to.
  */
 export function Quit(): $CancellablePromise<void> {
@@ -34,9 +45,10 @@ export function Quit(): $CancellablePromise<void> {
  */
 export function Titlebar(): $CancellablePromise<$models.TitlebarMetrics> {
     return $Call.ByID(981549064).then(($result: any) => {
-        return $$createType0($result);
+        return $$createType1($result);
     });
 }
 
 // Private type creation functions
-const $$createType0 = $models.TitlebarMetrics.createFrom;
+const $$createType0 = $Create.Array($Create.Any);
+const $$createType1 = $models.TitlebarMetrics.createFrom;

@@ -63,6 +63,8 @@ export interface TabKind {
   component: ComponentType<{ tab: ContributedTab; active: boolean }>
   /** Tab strip icon; none shows the title only. */
   icon?: IconName
+  /** Open tabs are saved with the session ({ view, key, title, data }) and reopened. */
+  restore?: boolean
 }
 
 /** An entry of the file tree's context menu, for the right-clicked paths. */
@@ -95,6 +97,13 @@ export interface ThemeContribution {
 export interface FeatureModule {
   /** The feature's id, the same as its Go module's (internal/features/<id>). */
   id: string
+  /**
+   * A built-in extension that can be switched off in Settings ▸ Extensions (Go:
+   * feature.Module.Optional); name and description are shown there.
+   */
+  optional?: boolean
+  name?: string
+  description?: string
   settings?: readonly SettingsSection[]
   panels?: readonly PanelSpec[]
   commands?: readonly Command[]

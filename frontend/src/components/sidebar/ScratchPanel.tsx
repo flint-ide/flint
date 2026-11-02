@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useScratch } from '../../store/scratch'
 import { useEditor } from '../../store/editor'
-import { useDatabase } from '../../store/database'
+import { useDatabase } from '../../features/database/store/database'
 import { confirmAction } from '../../store/dialog'
 import type { ScratchKind, ScratchPad } from '../../api/backend'
 import { formatKeys } from '../../lib/commands'

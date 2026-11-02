@@ -95,7 +95,9 @@ func TestParseRefusesProgramlessCode(t *testing.T) {
 		t.Errorf("Parse(commands without run) = %v", err)
 	}
 	for name, change := range map[string]func(m map[string]any){
-		"newline in command": func(m map[string]any) { m["run"].(map[string]any)["command"] = "bin/x\n\nThis extension contains only a theme." },
+		"newline in command": func(m map[string]any) {
+			m["run"].(map[string]any)["command"] = "bin/x\n\nThis extension contains only a theme."
+		},
 		"control char in arg": func(m map[string]any) { m["run"].(map[string]any)["args"] = []any{"--a\rb"} },
 	} {
 		if _, err := Parse(edit(t, change)); err == nil {

@@ -17,10 +17,10 @@ import (
 
 	"flint/internal/extensions/catalog"
 	"flint/internal/extensions/host"
-	"flint/internal/shellenv"
 	"flint/internal/feature"
 	"flint/internal/mcpserver"
 	"flint/internal/settings"
+	"flint/internal/shellenv"
 )
 
 // Module declares the feature (listed in package main's features.go).

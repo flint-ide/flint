@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -125,6 +126,44 @@ func TestRefreshReportsGitErrors(t *testing.T) {
 	if l.Entries == nil || c.Fetched() {
 		t.Fatalf("listing = %+v, fetched = %v", l, c.Fetched())
 	}
+	// The user reads this in Settings: what failed and what to do.
+	for _, want := range []string{"couldn't download the extensions repository", "internet connection", "Refresh Repository"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("message %q lacks %q", err, want)
+		}
+	}
+}
+
+func TestMessagesSayWhatToDo(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want []string
+	}{
+		{errGitMissing, []string{"git isn't installed", "xcode-select --install", "Refresh Repository"}},
+		{fetchError("u", errGitMissing), []string{"git isn't installed"}},
+		{ErrUnknown, []string{"Refresh Repository"}},
+	} {
+		for _, w := range tc.want {
+			if !strings.Contains(tc.err.Error(), w) {
+				t.Errorf("message %q lacks %q", tc.err, w)
+			}
+		}
+	}
+	t.Setenv("PATH", t.TempDir())
+	if _, err := exec.LookPath("go"); err == nil {
+		t.Skip("go still found")
+	}
+	if p, err := findGo("Docker"); err == nil {
+		if _, statErr := os.Stat(p); statErr == nil {
+			t.Skip("go installed in a usual location")
+		}
+	} else {
+		for _, w := range []string{"Docker", "Go isn't installed", "go.dev/dl", "Install…"} {
+			if !strings.Contains(err.Error(), w) {
+				t.Errorf("message %q lacks %q", err, w)
+			}
+		}
+	}
 }
 
 func TestPrepare(t *testing.T) {
@@ -143,10 +182,10 @@ func TestPrepare(t *testing.T) {
 	if _, _, err := c.Prepare(ctx, "nope"); !errors.Is(err, ErrUnknown) {
 		t.Fatalf("unknown folder: %v", err)
 	}
-	if _, _, err := c.Prepare(ctx, "broken"); err == nil {
-		t.Fatal("prepared a broken manifest")
+	if _, _, err := c.Prepare(ctx, "broken"); err == nil || !strings.Contains(err.Error(), "Refresh Repository") {
+		t.Fatalf("broken manifest: %v", err)
 	}
-	if _, err := findGo(); err != nil {
+	if _, err := findGo("Acme Tool"); err != nil {
 		t.Skip("go not installed")
 	}
 	dir, release, err = c.Prepare(ctx, "tool")

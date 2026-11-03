@@ -92,7 +92,9 @@ func hasState(m *Manager, word string) bool {
 
 func waitFor(t *testing.T, ok func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	// Generous: `go test ./...` builds and runs many packages at once, and a
+	// fake server that starts in 50 ms alone can take seconds then.
+	deadline := time.Now().Add(15 * time.Second)
 	for !ok() {
 		if time.Now().After(deadline) {
 			t.Fatal("timed out")

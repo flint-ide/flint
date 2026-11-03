@@ -79,8 +79,8 @@ func TestCommandFor(t *testing.T) {
 		{"known name by path trusted", true, goKey, ServerConfig{Command: "/repo/tools/gopls"}, []string{"/repo/tools/gopls"}, nil, ""},
 		{"known name by path untrusted", false, goKey, ServerConfig{Command: "/repo/tools/gopls"}, nil, ErrRestricted, ""},
 		{"custom server untrusted", false, goKey, ServerConfig{Command: "/opt/my-go-server"}, nil, ErrRestricted, ""},
-		{"relative command", true, goKey, ServerConfig{Command: "bin/gopls"}, nil, nil, "set in Settings"},
-		{"missing command", true, goKey, ServerConfig{Command: "/opt/none"}, nil, nil, "set in Settings"},
+		{"relative command", true, goKey, ServerConfig{Command: "bin/gopls"}, nil, nil, "Settings ▸ Language Servers"},
+		{"missing command", true, goKey, ServerConfig{Command: "/opt/none"}, nil, nil, "Settings ▸ Language Servers"},
 		{"invalid args", true, goKey, ServerConfig{Args: []string{"a\nb"}}, nil, nil, "arguments"},
 	}
 	for _, tt := range tests {
@@ -130,13 +130,13 @@ func TestReconfigureRestartsServer(t *testing.T) {
 
 	root := t.TempDir()
 	m.Open(root, filepath.Join(root, "main.go"), "package main")
-	waitFor(t, func() bool { return count() == 1 && hasState(m, "initialize") })
+	waitFor(t, func() bool { return count() == 1 && hasState(m, "finish setting up") })
 	m.Reconfigure("go")
 	waitFor(t, func() bool { return count() == 2 })
 	m.Reconfigure("python") // other languages are left alone
 	disabled = true
 	m.Reconfigure("go")
-	waitFor(t, func() bool { return hasState(m, "disabled") })
+	waitFor(t, func() bool { return hasState(m, "turned off") })
 	if n := count(); n != 2 {
 		t.Errorf("server started %d times, want 2", n)
 	}

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { installFromFolder, loadExtensions, uninstallExtension, useExtensions } from './store'
 import { installFromCatalog, loadCatalog, useCatalog, type Entry } from './catalogStore'
-import { catalogRows, type CatalogRow, type CatalogStatus } from './catalogModel'
+import { catalogRows, sentence, type CatalogRow, type CatalogStatus } from './catalogModel'
 
 const STATUS_LABELS: Record<CatalogStatus, string> = {
   available: 'Not installed',
@@ -38,7 +38,7 @@ export function CatalogSection() {
         <button onClick={() => void installFromFolder()}>Install from Folder…</button>
         <button onClick={() => void loadExtensions(true)}>Reload Installed</button>
       </div>
-      {error && <p className="error">Couldn’t read the extensions repository: {error}</p>}
+      {error && <p className="error">{sentence(error)}</p>}
       {loading && !listing && <p className="muted settings-note">Fetching the extensions repository…</p>}
       {listing && rows.length === 0 && <p className="muted settings-note">The repository has no extensions.</p>}
       {rows.map((row) => (

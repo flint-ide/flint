@@ -25,6 +25,14 @@ export interface CatalogRow<E extends CatalogEntryLike> {
   readonly installedVersion: string
 }
 
+/** A message from Go as a sentence: capital first letter, final period. */
+export function sentence(message: string): string {
+  const s = message.trim()
+  if (!s) return s
+  const capital = s[0].toUpperCase() + s.slice(1)
+  return /[.!?…:]$/.test(capital) || capital.includes('\n') ? capital : `${capital}.`
+}
+
 /** Compares dotted versions numerically ("1.10.0" > "1.9"); a pre-release or build suffix is ignored. */
 export function compareVersions(a: string, b: string): number {
   const parts = (v: string) => v.replace(/^v/, '').split(/[-+]/)[0].split('.').map((p) => Number.parseInt(p, 10) || 0)

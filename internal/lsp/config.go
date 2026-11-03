@@ -40,7 +40,19 @@ const (
 )
 
 // ErrDisabled: the user turned the language's server off in Settings.
-var ErrDisabled = errors.New("language server disabled in Settings")
+var ErrDisabled = errors.New("language server is turned off in Settings ▸ Language Servers")
+
+// ErrNotInstalled: no server to run (none installed, or the configured one is
+// missing); the message itself says what to install or fix.
+var ErrNotInstalled = errors.New("language server not installed")
+
+type notInstalledError string
+
+func (e notInstalledError) Error() string        { return string(e) }
+func (e notInstalledError) Is(target error) bool { return target == ErrNotInstalled }
+
+// notInstalled is an ErrNotInstalled with a message for the user.
+func notInstalled(msg string) error { return notInstalledError(msg) }
 
 // customServerReason explains Restricted Mode for a server Flint doesn't know.
 const customServerReason = "a language server set in Settings may run the project's code"

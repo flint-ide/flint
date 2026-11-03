@@ -33,6 +33,8 @@ For each installed extension:
 - **Show Log**: what the extension wrote to its standard error, its log messages, and when Flint started and stopped it. The log is kept in memory (the last 256 KiB) until Flint quits.
 - **Uninstall…** stops the extension and deletes its folder after you confirm. Its settings stay in `settings.json` and any secrets it stored stay in the system keychain, so installing it again restores them.
 
+**Built-in** lists the parts of Flint you can switch off, such as Database. A switched-off one isn't started, and the change takes effect after a restart (see [features](../reference/settings.md#features)).
+
 **Reload Installed** reads the extensions folder again, for example after you rebuilt an extension you are writing.
 
 An extension with settings gets its own page in Settings, after Flint's pages, generated from its manifest. Values are checked against the manifest before they are saved, under `extensions` in [settings.json](../reference/settings.md#extensions).
@@ -54,7 +56,8 @@ What it asks **Flint** for is checked:
 - Its secrets are stored in the system keychain under its own name and are never in `settings.json`; it can't read another extension's.
 - An agent chat draft is only a draft: you send it.
 - Its tools for agents are read-only from Flint's point of view, are offered only to agents in trusted folders while Flint's MCP server is on (**Settings ▸ Agent Context**), and can be turned off per extension.
-- Its process gets a minimal environment: `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `TZ`, the locale and proxy variables, plus `FLINT_EXTENSION_ID`, `FLINT_EXTENSION_DIR` and `FLINT_VERSION`. Tokens and keys in Flint's own environment (such as `GITHUB_TOKEN`) are not passed.
+- Its process gets a minimal environment: `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `TZ`, the locale and proxy variables, plus `FLINT_EXTENSION_ID`, `FLINT_EXTENSION_DIR`, `FLINT_EXTENSION_DATA` (its own data folder) and `FLINT_VERSION`. Other variables, such as `KUBECONFIG`, reach it only when its manifest names them in `run.env`; the confirmation lists them. Tokens and keys in Flint's own environment (such as `GITHUB_TOKEN`) are not passed unless named there.
+- Opening terminal tabs (`terminal`) also needs a declared permission. A terminal it opens is a normal tab in a trusted folder, so you see what runs and can stop it.
 - Network hosts declared in its manifest (`network:<host>`) are shown so you know where it talks to, but Flint does not enforce them.
 
 Flint itself sends nothing about extensions anywhere. See [Privacy and security](../reference/privacy-and-security.md#extensions).

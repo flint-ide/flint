@@ -131,7 +131,7 @@ Flint never downloads or installs updates itself. See [Update check](../referenc
 
 ## Extensions
 
-Installed extensions, their state, permissions and log, with **Install from Folder…**, an on/off switch, **Use …** for each color theme and **Uninstall…**. See [Extensions](extensions.md) and [Use a theme from an extension](../how-to/customize-flint.md#use-a-theme-from-an-extension).
+The extensions of the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository with **Install…**, **Update…** and **Refresh Repository**, and the installed extensions, their state, permissions and log, with **Install from Folder…**, an on/off switch, **Use …** for each color theme and **Uninstall…**. See [Extensions](extensions.md) and [Use a theme from an extension](../how-to/customize-flint.md#use-a-theme-from-an-extension).
 
 ## Import
 

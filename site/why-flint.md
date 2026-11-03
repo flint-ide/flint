@@ -82,7 +82,7 @@ A rough guide, from Flint's point of view. Every tool here is good at what it wa
 
 ## When Flint isn't the right choice (yet)
 
-- **You rely on a particular extension.** Flint has no extension marketplace. New languages, agents and panels are added to Flint itself.
+- **You rely on a particular extension.** Flint has no extension marketplace: its [extensions](guides/extensions.md) come from one repository, [flint-ide/extensions](https://github.com/flint-ide/extensions), or from a folder, and there are only a few of them so far.
 - **You work on Windows or Linux.** Flint runs on macOS; Linux is in progress and Windows is planned.
 - **Your language isn't Go, TypeScript/JavaScript, Python or Rust.** Other languages get editing and search, but no language server out of the box.
 - **You want AI completion as you type, above all.** Flint has optional ghost-text completion from a local model, but its focus is agents, not completion.

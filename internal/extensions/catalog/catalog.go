@@ -41,7 +41,10 @@ const (
 )
 
 // ErrUnknown: no such folder in the repository.
-var ErrUnknown = errors.New("this extension is not in the extensions repository")
+var ErrUnknown = errors.New("this extension is no longer in the extensions repository. Click Refresh Repository to see what it offers now")
+
+// errGitMissing: Flint reads the repository with git.
+var errGitMissing = errors.New("Flint downloads extensions with git, and git isn't installed. Install it (on macOS, run `xcode-select --install` in Terminal; or `brew install git`), then click Refresh Repository")
 
 // Options configure a Catalog.
 type Options struct {
@@ -135,9 +138,17 @@ func (c *Catalog) Refresh(ctx context.Context) (Listing, error) {
 	c.files.Lock()
 	defer c.files.Unlock()
 	if err := c.fetch(ctx); err != nil {
-		return Listing{Source: c.o.URL, Entries: []Entry{}}, err
+		return Listing{Source: c.o.URL, Entries: []Entry{}}, fetchError(c.o.URL, err)
 	}
 	return c.read(ctx)
+}
+
+// fetchError says why the repository couldn't be downloaded and what to do.
+func fetchError(url string, err error) error {
+	if errors.Is(err, errGitMissing) {
+		return err
+	}
+	return fmt.Errorf("couldn't download the extensions repository from %s. Check your internet connection and that you can open that address in a browser, then click Refresh Repository. If you set FLINT_EXTENSIONS_REPO, check that address too. Details: %w", url, err)
 }
 
 // origin is the URL the clone was made from ("" without a clone).
@@ -247,12 +258,12 @@ func (c *Catalog) Prepare(ctx context.Context, folder string) (dir string, relea
 	}
 	e := l.Entries[i]
 	if e.Error != "" {
-		return "", nil, fmt.Errorf("%s: %s", e.Folder, e.Error)
+		return "", nil, fmt.Errorf("%s can't be installed because its description in the repository is broken (%s). Click Refresh Repository to get a fixed version, or report it to the extension's authors", e.Name, e.Error)
 	}
 	dir = filepath.Join(c.o.Dir, e.Folder)
 	if e.Program {
 		if _, statErr := os.Stat(filepath.Join(dir, "go.mod")); statErr == nil {
-			if err = c.goBuild(ctx, dir, e.command); err != nil {
+			if err = c.goBuild(ctx, dir, e.Name, e.command); err != nil {
 				return "", nil, err
 			}
 		} // else prebuilt, or another language: Install checks the program
@@ -261,13 +272,13 @@ func (c *Catalog) Prepare(ctx context.Context, folder string) (dir string, relea
 	return dir, func() { once.Do(c.files.RUnlock) }, nil
 }
 
-func (c *Catalog) goBuild(ctx context.Context, dir, command string) error {
+func (c *Catalog) goBuild(ctx context.Context, dir, name, command string) error {
 	out, err := buildTarget(dir, command)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s can't be installed because its description in the repository is broken (%w). Report it to the extension's authors", name, err)
 	}
 	c.o.Before()
-	goBin, err := findGo()
+	goBin, err := findGo(name)
 	if err != nil {
 		return err
 	}
@@ -276,8 +287,12 @@ func (c *Catalog) goBuild(ctx context.Context, dir, command string) error {
 	cmd := exec.CommandContext(ctx, goBin, "build", "-trimpath", "-o="+out, ".")
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
-	if b, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("go build in %s: %w\n%s", filepath.Base(dir), err, clip(b))
+	b, err := cmd.CombinedOutput()
+	switch {
+	case ctx.Err() == context.DeadlineExceeded:
+		return fmt.Errorf("building %s took longer than %s, so Flint stopped it. Check your internet connection (Go may be downloading what the extension needs), then click Install… again", name, buildTimeout)
+	case err != nil:
+		return fmt.Errorf("couldn't build %s with Go. Update Go (check `go version` in a terminal against the extension's go.mod), then click Install… again. If it still fails, report it to the extension's authors with these details:\n%s", name, clip(b))
 	}
 	return nil
 }
@@ -313,8 +328,9 @@ func buildTarget(dir, command string) (string, error) {
 	return out, nil
 }
 
-// findGo is the go command: on PATH, else the usual install locations.
-func findGo() (string, error) {
+// findGo is the go command: on PATH, else the usual install locations; name
+// is the extension being built, for the message.
+func findGo(name string) (string, error) {
 	if p, err := exec.LookPath("go"); err == nil {
 		return p, nil
 	}
@@ -323,7 +339,7 @@ func findGo() (string, error) {
 			return p, nil
 		}
 	}
-	return "", errors.New("this extension is built with Go, and the go command was not found: install Go (go.dev/dl) and try again")
+	return "", fmt.Errorf("%s is a program that Flint builds on your computer with Go, and Go isn't installed. Install Go from https://go.dev/dl (or `brew install go`), then click Install… again", name)
 }
 
 func (c *Catalog) git(ctx context.Context, dir string, args ...string) (string, error) {
@@ -338,7 +354,7 @@ func (c *Catalog) git(ctx context.Context, dir string, args ...string) (string, 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
-			return "", errors.New("git was not found: Flint needs git to read the extensions repository")
+			return "", errGitMissing
 		}
 		return "", fmt.Errorf("git %s: %w\n%s", args[0], err, clip(out))
 	}

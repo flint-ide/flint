@@ -47,6 +47,20 @@ var languageIDs = map[string][2]string{
 	".rs":  {"rust", "rust"},
 }
 
+// displayNames are how messages name Flint's own languages.
+var displayNames = map[string]string{"go": "Go", "typescript": "TypeScript and JavaScript", "python": "Python", "rust": "Rust"}
+
+// displayName is a language's name for people ("Python", not "python").
+func displayName(language string) string {
+	if n, ok := displayNames[language]; ok {
+		return n
+	}
+	if language == "" {
+		return "this language"
+	}
+	return strings.ToUpper(language[:1]) + language[1:]
+}
+
 // languageFor returns the server language and LSP languageId for a path.
 func languageFor(path string) (language, languageID string, ok bool) {
 	ids, ok := languageIDs[strings.ToLower(filepath.Ext(path))]

@@ -14,7 +14,7 @@ import (
 // (vtsls, tried first, uses its bundled TypeScript unless told otherwise.)
 
 // ErrRestricted: the folder isn't trusted and the server would run its code.
-var ErrRestricted = errors.New("Restricted Mode: trust this folder to start its language server")
+var ErrRestricted = errors.New("Restricted Mode: the language server isn't started in a folder you haven't trusted")
 
 // needsTrust are servers that execute the project's own code when they start:
 // rust-analyzer runs build scripts, proc macros and .cargo/config tools; the
@@ -35,7 +35,7 @@ func initializationOptions(bin string) (map[string]any, error) {
 	if ts := tsserverNextTo(bin); ts != "" {
 		return map[string]any{"tsserver": map[string]any{"path": ts}}, nil
 	}
-	return nil, errors.New("typescript-language-server: no TypeScript installed next to it, and the project's own is never used — run: npm i -g typescript-language-server typescript (or install vtsls)")
+	return nil, errors.New("typescript-language-server has no TypeScript installed next to it, and Flint never runs the project's own copy. Install both with `npm i -g typescript-language-server typescript` (or install vtsls with `npm i -g @vtsls/language-server`), then reopen the file")
 }
 
 // tslsPackage returns the typescript-language-server package directory bin

@@ -52,7 +52,7 @@ func startServer(ctx context.Context, language, root string, argv []string, onDi
 	s := &server{language: language, root: root, cmd: cmd, onDiag: onDiag, initOptions: initOptions}
 	cmd.Stderr = (*tailWriter)(s)
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("start %s: %w", argv[0], err)
+		return nil, fmt.Errorf("couldn't start the language server %s (%w). Check that it is installed and runs from a terminal, then reopen the file", argv[0], err)
 	}
 	s.conn = newConn(stdout, stdin, s.handle)
 	go func() { _ = cmd.Wait() }()
@@ -61,7 +61,7 @@ func startServer(ctx context.Context, language, root string, argv []string, onDi
 	defer cancel()
 	if err := s.initialize(ctx); err != nil {
 		s.kill()
-		return nil, fmt.Errorf("%s initialize: %w%s", argv[0], err, s.stderrTail())
+		return nil, fmt.Errorf("the language server %s started but didn't finish setting up (%w). Update it, or check its output below, then reopen the file%s", argv[0], err, s.stderrTail())
 	}
 	s.out = newOutbox(s.conn)
 	return s, nil

@@ -88,7 +88,7 @@ func Supported(path string) bool {
 func (m *Manager) Open(root, path, text string) Status {
 	language, languageID, ok := languageFor(path)
 	if !ok {
-		return Status{State: StateUnavailable, Message: "no language server for this file type"}
+		return Status{State: StateUnavailable, Message: "Flint has no language server for this file type, so there's no completion or go to definition here. An extension can add one: see Settings ▸ Extensions ▸ Repository"}
 	}
 	k := key{root: root, language: language}
 	m.mu.Lock()
@@ -263,7 +263,7 @@ func (m *Manager) request(ctx context.Context, path, method string, params, out 
 	}
 	err := e.srv.conn.Call(ctx, method, params, out)
 	if errors.Is(err, ErrClosed) {
-		return fmt.Errorf("%s language server stopped%s", e.srv.language, e.srv.stderrTail())
+		return fmt.Errorf("the %s language server stopped while answering; Flint restarts it, so try again in a moment%s", displayName(e.srv.language), e.srv.stderrTail())
 	}
 	return err
 }
@@ -282,7 +282,7 @@ func (m *Manager) ensureServerLocked(k key) *entry {
 			// Crashed: restart (a bounded number of times) and re-open its documents.
 			if m.restarts[k] >= maxRestarts {
 				e.srv.kill()
-				failed := failedEntry(fmt.Errorf("%s language server keeps crashing%s — reopen the folder to retry", k.language, e.srv.stderrTail()))
+				failed := failedEntry(fmt.Errorf("the %s language server crashed %d times in a row, so Flint stopped restarting it. Check that it runs from a terminal (or update it), then reopen the folder to try again%s", displayName(k.language), maxRestarts+1, e.srv.stderrTail()))
 				m.servers[k] = failed
 				return failed
 			}
@@ -353,7 +353,7 @@ func (m *Manager) commandFor(k key) ([]string, error) {
 		cfg = m.Config(k.language)
 	}
 	if cfg.Disabled {
-		return nil, fmt.Errorf("%s %w", k.language, ErrDisabled)
+		return nil, fmt.Errorf("the %s %w. Turn it on there to get completion and go to definition", displayName(k.language), ErrDisabled)
 	}
 	trusted := m.Trusted == nil || m.Trusted(k.root)
 	argv, custom, ok := spec.command(cfg, m.lookPath)
@@ -361,18 +361,19 @@ func (m *Manager) commandFor(k key) ([]string, error) {
 	if custom && !gated {
 		reason, gated = customServerReason, true
 	}
+	name := displayName(k.language)
 	switch {
 	case gated && !trusted:
-		return nil, fmt.Errorf("%w (%s)", ErrRestricted, reason)
+		return nil, fmt.Errorf("%w: %s. To get completion and go to definition for %s, run Trust Folder from the command palette (or click Trust Folder in the Restricted Mode banner)", ErrRestricted, reason, name)
 	case !ok && cfg.Command != "":
-		return nil, fmt.Errorf("no %s language server at %q (set in Settings)", k.language, cfg.Command)
+		return nil, notInstalled(fmt.Sprintf("the %s language server set in Settings ▸ Language Servers (%q) wasn't found. Fix the path there, or clear it to use an installed default server", name, cfg.Command))
 	case !ok:
-		return nil, fmt.Errorf("no %s language server installed — %s", k.language, spec.Install)
+		return nil, notInstalled(fmt.Sprintf("completion and go to definition for %s need a language server, and none is installed. Install one with: %s — then reopen the file", name, spec.Install))
 	case !trusted:
 		return argv, nil
 	}
 	if err := CheckArgs(cfg.Args); err != nil {
-		return nil, fmt.Errorf("%s language server arguments: %w", k.language, err)
+		return nil, fmt.Errorf("the %s language server arguments in Settings ▸ Language Servers are invalid (%w). Fix them there, then reopen the file", name, err)
 	}
 	return append(argv, cfg.Args...), nil
 }
@@ -442,7 +443,7 @@ func (m *Manager) statusFor(k key, e *entry) Status {
 		return st
 	}
 	switch {
-	case e.err != nil && (strings.HasPrefix(e.err.Error(), "no ") || errors.Is(e.err, ErrDisabled)):
+	case e.err != nil && (errors.Is(e.err, ErrNotInstalled) || errors.Is(e.err, ErrDisabled)):
 		st.State, st.Message = StateUnavailable, e.err.Error()
 	case e.err != nil:
 		st.State, st.Message = StateFailed, e.err.Error()

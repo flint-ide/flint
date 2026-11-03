@@ -8,6 +8,7 @@ import type { Entry, Listing } from '../../../bindings/flint/internal/extensions
 import { errorMessage } from '../../api/backend'
 import { showToast } from '../../store/dialog'
 import { loadExtensions } from './store'
+import { sentence } from './catalogModel'
 
 export type { Entry, Listing }
 
@@ -48,7 +49,7 @@ export async function installFromCatalog(folder: string): Promise<void> {
     showToast(`Installed ${info.name} ${info.version}`)
     await loadExtensions()
   } catch (err) {
-    showToast(`Not installed: ${errorMessage(err)}`, 'error')
+    showToast(`Not installed. ${sentence(errorMessage(err))}`, 'error')
   } finally {
     useCatalog.setState((s) => ({ busy: s.busy.filter((b) => b !== folder) }))
   }

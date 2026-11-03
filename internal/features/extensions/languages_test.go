@@ -42,3 +42,37 @@ func TestExtensionLanguages(t *testing.T) {
 		t.Errorf("plain = %+v", p)
 	}
 }
+
+func TestExtensionDebuggersAndRunners(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "bin", "adapter"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dbg := manifest.Debugger{
+		Type: "rdbg", Label: "Ruby (rdbg)", Languages: []string{"ruby"}, Launch: []byte(`{"script":"${file}"}`),
+		Adapter: &manifest.Server{Candidates: [][]string{{"rdbg", "--open"}, {"./bin/adapter"}, {"./bin/missing"}}, Install: "gem install debug"},
+	}
+	runners := []manifest.TestRunner{
+		{ID: "rspec", Label: "RSpec", Languages: []string{"ruby"}, Command: []string{"rspec", "${file}"}, Format: "tap"},
+		{ID: "gone", Label: "Gone", Languages: []string{"ruby"}, Command: []string{"./bin/missing"}},
+	}
+	infos := []host.Info{
+		{ID: "me.ruby", Dir: dir, Enabled: true, State: host.StateStopped, Debuggers: []manifest.Debugger{dbg}, TestRunners: runners},
+		{ID: "me.off", Dir: dir, Enabled: false, State: host.StateDisabled, Debuggers: []manifest.Debugger{dbg}, TestRunners: runners},
+		{ID: "me.broken", Dir: dir, Enabled: true, State: host.StateInvalid, Debuggers: []manifest.Debugger{dbg}},
+	}
+	ds := extensionDebuggers(infos)
+	if len(ds) != 1 || ds[0].Source != "me.ruby" || ds[0].Install != "gem install debug" || string(ds[0].Launch) != `{"script":"${file}"}` {
+		t.Fatalf("debuggers = %+v", ds)
+	}
+	if c := ds[0].Candidates; len(c) != 2 || c[0][0] != "rdbg" || c[0][1] != "--open" || !filepath.IsAbs(c[1][0]) {
+		t.Errorf("adapter candidates = %v", c)
+	}
+	rs := extensionRunners(infos)
+	if len(rs) != 1 || rs[0].ID != "rspec" || rs[0].Format != "tap" || rs[0].Source != "me.ruby" || rs[0].Command[1] != "${file}" {
+		t.Errorf("runners = %+v", rs)
+	}
+}

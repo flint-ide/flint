@@ -213,6 +213,37 @@ An extension can teach Flint a language it doesn't know: which files are in it, 
 
 Flint's own languages (Go, TypeScript and JavaScript, Python, Rust, and the formats it highlights) always win: an extension can't take over their files.
 
+## 11. A debugger and a test runner
+
+An extension can debug and test files of a language: yours from section 10, or another one, such as Python. Both are data that name programs to run, so they need no program of their own either.
+
+```json
+"debuggers": [{
+  "type": "ruby-rdbg",
+  "label": "Ruby (rdbg)",
+  "languages": ["ruby"],
+  "adapter": {
+    "candidates": [["rdbg", "--open", "--command"], ["./bin/adapter"]],
+    "install": "gem install debug"
+  },
+  "launch": { "type": "rdbg", "request": "launch", "script": "${file}", "cwd": "${workspaceFolder}" }
+}],
+"testRunners": [{
+  "id": "rspec",
+  "label": "RSpec",
+  "languages": ["ruby"],
+  "command": ["bundle", "exec", "rspec", "${file}"],
+  "format": "plain"
+}]
+```
+
+- **`debuggers`**: a debug adapter that speaks the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) on its standard input and output. Flint runs the first of the **`adapter.candidates`** it finds (a name on `PATH`, or a `./` path inside your extension's folder, as for language servers) and shows **`install`** when none is installed. It sends `initialize` with `type` as the adapter id, then `launch` with **`launch`** as its arguments, then the breakpoints and `configurationDone`. **`launch`** is a JSON object of at most 16 KiB. Flint's debugger works as it does for Go: breakpoints, stepping, the call stack, variables and the debug console.
+- **`testRunners`**: **`command`** is the program and its arguments. Flint runs it in the project folder, without a shell. **`format`** is `tap` (Flint reads the results of each test from [TAP](https://testanything.org/) on standard output) or `plain` (only the exit code counts: 0 passed).
+- **Variables** in launch strings and command arguments: `${file}` (the file's absolute path), `${fileBasename}`, `${fileDirname}` and `${workspaceFolder}` (the project folder). In a command, an argument that is exactly `${tests}` becomes the names of the tests to run, one argument each, or nothing when the whole file runs (a TAP runner's results can be run again one by one). Any other `${…}` refuses the manifest.
+- **`languages`** are language ids, the `id` of a language from section 10 or one of Flint's own (`python`, `rust`). Flint debugs Go and runs Go and JavaScript/TypeScript tests itself, so a debugger for `go`, or a test runner for `go` or `typescript`, is ignored. When two extensions offer one for the same language, the first by extension id is used.
+
+The user runs them with **Debug File** and **Run Tests in File** in the command palette, the run configuration menu in the toolbar, or a file's context menu in the sidebar. Both run the project's code, so they start only in [trusted folders](../guides/restricted-mode.md), and the install confirmation lists the programs they start.
+
 ## Checklist before you share an extension
 
 - The manifest has `contract`, a `publisher.name` id, `name` and a `major.minor.patch` version.

@@ -2,6 +2,7 @@ package dap
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -50,12 +51,30 @@ func (m *Manager) StartGo(ctx context.Context, id string, env []string, cfg Laun
 	if err != nil {
 		return err
 	}
+	m.track(id, s)
+	return nil
+}
+
+// StartAdapter debugs with an extension's adapter (see StartAdapter). A
+// session already running under id is stopped first.
+func (m *Manager) StartAdapter(ctx context.Context, id string, a Adapter, args json.RawMessage, breakpoints map[string][]SourceBreakpoint) error {
+	m.Stop(id)
+	s, err := StartAdapter(ctx, a, args, breakpoints, func(e Event) { m.events.Event(id, e) })
+	if err != nil {
+		return err
+	}
+	m.track(id, s)
+	return nil
+}
+
+// track keeps s under id until its adapter exits.
+func (m *Manager) track(id string, s *Session) {
 	m.mu.Lock()
 	m.sessions[id] = s
 	m.mu.Unlock()
 	go func() {
 		<-s.Done()
-		s.kill() // dlv exited on its own: release the connection
+		s.kill() // the adapter exited on its own: release the connection
 		m.mu.Lock()
 		if m.sessions[id] == s {
 			delete(m.sessions, id)
@@ -63,7 +82,6 @@ func (m *Manager) StartGo(ctx context.Context, id string, env []string, cfg Laun
 		m.mu.Unlock()
 		m.events.Ended(id)
 	}()
-	return nil
 }
 
 // Get returns the session running under id.

@@ -28,6 +28,7 @@ In an untrusted folder, Flint:
 | Custom ACP agents | Don't start; Flint asks you to trust the folder | Flint can't tell an arbitrary agent to ignore the project's configuration (its settings, MCP servers, hooks) |
 | Project prompts (`.flint/prompts`) | Listed as "untrusted repo"; can't replace a built-in or personal prompt | A repository could otherwise swap the text behind `/review` for instructions you didn't write ([details](ai-agents.md#prompts-in-restricted-mode)) |
 | Language servers set in Settings | A server Flint doesn't know doesn't start; extra arguments are left out | Flint can't tell what another server runs |
+| Language servers, debuggers and test runners from extensions | Don't start; **Debug File** and **Run Tests in File** say to trust the folder | They are programs Flint doesn't know, and debuggers and test runners run the project's code |
 | Git | Runs without hooks, even on commit and push | Hooks are programs from the repository |
 
 Everything else works: browsing, editing, `⌘P`, search, diffs, blame, the Go and TypeScript language servers, and the Markdown preview.

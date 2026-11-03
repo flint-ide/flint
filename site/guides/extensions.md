@@ -1,6 +1,6 @@
 # Extensions
 
-An extension is a separate program that adds commands, a sidebar panel, a Settings page, status bar items and tools for agents to Flint. It can be written in any language. Flint draws everything an extension shows with its own components, from data the extension sends: an extension never runs code inside Flint's window.
+An extension is a separate program that adds commands, a sidebar panel, a Settings page, status bar items and tools for agents to Flint. It can be written in any language. Some extensions are only data: color themes, or a programming language with its language server, debugger and test runner (**Debug File** and **Run Tests in File** in the command palette use them). Flint draws everything an extension shows with its own components, from data the extension sends: an extension never runs code inside Flint's window.
 
 There is no marketplace. **Settings ▸ Extensions** lists every extension of the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository, and you can also install one from a folder on your disk. Either way, Flint shows you what it is and what it asks for first. To write one, see [Write an extension](../extensions/write-an-extension.md).
 

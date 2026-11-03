@@ -10,6 +10,7 @@ import (
 	"flint/internal/mcptools"
 	"flint/internal/runconfig"
 	"flint/internal/runner"
+	"flint/internal/shellenv"
 	"flint/internal/testrun"
 )
 
@@ -214,7 +215,14 @@ func (r *RunAPI) Start(id, root string, cfg runconfig.Config, cols, rows int) er
 // StartTests runs tests under id and returns the run's title. Results stream
 // as RunEvent.Tests.
 func (r *RunAPI) StartTests(id string, req testrun.Request) (string, error) {
-	plan, err := testrun.PlanRun(req)
+	var plan testrun.Plan
+	var err error
+	if req.Lang == testrun.LangExt {
+		shellenv.Wait() // PATH from the login shell, to find the runner
+		plan, err = r.app.planExtensionTests(req)
+	} else {
+		plan, err = testrun.PlanRun(req)
+	}
 	if err != nil {
 		return "", err
 	}

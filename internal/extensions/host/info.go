@@ -43,6 +43,9 @@ type Info struct {
 	// Languages are the programming languages it adds (files, comments,
 	// language server, highlighting grammar).
 	Languages []manifest.Language `json:"languages"`
+	// Debuggers and TestRunners debug and test files of some languages.
+	Debuggers   []manifest.Debugger   `json:"debuggers"`
+	TestRunners []manifest.TestRunner `json:"testRunners"`
 }
 
 // StatusItemInfo is a contributed status item with its last text.
@@ -68,6 +71,7 @@ func (e *ext) info() Info {
 		ID: e.id, Name: e.id, Dir: e.dir, Enabled: e.h.o.App.Enabled(e.id), State: e.state(),
 		Warnings: []string{}, Permissions: []string{}, PermissionTexts: []string{}, Commands: []manifest.Command{}, Panels: []manifest.Panel{},
 		StatusItems: []StatusItemInfo{}, AgentTools: []ToolInfo{}, Themes: []manifest.Theme{}, TabViews: []manifest.TabView{}, Languages: []manifest.Language{},
+		Debuggers: []manifest.Debugger{}, TestRunners: []manifest.TestRunner{},
 	}
 	if e.m == nil {
 		in.Error = errText(e.loadErr)
@@ -89,6 +93,8 @@ func (e *ext) info() Info {
 	in.Panels = slices.Clone(m.Contributes.Panels)
 	in.TabViews = slices.Clone(m.Contributes.TabViews)
 	in.Languages = slices.Clone(m.Contributes.Languages)
+	in.Debuggers = slices.Clone(m.Contributes.Debuggers)
+	in.TestRunners = slices.Clone(m.Contributes.TestRunners)
 	in.Settings = m.Contributes.Settings
 	for _, k := range m.Contributes.Unsupported {
 		in.Warnings = append(in.Warnings, "contributes."+k+" is not supported by this version of Flint and is ignored")

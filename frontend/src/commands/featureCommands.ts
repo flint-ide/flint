@@ -25,6 +25,7 @@ import {
 import {
   canDebug,
   debugSelected,
+  debugFile,
   debugStep,
   debugTestsInFile,
   isDebugging,
@@ -46,6 +47,7 @@ import {
 import {
   configKey,
   editRunConfig,
+  extensionTestFile,
   failedTests,
   fixFailedTestsWithAgent,
   newRunConfig,
@@ -59,6 +61,8 @@ import {
   stopRun,
   useRun,
 } from '../store/run'
+
+import { extensionDebuggerFor } from '../lib/extensionTools'
 
 // ⌃R in a shell is reverse history search; leave it there.
 const IN_TERMINAL = '.terminal-view'
@@ -223,7 +227,7 @@ function runCommands(): Command[] {
     { id: 'run.stop', title: 'Stop', category: 'Run', keys: 'Mod+F2', keywords: 'kill terminate', when: running, run: () => stopRun() },
     { id: 'run.edit', title: 'Edit Configurations…', category: 'Run', keywords: 'run.json settings', when: () => !!selectedRunConfig(), run: () => editRunConfig() },
     { id: 'run.new', title: 'Add Configuration…', category: 'Run', keywords: 'new run.json', run: () => newRunConfig() },
-    { id: 'test.file', title: 'Run Tests in File', category: 'Run', when: testFile, run: () => runTestsInFile(filePath()!) },
+    { id: 'test.file', title: 'Run Tests in File', category: 'Run', when: () => testFile() || extensionTestFile(filePath()), run: () => runTestsInFile(filePath()!) },
     { id: 'test.package', title: 'Run Package Tests', category: 'Run', keywords: 'directory folder', when: testFile, run: () => runTestsInPackage(filePath()!) },
     { id: 'test.rerunFailed', title: 'Rerun Failed Tests', category: 'Run', when: hasFailures, run: () => rerunFailedTests() },
     {
@@ -269,6 +273,11 @@ function debugCommands(): Command[] {
     {
       id: 'debug.testsInFile', title: 'Debug Tests in File', category: 'Debug', keywords: 'dlv delve',
       when: () => testFile() && goFile(), run: () => debugTestsInFile(filePath()!),
+    },
+    {
+      // A debugger an extension adds for the file's language.
+      id: 'debug.file', title: 'Debug File', category: 'Debug', keywords: 'extension debugger breakpoint',
+      when: () => !!extensionDebuggerFor(filePath() ?? ''), run: () => debugFile(filePath()!),
     },
     { id: 'debug.resume', title: 'Resume Program', category: 'Debug', keys: 'F9', keywords: 'continue', when: isPaused, run: () => debugStep('continue') },
     { id: 'debug.stepOver', title: 'Step Over', category: 'Debug', keys: 'F8', keywords: 'next', when: isPaused, run: () => debugStep('next') },

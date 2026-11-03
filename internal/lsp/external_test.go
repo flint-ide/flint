@@ -92,3 +92,21 @@ func TestExtensionServerNeedsATrustedFolder(t *testing.T) {
 	m.Retrust(root)
 	waitFor(t, func() bool { _, err := os.Stat(marker); return err == nil })
 }
+
+func TestLanguageOfCoversLanguagesWithoutServer(t *testing.T) {
+	setLanguages(t,
+		ExtensionLanguage{Language: "ruby", Label: "Ruby", Extensions: []string{".rb"}, Source: "me.ruby"},
+		ExtensionLanguage{Language: "mygo", Label: "My Go", Extensions: []string{".go"}, Source: "me.mygo"},
+	)
+	for _, tc := range []struct{ path, language, label string }{
+		{"/p/a.rb", "ruby", "Ruby"}, // no server, still a language
+		{"/p/main.go", "go", "Go"},  // Flint's own wins
+		{"/p/x.py", "python", "Python"},
+		{"/p/x.txt", "", ""},
+	} {
+		language, label, ok := LanguageOf(tc.path)
+		if language != tc.language || label != tc.label || ok != (tc.language != "") {
+			t.Errorf("LanguageOf(%s) = %q, %q, %v", tc.path, language, label, ok)
+		}
+	}
+}

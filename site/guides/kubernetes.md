@@ -4,8 +4,10 @@ Kubernetes is an extension now, not part of Flint itself. It adds a Kubernetes p
 
 ## Install it
 
-1. Get the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository and build its `kubernetes/` folder as the README there describes (`go build -o kubernetes-ext .` in that folder).
-2. Run **Install Extension from Folder…** from the command palette and pick the `kubernetes/` folder. See [Install an extension](extensions.md#install-an-extension).
+1. Open **Settings ▸ Extensions** and find the Kubernetes extension under **Repository**.
+2. Click **Install…**. Flint builds it with `go build` (Go must be installed) and shows its program, permissions and agent tools. Click **Install**.
+
+**Update…** appears there when the repository has a newer version. To install from a folder instead, build the `kubernetes/` folder of [flint-ide/extensions](https://github.com/flint-ide/extensions) (`go build -o kubernetes-ext .`) and run **Install Extension from Folder…**. See [Install an extension](extensions.md#install-an-extension).
 
 The extension needs `kubectl`. It gets `KUBECONFIG` (and, for EKS, the AWS variables) of your environment because its manifest names them (`run.env`); the install dialog lists them.
 

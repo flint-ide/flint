@@ -4,8 +4,10 @@ AWS Profiles is an extension now, not part of Flint itself. It adds an AWS Profi
 
 ## Install it
 
-1. Get the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository and build its `aws/` folder as the README there describes (`go build -o aws-ext .` in that folder).
-2. Run **Install Extension from Folder…** from the command palette and pick the `aws/` folder. See [Install an extension](extensions.md#install-an-extension).
+1. Open **Settings ▸ Extensions** and find the AWS Profiles extension under **Repository**.
+2. Click **Install…**. Flint builds it with `go build` (Go must be installed) and shows its program and permissions. Click **Install**.
+
+**Update…** appears there when the repository has a newer version. To install from a folder instead, build the `aws/` folder of [flint-ide/extensions](https://github.com/flint-ide/extensions) (`go build -o aws-ext .`) and run **Install Extension from Folder…**. See [Install an extension](extensions.md#install-an-extension).
 
 The extension needs the AWS CLI (`brew install awscli`), and `saml2aws` if you use it. It gets `AWS_CONFIG_FILE` and the related variables of your environment because its manifest names them (`run.env`); the install dialog lists them.
 

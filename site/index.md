@@ -54,7 +54,7 @@ See [Databases](guides/databases.md) and [HTTP client](guides/http-client.md).
 
 ### Infrastructure
 
-These come as [extensions](guides/extensions.md) you install from [flint-ide/extensions](https://github.com/flint-ide/extensions):
+These come as [extensions](guides/extensions.md) from [flint-ide/extensions](https://github.com/flint-ide/extensions), which you install in **Settings ▸ Extensions**:
 
 - Kubernetes apps with rollout state, pod problems, events and *Diagnose with AI*.
 - AWS profiles with credential status and one-click refresh.

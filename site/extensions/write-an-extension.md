@@ -78,7 +78,7 @@ Run **Install Extension from Folder…** from the command palette and pick the `
 - The **Hello** panel is on the activity bar. Opening it sends `view/resolve`.
 - **Settings ▸ Extensions ▸ Show Log** shows when Flint started the program and everything it wrote to standard error.
 
-After you change the program, reinstall the folder (Flint replaces the old copy), or edit the installed copy and click **Reload**. Five idle minutes after its last request, Flint stops the program; the next use starts it again.
+After you change the program, reinstall the folder (Flint replaces the old copy), or edit the installed copy and click **Reload Installed** in Settings ▸ Extensions. Five idle minutes after its last request, Flint stops the program; the next use starts it again.
 
 ## 4. A tree, with actions
 
@@ -155,6 +155,9 @@ Requests your program can send to Flint, each needing a permission declared in t
 | `secrets/get`, `secrets/set`, `secrets/delete` | `secrets` | Keeps a token or password in the system keychain |
 | `agent/ask` | `agent.ask` | Writes a draft in the agent chat for the user to send |
 | `window/openUrl` | none | Opens an `http(s)` link in the browser (Flint asks the user the first time per site) |
+| `window/openTerminal` | `terminal` | Opens a terminal tab in a trusted project folder that runs a command you give |
+
+Your program also gets a private folder for its own data in `FLINT_EXTENSION_DATA`, and the variables of the user's environment it names in the manifest's `run.env` (for example `["KUBECONFIG"]`). For a panel or tab drawn by your own HTML, see [Webviews](protocol.md#webviews) and the [`notes`](https://github.com/flint-ide/flint/tree/main/examples/extensions/notes) example.
 
 A request without its permission fails with error `-32001`. The user sees the permissions when installing, so ask only for what you need. If your program talks to the network, declare `network:<host>` so users know where; Flint shows it but can't enforce it.
 
@@ -181,3 +184,4 @@ A theme is data, so it needs no program: an extension with only `themes` (and se
 - Nothing but protocol messages on standard output; one message is at most 4 MiB.
 - The program exits when its standard input closes.
 - Build the program for both macOS and Linux if you can, using `run.darwin` and `run.linux` for separate binaries.
+- Run the contract checker from a Flint checkout: `go run ./cmd/flint-extcheck path/to/hello`. It checks the manifest and webview files with Flint's own code, then starts the program, sends `initialize`, resolves every declarative panel and lists the agent tools. The [flint-ide/extensions](https://github.com/flint-ide/extensions) repository runs it in CI; a Go extension there is built by Flint on the user's machine when they install it from Settings ▸ Extensions.

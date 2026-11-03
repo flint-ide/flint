@@ -124,7 +124,7 @@ The check only runs each tool's version command, outside your projects, and inst
 | `dlv` (Delve) | The Go debugger (`go install github.com/go-delve/delve/cmd/dlv@latest`). |
 | `node` (`brew install node`) | Only needed for the language servers installed with `npm`. |
 
-The Docker, Kubernetes and AWS Profiles extensions need `docker`, `kubectl` and `aws` respectively; see [Docker](guides/docker.md), [Kubernetes](guides/kubernetes.md) and [AWS](guides/aws.md).
+Installing an extension written in Go from Settings ▸ Extensions needs `go` (`brew install go`), since Flint builds it on your machine. The Docker, Kubernetes and AWS Profiles extensions need `docker`, `kubectl` and `aws` respectively; see [Docker](guides/docker.md), [Kubernetes](guides/kubernetes.md) and [AWS](guides/aws.md).
 
 > **Note:** The Go debugger also needs macOS developer mode: run `sudo DevToolsSecurity -enable` once. On Linux, the install commands the Tools window shows are the Debian/Ubuntu (`apt`), npm or snap ones; use your distribution's packages where they differ.
 

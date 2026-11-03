@@ -4,8 +4,10 @@ Docker is an extension now, not part of Flint itself. It adds a Docker panel wit
 
 ## Install it
 
-1. Get the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository and build its `docker/` folder as the README there describes (`go build -o docker-ext .` in that folder).
-2. Run **Install Extension from Folder…** from the command palette and pick the `docker/` folder. See [Install an extension](extensions.md#install-an-extension).
+1. Open **Settings ▸ Extensions** and find the Docker extension under **Repository**.
+2. Click **Install…**. Flint builds it with `go build` (Go must be installed) and shows its program and permissions. Click **Install**.
+
+**Update…** appears there when the repository has a newer version. To install from a folder instead, build the `docker/` folder of [flint-ide/extensions](https://github.com/flint-ide/extensions) (`go build -o docker-ext .`) and run **Install Extension from Folder…**. See [Install an extension](extensions.md#install-an-extension).
 
 The extension needs the `docker` CLI and a running engine (Docker Desktop, Colima, OrbStack or a plain daemon). It gets `DOCKER_HOST` and the related variables of your environment because its manifest names them (`run.env`); the install dialog lists them.
 

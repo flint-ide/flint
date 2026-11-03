@@ -20,6 +20,7 @@ Apart from the update check, data leaves your Mac only when you do something tha
 | Help ▸ Report an Issue… | A prefilled issue that you review in your browser before submitting | GitHub, only when you submit |
 | HTTP client | The request you send | The server in the request |
 | Databases, and the Kubernetes, AWS and Docker extensions | The commands and queries you run | Your servers and cloud accounts, through your own credentials |
+| Settings ▸ Extensions (when first opened, and **Refresh Repository**) | A `git` clone or fetch of the extensions repository, with your own git credentials | GitHub (`github.com/flint-ide/extensions`), or the URL in `FLINT_EXTENSIONS_REPO` |
 | Markdown preview | Requests for remote images, only after you click **Load remote images** | The image hosts |
 | Update check (on its own once a day, or Help ▸ Check for Updates…) | One anonymous request for the latest release, described below | GitHub's API (`api.github.com`) |
 
@@ -54,13 +55,13 @@ Query history masks passwords in `CREATE/ALTER ROLE … PASSWORD` and ClickHouse
 
 ## Extensions
 
-[Extensions](../guides/extensions.md) are programs you install yourself, from a folder, after a confirmation that shows the program, its permissions and the tools it offers agents. Flint never installs, updates or enables one on its own, and sends nothing about them anywhere.
+[Extensions](../guides/extensions.md) are programs you install yourself, from the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository in Settings ▸ Extensions or from a folder, after a confirmation that shows the program, its permissions and the tools it offers agents. Flint never installs, updates or enables one on its own, and sends nothing about them anywhere.
 
 - An extension runs with your user's permissions. Flint can't confine the program itself, so install only extensions you trust.
-- Flint checks what an extension asks of it against the permissions in its manifest: reading files (`workspace.read`), keychain secrets (`secrets`), agent chat drafts (`agent.ask`). It never passes folders in Restricted Mode, never returns files inside `.git` or credential files such as `.env`, and asks before the first link an extension opens to each site.
+- Flint checks what an extension asks of it against the permissions in its manifest: reading files (`workspace.read`), keychain secrets (`secrets`), agent chat drafts (`agent.ask`), terminal tabs (`terminal`). It never passes folders in Restricted Mode, never returns files inside `.git` or credential files such as `.env`, and asks before the first link an extension opens to each site.
 - Declared network hosts (`network:<host>`) are shown, not enforced.
 - An extension's secrets are in the keychain (service `flint-extensions`, account `<id>:<key>`), never in `settings.json`, and one extension can't read another's.
-- Its process gets a minimal environment, without tokens or keys from Flint's own environment, and runs in its own process group, which Flint kills when it stops it or quits.
+- Its process gets a minimal environment, plus only the variables its manifest names in `run.env` (the confirmation lists them), so no tokens or keys from Flint's own environment unless named there, and runs in its own process group, which Flint kills when it stops it or quits.
 - Its tools for agents are offered only in trusted folders while Flint's MCP server is on, and can be turned off per extension.
 - Everything it shows is drawn by Flint from plain data; it can't run code in Flint's window.
 
@@ -70,7 +71,7 @@ Query history masks passwords in `CREATE/ALTER ROLE … PASSWORD` and ClickHouse
 - Markdown, pull request descriptions and comments are rendered without raw HTML, and `javascript:` links are dropped.
 - HTTP response bodies are shown as text in a read-only editor, never rendered as HTML.
 - Names that come from the UI or from tool output (containers, contexts, namespaces, pods) are validated before Flint passes them to a command.
-- Extensions are installed only from a folder you pick, after a dialog that Flint's native code shows (code in the window can't answer it) with the extension's program and permissions. What an extension adds is data that Flint draws with its own components: it can't run code in the window. Its theme colors pass the same check as an imported theme (known color names, hex values only). Symlinks inside an extension's folder are refused when it is installed.
+- Extensions are installed only when you choose to, from the extensions repository or a folder you pick, after a dialog that Flint's native code shows (code in the window can't answer it) with the extension's program and permissions. What an extension adds is data that Flint draws with its own components: it can't run code in the window. Its theme colors pass the same check as an imported theme (known color names, hex values only). Symlinks inside an extension's folder are refused when it is installed.
 
 ## Reporting a vulnerability
 

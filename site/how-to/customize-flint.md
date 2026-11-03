@@ -39,7 +39,7 @@ System follows the macOS appearance and switches with it. Custom lays the theme'
 An extension can bring color themes: colors for the interface, the editor and the terminal. It is a folder with a `flint-extension.json` manifest, and it needs no program.
 
 1. Press `⌘,` and open **Extensions**, or run "Install Extension from Folder…" from the command palette.
-2. Choose **Install from Folder…** and pick the extension's folder. Flint shows its name, what it adds and, if it has one, its program and permissions. Choose **Install** to copy it into Flint's extensions folder (`~/Library/Application Support/flint/extensions/<id>`).
+2. For a theme from the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository, click **Install…** next to it under **Repository**; a theme needs no build. Otherwise choose **Install from Folder…** and pick the extension's folder. Flint shows its name, what it adds and, if it has one, its program and permissions. Choose **Install** to copy it into Flint's extensions folder (`~/Library/Application Support/flint/extensions/<id>`).
 3. Choose one of its themes, either with **Use …** on the extension or under **Color theme** in **Appearance**.
 
 The theme becomes your **Custom** theme, so it stays even if you uninstall the extension, and choosing another theme replaces it. Flint checks an extension's colors with the same rules as an imported theme: only the names Flint knows and plain hex colors. A manifest with anything else isn't installed, and Settings ▸ Extensions says why.

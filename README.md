@@ -75,7 +75,7 @@ The full reference, with every detail and all keyboard shortcuts, is in [docs/FE
 **Terminals**
 - Real PTYs with your login shell, WebGL rendering, clickable `path:line`, and terminals that come back after a restart
 
-**Infrastructure** (extensions from [flint-ide/extensions](https://github.com/flint-ide/extensions), installed with **Install Extension from Folder…**)
+**Infrastructure** (extensions from [flint-ide/extensions](https://github.com/flint-ide/extensions), installed from **Settings ▸ Extensions**)
 - Docker / Compose: projects, services and containers with logs, shell and lifecycle actions
 - Kubernetes: context and namespace picker that never changes your global context; apps grouped by Flux, Argo CD, Helm or labels, with rollout state, pod problems, events, and *Diagnose with AI*
 - AWS profiles: SSO and session credential status and expiry, one-click refresh, terminals per profile

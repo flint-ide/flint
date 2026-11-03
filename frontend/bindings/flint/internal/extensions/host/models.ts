@@ -122,6 +122,12 @@ export class Info {
      */
     "themes": manifest$0.Theme[];
 
+    /**
+     * Languages are the programming languages it adds (files, comments,
+     * language server, highlighting grammar).
+     */
+    "languages": manifest$0.Language[];
+
     /** Creates a new Info instance. */
     constructor($$source: Partial<Info> = {}) {
         if (!("id" in $$source)) {
@@ -187,6 +193,9 @@ export class Info {
         if (!("themes" in $$source)) {
             this["themes"] = [];
         }
+        if (!("languages" in $$source)) {
+            this["languages"] = [];
+        }
 
         Object.assign(this, $$source);
     }
@@ -205,6 +214,7 @@ export class Info {
         const $$createField18_0 = $$createType10;
         const $$createField19_0 = $$createType12;
         const $$createField20_0 = $$createType14;
+        const $$createField21_0 = $$createType16;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("warnings" in $$parsedSource) {
             $$parsedSource["warnings"] = $$createField10_0($$parsedSource["warnings"]);
@@ -235,6 +245,9 @@ export class Info {
         }
         if ("themes" in $$parsedSource) {
             $$parsedSource["themes"] = $$createField20_0($$parsedSource["themes"]);
+        }
+        if ("languages" in $$parsedSource) {
+            $$parsedSource["languages"] = $$createField21_0($$parsedSource["languages"]);
         }
         return new Info($$parsedSource as Partial<Info>);
     }
@@ -285,8 +298,8 @@ export class Item {
      * Creates a new Item instance from a string or object.
      */
     static createFrom($$source: any = {}): Item {
-        const $$createField6_0 = $$createType16;
-        const $$createField7_0 = $$createType18;
+        const $$createField6_0 = $$createType18;
+        const $$createField7_0 = $$createType20;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("actions" in $$parsedSource) {
             $$parsedSource["actions"] = $$createField6_0($$parsedSource["actions"]);
@@ -415,8 +428,8 @@ export class View {
      * Creates a new View instance from a string or object.
      */
     static createFrom($$source: any = {}): View {
-        const $$createField1_0 = $$createType20;
-        const $$createField3_0 = $$createType16;
+        const $$createField1_0 = $$createType22;
+        const $$createField3_0 = $$createType18;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("items" in $$parsedSource) {
             $$parsedSource["items"] = $$createField1_0($$parsedSource["items"]);
@@ -444,9 +457,11 @@ const $$createType11 = manifest$0.TabView.createFrom;
 const $$createType12 = $Create.Array($$createType11);
 const $$createType13 = manifest$0.Theme.createFrom;
 const $$createType14 = $Create.Array($$createType13);
-const $$createType15 = Action.createFrom;
+const $$createType15 = manifest$0.Language.createFrom;
 const $$createType16 = $Create.Array($$createType15);
-const $$createType17 = CommandRef.createFrom;
-const $$createType18 = $Create.Nullable($$createType17);
-const $$createType19 = Item.createFrom;
-const $$createType20 = $Create.Array($$createType19);
+const $$createType17 = Action.createFrom;
+const $$createType18 = $Create.Array($$createType17);
+const $$createType19 = CommandRef.createFrom;
+const $$createType20 = $Create.Nullable($$createType19);
+const $$createType21 = Item.createFrom;
+const $$createType22 = $Create.Array($$createType21);

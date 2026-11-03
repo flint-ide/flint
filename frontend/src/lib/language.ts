@@ -1,5 +1,6 @@
 import type { Extension } from '@codemirror/state'
 import { StreamLanguage, type StreamParser } from '@codemirror/language'
+import { commentTokens, compileGrammar, extensionLanguageFor, type LanguageSpec } from './extensionLanguages'
 
 type Loader = () => Promise<Extension>
 
@@ -63,9 +64,31 @@ export function extensionOf(path: string): string {
   return dot > 0 ? base.slice(dot + 1).toLowerCase() : ''
 }
 
-/** Loads the CodeMirror language support for a file path (empty extension if unknown). */
+/** Loads the CodeMirror language support for a file path: Flint's own, else an extension's (empty extension if unknown). */
 export async function languageFor(path: string): Promise<Extension> {
   const base = path.split('/').pop() ?? ''
   const loader = byName[base] ?? (base.startsWith('Dockerfile') ? byName.Dockerfile : undefined) ?? (base.startsWith('.env') ? byName['.env'] : undefined) ?? byExtension[extensionOf(path)]
-  return loader ? loader() : []
+  if (loader) return loader()
+  const spec = extensionLanguageFor(path)
+  return spec ? extensionLanguage(spec) : []
+}
+
+/** An extension's language: its grammar as a simple mode with its comment syntax, or only the comment syntax. */
+async function extensionLanguage(spec: LanguageSpec): Promise<Extension> {
+  const states = compileGrammar(spec.grammar)
+  const languageData = { commentTokens: commentTokens(spec) }
+  if (states) {
+    const { simpleMode } = await import('@codemirror/legacy-modes/mode/simple-mode')
+    // simpleMode takes languageData beside the states; its type leaves it out.
+    const parser = simpleMode({ ...states, languageData } as unknown as Parameters<typeof simpleMode>[0])
+    return StreamLanguage.define({ ...parser, name: spec.id })
+  }
+  return StreamLanguage.define<null>({
+    name: spec.id,
+    token: (stream) => {
+      stream.skipToEnd()
+      return null
+    },
+    languageData,
+  })
 }

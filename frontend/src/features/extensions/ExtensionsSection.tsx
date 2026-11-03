@@ -102,6 +102,23 @@ function ExtensionCard({ info }: { info: Info }) {
               </dd>
             </>
           )}
+          {(info.languages?.length ?? 0) > 0 && (
+            <>
+              <dt>Languages</dt>
+              <dd>
+                {info.languages.map((l) => (
+                  <div key={l.id}>
+                    {l.label} <span className="muted">({[...(l.extensions ?? []), ...(l.filenames ?? [])].join(', ')})</span>
+                    {l.server && (
+                      <div className="muted">
+                        Language server: <code>{l.server.candidates.map((c) => c.join(' ')).join(' | ')}</code> (in trusted folders)
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </dd>
+            </>
+          )}
           <dt>Permissions</dt>
           <dd>{info.permissionTexts.length ? info.permissionTexts.map((p) => <div key={p}>{p}</div>) : 'None'}</dd>
           {info.agentTools.length > 0 && (

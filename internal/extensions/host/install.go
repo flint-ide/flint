@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -96,6 +97,30 @@ func (h *Host) Install(src string) (Info, error) {
 }
 
 // installMessage lists what the user is about to allow.
+// languagesMessage lists the languages and the language servers they run;
+// it reports whether any language has a server.
+func languagesMessage(b *strings.Builder, langs []manifest.Language) bool {
+	if len(langs) == 0 {
+		return false
+	}
+	servers := false
+	b.WriteString("\nLanguages:\n")
+	for _, l := range langs {
+		files := append(slices.Clone(l.Extensions), l.Filenames...)
+		fmt.Fprintf(b, "• %s (%s)\n", l.Label, strings.Join(files, ", "))
+		if l.Server == nil {
+			continue
+		}
+		servers = true
+		cmds := make([]string, len(l.Server.Candidates))
+		for i, c := range l.Server.Candidates {
+			cmds[i] = strings.Join(c, " ")
+		}
+		fmt.Fprintf(b, "  language server, the first one installed: %s (starts in trusted folders only)\n", strings.Join(cmds, " | "))
+	}
+	return servers
+}
+
 func installMessage(m *manifest.Manifest) string {
 	var b strings.Builder
 	by := ""
@@ -109,8 +134,13 @@ func installMessage(m *manifest.Manifest) string {
 	if n := len(m.Contributes.Themes); n > 0 {
 		fmt.Fprintf(&b, "\nColor themes: %d\n", n)
 	}
+	servers := languagesMessage(&b, m.Contributes.Languages)
 	if !m.HasProgram() {
-		b.WriteString("\nNo program: this extension only adds data (themes, settings) and runs no code.")
+		if servers {
+			b.WriteString("\nNo program of its own: only the language servers above run, in trusted folders.")
+		} else {
+			b.WriteString("\nNo program: this extension only adds data (themes, languages, settings) and runs no code.")
+		}
 		return b.String()
 	}
 	fmt.Fprintf(&b, "\nProgram: %s\n", m.CommandLine(runtime.GOOS))

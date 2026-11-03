@@ -3,9 +3,13 @@
 
 export {
     Command,
+    Grammar,
+    GrammarRule,
+    Language,
     Panel,
     Property,
     Schema,
+    Server,
     TabView,
     Theme,
     Webview

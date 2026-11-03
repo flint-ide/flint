@@ -23,6 +23,7 @@ import { contributes, contributionKey, extensionParts, type ExtensionInfo } from
 import { ExtensionStatusItem } from './ExtensionStatusItem'
 import { deliverWebview, tabKeyOf } from './webviewEvents'
 import type { ContributedTab } from '../../lib/features'
+import { setExtensionLanguages } from '../../lib/extensionLanguages'
 
 export type { Info, View }
 
@@ -154,6 +155,7 @@ export function loadExtensions(rescan = false): Promise<void> {
     .then((list) => {
       useExtensions.setState({ list, loaded: true, status: statusFrom(list) })
       syncContributions(list)
+      setExtensionLanguages(list.filter((i) => i.enabled && i.state !== 'invalid').flatMap((i) => i.languages ?? []))
     })
     .catch((err: unknown) => showToast(`Extensions: ${errorMessage(err)}`, 'error'))
     .finally(() => {

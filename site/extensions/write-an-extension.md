@@ -174,6 +174,45 @@ A theme is data, so it needs no program: an extension with only `themes` (and se
 
 `colors` takes the CSS variables of a custom theme and `terminal` the terminal colors (`background`, `foreground`, `cursor`, `cursorAccent`, `selectionBackground`, the 16 ANSI colors); see [customTheme](../reference/settings.md#customtheme) for the full lists. Values are hex colors. Any other name or value refuses the whole manifest, with the reason shown in Settings ▸ Extensions. The user picks a theme under Settings ▸ Appearance ▸ Color theme, or with **Use …** on your extension; Flint copies it into their custom theme.
 
+## 10. A programming language
+
+An extension can teach Flint a language it doesn't know: which files are in it, its comments, its language server and its syntax highlighting. Like a theme this is data, so a language-only extension needs no program of its own.
+
+```json
+"languages": [{
+  "id": "ruby",
+  "label": "Ruby",
+  "extensions": [".rb", ".rake"],
+  "filenames": ["Gemfile", "Rakefile"],
+  "lineComment": "#",
+  "blockComment": ["=begin", "=end"],
+  "server": {
+    "candidates": [["ruby-lsp"], ["solargraph", "stdio"]],
+    "install": "gem install ruby-lsp"
+  },
+  "grammar": { "states": {
+    "start": [
+      { "regex": "#.*", "token": "comment" },
+      { "regex": "\"", "token": "string", "push": "string" },
+      { "regex": "\\b(?:def|end|class|module|if|elsif|else|unless|do|return)\\b", "token": "keyword" },
+      { "regex": "\\d+(?:\\.\\d+)?", "token": "number" }
+    ],
+    "string": [
+      { "regex": "\\\\.", "token": "string" },
+      { "regex": "\"", "token": "string", "pop": true },
+      { "regex": "[^\"\\\\]+", "token": "string" }
+    ]
+  } }
+}]
+```
+
+- **`id`** names the language (lower-case) and is the LSP `languageId` unless `languageId` says otherwise. **`extensions`** (with the dot) and **`filenames`** (exact names) pick its files.
+- **`lineComment`** and **`blockComment`** drive **Toggle Comment**.
+- **`server`**: Flint's own LSP client runs the first candidate it finds: completion, hover, go to definition, references and diagnostics, as for the built-in languages. A candidate's program is a name looked up on `PATH`, or a path inside your extension's folder starting with `./`. **`install`** is shown when none is installed. A server from an extension starts only in [trusted folders](../guides/restricted-mode.md), and the install confirmation lists it.
+- **`grammar`**: CodeMirror's simple mode as data. States hold rules tried in order. Each rule has a `regex` (JavaScript syntax, at most 500 characters) and a `token`. It can also `push` a state, `pop` back, switch to a state with `next`, or match only at the start of a line with `sol`. Tokens: `keyword`, `atom`, `number`, `def`, `variable`, `variable-2`, `variable-3`, `type`, `builtin`, `string`, `string-2`, `comment`, `meta`, `operator`, `punctuation`, `bracket`, `tag`, `attribute`, `property`, `qualifier`, `header`, `link`, `error`, `invalidchar`. A regex that repeats a repeated group (`(a+)+`) is refused, because it can freeze the editor. One that matches an empty string, or doesn't compile, turns highlighting off for the language.
+
+Flint's own languages (Go, TypeScript and JavaScript, Python, Rust, and the formats it highlights) always win: an extension can't take over their files.
+
 ## Checklist before you share an extension
 
 - The manifest has `contract`, a `publisher.name` id, `name` and a `major.minor.patch` version.

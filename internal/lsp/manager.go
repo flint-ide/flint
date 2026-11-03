@@ -73,9 +73,17 @@ const maxRestarts = 3
 
 // NewManager creates a manager; callbacks may be nil.
 func NewManager() *Manager {
-	return &Manager{
+	m := &Manager{
 		lookPath: defaultLookPath, servers: map[key]*entry{}, docs: map[string]*document{}, restarts: map[key]int{},
 	}
+	// An extension installed, updated, turned off or removed: its languages'
+	// servers restart (or stop) for the documents open in them.
+	onExtensionLanguagesChanged(func(languages []string) {
+		for _, l := range languages {
+			m.Reconfigure(l)
+		}
+	})
+	return m
 }
 
 // Supported reports whether Flint knows a language server for path.
@@ -358,6 +366,9 @@ func (m *Manager) commandFor(k key) ([]string, error) {
 	trusted := m.Trusted == nil || m.Trusted(k.root)
 	argv, custom, ok := spec.command(cfg, m.lookPath)
 	reason, gated := needsTrust[k.language]
+	if _, builtin := builtinSpec(k.language); !builtin {
+		reason, gated = extensionTrustReason, true
+	}
 	if custom && !gated {
 		reason, gated = customServerReason, true
 	}

@@ -19,6 +19,7 @@ import (
 type API struct {
 	host    *host.Host
 	catalog *catalog.Catalog
+	langs   *languageSync
 	fh      feature.Host
 	started sync.Once
 }
@@ -34,7 +35,10 @@ func (a *API) ctx() context.Context {
 // frontend once the window is up, also starts the onStartup ones.
 func (a *API) List() []host.Info {
 	list := a.host.List()
-	a.started.Do(func() { go a.host.StartAtLaunch() })
+	a.started.Do(func() {
+		go a.host.StartAtLaunch()
+		go a.langs.sync() // the first discovery sends no change event
+	})
 	return list
 }
 

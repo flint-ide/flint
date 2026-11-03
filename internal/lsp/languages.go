@@ -47,13 +47,30 @@ var languageIDs = map[string][2]string{
 	".rs":  {"rust", "rust"},
 }
 
-// languageFor returns the server language and LSP languageId for a path.
+// languageFor returns the server language and LSP languageId for a path:
+// Flint's own languages first, then an extension's that has a server.
 func languageFor(path string) (language, languageID string, ok bool) {
-	ids, ok := languageIDs[strings.ToLower(filepath.Ext(path))]
-	return ids[0], ids[1], ok
+	if ids, ok := languageIDs[strings.ToLower(filepath.Ext(path))]; ok {
+		return ids[0], ids[1], true
+	}
+	if l, ok := extensionLanguageFor(path); ok && len(l.Candidates) > 0 {
+		return l.Language, l.LanguageID, true
+	}
+	return "", "", false
 }
 
+// specFor is a language's server: Flint's own, else an extension's.
 func specFor(language string) (serverSpec, bool) {
+	if s, ok := builtinSpec(language); ok {
+		return s, true
+	}
+	if l, ok := extensionLanguage(language); ok && len(l.Candidates) > 0 {
+		return serverSpec{Language: l.Language, Candidates: l.Candidates, Install: l.Install}, true
+	}
+	return serverSpec{}, false
+}
+
+func builtinSpec(language string) (serverSpec, bool) {
 	for _, s := range specs {
 		if s.Language == language {
 			return s, true

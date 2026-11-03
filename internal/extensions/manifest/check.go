@@ -258,6 +258,9 @@ func (m *Manifest) checkContributions() error {
 			return err
 		}
 	}
+	if err := m.checkLanguages(); err != nil {
+		return err
+	}
 	return m.checkThemes(own)
 }
 

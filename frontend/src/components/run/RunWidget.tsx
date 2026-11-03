@@ -2,13 +2,14 @@ import { useEditor } from '../../store/editor'
 import { useWorkspace } from '../../store/workspace'
 import { labelOf } from '../../lib/workspaceRoots'
 import {
-  TESTS_KEY, configKey, currentKey, editRunConfig, loadRunConfigs, newRunConfig, rerunFailedTests, runSelected, runTestsInFile,
+  TESTS_KEY, configKey, currentKey, editRunConfig, extensionTestFile, loadRunConfigs, newRunConfig, rerunFailedTests, runSelected, runTestsInFile,
   runTestsInPackage, selectRunConfig, selectedRunConfig, stopRun, useRun, type RunConfig,
 } from '../../store/run'
 import { failedNodes } from '../../lib/runTree'
 import { testLang } from '../../lib/testFiles'
 import { TabKindIcon } from '../icons/FileIcon'
-import { debugSelected, debugTestsInFile, useDebug } from '../../store/debug'
+import { debugFile, debugSelected, debugTestsInFile, useDebug } from '../../store/debug'
+import { extensionDebuggerFor, extensionTestRunnerFor } from '../../lib/extensionTools'
 import { cancelProfiling, profileSelected, profileTestsInFile, profileTestsInPackage, useProfile } from '../../store/profile'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 import { formatKeys, keyHint } from '../../lib/commands'
@@ -44,6 +45,23 @@ export function RunWidget() {
     const tab = s.tabs.find((t) => t.id === s.activeId)
     return tab?.kind === 'file' && testLang(tab.path) ? tab.path : null
   })
+
+  // The active file's debugger and test runner from extensions (read when the menu opens).
+  const extensionItems = (): DropdownItem[] => {
+    const { tabs, activeId } = useEditor.getState()
+    const tab = tabs.find((t) => t.id === activeId)
+    const path = tab?.kind === 'file' ? tab.path : null
+    if (!path) return []
+    const runner = extensionTestFile(path) ? extensionTestRunnerFor(path) : undefined
+    const debuggerSpec = extensionDebuggerFor(path)
+    if (!runner && !debuggerSpec) return []
+    const file = path.split('/').pop()
+    return [
+      { type: 'section', label: file } as DropdownItem,
+      ...(runner ? [{ label: `Run Tests in ${file}`, hint: runner.label, onSelect: () => void runTestsInFile(path) }] : []),
+      ...(debuggerSpec ? [{ label: `Debug ${file}`, hint: debuggerSpec.label, onSelect: () => void debugFile(path) }] : []),
+    ]
+  }
 
   const configItem = (c: RunConfig): DropdownItem => ({
     key: c.id,
@@ -88,6 +106,7 @@ export function RunWidget() {
             : []),
         ]
       : []),
+    ...extensionItems(),
     ...(hasFailures ? [{ label: 'Rerun Failed Tests', onSelect: () => void rerunFailedTests() }] : []),
   ]
 

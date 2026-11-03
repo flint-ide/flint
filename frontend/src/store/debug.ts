@@ -11,6 +11,8 @@ import { fileTabId, useEditor, viewFor } from './editor'
 import { selectedRunConfig, useRun, type RunConfig } from './run'
 import * as RunAPI from '../../bindings/flint/runapi'
 import type { TestMark } from '../lib/testFiles'
+import { rootFor } from './activeRoot'
+import { extensionDebuggerFor } from '../lib/extensionTools'
 
 // One debug session at a time (Go via Delve), shown in the "debug" tab: the
 // adapter's events drive it, requests go through DebugAPI.
@@ -191,19 +193,37 @@ export async function debugTestsInFile(path: string): Promise<void> {
   return debugTests(dirOf(path), names, baseOf(path))
 }
 
+/** Debugs a file with the debugger an extension adds for its language (in a trusted folder). */
+export function debugFile(path: string): Promise<void> {
+  const root = rootFor(path)
+  if (!root) {
+    showToast(`Can't debug ${baseOf(path)}: it isn't inside an open project folder. Open its folder, then try again.`)
+    return Promise.resolve()
+  }
+  const label = extensionDebuggerFor(path)?.label ?? 'the debugger'
+  const run = () =>
+    start(`Debug ${baseOf(path)}`, (id) => DebugAPI.StartFile(id, root, path, launchBreakpoints()), run, `Starting ${baseOf(path)} with ${label}…`)
+  return run()
+}
+
 /** Test gutter shift-click: debug instead of run (Go only). */
 export function debugTestMark(path: string, mark: TestMark): void {
   void (mark.kind === 'file' ? debugTestsInFile(path) : debugTestAt(path, mark.name))
 }
 
-async function start(title: string, launch: (id: string) => Promise<void>, restart: () => Promise<void>): Promise<void> {
+async function start(
+  title: string,
+  launch: (id: string) => Promise<void>,
+  restart: () => Promise<void>,
+  starting = `Building and starting ${title.replace(/^Debug /, '')}…`,
+): Promise<void> {
   const prev = useDebug.getState().session
   if (prev && prev.status !== 'ended') await DebugAPI.Stop(prev.id).catch(() => undefined)
   if (prev) deliverDebug?.forget(prev.id) // every session has its own id; drop the old one's ordering state
   const id = crypto.randomUUID()
   useDebug.setState({
     session: { id, title, status: 'starting', threadId: 0, frames: [], frameId: 0, scopes: [], vars: {}, expanded: {}, restart },
-    output: `Building and starting ${title.replace(/^Debug /, '')}…\n`,
+    output: `${starting}\n`,
   })
   useEditor.getState().openDebug(title)
   try {

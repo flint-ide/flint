@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -22,15 +23,20 @@ const (
 )
 
 // Session is one debug session: a running adapter and the program it debugs.
-// Events reach the callback given to StartDelve one at a time, in order, from
-// the read loop — the callback must not block or make requests itself.
+// Events reach the callback given to StartDelve or StartAdapter one at a
+// time, in order, from the read loop — the callback must not block or make
+// requests itself.
 type Session struct {
 	cmd  *exec.Cmd
 	conn *conn
-	net  net.Conn
+	// closeIO closes Flint's end of the adapter's transport (Delve's TCP
+	// connection, an adapter's pipes), which ends the read loop.
+	closeIO func()
 
 	initialized chan struct{}
 	initOnce    sync.Once
+	// launched: the handshake is over, output is no longer kept for errors.
+	launched atomic.Bool
 
 	stderrMu sync.Mutex
 	stderr   bytes.Buffer
@@ -39,6 +45,52 @@ type Session struct {
 
 	stopOnce sync.Once
 	stopped  chan struct{} // closed when Stop finished
+}
+
+func newSession() *Session {
+	return &Session{
+		initialized: make(chan struct{}), exited: make(chan struct{}), stopped: make(chan struct{}),
+		closeIO: func() {},
+	}
+}
+
+// startProcess starts the adapter in its own process group (the debuggee
+// dies with it) and closes s.exited once it ended.
+func (s *Session) startProcess(cmd *exec.Cmd) error {
+	s.cmd = cmd
+	cmd.Stderr = (*tailWriter)(s)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.WaitDelay = time.Second // a child holding stderr must not keep Wait (and exited) open
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() {
+		_ = cmd.Wait()
+		close(s.exited)
+	}()
+	return nil
+}
+
+// connect speaks DAP over r and w, passing events on to onEvent.
+func (s *Session) connect(r io.Reader, w io.Writer, onEvent func(Event)) {
+	s.conn = newConn(r, w, func(name string, body json.RawMessage) {
+		switch name {
+		case "initialized":
+			s.initOnce.Do(func() { close(s.initialized) })
+		case "terminated":
+			// Adapters stay up after the program ends until they are told to
+			// disconnect; end the session so the adapter and what it made go away.
+			go s.Stop()
+		case "output":
+			// Build errors arrive as console output before launch fails; keep
+			// them for the error message.
+			var o OutputEvent
+			if !s.launched.Load() && json.Unmarshal(body, &o) == nil && o.Category != "stdout" {
+				_, _ = (*tailWriter)(s).Write([]byte(o.Output))
+			}
+		}
+		onEvent(Event{Name: name, Body: body})
+	})
 }
 
 // StartDelve debugs cfg with `dlv dap` from dlvPath (env is the environment for
@@ -51,20 +103,13 @@ func StartDelve(ctx context.Context, dlvPath string, env []string, cfg LaunchCon
 	}
 	defer ln.Close()
 
-	s := &Session{initialized: make(chan struct{}), exited: make(chan struct{}), stopped: make(chan struct{})}
-	s.cmd = exec.Command(dlvPath, "dap", "--client-addr="+ln.Addr().String())
-	s.cmd.Dir = cfg.Cwd
-	s.cmd.Env = env
-	s.cmd.Stderr = (*tailWriter)(s)
-	s.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // the debuggee dies with dlv
-	s.cmd.WaitDelay = time.Second                           // a child holding stderr must not keep Wait (and exited) open
-	if err := s.cmd.Start(); err != nil {
+	s := newSession()
+	cmd := exec.Command(dlvPath, "dap", "--client-addr="+ln.Addr().String())
+	cmd.Dir = cfg.Cwd
+	cmd.Env = env
+	if err := s.startProcess(cmd); err != nil {
 		return nil, fmt.Errorf("start dlv: %w", err)
 	}
-	go func() {
-		_ = s.cmd.Wait()
-		close(s.exited)
-	}()
 
 	ctx, cancel := context.WithTimeout(ctx, startTimeout)
 	defer cancel()
@@ -73,7 +118,7 @@ func StartDelve(ctx context.Context, dlvPath string, env []string, cfg LaunchCon
 		s.kill()
 		return nil, fmt.Errorf("dlv did not connect: %w%s", err, s.stderrTail())
 	}
-	s.net = nc
+	s.closeIO = func() { _ = nc.Close() }
 	if cfg.OutputMode == "" {
 		cfg.OutputMode = "remote" // program output as "output" events, not dlv's stdout
 	}
@@ -85,28 +130,8 @@ func StartDelve(ctx context.Context, dlvPath string, env []string, cfg LaunchCon
 			cfg.Output = filepath.Join(dir, fmt.Sprintf("__debug_bin%d", time.Now().UnixNano()))
 		}
 	}
-	var launched atomic.Bool
-	s.conn = newConn(nc, nc, func(name string, body json.RawMessage) {
-		switch name {
-		case "initialized":
-			s.initOnce.Do(func() { close(s.initialized) })
-		case "terminated":
-			// Delve stays up after the program ends until it is told to disconnect;
-			// end the session so dlv, its connection and the debug binary go away.
-			go s.Stop()
-		case "output":
-			// Build errors arrive as console output before launch fails; keep
-			// them for the error message.
-			var o OutputEvent
-			if !launched.Load() && json.Unmarshal(body, &o) == nil && o.Category != "stdout" {
-				_, _ = (*tailWriter)(s).Write([]byte(o.Output))
-			}
-		}
-		onEvent(Event{Name: name, Body: body})
-	})
-	err = s.launch(ctx, cfg, breakpoints)
-	launched.Store(true)
-	if err != nil {
+	s.connect(nc, nc, onEvent)
+	if err := s.launch(ctx, "go", cfg, breakpoints); err != nil {
 		s.kill()
 		return nil, fmt.Errorf("%w%s", err, s.stderrTail())
 	}
@@ -134,12 +159,15 @@ func accept(ctx context.Context, ln net.Listener, exited <-chan struct{}) (net.C
 }
 
 // launch runs the DAP handshake: initialize → launch → (initialized event) →
-// breakpoints → configurationDone.
-func (s *Session) launch(ctx context.Context, cfg LaunchConfig, breakpoints map[string][]SourceBreakpoint) error {
+// breakpoints → configurationDone. Some adapters (Delve) answer launch before
+// the initialized event, others only after configurationDone, so the answer
+// is awaited alongside.
+func (s *Session) launch(ctx context.Context, adapterID string, args any, breakpoints map[string][]SourceBreakpoint) error {
+	defer s.launched.Store(true)
 	init := map[string]any{
 		"clientID":                     "flint",
 		"clientName":                   "Flint",
-		"adapterID":                    "go",
+		"adapterID":                    adapterID,
 		"linesStartAt1":                true,
 		"columnsStartAt1":              true,
 		"pathFormat":                   "path",
@@ -149,22 +177,37 @@ func (s *Session) launch(ctx context.Context, cfg LaunchConfig, breakpoints map[
 	if err := s.conn.Request(ctx, "initialize", init, nil); err != nil {
 		return err
 	}
-	if err := s.conn.Request(ctx, "launch", cfg, nil); err != nil {
-		return err
-	}
-	select {
-	case <-s.initialized:
-	case <-ctx.Done():
-		return fmt.Errorf("waiting for initialized: %w", ctx.Err())
-	case <-s.conn.Done():
-		return ErrClosed
+	launched := make(chan error, 1)
+	go func() { launched <- s.conn.Request(ctx, "launch", args, nil) }()
+	answered := false
+	for initialized := false; !initialized; {
+		select {
+		case <-s.initialized:
+			initialized = true
+		case err := <-launched:
+			if err != nil {
+				return err
+			}
+			answered = true
+			launched = nil // a nil channel never fires again
+		case <-ctx.Done():
+			return fmt.Errorf("waiting for initialized: %w", ctx.Err())
+		case <-s.conn.Done():
+			return ErrClosed
+		}
 	}
 	for path, bps := range breakpoints {
 		if _, err := s.SetBreakpoints(ctx, path, bps); err != nil {
 			return err
 		}
 	}
-	return s.conn.Request(ctx, "configurationDone", nil, nil)
+	if err := s.conn.Request(ctx, "configurationDone", nil, nil); err != nil {
+		return err
+	}
+	if answered {
+		return nil
+	}
+	return <-launched
 }
 
 // SetBreakpoints replaces all breakpoints in path; the result matches bps by index.
@@ -269,9 +312,7 @@ func (s *Session) stop() {
 func (s *Session) Done() <-chan struct{} { return s.exited }
 
 func (s *Session) kill() {
-	if s.net != nil {
-		_ = s.net.Close()
-	}
+	s.closeIO()
 	select {
 	case <-s.exited:
 		return // reaped: its process group id may already belong to someone else

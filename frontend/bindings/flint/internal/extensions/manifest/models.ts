@@ -5,6 +5,10 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as json$0 from "../../../../encoding/json/models.js";
+
 /**
  * Command is a palette command; Keys is an optional default shortcut that
  * never overrides one Flint or the user already has.
@@ -33,6 +37,215 @@ export class Command {
     static createFrom($$source: any = {}): Command {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new Command($$parsedSource as Partial<Command>);
+    }
+}
+
+/**
+ * Debugger is a debug adapter an extension adds for some languages: a
+ * program speaking the Debug Adapter Protocol on its standard input and
+ * output, which Flint's debugger drives like Delve. It starts only in trusted
+ * folders, as it runs the project's code.
+ */
+export class Debugger {
+    /**
+     * Type names the debugger ("ruby-rdbg"); it is the adapterID Flint sends.
+     */
+    "type": string;
+    "label": string;
+
+    /**
+     * Languages are language ids (the extension's own or another's) whose
+     * files it debugs.
+     */
+    "languages": string[];
+
+    /**
+     * Adapter is the program: the first candidate found runs.
+     */
+    "adapter": Server | null;
+
+    /**
+     * Launch is the DAP launch request's arguments, with vars.Names
+     * substituted in its string values ("${file}").
+     */
+    "launch"?: json$0.RawMessage;
+
+    /** Creates a new Debugger instance. */
+    constructor($$source: Partial<Debugger> = {}) {
+        if (!("type" in $$source)) {
+            this["type"] = "";
+        }
+        if (!("label" in $$source)) {
+            this["label"] = "";
+        }
+        if (!("languages" in $$source)) {
+            this["languages"] = [];
+        }
+        if (!("adapter" in $$source)) {
+            this["adapter"] = null;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Debugger instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Debugger {
+        const $$createField2_0 = $$createType0;
+        const $$createField3_0 = $$createType2;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("languages" in $$parsedSource) {
+            $$parsedSource["languages"] = $$createField2_0($$parsedSource["languages"]);
+        }
+        if ("adapter" in $$parsedSource) {
+            $$parsedSource["adapter"] = $$createField3_0($$parsedSource["adapter"]);
+        }
+        return new Debugger($$parsedSource as Partial<Debugger>);
+    }
+}
+
+/**
+ * Grammar is a CodeMirror simple mode: states by name, "start" first; each
+ * rule matches a regular expression (JavaScript syntax) at the cursor.
+ */
+export class Grammar {
+    "states": { [_ in string]?: GrammarRule[] };
+
+    /** Creates a new Grammar instance. */
+    constructor($$source: Partial<Grammar> = {}) {
+        if (!("states" in $$source)) {
+            this["states"] = {};
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Grammar instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Grammar {
+        const $$createField0_0 = $$createType5;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("states" in $$parsedSource) {
+            $$parsedSource["states"] = $$createField0_0($$parsedSource["states"]);
+        }
+        return new Grammar($$parsedSource as Partial<Grammar>);
+    }
+}
+
+/**
+ * GrammarRule is one rule of a state.
+ */
+export class GrammarRule {
+    "regex": string;
+
+    /**
+     * Token is one of GrammarTokens ("" = no style).
+     */
+    "token"?: string;
+
+    /**
+     * Next switches to a state; Push enters one; Pop leaves it.
+     */
+    "next"?: string;
+    "push"?: string;
+    "pop"?: boolean;
+
+    /**
+     * Sol: the rule matches only at the start of a line.
+     */
+    "sol"?: boolean;
+    "indent"?: boolean;
+    "dedent"?: boolean;
+
+    /** Creates a new GrammarRule instance. */
+    constructor($$source: Partial<GrammarRule> = {}) {
+        if (!("regex" in $$source)) {
+            this["regex"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new GrammarRule instance from a string or object.
+     */
+    static createFrom($$source: any = {}): GrammarRule {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new GrammarRule($$parsedSource as Partial<GrammarRule>);
+    }
+}
+
+/**
+ * Language is a programming language an extension teaches Flint: which
+ * files are in it, how comments look, its language server and its syntax
+ * highlighting. All of it is data: the server is a program Flint's own LSP
+ * client runs (only in trusted folders), and the grammar is a list of
+ * regular expressions Flint's editor applies (CodeMirror's simple mode).
+ */
+export class Language {
+    /**
+     * ID names the language ("ruby"): the LSP languageId unless LanguageID
+     * says otherwise, and what onLanguage activation events name.
+     */
+    "id": string;
+    "label": string;
+
+    /**
+     * Extensions are file extensions with the dot (".rb"); Filenames are
+     * exact base names ("Gemfile").
+     */
+    "extensions"?: string[];
+    "filenames"?: string[];
+
+    /**
+     * LanguageID is the LSP languageId sent for these files ("" = ID).
+     */
+    "languageId"?: string;
+    "lineComment"?: string;
+    "blockComment"?: string[];
+    "server"?: Server | null;
+    "grammar"?: Grammar | null;
+
+    /** Creates a new Language instance. */
+    constructor($$source: Partial<Language> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("label" in $$source)) {
+            this["label"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Language instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Language {
+        const $$createField2_0 = $$createType0;
+        const $$createField3_0 = $$createType0;
+        const $$createField6_0 = $$createType0;
+        const $$createField7_0 = $$createType2;
+        const $$createField8_0 = $$createType7;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("extensions" in $$parsedSource) {
+            $$parsedSource["extensions"] = $$createField2_0($$parsedSource["extensions"]);
+        }
+        if ("filenames" in $$parsedSource) {
+            $$parsedSource["filenames"] = $$createField3_0($$parsedSource["filenames"]);
+        }
+        if ("blockComment" in $$parsedSource) {
+            $$parsedSource["blockComment"] = $$createField6_0($$parsedSource["blockComment"]);
+        }
+        if ("server" in $$parsedSource) {
+            $$parsedSource["server"] = $$createField7_0($$parsedSource["server"]);
+        }
+        if ("grammar" in $$parsedSource) {
+            $$parsedSource["grammar"] = $$createField8_0($$parsedSource["grammar"]);
+        }
+        return new Language($$parsedSource as Partial<Language>);
     }
 }
 
@@ -84,7 +297,7 @@ export class Panel {
      * Creates a new Panel instance from a string or object.
      */
     static createFrom($$source: any = {}): Panel {
-        const $$createField5_0 = $$createType1;
+        const $$createField5_0 = $$createType9;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("webview" in $$parsedSource) {
             $$parsedSource["webview"] = $$createField5_0($$parsedSource["webview"]);
@@ -136,7 +349,7 @@ export class Property {
      * Creates a new Property instance from a string or object.
      */
     static createFrom($$source: any = {}): Property {
-        const $$createField5_0 = $$createType2;
+        const $$createField5_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("enum" in $$parsedSource) {
             $$parsedSource["enum"] = $$createField5_0($$parsedSource["enum"]);
@@ -169,12 +382,47 @@ export class Schema {
      * Creates a new Schema instance from a string or object.
      */
     static createFrom($$source: any = {}): Schema {
-        const $$createField1_0 = $$createType4;
+        const $$createField1_0 = $$createType11;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("properties" in $$parsedSource) {
             $$parsedSource["properties"] = $$createField1_0($$parsedSource["properties"]);
         }
         return new Schema($$parsedSource as Partial<Schema>);
+    }
+}
+
+/**
+ * Server is a language server: the first candidate found runs. A candidate's
+ * program is a name looked up on PATH ("ruby-lsp") or a path inside the
+ * extension's folder starting with "./" ("./bin/server").
+ */
+export class Server {
+    "candidates": string[][];
+
+    /**
+     * Install is shown when no candidate is installed.
+     */
+    "install"?: string;
+
+    /** Creates a new Server instance. */
+    constructor($$source: Partial<Server> = {}) {
+        if (!("candidates" in $$source)) {
+            this["candidates"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Server instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Server {
+        const $$createField0_0 = $$createType12;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("candidates" in $$parsedSource) {
+            $$parsedSource["candidates"] = $$createField0_0($$parsedSource["candidates"]);
+        }
+        return new Server($$parsedSource as Partial<Server>);
     }
 }
 
@@ -221,12 +469,63 @@ export class TabView {
      * Creates a new TabView instance from a string or object.
      */
     static createFrom($$source: any = {}): TabView {
-        const $$createField4_0 = $$createType1;
+        const $$createField4_0 = $$createType9;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("webview" in $$parsedSource) {
             $$parsedSource["webview"] = $$createField4_0($$parsedSource["webview"]);
         }
         return new TabView($$parsedSource as Partial<TabView>);
+    }
+}
+
+/**
+ * TestRunner runs the tests of a file in some languages: Command is an
+ * argument list (no shell) with vars.Names and vars.Tests substituted.
+ */
+export class TestRunner {
+    "id": string;
+    "label": string;
+    "languages": string[];
+    "command": string[];
+
+    /**
+     * Format is how Flint reads its output: "tap", or "plain" (only the exit
+     * code counts; also when empty).
+     */
+    "format"?: string;
+
+    /** Creates a new TestRunner instance. */
+    constructor($$source: Partial<TestRunner> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("label" in $$source)) {
+            this["label"] = "";
+        }
+        if (!("languages" in $$source)) {
+            this["languages"] = [];
+        }
+        if (!("command" in $$source)) {
+            this["command"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TestRunner instance from a string or object.
+     */
+    static createFrom($$source: any = {}): TestRunner {
+        const $$createField2_0 = $$createType0;
+        const $$createField3_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("languages" in $$parsedSource) {
+            $$parsedSource["languages"] = $$createField2_0($$parsedSource["languages"]);
+        }
+        if ("command" in $$parsedSource) {
+            $$parsedSource["command"] = $$createField3_0($$parsedSource["command"]);
+        }
+        return new TestRunner($$parsedSource as Partial<TestRunner>);
     }
 }
 
@@ -264,8 +563,8 @@ export class Theme {
      * Creates a new Theme instance from a string or object.
      */
     static createFrom($$source: any = {}): Theme {
-        const $$createField3_0 = $$createType5;
-        const $$createField4_0 = $$createType5;
+        const $$createField3_0 = $$createType13;
+        const $$createField4_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("colors" in $$parsedSource) {
             $$parsedSource["colors"] = $$createField3_0($$parsedSource["colors"]);
@@ -305,9 +604,17 @@ export class Webview {
 }
 
 // Private type creation functions
-const $$createType0 = Webview.createFrom;
-const $$createType1 = $Create.Nullable($$createType0);
-const $$createType2 = $Create.Array($Create.Any);
-const $$createType3 = Property.createFrom;
+const $$createType0 = $Create.Array($Create.Any);
+const $$createType1 = Server.createFrom;
+const $$createType2 = $Create.Nullable($$createType1);
+const $$createType3 = GrammarRule.createFrom;
 const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = $Create.Map($Create.Any, $Create.Any);
+const $$createType5 = $Create.Map($Create.Any, $$createType4);
+const $$createType6 = Grammar.createFrom;
+const $$createType7 = $Create.Nullable($$createType6);
+const $$createType8 = Webview.createFrom;
+const $$createType9 = $Create.Nullable($$createType8);
+const $$createType10 = Property.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = $Create.Array($$createType0);
+const $$createType13 = $Create.Map($Create.Any, $Create.Any);

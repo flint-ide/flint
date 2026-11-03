@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -95,6 +96,55 @@ func (h *Host) Install(src string) (Info, error) {
 	return e.info(), nil
 }
 
+// languagesMessage lists the languages and the language servers they run;
+// it reports whether any language has a server.
+func languagesMessage(b *strings.Builder, langs []manifest.Language) bool {
+	if len(langs) == 0 {
+		return false
+	}
+	servers := false
+	b.WriteString("\nLanguages:\n")
+	for _, l := range langs {
+		files := append(slices.Clone(l.Extensions), l.Filenames...)
+		fmt.Fprintf(b, "• %s (%s)\n", l.Label, strings.Join(files, ", "))
+		if l.Server == nil {
+			continue
+		}
+		servers = true
+		cmds := make([]string, len(l.Server.Candidates))
+		for i, c := range l.Server.Candidates {
+			cmds[i] = strings.Join(c, " ")
+		}
+		fmt.Fprintf(b, "  language server, the first one installed: %s (starts in trusted folders only)\n", strings.Join(cmds, " | "))
+	}
+	return servers
+}
+
+// toolsMessage lists the debuggers and test runners and the programs they
+// start; it reports whether there is any.
+func toolsMessage(b *strings.Builder, m *manifest.Manifest) bool {
+	c := m.Contributes
+	if len(c.Debuggers) > 0 {
+		b.WriteString("\nDebuggers:\n")
+	}
+	for _, d := range c.Debuggers {
+		cmds := make([]string, len(d.Adapter.Candidates))
+		for i, cand := range d.Adapter.Candidates {
+			cmds[i] = strings.Join(cand, " ")
+		}
+		fmt.Fprintf(b, "• %s, for %s files\n", d.Label, strings.Join(d.Languages, ", "))
+		fmt.Fprintf(b, "  runs the first one installed: %s (in trusted folders only)\n", strings.Join(cmds, " | "))
+	}
+	if len(c.TestRunners) > 0 {
+		b.WriteString("\nTest runners:\n")
+	}
+	for _, r := range c.TestRunners {
+		fmt.Fprintf(b, "• %s, for %s files\n", r.Label, strings.Join(r.Languages, ", "))
+		fmt.Fprintf(b, "  runs: %s (in trusted folders only)\n", r.CommandLine())
+	}
+	return len(c.Debuggers)+len(c.TestRunners) > 0
+}
+
 // installMessage lists what the user is about to allow.
 func installMessage(m *manifest.Manifest) string {
 	var b strings.Builder
@@ -109,8 +159,14 @@ func installMessage(m *manifest.Manifest) string {
 	if n := len(m.Contributes.Themes); n > 0 {
 		fmt.Fprintf(&b, "\nColor themes: %d\n", n)
 	}
+	servers := languagesMessage(&b, m.Contributes.Languages)
+	tools := toolsMessage(&b, m)
 	if !m.HasProgram() {
-		b.WriteString("\nNo program: this extension only adds data (themes, settings) and runs no code.")
+		if servers || tools {
+			b.WriteString("\nNo program of its own: only the programs listed above run, and only in folders you trust.")
+		} else {
+			b.WriteString("\nNo program: this extension only adds data (themes, languages, settings) and runs no code.")
+		}
 		return b.String()
 	}
 	fmt.Fprintf(&b, "\nProgram: %s\n", m.CommandLine(runtime.GOOS))

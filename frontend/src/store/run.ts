@@ -9,6 +9,7 @@ import {
   type TestNode, type TestRequest, type TestTree,
 } from '../lib/runTree'
 import { testLang, type TestGutterHooks, type TestMark } from '../lib/testFiles'
+import { extensionTestRunnerFor } from '../lib/extensionTools'
 import { resolvePath } from '../lib/pathLinks'
 import { showToast } from './dialog'
 import { useEditor, viewFor } from './editor'
@@ -246,16 +247,23 @@ export async function runTests(req: TestRequest, launch?: TestLaunch): Promise<v
 
 const dirname = (p: string) => p.slice(0, Math.max(p.lastIndexOf('/'), 1))
 
+/** A file whose tests an extension's test runner runs (Flint's own test files excluded). */
+export const extensionTestFile = (path: string | null | undefined): path is string =>
+  !!path && !testLang(path) && !!extensionTestRunnerFor(path)
+
+/** An extension runner's request for path: the project folder, the file and maybe some tests. */
+const extensionRequest = (path: string, tests?: string[]): TestRequest => ({ lang: 'ext', dirs: [rootFor(path) || dirname(path)], file: path, tests })
+
 /** Runs one test (full name as in the gutter / results tree) of a test file. */
 export function runTestAt(path: string, name: string): Promise<void> {
   const lang = testLang(path)
-  if (!lang) return Promise.resolve()
+  if (!lang) return extensionTestFile(path) ? runTests(extensionRequest(path, [name])) : Promise.resolve()
   return runTests({ lang, dirs: [dirname(path)], file: lang === 'js' ? path : undefined, tests: [name] })
 }
 
 export function runTestsInFile(path: string): Promise<void> {
   const lang = testLang(path)
-  if (!lang) return Promise.resolve()
+  if (!lang) return extensionTestFile(path) ? runTests(extensionRequest(path)) : Promise.resolve()
   return runTests({ lang, dirs: [dirname(path)], file: path })
 }
 

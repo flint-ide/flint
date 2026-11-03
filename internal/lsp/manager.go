@@ -73,9 +73,17 @@ const maxRestarts = 3
 
 // NewManager creates a manager; callbacks may be nil.
 func NewManager() *Manager {
-	return &Manager{
+	m := &Manager{
 		lookPath: defaultLookPath, servers: map[key]*entry{}, docs: map[string]*document{}, restarts: map[key]int{},
 	}
+	// An extension installed, updated, turned off or removed: its languages'
+	// servers restart (or stop) for the documents open in them.
+	onExtensionLanguagesChanged(func(languages []string) {
+		for _, l := range languages {
+			m.Reconfigure(l)
+		}
+	})
+	return m
 }
 
 // Supported reports whether Flint knows a language server for path.
@@ -358,6 +366,9 @@ func (m *Manager) commandFor(k key) ([]string, error) {
 	trusted := m.Trusted == nil || m.Trusted(k.root)
 	argv, custom, ok := spec.command(cfg, m.lookPath)
 	reason, gated := needsTrust[k.language]
+	if _, builtin := builtinSpec(k.language); !builtin {
+		reason, gated = extensionTrustReason, true
+	}
 	if custom && !gated {
 		reason, gated = customServerReason, true
 	}
@@ -367,6 +378,8 @@ func (m *Manager) commandFor(k key) ([]string, error) {
 		return nil, fmt.Errorf("%w: %s. To get completion and go to definition for %s, run Trust Folder from the command palette (or click Trust Folder in the Restricted Mode banner)", ErrRestricted, reason, name)
 	case !ok && cfg.Command != "":
 		return nil, notInstalled(fmt.Sprintf("the %s language server set in Settings ▸ Language Servers (%q) wasn't found. Fix the path there, or clear it to use an installed default server", name, cfg.Command))
+	case !ok && spec.Install == "":
+		return nil, notInstalled(fmt.Sprintf("completion and go to definition for %s need a language server, and none is installed. Install the one its extension names (see Settings ▸ Extensions), then reopen the file", name))
 	case !ok:
 		return nil, notInstalled(fmt.Sprintf("completion and go to definition for %s need a language server, and none is installed. Install one with: %s — then reopen the file", name, spec.Install))
 	case !trusted:

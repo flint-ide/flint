@@ -21,7 +21,8 @@ export interface TestNode {
 
 /** What selects tests (testrun.Request). */
 export interface TestRequest {
-  lang: 'go' | 'js'
+  /** 'ext': an extension's test runner; dirs[0] is then the project folder and file the file. */
+  lang: 'go' | 'js' | 'ext'
   dirs: string[]
   file?: string
   tests?: string[]

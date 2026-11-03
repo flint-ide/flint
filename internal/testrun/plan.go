@@ -15,7 +15,7 @@ import (
 
 // Request selects tests to run.
 type Request struct {
-	Lang string `json:"lang"` // LangGo | LangJS
+	Lang string `json:"lang"` // LangGo | LangJS | LangExt
 	// Dirs: Go package directories; JS: a directory inside the package (the
 	// nearest package.json is used).
 	Dirs []string `json:"dirs"`

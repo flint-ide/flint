@@ -71,9 +71,12 @@ func Languages() []LanguageInfo {
 	return out
 }
 
-// KnownLanguage reports whether Flint has a server spec for language.
+// KnownLanguage reports whether Flint itself has a server spec for language
+// (settings.json "languageServers" configures only these: an extension's
+// server is set in its manifest, and settings are checked before extensions
+// are read).
 func KnownLanguage(language string) bool {
-	_, ok := specFor(language)
+	_, ok := builtinSpec(language)
 	return ok
 }
 

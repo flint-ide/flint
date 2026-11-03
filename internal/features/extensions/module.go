@@ -28,13 +28,15 @@ var Module = feature.Module{
 	ID:       "extensions",
 	Settings: []settings.AnySection{Section},
 	New: func(h feature.Host) feature.Instance {
+		langs := &languageSync{}
 		hst := host.New(host.Options{
 			Dir:     filepath.Join(h.ConfigDir(), "extensions"),
-			App:     app{h},
+			App:     app{h: h, changed: func() { go langs.sync() }},
 			Secrets: host.Keyring{},
 		})
+		langs.list = hst.List
 		cat := catalog.New(catalog.Options{Dir: catalogDir(h), Before: shellenv.Wait})
-		api := &API{host: hst, catalog: cat, fh: h}
+		api := &API{host: hst, catalog: cat, fh: h, langs: langs}
 		return feature.Instance{
 			Services: []application.Service{application.NewService(api)},
 			AgentTools: func() []mcpserver.Tool {
@@ -81,12 +83,21 @@ func settingsChanged(h *host.Host, prev, next Settings) {
 	}
 }
 
-// app is what the host sees of Flint.
-type app struct{ h feature.Host }
+// app is what the host sees of Flint; changed runs when the list or a state
+// changed (host.EventChanged), besides telling the frontend.
+type app struct {
+	h       feature.Host
+	changed func()
+}
 
-func (a app) Roots() []string                    { return a.h.Roots() }
-func (a app) Trusted(path string) bool           { return a.h.Trusted(path) }
-func (a app) Emit(event string, data ...any)     { a.h.Emit(event, data...) }
+func (a app) Roots() []string          { return a.h.Roots() }
+func (a app) Trusted(path string) bool { return a.h.Trusted(path) }
+func (a app) Emit(event string, data ...any) {
+	if event == host.EventChanged && a.changed != nil {
+		a.changed()
+	}
+	a.h.Emit(event, data...)
+}
 func (a app) OpenURL(link string) error          { return a.h.OpenURL(link) }
 func (a app) Version() string                    { return a.h.Version() }
 func (a app) Enabled(id string) bool             { return Section.Get(a.h.Settings()).enabled(id) }

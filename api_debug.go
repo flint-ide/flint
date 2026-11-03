@@ -147,7 +147,8 @@ func (e *debugEvents) emitLocked(ev DebugEvent) {
 // Breakpoints are the breakpoints to set at launch, by absolute file path.
 type Breakpoints map[string][]dap.SourceBreakpoint
 
-// DebugAPI debugs Go run configurations and tests with Delve (`dlv dap`).
+// DebugAPI debugs Go run configurations and tests with Delve (`dlv dap`), and
+// other languages' files with the debuggers extensions add.
 type DebugAPI struct {
 	app *App
 }
@@ -196,6 +197,24 @@ func (d *DebugAPI) StartTest(id, dir string, tests []string, breakpoints Breakpo
 		args = []string{"-test.run", testrun.GoRunPattern(tests)}
 	}
 	return d.start(id, nil, dap.LaunchConfig{Mode: "test", Program: dir, Cwd: dir, Args: args}, breakpoints)
+}
+
+// StartFile debugs the file at path (in the project at root) with the
+// debugger an extension adds for its language. It starts only in a trusted
+// folder; errors say what to do (install the debugger, trust the folder).
+func (d *DebugAPI) StartFile(id, root, path string, breakpoints Breakpoints) error {
+	shellenv.Wait() // PATH from the login shell, to find the adapter
+	adapter, launch, label, err := d.app.extensionAdapter(root, path)
+	if err == nil {
+		err = d.app.debugs.StartAdapter(context.Background(), id, adapter, launch, breakpoints)
+		if err != nil {
+			err = fmt.Errorf("%s couldn't start debugging %s: %w. Check that the debugger works from a terminal, then try again.", label, filepath.Base(path), err)
+		}
+	}
+	if err != nil {
+		d.app.debugEvents.finish(id)
+	}
+	return err
 }
 
 func (d *DebugAPI) start(id string, env []string, lc dap.LaunchConfig, breakpoints Breakpoints) error {

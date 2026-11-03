@@ -8,10 +8,11 @@ import { useEditor } from '../../store/editor'
 import { useTerminal } from '../../store/terminal'
 import { useWorkspace } from '../../store/workspace'
 import { showFileHistory } from '../../store/gitHistory'
-import { runTestsInFile } from '../../store/run'
+import { extensionTestFile, runTestsInFile } from '../../store/run'
 import { profileTestsInFile } from '../../store/profile'
-import { debugTestsInFile } from '../../store/debug'
+import { debugFile, debugTestsInFile } from '../../store/debug'
 import { testLang } from '../../lib/testFiles'
+import { extensionDebuggerFor, extensionTestRunnerFor } from '../../lib/extensionTools'
 import { formatKeys } from '../../lib/commands'
 import { fileManagerName } from '../../lib/platform'
 import { fileMenuFor, useContributions } from '../../lib/contributions'
@@ -80,6 +81,12 @@ export function fileTreeMenu(roots: string[], targets: TreeEntry[], actions: Men
       )
     }
   }
+  // Debuggers and test runners extensions add for the file's language.
+  const runner = single && !single.isDir && extensionTestFile(single.path) ? extensionTestRunnerFor(single.path) : undefined
+  const debuggerSpec = single && !single.isDir ? extensionDebuggerFor(single.path) : undefined
+  if (runner || debuggerSpec) items.push({ type: 'separator' })
+  if (runner) items.push({ label: 'Run Tests', hint: runner.label, onSelect: () => void runTestsInFile(single!.path) })
+  if (debuggerSpec) items.push({ label: 'Debug File', hint: debuggerSpec.label, onSelect: () => void debugFile(single!.path) })
   const history = single && !single.isDir && inRepo(root)
   if (history || changes.length > 0) items.push({ type: 'separator' })
   if (history) items.push({ label: 'Show History', onSelect: () => showFileHistory(single.path) })

@@ -14,6 +14,8 @@ type ExtensionLanguage struct {
 	// Language names it ("ruby"); LanguageID is the LSP languageId.
 	Language   string
 	LanguageID string
+	// Label is the language's name for people ("Ruby").
+	Label string
 	// Extensions are lower-case, with the dot; Filenames are exact names.
 	Extensions []string
 	Filenames  []string
@@ -124,6 +126,25 @@ func extensionLanguage(name string) (ExtensionLanguage, bool) {
 	defer registry.RUnlock()
 	l, ok := registry.langs[name]
 	return l, ok
+}
+
+// builtinLabels name Flint's own languages in messages.
+var builtinLabels = map[string]string{"go": "Go", "typescript": "TypeScript/JavaScript", "python": "Python", "rust": "Rust"}
+
+// LanguageOf names the language of path: Flint's own ("go", "typescript",
+// "python", "rust") first, else an extension's, with or without a server.
+// label is its name for messages ("Ruby").
+func LanguageOf(path string) (language, label string, ok bool) {
+	if ids, ok := languageIDs[strings.ToLower(filepath.Ext(path))]; ok {
+		return ids[0], builtinLabels[ids[0]], true
+	}
+	if l, ok := extensionLanguageFor(path); ok {
+		if l.Label == "" {
+			l.Label = l.Language
+		}
+		return l.Language, l.Label, true
+	}
+	return "", "", false
 }
 
 // ExtensionLanguages lists the extensions' languages in effect, for Settings

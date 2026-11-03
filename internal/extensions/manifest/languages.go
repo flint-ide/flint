@@ -156,7 +156,10 @@ func (l Language) check() error {
 	return nil
 }
 
-func (s Server) check() error {
+func (s Server) check() error { return s.checkAs("server") }
+
+// checkAs checks the candidates of a server or a debug adapter (kind).
+func (s Server) checkAs(kind string) error {
 	if len(s.Candidates) == 0 {
 		return fmt.Errorf("no candidates")
 	}
@@ -167,7 +170,7 @@ func (s Server) check() error {
 		if len(c) == 0 {
 			return fmt.Errorf("empty candidate")
 		}
-		if err := checkServerProgram(c[0]); err != nil {
+		if err := checkProgram(kind, c[0]); err != nil {
 			return err
 		}
 		if len(c)-1 > maxCandidateArgs {
@@ -180,16 +183,17 @@ func (s Server) check() error {
 	return checkText("install", s.Install, 200, false)
 }
 
-// checkServerProgram: a name on PATH, or "./" and a path inside the folder.
-func checkServerProgram(p string) error {
+// checkProgram: a name on PATH, or "./" and a path inside the folder; kind
+// names it in errors ("server", "adapter", "test runner").
+func checkProgram(kind, p string) error {
 	if rel, ok := strings.CutPrefix(p, "./"); ok {
 		if err := checkCommandPath(rel); err != nil {
-			return fmt.Errorf("server program %q: %w", p, err)
+			return fmt.Errorf("%s program %q: %w", kind, p, err)
 		}
 		return nil
 	}
 	if !programPattern.MatchString(p) || p == "." || p == ".." {
-		return fmt.Errorf(`server program %q is neither a program name nor a "./" path inside the extension`, p)
+		return fmt.Errorf(`%s program %q is neither a program name nor a "./" path inside the extension`, kind, p)
 	}
 	return nil
 }
@@ -242,9 +246,10 @@ func (g Grammar) checkRule(r GrammarRule) error {
 	return checkText("regex", r.Regex, maxRegexLen, true)
 }
 
-// ServerProgram resolves a candidate's program for an extension in dir: a
-// "./" path becomes the absolute path of an executable file inside dir
-// (symbolic links included); a name is returned as it is, for a PATH lookup.
+// ServerProgram resolves a candidate's program (a language server's, a debug
+// adapter's or a test runner's) for an extension in dir: a "./" path becomes
+// the absolute path of an executable file inside dir (symbolic links
+// included); a name is returned as it is, for a PATH lookup.
 func ServerProgram(dir, program string) (string, error) {
 	rel, ok := strings.CutPrefix(program, "./")
 	if !ok {

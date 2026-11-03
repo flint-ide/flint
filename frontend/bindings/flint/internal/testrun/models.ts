@@ -78,7 +78,7 @@ export class Profiles {
  */
 export class Request {
     /**
-     * LangGo | LangJS
+     * LangGo | LangJS | LangExt
      */
     "lang": string;
 

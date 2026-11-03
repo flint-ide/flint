@@ -3,6 +3,7 @@
 
 export {
     Command,
+    Debugger,
     Grammar,
     GrammarRule,
     Language,
@@ -11,6 +12,7 @@ export {
     Schema,
     Server,
     TabView,
+    TestRunner,
     Theme,
     Webview
 } from "./models.js";

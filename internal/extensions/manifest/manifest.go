@@ -74,6 +74,8 @@ type Contributes struct {
 	Themes      []Theme      `json:"themes,omitempty"`
 	TabViews    []TabView    `json:"tabViews,omitempty"`
 	Languages   []Language   `json:"languages,omitempty"`
+	Debuggers   []Debugger   `json:"debuggers,omitempty"`
+	TestRunners []TestRunner `json:"testRunners,omitempty"`
 	// Unsupported names contribution points this Flint doesn't offer yet
 	// (fileMenu): ignored, and listed as warnings in Settings.
 	Unsupported []string `json:"-"`
@@ -215,6 +217,10 @@ func Parse(data []byte) (*Manifest, error) {
 			err = json.Unmarshal(raw, &m.Contributes.TabViews)
 		case "languages":
 			err = json.Unmarshal(raw, &m.Contributes.Languages)
+		case "debuggers":
+			err = json.Unmarshal(raw, &m.Contributes.Debuggers)
+		case "testRunners":
+			err = json.Unmarshal(raw, &m.Contributes.TestRunners)
 		case "settings":
 			m.Contributes.Settings, err = parseSchema(raw)
 		default:

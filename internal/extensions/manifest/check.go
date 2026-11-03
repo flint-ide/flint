@@ -261,6 +261,12 @@ func (m *Manifest) checkContributions() error {
 	if err := m.checkLanguages(); err != nil {
 		return err
 	}
+	if err := m.checkDebuggers(); err != nil {
+		return err
+	}
+	if err := m.checkTestRunners(); err != nil {
+		return err
+	}
 	return m.checkThemes(own)
 }
 

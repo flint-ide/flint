@@ -6,6 +6,7 @@ import (
 	"errors"
 	"sync"
 
+	"flint/internal/extensions/catalog"
 	"flint/internal/extensions/host"
 	"flint/internal/feature"
 )
@@ -17,6 +18,7 @@ import (
 // extension's manifest.
 type API struct {
 	host    *host.Host
+	catalog *catalog.Catalog
 	fh      feature.Host
 	started sync.Once
 }
@@ -53,6 +55,26 @@ func (a *API) Install(dir string) (*host.Info, error) {
 		return nil, err
 	}
 	return &info, nil
+}
+
+// Catalog is what the extensions repository offers; the first call clones
+// the repository, later ones read the clone.
+func (a *API) Catalog() (catalog.Listing, error) { return a.catalog.List(a.ctx()) }
+
+// RefreshCatalog fetches the extensions repository again.
+func (a *API) RefreshCatalog() (catalog.Listing, error) { return a.catalog.Refresh(a.ctx()) }
+
+// InstallFromCatalog builds the extension in the repository's folder if it
+// is a Go program, then installs it like Install (native confirmation); nil
+// when the user cancelled. The repository isn't refreshed meanwhile, so what
+// is copied is what was built and confirmed.
+func (a *API) InstallFromCatalog(folder string) (*host.Info, error) {
+	dir, release, err := a.catalog.Prepare(a.ctx(), folder)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	return a.Install(dir)
 }
 
 // Uninstall removes an extension after a native confirmation; false when

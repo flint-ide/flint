@@ -10,14 +10,17 @@ package extensions
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"flint/internal/extensions/catalog"
 	"flint/internal/extensions/host"
 	"flint/internal/feature"
 	"flint/internal/mcpserver"
 	"flint/internal/settings"
+	"flint/internal/shellenv"
 )
 
 // Module declares the feature (listed in package main's features.go).
@@ -30,7 +33,8 @@ var Module = feature.Module{
 			App:     app{h},
 			Secrets: host.Keyring{},
 		})
-		api := &API{host: hst, fh: h}
+		cat := catalog.New(catalog.Options{Dir: catalogDir(h), Before: shellenv.Wait})
+		api := &API{host: hst, catalog: cat, fh: h}
 		return feature.Instance{
 			Services: []application.Service{application.NewService(api)},
 			AgentTools: func() []mcpserver.Tool {
@@ -42,6 +46,16 @@ var Module = feature.Module{
 			Close:           hst.Close,
 		}
 	},
+}
+
+// catalogDir is where the extensions repository is cloned: Flint's cache
+// folder, else next to its config (never inside the extensions folder, which
+// holds only installed ones).
+func catalogDir(h feature.Host) string {
+	if dir, err := os.UserCacheDir(); err == nil {
+		return filepath.Join(dir, "Flint", "extensions-repo")
+	}
+	return filepath.Join(h.ConfigDir(), "extensions-repo")
 }
 
 // settingsChanged tells the host about each extension whose settings or

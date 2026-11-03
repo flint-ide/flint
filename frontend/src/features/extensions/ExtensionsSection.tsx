@@ -3,12 +3,13 @@ import * as API from '../../../bindings/flint/internal/features/extensions/api'
 import { errorMessage } from '../../api/backend'
 import { useSettings } from '../../store/settings'
 import { extensionEnabled, toolsOffered, withFlag } from './settings'
-import { installFromFolder, loadExtensions, restartExtension, uninstallExtension, useExtensions, type Info } from './store'
+import { loadExtensions, restartExtension, uninstallExtension, useExtensions, type Info } from './store'
 import { themeContributions, type ExtensionInfo } from './model'
 import { activeThemeId, customThemeFrom } from '../../lib/contributedThemes'
 import { useContributions } from '../../lib/contributions'
 import type { ThemeContribution } from '../../lib/features'
 import { BuiltinExtensions } from './BuiltinExtensions'
+import { CatalogSection } from './CatalogSection'
 
 const STATE_LABELS: Record<string, string> = {
   invalid: 'Broken',
@@ -34,10 +35,8 @@ export function ExtensionsSection() {
         One starts when you first use it and stops after five idle minutes. A theme-only extension has no program and runs no code.
       </p>
       <BuiltinExtensions />
-      <div className="settings-actions">
-        <button onClick={() => void installFromFolder()}>Install from Folder…</button>
-        <button onClick={() => void loadExtensions(true)}>Reload</button>
-      </div>
+      <CatalogSection />
+      <h3>Installed</h3>
       {loaded && list.length === 0 && <p className="muted settings-note">No extensions installed.</p>}
       {list.map((info) => (
         <ExtensionCard key={info.id} info={info} />

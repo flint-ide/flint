@@ -280,6 +280,16 @@ func (m *Manifest) CommandLine(goos string) string {
 	return strings.Join(append([]string{command}, args...), " ")
 }
 
+// ProgramPath is the program's path inside the extension's folder on goos,
+// as the manifest writes it (the platform's override, if any); "" when the
+// extension has no program.
+func (m *Manifest) ProgramPath(goos string) string {
+	if o := m.Run.forOS(goos); o != nil {
+		return o.Command
+	}
+	return m.Run.Command
+}
+
 func (r Run) forOS(goos string) *RunOS {
 	switch goos {
 	case "darwin":

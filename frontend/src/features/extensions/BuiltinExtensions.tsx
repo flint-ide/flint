@@ -39,7 +39,6 @@ export function BuiltinExtensions() {
           </div>
         )
       })}
-      <h3>Installed</h3>
     </>
   )
 }

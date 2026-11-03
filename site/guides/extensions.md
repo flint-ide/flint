@@ -2,9 +2,17 @@
 
 An extension is a separate program that adds commands, a sidebar panel, a Settings page, status bar items and tools for agents to Flint. It can be written in any language. Flint draws everything an extension shows with its own components, from data the extension sends: an extension never runs code inside Flint's window.
 
-There is no marketplace. You install an extension from a folder on your disk, after Flint shows you what it is and what it asks for. To write one, see [Write an extension](../extensions/write-an-extension.md).
+There is no marketplace. **Settings ▸ Extensions** lists every extension of the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository, and you can also install one from a folder on your disk. Either way, Flint shows you what it is and what it asks for first. To write one, see [Write an extension](../extensions/write-an-extension.md).
 
 ## Install an extension
+
+### From the repository
+
+**Settings ▸ Extensions ▸ Repository** shows the extensions of `flint-ide/extensions`, each marked *Not installed*, *Installed* or *Update available*. Flint reads the repository with `git` and your own credentials (credential helper or SSH key) into its cache folder, the first time you open the page; **Refresh Repository** fetches it again. Set `FLINT_EXTENSIONS_REPO` to use a fork, a mirror or a local clone instead.
+
+**Install…** (or **Update…**) builds an extension that is a Go program on your machine with `go build` (Go must be installed), then shows the same confirmation as installing from a folder. A theme-only extension needs no build. **Uninstall…** removes it.
+
+### From a folder
 
 1. Get the extension's folder: it contains `flint-extension.json` (the manifest) and the extension's program.
 2. Run **Install Extension from Folder…** from the command palette, or click **Install from Folder…** in **Settings ▸ Extensions**, and pick the folder.
@@ -25,7 +33,7 @@ For each installed extension:
 - **Show Log**: what the extension wrote to its standard error, its log messages, and when Flint started and stopped it. The log is kept in memory (the last 256 KiB) until Flint quits.
 - **Uninstall…** stops the extension and deletes its folder after you confirm. Its settings stay in `settings.json` and any secrets it stored stay in the system keychain, so installing it again restores them.
 
-**Reload** reads the extensions folder again, for example after you rebuilt an extension you are writing.
+**Reload Installed** reads the extensions folder again, for example after you rebuilt an extension you are writing.
 
 An extension with settings gets its own page in Settings, after Flint's pages, generated from its manifest. Values are checked against the manifest before they are saved, under `extensions` in [settings.json](../reference/settings.md#extensions).
 

@@ -19,6 +19,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as json$0 from "../../../../encoding/json/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as catalog$0 from "../../extensions/catalog/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as host$0 from "../../extensions/host/models.js";
 
 /**
@@ -26,6 +29,16 @@ import * as host$0 from "../../extensions/host/models.js";
  */
 export function Action(id: string, view: string, item: string, action: string): $CancellablePromise<void> {
     return $Call.ByID(221078465, id, view, item, action);
+}
+
+/**
+ * Catalog is what the extensions repository offers; the first call clones
+ * the repository, later ones read the clone.
+ */
+export function Catalog(): $CancellablePromise<catalog$0.Listing> {
+    return $Call.ByID(1521862270).then(($result: any) => {
+        return $$createType0($result);
+    });
 }
 
 /**
@@ -41,7 +54,19 @@ export function Execute(id: string, command: string, args: json$0.RawMessage): $
  */
 export function Install(dir: string): $CancellablePromise<host$0.Info | null> {
     return $Call.ByID(16206978, dir).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType2($result);
+    });
+}
+
+/**
+ * InstallFromCatalog builds the extension in the repository's folder if it
+ * is a Go program, then installs it like Install (native confirmation); nil
+ * when the user cancelled. The repository isn't refreshed meanwhile, so what
+ * is copied is what was built and confirmed.
+ */
+export function InstallFromCatalog(folder: string): $CancellablePromise<host$0.Info | null> {
+    return $Call.ByID(1569663597, folder).then(($result: any) => {
+        return $$createType2($result);
     });
 }
 
@@ -51,7 +76,7 @@ export function Install(dir: string): $CancellablePromise<host$0.Info | null> {
  */
 export function List(): $CancellablePromise<host$0.Info[]> {
     return $Call.ByID(3916864187).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType3($result);
     });
 }
 
@@ -63,11 +88,20 @@ export function Log(id: string): $CancellablePromise<string> {
 }
 
 /**
+ * RefreshCatalog fetches the extensions repository again.
+ */
+export function RefreshCatalog(): $CancellablePromise<catalog$0.Listing> {
+    return $Call.ByID(1624232381).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
+/**
  * Rescan reads the extensions folder again (an extension changed on disk).
  */
 export function Rescan(): $CancellablePromise<host$0.Info[]> {
     return $Call.ByID(2973147495).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType3($result);
     });
 }
 
@@ -76,7 +110,7 @@ export function Rescan(): $CancellablePromise<host$0.Info[]> {
  */
 export function Resolve(id: string, view: string, parent: string): $CancellablePromise<host$0.View> {
     return $Call.ByID(1596846045, id, view, parent).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType4($result);
     });
 }
 
@@ -124,7 +158,8 @@ export function WebviewRequest(id: string, view: string, key: string, method: st
 }
 
 // Private type creation functions
-const $$createType0 = host$0.Info.createFrom;
-const $$createType1 = $Create.Nullable($$createType0);
-const $$createType2 = $Create.Array($$createType0);
-const $$createType3 = host$0.View.createFrom;
+const $$createType0 = catalog$0.Listing.createFrom;
+const $$createType1 = host$0.Info.createFrom;
+const $$createType2 = $Create.Nullable($$createType1);
+const $$createType3 = $Create.Array($$createType1);
+const $$createType4 = host$0.View.createFrom;

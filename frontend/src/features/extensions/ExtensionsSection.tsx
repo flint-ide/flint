@@ -3,7 +3,7 @@ import * as API from '../../../bindings/flint/internal/features/extensions/api'
 import { errorMessage } from '../../api/backend'
 import { useSettings } from '../../store/settings'
 import { extensionEnabled, toolsOffered, withFlag } from './settings'
-import { loadExtensions, restartExtension, uninstallExtension, useExtensions, type Info } from './store'
+import { installFromFolder, loadExtensions, restartExtension, uninstallExtension, useExtensions, type Info } from './store'
 import { themeContributions, type ExtensionInfo } from './model'
 import { activeThemeId, customThemeFrom } from '../../lib/contributedThemes'
 import { useContributions } from '../../lib/contributions'
@@ -34,6 +34,10 @@ export function ExtensionsSection() {
         show and checks every request against the permissions they declare, but a program runs with your user's permissions: install only ones you trust.
         One starts when you first use it and stops after five idle minutes. A theme-only extension has no program and runs no code.
       </p>
+      <div className="settings-actions">
+        <button onClick={() => void installFromFolder()}>Install from Folder…</button>
+        <button onClick={() => void loadExtensions(true)}>Reload Installed</button>
+      </div>
       <BuiltinExtensions />
       <CatalogSection />
       <h3>Installed</h3>

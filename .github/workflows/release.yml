@@ -160,8 +160,9 @@ jobs:
           (cd frontend && npm ci --ignore-scripts)
 
       - name: Test
+        # go test needs frontend/dist (main.go embeds it), like CI: build it first.
         run: |
-          (cd frontend && go run ../cmd/webbuild --test)
+          (cd frontend && go run ../cmd/webbuild --test && go run ../cmd/webbuild --typecheck)
           go test ./...
 
       - name: Build universal app

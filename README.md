@@ -108,7 +108,7 @@ cd frontend && npm ci --ignore-scripts && cd ..
 make install    # macOS: builds build/bin/flint.app, copies it to /Applications, installs `flint` in ~/.local/bin
 ```
 
-On Linux there are no release downloads yet: build it with `wails3 task package:linux` and unpack the archive into `~/.local` ([Building on Linux](docs/DEVELOPMENT.md#building-on-linux), [Installation](site/installation.md#linux)).
+On Linux, download `Flint-vX.Y.Z-linux-amd64.tar.gz` (or `-arm64`) from the releases page and unpack it into `~/.local`, or build it with `wails3 task package:linux` ([Building on Linux](docs/DEVELOPMENT.md#building-on-linux), [Installation](site/installation.md#linux)).
 
 ## Requirements
 

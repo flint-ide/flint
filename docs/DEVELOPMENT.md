@@ -206,11 +206,20 @@ CI (`.github/workflows/ci.yml`) runs on every pull request and on pushes to `mai
 
 ## Release process
 
-1. Make sure `main` is green.
-2. Tag the release: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-3. The release workflow (`.github/workflows/release.yml`) runs the tests, builds a universal (Apple silicon + Intel) `Flint.app` with `wails3 task package:universal VERSION=vX.Y.Z`, packs it as `.zip` and `.dmg` with SHA-256 checksums and build provenance, and drafts a GitHub release.
-4. Review the draft and publish it.
-5. Publishing runs the workflow's `homebrew` job (on macOS): it downloads the release's `.zip`, checks it against `SHA256SUMS.txt`, checks that the app is notarized (a valid signature and a stapled ticket: `codesign --verify` and `xcrun stapler validate`), renders `packaging/homebrew/flint.rb` with the version and SHA-256, and pushes it to the tap as `Casks/flint.rb`. Prereleases, tags that aren't `vX.Y.Z` and releases that aren't notarized are skipped with a notice: an ad-hoc signed app installed by Homebrew would be blocked by Gatekeeper. The tap token is passed to the push step only.
+Releases are made by `.github/workflows/release.yml` and published straight to the [Releases](https://github.com/flint-ide/flint/releases) page. A release starts in one of three ways:
+
+- **Automatically after a merge to `main`.** When CI passes on a push to `main`, `go run ./cmd/nextversion` works out the next version from the [Conventional Commits](https://www.conventionalcommits.org/) since the last `vX.Y.Z` tag: `feat` → minor, `fix`/`perf` → patch, `type!:` or a `BREAKING CHANGE:` footer → major (minor before 1.0). Merge commits are skipped; the commits they bring in count. With only `chore`, `docs`, `ci`, `refactor`, `test` and the like, nothing is released. If a newer commit has landed on `main` meanwhile, its own run releases both.
+- **By hand:** Actions ▸ Release ▸ Run workflow on `main`, with bump `auto`, `patch`, `minor` or `major` (or `gh workflow run release.yml -f bump=minor`).
+- **By pushing a tag:** `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
+To see which version the next release would get: `go run ./cmd/nextversion` (it prints nothing when nothing would be released).
+
+The workflow then:
+
+1. Runs the tests and builds a universal (Apple silicon + Intel) `Flint.app` with `wails3 task package:universal VERSION=vX.Y.Z`, packed as `.zip` and `.dmg` (signed and notarized when the Apple secrets below are set).
+2. Builds the Linux archives on x86_64 and arm64 with `wails3 task package:linux VERSION=vX.Y.Z` (`Flint-vX.Y.Z-linux-amd64.tar.gz`, `Flint-vX.Y.Z-linux-arm64.tar.gz`).
+3. Writes `SHA256SUMS.txt`, attests build provenance for every file, creates the tag (unless it was pushed) and publishes the release with generated notes, marked as the latest.
+4. Runs the `homebrew` job (on macOS), which also runs when someone publishes a release by hand: it downloads the release's `.zip`, checks it against `SHA256SUMS.txt`, checks that the app is notarized (a valid signature and a stapled ticket: `codesign --verify` and `xcrun stapler validate`), renders `packaging/homebrew/flint.rb` with the version and SHA-256, and pushes it to the tap as `Casks/flint.rb`. Prereleases, tags that aren't `vX.Y.Z` and releases that aren't notarized are skipped with a notice: an ad-hoc signed app installed by Homebrew would be blocked by Gatekeeper. The tap token is passed to the push step only.
 
 ### Homebrew tap: one-time setup
 

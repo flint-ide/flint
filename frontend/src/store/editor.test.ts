@@ -163,3 +163,38 @@ describe('contributed tabs', () => {
     assert.equal(st().activeId, 'contrib:acme.report:r1')
   })
 })
+
+describe('settings tab', () => {
+  const settingsTab = () => {
+    const tab = st().tabs.find((t) => t.kind === 'settings')
+    return tab?.kind === 'settings' ? tab : undefined
+  }
+
+  it('opens one Settings tab without asking for a page', () => {
+    st().openSettings()
+    st().openSettings()
+    assert.equal(st().tabs.filter((t) => t.kind === 'settings').length, 1)
+    assert.equal(st().activeId, 'settings')
+    assert.equal(settingsTab()?.page, undefined)
+  })
+
+  it('asks for a page, and asks again with a new nonce when already open', () => {
+    st().openFile('/p/a.go')
+    st().openSettings('extensions')
+    const first = settingsTab()?.page
+    assert.equal(first?.id, 'extensions')
+    st().setActive('file:/p/a.go')
+    st().openSettings('extensions')
+    const second = settingsTab()?.page
+    assert.equal(st().activeId, 'settings')
+    assert.equal(second?.id, 'extensions')
+    assert.notEqual(first?.nonce, second?.nonce)
+  })
+
+  it('keeps the last page request when reopened without one', () => {
+    st().openSettings('extensions')
+    const asked = settingsTab()?.page
+    st().openSettings()
+    assert.deepEqual(settingsTab()?.page, asked)
+  })
+})

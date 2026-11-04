@@ -137,6 +137,13 @@ export interface SettingsTab {
   kind: 'settings'
   title: string
   dirty: boolean // always false: settings save as they change
+  /** The page to show (a Settings ▸ section id); nonce changes on every request. */
+  page?: SettingsPageRequest
+}
+
+export interface SettingsPageRequest {
+  id: string
+  nonce: number
 }
 
 /** A GitHub pull request (store/pullRequests.ts) of the project at root. */
@@ -210,7 +217,8 @@ interface EditorState {
   openRun: (runKey: string, title: string, background?: boolean) => void
   openDebug: (title: string) => void
   openProfile: (profileId: string, title: string) => void
-  openSettings: () => void
+  /** page: a Settings section id to show (e.g. 'extensions'). */
+  openSettings: (page?: string) => void
   back: () => void
   forward: () => void
   openFile: (path: string, reveal?: Omit<Reveal, 'nonce'>) => void
@@ -322,11 +330,15 @@ export const useEditor = createStore<EditorState>((set) => ({
       return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
     }),
 
-  openSettings: () =>
+  openSettings: (pageId) =>
     set((s) => {
       const id = 'settings'
-      if (s.tabs.some((t) => t.id === id)) return activate(s, id)
-      const tab: SettingsTab = { id, kind: 'settings', title: 'Settings', dirty: false }
+      const page = pageId ? { id: pageId, nonce: ++revealSeq } : undefined
+      if (s.tabs.some((t) => t.id === id)) {
+        const tabs = page ? s.tabs.map((t) => (t.kind === 'settings' ? { ...t, page } : t)) : s.tabs
+        return { tabs, ...activate(s, id) }
+      }
+      const tab: SettingsTab = { id, kind: 'settings', title: 'Settings', dirty: false, page }
       return { tabs: insertAfterActive(s.tabs, s.activeId, tab), ...activate(s, id) }
     }),
 

@@ -1,4 +1,5 @@
-import { Suspense, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import type { SettingsPageRequest } from '../../store/editor'
 import { useSettings } from '../../store/settings'
 import { DEFAULT_SETTINGS, FONT_SIZE, LINE_HEIGHT, type FontSettings, type ThemeMode } from '../../lib/settings'
 import { byOrder, useContributions } from '../../lib/contributions'
@@ -40,9 +41,13 @@ const SECTIONS: { id: Section; label: string; order: number }[] = [
 // Offered in the font pickers; any installed font can be typed instead.
 const MONO_FONTS = ['JetBrains Mono', 'SF Mono', 'Menlo', 'Monaco', 'Fira Code', 'Cascadia Code', 'Source Code Pro', 'IBM Plex Mono', 'Courier New']
 
-/** The Settings tab (⌘,). Every change applies and saves right away. */
-export function SettingsView({ active }: { active: boolean }) {
-  const [section, setSection] = useState<string>('appearance')
+/** The Settings tab (⌘,). Every change applies and saves right away; page: a section asked for by openSettings. */
+export function SettingsView({ active, page: asked }: { active: boolean; page?: SettingsPageRequest }) {
+  const [section, setSection] = useState<string>(asked?.id ?? 'appearance')
+  // Every request (a new nonce) shows its page, even one the user has since left.
+  useEffect(() => {
+    if (asked) setSection(asked.id)
+  }, [asked?.id, asked?.nonce])
   const contributed = useContributions((s) => s.settingsPages)
   const pages = useMemo(() => byOrder<{ id: string; label: string; order: number }>([...SECTIONS, ...contributed]), [contributed])
   const page = contributed.find((p) => p.id === section)

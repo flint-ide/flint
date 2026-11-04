@@ -1,10 +1,11 @@
 // External extensions (Go: internal/features/extensions, docs/design/extensions.md):
-// Settings ▸ Extensions, "Install Extension from Folder…", the "extensions"
+// Settings ▸ Extensions ("Show Extensions"), "Install Extension from Folder…", the "extensions"
 // settings section, and — once the window is up — each installed extension's
 // commands, panels, Settings page and status items, contributed under
 // extension:<id> and withdrawn when it is turned off or uninstalled.
 import { lazy } from 'react'
 import { defineFeature } from '../../lib/features'
+import { useEditor } from '../../store/editor'
 import { extensionsSettings, featureToggleSettings } from './settings'
 import { installFromFolder, subscribeExtensions } from './store'
 
@@ -14,6 +15,13 @@ export default defineFeature({
   id: 'extensions',
   settings: [extensionsSettings, featureToggleSettings],
   commands: [
+    {
+      id: 'extensions.show',
+      title: 'Show Extensions',
+      category: 'Extensions',
+      keywords: 'extension plugin installed manage list settings marketplace repository',
+      run: () => useEditor.getState().openSettings('extensions'),
+    },
     {
       id: 'extensions.install',
       title: 'Install Extension from Folder…',

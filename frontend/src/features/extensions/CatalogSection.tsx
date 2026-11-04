@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { installFromFolder, loadExtensions, uninstallExtension, useExtensions } from './store'
+import { uninstallExtension, useExtensions } from './store'
 import { installFromCatalog, loadCatalog, useCatalog, type Entry } from './catalogStore'
 import { catalogRows, sentence, type CatalogRow, type CatalogStatus } from './catalogModel'
 
@@ -13,8 +13,8 @@ const STATUS_LABELS: Record<CatalogStatus, string> = {
 
 /**
  * Settings ▸ Extensions ▸ Repository: every extension of flint-ide/extensions,
- * shown by default, with Install / Update / Uninstall; local folders are
- * installed with the button next to it.
+ * shown by default, with Install / Update / Uninstall. Local folders are
+ * installed from the top of Settings ▸ Extensions (ExtensionsSection).
  */
 export function CatalogSection() {
   const listing = useCatalog((s) => s.listing)
@@ -35,8 +35,6 @@ export function CatalogSection() {
         <button disabled={loading} onClick={() => void loadCatalog(true)}>
           {loading ? 'Fetching…' : 'Refresh Repository'}
         </button>
-        <button onClick={() => void installFromFolder()}>Install from Folder…</button>
-        <button onClick={() => void loadExtensions(true)}>Reload Installed</button>
       </div>
       {error && <p className="error">{sentence(error)}</p>}
       {loading && !listing && <p className="muted settings-note">Fetching the extensions repository…</p>}

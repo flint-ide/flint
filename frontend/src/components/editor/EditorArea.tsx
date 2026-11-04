@@ -172,7 +172,7 @@ const TabPanel = memo(function TabPanel({ tab, active }: { tab: Tab; active: boo
           {tab.kind === 'debug' && <DebugView />}
           {tab.kind === 'profile' && <ProfileView profileId={tab.profileId} />}
           {tab.kind === 'http' && <HttpResponseView tab={tab} active={active} />}
-          {tab.kind === 'settings' && <SettingsView active={active} />}
+          {tab.kind === 'settings' && <SettingsView active={active} page={tab.page} />}
           {tab.kind === 'pr' && <PullRequestView tab={tab} active={active} />}
           {tab.kind === 'prdiff' && <PullRequestDiffView tab={tab} active={active} />}
           {tab.kind === 'cilog' && <CILogView tab={tab} />}

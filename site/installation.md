@@ -40,7 +40,13 @@ Homebrew only gets notarized releases, so the [first launch](#first-launch) warn
 
 ## Linux
 
-There are no Linux downloads on the releases page yet, so on Linux you build Flint yourself. It takes a few minutes.
+Every release has Linux archives for x86_64 (`Flint-vX.Y.Z-linux-amd64.tar.gz`) and arm64 (`Flint-vX.Y.Z-linux-arm64.tar.gz`) on the [releases page](https://github.com/flint-ide/flint/releases), checked by the same `SHA256SUMS.txt`. Download the one for your machine and unpack it into `~/.local`:
+
+```bash
+tar -xzf Flint-vX.Y.Z-linux-amd64.tar.gz -C ~/.local
+```
+
+The system still needs GTK 4 and WebKitGTK 6 (see below; the development packages are only for building). You can also build Flint yourself, which takes a few minutes.
 
 ### What you need
 

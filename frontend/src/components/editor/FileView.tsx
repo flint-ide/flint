@@ -14,6 +14,8 @@ import { testGutterHooks } from '../../store/run'
 import { breakpointGutter } from '../../lib/breakpointGutter'
 import { breakpointHooks, debugTestMark } from '../../store/debug'
 import { testMarkMenu } from '../../store/testMenu'
+import { mainGutter } from '../../lib/mainGutter'
+import { mainGutterHooks } from '../../store/mainRun'
 import { blameGutter } from '../../lib/blameGutter'
 import { indentationFor } from '../../lib/indent'
 import { Git, useGit, useHeadVersion } from '../../store/git'
@@ -25,6 +27,7 @@ import { isHttpFile } from '../../lib/httpFiles'
 import * as LSP from '../../../bindings/flint/lspapi'
 import { CodeEditor } from './CodeEditor'
 import { useBlame } from './useBlame'
+import { useEditorContextMenu } from './useEditorContextMenu'
 import { isMarkdown } from '../../lib/previewFiles'
 import { markdownMode, setMarkdownMode, usePreview, type MarkdownMode } from '../../store/preview'
 import { editorAi } from '../../store/editorAi'
@@ -104,12 +107,13 @@ export function FileView({ tab, active }: Props) {
   const indentation = useMemo(() => (file ? indentationFor(file.content, tab.path) : []), [file, tab.path])
 
   const tests = useMemo(() => testGutter(tab.path, { ...testGutterHooks, debug: debugTestMark, menu: testMarkMenu }), [tab.path])
+  const program = useMemo(() => mainGutter(tab.path, mainGutterHooks), [tab.path])
   const breakpoints = useMemo(() => (tab.path.endsWith('.go') ? breakpointGutter(tab.path, breakpointHooks) : []), [tab.path])
   const http = useHttpEditor(tab.path)
   const ai = useMemo(() => editorAi(tab.path), [tab.path])
   const extensions = useMemo(
-    () => [language, indentation, breakpoints, gitGutter(), blameGutter(), tests, http, lsp, ai, crlf ? EditorState.lineSeparator.of('\r\n') : []],
-    [crlf, language, indentation, breakpoints, tests, http, lsp, ai],
+    () => [language, indentation, breakpoints, gitGutter(), blameGutter(), tests, program, http, lsp, ai, crlf ? EditorState.lineSeparator.of('\r\n') : []],
+    [crlf, language, indentation, breakpoints, tests, program, http, lsp, ai],
   )
 
   // Gutter baseline: the file at HEAD of the work tree that contains it (which may be
@@ -133,6 +137,7 @@ export function FileView({ tab, active }: Props) {
     }
   }, [isRepo, headVersion, tab.path, editorReady])
   useBlame(view, tab.path, editorReady, headVersion)
+  useEditorContextMenu(view, tab.path, editorReady)
 
   // Saves are chained: Wails runs each call on its own goroutine, so two in-flight
   // writes could otherwise land out of order.

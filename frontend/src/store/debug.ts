@@ -156,7 +156,10 @@ export function debugSelected(): Promise<void> {
 }
 
 export function canDebug(config: RunConfig | null = selectedRunConfig()): boolean {
-  return !!config && !!useRun.getState().capabilities[config.id]?.debug
+  if (!config) return false
+  const caps = useRun.getState().capabilities[config.id]
+  // Not loaded (another folder's, or one built for ▶ next to func main): Go is debuggable.
+  return caps ? !!caps.debug : config.type === 'go'
 }
 
 /** Debugs config of root (default: the folder whose configurations are shown). */

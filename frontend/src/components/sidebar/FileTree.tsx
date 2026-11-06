@@ -7,7 +7,7 @@ import {
 import { rootLabels } from '../../lib/workspaceRoots'
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
-import { createEntry, renameEntry, trashEntries, type NewKind } from '../../store/fileOps'
+import { clearNewEntryRequest, createEntry, renameEntry, trashEntries, useNewEntryRequest, type NewKind } from '../../store/fileOps'
 import { FileIcon } from '../icons/FileIcon'
 import { openContextMenu } from '../../store/contextMenu'
 import { fileTreeMenu } from './fileTreeMenu'
@@ -56,6 +56,18 @@ export function FileTree() {
   useEffect(() => {
     if (draftIndex >= 0) scrollToIndex(treeEl.current, draftIndex)
   }, [draftIndex])
+
+  // ＋ ▸ New File… in the tab bar: the inline input in the asked folder.
+  const newEntry = useNewEntryRequest((s) => s.request)
+  useEffect(() => {
+    if (!newEntry) return
+    clearNewEntryRequest()
+    const { dir, kind } = newEntry
+    void (async () => {
+      if (dir !== implicitRoot && !useWorkspace.getState().expanded[dir]) await toggleDir(dir)
+      setEdit({ kind: 'new', dir, type: kind })
+    })()
+  }, [newEntry, implicitRoot, toggleDir])
 
   if (roots.length === 0) return <div className="placeholder muted">No folder open.</div>
 

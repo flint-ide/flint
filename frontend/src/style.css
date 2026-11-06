@@ -1932,6 +1932,41 @@ button.small {
 .change-row {
   padding-left: 22px !important;
 }
+/* Several repositories: a header per repository, its groups indented under it. */
+.repo-row {
+  gap: 4px;
+}
+.repo-section.current > .repo-row {
+  background: var(--bg-raised);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.repo-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.repo-branch {
+  flex: 1;
+  min-width: 0;
+  font-weight: 400;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: 6px;
+}
+.repo-changes .group-row {
+  padding-left: 18px !important;
+}
+.repo-changes .change-row {
+  padding-left: 38px !important;
+}
+.repo-clean {
+  padding: 2px 0 4px 34px;
+  font-size: 12px;
+}
+.git-branch-line .repo-name {
+  font-weight: 600;
+}
 .tree-row input[type='checkbox'] {
   margin: 0 4px 0 0;
   accent-color: var(--accent);

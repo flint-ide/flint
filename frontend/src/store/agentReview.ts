@@ -65,7 +65,7 @@ function scopeFiles(extra?: string): FileChange[] {
   const { status, isIncluded } = useGit.getState()
   const all = (status?.files ?? []).filter((f) => f.kind !== 'conflicted')
   const scope = useSettings.getState().settings.agentReview.scope
-  const files = scope === 'all' ? all : all.filter(isIncluded)
+  const files = scope === 'all' ? all : all.filter((f) => isIncluded(f))
   const added = extra ? all.find((f) => f.path === extra) : undefined
   return added && !files.includes(added) ? [...files, added] : files
 }

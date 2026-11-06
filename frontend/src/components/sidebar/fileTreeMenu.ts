@@ -3,7 +3,7 @@ import { dirname, type TreeEntry } from '../../lib/fileTree'
 import { rootOf } from '../../lib/workspaceRoots'
 import { attachPathsToAgent } from '../../lib/agentContext'
 import { copyPaths, findInFolder, removeFromWorkspace, revealInFinder, trashEntries, type NewKind } from '../../store/fileOps'
-import { changesUnder, confirmRollback, useGit } from '../../store/git'
+import { changesUnder, confirmRollbackIn, useGit } from '../../store/git'
 import { useEditor } from '../../store/editor'
 import { useTerminal } from '../../store/terminal'
 import { useWorkspace } from '../../store/workspace'
@@ -39,8 +39,10 @@ export function fileTreeMenu(roots: string[], targets: TreeEntry[], actions: Men
   const isRoot = !!single && roots.includes(single.path)
   const folder = single ? (single.isDir ? single.path : dirname(single.path)) : roots[0]
   const root = rootOf(roots, folder) ?? roots[0]
-  const changes = changesUnder(paths)
-  const changedFile = single && !single.isDir ? changes.find((f) => `${useGit.getState().root}/${f.path}` === single.path) : undefined
+  const changeGroups = changesUnder(paths)
+  const changes = changeGroups.flatMap((g) => g.files)
+  const changedGroup = single && !single.isDir ? changeGroups.find((g) => g.files.some((f) => `${g.root}/${f.path}` === single.path)) : undefined
+  const changedFile = changedGroup?.files.find((f) => `${changedGroup.root}/${f.path}` === single?.path)
 
   const items: DropdownItem[] = [
     { label: 'New File…', onSelect: () => actions.startCreate(folder, 'file') },
@@ -91,7 +93,7 @@ export function fileTreeMenu(roots: string[], targets: TreeEntry[], actions: Men
   if (history || changes.length > 0) items.push({ type: 'separator' })
   if (history) items.push({ label: 'Show History', onSelect: () => showFileHistory(single.path) })
   if (changes.length > 0) {
-    const gitRoot = useGit.getState().root ?? root
+    const gitRoot = changedGroup?.root ?? useGit.getState().root ?? root
     if (changedFile && changedFile.kind !== 'conflicted') {
       const base = changedFile.origPath ? `${gitRoot}/${changedFile.origPath}` : single!.path
       items.push({ label: 'Show Diff', onSelect: () => useEditor.getState().openDiff(gitRoot, single!.path, base) })
@@ -99,7 +101,7 @@ export function fileTreeMenu(roots: string[], targets: TreeEntry[], actions: Men
     items.push({
       label: changes.length === 1 ? 'Rollback…' : `Rollback ${changes.length} Changed Files…`,
       danger: true,
-      onSelect: () => void confirmRollback(changes),
+      onSelect: () => void confirmRollbackIn(changeGroups),
     })
   }
   if (isRoot) {

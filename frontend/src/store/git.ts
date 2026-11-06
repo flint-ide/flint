@@ -17,6 +17,24 @@ export type Worktree = git.Worktree
 
 export { Git }
 
+/** One repository of the workspace as the Commit panel lists it (several folders only). */
+export interface RepoView {
+  /** Workspace folder it was found from. */
+  folder: string
+  /** Work-tree root. */
+  root: string
+  status: GitStatus
+}
+
+/** Changed files of one repository (rollback, file tree). */
+export interface RepoChanges {
+  root: string
+  files: FileChange[]
+}
+
+/** Key of a file in the commit selection: absolute, so several repositories never clash. */
+export const selectionKey = (root: string, f: Pick<FileChange, 'path'>) => `${root}/${f.path}`
+
 type RemoteOp = 'fetch' | 'pull' | 'push' | 'commit' | null
 
 interface GitState {
@@ -25,7 +43,7 @@ interface GitState {
   root: string | null // work-tree root (may differ from the opened folder)
   isRepo: boolean
   status: GitStatus | null
-  /** Paths excluded from the next commit (IntelliJ includes all changes by default). */
+  /** Files (selectionKey) excluded from the next commit (IntelliJ includes all changes by default). */
   excluded: Record<string, boolean>
   /** Untracked files the user explicitly ticked (excluded by default, like IntelliJ). */
   includedUntracked: Record<string, boolean>
@@ -41,22 +59,27 @@ interface GitState {
   refsVersion: number
   /** Changed-file count per workspace folder (multi-root switcher); absent = not a repo. */
   counts: Record<string, number>
+  /** Every repository of the workspace, in folder order, one per work tree (several folders only). */
+  repos: RepoView[]
 
   load: (folder: string | null) => Promise<void>
   refresh: () => Promise<void>
   setMessage: (m: string) => void
   setAmend: (amend: boolean) => Promise<void>
-  toggleFile: (f: FileChange) => void
-  setGroup: (files: FileChange[], include: boolean) => void
-  isIncluded: (f: FileChange) => boolean
+  /** root: the file's repository (default: the shown one). */
+  toggleFile: (f: FileChange, root?: string) => void
+  setGroup: (files: FileChange[], include: boolean, root?: string) => void
+  isIncluded: (f: FileChange, root?: string) => boolean
+  /** Commits the ticked files of every repository (one commit each, same message). */
   commit: (push: boolean) => Promise<void>
-  rollback: (files: FileChange[]) => Promise<void>
+  rollback: (files: FileChange[], root?: string) => Promise<void>
   remote: (op: 'fetch' | 'pull' | 'push') => Promise<void>
 }
 
 export const useGit = createStore<GitState>((set, get) => ({
   folder: null,
   counts: {},
+  repos: [],
   root: null,
   isRepo: false,
   status: null,
@@ -77,7 +100,8 @@ export const useGit = createStore<GitState>((set, get) => ({
     try {
       const info = await Git.Info(folder)
       if (get().folder !== folder) return // switched again meanwhile
-      set({ root: info.isRepo ? info.root : null, isRepo: info.isRepo, status: null, excluded: {}, includedUntracked: {} })
+      // Ticks are keyed by absolute path, so switching repositories keeps each one's.
+      set({ root: info.isRepo ? info.root : null, isRepo: info.isRepo, status: null })
       if (info.isRepo) await get().refresh()
     } catch (err) {
       showToast(errorMessage(err), 'error')
@@ -101,52 +125,64 @@ export const useGit = createStore<GitState>((set, get) => ({
     }
   },
 
-  isIncluded: (f) => (f.kind === 'untracked' ? !!get().includedUntracked[f.path] : !get().excluded[f.path]),
+  isIncluded: (f, root = get().root ?? '') => {
+    const key = selectionKey(root, f)
+    return f.kind === 'untracked' ? !!get().includedUntracked[key] : !get().excluded[key]
+  },
 
-  toggleFile: (f) =>
+  toggleFile: (f, root = get().root ?? '') => {
+    const key = selectionKey(root, f)
     set((s) =>
       f.kind === 'untracked'
-        ? { includedUntracked: { ...s.includedUntracked, [f.path]: !s.includedUntracked[f.path] } }
-        : { excluded: { ...s.excluded, [f.path]: !s.excluded[f.path] } },
-    ),
+        ? { includedUntracked: { ...s.includedUntracked, [key]: !s.includedUntracked[key] } }
+        : { excluded: { ...s.excluded, [key]: !s.excluded[key] } },
+    )
+  },
 
-  setGroup: (files, include) =>
+  setGroup: (files, include, root = get().root ?? '') =>
     set((s) => {
       const excluded = { ...s.excluded }
       const includedUntracked = { ...s.includedUntracked }
       for (const f of files) {
-        if (f.kind === 'untracked') includedUntracked[f.path] = include
-        else excluded[f.path] = !include
+        const key = selectionKey(root, f)
+        if (f.kind === 'untracked') includedUntracked[key] = include
+        else excluded[key] = !include
       }
       return { excluded, includedUntracked }
     }),
 
   commit: async (push) => {
-    const { root, status, message, amend, isIncluded } = get()
-    if (!root || !status) return
-    const selected = status.files.filter((f) => f.kind !== 'conflicted' && isIncluded(f))
-    // Renames need both sides so the deletion of the old path is committed too.
-    const paths = [...new Set(selected.flatMap((f) => (f.origPath ? [f.path, f.origPath] : [f.path])))]
+    const { message, amend } = get()
+    const targets = commitTargets(get())
+    if (targets.length === 0) return
+    const many = targets.length > 1
+    const done: string[] = []
     set({ busy: 'commit' })
     try {
-      const hash = await Git.Commit(root, message, paths, amend)
+      for (const t of targets) {
+        // Renames need both sides so the deletion of the old path is committed too.
+        const paths = [...new Set(t.files.flatMap((f) => (f.origPath ? [f.path, f.origPath] : [f.path])))]
+        const hash = await Git.Commit(t.root, message, paths, amend)
+        done.push(`${hash}${many ? ` in ${baseName(t.root)}` : ''}${paths.length ? ` (${t.files.length} files)` : ''}`)
+      }
       set({ message: '', amend: false, excluded: {}, includedUntracked: {} })
-      showToast(`Committed ${hash}${paths.length ? ` (${selected.length} files)` : ''}`)
+      showToast(`Committed ${done.join(', ')}`)
       if (push) {
         set({ busy: 'push' })
-        await Git.Push(root)
-        showToast('Pushed')
+        for (const t of targets) await Git.Push(t.root)
+        showToast(many ? `Pushed ${targets.length} repositories` : 'Pushed')
       }
     } catch (err) {
-      showToast(errorMessage(err), 'error')
+      // Repositories committed before the failure keep their commits: say which.
+      showToast(`${done.length ? `Committed ${done.join(', ')}; then: ` : ''}${errorMessage(err)}`, 'error')
     } finally {
       set({ busy: null })
       void get().refresh()
+      void refreshRepos()
     }
   },
 
-  rollback: async (files) => {
-    const root = get().root
+  rollback: async (files, root = get().root ?? '') => {
     if (!root || files.length === 0) return
     const paths = [...new Set(files.flatMap((f) => (f.origPath ? [f.path, f.origPath] : [f.path])))]
     try {
@@ -155,6 +191,7 @@ export const useGit = createStore<GitState>((set, get) => ({
       showToast(errorMessage(err), 'error')
     } finally {
       void get().refresh()
+      void refreshRepos()
     }
   },
 
@@ -176,20 +213,47 @@ export const useGit = createStore<GitState>((set, get) => ({
   },
 }))
 
-/** Asks before discarding changes (new files are deleted), then rolls back. */
-export async function confirmRollback(files: FileChange[]): Promise<void> {
+const baseName = (p: string) => p.slice(p.lastIndexOf('/') + 1)
+
+/** Repositories with their freshest status: the shown one's comes from its own refresh. */
+function repoStatuses(s: Pick<GitState, 'root' | 'status' | 'repos'>): { root: string; status: GitStatus }[] {
+  if (s.repos.length > 1) return s.repos.map((r) => ({ root: r.root, status: r.root === s.root ? (s.status ?? r.status) : r.status }))
+  return s.root && s.status ? [{ root: s.root, status: s.status }] : []
+}
+
+/** What Commit commits: the ticked files of each repository (one commit per repository). */
+export function commitTargets(s: Pick<GitState, 'root' | 'status' | 'repos' | 'amend' | 'isIncluded'>): RepoChanges[] {
+  const ticked = repoStatuses(s).map((v) => ({
+    root: v.root,
+    files: (v.status.files ?? []).filter((f) => f.kind !== 'conflicted' && s.isIncluded(f, v.root)),
+  }))
+  const withFiles = ticked.filter((t) => t.files.length > 0)
+  // Amending with nothing ticked rewrites the shown repository's last commit (message only).
+  if (withFiles.length === 0 && s.amend && s.root) return [{ root: s.root, files: [] }]
+  return withFiles
+}
+
+/** Asks before discarding changes (new files are deleted), then rolls back; root: their repository. */
+export async function confirmRollback(files: FileChange[], root?: string): Promise<void> {
+  return confirmRollbackIn([{ root: root ?? useGit.getState().root ?? '', files }])
+}
+
+/** confirmRollback over several repositories at once (file tree selection across folders). */
+export async function confirmRollbackIn(groups: RepoChanges[]): Promise<void> {
+  const files = groups.flatMap((g) => g.files)
   if (files.length === 0) return
   const deletes = files.filter((f) => f.kind === 'untracked' || f.kind === 'added').length
   const what = files.length === 1 ? files[0].path : `${files.length} files`
   const extra = deletes ? ` ${deletes} new file(s) will be deleted.` : ''
-  if (await confirmAction(`Rollback changes in ${what}?${extra}`, 'Rollback')) await useGit.getState().rollback(files)
+  if (!(await confirmAction(`Rollback changes in ${what}?${extra}`, 'Rollback'))) return
+  for (const g of groups) if (g.files.length) await useGit.getState().rollback(g.files, g.root)
 }
 
-/** Changed files at or under any of the absolute paths (file tree ▸ Rollback). */
-export function changesUnder(paths: string[]): FileChange[] {
-  const { root, status } = useGit.getState()
-  if (!root || !status) return []
-  return status.files.filter((f) => paths.some((p) => isWithin(p, `${root}/${f.path}`)))
+/** Changed files at or under any of the absolute paths, per repository (file tree ▸ Rollback). */
+export function changesUnder(paths: string[]): RepoChanges[] {
+  return repoStatuses(useGit.getState())
+    .map((v) => ({ root: v.root, files: (v.status.files ?? []).filter((f) => paths.some((p) => isWithin(p, `${v.root}/${f.path}`))) }))
+    .filter((g) => g.files.length > 0)
 }
 
 // Single-flight status refresh with one trailing re-run, so bursts of agent edits cost
@@ -274,23 +338,52 @@ export function useHeadVersion(path: string): number {
   return useGit((s) => headVersionOf(s, tree))
 }
 
-/** Counts changes of every workspace folder for the Commit panel's switcher (several folders only). */
-async function refreshCounts(): Promise<void> {
+/** Work-tree root per workspace folder ('' = not a repository), until the folders change. */
+let infoCache = new Map<string, Promise<string>>()
+
+function workTreeOf(folder: string): Promise<string> {
+  let p = infoCache.get(folder)
+  if (!p) {
+    p = Git.Info(folder).then((i) => (i.isRepo ? i.root : ''), () => '')
+    infoCache.set(folder, p)
+  }
+  return p
+}
+
+/** Status of every repository of the workspace for the Commit panel (several folders only). */
+async function refreshRepos(): Promise<void> {
   const roots = useWorkspace.getState().roots
   if (roots.length < 2) {
-    if (Object.keys(useGit.getState().counts).length) useGit.setState({ counts: {} })
+    const s = useGit.getState()
+    if (Object.keys(s.counts).length || s.repos.length) useGit.setState({ counts: {}, repos: [] })
     return
   }
-  const results = await Promise.all(roots.map((r) => Git.Status(r).then((st) => (st.files ?? []).length, () => -1)))
+  const trees = await Promise.all(roots.map(workTreeOf))
+  const unique = [...new Set(trees.filter(Boolean))]
+  const statuses = new Map(await Promise.all(unique.map(async (t) => [t, await Git.Status(t).catch(() => null)] as const)))
+  if (useWorkspace.getState().roots !== roots) return // folders changed meanwhile; a newer refresh follows
   const counts: Record<string, number> = {}
-  roots.forEach((r, i) => {
-    if (results[i] >= 0) counts[r] = results[i]
+  const repos: RepoView[] = []
+  const seen = new Set<string>()
+  roots.forEach((folder, i) => {
+    const status = trees[i] ? statuses.get(trees[i]) : null
+    if (!status) return
+    counts[folder] = (status.files ?? []).length
+    if (seen.has(trees[i])) return // two folders of one repository: list it once
+    seen.add(trees[i])
+    repos.push({ folder, root: trees[i], status })
   })
-  // Most refreshes change no count: keep the old object so the switcher doesn't render.
-  const prev = useGit.getState().counts
+  // Most refreshes change nothing: keep the old objects so the panel doesn't render.
+  const prev = useGit.getState()
   const keys = Object.keys(counts)
-  if (keys.length === Object.keys(prev).length && keys.every((k) => prev[k] === counts[k])) return
-  useGit.setState({ counts })
+  const sameCounts = keys.length === Object.keys(prev.counts).length && keys.every((k) => prev.counts[k] === counts[k])
+  const kept = repos.map((r, i) => {
+    const old = prev.repos[i]
+    return old && old.folder === r.folder && old.root === r.root && sameStatus(old.status, r.status) ? old : r
+  })
+  const sameRepos = kept.length === prev.repos.length && kept.every((r, i) => r === prev.repos[i])
+  if (sameCounts && sameRepos) return
+  useGit.setState({ ...(sameCounts ? {} : { counts }), ...(sameRepos ? {} : { repos: kept }) })
 }
 
 let debounce: ReturnType<typeof setTimeout> | undefined
@@ -298,7 +391,7 @@ function scheduleRefresh(delay = 250): void {
   clearTimeout(debounce)
   debounce = setTimeout(() => {
     void refreshStatus()
-    void refreshCounts()
+    void refreshRepos()
   }, delay)
 }
 
@@ -325,12 +418,14 @@ export function subscribeGitEvents(): void {
   // Follow the workspace's folders and the active tab's folder among them.
   useWorkspace.subscribe((s, prev) => {
     if (s.roots !== prev.roots || s.root !== prev.root) {
+      if (s.roots !== prev.roots) infoCache = new Map()
       followActiveFolder()
-      void refreshCounts()
+      void refreshRepos()
     }
   })
   useEditor.subscribe((s, prev) => {
     if (s.activeId !== prev.activeId) followActiveFolder()
   })
   followActiveFolder()
+  void refreshRepos()
 }

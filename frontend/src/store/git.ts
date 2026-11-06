@@ -64,6 +64,8 @@ interface GitState {
 
   load: (folder: string | null) => Promise<void>
   refresh: () => Promise<void>
+  /** refresh plus every other repository of the workspace (the Commit panel's ↻). */
+  refreshAll: () => Promise<void>
   setMessage: (m: string) => void
   setAmend: (amend: boolean) => Promise<void>
   /** root: the file's repository (default: the shown one). */
@@ -109,6 +111,9 @@ export const useGit = createStore<GitState>((set, get) => ({
   },
 
   refresh: () => refreshStatus(),
+  refreshAll: async () => {
+    await Promise.all([refreshStatus(), refreshRepos()])
+  },
 
   setMessage: (message) => set({ message }),
 
@@ -165,12 +170,23 @@ export const useGit = createStore<GitState>((set, get) => ({
         const hash = await Git.Commit(t.root, message, paths, amend)
         done.push(`${hash}${many ? ` in ${baseName(t.root)}` : ''}${paths.length ? ` (${t.files.length} files)` : ''}`)
       }
-      set({ message: '', amend: false, excluded: {}, includedUntracked: {} })
+      // Forget the ticks of the committed repositories only: others keep what was unticked.
+      const committed = (key: string) => targets.some((t) => key.startsWith(`${t.root}/`))
+      const keep = (m: Record<string, boolean>) => Object.fromEntries(Object.entries(m).filter(([k]) => !committed(k)))
+      set((s) => ({ message: '', amend: false, excluded: keep(s.excluded), includedUntracked: keep(s.includedUntracked) }))
       showToast(`Committed ${done.join(', ')}`)
       if (push) {
         set({ busy: 'push' })
-        for (const t of targets) await Git.Push(t.root)
-        showToast(many ? `Pushed ${targets.length} repositories` : 'Pushed')
+        const failed: string[] = []
+        for (const t of targets) {
+          try {
+            await Git.Push(t.root)
+          } catch (err) {
+            failed.push(`${many ? `${baseName(t.root)}: ` : ''}${errorMessage(err)}`)
+          }
+        }
+        if (failed.length) showToast(`Push failed — ${failed.join('; ')}`, 'error')
+        else showToast(many ? `Pushed ${targets.length} repositories` : 'Pushed')
       }
     } catch (err) {
       // Repositories committed before the failure keep their commits: say which.
@@ -227,10 +243,10 @@ export function commitTargets(s: Pick<GitState, 'root' | 'status' | 'repos' | 'a
     root: v.root,
     files: (v.status.files ?? []).filter((f) => f.kind !== 'conflicted' && s.isIncluded(f, v.root)),
   }))
-  const withFiles = ticked.filter((t) => t.files.length > 0)
-  // Amending with nothing ticked rewrites the shown repository's last commit (message only).
-  if (withFiles.length === 0 && s.amend && s.root) return [{ root: s.root, files: [] }]
-  return withFiles
+  // Amend rewrites the shown repository's last commit only (its message is the one loaded):
+  // never another repository's, which may already be pushed.
+  if (s.amend) return s.root ? [{ root: s.root, files: ticked.find((t) => t.root === s.root)?.files ?? [] }] : []
+  return ticked.filter((t) => t.files.length > 0)
 }
 
 /** Asks before discarding changes (new files are deleted), then rolls back; root: their repository. */
@@ -338,20 +354,37 @@ export function useHeadVersion(path: string): number {
   return useGit((s) => headVersionOf(s, tree))
 }
 
-/** Work-tree root per workspace folder ('' = not a repository), until the folders change. */
+/**
+ * Work-tree root per workspace folder ('' = not a repository), until the folders change.
+ * Only repositories are cached, so a `git init` (or a failed lookup) is noticed next time.
+ */
 let infoCache = new Map<string, Promise<string>>()
 
 function workTreeOf(folder: string): Promise<string> {
   let p = infoCache.get(folder)
   if (!p) {
-    p = Git.Info(folder).then((i) => (i.isRepo ? i.root : ''), () => '')
+    const cache = infoCache
+    p = Git.Info(folder).then(
+      (i) => {
+        if (!i.isRepo) cache.delete(folder)
+        return i.isRepo ? i.root : ''
+      },
+      () => {
+        cache.delete(folder)
+        return ''
+      },
+    )
     infoCache.set(folder, p)
   }
   return p
 }
 
+/** Bumps per refreshRepos call: only the latest one applies (calls overlap on slow repositories). */
+let reposGeneration = 0
+
 /** Status of every repository of the workspace for the Commit panel (several folders only). */
 async function refreshRepos(): Promise<void> {
+  const generation = ++reposGeneration
   const roots = useWorkspace.getState().roots
   if (roots.length < 2) {
     const s = useGit.getState()
@@ -361,7 +394,8 @@ async function refreshRepos(): Promise<void> {
   const trees = await Promise.all(roots.map(workTreeOf))
   const unique = [...new Set(trees.filter(Boolean))]
   const statuses = new Map(await Promise.all(unique.map(async (t) => [t, await Git.Status(t).catch(() => null)] as const)))
-  if (useWorkspace.getState().roots !== roots) return // folders changed meanwhile; a newer refresh follows
+  // A newer refresh started meanwhile (its statuses are fresher), or the folders changed.
+  if (generation !== reposGeneration || useWorkspace.getState().roots !== roots) return
   const counts: Record<string, number> = {}
   const repos: RepoView[] = []
   const seen = new Set<string>()

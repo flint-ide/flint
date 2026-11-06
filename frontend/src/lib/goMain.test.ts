@@ -51,6 +51,11 @@ describe('mainConfigFor', () => {
     const c = mainConfigFor('/p', '/p/tools/gen/main.go', detected)
     assert.deepEqual(c, { id: 'detected:go-main:./tools/gen', name: 'gen', type: 'go', package: '.', cwd: 'tools/gen' })
   })
+  it('finds the one it built once it is saved (cwd set, package .)', () => {
+    const saved = [{ id: 'gen', name: 'gen', type: 'go', package: '.', cwd: 'tools/gen' }]
+    assert.equal(mainConfigFor('/p', '/p/tools/gen/main.go', saved)?.id, 'gen')
+    assert.equal(mainConfigFor('/p', '/p/tools/other/main.go', saved)?.id, 'detected:go-main:./tools/other')
+  })
   it('names a root-level program after the folder', () => {
     assert.equal(mainConfigFor('/p/demo', '/p/demo/main.go', [])?.name, 'demo')
   })

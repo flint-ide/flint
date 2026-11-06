@@ -58,7 +58,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
   // isIncluded reads these; subscribing re-renders the panel when a file is ticked.
   useGit((s) => s.excluded)
   useGit((s) => s.includedUntracked)
-  const { setMessage, setAmend, isIncluded, commit, remote, refresh } = useGit.getState()
+  const { setMessage, setAmend, isIncluded, commit, remote, refreshAll } = useGit.getState()
   const roots = useWorkspace((s) => s.roots)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [generating, setGenerating] = useState(false)
@@ -91,7 +91,9 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
 
   // Recomputed each render so ticking a file updates the count (isIncluded reads the store).
   const tickedIn = (sec: Section) => (sec.status.files ?? []).filter((f) => f.kind !== 'conflicted' && isIncluded(f, sec.root))
-  const selected = sections.flatMap(tickedIn)
+  // Amend only rewrites the shown repository's last commit (store/git.ts commitTargets).
+  const committing = amend ? sections.filter((sec) => sec.root === root) : sections
+  const selected = committing.flatMap(tickedIn)
   const canCommit = !busy && message.trim() !== '' && (selected.length > 0 || amend)
   const anyChanges = sections.some((sec) => (sec.status.files ?? []).length > 0)
   const conflicted = (status?.files ?? []).filter((f) => f.kind === 'conflicted')
@@ -123,7 +125,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
     <div className="panel commit-panel">
       <div className="panel-header">
         <RepoSwitcher fallback="Commit" />
-        <button className="icon" title="Refresh" onClick={() => void refresh()}>↻</button>
+        <button className="icon" title="Refresh" onClick={() => void refreshAll()}>↻</button>
         <button className="icon" title="Fetch" disabled={!!busy || !isRepo} onClick={() => void remote('fetch')}>⇣</button>
         <button className="icon" title="Update project (pull)" disabled={!!busy || !isRepo} onClick={() => void remote('pull')}>⤓</button>
         <button className="icon" title={`Push (${formatKeys('Mod+Shift+K')})`} disabled={!!busy || !isRepo} onClick={() => void remote('push')}>⤒</button>
@@ -219,7 +221,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
           </label>
           <span className="spacer" />
           <span className="muted count" title={multi ? 'One commit per repository with ticked files, same message' : undefined}>
-            {selected.length} selected{multi ? reposNote(sections, tickedIn) : ''}
+            {selected.length} selected{multi ? (amend ? ' (amend: this repo only)' : reposNote(sections, tickedIn)) : ''}
           </span>
           <button className="primary" disabled={!canCommit} onClick={() => void commit(false)} title={formatKeys('Mod+Enter')}>
             {busy === 'commit' ? 'Committing…' : 'Commit'}

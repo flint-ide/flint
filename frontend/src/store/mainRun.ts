@@ -18,13 +18,13 @@ interface MainTarget {
   config: RunConfig
 }
 
-/** The folder and configuration ▶ at path's func main starts; null (with a toast) when outside the workspace. */
-function targetFor(path: string): MainTarget | null {
+/** The folder and configuration ▶ at path's func main starts; null when outside the workspace (toast unless quiet). */
+function targetFor(path: string, quiet = false): MainTarget | null {
   const root = rootFor(path)
   const known = useRun.getState().root === root ? allConfigs() : []
   const found = root ? mainConfigFor(root, path, known) : null
   if (!root || !found) {
-    showToast(`Can't run ${baseOf(path)}: it isn't inside an open project folder.`)
+    if (!quiet) showToast(`Can't run ${baseOf(path)}: it isn't inside an open project folder.`)
     return null
   }
   return { root, config: known.find((c) => c.id === found.id) ?? runconfig.Config.createFrom(found) }
@@ -55,9 +55,9 @@ export function mainName(path: string): string {
   return targetFor(path)?.config.name ?? baseOf(path)
 }
 
-/** Menu entries for the program at path (gutter right click, editor context menu). */
+/** Menu entries for the program at path (gutter right click, editor context menu); none outside the workspace. */
 export function mainItems(path: string): DropdownItem[] {
-  const target = targetFor(path)
+  const target = targetFor(path, true)
   if (!target) return []
   const { config, root } = target
   const editable = useRun.getState().root === root

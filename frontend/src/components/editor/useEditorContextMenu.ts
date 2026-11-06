@@ -45,7 +45,10 @@ export function useEditorContextMenu(view: RefObject<EditorView | null>, path: s
     const v = view.current
     if (!v || !ready) return
     const onContextMenu = (e: MouseEvent) => {
-      if (e.defaultPrevented || !(e.target instanceof Element) || e.target.closest('.cm-gutters, .cm-panels, .cm-tooltip')) return
+      if (e.defaultPrevented || !(e.target instanceof Element)) return
+      // Only the text itself: gutters, panels, tooltips and widgets with their own inputs
+      // (the agent's inline-edit prompt) keep their own menus and clipboard.
+      if (!v.contentDOM.contains(e.target) || e.target.closest('input, textarea, [contenteditable="false"], .cm-inline-edit')) return
       e.preventDefault()
       v.focus()
       placeCaret(v, e)

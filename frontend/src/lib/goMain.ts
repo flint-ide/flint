@@ -48,11 +48,18 @@ export function mainConfigFor<C extends GoConfigLike>(root: string, path: string
   const rel = relativeDir(root, path)
   if (rel === null) return null
   const pkg = goPackageOf(rel)
-  const existing = configs.find((c) => c.type === 'go' && !c.cwd && normalizePackage(c.package) === pkg)
+  // Written from the project (package ./cmd/app) or, as this function builds them, from the folder (cwd cmd/app, package .).
+  const existing = configs.find(
+    (c) =>
+      c.type === 'go' &&
+      ((!c.cwd && normalizePackage(c.package) === pkg) || (!!rel && normalizeDir(c.cwd) === rel && normalizePackage(c.package) === '.')),
+  )
   if (existing) return existing
   const dir = rel ? rel.slice(rel.lastIndexOf('/') + 1) : root.slice(root.lastIndexOf('/') + 1)
   return { id: `detected:go-main:${pkg}`, name: dir || 'main', type: 'go', package: '.', cwd: rel || undefined }
 }
+
+const normalizeDir = (dir: string | undefined) => (dir ?? '').replace(/^\.\//, '').replace(/\/+$/, '')
 
 function normalizePackage(pkg: string | undefined): string {
   if (!pkg) return ''

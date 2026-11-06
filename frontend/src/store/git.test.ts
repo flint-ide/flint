@@ -63,6 +63,11 @@ describe('commit across repositories', () => {
     assert.deepEqual(targets(), [['/ws/a', []]])
   })
 
+  it('never amends another repository than the shown one', () => {
+    useGit.setState({ amend: true })
+    assert.deepEqual(targets(), [['/ws/a', ['a.go']]])
+  })
+
   it('uses the shown repository alone with one folder', () => {
     useGit.setState({ repos: [] })
     assert.deepEqual(targets(), [['/ws/a', ['a.go']]])

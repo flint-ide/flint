@@ -42,3 +42,23 @@ func (s *ScratchAPI) SetConnection(id, connID, database string) error {
 func (s *ScratchAPI) Delete(id string) error {
 	return s.app.scratch.Delete(id)
 }
+
+// Files lists the scratch files (any type, edited like project files), newest first.
+func (s *ScratchAPI) Files() ([]scratch.File, error) {
+	return s.app.scratch.Files()
+}
+
+// CreateFile writes a new scratch file (name made unique) with content.
+func (s *ScratchAPI) CreateFile(name, content string) (scratch.File, error) {
+	return s.app.scratch.CreateFile(name, content)
+}
+
+// RenameFile renames a scratch file.
+func (s *ScratchAPI) RenameFile(path, name string) (scratch.File, error) {
+	return s.app.scratch.RenameFile(path, name)
+}
+
+// DeleteFile removes a scratch file.
+func (s *ScratchAPI) DeleteFile(path string) error {
+	return s.app.scratch.DeleteFile(path)
+}

@@ -9,7 +9,7 @@ import { confirmAction } from '../../store/dialog'
 import { useTerminal } from '../../store/terminal'
 import { requestNewEntry } from '../../store/fileOps'
 import { useAgentChat } from '../../store/agentChat'
-import { useScratch } from '../../store/scratch'
+import { createScratchFile, openScratchFilePicker, useScratch } from '../../store/scratch'
 import { isFeatureActive } from '../../lib/activeFeatures'
 import { closeRunSession, useRun } from '../../store/run'
 import { isDebugging, stopDebug, useDebug } from '../../store/debug'
@@ -286,9 +286,11 @@ function NewTabMenu() {
     return [
       { key: 'file', label: 'New File…', icon: <FileIcon name="untitled" />, disabled: !roots.length, onSelect: () => requestNewEntry(newFileDir()) },
       { type: 'section', label: 'Scratch' },
+      { key: 'http', label: 'HTTP Request', icon: <TabKindIcon kind="http" />, onSelect: () => void createScratchFile('http') },
       scratch('text', 'Text scratch'),
       scratch('markdown', 'Markdown note'),
       ...(isFeatureActive('database') ? [scratch('sql', 'SQL console', formatKeys('Mod+N'))] : []),
+      { key: 'scratchFile', label: 'Scratch File…', hint: 'JSON, Go, YAML, …', icon: <FileIcon name="scratch" />, onSelect: openScratchFilePicker },
       { type: 'separator' },
       terminal(here, roots.length < 2 ? 'Terminal' : `Terminal in ${labelOf(roots, here)}`, formatKeys('Mod+Shift+T')),
       ...roots.flatMap((r, i) => (r === here ? [] : [terminal(r, `Terminal in ${labels[i]}`)])),

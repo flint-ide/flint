@@ -16,6 +16,7 @@ import { subscribeUsageEvents } from './store/usage'
 import { subscribeRunEvents, useRun } from './store/run'
 import { subscribeDebugEvents } from './store/debug'
 import { subscribeAutoSave } from './store/settings'
+import { subscribeScratchAutosave } from './store/scratch'
 import { subscribeEditorContext } from './store/editorContext'
 import { activeRoot } from './store/activeRoot'
 import { openDropped } from './store/drop'
@@ -85,6 +86,7 @@ subscribeUsageEvents()
     subscribeDebugEvents()
     subscribeSessionAutosave()
     subscribeAutoSave()
+    subscribeScratchAutosave()
     subscribeAlerts()
     subscribeEditorContext()
     // Native File menu: Open Folder… / Open Recent ▸ <folder>.

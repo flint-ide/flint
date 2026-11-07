@@ -6,6 +6,40 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
+ * File is a scratch file: any type (an .http request, a .json sample, a Go
+ * snippet), kept outside every project and edited like a project file, so the
+ * editor's language support, the HTTP client and the rest apply to it.
+ */
+export class File {
+    "name": string;
+    "path": string;
+    "updatedAt": number;
+
+    /** Creates a new File instance. */
+    constructor($$source: Partial<File> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("updatedAt" in $$source)) {
+            this["updatedAt"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new File instance from a string or object.
+     */
+    static createFrom($$source: any = {}): File {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new File($$parsedSource as Partial<File>);
+    }
+}
+
+/**
  * Kind decides the editor language of a scratchpad.
  */
 export enum Kind {

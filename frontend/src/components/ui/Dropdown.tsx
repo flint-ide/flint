@@ -162,12 +162,13 @@ export function Menu({ anchor, atPoint, items, align, searchable, placeholder, m
     })
   }, [anchor, atPoint, align, minWidth])
 
-  // A context menu that would run off the bottom or right edge opens up / to the left instead.
+  // A menu wider than its minimum (long labels, shortcuts) that would run off the right edge
+  // shifts left; a context menu that would run off the bottom opens up instead.
   useLayoutEffect(() => {
     const el = menu.current
-    if (!atPoint || !pos || !el) return
+    if (!pos || !el) return
     const r = el.getBoundingClientRect()
-    const top = r.bottom > window.innerHeight - 8 ? Math.max(8, pos.top - 4 - r.height) : pos.top
+    const top = atPoint && r.bottom > window.innerHeight - 8 ? Math.max(8, pos.top - 4 - r.height) : pos.top
     const left = r.right > window.innerWidth - 8 ? Math.max(8, window.innerWidth - 8 - r.width) : pos.left
     if (top !== pos.top || left !== pos.left) setPos({ ...pos, top, left })
   }, [atPoint, pos])

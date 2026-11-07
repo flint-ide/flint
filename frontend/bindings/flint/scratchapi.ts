@@ -32,6 +32,15 @@ export function Create(name: string, kind: string, connID: string, database: str
 }
 
 /**
+ * CreateFile writes a new scratch file (name made unique) with content.
+ */
+export function CreateFile(name: string, content: string): $CancellablePromise<scratch$0.File> {
+    return $Call.ByID(368792416, name, content).then(($result: any) => {
+        return $$createType1($result);
+    });
+}
+
+/**
  * Delete removes a scratchpad.
  */
 export function Delete(id: string): $CancellablePromise<void> {
@@ -39,11 +48,27 @@ export function Delete(id: string): $CancellablePromise<void> {
 }
 
 /**
+ * DeleteFile removes a scratch file.
+ */
+export function DeleteFile(path: string): $CancellablePromise<void> {
+    return $Call.ByID(1547858059, path);
+}
+
+/**
+ * Files lists the scratch files (any type, edited like project files), newest first.
+ */
+export function Files(): $CancellablePromise<scratch$0.File[]> {
+    return $Call.ByID(3506105925).then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
+/**
  * List returns all scratchpads, most recently edited first.
  */
 export function List(): $CancellablePromise<scratch$0.Scratch[]> {
     return $Call.ByID(1867353198).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType3($result);
     });
 }
 
@@ -52,6 +77,15 @@ export function List(): $CancellablePromise<scratch$0.Scratch[]> {
  */
 export function Rename(id: string, name: string): $CancellablePromise<void> {
     return $Call.ByID(3976058044, id, name);
+}
+
+/**
+ * RenameFile renames a scratch file.
+ */
+export function RenameFile(path: string, name: string): $CancellablePromise<scratch$0.File> {
+    return $Call.ByID(3368657930, path, name).then(($result: any) => {
+        return $$createType1($result);
+    });
 }
 
 /**
@@ -70,4 +104,6 @@ export function SetConnection(id: string, connID: string, database: string): $Ca
 
 // Private type creation functions
 const $$createType0 = scratch$0.Scratch.createFrom;
-const $$createType1 = $Create.Array($$createType0);
+const $$createType1 = scratch$0.File.createFrom;
+const $$createType2 = $Create.Array($$createType1);
+const $$createType3 = $Create.Array($$createType0);

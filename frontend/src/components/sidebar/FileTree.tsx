@@ -4,10 +4,10 @@ import { focusSoon } from '../../lib/focusSoon'
 import {
   basename, dirname, nameError, rangeBetween, stemRange, toggleIn, withDraft, workspaceRows, type Row, type TreeEntry,
 } from '../../lib/fileTree'
-import { rootLabels } from '../../lib/workspaceRoots'
+import { rootLabels, rootOf } from '../../lib/workspaceRoots'
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
-import { createEntry, renameEntry, trashEntries, type NewKind } from '../../store/fileOps'
+import { clearNewEntryRequest, createEntry, renameEntry, trashEntries, useNewEntryRequest, type NewKind } from '../../store/fileOps'
 import { FileIcon } from '../icons/FileIcon'
 import { openContextMenu } from '../../store/contextMenu'
 import { fileTreeMenu } from './fileTreeMenu'
@@ -56,6 +56,25 @@ export function FileTree() {
   useEffect(() => {
     if (draftIndex >= 0) scrollToIndex(treeEl.current, draftIndex)
   }, [draftIndex])
+
+  // ＋ ▸ New File… in the tab bar: the inline input in the asked folder.
+  const newEntry = useNewEntryRequest((s) => s.request)
+  useEffect(() => {
+    if (!newEntry) return
+    clearNewEntryRequest()
+    const { kind } = newEntry
+    // A folder outside the workspace falls back to the first workspace folder.
+    const root = rootOf(roots, newEntry.dir)
+    const dir = root ? newEntry.dir : roots[0]
+    if (!dir) return
+    void (async () => {
+      // Expand every folder from the workspace folder down, so the input row is visible.
+      for (const d of ancestorsFrom(root ?? dir, dir)) {
+        if (d !== implicitRoot && !useWorkspace.getState().expanded[d]) await toggleDir(d)
+      }
+      setEdit({ kind: 'new', dir, type: kind })
+    })()
+  }, [newEntry, implicitRoot, toggleDir, roots])
 
   if (roots.length === 0) return <div className="placeholder muted">No folder open.</div>
 
@@ -261,6 +280,13 @@ function treeKey(e: KeyboardEvent, rows: Row[], lead: string | null, act: KeyAct
       return act.clear(), true
   }
   return false
+}
+
+/** root, then each folder down to dir (dir included); [root] when dir is root. */
+function ancestorsFrom(root: string, dir: string): string[] {
+  if (dir === root || !dir.startsWith(`${root}/`)) return [root]
+  const parts = dir.slice(root.length + 1).split('/')
+  return [root, ...parts.map((_, i) => `${root}/${parts.slice(0, i + 1).join('/')}`)]
 }
 
 function scrollToIndex(el: HTMLElement | null, index: number): void {

@@ -1,6 +1,7 @@
 // File operations started from the file tree. Go does the work (and checks the paths
 // stay inside the project); this keeps tabs, the tree and the search scope in step.
 import { ClipboardSetText } from '../wails/runtime'
+import { createStore } from '../lib/store'
 import { Workspace, errorMessage } from '../api/backend'
 import { basename, folderGlob, isWithin, relativePath, remapKeys, topLevel } from '../lib/fileTree'
 import { rootOf } from '../lib/workspaceRoots'
@@ -95,6 +96,32 @@ export function findInFolder(folder: string): void {
   const root = rootOf(roots, folder) ?? folder
   useSearch.getState().setParams({ include: folderGlob(root, folder), scope: roots.length > 1 ? root : '' })
   useWorkspace.getState().setSidebar('search')
+}
+
+/** A request for the Files panel's inline "new file / folder" input (see requestNewEntry). */
+export interface NewEntryRequest {
+  dir: string
+  kind: NewKind
+  seq: number
+}
+
+export const useNewEntryRequest = createStore<{ request: NewEntryRequest | null }>(() => ({ request: null }))
+
+let newEntrySeq = 0
+
+/** Shows the Files panel with the inline name input for a new entry in dir (the tab bar's ＋ ▸ New File…). */
+export function requestNewEntry(dir: string, kind: NewKind = 'file'): void {
+  if (!dir) {
+    showToast('Open a folder first')
+    return
+  }
+  useWorkspace.getState().focusPanel('files')
+  useNewEntryRequest.setState({ request: { dir, kind, seq: ++newEntrySeq } })
+}
+
+/** The Files panel took the request. */
+export function clearNewEntryRequest(): void {
+  if (useNewEntryRequest.getState().request) useNewEntryRequest.setState({ request: null })
 }
 
 /** Asks, then detaches an attached workspace folder (its tabs close; nothing is deleted). */

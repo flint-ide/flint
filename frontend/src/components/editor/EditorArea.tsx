@@ -7,8 +7,9 @@ import { usePreview } from '../../store/preview'
 import { isImage } from '../../lib/previewFiles'
 import { confirmAction } from '../../store/dialog'
 import { useTerminal } from '../../store/terminal'
+import { requestNewEntry } from '../../store/fileOps'
 import { useAgentChat } from '../../store/agentChat'
-import { useScratch } from '../../store/scratch'
+import { createScratchFile, openScratchFilePicker, useScratch } from '../../store/scratch'
 import { isFeatureActive } from '../../lib/activeFeatures'
 import { closeRunSession, useRun } from '../../store/run'
 import { isDebugging, stopDebug, useDebug } from '../../store/debug'
@@ -254,53 +255,56 @@ function HttpTabIcon({ path }: { path: string }) {
   return <TabKindIcon kind="http" busy={sending} />
 }
 
-/** "+" at the end of the tab bar: new terminal, agent chat or SQL console. */
+/** Folder ＋ ▸ New File… creates in: the active file's folder, else the active tab's workspace folder. */
+function newFileDir(): string {
+  const { tabs, activeId } = useEditor.getState()
+  const tab = tabs.find((t) => t.id === activeId)
+  if (tab?.kind === 'file') return tab.path.slice(0, Math.max(tab.path.lastIndexOf('/'), 1))
+  return activeRoot()
+}
+
+/** "+" at the end of the tab bar: a new file or scratch, then terminals (agent chats live in the title bar). */
 function NewTabMenu() {
   const roots = useWorkspace((s) => s.roots)
-  const agents = useAgentChat((s) => s.agents)
-  const starting = useAgentChat((s) => s.starting)
-  // One folder: terminal and chats open there. Several: the active tab's folder, plus a section per folder.
-  const forRoot = (root: string): DropdownItem[] => [
-    { label: 'Terminal', key: `t:${root}`, icon: <TabKindIcon kind="terminal" />, onSelect: () => void useTerminal.getState().create(root) },
-    ...agents.map(
-      (a): DropdownItem => ({
-        key: `c:${a}:${root}`,
-        label: `${a} chat`,
-        icon: <TabKindIcon kind="chat" />,
-        disabled: !!starting,
-        onSelect: () => void useAgentChat.getState().start(a, root),
-      }),
-    ),
-  ]
   const items = (): DropdownItem[] => {
     const here = activeRoot()
-    const head = forRoot(here).map((it, i) => (i === 0 && 'onSelect' in it ? { ...it, kbd: formatKeys('Mod+Shift+T') } : it))
-    if (roots.length < 2) return [...head, ...tail]
     const labels = rootLabels(roots)
+    const terminal = (root: string, label: string, kbd?: string): DropdownItem => ({
+      key: `t:${root}`,
+      label,
+      kbd,
+      icon: <TabKindIcon kind="terminal" />,
+      onSelect: () => void useTerminal.getState().create(root),
+    })
+    const scratch = (kind: 'text' | 'markdown' | 'sql', label: string, kbd?: string): DropdownItem => ({
+      key: `s:${kind}`,
+      label,
+      kbd,
+      icon: <TabKindIcon kind={kind} />,
+      onSelect: () => void useScratch.getState().create(kind),
+    })
     return [
-      { type: 'section', label: `In ${labelOf(roots, here)}` },
-      ...head,
-      ...roots.flatMap((r, i): DropdownItem[] => (r === here ? [] : [{ type: 'section', label: `In ${labels[i]}` }, ...forRoot(r)])),
-      ...tail,
+      { key: 'file', label: 'New File…', icon: <FileIcon name="untitled" />, disabled: !roots.length, onSelect: () => requestNewEntry(newFileDir()) },
+      { type: 'section', label: 'Scratch' },
+      { key: 'http', label: 'HTTP Request', icon: <TabKindIcon kind="http" />, onSelect: () => void createScratchFile('http') },
+      scratch('text', 'Text scratch'),
+      scratch('markdown', 'Markdown note'),
+      ...(isFeatureActive('database') ? [scratch('sql', 'SQL console', formatKeys('Mod+N'))] : []),
+      { key: 'scratchFile', label: 'Scratch File…', hint: 'JSON, Go, YAML, …', icon: <FileIcon name="scratch" />, onSelect: openScratchFilePicker },
+      { type: 'separator' },
+      terminal(here, roots.length < 2 ? 'Terminal' : `Terminal in ${labelOf(roots, here)}`, formatKeys('Mod+Shift+T')),
+      ...roots.flatMap((r, i) => (r === here ? [] : [terminal(r, `Terminal in ${labels[i]}`)])),
     ]
   }
-  const tail: DropdownItem[] = [
-    { type: 'separator' },
-    ...(isFeatureActive('database')
-      ? [{ label: 'SQL console', kbd: formatKeys('Mod+N'), icon: <TabKindIcon kind="sql" />, onSelect: () => void useScratch.getState().create('sql') }]
-      : []),
-    { label: 'Markdown note', icon: <TabKindIcon kind="markdown" />, onSelect: () => void useScratch.getState().create('markdown') },
-  ]
   return (
     <span className="new-tab-wrap">
       <Dropdown
         align="end"
         items={items}
         trigger={(t) => (
-          <button {...t} className="icon new-tab" title={`New terminal (${formatKeys('Mod+Shift+T')}), agent chat or SQL console`}>＋</button>
+          <button {...t} className="icon new-tab" title="New file, scratch or terminal">＋</button>
         )}
       />
-      {starting && <span className="muted starting">starting {starting}…</span>}
     </span>
   )
 }

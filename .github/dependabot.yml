@@ -15,3 +15,8 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    groups:
+      # CodeQL refuses to run when its init and analyze steps differ in version,
+      # so they must always be bumped together in one pull request.
+      codeql-action:
+        patterns: ["github/codeql-action*"]

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -248,7 +249,8 @@ func ComposeArgs(k Kind, user, flint []string, untrusted bool) ([]string, error)
 	if err := CheckArgs(k, user); err != nil {
 		return nil, fmt.Errorf("%s extra arguments: %w", k, err)
 	}
-	return append(append(make([]string, 0, len(user)+len(flint)), user...), flint...), nil
+	// slices.Concat sizes the result itself (and checks the sum for overflow).
+	return slices.Concat(user, flint), nil
 }
 
 // Binary is the executable to run for k: the configured path, else its name.

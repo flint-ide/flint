@@ -423,7 +423,8 @@ func (w *lineWriter) emit(line []byte) {
 
 // toCRLF returns a copy of p with bare \n replaced by \r\n.
 func toCRLF(p []byte) []byte {
-	out := make([]byte, 0, len(p)+bytes.Count(p, []byte{'\n'}))
+	// Room for p; the few added \r grow it through append (no size arithmetic to overflow).
+	out := make([]byte, 0, len(p))
 	for i, b := range p {
 		if b == '\n' && (i == 0 || p[i-1] != '\r') {
 			out = append(out, '\r')

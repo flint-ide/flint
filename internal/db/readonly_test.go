@@ -27,6 +27,10 @@ func TestCheckReadStatement(t *testing.T) {
 		{"SELECT 1; SET default_transaction_read_only = off; DELETE FROM t", "one statement"},
 		{"SELECT ';'", "one statement"}, // refused although harmless: no SQL parsing here
 		{"SELECT 1\x00", "not valid text"},
+		{"SELECT set_config('default_transaction_read_only', 'off', false)", "read-only mode"},
+		{"select pg_catalog.SET_CONFIG('x', 'y', false)", "read-only mode"},
+		{`SELECT U&"\0073et_config"('default_transaction_read_only', 'off', false)`, "read-only mode"},
+		{"SHOW transaction_read_only", "read-only mode"},
 		{"SELECT '" + strings.Repeat("x", MaxReadOnlySQL) + "'", "longer than"},
 	} {
 		if err := CheckReadStatement(tc.sql); err == nil || !strings.Contains(err.Error(), tc.want) {

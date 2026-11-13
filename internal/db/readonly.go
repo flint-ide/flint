@@ -87,8 +87,25 @@ func CheckReadStatement(sql string) error {
 	case !isReadStatement(trimmed):
 		return fmt.Errorf("only reading statements are allowed (SELECT, WITH, SHOW, DESCRIBE, EXPLAIN, VALUES, TABLE), not %s",
 			orText(firstKeyword(trimmed), "this one"))
+	case changesSessionMode(trimmed):
+		return errors.New("statements that call set_config or name the read-only settings are not allowed: they could switch the session out of read-only mode")
 	}
 	return nil
+}
+
+// changesSessionMode reports a reading statement that could still turn off
+// read-only mode for the statements after it: SELECT set_config(...) changes
+// default_transaction_read_only for the whole pooled session. The name can
+// also be spelled with Unicode escapes (U&"\0073et_config"), so those
+// identifiers are refused as well.
+func changesSessionMode(sql string) bool {
+	lower := strings.ToLower(sql)
+	for _, word := range []string{"set_config", "transaction_read_only", `u&"`} {
+		if strings.Contains(lower, word) {
+			return true
+		}
+	}
+	return false
 }
 
 // CheckDatabaseName accepts "" (the profile's default) or a plain name.

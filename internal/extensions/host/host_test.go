@@ -237,7 +237,9 @@ func (f fixture) log(t *testing.T) string {
 // waitFor polls cond for up to 5 s (tests only).
 func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	// Generous: `go test ./...` runs many packages at once, and stopping an
+	// extension alone may take its 2 s shutdown and 2 s kill grace.
+	deadline := time.Now().Add(15 * time.Second)
 	for !cond() {
 		if time.Now().After(deadline) {
 			t.Fatalf("timed out waiting for %s", what)

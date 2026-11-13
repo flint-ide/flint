@@ -49,6 +49,7 @@ func (a *App) updateSettings(change func(settings.Settings) settings.Settings) (
 		return settings.Settings{}, err
 	}
 	a.usage.SetRetention(saved.Usage.RetentionDays)
+	a.startQueuedTasks() // a higher agentTasks.maxParallel or budget frees slots
 	a.mcpSettingsChanged(prev.MCPServer, saved.MCPServer)
 	a.features.SettingsChanged(prev, saved)
 	if prev.GitHub.Host != saved.GitHub.Host && a.github != nil {

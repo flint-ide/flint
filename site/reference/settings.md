@@ -77,7 +77,7 @@ The file is readable only by your user. It never contains secrets: database pass
     "contextLines": 100
   },
   "inlineEdit": { "contextLines": 60 },
-  "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/" },
+  "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/", "maxParallel": 3 },
   "usage": {
     "retentionDays": 90,
     "dailyBudgetUsd": 20,
@@ -111,7 +111,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `mcpServer` | object | see below | What Flint's own MCP server tells the agents Flint starts. See [mcpServer](#mcpserver). |
 | `completions` | object | see below | Inline suggestions from a code model (off by default). See [completions](#completions). |
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
-| `agentTasks` | object | see below | Where agent task worktrees go and how their branches are named. See [agentTasks](#agenttasks). |
+| `agentTasks` | object | see below | Where agent task worktrees go, how their branches are named and how many tasks work at the same time. See [agentTasks](#agenttasks). |
 | `usage` | object | see below | How long agent usage is kept, budgets, and prices for estimates. See [usage](#usage). |
 | `prompts` | object | see below | The prompt library of the agent chat (`/`). See [prompts](#prompts). |
 | `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
@@ -273,6 +273,7 @@ Used by [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel).
 |---|---|---|---|
 | `worktreeDir` | string | `""` | Folder for task worktrees, which go to `<worktreeDir>/<repository>/<branch>`. An absolute path or one starting with `~/`, up to 1024 characters. Empty puts them in `<repository>.worktrees/<branch>` next to the main checkout, like **New Worktree…** in the branch widget. |
 | `branchPrefix` | string | `"agent/"` | Starts every task branch, followed by a name made from the task's first line. Letters, digits, `.`, `_`, `-` and `/`, up to 40 characters; may be empty. It may not start with `-`, `/` or `.`, or contain `..`, `//` or `/.`. |
+| `maxParallel` | integer | `3` | How many agent tasks may work at the same time, from 0 to 32. A task started beyond it waits in [the queue](../guides/ai-agents.md#the-queue) until a working task settles. `0` means no limit. |
 
 Slashes in a branch name become dashes in the folder name. The tasks themselves are kept in `state.json`.
 

@@ -17,11 +17,18 @@
       { "id": "test.ext.crash", "title": "Crash" },
       { "id": "test.ext.garbage", "title": "Garbage" },
       { "id": "test.ext.hang", "title": "Hang" },
-      { "id": "test.ext.child", "title": "Child" }
+      { "id": "test.ext.child", "title": "Child" },
+      { "id": "test.ext.decorate", "title": "Decorate" },
+      { "id": "test.ext.clear", "title": "Clear decorations" }
     ],
     "panels": [{ "id": "test.ext.items", "title": "Items", "icon": "files", "order": 300, "view": "tree" }],
     "statusItems": [{ "id": "test.ext.count", "order": 1 }],
     "settings": { "properties": { "greeting": { "type": "string", "default": "hi" }, "count": { "type": "integer", "minimum": 1, "maximum": 9, "default": 3 } } },
+    "decorationSets": [
+      { "id": "test.ext.marks", "title": "Marks", "globs": ["*.txt"], "unsavedText": true },
+      { "id": "test.ext.extra", "title": "Extra marks", "globs": ["*.txt"], "default": false },
+      { "id": "test.ext.go", "title": "Go marks", "languages": ["go"] }
+    ],
     "agentTools": [{ "name": "lookup", "description": "Looks things up.", "inputSchema": { "type": "object" } }]
   }
 }

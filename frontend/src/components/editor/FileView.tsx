@@ -17,6 +17,7 @@ import { testMarkMenu } from '../../store/testMenu'
 import { mainGutter } from '../../lib/mainGutter'
 import { mainGutterHooks } from '../../store/mainRun'
 import { blameGutter } from '../../lib/blameGutter'
+import { editorDecorations } from '../../lib/editorDecorations'
 import { indentationFor } from '../../lib/indent'
 import { Git, useGit, useHeadVersion } from '../../store/git'
 import { lspActions, lspExtension, lspSupported, type LspHooks } from '../../lib/lsp'
@@ -123,9 +124,11 @@ export function FileView({ tab, active }: Props) {
   const breakpoints = useMemo(() => (tab.path.endsWith('.go') ? breakpointGutter(tab.path, breakpointHooks) : []), [tab.path])
   const http = useHttpEditor(tab.path)
   const ai = useMemo(() => editorAi(tab.path), [tab.path])
+  // Marks from features and extensions (gutter markers, underlines, hints, quick fixes).
+  const decorations = useMemo(() => editorDecorations(tab.path), [tab.path])
   const extensions = useMemo(
-    () => [language, indentation, breakpoints, gitGutter(), blameGutter(), tests, program, http, lsp, ai, crlf ? EditorState.lineSeparator.of('\r\n') : []],
-    [crlf, language, indentation, breakpoints, tests, program, http, lsp, ai],
+    () => [language, indentation, breakpoints, gitGutter(), blameGutter(), tests, program, http, lsp, ai, decorations, crlf ? EditorState.lineSeparator.of('\r\n') : []],
+    [crlf, language, indentation, breakpoints, tests, program, http, lsp, ai, decorations],
   )
 
   // Gutter baseline: the file at HEAD of the work tree that contains it (which may be

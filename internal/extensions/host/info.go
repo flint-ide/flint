@@ -3,6 +3,7 @@ package host
 import (
 	"runtime"
 	"slices"
+	"strings"
 
 	"flint/internal/extensions/manifest"
 )
@@ -46,6 +47,23 @@ type Info struct {
 	// Debuggers and TestRunners debug and test files of some languages.
 	Debuggers   []manifest.Debugger   `json:"debuggers"`
 	TestRunners []manifest.TestRunner `json:"testRunners"`
+	// DecorationSets are the groups of editor decorations it draws.
+	DecorationSets []DecorationSetInfo `json:"decorationSets"`
+}
+
+// DecorationSetInfo is a contributed decoration set, for Settings and the
+// palette: the files it is for in words, and its state.
+type DecorationSetInfo struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	// Default is whether it is on unless the user says otherwise; Enabled
+	// whether it is on now.
+	Default bool `json:"default"`
+	Enabled bool `json:"enabled"`
+	// Files names the files it is for ("go, .md, *.test.ts").
+	Files string `json:"files"`
+	// UnsavedText: it sees the text of unsaved edits.
+	UnsavedText bool `json:"unsavedText"`
 }
 
 // StatusItemInfo is a contributed status item with its last text.
@@ -73,7 +91,7 @@ func (e *ext) info() Info {
 		ID: e.id, Name: e.id, Dir: e.dir, Enabled: e.h.o.App.Enabled(e.id), State: e.state(),
 		Warnings: []string{}, Permissions: []string{}, PermissionTexts: []string{}, Commands: []manifest.Command{}, Panels: []manifest.Panel{},
 		StatusItems: []StatusItemInfo{}, AgentTools: []ToolInfo{}, Themes: []manifest.Theme{}, TabViews: []manifest.TabView{}, Languages: []manifest.Language{},
-		Debuggers: []manifest.Debugger{}, TestRunners: []manifest.TestRunner{},
+		Debuggers: []manifest.Debugger{}, TestRunners: []manifest.TestRunner{}, DecorationSets: []DecorationSetInfo{},
 	}
 	if e.m == nil {
 		in.Error = errText(e.loadErr)
@@ -98,6 +116,12 @@ func (e *ext) info() Info {
 	in.Debuggers = slices.Clone(m.Contributes.Debuggers)
 	in.TestRunners = slices.Clone(m.Contributes.TestRunners)
 	in.Settings = m.Contributes.Settings
+	for _, s := range m.Contributes.DecorationSets {
+		in.DecorationSets = append(in.DecorationSets, DecorationSetInfo{
+			ID: s.ID, Title: s.Title, Default: s.On(), Enabled: e.h.o.App.SetEnabled(s.ID, s.On()),
+			Files: strings.Join(slices.Concat(s.Languages, s.Extensions, s.Globs), ", "), UnsavedText: s.UnsavedText,
+		})
+	}
 	for _, k := range m.Contributes.Unsupported {
 		in.Warnings = append(in.Warnings, "contributes."+k+" is not supported by this version of Flint and is ignored")
 	}

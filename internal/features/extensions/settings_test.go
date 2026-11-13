@@ -56,6 +56,40 @@ func TestSettingsRoundTrip(t *testing.T) {
 	}
 }
 
+func TestDecorationSetFlags(t *testing.T) {
+	var s settings.Settings
+	in := `{"extensions": {"decorations": {"acme.lint.issues": false, "acme.lint.todo": true, "acme.lint": true, "Bad.Id.x": false, "acme.lint.": true}}}`
+	if err := json.Unmarshal([]byte(in), &s); err != nil {
+		t.Fatal(err)
+	}
+	got := Section.Get(s)
+	if len(got.Decorations) != 2 {
+		t.Errorf("only set ids (<extension id>.<name>) are kept: %v", got.Decorations)
+	}
+	for _, tc := range []struct {
+		set       string
+		def, want bool
+	}{
+		{"acme.lint.issues", true, false}, // turned off
+		{"acme.lint.todo", false, true},   // turned on
+		{"acme.lint.other", true, true},   // the manifest's default
+		{"acme.lint.other", false, false},
+	} {
+		if on := got.setEnabled(tc.set, tc.def); on != tc.want {
+			t.Errorf("setEnabled(%s, %v) = %v", tc.set, tc.def, on)
+		}
+	}
+	data, _ := json.Marshal(got)
+	if string(data) != `{"decorations":{"acme.lint.issues":false,"acme.lint.todo":true}}` {
+		t.Errorf("marshal = %s", data)
+	}
+	c := cloneSettings(got)
+	c.Decorations["acme.lint.issues"] = true
+	if got.Decorations["acme.lint.issues"] {
+		t.Error("clone shares the decorations map")
+	}
+}
+
 func TestSettingsCheck(t *testing.T) {
 	big := Settings{Values: map[string]json.RawMessage{"acme.x": json.RawMessage(`{"a":"` + strings.Repeat("x", maxValueSize) + `"}`)}}
 	if err := check(big); err == nil {

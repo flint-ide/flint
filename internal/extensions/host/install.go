@@ -176,10 +176,27 @@ func installMessage(m *manifest.Manifest) string {
 	if m.HasWebviews() {
 		b.WriteString("Shows its own UI in Flint (webviews, in a sandboxed frame without network)\n")
 	}
+	if sets := m.Contributes.DecorationSets; len(sets) > 0 {
+		titles := make([]string, len(sets))
+		unsaved := false
+		for i, s := range sets {
+			titles[i] = s.Title
+			unsaved = unsaved || s.UnsavedText
+		}
+		fmt.Fprintf(&b, "Marks lines in editors: %s (it learns which matching files are open in trusted folders", strings.Join(titles, ", "))
+		if unsaved {
+			b.WriteString(", and sees their text as you type, unsaved edits included")
+		}
+		b.WriteString(")\n")
+	}
 	if m.RunsAtStartup() {
 		b.WriteString("Starts: when Flint starts (onStartup)\n")
 	} else {
-		b.WriteString("Starts: when you first use it\n")
+		if len(m.Contributes.DecorationSets) > 0 {
+			b.WriteString("Starts: when you first use it, or open a file it marks\n")
+		} else {
+			b.WriteString("Starts: when you first use it\n")
+		}
 	}
 	b.WriteString("\nPermissions:\n")
 	if len(m.Permissions) == 0 {

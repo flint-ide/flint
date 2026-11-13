@@ -5524,3 +5524,106 @@ body.file-drop-target-active::after {
   border: none;
   background: var(--bg-editor);
 }
+
+/* ---------- editor decorations of extensions (lib/editorDecorations.ts) ---------- */
+
+.cm-ext-info {
+  --ext-color: var(--info);
+}
+.cm-ext-ok {
+  --ext-color: var(--ok);
+}
+.cm-ext-warning {
+  --ext-color: var(--warn);
+}
+.cm-ext-error {
+  --ext-color: var(--danger);
+}
+/* The column takes no room in files nobody marks. */
+.cm-ext-gutter .cm-gutterElement {
+  padding: 0 !important;
+}
+.cm-ext-marker {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--ext-color);
+}
+.cm-ext-marker.cm-ext-actionable {
+  cursor: pointer;
+}
+.cm-ext-diagnostic {
+  text-decoration: underline wavy var(--ext-color);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
+}
+.cm-ext-highlight,
+.cm-ext-highlight-line {
+  background: color-mix(in srgb, var(--ext-color) 14%, transparent);
+}
+.cm-ext-inline {
+  margin-left: 2em;
+  color: var(--fg-faint);
+  font-style: italic;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cm-ext-inline.cm-ext-clickable {
+  cursor: pointer;
+}
+.cm-ext-inline.cm-ext-clickable:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.cm-ext-hover {
+  max-width: 560px;
+  max-height: 320px;
+  overflow: auto;
+  font: 12px/1.45 var(--font-ui);
+}
+.cm-ext-hover-item {
+  padding: 6px 10px;
+  border-left: 3px solid var(--ext-color);
+}
+.cm-ext-hover-item + .cm-ext-hover-item {
+  border-top: 1px solid var(--border);
+}
+.cm-ext-hover-message {
+  white-space: pre-wrap;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.cm-ext-hover-source {
+  color: var(--fg-faint);
+  font-size: 11px;
+}
+.cm-ext-hover-action {
+  margin: 4px 6px 0 0;
+}
+.cm-ext-fixes {
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  max-width: 420px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 3px;
+}
+.cm-ext-fixes button {
+  border: none;
+  background: none;
+  color: var(--fg);
+  text-align: left;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font: 12px/1.5 var(--font-ui);
+}
+.cm-ext-fixes button:hover,
+.cm-ext-fixes button:focus {
+  background: var(--bg-active);
+  outline: none;
+}
+.extension-decoration-set {
+  display: block;
+}

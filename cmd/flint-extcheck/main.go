@@ -1,8 +1,8 @@
 // Command flint-extcheck checks extension folders against this Flint's
 // extension contract, with the same code Flint runs: the manifest rules, the
 // webview files, and a run of the program through the extension host
-// (install, initialize, every declarative panel resolved, agent tools listed,
-// shutdown). It is what the flint-ide/extensions CI runs.
+// (install, initialize, every declarative panel resolved, a file opened for
+// every decoration set, agent tools listed, shutdown). It is what the flint-ide/extensions CI runs.
 //
 //	go run ./cmd/flint-extcheck path/to/extension [more folders…]
 //
@@ -43,6 +43,7 @@ func (a *checkApp) Choose(string, string, []string) string {
 	return ""
 }
 func (a *checkApp) Enabled(string) bool             { return true }
+func (a *checkApp) SetEnabled(string, bool) bool    { return true }
 func (a *checkApp) Settings(string) json.RawMessage { return nil }
 func (a *checkApp) Version() string                 { return "extcheck" }
 func (a *checkApp) Emit(event string, data ...any) {
@@ -135,7 +136,7 @@ func runChecks(r *report, dir string, m *manifest.Manifest) {
 		return
 	}
 	app := &checkApp{root: project}
-	h := host.New(host.Options{Dir: filepath.Join(tmp, "config", "extensions"), App: app, StopTimeout: 2 * time.Second})
+	h := host.New(host.Options{Dir: filepath.Join(tmp, "config", "extensions"), App: app, StopTimeout: 2 * time.Second, LanguageOf: languageOf})
 	defer h.Close()
 	info, err := h.Install(dir)
 	if err != nil {
@@ -174,6 +175,8 @@ func runChecks(r *report, dir string, m *manifest.Manifest) {
 			r.fail("panel %s: %s", p.ID, v.Text)
 		}
 	}
+	checkDecorationSets(ctx, r, h, m, project)
+
 	// No panel to resolve: start it through its first command's activation
 	// only when it declares onStartup; otherwise a webview or tool start is
 	// enough to see it initialize.
@@ -187,7 +190,7 @@ func runChecks(r *report, dir string, m *manifest.Manifest) {
 	// It should have started (and initialized) for the panels; then quit cleanly.
 	h.Close()
 	log, _ := h.Log(m.ID)
-	for _, bad := range []string{"panic:", "fatal error:", "protocol error", "not a JSON-RPC"} {
+	for _, bad := range []string{"panic:", "fatal error:", "protocol error", "not a JSON-RPC", "editor/setDecorations: ", "editor/clearDecorations: "} {
 		if strings.Contains(log, bad) {
 			r.fail("its log has %q:\n%s", bad, tail(log, 2000))
 			break
@@ -197,6 +200,77 @@ func runChecks(r *report, dir string, m *manifest.Manifest) {
 		if in.ID == m.ID && in.State != host.StateStopped && in.State != host.StateDisabled {
 			r.fail("after shutdown it is %q, not stopped", in.State)
 		}
+	}
+}
+
+// checkLanguages are the file extensions of Flint's own languages, for the
+// decoration sets that select files by language.
+var checkLanguages = map[string]string{"go": ".go", "typescript": ".ts", "python": ".py", "rust": ".rs"}
+
+func languageOf(path string) string {
+	for language, ext := range checkLanguages {
+		if strings.HasSuffix(path, ext) {
+			return language
+		}
+	}
+	return ""
+}
+
+// sampleFile is a file name a decoration set is for ("" when its selectors
+// give none away: a language of another extension, a glob with a class).
+func sampleFile(s manifest.DecorationSet) string {
+	var names []string
+	for _, e := range s.Extensions {
+		names = append(names, "extcheck"+e)
+	}
+	for _, g := range s.Globs {
+		names = append(names, strings.NewReplacer("*", "extcheck", "?", "x").Replace(g))
+	}
+	for _, l := range s.Languages {
+		if ext, ok := checkLanguages[l]; ok {
+			names = append(names, "extcheck"+ext)
+		}
+	}
+	for _, name := range names {
+		if s.Matches(name, languageOf(name)) && name != "." && name != ".." {
+			return name
+		}
+	}
+	return ""
+}
+
+// checkDecorationSets opens a file for every decoration set, as an editor
+// would: the program must start for it, take editor/opened, editor/changed
+// and editor/closed, publish only what the contract allows (a publish Flint
+// refuses is in its log, which runChecks reads) and answer editor/action (an
+// error for an action it doesn't know is a fine answer).
+func checkDecorationSets(ctx context.Context, r *report, h *host.Host, m *manifest.Manifest, project string) {
+	for _, s := range m.Contributes.DecorationSets {
+		name := sampleFile(s)
+		if name == "" {
+			continue
+		}
+		path := filepath.Join(project, name)
+		text := "flint-extcheck\nTODO: a second line\n"
+		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+			r.fail("%v", err)
+			return
+		}
+		if !h.EditorInterest(path).Tracked {
+			r.fail("decoration set %s: not offered for %s", s.ID, name)
+			continue
+		}
+		if err := h.EditorOpened(path, 1, text, true); err != nil {
+			r.fail("decoration set %s: %v", s.ID, err)
+			continue
+		}
+		req := host.ActionRequest{Set: s.ID, Path: path, Version: 1, Action: "flint.extcheck.ping", Line: 1, EndLine: 1}
+		if _, err := h.EditorAction(ctx, m.ID, req); err != nil && !answered(err) {
+			r.fail("decoration set %s: editor/action: %v", s.ID, err)
+		}
+		h.EditorChanged(path, 2, text+"more\n", true)
+		time.Sleep(200 * time.Millisecond) // what it publishes for the change
+		h.EditorClosed(path)
 	}
 }
 

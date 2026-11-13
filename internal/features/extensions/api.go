@@ -117,6 +117,31 @@ func (a *API) SetVisible(id, view string, visible bool) error {
 	return a.host.SetVisible(id, view, visible)
 }
 
+// EditorInterest reports whether an extension's decoration set, turned on,
+// is for the file: only then does the editor report the document.
+func (a *API) EditorInterest(path string) host.DocumentInterest { return a.host.EditorInterest(path) }
+
+// EditorOpened reports a document open in an editor, at version; text is its
+// content when hasText (asked for by EditorInterest). Extensions with a
+// decoration set for the file hear of it, and start.
+func (a *API) EditorOpened(path string, version int, text string, hasText bool) error {
+	return a.host.EditorOpened(path, version, text, hasText)
+}
+
+// EditorChanged reports an open document's new version, debounced.
+func (a *API) EditorChanged(path string, version int, text string, hasText bool) {
+	a.host.EditorChanged(path, version, text, hasText)
+}
+
+// EditorClosed reports that a document's editor closed.
+func (a *API) EditorClosed(path string) { a.host.EditorClosed(path) }
+
+// EditorAction asks the extension for the edits of a quick fix the user
+// chose on one of its decorations.
+func (a *API) EditorAction(id string, req host.ActionRequest) (host.ActionResult, error) {
+	return a.host.EditorAction(a.ctx(), id, req)
+}
+
 // WebviewHTML returns a webview's HTML file, to show in a sandboxed frame.
 func (a *API) WebviewHTML(id, view string) (string, error) { return a.host.WebviewHTML(id, view) }
 

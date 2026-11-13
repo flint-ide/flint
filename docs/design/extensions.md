@@ -1,6 +1,6 @@
 # Extensions: feature modules (level 1) and external extensions (level 2)
 
-Status: level 1 implemented (Docker, TODO list and the release check migrated; Docker, Kubernetes and AWS Profiles have since moved on to level-2 extensions, see [Separate packages](#separate-packages-database-kubernetes-docker-aws)). Level 2 implemented in its first version (contract 1), color themes included: see [what is implemented and the decisions taken](#level-2-implemented-v1). The richer component catalog, tab views, editor decorations and file icons are designed, not implemented ([plan](#implementation-plan-level-2)).
+Status: level 1 implemented (Docker, TODO list and the release check migrated; Docker, Kubernetes and AWS Profiles have since moved on to level-2 extensions, see [Separate packages](#separate-packages-database-kubernetes-docker-aws)). Level 2 implemented in its first version (contract 1), color themes included: see [what is implemented and the decisions taken](#level-2-implemented-v1). Editor decorations and quick fixes are implemented ([decisions](#editor-decorations-implemented)). The richer component catalog and file icons are designed, not implemented ([plan](#implementation-plan-level-2)).
 
 Flint should be easy to extend through an explicit contract. Two levels:
 
@@ -153,6 +153,7 @@ interface FeatureModule {
   tabKinds?: readonly TabKind[]               // { id, component: ComponentType<{ tab, active }>, icon? }
   fileMenu?: readonly FileMenuItem[]          // { id, label, when?(paths), run(paths) }
   themes?: readonly ThemeContribution[]       // { id, label, group, base, colors, terminal }
+  decorationSets?: readonly DecorationSetContribution[] // { id, title, group, enabled?, action?, command? }
   activate?: () => void | (() => void)        // after the first render: event subscriptions
 }
 ```
@@ -201,6 +202,7 @@ export const dockerSettings = defineSection('docker', DEFAULT_DOCKER, coerceDock
 | Tab kinds | `contributions.tabKinds` + `useEditor().openContributed(view, key, title, data)` | a `kind: 'contrib'` tab with JSON `data`; `EditorArea` renders the kind's component, or "not available" when its source is gone; not saved in sessions |
 | File tree menu | `contributions.fileMenu` | appended after "Add to Agent Chat" for the right-clicked paths; failures become a toast |
 | Color themes | `contributions.themes` | Settings ▸ Appearance ▸ Color theme (shown when there is one); choosing one copies it into `customTheme` (`lib/contributedThemes.ts`) |
+| Decoration sets | `contributions.decorationSets` + `lib/editorDecorations.ts` | a contributed set that is on may publish marks for open documents (`publishDecorations`), hears of them with `watchDocuments`, and answers quick fixes ([Editor decorations](#editor-decorations)) |
 | Settings sections | `lib/settingsSections.ts` | see above |
 | Hand to agent | `lib/askAgent.ts` (existing) | features call `askAgent({ prompt, attachments })`; no separate registry is needed |
 
@@ -320,7 +322,7 @@ Rules, checked at discovery, where a violation disables the extension and is sho
 | `fileMenu` | `contribute(...fileMenu)` | runs the named command with `{ paths }` |
 | `themes` | `contribute(...themes)` (implemented) | offered in Settings ▸ Appearance; choosing one copies it into `customTheme` ([Themes](#themes-and-file-icons)) |
 | `fileIcons` | `contribute(...fileIcons)` (new level-1 point) | badges in the file tree and tab strip, merged after Flint's own |
-| `decorations` | `contribute(...decorationSets)` (new level-1 point) | gutter markers, inline hints, warnings and highlights in editors ([Editor decorations](#editor-decorations)) |
+| `decorationSets` | `contribute(...decorationSets)` (implemented) | gutter markers, inline hints, warnings and highlights in editors ([Editor decorations](#editor-decorations)) |
 | `agentTools` | `Instance.AgentTools` of the `extensions` feature | offered on Flint's MCP server as `<short>_<name>` (see below) |
 | notifications | `showToast`, OS notification when in the background (`notifyInBackground`) | `window/showMessage` |
 | hand to agent | `askAgent` | `agent/ask`, needs the `agent.ask` permission, always ends in a draft the user sends |
@@ -522,6 +524,8 @@ Messages from the frame are accepted only from that frame's window, are size-che
 
 ### Editor decorations
 
+Implemented; where the code differs from this section (the manifest key and fields, quick fixes that return edits, what happens when the extension stops), [Editor decorations: implemented](#editor-decorations-implemented) below says so and the [protocol reference](../../site/extensions/protocol.md#editor-decorations) is authoritative.
+
 Linters, test runners, coverage tools and issue trackers want to mark lines in the editor. An extension declares a decoration set and then publishes decorations for files:
 
 ```json
@@ -553,6 +557,27 @@ How it works:
 - **Control.** Settings ▸ Extensions turns each set on or off, and a palette command hides all extension decorations in the current editor. `editor/clearDecorations` removes a set's decorations from one file or all. When the extension stops, its decorations stay until the file changes; when it is disabled or uninstalled they are removed.
 - **Actions.** A diagnostic's actions appear as quick fixes (`⌥↩`) and send `view/action { view: set, item: "<path>:<line>", action }`. Edits are not part of the protocol: an extension that fixes code does so through the agent (`agent/ask`) or by writing the file itself, which the editor then reloads.
 - **Level 1.** A new contribution point, `decorationSets`, with a registry in `lib/editorDecorations.ts` that a feature module can use too (coverage from `go test -cover` is a natural first one).
+
+#### Editor decorations: implemented
+
+Code: `internal/extensions/manifest/decorations.go`, `internal/extensions/host/decorations.go`, `frontend/src/lib/{decorationModel,editorDecorations}.ts`, `frontend/src/features/extensions/documents.ts`, the example `examples/extensions/todos`. The reference is [site/extensions/protocol.md](../../site/extensions/protocol.md#editor-decorations). What was built follows the section above, with these decisions where it was open or is changed:
+
+- **The manifest key is `decorationSets`**, the name of the level-1 point, not `decorations`; a set has `title` (not `label`), and selects files by `languages`, `extensions` and `globs` (patterns for the file's name), at least one of them. `"default": false` leaves a set off until the user turns it on. At most 20 sets. An older Flint lists the key as an unsupported contribution point, like any it doesn't know.
+- **Declaring a set needs `workspace.read`** (a manifest error otherwise): the `editor/*` notifications tell the extension which files are open, and it reads them. No new permission.
+- **An extension hears only of files `workspace/readFile` would return**: inside a trusted folder with symbolic links resolved, not in `.git`, not a credential file. The check is made in Go for every document and repeated when folders, settings or extensions change.
+- **Languages** are Flint's server languages (`go`, `typescript` for JavaScript too, `python`, `rust`) and the languages extensions contribute; files of other types are selected by extension or glob. Go decides the language (`lsp.LanguageOf`), so the frontend can't claim one.
+- **Positions**: lines are 1-based, columns UTF-16 code units, as in LSP and CodeMirror.
+- **`editor/opened` carries `sets`**, the extension's sets that are on and match, and is sent again when that list changes, so turning a set on needs no other signal. There is no `editor/visible`: the three notifications of the design are enough.
+- **Unsaved text** is sent only for a set with `unsavedText`, up to 1 MiB; a larger document is announced without text.
+- **Versions**: a publish must be for exactly the editor's version (Go drops older ones against the version last reported, the editor checks the exact one); a publish without a version is drawn as is. Positions are clamped; marks are mapped through edits until the next publish.
+- **Diagnostics are not merged into the lint gutter and the Problems list.** They are drawn by `lib/editorDecorations.ts` (underline, gutter marker, hover), so the language server client stays untouched. Merging is a later step.
+- **Gutter icons** are six glyphs (`dot`, `check`, `cross`, `alert`, `info`, `arrow`), not Flint's icon set, whose icons are panel-sized line drawings.
+- **Quick fixes return edits**, unlike the design ("edits are not part of the protocol"): choosing an action sends the new request `editor/action { set, path, version, action, decoration?, line, endLine, from, to }` (not `view/action`), and the answer's `edits` are applied as one transaction only if the document is still at that version. Edits outside the document or overlapping are refused as a whole, never clamped. An action with `command` runs one of the extension's commands instead. Actions are allowed on every kind, not only diagnostics.
+- **Where quick fixes show**: buttons in the hover, a list on a click on the gutter marker, and the command *Show Extension Quick Fixes* (`Alt+Shift+Enter`). `⌥↩` / `⌘.` belong to the language server's code actions; `extensionQuickFixes(view, pos)` in `lib/editorDecorations.ts` returns `{ title, run }[]` for a shared menu later.
+- **Lifecycle differs from the design in one point:** decorations are removed when the extension's process ends for any reason (stopped, crashed, turned off, uninstalled), instead of staying until the file changes, so the editor never shows marks nobody maintains. To make that rare, a document an extension decorates keeps it from the idle stop, like a panel on screen, and a crashed extension with such a document is started again after its backoff and gets `editor/opened` for each. Opening a file starts an extension only when one of its sets is on and matches the file.
+- **Toggles** are `extensions.decorations` in `settings.json` (`{ "<set id>": bool }`, only where it differs from the manifest's default), a checkbox per set in Settings ▸ Extensions and a *Toggle … in Editors* command per set. *Toggle Extension Decorations in This Editor* hides them in one editor (not saved).
+- **Cost**: `editor/changed` at most every 300 ms per file; publishes for one editor applied together at most every 50 ms; 5,000 decorations per set and file; 500 tracked documents. A file open in two editors is decorated in the first.
+- **Checks**: `flint-extcheck` opens a file for every decoration set, sends `editor/action` and fails on a publish Flint refuses; `host/decorations_test.go` covers trust, credential files, versions, bounds, toggles, stops and the quick-fix round trip against `testdata/testext`; `decorations_conformance_test.go` drives the `todos` example.
 
 ### Themes and file icons
 
@@ -629,7 +654,7 @@ Each step is one pull request that leaves Flint shippable.
 3. **File icons.** `fileIcons` in the manifest, a `fileIcons` contribution point and its use in `FileIcon.tsx`. Data only, like themes.
 4. **Declarative views, part 1.** `table` and `form` in `DeclarativeView` (today's manifests with them are refused), and the file menu.
 5. **Declarative views, part 2.** `markdown`, `chart`, `cards` and `stack`, and tab views with session restore (`TabKind.restore`).
-6. **Editor decorations.** The `decorationSets` point and `lib/editorDecorations.ts`, the `editor/*` notifications, quick-fix actions, per-set toggles.
+6. **Done.** Editor decorations: the `decorationSets` point and `lib/editorDecorations.ts`, the `editor/*` notifications, quick-fix actions, per-set toggles ([implemented](#editor-decorations-implemented)).
 7. Later: project extensions (after sandboxing), `flint --install-extension <dir>`, a protocol reference generated from the Go types.
 
 ### Level 2: implemented (v1)
@@ -702,7 +727,7 @@ Points not yet in the contract, to add when a migration needs them:
 - **Native menu items.** The Help ▸ Check for Updates… item is still built in `menu.go` and emits an event the update module listens for.
 - **Ordering among status items.** Flint's own status items are not in the registry; contributed items come after them.
 - **Session restore for contributed tabs.** Their `data` is JSON, so saving them is a small step, but a view must be able to rebuild itself from it. Needed by [tab views](#tab-views).
-- **File icons and editor decorations.** New points for [file icons](#themes-and-file-icons) and [decoration sets](#editor-decorations); both are useful to feature modules too.
+- **File icons.** A new point for [file icons](#themes-and-file-icons), useful to feature modules too. ([Decoration sets](#editor-decorations) exist; no feature module uses them yet.)
 
 ## Open questions
 

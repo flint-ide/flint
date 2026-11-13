@@ -5,7 +5,8 @@
 import type { ComponentType } from 'react'
 import { canonicalKeys, keyConflicts, listCommands, type Command } from '../../lib/commands'
 import type { Contributions } from '../../lib/contributions'
-import type { ContributedTab, SettingsPage, StatusItem, TabKind, ThemeContribution } from '../../lib/features'
+import type { ContributedTab, DecorationSetContribution, SettingsPage, StatusItem, TabKind, ThemeContribution } from '../../lib/features'
+import type { QuickFixRequest, TextEdit } from '../../lib/decorationModel'
 import { coerceCustomTheme } from '../../lib/settings'
 import type { PanelProps, PanelSpec } from '../../panels/registry'
 import { isIconName } from '../../components/ui/icons'
@@ -24,6 +25,8 @@ export interface ExtensionInfo {
   /** Tab views (webviews); missing from an older backend. */
   tabViews?: readonly { id: string; title: string; icon?: string; view: string; restore?: boolean }[]
   settings: { title?: string; properties: readonly SchemaProperty[] } | null
+  /** Editor decoration sets; missing from an older backend. */
+  decorationSets?: readonly { id: string; title: string; default: boolean }[]
   /** Color themes; Go checked them with the custom theme rules. */
   themes?: readonly { id: string; label: string; base: string; colors: Readonly<Record<string, unknown>>; terminal?: Readonly<Record<string, unknown>> | null }[]
 }
@@ -39,7 +42,12 @@ export interface Deps {
   webviewTab: (ext: ExtensionInfo, view: string) => ComponentType<{ tab: ContributedTab; active: boolean }>
   statusItem: (ext: ExtensionInfo, item: string) => ComponentType
   settingsPage: (ext: ExtensionInfo) => ComponentType<{ active: boolean }>
-  run: (ext: string, command: string) => Promise<unknown>
+  run: (ext: string, command: string, args?: unknown) => Promise<unknown>
+  /** Whether a decoration set is on (the user's choice, else its default), and the switch. */
+  setEnabled: (set: string, byDefault: boolean) => boolean
+  toggleSet: (set: string, byDefault: boolean) => void
+  /** The edits of a quick fix the user chose on one of the extension's decorations. */
+  quickFix: (ext: string, req: QuickFixRequest) => Promise<readonly TextEdit[]>
   /** Opens a panel (its "Show …" command). */
   show: (panel: string) => void
   /** Commands a default shortcut must not collide with (default: all registered). */
@@ -61,7 +69,7 @@ export function contributes(info: ExtensionInfo): boolean {
 /** Changes when what the extension contributes changes (its status texts don't count). */
 export function contributionKey(info: ExtensionInfo): string {
   if (!contributes(info)) return ''
-  return JSON.stringify([info.version, info.commands, info.panels, info.statusItems.map((s) => [s.id, s.order]), info.settings, info.themes ?? [], info.tabViews ?? []])
+  return JSON.stringify([info.version, info.commands, info.panels, info.statusItems.map((s) => [s.id, s.order]), info.settings, info.themes ?? [], info.tabViews ?? [], (info.decorationSets ?? []).map((s) => [s.id, s.title, s.default])])
 }
 
 /**
@@ -118,7 +126,26 @@ export function extensionParts(info: ExtensionInfo, deps: Deps): Parts {
   const tabKinds: TabKind[] = (info.tabViews ?? [])
     .filter((t) => t.view === 'webview')
     .map((t) => ({ id: t.id, icon: t.icon && isIconName(t.icon) ? t.icon : undefined, restore: !!t.restore, component: deps.webviewTab(info, t.id) }))
-  return { contributions: { panels, statusItems, settingsPages, tabKinds, themes: themeContributions(info) }, commands, conflicts }
+  const decorationSets: DecorationSetContribution[] = (info.decorationSets ?? []).map((s) => ({
+    id: s.id,
+    title: s.title,
+    group: info.name,
+    enabled: () => deps.setEnabled(s.id, s.default),
+    action: (req) => deps.quickFix(info.id, req),
+    // Go kept only the extension's own commands on its decorations.
+    command: (ref) => deps.run(info.id, ref.id, ref.args),
+  }))
+  for (const s of decorationSets) {
+    const byDefault = info.decorationSets?.find((d) => d.id === s.id)?.default ?? true
+    commands.push({
+      id: `${s.id}.toggle`,
+      title: `Toggle ${s.title} in Editors`,
+      category: info.name,
+      keywords: `extension ${info.name} decorations marks gutter hints show hide`,
+      run: () => deps.toggleSet(s.id, byDefault),
+    })
+  }
+  return { contributions: { panels, statusItems, settingsPages, tabKinds, themes: themeContributions(info), decorationSets }, commands, conflicts }
 }
 
 /** Why an extension's default shortcut can't be used ('' when it can). */

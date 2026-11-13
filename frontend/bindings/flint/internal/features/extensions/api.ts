@@ -42,6 +42,49 @@ export function Catalog(): $CancellablePromise<catalog$0.Listing> {
 }
 
 /**
+ * EditorAction asks the extension for the edits of a quick fix the user
+ * chose on one of its decorations.
+ */
+export function EditorAction(id: string, req: host$0.ActionRequest): $CancellablePromise<host$0.ActionResult> {
+    return $Call.ByID(4150286204, id, req).then(($result: any) => {
+        return $$createType1($result);
+    });
+}
+
+/**
+ * EditorChanged reports an open document's new version, debounced.
+ */
+export function EditorChanged(path: string, version: number, text: string, hasText: boolean): $CancellablePromise<void> {
+    return $Call.ByID(2336310738, path, version, text, hasText);
+}
+
+/**
+ * EditorClosed reports that a document's editor closed.
+ */
+export function EditorClosed(path: string): $CancellablePromise<void> {
+    return $Call.ByID(3195720386, path);
+}
+
+/**
+ * EditorInterest reports whether an extension's decoration set, turned on,
+ * is for the file: only then does the editor report the document.
+ */
+export function EditorInterest(path: string): $CancellablePromise<host$0.DocumentInterest> {
+    return $Call.ByID(1853698612, path).then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
+/**
+ * EditorOpened reports a document open in an editor, at version; text is its
+ * content when hasText (asked for by EditorInterest). Extensions with a
+ * decoration set for the file hear of it, and start.
+ */
+export function EditorOpened(path: string, version: number, text: string, hasText: boolean): $CancellablePromise<void> {
+    return $Call.ByID(2865282615, path, version, text, hasText);
+}
+
+/**
  * Execute runs one of the extension's commands; args is JSON or null.
  */
 export function Execute(id: string, command: string, args: json$0.RawMessage): $CancellablePromise<void> {
@@ -54,7 +97,7 @@ export function Execute(id: string, command: string, args: json$0.RawMessage): $
  */
 export function Install(dir: string): $CancellablePromise<host$0.Info | null> {
     return $Call.ByID(16206978, dir).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType4($result);
     });
 }
 
@@ -66,7 +109,7 @@ export function Install(dir: string): $CancellablePromise<host$0.Info | null> {
  */
 export function InstallFromCatalog(folder: string): $CancellablePromise<host$0.Info | null> {
     return $Call.ByID(1569663597, folder).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType4($result);
     });
 }
 
@@ -76,7 +119,7 @@ export function InstallFromCatalog(folder: string): $CancellablePromise<host$0.I
  */
 export function List(): $CancellablePromise<host$0.Info[]> {
     return $Call.ByID(3916864187).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType5($result);
     });
 }
 
@@ -101,7 +144,7 @@ export function RefreshCatalog(): $CancellablePromise<catalog$0.Listing> {
  */
 export function Rescan(): $CancellablePromise<host$0.Info[]> {
     return $Call.ByID(2973147495).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType5($result);
     });
 }
 
@@ -110,7 +153,7 @@ export function Rescan(): $CancellablePromise<host$0.Info[]> {
  */
 export function Resolve(id: string, view: string, parent: string): $CancellablePromise<host$0.View> {
     return $Call.ByID(1596846045, id, view, parent).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType6($result);
     });
 }
 
@@ -159,7 +202,9 @@ export function WebviewRequest(id: string, view: string, key: string, method: st
 
 // Private type creation functions
 const $$createType0 = catalog$0.Listing.createFrom;
-const $$createType1 = host$0.Info.createFrom;
-const $$createType2 = $Create.Nullable($$createType1);
-const $$createType3 = $Create.Array($$createType1);
-const $$createType4 = host$0.View.createFrom;
+const $$createType1 = host$0.ActionResult.createFrom;
+const $$createType2 = host$0.DocumentInterest.createFrom;
+const $$createType3 = host$0.Info.createFrom;
+const $$createType4 = $Create.Nullable($$createType3);
+const $$createType5 = $Create.Array($$createType3);
+const $$createType6 = host$0.View.createFrom;

@@ -18,19 +18,24 @@ const info: ExtensionInfo = {
   settings: { title: 'Jira', properties: [{ key: 'site', type: 'string', default: '' }] },
 }
 
-function deps(existing: readonly Command[] = []): Deps & { ran: string[]; shown: string[] } {
+function deps(existing: readonly Command[] = []): Deps & { ran: string[]; shown: string[]; switched: Record<string, boolean> } {
+  const switched: Record<string, boolean> = {}
   const ran: string[] = []
   const shown: string[] = []
   return {
     ran,
     shown,
+    switched,
     existing,
     panel: () => () => null,
     webviewPanel: () => () => null,
     webviewTab: () => () => null,
     statusItem: () => () => null,
     settingsPage: () => () => null,
-    run: async (ext, command) => void ran.push(`${ext} ${command}`),
+    run: async (ext, command, args) => void ran.push(args === undefined ? `${ext} ${command}` : `${ext} ${command} ${JSON.stringify(args)}`),
+    setEnabled: (set, byDefault) => (set in switched ? switched[set] : byDefault),
+    toggleSet: (set, byDefault) => void (switched[set] = !(set in switched ? switched[set] : byDefault)),
+    quickFix: async (ext, req) => [{ line: req.line, from: 0, endLine: req.line, to: 0, text: `${ext}:${req.action}` }],
     show: (panel) => void shown.push(panel),
   }
 }
@@ -138,3 +143,47 @@ describe('webview contributions', () => {
   })
 })
 
+
+describe('decoration sets of an extension', () => {
+  const withSets: ExtensionInfo = {
+    ...info,
+    decorationSets: [
+      { id: 'acme.jira.refs', title: 'Issue References', default: true },
+      { id: 'acme.jira.stale', title: 'Stale Issues', default: false },
+    ],
+  }
+
+  it('contributes each set with its switch, quick fixes and commands', async () => {
+    const d = deps()
+    const parts = extensionParts(withSets, d)
+    const sets = parts.contributions.decorationSets ?? []
+    assert.deepEqual(sets.map((s) => [s.id, s.title, s.group, s.enabled?.()]), [
+      ['acme.jira.refs', 'Issue References', 'Jira', true],
+      ['acme.jira.stale', 'Stale Issues', 'Jira', false],
+    ])
+    const req = { set: 'acme.jira.refs', path: '/p/a.go', version: 3, action: 'fix', decoration: '', line: 2, endLine: 2, from: 0, to: 1 }
+    assert.deepEqual(await sets[0].action?.(req), [{ line: 2, from: 0, endLine: 2, to: 0, text: 'acme.jira:fix' }])
+    await sets[0].command?.({ id: 'acme.jira.open', args: { key: 'ABC-1' } })
+    assert.deepEqual(d.ran, ['acme.jira acme.jira.open {"key":"ABC-1"}'])
+
+    // A palette command per set flips it from whatever it is now.
+    const toggles = parts.commands.filter((c) => c.id.endsWith('.toggle'))
+    assert.deepEqual(toggles.map((c) => [c.id, c.title, c.category]), [
+      ['acme.jira.refs.toggle', 'Toggle Issue References in Editors', 'Jira'],
+      ['acme.jira.stale.toggle', 'Toggle Stale Issues in Editors', 'Jira'],
+    ])
+    toggles[0].run()
+    toggles[1].run()
+    assert.deepEqual(sets.map((s) => s.enabled?.()), [false, true])
+    toggles[0].run()
+    assert.equal(sets[0].enabled?.(), true)
+  })
+
+  it('contributes again when the sets change, not when one is switched', () => {
+    assert.notEqual(contributionKey(withSets), contributionKey(info))
+    const renamed = { ...withSets, decorationSets: [{ id: 'acme.jira.refs', title: 'Refs', default: true }] }
+    assert.notEqual(contributionKey(renamed), contributionKey(withSets))
+    const switched = { ...withSets, decorationSets: withSets.decorationSets?.map((s) => ({ ...s, enabled: false })) }
+    assert.equal(contributionKey(switched), contributionKey(withSets))
+  })
+})

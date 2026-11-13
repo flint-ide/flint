@@ -105,6 +105,10 @@ func (e *ext) notified(method string, params json.RawMessage) {
 		err = e.showMessage(params)
 	case "webview/post":
 		err = e.webviewPost(params)
+	case "editor/setDecorations":
+		err = e.setDecorations(params)
+	case "editor/clearDecorations":
+		err = e.clearDecorations(params)
 	case "log":
 		var p struct {
 			Level   string `json:"level"`

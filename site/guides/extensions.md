@@ -1,6 +1,6 @@
 # Extensions
 
-An extension is a separate program that adds commands, a sidebar panel, a Settings page, status bar items and tools for agents to Flint. It can be written in any language. Some extensions are only data: color themes, or a programming language with its language server, debugger and test runner (**Debug File** and **Run Tests in File** in the command palette use them). Flint draws everything an extension shows with its own components, from data the extension sends: an extension never runs code inside Flint's window.
+An extension is a separate program that adds commands, a sidebar panel, a Settings page, status bar items, marks in the editor and tools for agents to Flint. It can be written in any language. Some extensions are only data: color themes, or a programming language with its language server, debugger and test runner (**Debug File** and **Run Tests in File** in the command palette use them). Flint draws everything an extension shows with its own components, from data the extension sends: an extension never runs code inside Flint's window.
 
 There is no marketplace. **Settings ▸ Extensions** (**Show Extensions** in the command palette, or `⌘,` ▸ **Extensions**) lists every extension of the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository, and you can also install one from a folder on your disk. Either way, Flint shows you what it is and what it asks for first. To write one, see [Write an extension](../extensions/write-an-extension.md).
 
@@ -20,7 +20,7 @@ There is no marketplace. **Settings ▸ Extensions** (**Show Extensions** in the
 
 Flint copies the folder to `extensions/<id>/` in its [configuration folder](../reference/files-and-data.md). Installing an extension with the same id again replaces it (the old version is stopped first) and keeps its settings.
 
-Nothing starts when you install: the extension's process starts the first time you use one of its commands, open its panel, or an agent calls one of its tools. An extension whose manifest says `onStartup` starts once Flint's window is up, and the confirmation says so.
+Nothing starts when you install: the extension's process starts the first time you use one of its commands, open its panel, open a file it marks in the editor, or an agent calls one of its tools. An extension whose manifest says `onStartup` starts once Flint's window is up, and the confirmation says so.
 
 ## Settings ▸ Extensions
 
@@ -29,6 +29,7 @@ For each installed extension:
 - **The checkbox** turns it on or off. Off stops its process and removes its commands, panel, Settings page and status items. It stays installed.
 - **The state**: *Not running*, *Starting…*, *Running*, *Crashed* (it ended on its own; the next use starts it again), *Stopped after repeated crashes* (three crashes in ten minutes; click **Restart** to try again), *Off*, or *Broken* (the manifest is wrong; the reason is shown).
 - **Program** and **Permissions**, as declared in its manifest.
+- **Editor decorations**: a checkbox per group of marks the extension draws in editors, with the files it is for. See [Marks in the editor](#marks-in-the-editor).
 - **Agent tools**: the names agents see (for example `stats_summary`) and **Offer to agents**, which you can untick to keep the tools away from agents.
 - **Show Log**: what the extension wrote to its standard error, its log messages, and when Flint started and stopped it. The log is kept in memory (the last 256 KiB) until Flint quits.
 - **Uninstall…** stops the extension and deletes its folder after you confirm. Its settings stay in `settings.json` and any secrets it stored stay in the system keychain, so installing it again restores them.
@@ -38,6 +39,17 @@ For each installed extension:
 **Reload Installed** reads the extensions folder again, for example after you rebuilt an extension you are writing.
 
 An extension with settings gets its own page in Settings, after Flint's pages, generated from its manifest. Values are checked against the manifest before they are saved, under `extensions` in [settings.json](../reference/settings.md#extensions).
+
+## Marks in the editor
+
+An extension such as a linter or a coverage tool can mark lines in the files you have open: a marker in the gutter, a wavy underline with a message when you hover it, dim text after the end of a line, or a highlighted range. The colors are your theme's. Each extension groups its marks into one or more sets, for the files it names (a language, a file extension, a name pattern).
+
+- **Turn a set on or off** with its checkbox under **Editor decorations** in Settings ▸ Extensions, or with **Toggle … in Editors** in the command palette. Turning it off removes its marks at once. A set can be off until you turn it on, if its extension says so.
+- **Hide all marks in one editor** with **Toggle Extension Decorations in This Editor**; the same command shows them again.
+- **Quick fixes.** A mark can offer fixes: click its marker in the gutter, use the buttons in its hover, or press `⌥⇧↵` (**Show Extension Quick Fixes**) for a list of the fixes on the cursor's line (arrow keys and `↵` choose, `Esc` closes). A fix changes the file in one step that `⌘Z` undoes, and only if the file hasn't changed since the extension looked at it; otherwise Flint says so and you try again.
+- The marks follow your typing until the extension updates them. They disappear when the extension stops, crashes, is turned off or is uninstalled.
+
+An extension with a set that is on starts when you open a file the set is for, and keeps running while such a file is open. Flint tells it only about files in [trusted](restricted-mode.md) folders, never about files inside `.git` or credential files such as `.env`. It gets the file's path and reads the saved file through Flint; it sees what you have typed but not saved only if its set asks for that, which the install confirmation and Settings ▸ Extensions say ("sees their text as you type").
 
 ## Shortcuts
 
@@ -51,7 +63,7 @@ What it asks **Flint** for is checked:
 
 - It sees only [trusted](restricted-mode.md) project folders. Folders in Restricted Mode are never passed to it, and it can't read, open or attach files in them.
 - Reading files through Flint (`workspace.read`), keeping secrets in the keychain (`secrets`) and writing an agent chat draft (`agent.ask`) need permissions declared in its manifest. Flint refuses the request otherwise.
-- Files inside `.git` and credential files such as `.env`, `.netrc` or private keys are never returned to it.
+- Files inside `.git` and credential files such as `.env`, `.netrc` or private keys are never returned to it, and it is never told that one is open in an editor.
 - Links it opens are limited to `http` and `https`, and Flint asks you the first time it opens a link to a given site.
 - Its secrets are stored in the system keychain under its own name and are never in `settings.json`; it can't read another extension's.
 - An agent chat draft is only a draft: you send it.

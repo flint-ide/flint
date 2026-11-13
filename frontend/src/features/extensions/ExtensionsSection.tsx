@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import * as API from '../../../bindings/flint/internal/features/extensions/api'
 import { errorMessage } from '../../api/backend'
 import { useSettings } from '../../store/settings'
-import { extensionEnabled, toolsOffered, withFlag } from './settings'
+import { decorationSetEnabled, extensionEnabled, toolsOffered, withDecorationSet, withFlag } from './settings'
 import { installFromFolder, loadExtensions, restartExtension, uninstallExtension, useExtensions, type Info } from './store'
 import { themeContributions, type ExtensionInfo } from './model'
 import { activeThemeId, customThemeFrom } from '../../lib/contributedThemes'
@@ -153,6 +153,27 @@ function ExtensionCard({ info }: { info: Info }) {
                     </div>
                   </div>
                 ))}
+              </dd>
+            </>
+          )}
+          {(info.decorationSets?.length ?? 0) > 0 && (
+            <>
+              <dt>Editor decorations</dt>
+              <dd>
+                {info.decorationSets.map((set) => (
+                  <label key={set.id} className="extension-decoration-set">
+                    <input
+                      type="checkbox"
+                      checked={decorationSetEnabled(extensions, set.id, set.default)}
+                      onChange={(e) => update((s) => ({ extensions: withDecorationSet(s.extensions, set.id, e.target.checked, set.default) }))}
+                    />{' '}
+                    {set.title}{' '}
+                    <span className="muted">
+                      (in {set.files} files{set.unsavedText ? '; sees their text as you type, unsaved edits included' : ''})
+                    </span>
+                  </label>
+                ))}
+                <div className="muted">It starts when a matching file in a trusted folder is opened, and keeps running while one is open.</div>
               </dd>
             </>
           )}

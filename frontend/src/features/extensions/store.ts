@@ -25,6 +25,10 @@ import { deliverWebview, tabKeyOf } from './webviewEvents'
 import type { ContributedTab } from '../../lib/features'
 import { setExtensionLanguages } from '../../lib/extensionLanguages'
 import { setExtensionTools } from '../../lib/extensionTools'
+import { syncDecorationSets } from '../../lib/editorDecorations'
+import { useSettings } from '../../store/settings'
+import { decorationSetEnabled, withDecorationSet } from './settings'
+import { quickFix, resyncDocuments, subscribeDocuments } from './documents'
 
 export type { Info, View }
 
@@ -111,7 +115,11 @@ function syncContributions(list: readonly Info[]): void {
       webviewTab: webviewTabComponent,
       statusItem: statusComponent,
       settingsPage: settingsComponent,
-      run: (ext, command) => API.Execute(ext, command, null),
+      run: (ext, command, args) => API.Execute(ext, command, args ?? null),
+      setEnabled: (set, byDefault) => decorationSetEnabled(useSettings.getState().settings.extensions, set, byDefault),
+      toggleSet: (set, byDefault) =>
+        useSettings.getState().update((s) => ({ extensions: withDecorationSet(s.extensions, set, !decorationSetEnabled(s.extensions, set, byDefault), byDefault) })),
+      quickFix,
       show: (panel) => useWorkspace.getState().setSidebar(panel),
     })
     try {
@@ -158,6 +166,7 @@ export function loadExtensions(rescan = false): Promise<void> {
       syncContributions(list)
       setExtensionLanguages(list.filter((i) => i.enabled && i.state !== 'invalid').flatMap((i) => i.languages ?? []))
       setExtensionTools(list)
+      resyncDocuments() // an extension came, went or changed: who decorates which open file
     })
     .catch((err: unknown) => showToast(`Extensions: ${errorMessage(err)}`, 'error'))
     .finally(() => {
@@ -265,6 +274,11 @@ export function subscribeExtensions(): () => void {
       useEditor.getState().openContributed(e.view, e.key, e.title, e.data ?? null),
     ),
     EventsOn('extensions:openTerminal', (e: OpenTerminalEvent) => openExtensionTerminal(e)),
+    subscribeDocuments(),
+    // A decoration set turned off disappears at once; Go then tells the extension.
+    useSettings.subscribe((s, prev) => {
+      if (s.settings.extensions !== prev.settings.extensions) syncDecorationSets()
+    }),
     EventsOn('extensions:ask', (e: { prompt: string; attachments?: string[] }) =>
       void askAgent({ prompt: e.prompt, attachments: (e.attachments ?? []).map((path) => ({ path })) }),
     ),

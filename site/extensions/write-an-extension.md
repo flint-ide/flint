@@ -7,7 +7,7 @@ An extension is a folder with two things:
 - `flint-extension.json`, the **manifest**: who the extension is, the program Flint runs, what it adds to Flint and which permissions it needs.
 - **A program** in any language. Flint starts it when it is first needed and talks to it with [JSON-RPC 2.0](https://www.jsonrpc.org/specification), one JSON message per line, over the program's standard input and output. Whatever the program writes to standard error goes to its log in **Settings ▸ Extensions**.
 
-A complete example in Go, using only the standard library, is in Flint's repository: [`examples/extensions/stats`](https://github.com/flint-ide/flint/tree/main/examples/extensions/stats). It counts the files of the open projects by type.
+A complete example in Go, using only the standard library, is in Flint's repository: [`examples/extensions/stats`](https://github.com/flint-ide/flint/tree/main/examples/extensions/stats). It counts the files of the open projects by type. [`examples/extensions/todos`](https://github.com/flint-ide/flint/tree/main/examples/extensions/todos) marks TODO lines in the editor, with a quick fix.
 
 ## 1. The manifest
 
@@ -161,7 +161,45 @@ Your program also gets a private folder for its own data in `FLINT_EXTENSION_DAT
 
 A request without its permission fails with error `-32001`. The user sees the permissions when installing, so ask only for what you need. If your program talks to the network, declare `network:<host>` so users know where; Flint shows it but can't enforce it.
 
-## 9. A color theme
+## 9. Marks in the editor
+
+A linter, a coverage tool or an issue tracker marks lines in open files. Declare a **decoration set** and the files it is for; it needs the `workspace.read` permission:
+
+```json
+"permissions": ["workspace.read"],
+"contributes": {
+  "decorationSets": [{ "id": "me.hello.todos", "title": "TODO Marks", "globs": ["*"], "unsavedText": true }]
+}
+```
+
+`languages` (`go`, `typescript`, `python`, `rust`, or an extension's language), `extensions` (`.md`) and `globs` (patterns for the file's name) say which files; `"default": false` leaves the set off until the user turns it on in Settings ▸ Extensions.
+
+When a matching file in a trusted folder is opened in an editor, Flint starts your program and sends `editor/opened`, then `editor/changed` (at most every 300 ms while the user types) and `editor/closed`:
+
+```json
+{ "jsonrpc": "2.0", "method": "editor/opened",
+  "params": { "path": "/path/to/main.go", "language": "go", "version": 1, "sets": ["me.hello.todos"], "text": "…" } }
+```
+
+`text` is there because the set says `unsavedText` (the install dialog tells the user); without it, read the saved file with `workspace/readFile`. Answer with the set's decorations for that version of the document:
+
+```json
+{ "jsonrpc": "2.0", "method": "editor/setDecorations", "params": {
+  "set": "me.hello.todos", "path": "/path/to/main.go", "version": 1, "decorations": [
+    { "kind": "diagnostic", "line": 3, "from": 3, "to": 7, "severity": "info", "message": "To do: tidy up",
+      "actions": [{ "id": "remove", "label": "Remove TODO marker" }] }
+  ] } }
+```
+
+- Kinds are `diagnostic` (underline, gutter marker, message on hover), `gutter` (a marker with a hover), `inline` (dim text after the line, clickable with a `command`) and `highlight` (a background). Colors come from `severity` (`info`, `ok`, `warning`, `error`).
+- Lines are 1-based; columns count UTF-16 code units, as in LSP.
+- Always send the `version` you computed for: Flint drops a publish for a version the editor has moved past, and moves what is shown with the user's edits until your next publish.
+- When the user picks an action, Flint sends the `editor/action` request with the set, path, version, action id and the decoration's current place. Answer `{ "edits": [{ "line": 3, "from": 3, "to": 9, "text": "" }] }`; Flint applies the edits as one undo step, and only if the document is still at that version. An action with a `command` runs that command instead.
+- While a document you decorate is open your program is not stopped for being idle. If it stops or crashes, its decorations are removed.
+
+The complete example is [`todos`](https://github.com/flint-ide/flint/tree/main/examples/extensions/todos); every field and limit is in the [protocol reference](protocol.md#editor-decorations).
+
+## 10. A color theme
 
 A theme is data, so it needs no program: an extension with only `themes` (and settings) leaves out `run` and never runs code.
 
@@ -177,7 +215,7 @@ A theme is data, so it needs no program: an extension with only `themes` (and se
 
 `colors` takes the CSS variables of a custom theme and `terminal` the terminal colors (`background`, `foreground`, `cursor`, `cursorAccent`, `selectionBackground`, the 16 ANSI colors); see [customTheme](../reference/settings.md#customtheme) for the full lists. Values are hex colors. Any other name or value refuses the whole manifest, with the reason shown in Settings ▸ Extensions. The user picks a theme under Settings ▸ Appearance ▸ Color theme, or with **Use …** on your extension; Flint copies it into their custom theme.
 
-## 10. A programming language
+## 11. A programming language
 
 An extension can teach Flint a language it doesn't know: which files are in it, its comments, its language server and its syntax highlighting. Like a theme this is data, so a language-only extension needs no program of its own.
 
@@ -216,7 +254,7 @@ An extension can teach Flint a language it doesn't know: which files are in it, 
 
 Flint's own languages (Go, TypeScript and JavaScript, Python, Rust, and the formats it highlights) always win: an extension can't take over their files.
 
-## 11. A debugger and a test runner
+## 12. A debugger and a test runner
 
 An extension can debug and test files of a language: yours from section 10, or another one, such as Python. Both are data that name programs to run, so they need no program of their own either.
 

@@ -1,6 +1,7 @@
 // The "extensions" part of settings.json (Go: internal/features/extensions/settings.go):
 //
-//   "extensions": { "enabled": { "<id>": false }, "agentTools": { "<id>": false }, "<id>": { …its settings } }
+//   "extensions": { "enabled": { "<id>": false }, "agentTools": { "<id>": false },
+//                   "decorations": { "<set id>": false }, "<id>": { …its settings } }
 //
 // Kept as the flat object it is in the file, so values of extensions that
 // aren't installed survive every save. Framework-free.
@@ -28,13 +29,27 @@ function flags(v: unknown): Record<string, boolean> {
   return Object.fromEntries(Object.entries(v).filter(([id, on]) => ID.test(id) && typeof on === 'boolean')) as Record<string, boolean>
 }
 
-/** Keeps what Go keeps: the two flag maps and an object per valid id. */
+/** A decoration set's id: "<extension id>.<name>" (Go: validSetID). */
+const isSetId = (id: string) => {
+  const parts = id.split('.')
+  return id.length <= 128 && parts.length >= 3 && parts.slice(2).join('.') !== '' && ID.test(`${parts[0]}.${parts[1]}`)
+}
+
+function setFlags(v: unknown): Record<string, boolean> {
+  if (!isObject(v)) return {}
+  return Object.fromEntries(Object.entries(v).filter(([id, on]) => isSetId(id) && typeof on === 'boolean')) as Record<string, boolean>
+}
+
+/** Keeps what Go keeps: the flag maps and an object per valid id. */
 export function coerceExtensions(v: unknown): ExtensionsSettings {
   if (!isObject(v)) return {}
   const out: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(v)) {
     if (key === 'enabled' || key === 'agentTools') {
       const f = flags(value)
+      if (Object.keys(f).length) out[key] = f
+    } else if (key === 'decorations') {
+      const f = setFlags(value)
       if (Object.keys(f).length) out[key] = f
     } else if (ID.test(key) && isObject(value)) out[key] = value
   }
@@ -49,6 +64,21 @@ export function extensionEnabled(s: ExtensionsSettings, id: string): boolean {
 /** Offered unless turned off. */
 export function toolsOffered(s: ExtensionsSettings, id: string): boolean {
   return flags(s.agentTools)[id] !== false
+}
+
+/** Whether a decoration set is on: the user's choice, else the manifest's default. */
+export function decorationSetEnabled(s: ExtensionsSettings, set: string, byDefault: boolean): boolean {
+  return setFlags(s.decorations)[set] ?? byDefault
+}
+
+/** The section with a decoration set turned on or off; the manifest's default removes the entry. */
+export function withDecorationSet(s: ExtensionsSettings, set: string, on: boolean, byDefault: boolean): ExtensionsSettings {
+  const rest = Object.fromEntries(Object.entries(setFlags(s.decorations)).filter(([k]) => k !== set))
+  const next = on === byDefault ? rest : { ...rest, [set]: on }
+  const out: Record<string, unknown> = { ...s }
+  if (Object.keys(next).length) out.decorations = next
+  else delete out.decorations
+  return out
 }
 
 /** The section with a flag set; true removes the entry (the default). */

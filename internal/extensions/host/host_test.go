@@ -76,6 +76,7 @@ type fakeApp struct {
 	confirm  bool
 	disabled map[string]bool
 	settings map[string]json.RawMessage
+	sets     map[string]bool // decoration sets the user switched
 }
 
 func (a *fakeApp) Roots() []string {
@@ -117,6 +118,15 @@ func (a *fakeApp) Enabled(id string) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return !a.disabled[id]
+}
+
+func (a *fakeApp) SetEnabled(set string, def bool) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if on, ok := a.sets[set]; ok {
+		return on
+	}
+	return def
 }
 
 func (a *fakeApp) Settings(id string) json.RawMessage {

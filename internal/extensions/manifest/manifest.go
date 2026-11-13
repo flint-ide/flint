@@ -76,6 +76,8 @@ type Contributes struct {
 	Languages   []Language   `json:"languages,omitempty"`
 	Debuggers   []Debugger   `json:"debuggers,omitempty"`
 	TestRunners []TestRunner `json:"testRunners,omitempty"`
+	// DecorationSets are groups of marks it draws in editors (decorations.go).
+	DecorationSets []DecorationSet `json:"decorationSets,omitempty"`
 	// Unsupported names contribution points this Flint doesn't offer yet
 	// (fileMenu): ignored, and listed as warnings in Settings.
 	Unsupported []string `json:"-"`
@@ -183,10 +185,11 @@ func (m *Manifest) HasProgram() bool {
 }
 
 // NeedsProgram: something the manifest contributes is served by a running
-// program (commands, panels, status items, agent tools, activation events).
+// program (commands, panels, status items, agent tools, decoration sets,
+// activation events).
 func (m *Manifest) NeedsProgram() bool {
 	c := m.Contributes
-	return len(c.Commands)+len(c.Panels)+len(c.StatusItems)+len(c.AgentTools)+len(m.Activation) > 0
+	return len(c.Commands)+len(c.Panels)+len(c.StatusItems)+len(c.AgentTools)+len(c.DecorationSets)+len(m.Activation) > 0
 }
 
 // Parse decodes and checks a manifest.
@@ -225,6 +228,8 @@ func Parse(data []byte) (*Manifest, error) {
 			err = json.Unmarshal(raw, &m.Contributes.Debuggers)
 		case "testRunners":
 			err = json.Unmarshal(raw, &m.Contributes.TestRunners)
+		case "decorationSets":
+			err = json.Unmarshal(raw, &m.Contributes.DecorationSets)
 		case "settings":
 			m.Contributes.Settings, err = parseSchema(raw)
 		default:

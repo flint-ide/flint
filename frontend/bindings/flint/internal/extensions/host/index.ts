@@ -3,10 +3,15 @@
 
 export {
     Action,
+    ActionRequest,
+    ActionResult,
     CommandRef,
+    DecorationSetInfo,
+    DocumentInterest,
     Info,
     Item,
     StatusItemInfo,
+    TextEdit,
     ToolInfo,
     View
 } from "./models.js";

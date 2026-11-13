@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 
 	"flint/internal/extensions/manifest"
 	"flint/internal/settings"
@@ -16,6 +17,7 @@ import (
 //	"extensions": {
 //	  "enabled":    { "acme.jira": false },
 //	  "agentTools": { "acme.jira": false },
+//	  "decorations": { "acme.jira.refs": false },
 //	  "acme.jira":  { "site": "acme.atlassian.net" }
 //	}
 //
@@ -31,6 +33,9 @@ type Settings struct {
 	Enabled map[string]bool
 	// AgentTools: false keeps an extension's tools from agents (missing: offered).
 	AgentTools map[string]bool
+	// Decorations turns editor decoration sets on or off by set id (missing:
+	// the manifest's default).
+	Decorations map[string]bool
 	// Values are the extensions' settings objects by id, as written.
 	Values map[string]json.RawMessage
 }
@@ -77,6 +82,11 @@ func (s Settings) MarshalJSON() ([]byte, error) {
 			return nil, err
 		}
 	}
+	if len(s.Decorations) > 0 {
+		if err := field("decorations", s.Decorations); err != nil {
+			return nil, err
+		}
+	}
 	for _, id := range slices.Sorted(maps.Keys(s.Values)) {
 		if err := field(id, s.Values[id]); err != nil {
 			return nil, fmt.Errorf("extensions.%s: %w", id, err)
@@ -100,6 +110,8 @@ func (s *Settings) UnmarshalJSON(data []byte) error {
 			out.Enabled = idFlags(raw)
 		case "agentTools":
 			out.AgentTools = idFlags(raw)
+		case "decorations":
+			out.Decorations = setFlags(raw)
 		default:
 			trimmed := bytes.TrimSpace(raw)
 			if manifest.ValidID(key) && len(trimmed) > 0 && trimmed[0] == '{' {
@@ -127,8 +139,24 @@ func idFlags(raw json.RawMessage) map[string]bool {
 	return m
 }
 
+// setFlags decodes { set id: bool }, keeping ids that an extension could
+// contribute: "<extension id>.<name>".
+func setFlags(raw json.RawMessage) map[string]bool {
+	var m map[string]bool
+	if json.Unmarshal(raw, &m) != nil {
+		return nil
+	}
+	maps.DeleteFunc(m, func(id string, _ bool) bool { return !validSetID(id) })
+	return m
+}
+
+func validSetID(id string) bool {
+	parts := strings.SplitN(id, ".", 3)
+	return len(id) <= 128 && len(parts) == 3 && parts[2] != "" && manifest.ValidID(parts[0]+"."+parts[1])
+}
+
 func check(s Settings) error {
-	if len(s.Enabled) > maxEntries || len(s.AgentTools) > maxEntries || len(s.Values) > maxEntries {
+	if len(s.Enabled) > maxEntries || len(s.AgentTools) > maxEntries || len(s.Values) > maxEntries || len(s.Decorations) > 10*maxEntries {
 		return fmt.Errorf("extensions: at most %d entries", maxEntries)
 	}
 	for id, v := range s.Values {
@@ -140,13 +168,21 @@ func check(s Settings) error {
 }
 
 func cloneSettings(s Settings) Settings {
-	return Settings{Enabled: maps.Clone(s.Enabled), AgentTools: maps.Clone(s.AgentTools), Values: maps.Clone(s.Values)}
+	return Settings{Enabled: maps.Clone(s.Enabled), AgentTools: maps.Clone(s.AgentTools), Decorations: maps.Clone(s.Decorations), Values: maps.Clone(s.Values)}
 }
 
 // enabled: on unless turned off.
 func (s Settings) enabled(id string) bool {
 	on, ok := s.Enabled[id]
 	return !ok || on
+}
+
+// setEnabled: the user's choice for a decoration set, else def.
+func (s Settings) setEnabled(set string, def bool) bool {
+	if on, ok := s.Decorations[set]; ok {
+		return on
+	}
+	return def
 }
 
 // toolsOffered: on unless turned off.

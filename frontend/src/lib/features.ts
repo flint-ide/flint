@@ -11,6 +11,7 @@
 //   tabKinds       editor tab views, opened with useEditor().openContributed
 //   fileMenu       entries of the file tree's context menu
 //   themes         color themes offered in Settings ▸ Appearance
+//   decorationSets groups of marks drawn in editors (lib/editorDecorations.ts)
 //   activate       runs once after the first render (event subscriptions); may return a cleanup
 //
 // Components are types only, so React.lazy or lazyPreload components keep their
@@ -24,6 +25,7 @@ import type { SettingsSection } from './settingsSections'
 import type { PanelSpec } from '../panels/registry'
 import type { IconName } from '../components/ui/icons'
 import type { ResolvedTheme } from './themeMode'
+import type { CommandRef, QuickFixRequest, TextEdit } from './decorationModel'
 
 /** A page of the Settings tab. */
 export interface SettingsPage {
@@ -94,6 +96,26 @@ export interface ThemeContribution {
   terminal: Readonly<Record<string, string>>
 }
 
+/**
+ * A group of marks a feature or an extension draws in editors: gutter
+ * markers, underlines with a message, text after a line and highlights. The
+ * contributor publishes them per document with lib/editorDecorations.ts
+ * (publishDecorations); only a contributed set that is on is drawn.
+ */
+export interface DecorationSetContribution {
+  /** Unique among decoration sets; what publishDecorations names. */
+  id: string
+  title: string
+  /** Who draws it (the extension's name), for messages. */
+  group: string
+  /** Whether the user left it on; default: always. Read on every publish. */
+  enabled?: () => boolean
+  /** A quick fix was chosen: the edits to apply to the document at req.version, if any. */
+  action?: (req: QuickFixRequest) => Promise<readonly TextEdit[] | void>
+  /** Runs a command a decoration or a quick fix names. */
+  command?: (ref: CommandRef) => void | Promise<unknown>
+}
+
 export interface FeatureModule {
   /** The feature's id, the same as its Go module's (internal/features/<id>). */
   id: string
@@ -112,6 +134,7 @@ export interface FeatureModule {
   tabKinds?: readonly TabKind[]
   fileMenu?: readonly FileMenuItem[]
   themes?: readonly ThemeContribution[]
+  decorationSets?: readonly DecorationSetContribution[]
   /** Runs once after the first render; the returned function undoes it. */
   activate?: () => void | (() => void)
 }
@@ -136,6 +159,7 @@ export function checkFeatures(mods: readonly FeatureModule[]): void {
     ['tab kind', (m) => m.tabKinds],
     ['file menu item', (m) => m.fileMenu],
     ['theme', (m) => m.themes],
+    ['decoration set', (m) => m.decorationSets],
   ]
   for (const [kind, of] of kinds) {
     const seen = new Set<string>()

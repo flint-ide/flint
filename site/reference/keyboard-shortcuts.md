@@ -48,6 +48,7 @@ The keys below are the macOS ones. On Linux, read Ctrl for ⌘ and Alt for ⌥ (
 | `⌥⌘O` | Go to symbol in workspace |
 | `⇧F6` / `F2` | Rename symbol |
 | `⌥↵` / `⌘.` | Quick fixes and refactorings |
+| `⌥⇧↵` | Quick fixes of [extensions' marks](../guides/extensions.md#marks-in-the-editor) on the cursor's line |
 | `⌥⌘L` / `⇧⌥F` | Reformat file |
 | `⇧⌥O` | Organize imports |
 | `⇧⌘Space` | Parameter info |

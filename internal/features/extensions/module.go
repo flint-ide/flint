@@ -10,6 +10,7 @@ package extensions
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 
@@ -18,6 +19,7 @@ import (
 	"flint/internal/extensions/catalog"
 	"flint/internal/extensions/host"
 	"flint/internal/feature"
+	"flint/internal/lsp"
 	"flint/internal/mcpserver"
 	"flint/internal/settings"
 	"flint/internal/shellenv"
@@ -33,6 +35,10 @@ var Module = feature.Module{
 			Dir:     filepath.Join(h.ConfigDir(), "extensions"),
 			App:     app{h: h, changed: func() { go langs.sync() }},
 			Secrets: host.Keyring{},
+			LanguageOf: func(path string) string {
+				language, _, _ := lsp.LanguageOf(path)
+				return language
+			},
 		})
 		langs.list = hst.List
 		cat := catalog.New(catalog.Options{Dir: catalogDir(h), Before: shellenv.Wait})
@@ -81,6 +87,9 @@ func settingsChanged(h *host.Host, prev, next Settings) {
 			h.SettingsChanged(id)
 		}
 	}
+	if !maps.Equal(prev.Decorations, next.Decorations) {
+		h.SetsChanged()
+	}
 }
 
 // app is what the host sees of Flint; changed runs when the list or a state
@@ -98,9 +107,12 @@ func (a app) Emit(event string, data ...any) {
 	}
 	a.h.Emit(event, data...)
 }
-func (a app) OpenURL(link string) error          { return a.h.OpenURL(link) }
-func (a app) Version() string                    { return a.h.Version() }
-func (a app) Enabled(id string) bool             { return Section.Get(a.h.Settings()).enabled(id) }
+func (a app) OpenURL(link string) error { return a.h.OpenURL(link) }
+func (a app) Version() string           { return a.h.Version() }
+func (a app) Enabled(id string) bool    { return Section.Get(a.h.Settings()).enabled(id) }
+func (a app) SetEnabled(set string, def bool) bool {
+	return Section.Get(a.h.Settings()).setEnabled(set, def)
+}
 func (a app) Settings(id string) json.RawMessage { return Section.Get(a.h.Settings()).Values[id] }
 func (a app) Confirm(title, msg, ok string) bool { return a.h.Confirm(title, msg, ok) }
 func (a app) Choose(title, msg string, buttons []string) string {

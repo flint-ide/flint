@@ -22,6 +22,8 @@ Everything an extension and Flint say to each other, for extension contract **1*
 | `-32001` | Permission denied: the manifest doesn't declare the permission the method needs, or the path is outside the trusted project folders |
 | `-32800` | Cancelled (for example, the user said no to opening a link) |
 
+Editor decorations add no error code: `editor/setDecorations` and `editor/clearDecorations` are notifications, so a publish Flint refuses or drops is a line in the extension's log, not an error answer.
+
 ## Manifest
 
 `flint-extension.json` at the root of the extension's folder, at most 256 KiB. A manifest that breaks a rule is refused as a whole, and Settings ▸ Extensions shows why.
@@ -34,7 +36,7 @@ Everything an extension and Flint say to each other, for extension contract **1*
 | `version` | string | Required, `major.minor.patch` with an optional `-suffix` |
 | `publisher`, `description` | string | At most 60 and 500 characters |
 | `run` | object | Required. `command`: a clean relative path inside the folder to an executable file (symbolic links must stay inside the folder); `args`: up to 32 fixed arguments. `darwin` and `linux` (each `{ command, args }`) replace both on that platform. Never run through a shell or `PATH` |
-| `activation` | string[] | `onStartup` starts the process once Flint's window is up. `onCommand:<id>`, `onView:<id>`, `onAgentTool:<name>` must name the extension's own contributions; using any contribution starts the extension anyway |
+| `activation` | string[] | `onStartup` starts the process once Flint's window is up. `onCommand:<id>`, `onView:<id>`, `onAgentTool:<name>` must name the extension's own contributions and `onLanguage:<language>` a language one of its decoration sets lists; using any contribution starts the extension anyway |
 | `permissions` | string[] | `workspace.read`, `secrets`, `agent.ask`, `terminal`, `network:<host>[,<host>…]` (shown, not enforced) |
 | `contributes` | object | Below. Contribution points this Flint doesn't know (`fileMenu`) are ignored with a warning in Settings |
 
@@ -104,14 +106,34 @@ At most 20. `{ "name", "title"?, "description", "inputSchema"?, "acts"? }`. `nam
 
 A tool is read-only unless it declares `"acts": true`: set it for every tool that changes something (creates, sends, starts, writes, deletes). Flint then asks the user before each call, showing the tool and the arguments (in the agent chat when the agent asks there, otherwise in a dialog of Flint's own); no approval policy and no "always allow" answers for them, and `agentTool/call` only arrives after a yes. The install confirmation and Settings ▸ Extensions mark such tools. A tool without `acts` must not change anything.
 
+### contributes.decorationSets
+
+At most 20. A decoration set is a group of marks the extension draws in editors (see [Editor decorations](#editor-decorations)); the user turns each set on or off. Declaring one needs the `workspace.read` permission.
+
+```json
+"decorationSets": [{ "id": "acme.lint.issues", "title": "Lint Issues", "languages": ["go"], "extensions": [".md"], "globs": ["*.test.ts"], "default": true, "unsavedText": false }]
+```
+
+| Field | Rules |
+|---|---|
+| `id` | Required, starts with `<id>.` |
+| `title` | Required, ≤ 60 characters: its name in Settings ▸ Extensions and in the command **Toggle … in Editors** |
+| `languages` | Flint's language ids: `go`, `typescript` (JavaScript too), `python`, `rust`, or the id of a language an extension [contributes](write-an-extension.md) |
+| `extensions` | File extensions with the dot (`.md`), compared without case |
+| `globs` | Patterns for the file's **name**, without folders: `*`, `?` and `[a-z]` classes (`Dockerfile*`, `*.test.ts`, `*` for every file), ≤ 80 characters each |
+| `default` | `false` leaves the set off until the user turns it on. Default `true` |
+| `unsavedText` | `true`: `editor/opened` and `editor/changed` carry the document's text as it is in the editor, unsaved edits included. The install dialog says so |
+
+A set needs at least one of `languages`, `extensions` and `globs` (at most 50 together); a file matching any of them is the set's.
+
 ## Lifecycle
 
-1. **Start.** On the first use of a contribution (or after the window is up, for `onStartup`), Flint starts the program in the extension's folder, in its own process group, with the environment below.
+1. **Start.** On the first use of a contribution, when a file one of its decoration sets is for is opened in an editor (or after the window is up, for `onStartup`), Flint starts the program in the extension's folder, in its own process group, with the environment below.
 2. **`initialize`** (request, Flint → extension, 10 s). The extension answers with its contract version.
 3. **`initialized`** (notification, Flint → extension). Requests follow.
-4. **Idle stop.** After 5 minutes without a request in either direction, with none of its panels on screen, Flint stops it (`shutdown`). Extensions with `onStartup` are not stopped for being idle. Status items keep their last text; the next use starts the program again.
+4. **Idle stop.** After 5 minutes without a request in either direction, with none of its panels on screen and no document it decorates open in an editor, Flint stops it (`shutdown`). Extensions with `onStartup` are not stopped for being idle. Status items keep their last text; the next use starts the program again.
 5. **`shutdown`** (request, Flint → extension, 2 s). Flint then closes standard input and, if the process is still there 2 seconds later, kills its process group. The same happens when the user turns the extension off, uninstalls or replaces it, or quits Flint.
-6. **Crashes.** When the process ends on its own, its pending requests fail. The next use starts it again, after 1 s and then 4 s; an extension whose panel is on screen or that runs at startup is started again on its own. After 3 crashes in 10 minutes it stays stopped until the user clicks **Restart** (or turns it off and on), and a toast says so once.
+6. **Crashes.** When the process ends on its own, its pending requests fail. The next use starts it again, after 1 s and then 4 s; an extension whose panel is on screen, that decorates an open document or that runs at startup is started again on its own. After 3 crashes in 10 minutes it stays stopped until the user clicks **Restart** (or turns it off and on), and a toast says so once.
 
 ### Environment
 
@@ -149,9 +171,12 @@ A request that times out is cancelled with `$/cancelRequest`; the process keeps 
   "settings": { "site": "acme.atlassian.net", "pollMinutes": 10 },
   "roots": [{ "path": "/Users/me/src/app", "trusted": true }],
   "platform": "darwin",
-  "capabilities": { "views": ["tree", "list", "message"], "secrets": true, "agent": true, "openUrl": true }
+  "capabilities": { "views": ["tree", "list", "message"], "secrets": true, "agent": true, "openUrl": true,
+                    "decorations": ["diagnostic", "gutter", "inline", "highlight"], "quickFixes": true }
 } }
 ```
+
+`capabilities.decorations` lists the decoration kinds this Flint draws and `quickFixes` says it sends `editor/action`; a Flint without them has no editor decorations (and ignores `contributes.decorationSets` with a warning).
 
 `roots` are the open project folders the user trusts; folders in Restricted Mode are left out. Answer:
 
@@ -259,6 +284,49 @@ A page's `flint.request(method, params)`. The result (any JSON, ≤ 4 MiB) resol
   "params": { "view": "example.notes.note", "key": "2", "method": "save", "params": { "title": "Plan", "text": "…" } } }
 ```
 
+### editor/opened, editor/changed, editor/closed
+
+Notifications about the documents open in editors, sent only to an extension with a [decoration set](#contributesdecorationsets) that is on and for that file. See [Editor decorations](#editor-decorations) for which files and when.
+
+```json
+{ "jsonrpc": "2.0", "method": "editor/opened", "params": {
+  "path": "/Users/me/src/app/main.go", "language": "go", "version": 1, "sets": ["acme.lint.issues"], "text": "package main\n…" } }
+{ "jsonrpc": "2.0", "method": "editor/changed", "params": { "path": "/Users/me/src/app/main.go", "version": 4, "text": "…" } }
+{ "jsonrpc": "2.0", "method": "editor/closed", "params": { "path": "/Users/me/src/app/main.go" } }
+```
+
+| Field | Meaning |
+|---|---|
+| `path` | The file, absolute. Use it as given in `editor/setDecorations` |
+| `language` | Flint's language id, `""` when the file has none |
+| `version` | The document's version: 1 when it is opened, one more with every change to its text. `editor/changed` is sent at most every 300 ms per file while the user types, so versions may skip |
+| `sets` | The extension's sets that are on and for this file. `editor/opened` is sent again for an open document when this list changes (the user turned a set on or off), and after the extension restarts |
+| `text` | Only for a set with `unsavedText`, and only when the text is at most 1 MiB: the document as it is in the editor. Without it, read the saved file with `workspace/readFile` |
+
+### editor/action
+
+The user chose a quick fix (an entry of a decoration's `actions` without a `command`). Request, 30 s:
+
+```json
+{ "jsonrpc": "2.0", "id": 12, "method": "editor/action", "params": {
+  "set": "acme.lint.issues", "path": "/Users/me/src/app/main.go", "version": 4,
+  "action": "rename", "decoration": "d1", "line": 12, "endLine": 12, "from": 4, "to": 9 } }
+```
+
+`decoration` is the decoration's `id` (left out when it has none); `line`, `endLine`, `from` and `to` are where the decoration is now, after the user's edits since the publish. Answer with edits for the document **at `version`**, or with none:
+
+```json
+{ "edits": [{ "line": 12, "from": 4, "to": 9, "text": "err2" }, { "line": 20, "from": 0, "text": "// renamed\n" }] }
+```
+
+| Field | Rules |
+|---|---|
+| `line`, `endLine` | 1-based; `endLine` defaults to `line` |
+| `from`, `to` | Columns in UTF-16 code units from the start of `line` and of `endLine`; `to` defaults to `from` (an insertion) |
+| `text` | The replacement, `""` to delete; `\n` or `\r\n` between lines |
+
+At most 1,000 edits and 1 MiB of text. Flint applies the edits as one change (one undo step) and only if the document is still at `version`; otherwise the user is told to try again. An edit outside the document, or two edits that overlap, refuse the whole answer: edits are never clamped. If you don't know the text of that version, answer without edits. The extension may do anything else in the handler; to run one of its commands instead, give the action a `command`.
+
 ## Extension → Flint
 
 ### Notifications
@@ -269,6 +337,8 @@ A page's `flint.request(method, params)`. The result (any JSON, ≤ 4 MiB) resol
 | `view/refresh` | `{ "view", "item"? }` | Flint resolves the panel again, with the nodes the user expanded |
 | `window/showMessage` | `{ "type": "info" \| "warning" \| "error", "message" }` | A toast, prefixed with the extension's name; ≤ 1,000 characters; at most 5 per 10 seconds |
 | `webview/post` | `{ "view", "key"?, "message" }` | `message` (any JSON, ≤ 4 MiB) reaches `flint.onMessage` in the view's frames: the tab with that key, or every frame of the view without one |
+| `editor/setDecorations` | `{ "set", "path", "version"?, "decorations" }` | Replaces what a decoration set shows in one open document; needs `workspace.read`. See [Editor decorations](#editor-decorations) |
+| `editor/clearDecorations` | `{ "set", "path"? }` | Removes a set's decorations from one document, or from all |
 | `log` | `{ "level", "message" }` | A line in the extension's log |
 
 ### Requests
@@ -295,6 +365,50 @@ A page's `flint.request(method, params)`. The result (any JSON, ≤ 4 MiB) resol
 - **`agent/ask`** puts the prompt (≤ 20,000 characters) and the attached files in the agent chat's draft. It never sends.
 
 There is no method to run commands and no proxy for network requests: the extension is its own program and does its own I/O.
+
+## Editor decorations
+
+An extension with a [decoration set](#contributesdecorationsets) marks lines in the files open in editors. Flint tells it which documents are open (`editor/opened`, `editor/changed`, `editor/closed`), and it publishes the set's decorations for a document:
+
+```json
+{ "jsonrpc": "2.0", "method": "editor/setDecorations", "params": {
+  "set": "acme.lint.issues", "path": "/Users/me/src/app/main.go", "version": 4, "decorations": [
+    { "kind": "diagnostic", "id": "d1", "line": 12, "from": 4, "to": 9, "severity": "warning", "message": "err is shadowed",
+      "actions": [{ "id": "rename", "label": "Rename to err2" }, { "id": "docs", "label": "Open the Rule", "command": { "id": "acme.lint.rule", "args": { "rule": "shadow" } } }] },
+    { "kind": "gutter", "line": 30, "icon": "check", "severity": "ok", "hover": "Covered by 3 tests" },
+    { "kind": "inline", "line": 41, "text": "ABC-123 · In progress", "command": { "id": "acme.lint.open", "args": { "key": "ABC-123" } } },
+    { "kind": "highlight", "line": 50, "endLine": 58, "severity": "info" }
+  ] } }
+```
+
+Each publish replaces everything the set showed in that document; an empty list removes it.
+
+| Kind | Draws |
+|---|---|
+| `diagnostic` | A wavy underline under the range, a marker in the gutter, and `message` (required) on hover |
+| `gutter` | A marker in the gutter next to the line, with `hover` as its tooltip. `icon` is `dot` (default), `check`, `cross`, `alert`, `info` or `arrow` |
+| `inline` | `text` (required, ≤ 200 characters, one line) in dim type after the end of the line; with `command`, a click runs that command of the extension |
+| `highlight` | A background over the range, or over whole lines when no columns are given |
+
+| Field | Rules |
+|---|---|
+| `line` | Required, 1-based. A decoration without it is dropped |
+| `endLine` | The last line of a range; default `line` |
+| `from`, `to` | Columns in UTF-16 code units (as in LSP) from the start of `line` and of `endLine`. Without them the decoration is about the whole line(s) |
+| `severity` | `info` (default), `ok`, `warning` or `error`: the color, taken from the theme. An extension can't set a color |
+| `message`, `hover` | Plain text for the hover, ≤ 2,000 characters; line breaks are kept. Both names work on every kind |
+| `id` | ≤ 256 characters; sent back as `decoration` in `editor/action` |
+| `actions` | ≤ 10 quick fixes, each `{ "id" (≤ 64), "label" (≤ 60), "command"? }`. Without `command`, choosing it sends [`editor/action`](#editoraction); with one, Flint runs that command of the extension (`command/execute` with its `args`, ≤ 16 KiB) |
+
+How Flint treats a publish:
+
+- **Which files.** Only a document the extension was told about with `editor/opened` and not yet `editor/closed`, for a set in that notification's `sets`. Flint announces a file only when it is inside a trusted project folder (symbolic links resolved), not inside `.git` and not a credential file (the list under `workspace/readFile`): exactly the files `workspace/readFile` would return. A publish for any other file, for a set that is off or for a set of another extension is dropped, with a line in the log.
+- **Versions.** Give the `version` the decorations were computed for. A publish for a version older than the editor's is dropped, so a slow extension never paints marks on text that has changed; the next `editor/changed` is the cue to publish again. Without `version` the publish is drawn as is.
+- **Positions** beyond the document are clamped to it: a line past the end lands on the last line, a column past the end of the line at its end.
+- **Edits.** Until the next publish, decorations move with the user's edits; a decoration whose text is deleted goes.
+- **Limits.** 5,000 decorations per set and document (more are cut), 4 MiB per message as everywhere. Publishes for one editor are applied together, at most every 50 ms.
+- **Removal.** `editor/clearDecorations { set, path? }` removes a set's decorations from one document or from all. Flint removes them itself when the user turns the set or the extension off, when the extension is uninstalled, and when its process stops or crashes (it is started again while a document it decorates is open, and gets `editor/opened` for each).
+- **Quick fixes** appear as buttons in the decoration's hover, in a list when the gutter marker is clicked, and with **Show Extension Quick Fixes** (`⌥⇧↵` / `Alt+Shift+Enter`) for the cursor's line.
 
 ## Versioning
 

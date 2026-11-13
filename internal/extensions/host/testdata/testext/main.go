@@ -79,7 +79,7 @@ func main() {
 			continue
 		}
 		if m.ID == nil {
-			if m.Method == "settings/changed" || m.Method == "workspace/rootsChanged" || m.Method == "view/visible" {
+			if m.Method == "settings/changed" || m.Method == "workspace/rootsChanged" || m.Method == "view/visible" || strings.HasPrefix(m.Method, "editor/") {
 				notify("log", map[string]string{"level": "info", "message": m.Method + " " + string(m.Params)})
 			}
 			continue
@@ -121,6 +121,30 @@ func handle(m msg) {
 		}
 		_ = json.Unmarshal(m.Params, &p)
 		reply(m.ID, map[string]any{"text": fmt.Sprintf("%s in %s with %v", p.Name, p.Root, p.Arguments["q"])})
+	case "editor/action":
+		var p struct {
+			Set, Path, Action, Decoration string
+			Version, Line, From, To       int
+		}
+		_ = json.Unmarshal(m.Params, &p)
+		notify("log", map[string]string{"level": "info", "message": "editor/action " + string(m.Params)})
+		switch p.Action {
+		case "bad":
+			reply(m.ID, map[string]any{"edits": []any{map[string]any{"line": 0, "from": 0, "to": 1, "text": "x"}}})
+		case "many":
+			edits := make([]any, 1001)
+			for i := range edits {
+				edits[i] = map[string]any{"line": i + 1, "from": 0, "to": 0, "text": "x"}
+			}
+			reply(m.ID, map[string]any{"edits": edits})
+		case "none":
+			reply(m.ID, map[string]any{})
+		default:
+			reply(m.ID, map[string]any{"edits": []any{
+				map[string]any{"line": p.Line, "from": p.From, "to": p.To, "text": "fixed " + p.Decoration},
+				map[string]any{"line": p.Line + 1, "from": 2, "text": "inserted\n"},
+			}})
+		}
 	case "command/execute":
 		var p struct {
 			ID   string
@@ -136,6 +160,9 @@ func handle(m msg) {
 func command(m msg, id string, args json.RawMessage) {
 	var a struct {
 		Path, Key, Value, URL string
+		Set                   string
+		Version               *int
+		Count                 int
 	}
 	_ = json.Unmarshal(args, &a)
 	switch strings.TrimPrefix(id, "test.ext.") {
@@ -156,6 +183,18 @@ func command(m msg, id string, args json.RawMessage) {
 		notify("log", map[string]string{"level": "result", "message": call("agent/ask", map[string]any{"prompt": "explain", "attachments": []any{map[string]string{"path": a.Path}}})})
 	case "unknown":
 		notify("log", map[string]string{"level": "result", "message": call("exec", map[string]string{"cmd": "rm"})})
+	case "decorate":
+		params := map[string]any{"set": a.Set, "path": a.Path, "decorations": decorations(a.Count)}
+		if a.Version != nil {
+			params["version"] = *a.Version
+		}
+		notify("editor/setDecorations", params)
+	case "clear":
+		params := map[string]any{"set": a.Set}
+		if a.Path != "" {
+			params["path"] = a.Path
+		}
+		notify("editor/clearDecorations", params)
 	case "crash":
 		os.Exit(3)
 	case "garbage":
@@ -172,4 +211,34 @@ func command(m msg, id string, args json.RawMessage) {
 		notify("log", map[string]string{"level": "result", "message": fmt.Sprint(cmd.Process.Pid)})
 	}
 	reply(m.ID, nil)
+}
+
+// decorations are n gutter markers, or (n = 0) one of each kind with the
+// things Flint must clean: control characters, foreign commands, unknown
+// kinds, icons and severities, missing lines, messages and texts.
+func decorations(n int) []any {
+	if n > 0 {
+		out := make([]any, n)
+		for i := range out {
+			out[i] = map[string]any{"kind": "gutter", "line": i + 1}
+		}
+		return out
+	}
+	return []any{
+		map[string]any{"kind": "diagnostic", "id": "d1", "line": 2, "from": 1, "to": 4, "severity": "warning", "message": "shadowed\x1b[31m\nsecond line",
+			"actions": []any{
+				map[string]any{"id": "fix", "label": "Fix it"},
+				map[string]any{"id": "run", "label": "Run", "command": map[string]any{"id": "test.ext.status"}},
+				map[string]any{"id": "evil", "label": "Evil", "command": map[string]any{"id": "git.push"}},
+				map[string]any{"id": "", "label": "No id"},
+			}},
+		map[string]any{"kind": "gutter", "line": 3, "icon": "check", "severity": "ok", "hover": "Covered"},
+		map[string]any{"kind": "gutter", "line": 4, "icon": "<svg>", "severity": "bogus"},
+		map[string]any{"kind": "inline", "line": 5, "text": strings.Repeat("y", 300), "command": map[string]any{"id": "git.push"}},
+		map[string]any{"kind": "highlight", "line": 6, "endLine": 2, "from": -3, "to": 2},
+		map[string]any{"kind": "bogus", "line": 1},
+		map[string]any{"kind": "diagnostic", "line": 0, "message": "no line"},
+		map[string]any{"kind": "diagnostic", "line": 7},
+		map[string]any{"kind": "inline", "line": 8},
+	}
 }

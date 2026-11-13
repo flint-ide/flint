@@ -41,6 +41,101 @@ export class Action {
 }
 
 /**
+ * ActionRequest names the quick fix the user chose and where its decoration
+ * is now (it moves with the user's edits).
+ */
+export class ActionRequest {
+    "set": string;
+
+    /**
+     * Path and Version are the document and its version when the user chose.
+     */
+    "path": string;
+    "version": number;
+    "action": string;
+
+    /**
+     * Decoration is the decoration's id, when the extension gave it one.
+     */
+    "decoration"?: string;
+    "line": number;
+    "endLine": number;
+    "from": number;
+    "to": number;
+
+    /** Creates a new ActionRequest instance. */
+    constructor($$source: Partial<ActionRequest> = {}) {
+        if (!("set" in $$source)) {
+            this["set"] = "";
+        }
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("version" in $$source)) {
+            this["version"] = 0;
+        }
+        if (!("action" in $$source)) {
+            this["action"] = "";
+        }
+        if (!("line" in $$source)) {
+            this["line"] = 0;
+        }
+        if (!("endLine" in $$source)) {
+            this["endLine"] = 0;
+        }
+        if (!("from" in $$source)) {
+            this["from"] = 0;
+        }
+        if (!("to" in $$source)) {
+            this["to"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ActionRequest instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ActionRequest {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ActionRequest($$parsedSource as Partial<ActionRequest>);
+    }
+}
+
+/**
+ * ActionResult is a quick fix's answer: edits for the document at Version,
+ * which the editor applies only if that is still its version.
+ */
+export class ActionResult {
+    "version": number;
+    "edits": TextEdit[];
+
+    /** Creates a new ActionResult instance. */
+    constructor($$source: Partial<ActionResult> = {}) {
+        if (!("version" in $$source)) {
+            this["version"] = 0;
+        }
+        if (!("edits" in $$source)) {
+            this["edits"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ActionResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ActionResult {
+        const $$createField1_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("edits" in $$parsedSource) {
+            $$parsedSource["edits"] = $$createField1_0($$parsedSource["edits"]);
+        }
+        return new ActionResult($$parsedSource as Partial<ActionResult>);
+    }
+}
+
+/**
  * CommandRef names a command of the extension and its arguments.
  */
 export class CommandRef {
@@ -62,6 +157,100 @@ export class CommandRef {
     static createFrom($$source: any = {}): CommandRef {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new CommandRef($$parsedSource as Partial<CommandRef>);
+    }
+}
+
+/**
+ * DecorationSetInfo is a contributed decoration set, for Settings and the
+ * palette: the files it is for in words, and its state.
+ */
+export class DecorationSetInfo {
+    "id": string;
+    "title": string;
+
+    /**
+     * Default is whether it is on unless the user says otherwise; Enabled
+     * whether it is on now.
+     */
+    "default": boolean;
+    "enabled": boolean;
+
+    /**
+     * Files names the files it is for ("go, .md, *.test.ts").
+     */
+    "files": string;
+
+    /**
+     * UnsavedText: it sees the text of unsaved edits.
+     */
+    "unsavedText": boolean;
+
+    /** Creates a new DecorationSetInfo instance. */
+    constructor($$source: Partial<DecorationSetInfo> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("title" in $$source)) {
+            this["title"] = "";
+        }
+        if (!("default" in $$source)) {
+            this["default"] = false;
+        }
+        if (!("enabled" in $$source)) {
+            this["enabled"] = false;
+        }
+        if (!("files" in $$source)) {
+            this["files"] = "";
+        }
+        if (!("unsavedText" in $$source)) {
+            this["unsavedText"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new DecorationSetInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): DecorationSetInfo {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new DecorationSetInfo($$parsedSource as Partial<DecorationSetInfo>);
+    }
+}
+
+/**
+ * DocumentInterest says whether any extension wants to hear about a document.
+ */
+export class DocumentInterest {
+    /**
+     * Tracked: an enabled extension has a decoration set, turned on, for the file.
+     */
+    "tracked": boolean;
+
+    /**
+     * Text: one of those sets declared unsavedText, so the editor's text is
+     * passed along with each change.
+     */
+    "text": boolean;
+
+    /** Creates a new DocumentInterest instance. */
+    constructor($$source: Partial<DocumentInterest> = {}) {
+        if (!("tracked" in $$source)) {
+            this["tracked"] = false;
+        }
+        if (!("text" in $$source)) {
+            this["text"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new DocumentInterest instance from a string or object.
+     */
+    static createFrom($$source: any = {}): DocumentInterest {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new DocumentInterest($$parsedSource as Partial<DocumentInterest>);
     }
 }
 
@@ -133,6 +322,11 @@ export class Info {
      */
     "debuggers": manifest$0.Debugger[];
     "testRunners": manifest$0.TestRunner[];
+
+    /**
+     * DecorationSets are the groups of editor decorations it draws.
+     */
+    "decorationSets": DecorationSetInfo[];
 
     /** Creates a new Info instance. */
     constructor($$source: Partial<Info> = {}) {
@@ -208,6 +402,9 @@ export class Info {
         if (!("testRunners" in $$source)) {
             this["testRunners"] = [];
         }
+        if (!("decorationSets" in $$source)) {
+            this["decorationSets"] = [];
+        }
 
         Object.assign(this, $$source);
     }
@@ -216,19 +413,20 @@ export class Info {
      * Creates a new Info instance from a string or object.
      */
     static createFrom($$source: any = {}): Info {
-        const $$createField10_0 = $$createType0;
-        const $$createField11_0 = $$createType0;
-        const $$createField12_0 = $$createType0;
-        const $$createField14_0 = $$createType2;
-        const $$createField15_0 = $$createType4;
-        const $$createField16_0 = $$createType6;
-        const $$createField17_0 = $$createType8;
-        const $$createField18_0 = $$createType10;
-        const $$createField19_0 = $$createType12;
-        const $$createField20_0 = $$createType14;
-        const $$createField21_0 = $$createType16;
-        const $$createField22_0 = $$createType18;
-        const $$createField23_0 = $$createType20;
+        const $$createField10_0 = $$createType2;
+        const $$createField11_0 = $$createType2;
+        const $$createField12_0 = $$createType2;
+        const $$createField14_0 = $$createType4;
+        const $$createField15_0 = $$createType6;
+        const $$createField16_0 = $$createType8;
+        const $$createField17_0 = $$createType10;
+        const $$createField18_0 = $$createType12;
+        const $$createField19_0 = $$createType14;
+        const $$createField20_0 = $$createType16;
+        const $$createField21_0 = $$createType18;
+        const $$createField22_0 = $$createType20;
+        const $$createField23_0 = $$createType22;
+        const $$createField24_0 = $$createType24;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("warnings" in $$parsedSource) {
             $$parsedSource["warnings"] = $$createField10_0($$parsedSource["warnings"]);
@@ -268,6 +466,9 @@ export class Info {
         }
         if ("testRunners" in $$parsedSource) {
             $$parsedSource["testRunners"] = $$createField23_0($$parsedSource["testRunners"]);
+        }
+        if ("decorationSets" in $$parsedSource) {
+            $$parsedSource["decorationSets"] = $$createField24_0($$parsedSource["decorationSets"]);
         }
         return new Info($$parsedSource as Partial<Info>);
     }
@@ -318,8 +519,8 @@ export class Item {
      * Creates a new Item instance from a string or object.
      */
     static createFrom($$source: any = {}): Item {
-        const $$createField6_0 = $$createType22;
-        const $$createField7_0 = $$createType24;
+        const $$createField6_0 = $$createType26;
+        const $$createField7_0 = $$createType28;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("actions" in $$parsedSource) {
             $$parsedSource["actions"] = $$createField6_0($$parsedSource["actions"]);
@@ -372,6 +573,47 @@ export class StatusItemInfo {
     static createFrom($$source: any = {}): StatusItemInfo {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new StatusItemInfo($$parsedSource as Partial<StatusItemInfo>);
+    }
+}
+
+/**
+ * TextEdit replaces the text from (Line, From) to (EndLine, To) with Text;
+ * positions as in Decoration.
+ */
+export class TextEdit {
+    "line": number;
+    "from": number;
+    "endLine": number;
+    "to": number;
+    "text": string;
+
+    /** Creates a new TextEdit instance. */
+    constructor($$source: Partial<TextEdit> = {}) {
+        if (!("line" in $$source)) {
+            this["line"] = 0;
+        }
+        if (!("from" in $$source)) {
+            this["from"] = 0;
+        }
+        if (!("endLine" in $$source)) {
+            this["endLine"] = 0;
+        }
+        if (!("to" in $$source)) {
+            this["to"] = 0;
+        }
+        if (!("text" in $$source)) {
+            this["text"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TextEdit instance from a string or object.
+     */
+    static createFrom($$source: any = {}): TextEdit {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new TextEdit($$parsedSource as Partial<TextEdit>);
     }
 }
 
@@ -456,8 +698,8 @@ export class View {
      * Creates a new View instance from a string or object.
      */
     static createFrom($$source: any = {}): View {
-        const $$createField1_0 = $$createType26;
-        const $$createField3_0 = $$createType22;
+        const $$createField1_0 = $$createType30;
+        const $$createField3_0 = $$createType26;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("items" in $$parsedSource) {
             $$parsedSource["items"] = $$createField1_0($$parsedSource["items"]);
@@ -470,30 +712,34 @@ export class View {
 }
 
 // Private type creation functions
-const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = manifest$0.Command.createFrom;
-const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = manifest$0.Panel.createFrom;
+const $$createType0 = TextEdit.createFrom;
+const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = $Create.Array($Create.Any);
+const $$createType3 = manifest$0.Command.createFrom;
 const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = StatusItemInfo.createFrom;
+const $$createType5 = manifest$0.Panel.createFrom;
 const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = manifest$0.Schema.createFrom;
-const $$createType8 = $Create.Nullable($$createType7);
-const $$createType9 = ToolInfo.createFrom;
-const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = manifest$0.TabView.createFrom;
+const $$createType7 = StatusItemInfo.createFrom;
+const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = manifest$0.Schema.createFrom;
+const $$createType10 = $Create.Nullable($$createType9);
+const $$createType11 = ToolInfo.createFrom;
 const $$createType12 = $Create.Array($$createType11);
-const $$createType13 = manifest$0.Theme.createFrom;
+const $$createType13 = manifest$0.TabView.createFrom;
 const $$createType14 = $Create.Array($$createType13);
-const $$createType15 = manifest$0.Language.createFrom;
+const $$createType15 = manifest$0.Theme.createFrom;
 const $$createType16 = $Create.Array($$createType15);
-const $$createType17 = manifest$0.Debugger.createFrom;
+const $$createType17 = manifest$0.Language.createFrom;
 const $$createType18 = $Create.Array($$createType17);
-const $$createType19 = manifest$0.TestRunner.createFrom;
+const $$createType19 = manifest$0.Debugger.createFrom;
 const $$createType20 = $Create.Array($$createType19);
-const $$createType21 = Action.createFrom;
+const $$createType21 = manifest$0.TestRunner.createFrom;
 const $$createType22 = $Create.Array($$createType21);
-const $$createType23 = CommandRef.createFrom;
-const $$createType24 = $Create.Nullable($$createType23);
-const $$createType25 = Item.createFrom;
+const $$createType23 = DecorationSetInfo.createFrom;
+const $$createType24 = $Create.Array($$createType23);
+const $$createType25 = Action.createFrom;
 const $$createType26 = $Create.Array($$createType25);
+const $$createType27 = CommandRef.createFrom;
+const $$createType28 = $Create.Nullable($$createType27);
+const $$createType29 = Item.createFrom;
+const $$createType30 = $Create.Array($$createType29);

@@ -409,7 +409,7 @@ internal/prompts            prompt library: Markdown prompts (project, personal,
 internal/agent              claude / codex: headless runs and interactive commands
 internal/shellenv           PATH from the login shell (git hooks, brew, nvm inside a GUI app)
 internal/watcher            FSEvents (macOS) / inotify (Linux) + debounce
-internal/lsp                LSP client (JSON-RPC, Content-Length), server manager
+internal/lsp                LSP client (JSON-RPC, Content-Length), server manager, workspace edits (rename, code actions, formatting)
 internal/acp                Agent Client Protocol client (newline-delimited JSON-RPC); acptest: a fake agent for tests
 internal/agentsession       shared agent event model, approval policy, session manager
   claude/ codex/            native agent drivers

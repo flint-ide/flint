@@ -6,6 +6,51 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
+ * CodeAction is a fix or refactoring the server offers; ID names it in
+ * ApplyCodeAction.
+ */
+export class CodeAction {
+    "id": number;
+    "title": string;
+    "kind": string;
+    "preferred": boolean;
+
+    /**
+     * Disabled, when set, is why the action can't be used here.
+     */
+    "disabled": string;
+
+    /** Creates a new CodeAction instance. */
+    constructor($$source: Partial<CodeAction> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("title" in $$source)) {
+            this["title"] = "";
+        }
+        if (!("kind" in $$source)) {
+            this["kind"] = "";
+        }
+        if (!("preferred" in $$source)) {
+            this["preferred"] = false;
+        }
+        if (!("disabled" in $$source)) {
+            this["disabled"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CodeAction instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CodeAction {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CodeAction($$parsedSource as Partial<CodeAction>);
+    }
+}
+
+/**
  * CompletionItem is the subset of LSP completion data the editor uses.
  */
 export class CompletionItem {
@@ -95,6 +140,48 @@ export class CompletionList {
 }
 
 /**
+ * FileEdit is the edits of one file; the positions of all its Edits refer to
+ * the file before any of them is applied.
+ */
+export class FileEdit {
+    "path": string;
+    "edits": TextEdit[];
+
+    /**
+     * Open says the file is open in an editor, so the edits belong in its
+     * buffer (undoable) instead of on disk.
+     */
+    "open": boolean;
+
+    /** Creates a new FileEdit instance. */
+    constructor($$source: Partial<FileEdit> = {}) {
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("edits" in $$source)) {
+            this["edits"] = [];
+        }
+        if (!("open" in $$source)) {
+            this["open"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new FileEdit instance from a string or object.
+     */
+    static createFrom($$source: any = {}): FileEdit {
+        const $$createField1_0 = $$createType4;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("edits" in $$parsedSource) {
+            $$parsedSource["edits"] = $$createField1_0($$parsedSource["edits"]);
+        }
+        return new FileEdit($$parsedSource as Partial<FileEdit>);
+    }
+}
+
+/**
  * LanguageInfo describes a language Flint runs a server for (for Settings).
  */
 export class LanguageInfo {
@@ -134,7 +221,7 @@ export class LanguageInfo {
      * Creates a new LanguageInfo instance from a string or object.
      */
     static createFrom($$source: any = {}): LanguageInfo {
-        const $$createField1_0 = $$createType4;
+        const $$createField1_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("servers" in $$parsedSource) {
             $$parsedSource["servers"] = $$createField1_0($$parsedSource["servers"]);
@@ -170,12 +257,44 @@ export class Location {
      * Creates a new Location instance from a string or object.
      */
     static createFrom($$source: any = {}): Location {
-        const $$createField1_0 = $$createType5;
+        const $$createField1_0 = $$createType6;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("range" in $$parsedSource) {
             $$parsedSource["range"] = $$createField1_0($$parsedSource["range"]);
         }
         return new Location($$parsedSource as Partial<Location>);
+    }
+}
+
+/**
+ * Parameter is one parameter of a Signature.
+ */
+export class Parameter {
+    "start": number;
+    "end": number;
+    "documentation": string;
+
+    /** Creates a new Parameter instance. */
+    constructor($$source: Partial<Parameter> = {}) {
+        if (!("start" in $$source)) {
+            this["start"] = 0;
+        }
+        if (!("end" in $$source)) {
+            this["end"] = 0;
+        }
+        if (!("documentation" in $$source)) {
+            this["documentation"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Parameter instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Parameter {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Parameter($$parsedSource as Partial<Parameter>);
     }
 }
 
@@ -231,8 +350,8 @@ export class Range {
      * Creates a new Range instance from a string or object.
      */
     static createFrom($$source: any = {}): Range {
-        const $$createField0_0 = $$createType6;
-        const $$createField1_0 = $$createType6;
+        const $$createField0_0 = $$createType7;
+        const $$createField1_0 = $$createType7;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("start" in $$parsedSource) {
             $$parsedSource["start"] = $$createField0_0($$parsedSource["start"]);
@@ -241,6 +360,120 @@ export class Range {
             $$parsedSource["end"] = $$createField1_0($$parsedSource["end"]);
         }
         return new Range($$parsedSource as Partial<Range>);
+    }
+}
+
+/**
+ * RenameTarget is what a rename at a position would rename.
+ */
+export class RenameTarget {
+    "range": Range;
+    "placeholder": string;
+
+    /**
+     * Known is false when the server can't say (no prepareRename): the UI
+     * then offers the word under the cursor.
+     */
+    "known": boolean;
+
+    /** Creates a new RenameTarget instance. */
+    constructor($$source: Partial<RenameTarget> = {}) {
+        if (!("range" in $$source)) {
+            this["range"] = (new Range());
+        }
+        if (!("placeholder" in $$source)) {
+            this["placeholder"] = "";
+        }
+        if (!("known" in $$source)) {
+            this["known"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new RenameTarget instance from a string or object.
+     */
+    static createFrom($$source: any = {}): RenameTarget {
+        const $$createField0_0 = $$createType6;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("range" in $$parsedSource) {
+            $$parsedSource["range"] = $$createField0_0($$parsedSource["range"]);
+        }
+        return new RenameTarget($$parsedSource as Partial<RenameTarget>);
+    }
+}
+
+/**
+ * Signature is one overload; a parameter's Start and End are UTF-16 offsets
+ * into Label (both zero when the server didn't say where it is).
+ */
+export class Signature {
+    "label": string;
+    "documentation": string;
+    "parameters": Parameter[];
+
+    /** Creates a new Signature instance. */
+    constructor($$source: Partial<Signature> = {}) {
+        if (!("label" in $$source)) {
+            this["label"] = "";
+        }
+        if (!("documentation" in $$source)) {
+            this["documentation"] = "";
+        }
+        if (!("parameters" in $$source)) {
+            this["parameters"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Signature instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Signature {
+        const $$createField2_0 = $$createType9;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("parameters" in $$parsedSource) {
+            $$parsedSource["parameters"] = $$createField2_0($$parsedSource["parameters"]);
+        }
+        return new Signature($$parsedSource as Partial<Signature>);
+    }
+}
+
+/**
+ * SignatureHelp describes the call around the cursor.
+ */
+export class SignatureHelp {
+    "signatures": Signature[];
+    "activeSignature": number;
+    "activeParameter": number;
+
+    /** Creates a new SignatureHelp instance. */
+    constructor($$source: Partial<SignatureHelp> = {}) {
+        if (!("signatures" in $$source)) {
+            this["signatures"] = [];
+        }
+        if (!("activeSignature" in $$source)) {
+            this["activeSignature"] = 0;
+        }
+        if (!("activeParameter" in $$source)) {
+            this["activeParameter"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SignatureHelp instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SignatureHelp {
+        const $$createField0_0 = $$createType11;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("signatures" in $$parsedSource) {
+            $$parsedSource["signatures"] = $$createField0_0($$parsedSource["signatures"]);
+        }
+        return new SignatureHelp($$parsedSource as Partial<SignatureHelp>);
     }
 }
 
@@ -281,6 +514,67 @@ export class Status {
 }
 
 /**
+ * Symbol is a declaration in a document. Depth is its nesting level, so the
+ * list reads as an outline without a tree on the wire.
+ */
+export class Symbol {
+    "name": string;
+    "detail": string;
+    "kind": number;
+    "depth": number;
+    "container": string;
+    "range": Range;
+
+    /**
+     * Selection is the name itself, where the cursor goes.
+     */
+    "selection": Range;
+
+    /** Creates a new Symbol instance. */
+    constructor($$source: Partial<Symbol> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("detail" in $$source)) {
+            this["detail"] = "";
+        }
+        if (!("kind" in $$source)) {
+            this["kind"] = 0;
+        }
+        if (!("depth" in $$source)) {
+            this["depth"] = 0;
+        }
+        if (!("container" in $$source)) {
+            this["container"] = "";
+        }
+        if (!("range" in $$source)) {
+            this["range"] = (new Range());
+        }
+        if (!("selection" in $$source)) {
+            this["selection"] = (new Range());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Symbol instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Symbol {
+        const $$createField5_0 = $$createType6;
+        const $$createField6_0 = $$createType6;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("range" in $$parsedSource) {
+            $$parsedSource["range"] = $$createField5_0($$parsedSource["range"]);
+        }
+        if ("selection" in $$parsedSource) {
+            $$parsedSource["selection"] = $$createField6_0($$parsedSource["selection"]);
+        }
+        return new Symbol($$parsedSource as Partial<Symbol>);
+    }
+}
+
+/**
  * TextEdit replaces Range with NewText.
  */
 export class TextEdit {
@@ -303,7 +597,7 @@ export class TextEdit {
      * Creates a new TextEdit instance from a string or object.
      */
     static createFrom($$source: any = {}): TextEdit {
-        const $$createField0_0 = $$createType5;
+        const $$createField0_0 = $$createType6;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("range" in $$parsedSource) {
             $$parsedSource["range"] = $$createField0_0($$parsedSource["range"]);
@@ -312,11 +606,92 @@ export class TextEdit {
     }
 }
 
+/**
+ * WorkspaceEdit is a change across files (rename, a code action). Files are
+ * applied in order; a path may appear more than once when a server sent
+ * several edits one after another.
+ */
+export class WorkspaceEdit {
+    "files": FileEdit[];
+
+    /** Creates a new WorkspaceEdit instance. */
+    constructor($$source: Partial<WorkspaceEdit> = {}) {
+        if (!("files" in $$source)) {
+            this["files"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new WorkspaceEdit instance from a string or object.
+     */
+    static createFrom($$source: any = {}): WorkspaceEdit {
+        const $$createField0_0 = $$createType13;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("files" in $$parsedSource) {
+            $$parsedSource["files"] = $$createField0_0($$parsedSource["files"]);
+        }
+        return new WorkspaceEdit($$parsedSource as Partial<WorkspaceEdit>);
+    }
+}
+
+/**
+ * WorkspaceSymbol is a declaration somewhere in the project.
+ */
+export class WorkspaceSymbol {
+    "name": string;
+    "kind": number;
+    "container": string;
+    "path": string;
+    "range": Range;
+
+    /** Creates a new WorkspaceSymbol instance. */
+    constructor($$source: Partial<WorkspaceSymbol> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("kind" in $$source)) {
+            this["kind"] = 0;
+        }
+        if (!("container" in $$source)) {
+            this["container"] = "";
+        }
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("range" in $$source)) {
+            this["range"] = (new Range());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new WorkspaceSymbol instance from a string or object.
+     */
+    static createFrom($$source: any = {}): WorkspaceSymbol {
+        const $$createField4_0 = $$createType6;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("range" in $$parsedSource) {
+            $$parsedSource["range"] = $$createField4_0($$parsedSource["range"]);
+        }
+        return new WorkspaceSymbol($$parsedSource as Partial<WorkspaceSymbol>);
+    }
+}
+
 // Private type creation functions
 const $$createType0 = TextEdit.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);
 const $$createType2 = CompletionItem.createFrom;
 const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = $Create.Array($Create.Any);
-const $$createType5 = Range.createFrom;
-const $$createType6 = Position.createFrom;
+const $$createType4 = $Create.Array($$createType0);
+const $$createType5 = $Create.Array($Create.Any);
+const $$createType6 = Range.createFrom;
+const $$createType7 = Position.createFrom;
+const $$createType8 = Parameter.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = Signature.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = FileEdit.createFrom;
+const $$createType13 = $Create.Array($$createType12);

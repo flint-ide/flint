@@ -2416,6 +2416,46 @@ button.small {
   user-select: text;
   -webkit-user-select: text;
 }
+.cm-lsp-signature {
+  max-width: 640px;
+  padding: 5px 10px;
+  font: 12px/1.45 var(--font-mono);
+}
+.cm-lsp-signature-label {
+  white-space: pre-wrap;
+}
+.cm-lsp-signature-label b {
+  color: var(--accent);
+}
+.cm-lsp-signature-doc {
+  max-height: 120px;
+  overflow: auto;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+  color: var(--fg-muted);
+  white-space: pre-wrap;
+}
+.cm-lsp-rename {
+  padding: 3px;
+}
+.cm-lsp-rename input {
+  padding: 3px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg-editor);
+  color: var(--fg);
+  font: 12px/1.45 var(--font-mono);
+  outline: none;
+}
+.symbols .symbol-kind {
+  flex: none;
+  width: 92px;
+  font-size: 11px;
+}
+.quick-empty {
+  padding: 10px 14px;
+}
 .cm-tooltip-autocomplete .cm-completionDetail {
   color: var(--fg-faint);
   font-style: normal;

@@ -43,6 +43,14 @@ The keys below are the macOS ones. On Linux, read Ctrl for ⌘ and Alt for ⌥ (
 | `⌥⌘G` | Go to line |
 | `⌘B` / `F12` / `⌘`-click | Go to definition |
 | `⌥F7` / `⇧F12` | Find usages |
+| `⌥⌘B` / `⇧⌘B` | Go to implementation / type declaration |
+| `⌘F12` | Go to symbol in file |
+| `⌥⌘O` | Go to symbol in workspace |
+| `⇧F6` / `F2` | Rename symbol |
+| `⌥↵` / `⌘.` | Quick fixes and refactorings |
+| `⌥⌘L` / `⇧⌥F` | Reformat file |
+| `⇧⌥O` | Organize imports |
+| `⇧⌘Space` | Parameter info |
 | `⇧⌘M` | Problems list |
 | `F8` | Next problem (when not debugging) |
 | `⇧⌘V` | Markdown preview |

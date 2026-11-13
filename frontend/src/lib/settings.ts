@@ -32,6 +32,10 @@ export interface FontSettings {
 export interface EditorSettings extends FontSettings {
   /** Vim key bindings in every editor. */
   vimMode: boolean
+  /** Format a file with its language server before each save. */
+  formatOnSave: boolean
+  /** Run the language server's "organize imports" before each save. */
+  organizeImportsOnSave: boolean
 }
 
 /** A palette laid over the dark or light one (Theme "custom"), e.g. imported from VS Code. */
@@ -96,7 +100,7 @@ export type AppSettings = CoreSettings & FeatureSettings
 export const DEFAULT_SETTINGS: CoreSettings = Object.freeze({
   version: 1,
   theme: 'dark',
-  editor: Object.freeze({ fontFamily: `'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace`, fontSize: 13, lineHeight: 1.55, vimMode: false }),
+  editor: Object.freeze({ fontFamily: `'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace`, fontSize: 13, lineHeight: 1.55, vimMode: false, formatOnSave: false, organizeImportsOnSave: false }),
   terminal: Object.freeze({ fontFamily: `"JetBrains Mono", "SF Mono", Menlo, monospace`, fontSize: 13, lineHeight: 1.2 }),
   customTheme: Object.freeze({
     name: '', base: 'dark', colors: Object.freeze({}) as Record<string, string>, terminal: Object.freeze({}) as Record<string, string>, source: '',
@@ -233,6 +237,9 @@ function coerceCore(v: Record<string, unknown>): CoreSettings {
     editor: {
       ...font(v.editor, d.editor),
       vimMode: isObject(v.editor) && typeof v.editor.vimMode === 'boolean' ? v.editor.vimMode : d.editor.vimMode,
+      formatOnSave: isObject(v.editor) && typeof v.editor.formatOnSave === 'boolean' ? v.editor.formatOnSave : d.editor.formatOnSave,
+      organizeImportsOnSave:
+        isObject(v.editor) && typeof v.editor.organizeImportsOnSave === 'boolean' ? v.editor.organizeImportsOnSave : d.editor.organizeImportsOnSave,
     },
     terminal: font(v.terminal, d.terminal),
     customTheme: coerceCustomTheme(v.customTheme, d.customTheme),

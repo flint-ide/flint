@@ -65,6 +65,11 @@ type EditorSettings struct {
 	Font
 	// VimMode turns on Vim key bindings in every editor.
 	VimMode bool `json:"vimMode"`
+	// FormatOnSave formats a file with its language server before each save.
+	FormatOnSave bool `json:"formatOnSave"`
+	// OrganizeImportsOnSave runs the language server's "organize imports"
+	// before each save.
+	OrganizeImportsOnSave bool `json:"organizeImportsOnSave"`
 }
 
 // Settings is the whole settings.json document.

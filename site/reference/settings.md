@@ -29,7 +29,9 @@ The file is readable only by your user. It never contains secrets: database pass
     "fontFamily": "'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace",
     "fontSize": 14,
     "lineHeight": 1.55,
-    "vimMode": false
+    "vimMode": false,
+    "formatOnSave": false,
+    "organizeImportsOnSave": false
   },
   "terminal": {
     "fontFamily": "\"JetBrains Mono\", \"SF Mono\", Menlo, monospace",
@@ -95,7 +97,7 @@ The file is readable only by your user. It never contains secrets: database pass
 |---|---|---|---|
 | `version` | number | `1` | Schema version. Written by Flint; you don't need to change it. |
 | `theme` | string | `"dark"` | `"dark"`, `"light"`, `"system"` (follows the macOS appearance) or `"custom"` (uses `customTheme`). |
-| `editor` | object | see below | Font for all editors (files, diffs and scratchpads), and `vimMode`: Vim key bindings in every editor (default `false`). |
+| `editor` | object | see below | Font for all editors (files, diffs and scratchpads), `vimMode`: Vim key bindings in every editor (default `false`), and `formatOnSave` / `organizeImportsOnSave` (default `false`). |
 | `terminal` | object | see below | Font for terminals and run consoles. |
 | `customTheme` | object | see below | The palette of the `"custom"` theme, usually imported from VS Code. See [customTheme](#customtheme). |
 | `defaultAgent` | string | `""` | Agent for new chats, commit messages and conflict resolution: `"claude"`, `"codex"` or the `id` of a custom agent. Empty means the first installed agent. Conflict resolution always uses Claude Code or Codex. |
@@ -129,6 +131,8 @@ The file is readable only by your user. It never contains secrets: database pass
 `fontFamily` is a CSS font list; the first installed font is used. It may not contain `;`, `{`, `}`, `<`, `>` or `\`.
 
 `editor` also has `vimMode` (boolean, default `false`): Vim key bindings in every editor. See [Use Vim key bindings](../how-to/customize-flint.md#use-vim-key-bindings).
+
+`editor.formatOnSave` and `editor.organizeImportsOnSave` (booleans, default `false`) make the file's language server format it, or put its imports in order, before every save. Files whose server has no formatter are saved as they are, and a save never waits more than 3 seconds for the server. See [Language servers](../guides/editor-and-navigation.md#language-servers).
 
 ### customTheme
 

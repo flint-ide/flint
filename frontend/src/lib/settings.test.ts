@@ -29,7 +29,7 @@ describe('theme resolution', () => {
 
 describe('editor variables', () => {
   it('maps the editor font to CSS custom properties', () => {
-    const s = { ...DEFAULT_SETTINGS, editor: { fontFamily: 'Menlo', fontSize: 15, lineHeight: 1.4, vimMode: false } }
+    const s = { ...DEFAULT_SETTINGS, editor: { fontFamily: 'Menlo', fontSize: 15, lineHeight: 1.4, vimMode: false, formatOnSave: false, organizeImportsOnSave: false } }
     assert.deepEqual(editorCssVars(s), {
       '--editor-font': 'Menlo',
       '--editor-font-size': '15px',
@@ -120,6 +120,10 @@ describe('vim mode', () => {
     assert.equal(coerceSettings({}).editor.vimMode, false)
     assert.equal(coerceSettings({ editor: { vimMode: true } }).editor.vimMode, true)
     assert.equal(coerceSettings({ editor: { vimMode: 'yes' } }).editor.vimMode, false)
+    assert.equal(coerceSettings({}).editor.formatOnSave, false)
+    assert.equal(coerceSettings({ editor: { formatOnSave: true, organizeImportsOnSave: true } }).editor.formatOnSave, true)
+    assert.equal(coerceSettings({ editor: { formatOnSave: true, organizeImportsOnSave: true } }).editor.organizeImportsOnSave, true)
+    assert.equal(coerceSettings({ editor: { formatOnSave: 1 } }).editor.formatOnSave, false)
   })
 })
 

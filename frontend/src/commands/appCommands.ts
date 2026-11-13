@@ -27,6 +27,7 @@ import { copyDiagnostics, reportIssue, showLogs } from '../store/diagnostics'
 import { openToolCheck } from '../store/toolCheck'
 import { openInlineEditInActiveEditor } from '../store/editorAi'
 import { useSettings } from '../store/settings'
+import { useLsp } from '../store/lsp'
 import { openVSCodeImport } from '../store/vscodeImport'
 import { fileManagerName } from '../lib/platform'
 
@@ -45,6 +46,8 @@ const hasEditor = () => {
   const id = useEditor.getState().activeId
   return !!id && !!viewFor(id)
 }
+/** The active tab is a file in an editor (the commands below are its language server's own keys there). */
+const hasLanguageServer = () => activeTab()?.kind === 'file' && hasEditor()
 /** Registers everything below; returns the matching unregister. */
 export function registerAppCommands(): () => void {
   const offStatic = registerCommands(appCommands())
@@ -136,9 +139,45 @@ function appCommands(): Command[] {
       id: 'nav.findUsages', title: 'Find Usages', category: 'Navigate', hintKeys: 'Alt+F7', keywords: 'references lsp',
       when: () => activeTab()?.kind === 'file' && hasEditor(), run: () => pressInEditor('Alt+F7'),
     },
+    {
+      id: 'nav.goToImplementation', title: 'Go to Implementation', category: 'Navigate', hintKeys: 'Mod+Alt+B', keywords: 'implementations lsp',
+      when: hasLanguageServer, run: () => pressInEditor('Mod+Alt+B'),
+    },
+    {
+      id: 'nav.goToTypeDefinition', title: 'Go to Type Declaration', category: 'Navigate', hintKeys: 'Mod+Shift+B', keywords: 'type definition lsp',
+      when: hasLanguageServer, run: () => pressInEditor('Mod+Shift+B'),
+    },
+    {
+      id: 'nav.fileStructure', title: 'Go to Symbol in File…', category: 'Navigate', hintKeys: 'Mod+F12', keywords: 'outline file structure symbols lsp',
+      when: hasLanguageServer, run: () => pressInEditor('Mod+F12'),
+    },
+    {
+      id: 'nav.goToSymbol', title: 'Go to Symbol in Workspace…', category: 'Navigate', keys: 'Mod+Alt+O', keywords: 'class function type lsp',
+      when: () => !!ws().root, run: () => useLsp.getState().showWorkspaceSymbols(),
+    },
     { id: 'nav.goToLine', title: 'Go to Line…', category: 'Navigate', hintKeys: 'Mod+Alt+G', when: hasEditor, run: () => pressInEditor('Mod+Alt+G') },
 
     // Editor
+    {
+      id: 'editor.rename', title: 'Rename Symbol…', category: 'Editor', hintKeys: 'Shift+F6', keywords: 'refactor lsp F2',
+      when: hasLanguageServer, run: () => pressInEditor('Shift+F6'),
+    },
+    {
+      id: 'editor.quickFix', title: 'Show Quick Fixes and Refactorings…', category: 'Editor', hintKeys: 'Alt+Enter', keywords: 'code actions intentions lightbulb lsp',
+      when: hasLanguageServer, run: () => pressInEditor('Alt+Enter'),
+    },
+    {
+      id: 'editor.format', title: 'Reformat File', category: 'Editor', hintKeys: 'Mod+Alt+L', keywords: 'format document gofmt prettier lsp',
+      when: hasLanguageServer, run: () => pressInEditor('Mod+Alt+L'),
+    },
+    {
+      id: 'editor.organizeImports', title: 'Organize Imports', category: 'Editor', hintKeys: 'Shift+Alt+O', keywords: 'optimize imports sort lsp',
+      when: hasLanguageServer, run: () => pressInEditor('Shift+Alt+O'),
+    },
+    {
+      id: 'editor.parameterInfo', title: 'Parameter Info', category: 'Editor', hintKeys: 'Mod+Shift+Space', keywords: 'signature help arguments lsp',
+      when: hasLanguageServer, run: () => pressInEditor('Mod+Shift+Space'),
+    },
     { id: 'editor.find', title: 'Find in File…', category: 'Editor', hintKeys: 'Mod+F', keywords: 'search replace', when: hasEditor, run: () => pressInEditor('Mod+F') },
     {
       id: 'editor.save', title: 'Save', category: 'Editor', hintKeys: 'Mod+S',

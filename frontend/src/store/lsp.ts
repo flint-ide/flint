@@ -17,6 +17,11 @@ interface LspState {
   usages: { symbol: string; locations: lsp.Location[] } | null
   showUsages: (symbol: string, locations: lsp.Location[]) => void
   closeUsages: () => void
+  /** Symbol picker: the outline of one file, or a search of the whole workspace (null = closed). */
+  symbols: { path: string; outline: lsp.Symbol[] } | { workspace: true } | null
+  showOutline: (path: string, outline: lsp.Symbol[]) => void
+  showWorkspaceSymbols: () => void
+  closeSymbols: () => void
 }
 
 export const useLsp = createStore<LspState>((set) => ({
@@ -24,6 +29,10 @@ export const useLsp = createStore<LspState>((set) => ({
   usages: null,
   showUsages: (symbol, locations) => set({ usages: { symbol, locations } }),
   closeUsages: () => set({ usages: null }),
+  symbols: null,
+  showOutline: (path, outline) => set({ symbols: { path, outline } }),
+  showWorkspaceSymbols: () => set({ symbols: { workspace: true } }),
+  closeSymbols: () => set({ symbols: null }),
 }))
 
 // Diagnostics live outside React state: editors subscribe per file and apply them

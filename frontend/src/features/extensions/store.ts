@@ -19,7 +19,7 @@ import { activeRoot } from '../../store/activeRoot'
 import { shellCommand } from '../../lib/shellArgs'
 import { useWorkspace } from '../../store/workspace'
 import type { PanelProps } from '../../panels/registry'
-import { contributes, contributionKey, extensionParts, type ExtensionInfo } from './model'
+import { contributes, contributionKey, extensionParts, isTreeView, type ExtensionInfo } from './model'
 import { ExtensionStatusItem } from './ExtensionStatusItem'
 import { deliverWebview, tabKeyOf } from './webviewEvents'
 import type { ContributedTab } from '../../lib/features'
@@ -52,20 +52,32 @@ interface ExtensionsState {
 
 export const useExtensions = createStore<ExtensionsState>(() => ({ list: [], loaded: false, status: {}, refresh: {}, conflicts: {} }))
 
-export const refreshKey = (ext: string, view: string) => `${ext}\n${view}`
+/** The refresh counter of a view; with key, of one tab of a tab view. */
+export const refreshKey = (ext: string, view: string, key = '') => (key ? `${ext}\n${view}\n${key}` : `${ext}\n${view}`)
 
 // ---------- contributions ----------
 
 const ExtensionPanel = lazy(() => import('./ExtensionPanel').then((m) => ({ default: m.ExtensionPanel })))
+const DeclarativeView = lazy(() => import('./DeclarativeView').then((m) => ({ default: m.DeclarativeView })))
 const WebviewFrame = lazy(() => import('./WebviewFrame').then((m) => ({ default: m.WebviewFrame })))
 const ExtensionSettingsPage = lazy(() => import('./ExtensionSettingsPage').then((m) => ({ default: m.ExtensionSettingsPage })))
 
 // One component per contribution, made once per extension version: React keeps
 // a panel's state as long as its component type stays the same.
 function panelComponent(ext: ExtensionInfo, panel: ExtensionInfo['panels'][number]): ComponentType<PanelProps> {
-  const Panel = () => createElement(ExtensionPanel, { ext: ext.id, view: panel.id, title: panel.title, kind: panel.view })
+  const Panel: ComponentType<PanelProps> = isTreeView(panel.view)
+    ? () => createElement(ExtensionPanel, { ext: ext.id, view: panel.id, title: panel.title, kind: panel.view })
+    : () => createElement(DeclarativeView, { ext: ext.id, view: panel.id, title: panel.title, tabKey: '', data: null, active: true })
   Panel.displayName = `ExtensionPanel(${panel.id})`
   return Panel
+}
+
+/** A table, form or chart tab view's component. */
+function viewTabComponent(ext: ExtensionInfo, view: string): ComponentType<{ tab: ContributedTab; active: boolean }> {
+  const Tab = ({ tab, active }: { tab: ContributedTab; active: boolean }) =>
+    createElement(DeclarativeView, { ext: ext.id, view, title: tab.title, tabKey: tabKeyOf(tab), data: tab.data, active })
+  Tab.displayName = `ExtensionViewTab(${view})`
+  return Tab
 }
 
 function webviewPanelComponent(ext: ExtensionInfo, panel: ExtensionInfo['panels'][number]): ComponentType<PanelProps> {
@@ -113,6 +125,7 @@ function syncContributions(list: readonly Info[]): void {
       panel: panelComponent,
       webviewPanel: webviewPanelComponent,
       webviewTab: webviewTabComponent,
+      viewTab: viewTabComponent,
       statusItem: statusComponent,
       settingsPage: settingsComponent,
       run: (ext, command, args) => API.Execute(ext, command, args ?? null),
@@ -265,9 +278,10 @@ export function subscribeExtensions(): () => void {
     EventsOn('extensions:status', (e: StatusEvent) =>
       useExtensions.setState((s) => ({ status: { ...s.status, [e.extension]: { ...s.status[e.extension], [e.item.id]: e.item } } })),
     ),
-    EventsOn('extensions:refresh', (e: { extension: string; view: string }) =>
+    EventsOn('extensions:refresh', (e: { extension: string; view: string; key?: string }) =>
       useExtensions.setState((s) => {
-        const key = refreshKey(e.extension, e.view)
+        // With a key, one tab of a tab view; without, the panel or every tab of the view.
+        const key = refreshKey(e.extension, e.view, e.key ?? '')
         return { refresh: { ...s.refresh, [key]: (s.refresh[key] ?? 0) + 1 } }
       }),
     ),

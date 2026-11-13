@@ -48,11 +48,11 @@ At most 100. `{ "id", "title" (≤ 100), "category"? (≤ 40, default: the exten
 
 ### contributes.panels
 
-At most 10. `{ "id", "title" (≤ 40), "icon", "order", "view" }`. `icon` is a name from Flint's icon set (`files`, `search`, `branch`, `fork`, `updown`, `database`, `pencil`, `checkbox`, `ship`, `cloud`, `helm`, `terminal`, `sum`, `puzzle`); an unknown name shows `puzzle`. `order` places the panel among other extensions' panels, after Flint's. `view` is `tree`, `list` or `webview`; a `webview` panel also has `"webview": { "html": "<path>" }` (see [Webviews](#webviews)). Each panel also gets a **Show …** command, `view.<panel id>`.
+At most 10. `{ "id", "title" (≤ 40), "icon", "order", "view" }`. `icon` is a name from Flint's icon set (`files`, `search`, `branch`, `fork`, `updown`, `database`, `pencil`, `checkbox`, `ship`, `cloud`, `helm`, `terminal`, `sum`, `puzzle`); an unknown name shows `puzzle`. `order` places the panel among other extensions' panels, after Flint's. `view` is what the panel shows: `tree`, `list`, `table`, `form` or `chart`, drawn by Flint from the answer to [`view/resolve`](#viewresolve), or `webview`; a `webview` panel also has `"webview": { "html": "<path>" }` (see [Webviews](#webviews)) and no other panel may have that key. Any other `view` (`markdown`, `cards`, `stack`) refuses the manifest: this Flint doesn't draw it. Each panel also gets a **Show …** command, `view.<panel id>`.
 
 ### contributes.tabViews
 
-At most 50. `{ "id", "title" (≤ 60), "icon"?, "view": "webview", "webview": { "html" }, "restore"? }`. Kinds of editor tabs the extension opens with `window/openTab` (or `flint.openTab` from a page). With `restore: true`, open tabs are saved with the session (`{ view, key, title, data }`, `data` ≤ 64 KiB) and reopened at the next start.
+At most 50. `{ "id", "title" (≤ 60), "icon"?, "view", "webview"?, "restore"? }`. Kinds of editor tabs the extension opens with `window/openTab` (or `flint.openTab` from a page). `view` is `table`, `form` or `chart` (drawn by Flint from [`view/resolve`](#viewresolve), which gets the tab's `key` and `data`), or `webview` with `"webview": { "html" }`; `tree` and `list` are for panels only. With `restore: true`, open tabs are saved with the session (`{ view, key, title, data }`, `data` ≤ 64 KiB) and reopened at the next start; a restored tab is resolved when it is first shown.
 
 ### Webviews
 
@@ -153,7 +153,7 @@ Other variables of the user's environment reach the program only when the manife
 | Request | Timeout |
 |---|---|
 | `initialize` | 10 s |
-| `view/resolve` | 5 s (the panel shows "not responding" and **Try again**) |
+| `view/resolve` | 5 s (the panel or tab shows "not responding" and **Try again**) |
 | `agentTool/call` | 120 s |
 | everything else | 30 s |
 
@@ -171,10 +171,13 @@ A request that times out is cancelled with `$/cancelRequest`; the process keeps 
   "settings": { "site": "acme.atlassian.net", "pollMinutes": 10 },
   "roots": [{ "path": "/Users/me/src/app", "trusted": true }],
   "platform": "darwin",
-  "capabilities": { "views": ["tree", "list", "message"], "secrets": true, "agent": true, "openUrl": true,
+  "capabilities": { "views": ["tree", "list", "table", "form", "chart", "message"], "charts": ["line", "bar", "area"],
+                    "secrets": true, "agent": true, "openUrl": true,
                     "decorations": ["diagnostic", "gutter", "inline", "highlight"], "quickFixes": true }
 } }
 ```
+
+`capabilities.views` lists the view kinds this Flint draws and `charts` the chart types. A Flint without `table`, `form` or `chart` there refuses a manifest that declares such a panel, so an extension that wants to run on both declares what the older one knows.
 
 `capabilities.decorations` lists the decoration kinds this Flint draws and `quickFixes` says it sends `editor/action`; a Flint without them has no editor decorations (and ignores `contributes.decorationSets` with a warning).
 
@@ -208,7 +211,13 @@ Request, `{}`. Answer `null`; Flint then closes standard input.
 { "jsonrpc": "2.0", "id": 8, "method": "view/resolve", "params": { "view": "acme.jira.issues", "parent": "ABC-1" } }
 ```
 
-`parent` is present when the user expands a tree node. Answer with a view model:
+`parent` is present when the user expands a tree node. For a tab of a [tab view](#contributestabviews), `key` is the tab's key and `data` the JSON saved with it (≤ 64 KiB; left out when there is none):
+
+```json
+{ "jsonrpc": "2.0", "id": 8, "method": "view/resolve", "params": { "view": "acme.jira.board", "key": "sprint-42", "data": { "team": "core" } } }
+```
+
+Answer with a view model of the kind the panel or tab view declares: a tree or list (below), a [table](#table-views), a [form](#form-views), a [chart](#chart-views), or a message. A tree:
 
 ```json
 { "kind": "tree", "items": [{
@@ -221,7 +230,7 @@ Request, `{}`. Answer `null`; Flint then closes standard input.
 
 | Field | Rules |
 |---|---|
-| `kind` | The panel's `view` (`tree` or `list`), or `message` |
+| `kind` | The panel's or tab view's `view`, or `message`. Another kind is shown as a message saying so |
 | `items[].id` | Required, unique in the answer, ≤ 256 characters |
 | `label`, `description`, `tooltip` | Plain text (never HTML or Markdown), ≤ 2,000 characters; control characters are removed |
 | `icon` | An icon name, else none |
@@ -229,11 +238,88 @@ Request, `{}`. Answer `null`; Flint then closes standard input.
 | `actions` | ≤ 10, each `{ id (≤ 64), label (≤ 60) }`: the item's context menu, sent back as `view/action` |
 | `command` | One of the extension's commands, run on click with `args` (≤ 16 KiB) |
 
-At most 5,000 items per answer; Flint shows the first 5,000 and says so. Instead of items, any panel may show a message with buttons:
+At most 5,000 items per answer; Flint shows the first 5,000 and says so. Instead of its content, any panel or tab may show a message with buttons:
 
 ```json
 { "kind": "message", "text": "Sign in to Jira first.", "actions": [{ "id": "signin", "label": "Sign In" }] }
 ```
+
+Everything in a view model is checked and cut to its limits by Flint before it is drawn. Text is plain text everywhere: never HTML or Markdown, control characters removed. An extension can't set a color: badges and chart series take theirs from the theme.
+
+#### Table views
+
+```json
+{ "kind": "table",
+  "columns": [{ "id": "key", "title": "Key", "type": "text" },
+              { "id": "points", "title": "Points", "type": "number", "align": "end" },
+              { "id": "updated", "title": "Updated", "type": "date" },
+              { "id": "status", "title": "Status", "type": "badge", "badges": { "Done": "ok", "Blocked": "error" } }],
+  "rows": [{ "id": "ABC-1",
+             "cells": { "key": "ABC-1", "points": 3, "updated": "2026-11-01T09:30:00Z", "status": "Done" },
+             "command": { "id": "acme.jira.open", "args": { "key": "ABC-1" } },
+             "actions": [{ "id": "close", "label": "Close Issue" }] }],
+  "sort": { "column": "updated", "descending": true },
+  "actions": [{ "id": "assign", "label": "Assign to Me" }] }
+```
+
+| Field | Rules |
+|---|---|
+| `columns` | 1–30 (more are cut; none shows a message). `id` required, unique, ≤ 64 characters; `title` ≤ 100 (default: the id) |
+| `columns[].type` | `text` (default), `number`, `date` or `badge`. An unknown type is `text` |
+| `columns[].align` | `start`, `center` or `end`. Default: `end` for numbers, `start` otherwise |
+| `columns[].badges` | For `badge` columns: value → `info`, `ok`, `warning` or `error`, ≤ 50 entries. A value without a severity is a neutral badge |
+| `rows` | ≤ 5,000; Flint shows the first 5,000 and says so. `id` required, unique, ≤ 256 characters; a row without one is left out |
+| `rows[].cells` | An object by column id. `text` and `badge`: a string ≤ 2,000 characters (a number or boolean is shown as written); `number`: a JSON number; `date`: an ISO 8601 date (`2026-11-01`) or date and time (`2026-11-01T09:30:00Z`; without a zone it is UTC). A missing value, or one of another type, is an empty cell. Keys that aren't columns are ignored |
+| `rows[].command` | One of the extension's commands, run with `args` (≤ 16 KiB) on Enter or a double click |
+| `actions`, `rows[].actions` | ≤ 10 each, `{ id (≤ 64), label (≤ 60) }`: the row's context menu, sent as [`view/action`](#viewaction) with the row's id as `item`. A row's own `actions` replace the table's for that row |
+| `sort` | `{ "column", "descending"? }`: the order the table is first shown in. Without it, the order of `rows` |
+
+Flint sorts the rows itself when the user clicks a column header (ascending, descending, then the extension's order again): numbers by value, dates by time, text without case and with the numbers in it by value, empty cells last. The extension is not asked again. Rows are drawn as they scroll into view, so 5,000 rows cost no more than 50. There is no paging: an extension with more rows filters or summarizes them.
+
+#### Form views
+
+```json
+{ "kind": "form", "id": "comment", "description": "Add a comment to ABC-1.", "submit": "Add Comment",
+  "fields": [{ "id": "comment", "type": "string", "title": "Comment", "multiline": true, "maxLength": 4000, "required": true },
+             { "id": "notify", "type": "boolean", "title": "Notify watchers", "default": true },
+             { "id": "priority", "type": "string", "enum": ["low", "normal", "high"], "value": "normal" },
+             { "id": "token", "type": "string", "title": "API token", "secret": true }] }
+```
+
+A field is a property of the [settings schema](#contributessettings), with the same keywords and the same checks (`type`, `enum`, `default`, `minimum`, `maximum`, `maxLength`, `pattern`, `format`, `items`, `title`, `description`), plus:
+
+| Keyword | Meaning |
+|---|---|
+| `id` | Required: letters, digits, dashes and underscores (≤ 40), unique in the form. The key of the value in `form/submit` |
+| `value` | The value to show. One the field's rules refuse is replaced with `default` |
+| `required` | Text and lists may not be empty |
+| `multiline` | A text field of several lines (strings without `enum`) |
+| `secret` | A password field (strings without `enum`). Flint never shows a value in it: `value` and `default` are dropped, so the field always starts empty, and what the user types is sent with the submit only. Flint stores it nowhere; keep it with [`secrets/set`](#requests) |
+| `placeholder` | Dim text in an empty field, ≤ 100 characters |
+
+At most 50 fields. `maxLength` above 4,096 is lowered to 4,096, the longest text a field holds. `submit` is the button's label (≤ 60, default "Submit"); `description` is plain text above the fields (≤ 2,000). `id` (≤ 64) is for the extension's own use. Keywords Flint doesn't know are ignored; a field it can't draw (an unknown `type`, a `default` its own rules refuse, a title with control characters) makes the whole form a message that names the field, so it is noticed while developing. The read-only Markdown field and the `select` type of the design are not part of the contract: use `enum` for a menu.
+
+Submitting sends [`form/submit`](#formsubmit).
+
+#### Chart views
+
+```json
+{ "kind": "chart", "type": "line", "title": "Open issues",
+  "x": { "type": "date", "label": "Week" }, "y": { "label": "Issues", "min": 0 },
+  "series": [{ "id": "open", "label": "Open", "points": [["2026-10-01", 14], ["2026-10-08", 11]] },
+             { "id": "blocked", "label": "Blocked", "points": [["2026-10-01", 2], ["2026-10-08", 3]] }] }
+```
+
+| Field | Rules |
+|---|---|
+| `type` | `line`, `bar` or `area` (`capabilities.charts`). Another type shows a message |
+| `title` | ≤ 100 characters |
+| `x.type` | `number`, `date` (ISO 8601, as in a table) or `category` (text ≤ 200 characters; the default). `x.label` ≤ 100 |
+| `y` | `label` ≤ 100; `min` and `max` fix an end of the axis (values beyond it are drawn at the edge). Without them the axis covers the values, from zero for bars and areas |
+| `series` | ≤ 10, each `{ "id" (≤ 64, unique), "label" (≤ 100, default: the id), "points" }` |
+| `points` | ≤ 2,000 per series, each `[x, y]` with `y` a JSON number. A point whose `x` doesn't fit the axis or whose `y` isn't a number is left out |
+
+More series or points than that are cut, and the chart says so. Lines and areas over numbers or dates are drawn in the order of `x`, whatever the order of `points`; categories keep the order in which they first appear. Bars are grouped by `x`, one bar per series, and at most 500 different `x` values are drawn. Series get their colors from the theme, in order; the chart has a legend and lists its values as a table under **Values**.
 
 ### view/action
 
@@ -241,7 +327,31 @@ At most 5,000 items per answer; Flint shows the first 5,000 and says so. Instead
 { "jsonrpc": "2.0", "id": 9, "method": "view/action", "params": { "view": "acme.jira.issues", "item": "ABC-1", "action": "open" } }
 ```
 
-`item` is `""` for a message's button. Answer `null`.
+`item` is the id of a tree or list item or of a table's row, and `""` for a message's button. For a tab of a tab view, `key` names the tab. Answer `null`.
+
+### form/submit
+
+The user pressed a [form](#form-views)'s button. Request, 30 s:
+
+```json
+{ "jsonrpc": "2.0", "id": 11, "method": "form/submit", "params": {
+  "view": "acme.jira.comment", "key": "ABC-1",
+  "values": { "comment": "Fixed in 1.4.", "notify": true, "priority": "normal", "token": "…" } } }
+```
+
+`values` holds every field of the form Flint last drew for that panel or tab, by field id, and nothing else: Flint checks each value against the field's rules first (and `required`), shows the reasons under the fields, and sends the request only when all of them pass. A field the page didn't send has its `default`. `key` is present for a tab. Answer with nothing to accept the values, or say what is wrong:
+
+```json
+{ "errors": { "comment": "mentions a user who can't see this issue" }, "error": "The issue is locked.", "message": "" }
+```
+
+| Field | Meaning |
+|---|---|
+| `errors` | Field id → why its value is refused, shown under the field (≤ 500 characters; ids that aren't fields are dropped) |
+| `error` | Why the form as a whole is refused, shown above the button (≤ 500) |
+| `message` | Shown next to the button after an accepted submit (≤ 500; default "Done.") |
+
+After an accepted submit (no `errors`, no `error`) Flint resolves the view again; if the form comes back unchanged, what the user typed stays, except in secret fields. An error answer (a JSON-RPC error) is shown above the button. If the form was never drawn, or its fields no longer are what Flint last drew (more than 64 forms of one extension open at once), the submit fails without reaching the extension and the user is told to refresh.
 
 ### agentTool/call
 
@@ -273,7 +383,7 @@ Sent when a folder is opened, attached, removed, trusted or untrusted.
 { "jsonrpc": "2.0", "method": "view/visible", "params": { "view": "acme.jira.issues", "visible": true } }
 ```
 
-If the extension refreshes a view on a timer, it should do so only while the view is visible. For a tab view, `key` names the tab.
+If the extension refreshes a view on a timer, it should do so only while the view is visible. For a tab view (declarative or webview), `key` names the tab.
 
 ### webview/request
 
@@ -334,7 +444,7 @@ At most 1,000 edits and 1 MiB of text. Flint applies the edits as one change (on
 | Method | Params | Notes |
 |---|---|---|
 | `status/update` | `{ "id", "text", "tooltip"?, "command"?, "severity"? }` | `id` is a declared status item; `text` ≤ 40 characters (`""` hides the item); `command` one of the extension's commands, run on click; `severity` `info`, `warning` or `error` |
-| `view/refresh` | `{ "view", "item"? }` | Flint resolves the panel again, with the nodes the user expanded |
+| `view/refresh` | `{ "view", "key"?, "item"? }` | Flint resolves the panel again, with the nodes the user expanded. For a table, form or chart tab view, `key` refreshes one tab and no `key` every open tab of the view. A view that isn't in the manifest, or a webview, is a line in the log |
 | `window/showMessage` | `{ "type": "info" \| "warning" \| "error", "message" }` | A toast, prefixed with the extension's name; ≤ 1,000 characters; at most 5 per 10 seconds |
 | `webview/post` | `{ "view", "key"?, "message" }` | `message` (any JSON, ≤ 4 MiB) reaches `flint.onMessage` in the view's frames: the tab with that key, or every frame of the view without one |
 | `editor/setDecorations` | `{ "set", "path", "version"?, "decorations" }` | Replaces what a decoration set shows in one open document; needs `workspace.read`. See [Editor decorations](#editor-decorations) |
@@ -348,7 +458,7 @@ At most 1,000 edits and 1 MiB of text. Flint applies the edits as one change (on
 | `window/showMessageRequest` | `{ "type", "message", "actions": [title, …] }` (1–3 actions) → `{ "action"? }` | none |
 | `window/openFile` | `{ "path", "line"? }` → `null` | `workspace.read` |
 | `window/openUrl` | `{ "url" }` → `null` | none |
-| `window/openTab` | `{ "view", "key", "title"?, "data"? }` → `null`; opens or focuses a tab of a declared tab view (`data` ≤ 64 KiB) | none |
+| `window/openTab` | `{ "view", "key", "title"?, "data"? }` → `null`; opens or focuses a tab of a declared tab view (`data` ≤ 64 KiB). For a table, form or chart tab view Flint then sends `view/resolve` with that `key` and `data` | none |
 | `workspace/readFile` | `{ "path" }` → `{ "text" }` | `workspace.read` |
 | `secrets/get` | `{ "key" }` → `{ "value"? }` | `secrets` |
 | `secrets/set` | `{ "key", "value" }` → `{}` | `secrets` |

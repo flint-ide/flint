@@ -1,6 +1,6 @@
 # Extensions
 
-An extension is a separate program that adds commands, a sidebar panel, a Settings page, status bar items, marks in the editor and tools for agents to Flint. It can be written in any language. Some extensions are only data: color themes, or a programming language with its language server, debugger and test runner (**Debug File** and **Run Tests in File** in the command palette use them). Flint draws everything an extension shows with its own components, from data the extension sends: an extension never runs code inside Flint's window.
+An extension is a separate program that adds commands, sidebar panels and editor tabs (trees, tables, forms and charts), a Settings page, status bar items, marks in the editor and tools for agents to Flint. It can be written in any language. Some extensions are only data: color themes, or a programming language with its language server, debugger and test runner (**Debug File** and **Run Tests in File** in the command palette use them). Flint draws everything an extension shows with its own components, from data the extension sends: an extension never runs code inside Flint's window.
 
 There is no marketplace. **Settings ▸ Extensions** (**Show Extensions** in the command palette, or `⌘,` ▸ **Extensions**) offers the extensions of the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository, prebuilt from its signed [extension index](#from-the-extension-index) or built from its sources, and you can also install one from a folder on your disk. Either way, Flint shows you what it is and what it asks for first. To write one, see [Write an extension](../extensions/write-an-extension.md).
 
@@ -55,6 +55,16 @@ For each installed extension:
 **Reload Installed** reads the extensions folder again, for example after you rebuilt an extension you are writing.
 
 An extension with settings gets its own page in Settings, after Flint's pages, generated from its manifest. Values are checked against the manifest before they are saved, under `extensions` in [settings.json](../reference/settings.md#extensions).
+
+## Panels and tabs
+
+What an extension shows in a sidebar panel or an editor tab is a tree, a list, a table, a form or a chart that Flint draws itself from the extension's data, in your theme and with Flint's keys. (Some extensions show a page of their own instead, in a sandboxed frame; those look and behave as their authors made them.)
+
+- **Refresh** (`↻` in the panel's or tab's header) asks the extension again. Extensions also refresh on their own.
+- **Tables.** Click a column header to sort by it: once for ascending, again for descending, a third time for the extension's own order. Flint sorts the rows it has; the extension isn't asked again. With the table focused, `↑` `↓` `Page Up` `Page Down` `Home` and `End` move the selection, `↵` or a double click runs the row's command if it has one, a right click (or `Shift+F10`) opens the row's actions, and `⌘C` copies the row. **Copy** under the table copies all shown rows, tab-separated. A table shows at most 5,000 rows and says so when the extension sent more.
+- **Forms.** Fill in the fields and press the button (or `↵` in a one-line field). Flint checks the values first and shows what is wrong under each field; the extension can refuse values too, with its own reasons. A password field is always empty when the form opens: Flint passes what you type to the extension and keeps no copy.
+- **Charts** are line, bar or area charts in your theme's colors. Hover a bar or a point for its value, or open **Values** under the chart for all of them as a table.
+- An extension's tabs can come back with your session, like file tabs; such a tab loads its content when you first switch to it.
 
 ## Marks in the editor
 

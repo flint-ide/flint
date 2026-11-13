@@ -163,11 +163,13 @@ Level 2 of the same contract: programs the user installs, run as child processes
 ```text
 internal/extensions/manifest   flint-extension.json: parsing, id and path rules, the settings schema subset
 internal/extensions/rpc        newline-delimited JSON-RPC 2.0, both directions, size caps, $/cancelRequest
-internal/extensions/host       discovery, lazy start, initialize, idle stop, crash policy, host methods + permissions, install/uninstall, log
+internal/extensions/host       discovery, lazy start, initialize, idle stop, crash policy, host methods + permissions, install/uninstall, log;
+                               view models checked and bounded before the web view sees them (views.go: tree, list; richviews.go: table, form, chart)
 internal/extensions/index      the signed extension index: format, Ed25519 signature, bounded https download, safe tar.gz unpacking, building (cmd/flint-extindex)
 internal/features/extensions   the level-1 module: "extensions" settings section, ExtensionsAPI, MCP tools, hooks
-frontend/src/features/extensions   contributions per extension (extension:<id>), ExtensionPanel, generated Settings page, Settings ▸ Extensions
-examples/extensions/stats      an example extension in Go (stdlib), built and driven by host's conformance test
+frontend/src/features/extensions   contributions per extension (extension:<id>), ExtensionPanel (tree, list), DeclarativeView (table, form, chart;
+                               logic in lib/viewTable.ts, lib/chartScale.ts, formModel.ts), generated Settings page, Settings ▸ Extensions
+examples/extensions/stats      an example extension in Go (stdlib): tree and table panels, a chart tab; built and driven by host's conformance test
 examples/extensions/todos      an example of editor decorations and a quick fix, with its own conformance test
 ```
 

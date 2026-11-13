@@ -22,7 +22,7 @@ export interface ExtensionInfo {
   commands: readonly { id: string; title: string; category?: string; keys?: string }[]
   panels: readonly { id: string; title: string; icon: string; order: number; view: string }[]
   statusItems: readonly { id: string; order: number }[]
-  /** Tab views (webviews); missing from an older backend. */
+  /** Tab views (webviews and declarative views); missing from an older backend. */
   tabViews?: readonly { id: string; title: string; icon?: string; view: string; restore?: boolean }[]
   settings: { title?: string; properties: readonly SchemaProperty[] } | null
   /** Editor decoration sets; missing from an older backend. */
@@ -38,8 +38,10 @@ export interface Deps {
   panel: (ext: ExtensionInfo, panel: ExtensionInfo['panels'][number]) => ComponentType<PanelProps>
   /** A "webview" panel's component. */
   webviewPanel: (ext: ExtensionInfo, panel: ExtensionInfo['panels'][number]) => ComponentType<PanelProps>
-  /** A tab view's component. */
+  /** A "webview" tab view's component. */
   webviewTab: (ext: ExtensionInfo, view: string) => ComponentType<{ tab: ContributedTab; active: boolean }>
+  /** A declarative (table, form, chart) tab view's component. */
+  viewTab: (ext: ExtensionInfo, view: string) => ComponentType<{ tab: ContributedTab; active: boolean }>
   statusItem: (ext: ExtensionInfo, item: string) => ComponentType
   settingsPage: (ext: ExtensionInfo) => ComponentType<{ active: boolean }>
   run: (ext: string, command: string, args?: unknown) => Promise<unknown>
@@ -60,6 +62,12 @@ export interface Parts {
   /** Default shortcuts left out, and why. */
   conflicts: string[]
 }
+
+/** The panel views drawn as rows: the others are a table, a form or a chart (DeclarativeView). */
+export const isTreeView = (view: string) => view === 'tree' || view === 'list'
+
+/** The declarative views a tab view may be (Go: manifest.TabViewKinds). */
+export const isTabView = (view: string) => view === 'table' || view === 'form' || view === 'chart'
 
 /** Whether the extension's contributions are shown at all. */
 export function contributes(info: ExtensionInfo): boolean {
@@ -124,8 +132,13 @@ export function extensionParts(info: ExtensionInfo, deps: Deps): Parts {
     ? [{ id: `extension:${info.id}`, label: info.settings.title || info.name, order: EXTENSION_ORDER, component: deps.settingsPage(info) }]
     : []
   const tabKinds: TabKind[] = (info.tabViews ?? [])
-    .filter((t) => t.view === 'webview')
-    .map((t) => ({ id: t.id, icon: t.icon && isIconName(t.icon) ? t.icon : undefined, restore: !!t.restore, component: deps.webviewTab(info, t.id) }))
+    .filter((t) => t.view === 'webview' || isTabView(t.view))
+    .map((t) => ({
+      id: t.id,
+      icon: t.icon && isIconName(t.icon) ? t.icon : undefined,
+      restore: !!t.restore,
+      component: t.view === 'webview' ? deps.webviewTab(info, t.id) : deps.viewTab(info, t.id),
+    }))
   const decorationSets: DecorationSetContribution[] = (info.decorationSets ?? []).map((s) => ({
     id: s.id,
     title: s.title,

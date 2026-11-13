@@ -5525,6 +5525,224 @@ body.file-drop-target-active::after {
   background: var(--bg-editor);
 }
 
+/* ---------- declarative views of extensions: table, form, chart ---------- */
+
+.ext-view-tab {
+  background: var(--bg-editor);
+}
+.ext-view-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.ext-table {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ext-table-scroller:focus-visible,
+.ext-header-cell:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.ext-header-cell {
+  padding-right: 8px;
+}
+.ext-table-row:hover .grid-cell {
+  background: var(--bg-hover);
+}
+.ext-table-row.selected .grid-cell {
+  background: var(--accent-dim);
+}
+.ext-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 16px;
+  background: var(--bg-active);
+  color: var(--fg-muted);
+}
+.ext-badge.info {
+  background: var(--info-bg);
+  color: var(--info);
+}
+.ext-badge.ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.ext-badge.warning {
+  color: var(--warn);
+}
+.ext-badge.error {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.ext-table-status {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 10px;
+  font-size: 11px;
+  border-top: 1px solid var(--border);
+}
+
+.ext-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 560px;
+  padding: 10px 12px 16px;
+}
+.ext-form-description {
+  margin: 0;
+}
+.ext-form-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.ext-form-field > label {
+  font-weight: 600;
+}
+.ext-form-field .settings-text,
+.ext-form-field .settings-textarea,
+.ext-form-select {
+  width: 100%;
+  max-width: none;
+}
+.ext-form-required {
+  color: var(--danger);
+}
+.ext-form-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11.5px;
+}
+.ext-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ext-chart {
+  margin: 0;
+  padding: 8px 12px 12px;
+}
+.ext-chart-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.ext-chart-box {
+  width: 100%;
+  min-height: 60px;
+}
+.ext-chart-box svg {
+  display: block;
+}
+.ext-chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.ext-chart-axis {
+  stroke: var(--fg-faint);
+  stroke-width: 1;
+}
+.ext-chart-tick {
+  fill: var(--fg-muted);
+  font-size: 10px;
+  font-family: var(--font-ui);
+}
+/* Series colors come from the theme, in this order; an extension can't set one. */
+.ext-chart .s0 { --series: var(--accent); }
+.ext-chart .s1 { --series: var(--ok); }
+.ext-chart .s2 { --series: var(--warn); }
+.ext-chart .s3 { --series: var(--danger); }
+.ext-chart .s4 { --series: var(--info); }
+.ext-chart .s5 { --series: var(--syn-keyword); }
+.ext-chart .s6 { --series: var(--syn-string); }
+.ext-chart .s7 { --series: var(--syn-number); }
+.ext-chart .s8 { --series: var(--syn-type); }
+.ext-chart .s9 { --series: var(--syn-function); }
+.ext-chart-series .line {
+  fill: none;
+  stroke: var(--series);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.ext-chart-series .area {
+  fill: var(--series);
+  opacity: 0.18;
+}
+.ext-chart-series .bar,
+.ext-chart-series .dot {
+  fill: var(--series);
+}
+.ext-chart-series .bar:hover,
+.ext-chart-series .dot:hover {
+  opacity: 0.75;
+}
+.ext-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 6px;
+  font-size: 11px;
+}
+.ext-chart-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.ext-chart-key i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--series);
+}
+.ext-chart-xlabel {
+  margin-left: auto;
+}
+.ext-chart-note {
+  font-size: 11px;
+  margin-top: 4px;
+}
+.ext-chart-data {
+  margin-top: 8px;
+  font-size: 11.5px;
+}
+.ext-chart-data summary {
+  cursor: pointer;
+  color: var(--fg-muted);
+}
+.ext-chart-data-scroll {
+  max-height: 240px;
+  overflow: auto;
+  margin-top: 4px;
+}
+.ext-chart-data table {
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+}
+.ext-chart-data th,
+.ext-chart-data td {
+  padding: 1px 10px 1px 0;
+  text-align: right;
+  font-weight: normal;
+  white-space: nowrap;
+}
+.ext-chart-data thead th {
+  color: var(--fg-muted);
+}
+.ext-chart-data th[scope='row'] {
+  text-align: left;
+}
+
 /* ---------- editor decorations of extensions (lib/editorDecorations.ts) ---------- */
 
 .cm-ext-info {

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { contributionKey, extensionParts, EXTENSION_ORDER, themeContributions, type Deps, type ExtensionInfo } from './model'
+import { contributionKey, extensionParts, EXTENSION_ORDER, isTabView, isTreeView, themeContributions, type Deps, type ExtensionInfo } from './model'
 import type { Command } from '../../lib/commands'
 
 const info: ExtensionInfo = {
@@ -30,6 +30,7 @@ function deps(existing: readonly Command[] = []): Deps & { ran: string[]; shown:
     panel: () => () => null,
     webviewPanel: () => () => null,
     webviewTab: () => () => null,
+    viewTab: () => () => null,
     statusItem: () => () => null,
     settingsPage: () => () => null,
     run: async (ext, command, args) => void ran.push(args === undefined ? `${ext} ${command}` : `${ext} ${command} ${JSON.stringify(args)}`),
@@ -143,6 +144,45 @@ describe('webview contributions', () => {
   })
 })
 
+describe('declarative views', () => {
+  it('draws table, form and chart panels like other panels and their tab views with the view component', () => {
+    const marks: string[] = []
+    const d = {
+      ...deps(),
+      panel: (_e: unknown, p: { id: string; view: string }) => (marks.push(`panel ${p.id} ${p.view}`), () => null),
+      webviewTab: (_e: unknown, v: string) => (marks.push(`webview ${v}`), () => null),
+      viewTab: (_e: unknown, v: string) => (marks.push(`tab ${v}`), () => null),
+    }
+    const parts = extensionParts(
+      {
+        ...info,
+        panels: [
+          { id: 'acme.jira.table', title: 'Issues', icon: 'checkbox', order: 1, view: 'table' },
+          { id: 'acme.jira.trend', title: 'Trend', icon: 'sum', order: 2, view: 'chart' },
+        ],
+        tabViews: [
+          { id: 'acme.jira.board', title: 'Board', view: 'table', restore: true },
+          { id: 'acme.jira.comment', title: 'Comment', view: 'form' },
+          { id: 'acme.jira.page', title: 'Page', view: 'webview' },
+          { id: 'acme.jira.cards', title: 'Cards', view: 'cards' },
+          { id: 'acme.jira.tree', title: 'Tree', view: 'tree' },
+        ],
+      },
+      d,
+    )
+    assert.deepEqual(marks, ['panel acme.jira.table table', 'panel acme.jira.trend chart', 'tab acme.jira.board', 'tab acme.jira.comment', 'webview acme.jira.page'])
+    assert.deepEqual(
+      parts.contributions.tabKinds?.map((k) => [k.id, k.restore]),
+      [['acme.jira.board', true], ['acme.jira.comment', false], ['acme.jira.page', false]],
+    )
+    assert.deepEqual(parts.contributions.panels?.map((p) => p.id), ['acme.jira.table', 'acme.jira.trend'])
+  })
+
+  it('knows which views are rows and which may be tabs', () => {
+    assert.deepEqual(['tree', 'list', 'table', 'form', 'chart', 'webview'].map(isTreeView), [true, true, false, false, false, false])
+    assert.deepEqual(['tree', 'list', 'table', 'form', 'chart', 'webview', 'cards'].map(isTabView), [false, false, true, true, true, false, false])
+  })
+})
 
 describe('decoration sets of an extension', () => {
   const withSets: ExtensionInfo = {

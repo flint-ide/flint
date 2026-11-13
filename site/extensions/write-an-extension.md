@@ -7,7 +7,7 @@ An extension is a folder with two things:
 - `flint-extension.json`, the **manifest**: who the extension is, the program Flint runs, what it adds to Flint and which permissions it needs.
 - **A program** in any language. Flint starts it when it is first needed and talks to it with [JSON-RPC 2.0](https://www.jsonrpc.org/specification), one JSON message per line, over the program's standard input and output. Whatever the program writes to standard error goes to its log in **Settings ▸ Extensions**.
 
-A complete example in Go, using only the standard library, is in Flint's repository: [`examples/extensions/stats`](https://github.com/flint-ide/flint/tree/main/examples/extensions/stats). It counts the files of the open projects by type. [`examples/extensions/todos`](https://github.com/flint-ide/flint/tree/main/examples/extensions/todos) marks TODO lines in the editor, with a quick fix.
+A complete example in Go, using only the standard library, is in Flint's repository: [`examples/extensions/stats`](https://github.com/flint-ide/flint/tree/main/examples/extensions/stats). It counts the files of the open projects by type and shows them as a tree, a sortable table and a chart in a tab. [`examples/extensions/todos`](https://github.com/flint-ide/flint/tree/main/examples/extensions/todos) marks TODO lines in the editor, with a quick fix.
 
 ## 1. The manifest
 
@@ -97,6 +97,8 @@ Change the panel's `view` to `tree` and return items with `hasChildren`. Flint a
 - `actions` are the item's context menu: Flint sends `view/action` with the item and action ids.
 - `icon` is a name from Flint's icon set (`files`, `search`, `branch`, `database`, `checkbox`, `terminal`, `sum`, `puzzle` and a few others); an unknown name shows no icon.
 - When the content changes, send the `view/refresh` notification and Flint asks again.
+
+A panel can also be a table, a form or a chart: see [Tables, forms and charts](#13-tables-forms-and-charts).
 
 ## 5. A setting
 
@@ -285,6 +287,69 @@ An extension can debug and test files of a language: yours from section 10, or a
 
 The user runs them with **Debug File** and **Run Tests in File** in the command palette, the run configuration menu in the toolbar, or a file's context menu in the sidebar. Both run the project's code, so they start only in [trusted folders](../guides/restricted-mode.md), and the install confirmation lists the programs they start.
 
+## 13. Tables, forms and charts
+
+A panel's `view` can also be `table`, `form` or `chart`, and so can a tab view (`contributes.tabViews`), which opens in the editor area where there is more room. Flint draws them with its own components, in the user's theme, from the answer to `view/resolve`. You send data, never markup or colors: text is shown as text.
+
+**A table** has typed columns and rows with an id. The user sorts it by clicking a column header; Flint does that itself, so send numbers and dates as values, not as formatted text:
+
+```json
+{ "kind": "table",
+  "columns": [{ "id": "type", "title": "Type" },
+              { "id": "files", "title": "Files", "type": "number" },
+              { "id": "changed", "title": "Changed", "type": "date" },
+              { "id": "share", "title": "Share", "type": "badge", "badges": { "large": "warning", "small": "info" } }],
+  "rows": [{ "id": "type:.go", "cells": { "type": ".go", "files": 212, "changed": "2026-11-01T09:30:00Z", "share": "large" },
+             "command": { "id": "me.hello.open", "args": { "path": "/path/to/main.go" } },
+             "actions": [{ "id": "open", "label": "Open Largest File" }] }],
+  "sort": { "column": "files", "descending": true } }
+```
+
+- `command` runs on Enter or a double click; `actions` are the row's context menu (right click, or `Shift+F10`), sent as `view/action` with the row's id as `item`.
+- A `badge` column shows its values as labels colored by severity (`info`, `ok`, `warning`, `error`).
+- Flint shows 5,000 rows. Send fewer: sort and cut on your side when you have more.
+
+**A form** has fields with the keywords of a [setting](#5-a-setting), and a submit button:
+
+```json
+{ "kind": "form", "submit": "Sign In",
+  "fields": [{ "id": "site", "type": "string", "format": "hostname", "title": "Site", "required": true, "value": "acme.example" },
+             { "id": "token", "type": "string", "title": "API token", "secret": true, "required": true },
+             { "id": "remember", "type": "boolean", "title": "Stay signed in", "default": true }] }
+```
+
+When the user submits, Flint checks every value against its field and sends you `form/submit` only when all of them pass:
+
+```json
+{ "jsonrpc": "2.0", "id": 11, "method": "form/submit",
+  "params": { "view": "me.hello.signin", "values": { "site": "acme.example", "token": "…", "remember": true } } }
+```
+
+Answer `{}` to accept, or `{ "errors": { "token": "was rejected by the server" }, "error": "Not signed in." }`: the messages appear under the fields and above the button. A `secret` field is a password field that always starts empty: Flint never shows a value in it, sends what the user typed with the submit only and keeps it nowhere. Store it with `secrets/set` (permission `secrets`), never in a file or a setting.
+
+**A chart** is a `line`, `bar` or `area` chart of up to 10 series of 2,000 points, each point `[x, y]`:
+
+```json
+{ "kind": "chart", "type": "bar", "title": "Files by type",
+  "x": { "type": "category", "label": "File type" }, "y": { "label": "Files", "min": 0 },
+  "series": [{ "id": "files", "label": "Files", "points": [[".go", 212], [".md", 40], [".json", 9]] }] }
+```
+
+`x.type` is `category`, `number` or `date` (ISO 8601). Colors come from the theme, one per series.
+
+**A tab view** is declared in the manifest and opened by you, for example from a command:
+
+```json
+"tabViews": [{ "id": "me.hello.chart", "title": "Files by Type", "icon": "sum", "view": "chart", "restore": true }]
+```
+
+```json
+{ "jsonrpc": "2.0", "id": 3, "method": "window/openTab", "params": { "view": "me.hello.chart", "key": "files", "title": "Files by Type" } }
+```
+
+Flint opens the tab (or focuses the one with that key) and sends `view/resolve` with `view`, `key` and the tab's `data`; the key is how one view shows different things in different tabs. `view/refresh` with a `key` reloads one tab, without it every tab of the view. With `restore`, the tab comes back with the session and is resolved when it is first shown, so answer `view/resolve` for any key, with a `message` view when the key means nothing any more.
+
+Any of these may answer `{ "kind": "message", "text": "…", "actions": […] }` instead, for empty and sign-in states. `initialize`'s `capabilities.views` and `capabilities.charts` list what the running Flint draws. Every field and limit is in the [protocol reference](protocol.md#table-views); the [`stats`](https://github.com/flint-ide/flint/tree/main/examples/extensions/stats) example has a table panel and a chart tab.
 ## Getting into the extension index
 
 Flint installs prebuilt extensions from a signed [index](index-format.md) that the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository publishes. There is no upload and no account: an extension gets into the index by being in that repository.
@@ -302,4 +367,4 @@ To distribute extensions without that repository, hand out the folder (**Install
 - Nothing but protocol messages on standard output; one message is at most 4 MiB.
 - The program exits when its standard input closes.
 - Build the program for both macOS and Linux if you can, using `run.darwin` and `run.linux` for separate binaries.
-- Run the contract checker from a Flint checkout: `go run ./cmd/flint-extcheck path/to/hello`. It checks the manifest and webview files with Flint's own code, then starts the program, sends `initialize`, resolves every declarative panel and lists the agent tools. The [flint-ide/extensions](https://github.com/flint-ide/extensions) repository runs it in CI; a Go extension there is built by Flint on the user's machine when they install it from Settings ▸ Extensions.
+- Run the contract checker from a Flint checkout: `go run ./cmd/flint-extcheck path/to/hello`. It checks the manifest and webview files with Flint's own code, then starts the program, sends `initialize`, resolves every declarative panel and tab view (a table, form or chart Flint can't draw, or one that is cut, fails the check), submits every form with the values it shows and lists the agent tools. The [flint-ide/extensions](https://github.com/flint-ide/extensions) repository runs it in CI; a Go extension there is built by Flint on the user's machine when they install it from Settings ▸ Extensions.

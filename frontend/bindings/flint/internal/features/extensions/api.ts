@@ -205,10 +205,28 @@ export function Resolve(id: string, view: string, parent: string): $CancellableP
 }
 
 /**
+ * ResolveView returns the content of a panel (key "") or of a tab view's tab
+ * (its key and saved data) that Flint draws from data: a table, a form, a
+ * chart, or a tree or list.
+ */
+export function ResolveView(id: string, view: string, key: string, data: json$0.RawMessage): $CancellablePromise<host$0.View> {
+    return $Call.ByID(2662881856, id, view, key, data).then(($result: any) => {
+        return $$createType8($result);
+    });
+}
+
+/**
  * Restart clears a stopped-after-crashes extension; the next use starts it.
  */
 export function Restart(id: string): $CancellablePromise<void> {
     return $Call.ByID(3225680282, id);
+}
+
+/**
+ * SetViewVisible tells the host a declarative panel or tab was shown or hidden.
+ */
+export function SetViewVisible(id: string, view: string, key: string, visible: boolean): $CancellablePromise<void> {
+    return $Call.ByID(3235295502, id, view, key, visible);
 }
 
 /**
@@ -226,11 +244,29 @@ export function SetWebviewVisible(id: string, view: string, key: string, visible
 }
 
 /**
+ * SubmitForm sends a form view's values (a JSON object by field id) to the
+ * extension once Go's checks of them pass; the result says what was refused.
+ */
+export function SubmitForm(id: string, view: string, key: string, values: json$0.RawMessage): $CancellablePromise<host$0.FormResult> {
+    return $Call.ByID(3332730897, id, view, key, values).then(($result: any) => {
+        return $$createType9($result);
+    });
+}
+
+/**
  * Uninstall removes an extension after a native confirmation; false when
  * the user cancelled.
  */
 export function Uninstall(id: string): $CancellablePromise<boolean> {
     return $Call.ByID(4215234639, id);
+}
+
+/**
+ * ViewAction sends the choice of a row's or a message's action in a panel
+ * (key "") or a tab.
+ */
+export function ViewAction(id: string, view: string, key: string, item: string, action: string): $CancellablePromise<void> {
+    return $Call.ByID(2805817436, id, view, key, item, action);
 }
 
 /**
@@ -257,3 +293,4 @@ const $$createType5 = $Create.Nullable($$createType4);
 const $$createType6 = $Create.Array($$createType4);
 const $$createType7 = $models.InstallRequest.createFrom;
 const $$createType8 = host$0.View.createFrom;
+const $$createType9 = host$0.FormResult.createFrom;

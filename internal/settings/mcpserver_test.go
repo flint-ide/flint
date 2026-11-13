@@ -25,6 +25,32 @@ func TestMCPServerDefaultsAndPartialFiles(t *testing.T) {
 	}
 }
 
+// The tools that act are off unless the file switches a group on.
+func TestMCPServerActionsAreOffByDefault(t *testing.T) {
+	def := Default().MCPServer
+	if def.Actions != (MCPActions{}) || def.TestWaitSeconds != 120 {
+		t.Fatalf("defaults = %+v", def)
+	}
+	// A value that isn't a boolean never switches a group on.
+	got, _ := Load(write(t, `{"mcpServer":{"actions":{"sql":"yes","run":1}}}`))
+	if got.MCPServer.Actions.SQL || got.MCPServer.Actions.Run {
+		t.Fatalf("a non-boolean switch loaded: %+v", got.MCPServer.Actions)
+	}
+	got, err := Load(write(t, `{"mcpServer":{"actions":{"tests":true,"http":true},"testWaitSeconds":5}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := got.MCPServer
+	if m.Actions != (MCPActions{Tests: true, HTTP: true}) || m.TestWaitSeconds != MinTestWaitSeconds || !m.Tools.Diagnostics {
+		t.Fatalf("loaded %+v", m)
+	}
+	s := Default()
+	s.MCPServer.TestWaitSeconds = MaxTestWaitSeconds + 1
+	if err := Validate(s); err == nil {
+		t.Fatal("a test wait over the range was accepted")
+	}
+}
+
 func TestMCPServerValidation(t *testing.T) {
 	s := Default()
 	s.MCPServer.TerminalLines = 1

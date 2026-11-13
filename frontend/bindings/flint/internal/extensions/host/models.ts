@@ -384,6 +384,11 @@ export class ToolInfo {
     "title": string;
     "description": string;
 
+    /**
+     * Acts: the tool changes something, so Flint asks before each call.
+     */
+    "acts": boolean;
+
     /** Creates a new ToolInfo instance. */
     constructor($$source: Partial<ToolInfo> = {}) {
         if (!("name" in $$source)) {
@@ -397,6 +402,9 @@ export class ToolInfo {
         }
         if (!("description" in $$source)) {
             this["description"] = "";
+        }
+        if (!("acts" in $$source)) {
+            this["acts"] = false;
         }
 
         Object.assign(this, $$source);

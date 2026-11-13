@@ -23,6 +23,10 @@ var Module = feature.Module{
 	Optional: true,
 	New: func(h feature.Host) feature.Instance {
 		api := newAPI(h)
-		return feature.Instance{Services: []application.Service{application.NewService(api)}, Close: api.close}
+		return feature.Instance{
+			Services:   []application.Service{application.NewService(api)},
+			AgentTools: api.agentTools,
+			Close:      api.close,
+		}
 	},
 }

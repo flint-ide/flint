@@ -109,12 +109,16 @@ type StatusItem struct {
 	Order int    `json:"order"`
 }
 
-// AgentTool is a read-only tool offered to agents on Flint's MCP server.
+// AgentTool is a tool offered to agents on Flint's MCP server: read-only,
+// unless Acts.
 type AgentTool struct {
 	Name        string          `json:"name"`
 	Title       string          `json:"title,omitempty"`
 	Description string          `json:"description"`
 	InputSchema json.RawMessage `json:"inputSchema,omitempty"`
+	// Acts declares that the tool changes something (it starts, sends,
+	// writes or deletes): Flint asks the user before every call.
+	Acts bool `json:"acts,omitempty"`
 }
 
 // Theme is a color theme: the CSS variables and terminal colors of a custom

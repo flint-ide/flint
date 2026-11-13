@@ -100,7 +100,9 @@ Values are stored in `settings.json` under `extensions` → `<id>`. The extensio
 
 ### contributes.agentTools
 
-At most 20. `{ "name", "title"?, "description", "inputSchema"? }`. `name` is lower-case letters, digits and underscores (≤ 40). `inputSchema` is a JSON Schema with `"type": "object"` (≤ 16 KiB), passed to agents as is. Agents see the tool as `<name part of the id>_<name>`, with dashes turned into underscores, cut to 64 characters and numbered if two collide (`acme.jira-cloud` + `issue` → `jira_cloud_issue`).
+At most 20. `{ "name", "title"?, "description", "inputSchema"?, "acts"? }`. `name` is lower-case letters, digits and underscores (≤ 40). `inputSchema` is a JSON Schema with `"type": "object"` (≤ 16 KiB), passed to agents as is. Agents see the tool as `<name part of the id>_<name>`, with dashes turned into underscores, cut to 64 characters and numbered if two collide (`acme.jira-cloud` + `issue` → `jira_cloud_issue`).
+
+A tool is read-only unless it declares `"acts": true`: set it for every tool that changes something (creates, sends, starts, writes, deletes). Flint then asks the user before each call, showing the tool and the arguments (in the agent chat when the agent asks there, otherwise in a dialog of Flint's own); no approval policy and no "always allow" answers for them, and `agentTool/call` only arrives after a yes. The install confirmation and Settings ▸ Extensions mark such tools. A tool without `acts` must not change anything.
 
 ## Lifecycle
 

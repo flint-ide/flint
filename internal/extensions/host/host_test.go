@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"flint/internal/extensions/manifest"
 	"flint/internal/extensions/rpc"
 )
 
@@ -512,6 +513,29 @@ func TestAgentTools(t *testing.T) {
 	f.app.disabled["test.ext"] = true
 	if got := f.h.Tools(func(string) bool { return true }); len(got) != 0 {
 		t.Errorf("tools of a disabled extension: %+v", got)
+	}
+}
+
+// A tool whose manifest says it acts is offered as one (the MCP server then
+// asks before each call), and the install confirmation and the info say so.
+func TestActingAgentTools(t *testing.T) {
+	m, err := manifest.Parse([]byte(`{"id":"acme.jira","name":"Jira","version":"1.0.0","contract":1,"run":{"command":"jira"},
+		"contributes":{"agentTools":[
+			{"name":"issue","description":"An issue by key."},
+			{"name":"comment","description":"Adds a comment.","acts":true}]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg := installMessage(m)
+	if !strings.Contains(msg, "Agent tools: issue, comment (acts)") || !strings.Contains(msg, "Flint asks you before each call") {
+		t.Errorf("the confirmation doesn't say which tool acts:\n%s", msg)
+	}
+	f := setup(t, nil)
+	if tools := f.h.Tools(func(string) bool { return true }); len(tools) != 1 || tools[0].Acts {
+		t.Errorf("a read tool is offered as acting: %+v", tools)
+	}
+	if info := f.h.List()[0]; len(info.AgentTools) != 1 || info.AgentTools[0].Acts {
+		t.Errorf("info = %+v", info.AgentTools)
 	}
 }
 

@@ -26,6 +26,8 @@ Apart from the update check, data leaves your Mac only when you do something tha
 
 Agents decide what they read and send to their provider. The [approval policy](../guides/ai-agents.md#what-the-agent-may-do-without-asking) controls what they may do without asking.
 
+Flint's own tools for agents only read, unless you turn on [tools that act](../guides/ai-agents.md#letting-agents-act-in-flint) (run tests, run a configuration, send a request from a `.http` file, query a read-only database connection). Those are off by default, and each call needs your yes, in the chat or in a dialog Flint shows itself: no approval policy and no "always allow" covers them. What they return goes to the agent's provider like anything else the agent reads, so a response body or query result you approve is shared with it (bounded, with recognized credentials removed).
+
 ## Update check
 
 Flint looks for a newer release so it can tell you about it. It never downloads or installs anything itself.
@@ -62,7 +64,7 @@ Query history masks passwords in `CREATE/ALTER ROLE … PASSWORD` and ClickHouse
 - Declared network hosts (`network:<host>`) are shown, not enforced.
 - An extension's secrets are in the keychain (service `flint-extensions`, account `<id>:<key>`), never in `settings.json`, and one extension can't read another's.
 - Its process gets a minimal environment, plus only the variables its manifest names in `run.env` (the confirmation lists them), so no tokens or keys from Flint's own environment unless named there, and runs in its own process group, which Flint kills when it stops it or quits.
-- Its tools for agents are offered only in trusted folders while Flint's MCP server is on, and can be turned off per extension.
+- Its tools for agents are offered only in trusted folders while Flint's MCP server is on, and can be turned off per extension. A tool the extension declares as acting (`"acts": true`, shown when you install it and in Settings ▸ Extensions) needs your yes before each call.
 - Everything it shows is drawn by Flint from plain data; it can't run code in Flint's window.
 
 ## Untrusted content

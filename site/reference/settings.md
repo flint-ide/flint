@@ -65,7 +65,9 @@ The file is readable only by your user. It never contains secrets: database pass
   "mcpServer": {
     "enabled": true,
     "tools": { "diagnostics": true, "editor": true, "terminals": true, "tests": true },
-    "terminalLines": 200
+    "actions": { "tests": true, "run": false, "http": false, "sql": false },
+    "terminalLines": 200,
+    "testWaitSeconds": 120
   },
   "completions": {
     "enabled": true,
@@ -230,7 +232,7 @@ A change made in the Settings tab restarts that language's servers. Servers that
 
 ### mcpServer
 
-Flint's own read-only MCP server for agent chats. See [What agents can see in Flint](../guides/ai-agents.md#what-agents-can-see-in-flint).
+Flint's own MCP server for agent chats: read-only tools, and tools that act when you switch them on. See [What agents can see in Flint](../guides/ai-agents.md#what-agents-can-see-in-flint).
 
 | Key | Type | Range | Default | Meaning |
 |---|---|---|---|---|
@@ -239,7 +241,12 @@ Flint's own read-only MCP server for agent chats. See [What agents can see in Fl
 | `tools.editor` | boolean | | `true` | `get_editor_state`: open files, the active file and the selection. When `false`, Flint also stops sending the editor state to its backend. |
 | `tools.terminals` | boolean | | `false` | `get_terminal_output`: recent output terminals and run consoles printed in the project. The agent asks before each call. |
 | `tools.tests` | boolean | | `true` | `get_test_results`: the last test run. |
-| `terminalLines` | integer | 10–2000 | `200` | The most lines of one terminal's output an agent gets (clamped into the range). |
+| `actions.tests` | boolean | | `false` | `run_tests`: run tests in Flint's test runner. Like every `actions` tool, it isn't offered while `false`, and you are asked before each call. |
+| `actions.run` | boolean | | `false` | `run_configuration` (start a run configuration by name) and `get_run_output` (read a run's output and state). |
+| `actions.http` | boolean | | `false` | `send_http_request`: send a named request of a `.http` file in the project. |
+| `actions.sql` | boolean | | `false` | `run_sql_query`: one reading statement on a saved connection that is read-only. Needs the Database feature. |
+| `terminalLines` | integer | 10–2000 | `200` | The most lines of one terminal's or run's output an agent gets (clamped into the range). |
+| `testWaitSeconds` | integer | 10–540 | `120` | How long `run_tests` waits for a test run before it answers with the results so far (clamped into the range). |
 
 Tool switches apply right away, also to running chats.
 ### completions

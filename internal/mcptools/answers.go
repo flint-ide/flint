@@ -173,21 +173,27 @@ func (s *Sources) terminals(_ context.Context, root string, args json.RawMessage
 	if len(list) == 0 {
 		return "No terminals or run consoles of this project are open in Flint.", nil
 	}
+	return s.consoleTails(root, list, "console", in.Terminal, in.Lines, maxLines)
+}
+
+// consoleTails renders the last lines of the consoles in list, or of the one
+// called id (what: "console" or "run", for the message when there is none).
+func (s *Sources) consoleTails(root string, list []TerminalInfo, what, id string, want, maxLines int) (string, error) {
 	pick := list
 	lines := min(maxLines, listLines)
-	if in.Terminal != "" {
-		i := slices.IndexFunc(list, func(t TerminalInfo) bool { return t.ID == in.Terminal })
+	if id != "" {
+		i := slices.IndexFunc(list, func(t TerminalInfo) bool { return t.ID == id })
 		if i < 0 {
 			ids := make([]string, len(list))
 			for j, t := range list {
 				ids[j] = t.ID
 			}
-			return "", fmt.Errorf("no console %q in this project (consoles: %s)", in.Terminal, strings.Join(ids, ", "))
+			return "", fmt.Errorf("no %s %q in this project (%ss: %s)", what, cut(id, maxNameLen), what, strings.Join(ids, ", "))
 		}
 		pick, lines = list[i:i+1], maxLines
 	}
-	if in.Lines > 0 {
-		lines = min(in.Lines, maxLines)
+	if want > 0 {
+		lines = min(want, maxLines)
 	}
 	var b strings.Builder
 	for _, t := range pick {
@@ -225,9 +231,15 @@ func (s *Sources) tests(_ context.Context, root string, args json.RawMessage) (s
 	if !ok {
 		return "No test run of this project in Flint yet.", nil
 	}
+	return s.describeRun("Last test run", run, root), nil
+}
+
+// describeRun renders a test run: how it ended, the totals and each failed
+// test with its location and output.
+func (s *Sources) describeRun(label string, run TestRun, root string) string {
 	var b strings.Builder
 	ago := s.now().Sub(run.Started).Round(time.Second)
-	fmt.Fprintf(&b, "Last test run: %s (in %s, started %s ago)\n", run.Title, rel(run.Dir, root), ago)
+	fmt.Fprintf(&b, "%s: %s (in %s, started %s ago)\n", label, run.Title, rel(run.Dir, root), ago)
 	switch {
 	case !run.Done:
 		b.WriteString("Status: still running; results so far.\n")
@@ -261,7 +273,7 @@ func (s *Sources) tests(_ context.Context, root string, args json.RawMessage) (s
 	fmt.Fprintf(&b, "Tests: %d passed, %d failed, %d skipped, %d running, %d cancelled\n",
 		counts[testrun.Passed], counts[testrun.Failed], counts[testrun.Skipped], counts[testrun.Running], counts[testrun.Cancelled])
 	if len(failed) == 0 {
-		return strings.TrimRight(b.String(), "\n"), nil
+		return strings.TrimRight(b.String(), "\n")
 	}
 	fmt.Fprintf(&b, "\nFailed (%d):\n", len(failed))
 	for _, n := range failed[:min(len(failed), maxFailures)] {
@@ -283,7 +295,7 @@ func (s *Sources) tests(_ context.Context, root string, args json.RawMessage) (s
 	if len(failed) > maxFailures {
 		fmt.Fprintf(&b, "- … and %d more\n", len(failed)-maxFailures)
 	}
-	return strings.TrimRight(b.String(), "\n"), nil
+	return strings.TrimRight(b.String(), "\n")
 }
 
 // packageOf names the package a node belongs to ("" when none).

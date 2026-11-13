@@ -142,7 +142,7 @@ Agents that Flint starts (Claude Code, Codex, custom ACP agents) can call your t
 }]
 ```
 
-The agent sees it as `hello_greeting` (your id's name part, then the tool's name). A call arrives as `agentTool/call` with the tool's `name`, the agent's project folder (`root`) and the `arguments`; answer with `{ "text": "…" }`. Tools are read-only: return information, don't change things.
+The agent sees it as `hello_greeting` (your id's name part, then the tool's name). A call arrives as `agentTool/call` with the tool's `name`, the agent's project folder (`root`) and the `arguments`; answer with `{ "text": "…" }`. Tools are read-only by default: return information, don't change things. A tool that does change something declares `"acts": true`, and Flint asks the user before each call.
 
 ## 8. Ask Flint for more
 

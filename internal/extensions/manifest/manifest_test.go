@@ -73,6 +73,25 @@ func edit(t *testing.T, change func(m map[string]any)) []byte {
 
 func contributes(m map[string]any) map[string]any { return m["contributes"].(map[string]any) }
 
+// A tool may declare that it acts; by default it only reads.
+func TestAgentToolActs(t *testing.T) {
+	m, err := Parse([]byte(valid))
+	if err != nil || m.Contributes.AgentTools[0].Acts {
+		t.Fatalf("a tool acts by default: %+v, %v", m, err)
+	}
+	m, err = Parse(edit(t, func(m map[string]any) {
+		contributes(m)["agentTools"] = []any{map[string]any{"name": "jira_issue", "description": "Adds a comment.", "acts": true}}
+	}))
+	if err != nil || !m.Contributes.AgentTools[0].Acts {
+		t.Fatalf("acts not read: %+v, %v", m, err)
+	}
+	if _, err := Parse(edit(t, func(m map[string]any) {
+		contributes(m)["agentTools"] = []any{map[string]any{"name": "jira_issue", "description": "d", "acts": "yes"}}
+	})); err == nil {
+		t.Fatal(`"acts": "yes" accepted`)
+	}
+}
+
 func TestParseRefuses(t *testing.T) {
 	for _, tc := range []struct {
 		name, want string

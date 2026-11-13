@@ -4,6 +4,8 @@
 // The shapes deliberately mirror ACP's session/update so ACP maps 1:1.
 package agentsession
 
+import "encoding/json"
+
 import "context"
 
 // Event kinds.
@@ -111,6 +113,12 @@ type PermissionRequest struct {
 	ID       string             `json:"id"`
 	ToolCall ToolCall           `json:"toolCall"`
 	Options  []PermissionOption `json:"options"`
+	// FlintTool and FlintArgs are set by a driver that knows the request is
+	// for a tool of Flint's own MCP server (MCPServerName): the tool's name
+	// there and the call's raw arguments. The manager uses them for the
+	// tools that act (actions.go); they are not sent to the UI.
+	FlintTool string          `json:"-"`
+	FlintArgs json.RawMessage `json:"-"`
 }
 
 // PermissionOption is one answer to a PermissionRequest.

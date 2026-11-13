@@ -64,6 +64,8 @@ type ToolInfo struct {
 	AgentName   string `json:"agentName"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
+	// Acts: the tool changes something, so Flint asks before each call.
+	Acts bool `json:"acts"`
 }
 
 func (e *ext) info() Info {
@@ -108,7 +110,7 @@ func (e *ext) info() Info {
 	e.mu.Unlock()
 	names := e.h.ToolNames(e.id)
 	for _, t := range m.Contributes.AgentTools {
-		in.AgentTools = append(in.AgentTools, ToolInfo{Name: t.Name, AgentName: names[t.Name], Title: t.Title, Description: t.Description})
+		in.AgentTools = append(in.AgentTools, ToolInfo{Name: t.Name, AgentName: names[t.Name], Title: t.Title, Description: t.Description, Acts: t.Acts})
 	}
 	return in
 }

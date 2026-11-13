@@ -15,6 +15,7 @@ import { subscribeLspEdits } from './store/lspEdits'
 import { subscribeAgentChatEvents } from './store/agentChat'
 import { subscribeUsageEvents } from './store/usage'
 import { subscribeRunEvents, useRun } from './store/run'
+import { subscribeHttpEvents } from './store/httpClient'
 import { subscribeDebugEvents } from './store/debug'
 import { subscribeAutoSave } from './store/settings'
 import { subscribeScratchAutosave } from './store/scratch'
@@ -86,6 +87,7 @@ export default function App() {
     subscribeAgentChatEvents()
 subscribeUsageEvents()
     subscribeRunEvents()
+    subscribeHttpEvents()
     subscribeDebugEvents()
     subscribeSessionAutosave()
     subscribeAutoSave()

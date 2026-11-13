@@ -81,15 +81,18 @@ type App struct {
 	profiles    *profiles // temporary profiles and recordings in progress
 	lsp         *lsp.Manager
 	agents      *agentsession.Manager
-	mcp         *mcpserver.Server  // Flint's MCP server for its agents (api_mcp.go)
-	mcpSources  *mcptools.Sources  // what the MCP server's tools read
-	tasks       *agenttask.Tracker // state of agent tasks from their chats
-	sessions    *restore.Store
-	usage       *usage.Store // agent usage per day (usage_state.go)
-	usageChats  usageChats
-	files       fuzzy.Index      // quick-open file list of the open folder
-	http        *httpfile.Client // requests of .http files, sent only on demand
-	features    *feature.Set     // the feature modules (features.go)
+	mcp         *mcpserver.Server // Flint's MCP server for its agents (api_mcp.go)
+	mcpSources  *mcptools.Sources // what the MCP server's tools read
+	// actionGrants and configRuns serve the MCP tools that act (api_mcp_actions.go).
+	actionGrants actionGrants
+	configRuns   configRuns
+	tasks        *agenttask.Tracker // state of agent tasks from their chats
+	sessions     *restore.Store
+	usage        *usage.Store // agent usage per day (usage_state.go)
+	usageChats   usageChats
+	files        fuzzy.Index      // quick-open file list of the open folder
+	http         *httpfile.Client // requests of .http files, sent only on demand
+	features     *feature.Set     // the feature modules (features.go)
 
 	projMu   sync.Mutex
 	roots    []string                    // open project folders, the primary one first

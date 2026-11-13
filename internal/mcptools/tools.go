@@ -26,15 +26,23 @@ const (
 var Names = []string{ToolDiagnostics, ToolEditor, ToolTerminals, ToolTests}
 
 // Instructions are sent to the agent with initialize.
-const Instructions = "You are running inside Flint, the user's IDE. These read-only tools show what Flint sees and a terminal doesn't: " +
+const Instructions = "You are running inside Flint, the user's IDE. The get_ tools are read-only and show what Flint sees and a terminal doesn't: " +
 	"language-server diagnostics, the files open in the editor and the user's selection, recent output of the user's terminals and run consoles, " +
-	"and the results of the last test run. Use them to find out what the user is looking at or what is failing before you ask."
+	"and the results of the last test run. Use them to find out what the user is looking at or what is failing before you ask. " +
+	"When the user switched them on, there are also tools that act in Flint (run_tests, run_configuration, send_http_request, run_sql_query): " +
+	"their results show in Flint's own tabs too, and the user is asked before each call, so call them only when the task needs it."
 
 // Config selects the tools offered (settings.json "mcpServer").
 type Config struct {
 	Diagnostics, Editor, Terminals, Tests bool
-	// TerminalLines is the most lines get_terminal_output returns per console.
+	// TerminalLines is the most lines get_terminal_output and get_run_output
+	// return per console.
 	TerminalLines int
+	// RunTests, RunConfigs and HTTP offer the tools that act (actions.go);
+	// they need Sources.Actor.
+	RunTests, RunConfigs, HTTP bool
+	// TestWait is how long run_tests waits for a run to finish.
+	TestWait time.Duration
 }
 
 // Sources is what the tools read.
@@ -43,6 +51,8 @@ type Sources struct {
 	Editor      *Editor
 	Terminals   *Terminals
 	Tests       *Tests
+	// Actor does what the acting tools ask; nil offers none of them.
+	Actor Actor
 	// Now is the clock (tests); nil is time.Now.
 	Now func() time.Time
 }
@@ -112,7 +122,7 @@ func (s *Sources) Tools(cfg Config) []mcpserver.Tool {
 			Call:        s.tests,
 		})
 	}
-	return out
+	return append(out, s.actionTools(cfg)...)
 }
 
 // decode reads a tool's arguments; unknown fields are ignored.

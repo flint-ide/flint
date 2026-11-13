@@ -15,7 +15,8 @@ const MCPTokenEnv = "FLINT_MCP_TOKEN"
 // MCPReadTools are the tools of Flint's server that only show the project's
 // own state (problems, the editor, test results). With the reads policy they
 // run without asking; the others (terminal output, cluster status) can show
-// anything the user saw, so they always ask.
+// anything the user saw, so they always ask. The tools that act (run_tests,
+// run_configuration, ...) are never in this list: see actions.go.
 var MCPReadTools = []string{"get_diagnostics", "get_editor_state", "get_test_results"}
 
 // MCPServer is Flint's read-only MCP server (Streamable HTTP) as offered to

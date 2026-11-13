@@ -284,6 +284,22 @@ func TestFlintToolClassification(t *testing.T) {
 	}
 }
 
+// Only a session that was given Flint's server names its tools to the
+// manager (which keeps the acting ones out of auto-approval).
+func TestFlintToolName(t *testing.T) {
+	if tool, ok := flintToolName("mcp__flint__run_tests", true); !ok || tool != "run_tests" {
+		t.Errorf("Flint's tool = %q, %v", tool, ok)
+	}
+	for _, name := range []string{"mcp__github__run_tests", "run_tests", "mcp__flint__", "Bash"} {
+		if tool, ok := flintToolName(name, true); ok {
+			t.Errorf("%s taken for Flint's %q", name, tool)
+		}
+	}
+	if _, ok := flintToolName("mcp__flint__run_tests", false); ok {
+		t.Error("someone else's flint server taken for Flint's")
+	}
+}
+
 // Flint's MCP server is passed with --mcp-config after the user's own
 // (Claude Code merges them); the token travels in the environment only.
 func TestBuildArgsWithFlintMCPServer(t *testing.T) {

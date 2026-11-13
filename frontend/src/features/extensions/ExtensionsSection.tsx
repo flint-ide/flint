@@ -168,11 +168,12 @@ function ExtensionCard({ info }: { info: Info }) {
                     checked={toolsOffered(extensions, info.id)}
                     onChange={(e) => update((s) => ({ extensions: withFlag(s.extensions, 'agentTools', info.id, e.target.checked) }))}
                   />{' '}
-                  Offer to agents (read-only, in trusted folders, when Settings ▸ Agent Context is on)
+                  Offer to agents (in trusted folders, when Settings ▸ Agent Context is on)
                 </label>
                 {info.agentTools.map((t) => (
                   <div key={t.name} className="muted">
-                    <code>{t.agentName || t.name}</code> {t.description}
+                    <code>{t.agentName || t.name}</code> {t.acts ? <strong>Acts (Flint asks you before each call). </strong> : 'Read-only. '}
+                    {t.description}
                   </div>
                 ))}
               </dd>

@@ -190,10 +190,18 @@ func installMessage(m *manifest.Manifest) string {
 	}
 	if n := len(m.Contributes.AgentTools); n > 0 {
 		names := make([]string, n)
+		acts := false
 		for i, t := range m.Contributes.AgentTools {
 			names[i] = t.Name
+			if t.Acts {
+				names[i] += " (acts)"
+				acts = true
+			}
 		}
 		fmt.Fprintf(&b, "• Agent tools: %s\n", strings.Join(names, ", "))
+		if acts {
+			b.WriteString("  Tools marked (acts) change things for an agent; Flint asks you before each call.\n")
+		}
 	}
 	b.WriteString("\nThe program runs with your user's permissions: Flint shows what it declares but cannot confine what it does. Install only extensions you trust.")
 	return b.String()

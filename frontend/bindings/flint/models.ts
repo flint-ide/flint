@@ -544,6 +544,85 @@ export class NewTask {
 }
 
 /**
+ * PRReviewDraft is the agent chat draft for a pull request's review feedback
+ * and what the UI says about it.
+ */
+export class PRReviewDraft {
+    /**
+     * Prompt is the draft: reviewers' text quoted, redacted and bounded.
+     */
+    "prompt": string;
+    "number": number;
+
+    /**
+     * Threads and Reviews are how many the draft quotes; LeftOut how many
+     * unresolved threads did not fit.
+     */
+    "threads": number;
+    "reviews": number;
+    "leftOut": number;
+
+    /**
+     * HeadBranch is the branch Check out puts the pull request on; Branch the
+     * one checked out in dir ("" when detached).
+     */
+    "headBranch": string;
+    "branch": string;
+
+    /**
+     * OnBranch: dir has the pull request's branch checked out. When false the
+     * draft tells the agent not to edit files there.
+     */
+    "onBranch": boolean;
+
+    /**
+     * Open: the pull request is open (Check out makes sense).
+     */
+    "open": boolean;
+
+    /** Creates a new PRReviewDraft instance. */
+    constructor($$source: Partial<PRReviewDraft> = {}) {
+        if (!("prompt" in $$source)) {
+            this["prompt"] = "";
+        }
+        if (!("number" in $$source)) {
+            this["number"] = 0;
+        }
+        if (!("threads" in $$source)) {
+            this["threads"] = 0;
+        }
+        if (!("reviews" in $$source)) {
+            this["reviews"] = 0;
+        }
+        if (!("leftOut" in $$source)) {
+            this["leftOut"] = 0;
+        }
+        if (!("headBranch" in $$source)) {
+            this["headBranch"] = "";
+        }
+        if (!("branch" in $$source)) {
+            this["branch"] = "";
+        }
+        if (!("onBranch" in $$source)) {
+            this["onBranch"] = false;
+        }
+        if (!("open" in $$source)) {
+            this["open"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PRReviewDraft instance from a string or object.
+     */
+    static createFrom($$source: any = {}): PRReviewDraft {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PRReviewDraft($$parsedSource as Partial<PRReviewDraft>);
+    }
+}
+
+/**
  * ProfiledTests is a started profiling test run.
  */
 export class ProfiledTests {

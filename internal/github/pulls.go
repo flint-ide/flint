@@ -323,8 +323,11 @@ type Commit struct {
 
 // Review is a submitted review (approval, changes requested or comment).
 type Review struct {
-	Author      string `json:"author"`
-	State       string `json:"state"` // APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED
+	Author string `json:"author"`
+	State  string `json:"state"` // APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED
+	// Body is the review's Markdown source; it stays in Go (the agent draft
+	// quotes it, the tab shows BodyHTML).
+	Body        string `json:"-"`
 	BodyHTML    string `json:"bodyHtml"`
 	SubmittedAt string `json:"submittedAt"`
 }
@@ -427,6 +430,29 @@ func (c *Client) Details(ctx context.Context, dir string, number int, force bool
 		return Details{}, err
 	}
 	return data.details, nil
+}
+
+// DetailsWithPatches is Details plus GitHub's patch of each changed file, by
+// path ("" for a binary or very large file), from the same cached answer.
+func (c *Client) DetailsWithPatches(ctx context.Context, dir string, number int, force bool) (Details, map[string]string, error) {
+	data, err := c.prData(ctx, dir, number, force)
+	if err != nil {
+		return Details{}, nil, err
+	}
+	patches := make(map[string]string, len(data.files))
+	for path, f := range data.files {
+		patches[path] = f.Patch
+	}
+	return data.details, patches, nil
+}
+
+// LocalBranch is the branch Checkout puts the pull request on: its own name,
+// or <owner>/<branch> for a fork's.
+func (d Details) LocalBranch() string {
+	if d.CrossRepository && d.HeadOwner != "" {
+		return d.HeadOwner + "/" + d.HeadRef
+	}
+	return d.HeadRef
 }
 
 func (c *Client) prData(ctx context.Context, dir string, number int, force bool) (*prData, error) {
@@ -602,7 +628,7 @@ func buildDetails(repo Repo, v prView, files []restFile, tp threadPage) *prData 
 		if r.State == "PENDING" || (r.State == "COMMENTED" && strings.TrimSpace(r.Body) == "") {
 			continue
 		}
-		d.Reviews = append(d.Reviews, Review{Author: r.Author.Login, State: r.State, BodyHTML: markdown(r.Body), SubmittedAt: r.SubmittedAt})
+		d.Reviews = append(d.Reviews, Review{Author: r.Author.Login, State: r.State, Body: r.Body, BodyHTML: markdown(r.Body), SubmittedAt: r.SubmittedAt})
 	}
 	return &prData{details: d, files: byPath}
 }

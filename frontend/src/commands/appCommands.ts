@@ -8,6 +8,7 @@ import { registerFeatureCommands } from './featureCommands'
 import { registerTaskCommands } from './taskCommands'
 import { registerPromptCommands } from './promptCommands'
 import { registerReviewCommands } from './reviewCommands'
+import { registerPullRequestCommands } from './prCommands'
 import { requestCloseTab } from '../components/editor/EditorArea'
 import { useWorkspace } from '../store/workspace'
 import { PANELS } from '../panels'
@@ -57,9 +58,11 @@ export function registerAppCommands(): () => void {
   const offTasks = registerTaskCommands()
   const offPrompts = registerPromptCommands()
   const offReview = registerReviewCommands()
+  const offPullRequests = registerPullRequestCommands()
   return () => {
     offPrompts()
     offReview()
+    offPullRequests()
     offTasks()
     offStatic()
     offAgents()

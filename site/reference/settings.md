@@ -87,6 +87,7 @@ The file is readable only by your user. It never contains secrets: database pass
   },
   "agentReview": { "scope": "selected", "maxDiffKB": 128, "agent": "", "timeoutSeconds": 300 },
   "ci": { "pollSeconds": 60, "logTailLines": 80, "logErrorLines": 40, "notify": true },
+  "prReview": { "maxThreads": 20, "contextLines": 8 },
   "github": { "host": "github.com", "clientId": "", "scopes": ["repo", "read:org", "workflow"], "maxRetryWaitSeconds": 60 }
 }
 ```
@@ -115,6 +116,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `prompts` | object | see below | The prompt library of the agent chat (`/`). See [prompts](#prompts). |
 | `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
 | `ci` | object | see below | Following your pull requests' CI: poll interval, Fix with agent's log excerpt, notifications. See [ci](#ci). |
+| `prReview` | object | see below | Handing a pull request's review comments to the agent: threads per draft, code lines around a comment. See [prReview](#prreview). |
 | `github` | object | see below | The GitHub host, the OAuth App Sign in with GitHub uses, scopes and the retry wait. See [github](#github). |
 <!-- include-rows _settings/*.md -->
 
@@ -320,6 +322,17 @@ Used by [When CI fails](../guides/git-and-github.md#when-ci-fails).
 | `notify` | boolean | | `true` | A notification when your pull request's CI fails or turns green while Flint is in the background. Also needs `notifyInBackground`. |
 
 Flint keeps at most the last 8 MB of each failed job's log (and says when it cut one), describes at most 4 failed jobs per run, cuts log lines at 2,000 characters and workflow, job and step names at 120, and the Log tab keeps the last 20,000 lines; these limits are not settings.
+
+### prReview
+
+Used by [Handing review comments to the agent](../guides/git-and-github.md#handing-review-comments-to-the-agent). Edited in **Settings ▸ CI ▸ Review comments**.
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `maxThreads` | integer | 1–50 | `20` | Unresolved threads one **Address review comments** draft carries, in the pull request's file order. The rest are listed at the end of the draft. |
+| `contextLines` | integer | 0–50 | `8` | Lines of code before and after a commented line in the draft: from the working tree when the pull request's branch is checked out, else from the pull request's diff. `0` leaves the code out. |
+
+Flint cuts a comment and a suggestion at 4,000 bytes, quotes the first and the latest 7 comments of a thread and the latest 5 reviews that request changes, cuts code lines at 400 characters and keeps a draft under 64 kB; these limits are not settings.
 
 ### github
 

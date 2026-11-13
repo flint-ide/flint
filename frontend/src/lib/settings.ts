@@ -15,6 +15,7 @@ import { coerceUsage, DEFAULT_USAGE, type UsageSettings } from './usageSettings'
 import { coercePromptSettings, DEFAULT_PROMPT_SETTINGS, type PromptSettings } from './prompts'
 import { coerceAgentReview, DEFAULT_AGENT_REVIEW, type AgentReviewSettings } from './reviewSettings'
 import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
+import { coercePRReview, DEFAULT_PR_REVIEW, type PRReviewSettings } from './prAgent'
 import { coerceGitHub, DEFAULT_GITHUB, type GitHubSettings } from './githubSettings'
 import { coerceSections, type FeatureSettings } from './settingsSections'
 import { TERMINAL_COLOR_NAMES } from './terminalTheme'
@@ -89,6 +90,8 @@ export interface CoreSettings {
   agentReview: AgentReviewSettings
   /** Following your pull requests' CI: poll interval, log excerpt size, notifications. */
   ci: CISettings
+  /** Handing review comments to the agent: threads per draft, context lines (lib/prAgent.ts). */
+  prReview: PRReviewSettings
   /** GitHub host, the OAuth App Flint signs in with, scopes and the retry wait (lib/githubSettings.ts). */
   github: GitHubSettings
 }
@@ -121,6 +124,7 @@ export const DEFAULT_SETTINGS: CoreSettings = Object.freeze({
   prompts: DEFAULT_PROMPT_SETTINGS,
   agentReview: DEFAULT_AGENT_REVIEW,
   ci: DEFAULT_CI,
+  prReview: DEFAULT_PR_REVIEW,
   github: DEFAULT_GITHUB,
 }) as CoreSettings
 
@@ -259,6 +263,7 @@ function coerceCore(v: Record<string, unknown>): CoreSettings {
     prompts: coercePromptSettings(v.prompts),
     agentReview: coerceAgentReview(v.agentReview),
     ci: coerceCI(v.ci),
+    prReview: coercePRReview(v.prReview),
     github: coerceGitHub(v.github),
   }
 }

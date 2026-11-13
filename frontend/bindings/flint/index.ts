@@ -70,6 +70,7 @@ export {
     FileHistory,
     MergeResult,
     NewTask,
+    PRReviewDraft,
     ProfiledTests,
     PromptInput,
     PromptLibrary,

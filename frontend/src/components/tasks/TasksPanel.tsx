@@ -16,7 +16,7 @@ import {
 import { BrowserOpenURL } from '../../wails/runtime'
 import { NewTaskForm } from './NewTaskForm'
 import { Icon } from '../ui/Icon'
-import { TaskCI, TaskCIFix } from './TaskCI'
+import { TaskCI, TaskCIFix, TaskReviewComments } from './TaskCI'
 
 const basename = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 
@@ -83,6 +83,7 @@ function TaskRow({ t, changes, open, busy }: RowProps) {
         {a.pr && <button className="link" disabled={busy} onClick={() => void createTaskPullRequest(t)} title="Push the branch and create a pull request on GitHub (asks first)">Create PR</button>}
         {t.pullRequest && <button className="link" onClick={() => BrowserOpenURL(t.pullRequest)} title={t.pullRequest}>PR ↗</button>}
         <TaskCIFix t={t} />
+        <TaskReviewComments t={t} />
         <span className="spacer" />
         <button className="icon" disabled={busy} title="Remove the task" onClick={() => void removeTask(t)}>✕</button>
       </div>

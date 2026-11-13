@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"flint/internal/extensions/manifest"
+	"flint/internal/extensions/sandbox"
 )
 
 // App is what the host needs from Flint.
@@ -64,6 +65,14 @@ type Options struct {
 	// LanguageOf names a file's language (Flint's id, "" for none), which
 	// decoration sets select files by; nil knows no languages.
 	LanguageOf func(path string) string
+	// Sandbox reports what this system can confine; nil asks the system
+	// (sandbox.Probe). Launcher is the program started as the sandbox
+	// launcher; "" is Flint's own executable, whose main calls sandbox.Main.
+	Sandbox  func() sandbox.Support
+	Launcher string
+	// RequireSandbox: the user only runs extensions that are sandboxed
+	// (the "extensions.requireSandbox" setting); nil means no.
+	RequireSandbox func() bool
 	// Timeouts; zero values use the defaults below.
 	IdleTimeout    time.Duration
 	InitTimeout    time.Duration
@@ -319,6 +328,10 @@ func (h *Host) RootsChanged() {
 	defer h.syncDocuments() // open documents of a folder that is trusted now, or no more
 	for _, e := range h.all() {
 		if p := e.running(); p != nil {
+			if e.rootsOutgrew(p) {
+				go e.restartForRoots()
+				continue
+			}
 			_ = p.conn.Notify("workspace/rootsChanged", map[string]any{"roots": e.roots()})
 		}
 	}

@@ -2,7 +2,7 @@
 //
 //   "extensions": { "enabled": { "<id>": false }, "agentTools": { "<id>": false },
 //                   "decorations": { "<set id>": false }, "indexUrl": "https://…/index.json", "indexPublicKey": "<base64>",
-//                   "<id>": { …its settings } }
+//                   "requireSandbox": true, "<id>": { …its settings } }
 //
 // Kept as the flat object it is in the file, so values of extensions that
 // aren't installed survive every save. Framework-free.
@@ -80,7 +80,7 @@ export function withIndexSetting(s: ExtensionsSettings, key: 'indexUrl' | 'index
   return out
 }
 
-/** Keeps what Go keeps: the flag maps, the index's address and key, and an object per valid id. */
+/** Keeps what Go keeps: the flag maps, the index's address and key, requireSandbox when on, and an object per valid id. */
 export function coerceExtensions(v: unknown): ExtensionsSettings {
   if (!isObject(v)) return {}
   const out: Record<string, unknown> = {}
@@ -91,6 +91,8 @@ export function coerceExtensions(v: unknown): ExtensionsSettings {
     } else if (key === 'decorations') {
       const f = setFlags(value)
       if (Object.keys(f).length) out[key] = f
+    } else if (key === 'requireSandbox') {
+      if (value === true) out[key] = true
     } else if (ID.test(key) && isObject(value)) out[key] = value
   }
   const index = indexSettings(v)
@@ -121,6 +123,19 @@ export function withDecorationSet(s: ExtensionsSettings, set: string, on: boolea
   const out: Record<string, unknown> = { ...s }
   if (Object.keys(next).length) out.decorations = next
   else delete out.decorations
+  return out
+}
+
+/** Only extensions whose program runs sandboxed are started (off by default). */
+export function sandboxRequired(s: ExtensionsSettings): boolean {
+  return s.requireSandbox === true
+}
+
+/** The section with requireSandbox set; off removes the key (the default). */
+export function withSandboxRequired(s: ExtensionsSettings, on: boolean): ExtensionsSettings {
+  const out: Record<string, unknown> = { ...s }
+  if (on) out.requireSandbox = true
+  else delete out.requireSandbox
   return out
 }
 

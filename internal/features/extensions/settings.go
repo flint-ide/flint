@@ -21,6 +21,7 @@ import (
 //	  "decorations": { "acme.jira.refs": false },
 //	  "indexUrl": "https://extensions.example.com/index.json",
 //	  "indexPublicKey": "<base64 Ed25519 public key>",
+//	  "requireSandbox": true,
 //	  "acme.jira":  { "site": "acme.atlassian.net" }
 //	}
 //
@@ -45,6 +46,9 @@ type Settings struct {
 	// settings.json is per user, and nothing in a project can set them.
 	IndexURL       string
 	IndexPublicKey string
+	// RequireSandbox: only extensions whose program runs sandboxed are
+	// started (internal/extensions/sandbox); the others stay installed.
+	RequireSandbox bool
 	// Values are the extensions' settings objects by id, as written.
 	Values map[string]json.RawMessage
 }
@@ -106,6 +110,11 @@ func (s Settings) MarshalJSON() ([]byte, error) {
 			return nil, err
 		}
 	}
+	if s.RequireSandbox {
+		if err := field("requireSandbox", true); err != nil {
+			return nil, err
+		}
+	}
 	for _, id := range slices.Sorted(maps.Keys(s.Values)) {
 		if err := field(id, s.Values[id]); err != nil {
 			return nil, fmt.Errorf("extensions.%s: %w", id, err)
@@ -135,6 +144,8 @@ func (s *Settings) UnmarshalJSON(data []byte) error {
 			out.IndexURL = text(raw)
 		case "indexPublicKey":
 			out.IndexPublicKey = text(raw)
+		case "requireSandbox":
+			_ = json.Unmarshal(raw, &out.RequireSandbox) // not a boolean: off
 		default:
 			trimmed := bytes.TrimSpace(raw)
 			if manifest.ValidID(key) && len(trimmed) > 0 && trimmed[0] == '{' {
@@ -212,7 +223,7 @@ func check(s Settings) error {
 func cloneSettings(s Settings) Settings {
 	return Settings{
 		Enabled: maps.Clone(s.Enabled), AgentTools: maps.Clone(s.AgentTools), Decorations: maps.Clone(s.Decorations), Values: maps.Clone(s.Values),
-		IndexURL: s.IndexURL, IndexPublicKey: s.IndexPublicKey,
+		IndexURL: s.IndexURL, IndexPublicKey: s.IndexPublicKey, RequireSandbox: s.RequireSandbox,
 	}
 }
 

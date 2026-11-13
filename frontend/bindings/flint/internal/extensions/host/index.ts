@@ -19,6 +19,7 @@ export {
     Item,
     Point,
     Row,
+    SandboxInfo,
     Series,
     StatusItemInfo,
     Table,

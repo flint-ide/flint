@@ -5469,6 +5469,9 @@ body.file-drop-target-active::after {
   margin: 6px 0;
   font-size: 12px;
 }
+.extension-unsandboxed {
+  color: var(--warn);
+}
 .extension-facts {
   display: grid;
   grid-template-columns: max-content 1fr;

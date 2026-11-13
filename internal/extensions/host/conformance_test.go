@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"flint/internal/extensions/sandbox"
 )
 
 // The conformance test of the example extension (examples/extensions/stats):
@@ -63,6 +65,11 @@ func TestExampleExtension(t *testing.T) {
 	}
 	if info.ID != "example.stats" || info.State != StateStopped || len(info.Commands) != 3 || len(info.Panels) != 2 || len(info.TabViews) != 1 || info.Settings == nil {
 		t.Fatalf("installed: %+v", info)
+	}
+	// The example declares the strict sandbox ("sandbox": {}): it runs
+	// confined wherever this system can confine it.
+	if s := sandbox.Probe(); (info.Sandbox.State == SandboxOn) != s.Available || (!s.Available && info.Sandbox.State != SandboxUnavailable) {
+		t.Errorf("sandbox = %+v on a system with %+v", info.Sandbox, s)
 	}
 	ctx := context.Background()
 

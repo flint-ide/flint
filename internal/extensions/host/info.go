@@ -49,6 +49,8 @@ type Info struct {
 	TestRunners []manifest.TestRunner `json:"testRunners"`
 	// DecorationSets are the groups of editor decorations it draws.
 	DecorationSets []DecorationSetInfo `json:"decorationSets"`
+	// Sandbox says how the program is confined, or why it isn't.
+	Sandbox SandboxInfo `json:"sandbox"`
 }
 
 // DecorationSetInfo is a contributed decoration set, for Settings and the
@@ -92,6 +94,7 @@ func (e *ext) info() Info {
 		Warnings: []string{}, Permissions: []string{}, PermissionTexts: []string{}, Commands: []manifest.Command{}, Panels: []manifest.Panel{},
 		StatusItems: []StatusItemInfo{}, AgentTools: []ToolInfo{}, Themes: []manifest.Theme{}, TabViews: []manifest.TabView{}, Languages: []manifest.Language{},
 		Debuggers: []manifest.Debugger{}, TestRunners: []manifest.TestRunner{}, DecorationSets: []DecorationSetInfo{},
+		Sandbox: SandboxInfo{State: SandboxNone, Details: []string{}},
 	}
 	if e.m == nil {
 		in.Error = errText(e.loadErr)
@@ -100,6 +103,7 @@ func (e *ext) info() Info {
 	m := e.m
 	in.Name, in.Version, in.Publisher, in.Description = m.Name, m.Version, m.Publisher, m.Description
 	in.Program = m.CommandLine(runtime.GOOS)
+	in.Sandbox = e.sandboxInfo()
 	for _, t := range m.Contributes.Themes {
 		th := t.CustomTheme() // copies of the maps
 		in.Themes = append(in.Themes, manifest.Theme{ID: t.ID, Label: t.Label, Base: t.Base, Colors: th.Colors, Terminal: th.Terminal})

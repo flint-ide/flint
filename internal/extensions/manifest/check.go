@@ -96,6 +96,9 @@ func (m *Manifest) checkRun() error {
 	if err := checkRunEnv(m.Run.Env); err != nil {
 		return err
 	}
+	if err := m.checkSandbox(); err != nil {
+		return err
+	}
 	for _, o := range []*RunOS{m.Run.Darwin, m.Run.Linux} {
 		if o == nil {
 			continue

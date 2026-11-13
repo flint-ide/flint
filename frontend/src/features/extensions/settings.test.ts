@@ -1,6 +1,17 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { coerceExtensions, decorationSetEnabled, extensionEnabled, storedValues, toolsOffered, withDecorationSet, withFlag, withValue } from './settings'
+import {
+  coerceExtensions,
+  decorationSetEnabled,
+  extensionEnabled,
+  sandboxRequired,
+  storedValues,
+  toolsOffered,
+  withDecorationSet,
+  withFlag,
+  withSandboxRequired,
+  withValue,
+} from './settings'
 import { checkValue, currentValue, linesToList, type SchemaProperty } from './schema'
 
 describe('extensions settings', () => {
@@ -40,6 +51,17 @@ describe('extensions settings', () => {
     assert.deepEqual(s, {})
     s = withDecorationSet(s, 'acme.lint.todo', true, false)
     assert.deepEqual(s, { decorations: { 'acme.lint.todo': true } }, 'a set that is off by default is turned on')
+  })
+
+  it('requires a sandbox only when asked to', () => {
+    assert.equal(sandboxRequired(coerceExtensions({})), false)
+    assert.deepEqual(coerceExtensions({ requireSandbox: true, 'acme.jira': {} }), { requireSandbox: true, 'acme.jira': {} })
+    assert.deepEqual(coerceExtensions({ requireSandbox: 'yes' }), {}, 'not a boolean: off, like Go')
+    assert.deepEqual(coerceExtensions({ requireSandbox: false }), {}, 'off is the default, so the key goes')
+    const on = withSandboxRequired({ enabled: { 'acme.jira': false } }, true)
+    assert.deepEqual(on, { enabled: { 'acme.jira': false }, requireSandbox: true })
+    assert.equal(sandboxRequired(on), true)
+    assert.deepEqual(withSandboxRequired(on, false), { enabled: { 'acme.jira': false } })
   })
 
   it('replaces one value and keeps the rest', () => {

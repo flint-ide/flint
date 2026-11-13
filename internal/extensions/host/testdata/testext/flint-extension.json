@@ -19,7 +19,9 @@
       { "id": "test.ext.hang", "title": "Hang" },
       { "id": "test.ext.child", "title": "Child" },
       { "id": "test.ext.decorate", "title": "Decorate" },
-      { "id": "test.ext.clear", "title": "Clear decorations" }
+      { "id": "test.ext.clear", "title": "Clear decorations" },
+      { "id": "test.ext.fs", "title": "Files, directly" },
+      { "id": "test.ext.dial", "title": "Dial" }
     ],
     "panels": [
       { "id": "test.ext.items", "title": "Items", "icon": "files", "order": 300, "view": "tree" },

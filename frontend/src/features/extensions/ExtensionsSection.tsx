@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import * as API from '../../../bindings/flint/internal/features/extensions/api'
 import { errorMessage } from '../../api/backend'
 import { useSettings } from '../../store/settings'
-import { decorationSetEnabled, extensionEnabled, toolsOffered, withDecorationSet, withFlag } from './settings'
+import { decorationSetEnabled, extensionEnabled, sandboxRequired, toolsOffered, withDecorationSet, withFlag, withSandboxRequired } from './settings'
 import { installFromFolder, loadExtensions, restartExtension, uninstallExtension, useExtensions, type Info } from './store'
 import { themeContributions, type ExtensionInfo } from './model'
 import { activeThemeId, customThemeFrom } from '../../lib/contributedThemes'
 import { useContributions } from '../../lib/contributions'
 import type { ThemeContribution } from '../../lib/features'
+import { Row } from '../../components/settings/fields'
 import { BuiltinExtensions } from './BuiltinExtensions'
 import { CatalogSection } from './CatalogSection'
 import { IndexSection } from './IndexSection'
@@ -28,15 +29,28 @@ const STATE_LABELS: Record<string, string> = {
 export function ExtensionsSection() {
   const list = useExtensions((s) => s.list)
   const loaded = useExtensions((s) => s.loaded)
+  const extensions = useSettings((s) => s.settings.extensions)
+  const update = useSettings((s) => s.update)
   useEffect(() => void loadExtensions(), [])
   return (
     <section>
       <h2>Extensions</h2>
       <p className="muted settings-note">
         Extensions add color themes, or are programs that add commands, panels, settings, status bar items and agent tools. Flint draws everything they
-        show and checks every request against the permissions they declare, but a program runs with your user's permissions: install only ones you trust.
-        One starts when you first use it and stops after five idle minutes. A theme-only extension has no program and runs no code.
+        show and checks every request against the permissions they declare. A program that declares a sandbox is confined by the operating system to
+        the files and network access shown on its card; one that doesn't runs with your user's permissions. Install only ones you trust. One starts
+        when you first use it and stops after five idle minutes. A theme-only extension has no program and runs no code.
       </p>
+      <Row
+        label="Only run sandboxed extensions"
+        hint="Extensions whose program would run unconfined (no sandbox declared, or none on this system) stay installed but are not started."
+      >
+        <input
+          type="checkbox"
+          checked={sandboxRequired(extensions)}
+          onChange={(e) => update((s) => ({ extensions: withSandboxRequired(s.extensions, e.target.checked) }))}
+        />
+      </Row>
       <div className="settings-actions">
         <button onClick={() => void installFromFolder()}>Install from Folder…</button>
         <button onClick={() => void loadExtensions(true)}>Reload Installed</button>
@@ -186,6 +200,17 @@ function ExtensionCard({ info }: { info: Info }) {
           )}
           <dt>Permissions</dt>
           <dd>{info.permissionTexts.length ? info.permissionTexts.map((p) => <div key={p}>{p}</div>) : 'None'}</dd>
+          {info.program && info.sandbox && (
+            <>
+              <dt>Sandbox</dt>
+              <dd>
+                <div className={info.sandbox.state === 'sandboxed' ? '' : 'extension-unsandboxed'}>{info.sandbox.summary}</div>
+                {info.sandbox.details.map((d) => (
+                  <div key={d} className="muted">{d}</div>
+                ))}
+              </dd>
+            </>
+          )}
           {info.agentTools.length > 0 && (
             <>
               <dt>Agent tools</dt>

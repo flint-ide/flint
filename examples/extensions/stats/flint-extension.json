@@ -5,7 +5,7 @@
   "version": "0.2.0",
   "publisher": "Flint examples",
   "description": "Counts the files of the open projects by type: a tree, a sortable table, a chart in a tab, a status bar item and a tool for agents.",
-  "run": { "command": "stats" },
+  "run": { "command": "stats", "sandbox": {} },
   "activation": ["onView:example.stats.files", "onView:example.stats.types", "onView:example.stats.chart", "onCommand:example.stats.refresh", "onCommand:example.stats.showChart", "onAgentTool:summary"],
   "permissions": ["workspace.read"],
   "contributes": {

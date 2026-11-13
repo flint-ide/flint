@@ -35,12 +35,69 @@ Editor decorations add no error code: `editor/setDecorations` and `editor/clearD
 | `name` | string | Required, at most 60 characters |
 | `version` | string | Required, `major.minor.patch` with an optional `-suffix` |
 | `publisher`, `description` | string | At most 60 and 500 characters |
-| `run` | object | Required. `command`: a clean relative path inside the folder to an executable file (symbolic links must stay inside the folder); `args`: up to 32 fixed arguments. `darwin` and `linux` (each `{ command, args }`) replace both on that platform. Never run through a shell or `PATH` |
+| `run` | object | Required. `command`: a clean relative path inside the folder to an executable file (symbolic links must stay inside the folder); `args`: up to 32 fixed arguments. `darwin` and `linux` (each `{ command, args }`) replace both on that platform. Never run through a shell or `PATH`. `env`: see [Environment](#environment). `sandbox`: see [run.sandbox](#runsandbox) |
 | `activation` | string[] | `onStartup` starts the process once Flint's window is up. `onCommand:<id>`, `onView:<id>`, `onAgentTool:<name>` must name the extension's own contributions and `onLanguage:<language>` a language one of its decoration sets lists; using any contribution starts the extension anyway |
-| `permissions` | string[] | `workspace.read`, `secrets`, `agent.ask`, `terminal`, `network:<host>[,<host>…]` (shown, not enforced) |
+| `permissions` | string[] | `workspace.read`, `secrets`, `agent.ask`, `terminal`, `network:<host>[,<host>…]` (the hosts are shown, not enforced; in a [sandbox](#runsandbox) the permission opens the network) |
 | `contributes` | object | Below. Contribution points this Flint doesn't know (`fileMenu`) are ignored with a warning in Settings |
 
 Every contributed id must start with `<id>.` followed by letters, digits, dots, dashes or underscores.
+
+### run.sandbox
+
+What the program needs from the machine. Flint confines a program that declares this object with the operating system's sandbox: Landlock and seccomp on Linux, `sandbox-exec` on macOS.
+
+```json
+"run": {
+  "command": "bin/ext",
+  "env": ["KUBECONFIG"],
+  "sandbox": { "read": ["~/.kube", "${env:KUBECONFIG}"], "write": ["~/.cache/tool"], "network": true, "exec": true }
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `mode` | string | `"strict"` (the default) or `"none"`: the program can't work confined and runs with the user's permissions. With `"none"`, no other field is allowed |
+| `read` | string[] | More files and folders the program may read, at most 32 |
+| `write` | string[] | Files and folders it may read and change, at most 32 |
+| `network` | boolean | It talks to the Internet (IPv4 and IPv6). A `network:<host>` permission implies it. Hosts are not filtered |
+| `localSockets` | boolean | It connects to services on this machine through Unix sockets (the Docker socket, the desktop's message bus) |
+| `exec` | boolean | It starts other programs. They are confined exactly like the program itself |
+
+An unknown field is a manifest error. `"sandbox": {}` is the **strict profile**:
+
+- **Read:** the extension's own folder; the system's programs, libraries, certificates, time zones and `/etc`; the trusted project folders, only with the `workspace.read` permission.
+- **Write:** `FLINT_EXTENSION_DATA` and a private temporary folder (`TMPDIR`), made for each run and deleted when the process ends. The extension's own folder is read-only.
+- **Network:** none. No socket of any kind can be created.
+- **Programs:** only files in the extension's folder, plus what the system needs to start its program (the dynamic loader; a script's `#!` interpreter and, for `#!/usr/bin/env name`, the `name` found on `PATH`). With `exec`, anything it can read, and the folders of `PATH` become readable.
+- **Everything else is unreadable:** the rest of the home folder (`~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.kube`, `~/.docker`, `~/.config/gcloud`, browser profiles, keyrings and Keychains, shell history), Flint's configuration, other extensions' folders and data, other programs' temporary files.
+- **Limits:** no core dumps, at most 4,096 open files. Memory and CPU are not limited.
+
+Paths in `read` and `write`:
+
+| Form | Meaning |
+|---|---|
+| `/abs/path` | An absolute path |
+| `~/path` | Inside the user's home folder |
+| `${XDG_CONFIG_HOME}/path`, also `XDG_DATA_HOME`, `XDG_CACHE_HOME`, `XDG_STATE_HOME`, `XDG_RUNTIME_DIR` | Inside that folder (`~/.config`, `~/.local/share`, `~/.cache`, `~/.local/state` when the variable is unset; `XDG_RUNTIME_DIR` has no default) |
+| `${env:NAME}` | The path, or the paths separated by `:`, in a variable listed in `run.env`: `${env:KUBECONFIG}` |
+
+Paths are written clean: no `..` or `.`, no doubled or trailing slash, no wildcards, at most 512 bytes; the root and the home folder themselves can't be named. A folder grants everything in it. When the program starts, Flint does not grant, and says so in Settings ▸ Extensions and in the log:
+
+- a path that doesn't exist;
+- anything inside Flint's own configuration folder other than the extension's folders;
+- a path that contains a protected location, such as `~/.config` (browser profiles and Flint's settings are in it): name the folders you need;
+- a protected location reached through a symbolic link. Protected locations (`~/.ssh`, `~/.kube`, …) are granted only when the manifest names them as written, so the user saw them when installing.
+
+**A manifest without `run.sandbox` runs unconfined,** as extensions did before the sandbox existed, and Flint says so in the install dialog, in Settings ▸ Extensions and in the log. Users can refuse to run such extensions (`extensions.requireSandbox`), so declare the object, even as `{}`.
+
+Where the system has no sandbox (Linux without Landlock, that is before 5.13 or with Landlock left out of the kernel; macOS without `/usr/bin/sandbox-exec`), a program that declares one runs unconfined and Flint shows "Not sandboxed: not available on this system". On an older Linux kernel some protections are missing, and Flint lists them: readable files can be truncated before 6.2, signals reach other processes before 6.12. On macOS, `network` and `localSockets` are not told apart: declaring one allows both.
+
+What a sandboxed program should expect:
+
+- Opening a file it wasn't granted fails with "permission denied" (`EACCES`); creating a socket without `network` or `localSockets` fails the same way. Starting a program without `exec` does too.
+- `HOME` still names the home folder, but nothing in it is readable: keep state in `FLINT_EXTENSION_DATA`, scratch files in `TMPDIR`.
+- The trusted project folders are readable directly only with `workspace.read`. When they change, Flint stops a sandboxed program and starts it again (a sandbox can't be widened while the process runs) instead of sending `workspace/rootsChanged`.
+- `secrets/*`, `workspace/readFile`, `window/openUrl` and the other requests work as before: Flint does that work, outside the sandbox.
 
 ### contributes.commands
 
@@ -128,7 +185,7 @@ A set needs at least one of `languages`, `extensions` and `globs` (at most 50 to
 
 ## Lifecycle
 
-1. **Start.** On the first use of a contribution, when a file one of its decoration sets is for is opened in an editor (or after the window is up, for `onStartup`), Flint starts the program in the extension's folder, in its own process group, with the environment below.
+1. **Start.** On the first use of a contribution, when a file one of its decoration sets is for is opened in an editor (or after the window is up, for `onStartup`), Flint starts the program in the extension's folder, in its own process group, with the environment below, inside its [sandbox](#runsandbox) when the manifest declares one.
 2. **`initialize`** (request, Flint → extension, 10 s). The extension answers with its contract version.
 3. **`initialized`** (notification, Flint → extension). Requests follow.
 4. **Idle stop.** After 5 minutes without a request in either direction, with none of its panels on screen and no document it decorates open in an editor, Flint stops it (`shutdown`). Extensions with `onStartup` are not stopped for being idle. Status items keep their last text; the next use starts the program again.
@@ -145,6 +202,8 @@ The process gets only `PATH` (with the login shell's additions), `HOME`, `USER`,
 | `FLINT_EXTENSION_DIR` | Its installed folder (also the working directory) |
 | `FLINT_EXTENSION_DATA` | A private folder for its own data (`<config>/extension-data/<id>`, mode 0700), created before it starts and kept when it is uninstalled |
 | `FLINT_VERSION` | Flint's version |
+| `FLINT_EXTENSION_SANDBOX` | `1` when the process runs in a [sandbox](#runsandbox); not set otherwise |
+| `TMPDIR` | In a sandbox: a private temporary folder for this run, the only one the process can write, deleted when it ends. Otherwise the user's |
 
 Other variables of the user's environment reach the program only when the manifest names them in `run.env` (at most 30 upper-case names, e.g. `["KUBECONFIG", "AWS_CONFIG_FILE", "DOCKER_HOST"]`): Flint copies their values from its own environment, which includes what the login shell sets. `PATH`, `HOME`, `SHELL`, `USER`, `LOGNAME`, `TMPDIR`, loader variables and `FLINT_*` can't be requested. The install dialog lists the names.
 
@@ -171,6 +230,7 @@ A request that times out is cancelled with `$/cancelRequest`; the process keeps 
   "settings": { "site": "acme.atlassian.net", "pollMinutes": 10 },
   "roots": [{ "path": "/Users/me/src/app", "trusted": true }],
   "platform": "darwin",
+  "sandbox": { "active": true, "network": false, "localSockets": false, "exec": false },
   "capabilities": { "views": ["tree", "list", "table", "form", "chart", "message"], "charts": ["line", "bar", "area"],
                     "secrets": true, "agent": true, "openUrl": true,
                     "decorations": ["diagnostic", "gutter", "inline", "highlight"], "quickFixes": true }
@@ -181,7 +241,7 @@ A request that times out is cancelled with `$/cancelRequest`; the process keeps 
 
 `capabilities.decorations` lists the decoration kinds this Flint draws and `quickFixes` says it sends `editor/action`; a Flint without them has no editor decorations (and ignores `contributes.decorationSets` with a warning).
 
-`roots` are the open project folders the user trusts; folders in Restricted Mode are left out. Answer:
+`roots` are the open project folders the user trusts; folders in Restricted Mode are left out. `sandbox.active` says whether the process is confined ([run.sandbox](#runsandbox)); the other three fields are present when it is. Answer:
 
 ```json
 { "jsonrpc": "2.0", "id": 1, "result": { "contract": 1, "capabilities": {} } }

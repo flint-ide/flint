@@ -6,11 +6,13 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type msg struct {
@@ -232,6 +234,30 @@ func command(m msg, id string, args json.RawMessage) {
 		cmd := exec.Command("sleep", "600")
 		_ = cmd.Start()
 		notify("log", map[string]string{"level": "result", "message": fmt.Sprint(cmd.Process.Pid)})
+	case "fs":
+		// The file system as the process itself sees it (the sandbox), not
+		// through Flint: Value is "read" or "write".
+		var err error
+		text := ""
+		if a.Value == "write" {
+			err = os.WriteFile(a.Path, []byte("written by testext"), 0o600)
+		} else {
+			var data []byte
+			data, err = os.ReadFile(a.Path)
+			text = string(data)
+		}
+		if err != nil {
+			text = "error: " + err.Error()
+		}
+		notify("log", map[string]string{"level": "result", "message": a.Value + " " + a.Path + " -> " + text})
+	case "dial":
+		text := "connected"
+		if c, err := net.DialTimeout("tcp", a.URL, 2*time.Second); err != nil {
+			text = "error: " + err.Error()
+		} else {
+			c.Close()
+		}
+		notify("log", map[string]string{"level": "result", "message": "dial " + a.URL + " -> " + text})
 	}
 	reply(m.ID, nil)
 }

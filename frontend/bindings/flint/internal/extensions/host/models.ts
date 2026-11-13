@@ -602,6 +602,11 @@ export class Info {
      */
     "decorationSets": DecorationSetInfo[];
 
+    /**
+     * Sandbox says how the program is confined, or why it isn't.
+     */
+    "sandbox": SandboxInfo;
+
     /** Creates a new Info instance. */
     constructor($$source: Partial<Info> = {}) {
         if (!("id" in $$source)) {
@@ -679,6 +684,9 @@ export class Info {
         if (!("decorationSets" in $$source)) {
             this["decorationSets"] = [];
         }
+        if (!("sandbox" in $$source)) {
+            this["sandbox"] = (new SandboxInfo());
+        }
 
         Object.assign(this, $$source);
     }
@@ -701,6 +709,7 @@ export class Info {
         const $$createField22_0 = $$createType28;
         const $$createField23_0 = $$createType30;
         const $$createField24_0 = $$createType32;
+        const $$createField25_0 = $$createType33;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("warnings" in $$parsedSource) {
             $$parsedSource["warnings"] = $$createField10_0($$parsedSource["warnings"]);
@@ -743,6 +752,9 @@ export class Info {
         }
         if ("decorationSets" in $$parsedSource) {
             $$parsedSource["decorationSets"] = $$createField24_0($$parsedSource["decorationSets"]);
+        }
+        if ("sandbox" in $$parsedSource) {
+            $$parsedSource["sandbox"] = $$createField25_0($$parsedSource["sandbox"]);
         }
         return new Info($$parsedSource as Partial<Info>);
     }
@@ -793,8 +805,8 @@ export class Item {
      * Creates a new Item instance from a string or object.
      */
     static createFrom($$source: any = {}): Item {
-        const $$createField6_0 = $$createType34;
-        const $$createField7_0 = $$createType36;
+        const $$createField6_0 = $$createType35;
+        const $$createField7_0 = $$createType37;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("actions" in $$parsedSource) {
             $$parsedSource["actions"] = $$createField6_0($$parsedSource["actions"]);
@@ -861,9 +873,9 @@ export class Row {
      * Creates a new Row instance from a string or object.
      */
     static createFrom($$source: any = {}): Row {
-        const $$createField1_0 = $$createType37;
-        const $$createField2_0 = $$createType34;
-        const $$createField3_0 = $$createType36;
+        const $$createField1_0 = $$createType38;
+        const $$createField2_0 = $$createType35;
+        const $$createField3_0 = $$createType37;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("cells" in $$parsedSource) {
             $$parsedSource["cells"] = $$createField1_0($$parsedSource["cells"]);
@@ -875,6 +887,65 @@ export class Row {
             $$parsedSource["command"] = $$createField3_0($$parsedSource["command"]);
         }
         return new Row($$parsedSource as Partial<Row>);
+    }
+}
+
+/**
+ * SandboxInfo says how an extension's program is confined, for the install
+ * dialog and Settings ▸ Extensions.
+ */
+export class SandboxInfo {
+    /**
+     * State is one of the Sandbox constants.
+     */
+    "state": string;
+
+    /**
+     * Summary is one line: "Sandboxed (…)", "Not sandboxed (declared by the
+     * extension)", "Not sandboxed: not available on this system (…)".
+     */
+    "summary": string;
+
+    /**
+     * Details are what it may read, write and connect to, what this system
+     * can't enforce, and what was asked for but not granted.
+     */
+    "details": string[];
+
+    /**
+     * Refused: the user requires a sandbox and this extension has none, so
+     * Flint doesn't start it.
+     */
+    "refused": boolean;
+
+    /** Creates a new SandboxInfo instance. */
+    constructor($$source: Partial<SandboxInfo> = {}) {
+        if (!("state" in $$source)) {
+            this["state"] = "";
+        }
+        if (!("summary" in $$source)) {
+            this["summary"] = "";
+        }
+        if (!("details" in $$source)) {
+            this["details"] = [];
+        }
+        if (!("refused" in $$source)) {
+            this["refused"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SandboxInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SandboxInfo {
+        const $$createField2_0 = $$createType10;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("details" in $$parsedSource) {
+            $$parsedSource["details"] = $$createField2_0($$parsedSource["details"]);
+        }
+        return new SandboxInfo($$parsedSource as Partial<SandboxInfo>);
     }
 }
 
@@ -905,7 +976,7 @@ export class Series {
      * Creates a new Series instance from a string or object.
      */
     static createFrom($$source: any = {}): Series {
-        const $$createField2_0 = $$createType39;
+        const $$createField2_0 = $$createType40;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("points" in $$parsedSource) {
             $$parsedSource["points"] = $$createField2_0($$parsedSource["points"]);
@@ -991,10 +1062,10 @@ export class Table {
      * Creates a new Table instance from a string or object.
      */
     static createFrom($$source: any = {}): Table {
-        const $$createField0_0 = $$createType41;
-        const $$createField1_0 = $$createType43;
-        const $$createField2_0 = $$createType45;
-        const $$createField3_0 = $$createType34;
+        const $$createField0_0 = $$createType42;
+        const $$createField1_0 = $$createType44;
+        const $$createField2_0 = $$createType46;
+        const $$createField3_0 = $$createType35;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("columns" in $$parsedSource) {
             $$parsedSource["columns"] = $$createField0_0($$parsedSource["columns"]);
@@ -1168,11 +1239,11 @@ export class View {
      * Creates a new View instance from a string or object.
      */
     static createFrom($$source: any = {}): View {
-        const $$createField1_0 = $$createType47;
-        const $$createField2_0 = $$createType49;
-        const $$createField3_0 = $$createType51;
-        const $$createField4_0 = $$createType53;
-        const $$createField6_0 = $$createType34;
+        const $$createField1_0 = $$createType48;
+        const $$createField2_0 = $$createType50;
+        const $$createField3_0 = $$createType52;
+        const $$createField4_0 = $$createType54;
+        const $$createField6_0 = $$createType35;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("items" in $$parsedSource) {
             $$parsedSource["items"] = $$createField1_0($$parsedSource["items"]);
@@ -1227,24 +1298,25 @@ const $$createType29 = manifest$0.TestRunner.createFrom;
 const $$createType30 = $Create.Array($$createType29);
 const $$createType31 = DecorationSetInfo.createFrom;
 const $$createType32 = $Create.Array($$createType31);
-const $$createType33 = Action.createFrom;
-const $$createType34 = $Create.Array($$createType33);
-const $$createType35 = CommandRef.createFrom;
-const $$createType36 = $Create.Nullable($$createType35);
-const $$createType37 = $Create.Array($Create.Any);
-const $$createType38 = Point.createFrom;
-const $$createType39 = $Create.Array($$createType38);
-const $$createType40 = Column.createFrom;
-const $$createType41 = $Create.Array($$createType40);
-const $$createType42 = Row.createFrom;
-const $$createType43 = $Create.Array($$createType42);
-const $$createType44 = TableSort.createFrom;
-const $$createType45 = $Create.Nullable($$createType44);
-const $$createType46 = Item.createFrom;
-const $$createType47 = $Create.Array($$createType46);
-const $$createType48 = Table.createFrom;
-const $$createType49 = $Create.Nullable($$createType48);
-const $$createType50 = Form.createFrom;
-const $$createType51 = $Create.Nullable($$createType50);
-const $$createType52 = Chart.createFrom;
-const $$createType53 = $Create.Nullable($$createType52);
+const $$createType33 = SandboxInfo.createFrom;
+const $$createType34 = Action.createFrom;
+const $$createType35 = $Create.Array($$createType34);
+const $$createType36 = CommandRef.createFrom;
+const $$createType37 = $Create.Nullable($$createType36);
+const $$createType38 = $Create.Array($Create.Any);
+const $$createType39 = Point.createFrom;
+const $$createType40 = $Create.Array($$createType39);
+const $$createType41 = Column.createFrom;
+const $$createType42 = $Create.Array($$createType41);
+const $$createType43 = Row.createFrom;
+const $$createType44 = $Create.Array($$createType43);
+const $$createType45 = TableSort.createFrom;
+const $$createType46 = $Create.Nullable($$createType45);
+const $$createType47 = Item.createFrom;
+const $$createType48 = $Create.Array($$createType47);
+const $$createType49 = Table.createFrom;
+const $$createType50 = $Create.Nullable($$createType49);
+const $$createType51 = Form.createFrom;
+const $$createType52 = $Create.Nullable($$createType51);
+const $$createType53 = Chart.createFrom;
+const $$createType54 = $Create.Nullable($$createType53);

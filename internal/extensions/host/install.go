@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	"flint/internal/extensions/manifest"
+	"flint/internal/extensions/sandbox"
 )
 
 // Limits on a folder being installed.
@@ -295,7 +296,7 @@ func installMessage(m *manifest.Manifest) string {
 			b.WriteString("  Tools marked (acts) change things for an agent; Flint asks you before each call.\n")
 		}
 	}
-	b.WriteString("\nThe program runs with your user's permissions: Flint shows what it declares but cannot confine what it does. Install only extensions you trust.")
+	sandboxMessage(&b, describeSandbox(m, sandbox.Probe(), nil))
 	return b.String()
 }
 

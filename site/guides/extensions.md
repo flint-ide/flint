@@ -32,7 +32,7 @@ To use an index of your own (for example your company's), set **Index address** 
 
 1. Get the extension's folder: it contains `flint-extension.json` (the manifest) and the extension's program.
 2. Run **Install Extension from Folder…** from the command palette, or click **Install from Folder…** in **Settings ▸ Extensions**, and pick the folder. From a terminal, `flint --install-extension <folder>` does the same: Flint opens (or the running Flint comes to the front) and shows the confirmation. The flag never installs without it.
-3. Flint shows a confirmation with the extension's name, version, publisher, id, the program it runs, when it starts, the permissions it declares and the tools it offers to agents. Click **Install** only if you trust it.
+3. Flint shows a confirmation with the extension's name, version, publisher, id, the program it runs, when it starts, the permissions it declares, the tools it offers to agents and its sandbox: what the program may read, write and connect to, or that it is not sandboxed. Click **Install** only if you trust it.
 
 Flint copies the folder to `extensions/<id>/` in its [configuration folder](../reference/files-and-data.md). Installing an extension with the same id again replaces it (the old version is stopped first) and keeps its settings; the confirmation then starts with what changes from the installed version.
 
@@ -46,9 +46,12 @@ For each installed extension:
 - **The state**: *Not running*, *Starting…*, *Running*, *Crashed* (it ended on its own; the next use starts it again), *Stopped after repeated crashes* (three crashes in ten minutes; click **Restart** to try again), *Off*, or *Broken* (the manifest is wrong; the reason is shown).
 - **Program** and **Permissions**, as declared in its manifest.
 - **Editor decorations**: a checkbox per group of marks the extension draws in editors, with the files it is for. See [Marks in the editor](#marks-in-the-editor).
+- **Sandbox**: *Sandboxed*, with what the program may read, write and connect to, what your system can't enforce and anything it asked for that Flint did not grant; or *Not sandboxed*, with the reason (see [The sandbox](#the-sandbox)).
 - **Agent tools**: the names agents see (for example `stats_summary`) and **Offer to agents**, which you can untick to keep the tools away from agents.
 - **Show Log**: what the extension wrote to its standard error, its log messages, and when Flint started and stopped it. The log is kept in memory (the last 256 KiB) until Flint quits.
 - **Uninstall…** stops the extension and deletes its folder after you confirm. Its settings stay in `settings.json` and any secrets it stored stay in the system keychain, so installing it again restores them.
+
+**Only run sandboxed extensions** (off by default, [`extensions.requireSandbox`](../reference/settings.md#extensions)) keeps Flint from starting any extension whose program would run unconfined. Such an extension stays installed, its card says why it isn't started, and using one of its commands or panels shows the same reason.
 
 **Built-in** lists the parts of Flint you can switch off, such as Database. A switched-off one isn't started, and the change takes effect after a restart (see [features](../reference/settings.md#features)).
 
@@ -83,7 +86,7 @@ An extension's command can come with a default shortcut. Flint never lets it rep
 
 ## What an extension can and can't do
 
-An extension is a program running with your user's permissions. Flint can't confine what that program does on its own, so install only extensions you trust, as you would any program.
+An extension is a program on your machine. One that declares a [sandbox](#the-sandbox) is confined by the operating system to the files and network access the confirmation showed. One that doesn't runs with your user's permissions, and Flint can't confine what it does on its own. Either way, install only extensions you trust, as you would any program.
 
 What it asks **Flint** for is checked:
 
@@ -96,8 +99,37 @@ What it asks **Flint** for is checked:
 - Its tools for agents are read-only from Flint's point of view, are offered only to agents in trusted folders while Flint's MCP server is on (**Settings ▸ Agent Context**), and can be turned off per extension.
 - Its process gets a minimal environment: `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `TZ`, the locale and proxy variables, plus `FLINT_EXTENSION_ID`, `FLINT_EXTENSION_DIR`, `FLINT_EXTENSION_DATA` (its own data folder) and `FLINT_VERSION`. Other variables, such as `KUBECONFIG`, reach it only when its manifest names them in `run.env`; the confirmation lists them. Tokens and keys in Flint's own environment (such as `GITHUB_TOKEN`) are not passed unless named there.
 - Opening terminal tabs (`terminal`) also needs a declared permission. A terminal it opens is a normal tab in a trusted folder, so you see what runs and can stop it.
-- Network hosts declared in its manifest (`network:<host>`) are shown so you know where it talks to, but Flint does not enforce them.
+- Network hosts declared in its manifest (`network:<host>`) are shown so you know where it talks to, but Flint does not enforce them: the sandbox blocks the network as a whole or not at all.
 
 Flint itself sends nothing about extensions anywhere. See [Privacy and security](../reference/privacy-and-security.md#extensions).
+
+## The sandbox
+
+An extension's manifest can ask Flint to confine its program. Flint then starts it inside the operating system's sandbox: Landlock and seccomp on Linux, `sandbox-exec` on macOS. Settings ▸ Extensions and the install confirmation show one of:
+
+| Shown | Meaning |
+|---|---|
+| **Sandboxed** | The program is confined. The lines below say what it may read, write and connect to |
+| **Not sandboxed (declared by the extension)** | The extension says it can't work confined, usually because it runs command-line tools that use your credentials (`kubectl`, `aws`) |
+| **Not sandboxed: the extension doesn't declare a sandbox** | It was written before Flint had a sandbox, or not updated for it |
+| **Not sandboxed: not available on this system (…)** | The extension asks to be confined, but your system can't: Linux without Landlock (before 5.13, or switched off in the kernel), or macOS without `sandbox-exec` |
+
+A sandboxed program, unless its manifest declares more:
+
+- **reads** only its own folder, the system's programs and libraries, and, with the `workspace.read` permission, your trusted project folders;
+- **writes** only its own data folder and a private temporary folder;
+- has **no network**: it can't open a connection of any kind;
+- **starts no other program** than its own;
+- can't read the rest of your home folder: `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.kube`, `~/.docker`, cloud SDK folders, browser profiles, keyrings and Keychains, shell history, Flint's own settings and other extensions' files.
+
+What a manifest adds is listed in the confirmation and on the card: more folders to read or write, **Network: allowed**, **Local sockets: allowed** (services on your machine, such as Docker), **Other programs** (which then run in the same sandbox). Flint refuses some requests even when declared, and says so on the card: anything in its own configuration folder, and folders that contain protected ones, such as your whole home folder or `~/.config`.
+
+What the sandbox does not do:
+
+- It doesn't limit what the program does with what it may reach. An extension with `workspace.read` reads every file of a trusted project folder directly, `.env` files included; one with network access can send what it reads to any host.
+- With local sockets allowed, on Linux the program can reach every local service you can, including the desktop's message bus.
+- It doesn't limit memory or CPU. A sandboxed program can't write core dumps and has at most 4,096 open files.
+- On an older Linux kernel some protections are missing; the card lists them. On macOS, network access and local sockets can only be allowed together, and `sandbox-exec` is a tool Apple calls deprecated, though macOS still ships and uses it.
+- An extension that is not sandboxed is not limited at all.
 
 Project-local extensions (in a repository's own folder) are not supported: every extension is one you installed yourself.

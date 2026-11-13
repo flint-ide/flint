@@ -56,6 +56,10 @@ type Run struct {
 	Env    []string `json:"env,omitempty"`
 	Darwin *RunOS   `json:"darwin,omitempty"`
 	Linux  *RunOS   `json:"linux,omitempty"`
+
+	// Sandbox is what the program needs beyond the strict sandbox profile
+	// (sandbox.go); nil runs it unconfined, with a warning.
+	Sandbox *Sandbox `json:"sandbox,omitempty"`
 }
 
 // RunOS is a platform's Run.

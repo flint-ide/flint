@@ -40,6 +40,8 @@ var Module = feature.Module{
 				language, _, _ := lsp.LanguageOf(path)
 				return language
 			},
+
+			RequireSandbox: func() bool { return Section.Get(h.Settings()).RequireSandbox },
 		})
 		langs.list = hst.List
 		cat := catalog.New(catalog.Options{Dir: catalogDir(h), Before: shellenv.Wait})
@@ -79,6 +81,9 @@ func catalogDir(h feature.Host) string {
 // settingsChanged tells the host about each extension whose settings or
 // enabled state changed.
 func settingsChanged(h *host.Host, prev, next Settings) {
+	if prev.RequireSandbox != next.RequireSandbox {
+		h.SandboxSettingChanged()
+	}
 	ids := map[string]bool{}
 	for id := range prev.Values {
 		ids[id] = true

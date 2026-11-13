@@ -15,6 +15,7 @@ func TestSettingsRoundTrip(t *testing.T) {
 	in := `{"extensions": {
 	  "enabled": {"acme.jira": false, "Bad Id": true},
 	  "agentTools": {"acme.jira": false},
+	  "requireSandbox": true,
 	  "acme.jira": {"site": "acme.atlassian.net", "pollMinutes": 10},
 	  "gone.ext": {"kept": [1, 2]},
 	  "acme.list": [1],
@@ -41,7 +42,10 @@ func TestSettingsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"enabled":{"acme.jira":false},"agentTools":{"acme.jira":false},"acme.jira":{"site":"acme.atlassian.net","pollMinutes":10},"gone.ext":{"kept":[1,2]}}`
+	if !got.RequireSandbox {
+		t.Error("requireSandbox is dropped")
+	}
+	want := `{"enabled":{"acme.jira":false},"agentTools":{"acme.jira":false},"requireSandbox":true,"acme.jira":{"site":"acme.atlassian.net","pollMinutes":10},"gone.ext":{"kept":[1,2]}}`
 	if string(data) != want {
 		t.Errorf("marshal = %s\nwant      %s", data, want)
 	}
@@ -49,7 +53,7 @@ func TestSettingsRoundTrip(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"extensions": {"acme.jira": {}}}`), &s); err != nil {
 		t.Fatal(err)
 	}
-	if got := Section.Get(s); len(got.Values) != 1 || len(got.Enabled) != 0 {
+	if got := Section.Get(s); len(got.Values) != 1 || len(got.Enabled) != 0 || got.RequireSandbox {
 		t.Errorf("after a second decode: %+v", got)
 	}
 	if def, _ := json.Marshal(Settings{}); string(def) != `{}` {
@@ -98,6 +102,14 @@ func TestSettingsCheck(t *testing.T) {
 	}
 	if err := check(Settings{Values: map[string]json.RawMessage{"acme.x": json.RawMessage(`{"any":"value"}`)}}); err != nil {
 		t.Errorf("schema errors are not save errors: %v", err)
+	}
+	// requireSandbox is a boolean; anything else is off.
+	var odd Settings
+	if err := json.Unmarshal([]byte(`{"requireSandbox": "yes"}`), &odd); err != nil || odd.RequireSandbox {
+		t.Errorf("requireSandbox from a string: %+v, %v", odd, err)
+	}
+	if !cloneSettings(Settings{RequireSandbox: true}).RequireSandbox {
+		t.Error("clone drops requireSandbox")
 	}
 	c := cloneSettings(Settings{Enabled: map[string]bool{"a.b": false}})
 	c.Enabled["a.b"] = true

@@ -17,6 +17,7 @@ import (
 
 	"flint/internal/extensions/manifest"
 	"flint/internal/extensions/rpc"
+	"flint/internal/extensions/sandbox"
 )
 
 // The host's tests drive testdata/testext, a Go program built once per run.
@@ -57,6 +58,7 @@ func testextSource(t *testing.T) string {
 }
 
 func TestMain(m *testing.M) {
+	sandbox.Main() // the tests' sandboxed extensions start this binary as their launcher
 	backoffBase = 20 * time.Millisecond
 	code := m.Run()
 	if buildDir != "" {

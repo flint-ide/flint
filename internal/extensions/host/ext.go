@@ -58,6 +58,8 @@ type ext struct {
 	origins  map[string]bool // links the user let it open this session
 	messages []time.Time     // recent showMessage, for the rate limit
 	forms    formCache       // the form views last drawn (richviews.go)
+	// sandboxed: the process last started runs confined (sandbox.go).
+	sandboxed bool
 }
 
 func newExt(h *Host, id, dir string, m *manifest.Manifest, err error) *ext {
@@ -180,6 +182,9 @@ func (e *ext) usable() error {
 	e.h.mu.Unlock()
 	if closed {
 		return errors.New("Flint is quitting")
+	}
+	if err := e.sandboxRefusal(); err != nil {
+		return err
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -367,6 +372,7 @@ func (e *ext) initializeParams() map[string]any {
 		"settings":     e.settings(),
 		"roots":        e.roots(),
 		"platform":     runtime.GOOS,
+		"sandbox":      e.sandboxParams(),
 		"capabilities": map[string]any{
 			"views": ViewKinds, "charts": ChartTypes, "secrets": true, "agent": true, "openUrl": true,
 			"decorations": DecorationKinds, "quickFixes": true,

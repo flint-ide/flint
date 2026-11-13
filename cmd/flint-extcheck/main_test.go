@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"flint/internal/extensions/manifest"
+	"flint/internal/extensions/sandbox"
 )
 
 // extension writes a folder with a manifest and, when script is set, a shell
@@ -194,5 +195,60 @@ func TestCheckDeclarativeViews(t *testing.T) {
 				t.Errorf("problems %q, want one with %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestMain(m *testing.M) {
+	sandbox.Main() // sandboxed test extensions start this binary as their launcher
+	os.Exit(m.Run())
+}
+
+// The effective sandbox is reported, a sandboxed extension is really run
+// confined, and a broken sandbox section fails the manifest.
+func TestCheckReportsTheSandbox(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell extensions")
+	}
+	withSandbox := func(section string) string {
+		return strings.Replace(panelManifest, `"run":{"command":"run.sh"}`, `"run":{"command":"run.sh","sandbox":`+section+`}`, 1)
+	}
+	script := shellExtension(`"result":{"kind":"list","items":[]}`)
+
+	r := check(extension(t, panelManifest, script))
+	if len(r.problems) != 0 || !strings.HasPrefix(r.sandbox, "Not sandboxed: the extension doesn't declare a sandbox") {
+		t.Errorf("no section: %q, %v", r.sandbox, r.problems)
+	}
+	r = check(extension(t, withSandbox(`{"mode":"none"}`), script))
+	if len(r.problems) != 0 || r.sandbox != "Not sandboxed (declared by the extension)" {
+		t.Errorf("mode none: %q, %v", r.sandbox, r.problems)
+	}
+	for _, bad := range []string{`{"read":["../x"]}`, `{"mode":"none","exec":true}`, `{"unknown":1}`} {
+		r = check(extension(t, withSandbox(bad), script))
+		if got := strings.Join(r.problems, "\n"); !strings.Contains(got, "manifest: ") || !strings.Contains(got, "run.sandbox") {
+			t.Errorf("%s: problems %q", bad, got)
+		}
+	}
+
+	// The script runs grep, head and cut: it needs "exec".
+	r = check(extension(t, withSandbox(`{"exec":true}`), script))
+	if len(r.problems) != 0 {
+		t.Errorf("sandboxed with exec: %v", r.problems)
+	}
+	if !sandbox.Probe().Available {
+		if !strings.HasPrefix(r.sandbox, "Not sandboxed: not available on this system") {
+			t.Errorf("sandbox = %q", r.sandbox)
+		}
+		t.Skipf("no sandbox on this system (%s): the confined run is not tested", sandbox.Probe().Reason)
+	}
+	for _, want := range []string{"Sandboxed (", "Reads: its own folder, system files", "Network: blocked", "Other programs: may start any program it can read"} {
+		if !strings.Contains(r.sandbox, want) {
+			t.Errorf("sandbox %q lacks %q", r.sandbox, want)
+		}
+	}
+	// Without "exec" the same script can't start its helpers, and the check
+	// that passes unconfined fails: the sandbox was really applied.
+	r = check(extension(t, withSandbox(`{}`), script))
+	if len(r.problems) == 0 {
+		t.Error("a script that runs other programs passes in the strict sandbox")
 	}
 }

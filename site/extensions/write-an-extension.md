@@ -161,7 +161,7 @@ Requests your program can send to Flint, each needing a permission declared in t
 
 Your program also gets a private folder for its own data in `FLINT_EXTENSION_DATA`, and the variables of the user's environment it names in the manifest's `run.env` (for example `["KUBECONFIG"]`). For a panel or tab drawn by your own HTML, see [Webviews](protocol.md#webviews) and the [`notes`](https://github.com/flint-ide/flint/tree/main/examples/extensions/notes) example.
 
-A request without its permission fails with error `-32001`. The user sees the permissions when installing, so ask only for what you need. If your program talks to the network, declare `network:<host>` so users know where; Flint shows it but can't enforce it.
+A request without its permission fails with error `-32001`. The user sees the permissions when installing, so ask only for what you need. If your program talks to the network, declare `network:<host>` so users know where; Flint shows the hosts but can't limit the program to them.
 
 ## 9. Marks in the editor
 
@@ -201,7 +201,43 @@ When a matching file in a trusted folder is opened in an editor, Flint starts yo
 
 The complete example is [`todos`](https://github.com/flint-ide/flint/tree/main/examples/extensions/todos); every field and limit is in the [protocol reference](protocol.md#editor-decorations).
 
-## 10. A color theme
+## 10. Declare a sandbox
+
+Add `"sandbox": {}` to `run` and Flint confines your program with the operating system's sandbox (Landlock and seccomp on Linux, `sandbox-exec` on macOS): it can read its own folder and the system's files, write only `FLINT_EXTENSION_DATA` and its own `TMPDIR`, open no socket and start no other program. Without the object the program runs unconfined, Flint tells the user "Not sandboxed" when installing and in Settings, and users who turned on **Only run sandboxed extensions** can't run it.
+
+```json
+"run": { "command": "hello.py", "sandbox": {} }
+```
+
+Then say what your program needs beyond that, and nothing more; the install dialog lists it:
+
+| It… | Declare |
+|---|---|
+| reads the project's files itself | the `workspace.read` permission |
+| calls a web API | `"network": true`, or the `network:<host>` permission |
+| reads a tool's configuration | `"read": ["~/.config/tool", "${env:TOOL_CONFIG}"]` (the variable must be in `run.env`) |
+| keeps a cache outside its data folder | `"write": ["~/.cache/tool"]` |
+| talks to Docker or another local service | `"localSockets": true` |
+| runs command-line tools | `"exec": true`; they run in the same sandbox, so they need the same paths and network |
+
+For example, an extension that drives the Docker CLI and Engine API:
+
+```json
+"run": {
+  "command": "docker-ext",
+  "env": ["DOCKER_HOST", "DOCKER_CONFIG", "DOCKER_CERT_PATH"],
+  "sandbox": {
+    "read": ["~/.docker", "${env:DOCKER_CONFIG}", "${env:DOCKER_CERT_PATH}"],
+    "network": true, "localSockets": true, "exec": true
+  }
+}
+```
+
+An extension that can't be described this way, typically one that runs tools with credential plugins that read and write all over the home folder, declares `"sandbox": { "mode": "none" }`. It runs as before, and Flint shows "Not sandboxed (declared by the extension)", which is more honest than no declaration.
+
+Things that surprise a program in the strict profile: its own folder is read-only (write to `FLINT_EXTENSION_DATA`); `~` is unreadable, so libraries that keep caches there fail unless you point them at `TMPDIR` or the data folder; a script whose interpreter is a wrapper that starts another program (a version manager's shim) needs `exec`; an interpreter installed in the home folder needs its folder in `read`. All the rules are in the [protocol reference](protocol.md#runsandbox). `flint-extcheck` (below) runs your program inside its sandbox and prints what it was allowed.
+
+## 11. A color theme
 
 A theme is data, so it needs no program: an extension with only `themes` (and settings) leaves out `run` and never runs code.
 
@@ -217,7 +253,7 @@ A theme is data, so it needs no program: an extension with only `themes` (and se
 
 `colors` takes the CSS variables of a custom theme and `terminal` the terminal colors (`background`, `foreground`, `cursor`, `cursorAccent`, `selectionBackground`, the 16 ANSI colors); see [customTheme](../reference/settings.md#customtheme) for the full lists. Values are hex colors. Any other name or value refuses the whole manifest, with the reason shown in Settings ▸ Extensions. The user picks a theme under Settings ▸ Appearance ▸ Color theme, or with **Use …** on your extension; Flint copies it into their custom theme.
 
-## 11. A programming language
+## 12. A programming language
 
 An extension can teach Flint a language it doesn't know: which files are in it, its comments, its language server and its syntax highlighting. Like a theme this is data, so a language-only extension needs no program of its own.
 
@@ -256,7 +292,7 @@ An extension can teach Flint a language it doesn't know: which files are in it, 
 
 Flint's own languages (Go, TypeScript and JavaScript, Python, Rust, and the formats it highlights) always win: an extension can't take over their files.
 
-## 12. A debugger and a test runner
+## 13. A debugger and a test runner
 
 An extension can debug and test files of a language: yours from section 10, or another one, such as Python. Both are data that name programs to run, so they need no program of their own either.
 
@@ -366,5 +402,6 @@ To distribute extensions without that repository, hand out the folder (**Install
 - The program starts in under 10 seconds and answers `initialize`; `view/resolve` answers in under 5 seconds; other requests in under 30 (agent tools: 120).
 - Nothing but protocol messages on standard output; one message is at most 4 MiB.
 - The program exits when its standard input closes.
+- `run.sandbox` is declared: `{}` if the program only needs its own folder, its data folder and Flint; otherwise the paths, `network`, `localSockets` and `exec` it needs; `"mode": "none"` only when it can't work confined.
 - Build the program for both macOS and Linux if you can, using `run.darwin` and `run.linux` for separate binaries.
-- Run the contract checker from a Flint checkout: `go run ./cmd/flint-extcheck path/to/hello`. It checks the manifest and webview files with Flint's own code, then starts the program, sends `initialize`, resolves every declarative panel and tab view (a table, form or chart Flint can't draw, or one that is cut, fails the check), submits every form with the values it shows and lists the agent tools. The [flint-ide/extensions](https://github.com/flint-ide/extensions) repository runs it in CI; a Go extension there is built by Flint on the user's machine when they install it from Settings ▸ Extensions.
+- Run the contract checker from a Flint checkout: `go run ./cmd/flint-extcheck path/to/hello`. It checks the manifest and webview files with Flint's own code, then starts the program (in its sandbox, on a system that has one), sends `initialize`, resolves every declarative panel and tab view (a table, form or chart Flint can't draw, or one that is cut, fails the check), submits every form with the values it shows and lists the agent tools. It prints the sandbox the program ran in, and a wrong `run.sandbox` fails the check. The [flint-ide/extensions](https://github.com/flint-ide/extensions) repository runs it in CI; a Go extension there is built by Flint on the user's machine when they install it from Settings ▸ Extensions.

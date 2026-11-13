@@ -26,6 +26,7 @@ import (
 	"flint/internal/extensions/host"
 	"flint/internal/extensions/manifest"
 	"flint/internal/extensions/rpc"
+	"flint/internal/extensions/sandbox"
 )
 
 // checkApp is the Flint side of the run: one trusted project folder, every
@@ -56,6 +57,9 @@ func (a *checkApp) Emit(event string, data ...any) {
 type report struct {
 	dir      string
 	problems []string
+	// sandbox is how the program ran here: the effective sandbox on this
+	// system, or why there is none ("" for an extension without a program).
+	sandbox string
 }
 
 func (r *report) fail(format string, args ...any) {
@@ -63,6 +67,7 @@ func (r *report) fail(format string, args ...any) {
 }
 
 func main() {
+	sandbox.Main() // the extensions' sandbox launcher is this program
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: flint-extcheck <extension folder>…")
 		os.Exit(2)
@@ -70,6 +75,9 @@ func main() {
 	failed := false
 	for _, dir := range os.Args[1:] {
 		r := check(dir)
+		if r.sandbox != "" {
+			fmt.Printf("     %s: sandbox: %s\n", dir, r.sandbox)
+		}
 		if len(r.problems) == 0 {
 			fmt.Printf("ok   %s\n", dir)
 			continue
@@ -149,6 +157,7 @@ func runChecks(r *report, dir string, m *manifest.Manifest) {
 	for _, w := range info.Warnings {
 		r.fail("warning: %s", w)
 	}
+	r.sandbox = sandboxLine(info.Sandbox)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -305,6 +314,15 @@ func checkDecorationSets(ctx context.Context, r *report, h *host.Host, m *manife
 		time.Sleep(200 * time.Millisecond) // what it publishes for the change
 		h.EditorClosed(path)
 	}
+}
+
+// sandboxLine is the effective sandbox in one line: the summary, and for a
+// sandboxed program what it may do and what was not granted here.
+func sandboxLine(in host.SandboxInfo) string {
+	if in.State != host.SandboxOn || len(in.Details) == 0 {
+		return in.Summary
+	}
+	return in.Summary + ": " + strings.Join(in.Details, "; ")
 }
 
 // answered tells an error the program sent (it is alive and speaks the

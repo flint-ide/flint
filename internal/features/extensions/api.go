@@ -20,8 +20,14 @@ type API struct {
 	host    *host.Host
 	catalog *catalog.Catalog
 	langs   *languageSync
+	index   *indexStore
 	fh      feature.Host
 	started sync.Once
+
+	// pending is the folder `flint --install-extension <dir>` named when
+	// this Flint was started with it; the frontend takes it once.
+	pendingMu sync.Mutex
+	pending   *InstallRequest
 }
 
 func (a *API) ctx() context.Context {
@@ -59,6 +65,21 @@ func (a *API) Install(dir string) (*host.Info, error) {
 		return nil, err
 	}
 	return &info, nil
+}
+
+// PendingInstall is the folder this Flint was started to install
+// (`flint --install-extension <dir>`), handed out once; an empty request
+// when there is none. The frontend then calls Install with it, so the
+// native confirmation is the same as for "Install Extension from Folder…".
+func (a *API) PendingInstall() InstallRequest {
+	a.pendingMu.Lock()
+	defer a.pendingMu.Unlock()
+	if a.pending == nil {
+		return InstallRequest{}
+	}
+	req := *a.pending
+	a.pending = nil
+	return req
 }
 
 // Catalog is what the extensions repository offers; the first call clones

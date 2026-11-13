@@ -21,6 +21,7 @@ import (
 	"flint/internal/config"
 	"flint/internal/dap"
 	"flint/internal/feature"
+	"flint/internal/features/extensions"
 	"flint/internal/fuzzy"
 	"flint/internal/git"
 	"flint/internal/github"
@@ -247,9 +248,11 @@ func (a *App) recentFolders() []string {
 }
 
 // folderFromArgs supports `flint <dir>`; flags (e.g. injected by macOS) are
-// ignored. Relative paths are resolved against cwd ("" = this process's).
+// ignored, and so is the folder of `--install-extension <dir>`, which is an
+// extension to install, not a project. Relative paths are resolved against
+// cwd ("" = this process's).
 func folderFromArgs(args []string, cwd string) string {
-	for _, arg := range args {
+	for _, arg := range extensions.WithoutInstallArg(args) {
 		if strings.HasPrefix(arg, "-") {
 			continue
 		}

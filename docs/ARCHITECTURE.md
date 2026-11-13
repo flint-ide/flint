@@ -164,6 +164,7 @@ Level 2 of the same contract: programs the user installs, run as child processes
 internal/extensions/manifest   flint-extension.json: parsing, id and path rules, the settings schema subset
 internal/extensions/rpc        newline-delimited JSON-RPC 2.0, both directions, size caps, $/cancelRequest
 internal/extensions/host       discovery, lazy start, initialize, idle stop, crash policy, host methods + permissions, install/uninstall, log
+internal/extensions/index      the signed extension index: format, Ed25519 signature, bounded https download, safe tar.gz unpacking, building (cmd/flint-extindex)
 internal/features/extensions   the level-1 module: "extensions" settings section, ExtensionsAPI, MCP tools, hooks
 frontend/src/features/extensions   contributions per extension (extension:<id>), ExtensionPanel, generated Settings page, Settings ▸ Extensions
 examples/extensions/stats      an example extension in Go (stdlib), built and driven by host's conformance test
@@ -287,6 +288,7 @@ An installed extension is a native program with the user's rights, so its instal
 - Links: `http(s)` only, confirmed once per extension and origin per session. `agent/ask` only fills a chat draft.
 - The process gets `PATH`, `HOME`, locale, proxy and a few `FLINT_*` variables, nothing else; stdout that isn't JSON-RPC, a message over 4 MiB or more than 8 MiB/s for 5 s stops it; the process group is killed on stop and quit.
 - Agent tools are listed from manifests, offered under `<short>_<name>`, re-check the root's trust, and stay behind the MCP server's own gates. A tool with `"acts": true` in its manifest goes through the same per-call approval as Flint's own acting tools.
+- The signed extension index (`internal/extensions/index`) is requested only on a user action. Its signature is verified against a compiled-in or user-set Ed25519 key before it is parsed; an archive must match the index's size and SHA-256, is unpacked through an `os.Root` (regular files and folders only, bounded), must hold the id and version the index lists, and then goes through the same native confirmation and copy as a folder (`host.InstallExpected`). `flint --install-extension <dir>` reaches the same `Install` binding through the frontend, so it can't skip the confirmation either.
 - Project-local extensions are not supported until processes can be sandboxed.
 
 ### Untrusted rendered content
@@ -373,7 +375,7 @@ internal/features/<id>      feature modules: database, todo, update, extensions 
 internal/extensions         external extensions: manifest (flint-extension.json, themes included), rpc, host
 cmd/webbuild                frontend bundler (esbuild Go API), --watch, --test, CSP
 build/                      Wails config (config.yml), Info.plist, app icon
-scripts/flint               the `flint [folder]` command installed by `make install`
+scripts/flint               the `flint [folder]` / `flint --install-extension <folder>` command installed by `make install`
 packaging/homebrew          Homebrew cask template, rendered and pushed to the tap by the release workflow
 internal/workspace          tree, file read/write, file list, create/rename/Trash, workspace roots
 internal/fuzzy              ⌘P fuzzy matching and the file index of workspace folders

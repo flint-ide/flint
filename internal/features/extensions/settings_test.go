@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"flint/internal/extensions/index"
 	"flint/internal/settings"
 )
 
@@ -102,5 +103,65 @@ func TestSettingsCheck(t *testing.T) {
 	c.Enabled["a.b"] = true
 	if c2 := cloneSettings(c); !c2.Enabled["a.b"] {
 		t.Error("clone")
+	}
+}
+
+func TestIndexSettings(t *testing.T) {
+	pub, _, err := index.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s settings.Settings
+	in := `{"extensions": {"indexUrl": " https://ext.example.com/index.json ", "indexPublicKey": "` + pub + `", "acme.jira": {}}}`
+	if err := json.Unmarshal([]byte(in), &s); err != nil {
+		t.Fatal(err)
+	}
+	got := Section.Get(s)
+	if got.IndexURL != "https://ext.example.com/index.json" || got.IndexPublicKey != pub {
+		t.Fatalf("settings = %+v", got)
+	}
+	if err := check(got); err != nil {
+		t.Errorf("check: %v", err)
+	}
+	if u, key, own := got.indexSource(); u != got.IndexURL || key != pub || !own {
+		t.Errorf("source = %q %q %v", u, key, own)
+	}
+	data, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"indexUrl":"https://ext.example.com/index.json","indexPublicKey":"` + pub + `","acme.jira":{}}`; string(data) != want {
+		t.Errorf("marshal = %s\nwant      %s", data, want)
+	}
+	if c := cloneSettings(got); c.IndexURL != got.IndexURL || c.IndexPublicKey != pub {
+		t.Errorf("clone = %+v", c)
+	}
+
+	// The defaults: the official index and the key built into Flint.
+	if u, key, own := (Settings{}).indexSource(); u != index.DefaultURL || key != index.OfficialPublicKey || own {
+		t.Errorf("default source = %q %q %v", u, key, own)
+	}
+	// A value of the wrong type is dropped, like the other keys.
+	if err := json.Unmarshal([]byte(`{"extensions": {"indexUrl": 5, "indexPublicKey": {"a": 1}}}`), &s); err != nil {
+		t.Fatal(err)
+	}
+	if got := Section.Get(s); got.IndexURL != "" || got.IndexPublicKey != "" {
+		t.Errorf("wrong types kept: %+v", got)
+	}
+
+	for _, bad := range []Settings{
+		{IndexURL: "http://ext.example.com/index.json"},
+		{IndexURL: "ext.example.com/index.json"},
+		{IndexURL: "file:///tmp/index.json"},
+		{IndexURL: "https://user:pw@ext.example.com/index.json"},
+		{IndexPublicKey: "not a key"},
+		{IndexPublicKey: pub[:20]},
+	} {
+		if err := check(bad); err == nil {
+			t.Errorf("%+v is saved", bad)
+		}
+	}
+	if err := check(Settings{IndexURL: "http://127.0.0.1:8123/index.json"}); err != nil {
+		t.Errorf("a loopback http index is refused: %v", err)
 	}
 }

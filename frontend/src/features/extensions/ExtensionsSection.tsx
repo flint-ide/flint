@@ -10,6 +10,9 @@ import { useContributions } from '../../lib/contributions'
 import type { ThemeContribution } from '../../lib/features'
 import { BuiltinExtensions } from './BuiltinExtensions'
 import { CatalogSection } from './CatalogSection'
+import { IndexSection } from './IndexSection'
+import { installFromIndex, useIndex } from './indexStore'
+import { availableUpdates } from './indexModel'
 
 const STATE_LABELS: Record<string, string> = {
   invalid: 'Broken',
@@ -39,6 +42,7 @@ export function ExtensionsSection() {
         <button onClick={() => void loadExtensions(true)}>Reload Installed</button>
       </div>
       <BuiltinExtensions />
+      <IndexSection />
       <CatalogSection />
       <h3>Installed</h3>
       {loaded && list.length === 0 && <p className="muted settings-note">No extensions installed.</p>}
@@ -54,6 +58,9 @@ function ExtensionCard({ info }: { info: Info }) {
   const update = useSettings((s) => s.update)
   const conflicts = useExtensions((s) => s.conflicts[info.id])
   const [log, setLog] = useState<string | null>(null)
+  // A newer version in the signed index, once the user fetched it (IndexSection).
+  const newer = useIndex((s) => availableUpdates(s.status?.entries ?? [], [info]).get(info.id))
+  const updating = useIndex((s) => s.busy.includes(info.id))
   const showLog = () =>
     API.Log(info.id).then(
       (text) => setLog(text || '(empty)'),
@@ -203,6 +210,11 @@ function ExtensionCard({ info }: { info: Info }) {
         </dl>
       )}
       <div className="settings-actions">
+        {newer && (
+          <button disabled={updating} onClick={() => void installFromIndex(info.id)}>
+            {updating ? 'Downloading…' : `Update to ${newer}…`}
+          </button>
+        )}
         <button onClick={() => (log === null ? void showLog() : setLog(null))}>{log === null ? 'Show Log' : 'Hide Log'}</button>
         {log !== null && <button onClick={() => void showLog()}>Refresh Log</button>}
         {(info.state === 'failed' || info.state === 'crashed') && <button onClick={() => void restartExtension(info.id)}>Restart</button>}

@@ -218,6 +218,12 @@ export async function restartExtension(id: string): Promise<void> {
   }
 }
 
+/** `flint --install-extension <dir>`: the folder goes through the same confirmation as the picker's. */
+function installRequested(req: { dir?: string; error?: string } | null | undefined): void {
+  if (req?.error) showToast(`Not installed: ${req.error}`, 'error')
+  else if (req?.dir) void installExtension(req.dir)
+}
+
 // ---------- events ----------
 
 interface StatusEvent {
@@ -283,7 +289,9 @@ export function subscribeExtensions(): () => void {
       void askAgent({ prompt: e.prompt, attachments: (e.attachments ?? []).map((path) => ({ path })) }),
     ),
   ]
-  void loadExtensions()
+  offs.push(EventsOn('extensions:install-request', installRequested))
+  // The list first, so a replaced version shows as such; then the folder this Flint was started to install.
+  void loadExtensions().then(() => API.PendingInstall().then(installRequested, () => {}))
   return () => {
     offs.forEach((off) => off())
     for (const have of installed.values()) have.withdraw()

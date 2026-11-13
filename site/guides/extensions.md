@@ -2,9 +2,25 @@
 
 An extension is a separate program that adds commands, a sidebar panel, a Settings page, status bar items, marks in the editor and tools for agents to Flint. It can be written in any language. Some extensions are only data: color themes, or a programming language with its language server, debugger and test runner (**Debug File** and **Run Tests in File** in the command palette use them). Flint draws everything an extension shows with its own components, from data the extension sends: an extension never runs code inside Flint's window.
 
-There is no marketplace. **Settings ▸ Extensions** (**Show Extensions** in the command palette, or `⌘,` ▸ **Extensions**) lists every extension of the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository, and you can also install one from a folder on your disk. Either way, Flint shows you what it is and what it asks for first. To write one, see [Write an extension](../extensions/write-an-extension.md).
+There is no marketplace. **Settings ▸ Extensions** (**Show Extensions** in the command palette, or `⌘,` ▸ **Extensions**) offers the extensions of the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository, prebuilt from its signed [extension index](#from-the-extension-index) or built from its sources, and you can also install one from a folder on your disk. Either way, Flint shows you what it is and what it asks for first. To write one, see [Write an extension](../extensions/write-an-extension.md).
 
 ## Install an extension
+
+### From the extension index
+
+**Settings ▸ Extensions ▸ Extension index** installs prebuilt extensions, so you need neither `git` nor Go. The index is one signed list published by `flint-ide/extensions`; it is not a marketplace, and nobody else can add to it.
+
+1. Click **Browse Extensions** (or run **Browse Extensions** from the command palette). Flint downloads the index and its signature and checks the signature against the public key built into Flint. Nothing is shown from an index that fails the check.
+2. Each extension shows its version, kind, download size, permissions and agent tools. Click **Install…**.
+3. Flint downloads the archive for your Mac or Linux machine, checks that it is exactly the file the index describes (size and SHA-256), unpacks it, and checks that it holds the extension and version the index lists. Then it shows the same confirmation as for a folder. Click **Install** only if you trust it.
+
+**Check for Updates** (or **Check for Extension Updates** in the command palette) downloads the index again. An installed extension with a newer version in it shows **Update to x.y.z…**, on its card under **Installed** too. The confirmation of an update starts with what changes: the version, and every permission and agent tool the new version adds.
+
+Flint contacts the index only when you click one of these buttons or run one of these commands, never on its own, and it never updates anything by itself. Extensions you installed from a folder are left alone unless you click **Update** on them.
+
+The official index's public key is not built into Flint yet. Until it is, this section says the index is not configured and requests nothing; use the repository below or a folder.
+
+To use an index of your own (for example your company's), set **Index address** and **Index public key** below the list; see [The extension index](../extensions/index-format.md#your-own-index).
 
 ### From the repository
 
@@ -15,10 +31,10 @@ There is no marketplace. **Settings ▸ Extensions** (**Show Extensions** in the
 ### From a folder
 
 1. Get the extension's folder: it contains `flint-extension.json` (the manifest) and the extension's program.
-2. Run **Install Extension from Folder…** from the command palette, or click **Install from Folder…** in **Settings ▸ Extensions**, and pick the folder.
+2. Run **Install Extension from Folder…** from the command palette, or click **Install from Folder…** in **Settings ▸ Extensions**, and pick the folder. From a terminal, `flint --install-extension <folder>` does the same: Flint opens (or the running Flint comes to the front) and shows the confirmation. The flag never installs without it.
 3. Flint shows a confirmation with the extension's name, version, publisher, id, the program it runs, when it starts, the permissions it declares and the tools it offers to agents. Click **Install** only if you trust it.
 
-Flint copies the folder to `extensions/<id>/` in its [configuration folder](../reference/files-and-data.md). Installing an extension with the same id again replaces it (the old version is stopped first) and keeps its settings.
+Flint copies the folder to `extensions/<id>/` in its [configuration folder](../reference/files-and-data.md). Installing an extension with the same id again replaces it (the old version is stopped first) and keeps its settings; the confirmation then starts with what changes from the installed version.
 
 Nothing starts when you install: the extension's process starts the first time you use one of its commands, open its panel, open a file it marks in the editor, or an agent calls one of its tools. An extension whose manifest says `onStartup` starts once Flint's window is up, and the confirmation says so.
 

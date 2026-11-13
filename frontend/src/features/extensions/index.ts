@@ -1,5 +1,6 @@
 // External extensions (Go: internal/features/extensions, docs/design/extensions.md):
-// Settings ▸ Extensions ("Show Extensions"), "Install Extension from Folder…", the "extensions"
+// Settings ▸ Extensions ("Show Extensions"), "Install Extension from Folder…", the signed
+// extension index ("Browse Extensions", "Check for Extension Updates"), the "extensions"
 // settings section, and — once the window is up — each installed extension's
 // commands, panels, Settings page and status items, contributed under
 // extension:<id> and withdrawn when it is turned off or uninstalled.
@@ -10,6 +11,7 @@ import { showToast } from '../../store/dialog'
 import { showExtensionQuickFixes, toggleDecorationsHidden } from '../../lib/editorDecorations'
 import { extensionsSettings, featureToggleSettings } from './settings'
 import { installFromFolder, subscribeExtensions } from './store'
+import { checkForExtensionUpdates, fetchIndex } from './indexStore'
 
 /** The editor of the active tab, if it is a file. */
 const activeView = () => viewFor(useEditor.getState().activeId ?? '')
@@ -56,6 +58,24 @@ export default defineFeature({
         const view = activeView()
         if (view) showToast(toggleDecorationsHidden(view) ? 'Extension decorations hidden in this editor' : 'Extension decorations shown')
       },
+    },
+    {
+      id: 'extensions.browseIndex',
+      title: 'Browse Extensions',
+      category: 'Extensions',
+      keywords: 'extension plugin index signed download install prebuilt',
+      // Opens Settings ▸ Extensions and downloads the signed index (a request made because the user asked).
+      run: () => {
+        useEditor.getState().openSettings('extensions')
+        void fetchIndex()
+      },
+    },
+    {
+      id: 'extensions.checkUpdates',
+      title: 'Check for Extension Updates',
+      category: 'Extensions',
+      keywords: 'extension plugin index update upgrade new version',
+      run: () => checkForExtensionUpdates(),
     },
   ],
   settingsPages: [{ id: 'extensions', label: 'Extensions', order: 155, component: ExtensionsSection }],

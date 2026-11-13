@@ -285,6 +285,16 @@ An extension can debug and test files of a language: yours from section 10, or a
 
 The user runs them with **Debug File** and **Run Tests in File** in the command palette, the run configuration menu in the toolbar, or a file's context menu in the sidebar. Both run the project's code, so they start only in [trusted folders](../guides/restricted-mode.md), and the install confirmation lists the programs they start.
 
+## Getting into the extension index
+
+Flint installs prebuilt extensions from a signed [index](index-format.md) that the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository publishes. There is no upload and no account: an extension gets into the index by being in that repository.
+
+1. Open a pull request there that adds your extension's folder (the manifest, a `README.md`, and for a program its source as a Go module). CI checks it with `flint-extcheck`.
+2. Once it is merged, the repository's release workflow builds every program for `darwin-arm64`, `darwin-amd64`, `linux-amd64` and `linux-arm64`, packs each extension, writes `index.json` with `flint-extindex` and signs it. Users see your extension after their next **Browse Extensions** or **Check for Updates**.
+3. To publish an update, raise `version` in the manifest in a pull request. Flint offers **Update to x.y.z…** only for a higher version, and its confirmation lists every permission and agent tool the update adds, so add only what you need.
+
+To distribute extensions without that repository, hand out the folder (**Install from Folder…**, or `flint --install-extension <folder>`), or [run your own index](index-format.md#your-own-index).
+
 ## Checklist before you share an extension
 
 - The manifest has `contract`, a `publisher.name` id, `name` and a `major.minor.patch` version.

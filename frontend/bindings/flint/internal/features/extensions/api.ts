@@ -24,6 +24,10 @@ import * as catalog$0 from "../../extensions/catalog/models.js";
 // @ts-ignore: Unused imports
 import * as host$0 from "../../extensions/host/models.js";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 /**
  * Action sends the choice of an item's action ("" item: a message's).
  */
@@ -92,12 +96,32 @@ export function Execute(id: string, command: string, args: json$0.RawMessage): $
 }
 
 /**
+ * FetchIndex downloads the index and its signature and verifies them. It
+ * runs only when the user asks: Browse Extensions or Check for Updates.
+ */
+export function FetchIndex(): $CancellablePromise<$models.IndexStatus> {
+    return $Call.ByID(1297388579).then(($result: any) => {
+        return $$createType3($result);
+    });
+}
+
+/**
+ * Index is the signed extension index as last downloaded and verified (or
+ * read from its cache); it makes no request.
+ */
+export function Index(): $CancellablePromise<$models.IndexStatus> {
+    return $Call.ByID(1009083113).then(($result: any) => {
+        return $$createType3($result);
+    });
+}
+
+/**
  * Install copies the extension in folder dir into Flint after a native
  * confirmation; nil when the user cancelled.
  */
 export function Install(dir: string): $CancellablePromise<host$0.Info | null> {
     return $Call.ByID(16206978, dir).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType5($result);
     });
 }
 
@@ -109,7 +133,18 @@ export function Install(dir: string): $CancellablePromise<host$0.Info | null> {
  */
 export function InstallFromCatalog(folder: string): $CancellablePromise<host$0.Info | null> {
     return $Call.ByID(1569663597, folder).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType5($result);
+    });
+}
+
+/**
+ * InstallFromIndex downloads, verifies and unpacks an extension of the
+ * index, then installs it like Install (native confirmation); nil when the
+ * user cancelled.
+ */
+export function InstallFromIndex(id: string): $CancellablePromise<host$0.Info | null> {
+    return $Call.ByID(269599146, id).then(($result: any) => {
+        return $$createType5($result);
     });
 }
 
@@ -119,7 +154,7 @@ export function InstallFromCatalog(folder: string): $CancellablePromise<host$0.I
  */
 export function List(): $CancellablePromise<host$0.Info[]> {
     return $Call.ByID(3916864187).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType6($result);
     });
 }
 
@@ -128,6 +163,18 @@ export function List(): $CancellablePromise<host$0.Info[]> {
  */
 export function Log(id: string): $CancellablePromise<string> {
     return $Call.ByID(3101205875, id);
+}
+
+/**
+ * PendingInstall is the folder this Flint was started to install
+ * (`flint --install-extension <dir>`), handed out once; an empty request
+ * when there is none. The frontend then calls Install with it, so the
+ * native confirmation is the same as for "Install Extension from Folder…".
+ */
+export function PendingInstall(): $CancellablePromise<$models.InstallRequest> {
+    return $Call.ByID(340403297).then(($result: any) => {
+        return $$createType7($result);
+    });
 }
 
 /**
@@ -144,7 +191,7 @@ export function RefreshCatalog(): $CancellablePromise<catalog$0.Listing> {
  */
 export function Rescan(): $CancellablePromise<host$0.Info[]> {
     return $Call.ByID(2973147495).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType6($result);
     });
 }
 
@@ -153,7 +200,7 @@ export function Rescan(): $CancellablePromise<host$0.Info[]> {
  */
 export function Resolve(id: string, view: string, parent: string): $CancellablePromise<host$0.View> {
     return $Call.ByID(1596846045, id, view, parent).then(($result: any) => {
-        return $$createType6($result);
+        return $$createType8($result);
     });
 }
 
@@ -204,7 +251,9 @@ export function WebviewRequest(id: string, view: string, key: string, method: st
 const $$createType0 = catalog$0.Listing.createFrom;
 const $$createType1 = host$0.ActionResult.createFrom;
 const $$createType2 = host$0.DocumentInterest.createFrom;
-const $$createType3 = host$0.Info.createFrom;
-const $$createType4 = $Create.Nullable($$createType3);
-const $$createType5 = $Create.Array($$createType3);
-const $$createType6 = host$0.View.createFrom;
+const $$createType3 = $models.IndexStatus.createFrom;
+const $$createType4 = host$0.Info.createFrom;
+const $$createType5 = $Create.Nullable($$createType4);
+const $$createType6 = $Create.Array($$createType4);
+const $$createType7 = $models.InstallRequest.createFrom;
+const $$createType8 = host$0.View.createFrom;

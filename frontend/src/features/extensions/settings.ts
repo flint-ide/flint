@@ -1,7 +1,8 @@
 // The "extensions" part of settings.json (Go: internal/features/extensions/settings.go):
 //
 //   "extensions": { "enabled": { "<id>": false }, "agentTools": { "<id>": false },
-//                   "decorations": { "<set id>": false }, "<id>": { …its settings } }
+//                   "decorations": { "<set id>": false }, "indexUrl": "https://…/index.json", "indexPublicKey": "<base64>",
+//                   "<id>": { …its settings } }
 //
 // Kept as the flat object it is in the file, so values of extensions that
 // aren't installed survive every save. Framework-free.
@@ -40,7 +41,46 @@ function setFlags(v: unknown): Record<string, boolean> {
   return Object.fromEntries(Object.entries(v).filter(([id, on]) => isSetId(id) && typeof on === 'boolean')) as Record<string, boolean>
 }
 
-/** Keeps what Go keeps: the flag maps and an object per valid id. */
+/** The signed extension index Flint downloads when asked ("" in settings: this one). Go: index.DefaultURL. */
+export const DEFAULT_INDEX_URL = 'https://github.com/flint-ide/extensions/releases/latest/download/index.json'
+
+/** An index address Go accepts (index.CheckURL): https, or http on this machine; "" is the default. */
+export function validIndexUrl(v: string): boolean {
+  if (v === '') return true
+  if (v.length > 2000) return false
+  let u: URL
+  try {
+    u = new URL(v)
+  } catch {
+    return false
+  }
+  if (u.username || u.password || !u.hostname) return false
+  if (u.protocol === 'https:') return true
+  return u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname)
+}
+
+/** An Ed25519 public key in base64 (Go: index.ParsePublicKey); "" is the key built into Flint. */
+export function validIndexKey(v: string): boolean {
+  return v === '' || /^[A-Za-z0-9+/]{43}=$/.test(v)
+}
+
+/** extensions.indexUrl and extensions.indexPublicKey ("" when unset or invalid). */
+export function indexSettings(s: ExtensionsSettings): { url: string; publicKey: string } {
+  const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
+  const url = text(s.indexUrl)
+  const publicKey = text(s.indexPublicKey)
+  return { url: validIndexUrl(url) ? url : '', publicKey: validIndexKey(publicKey) ? publicKey : '' }
+}
+
+/** The section with one of the two index settings replaced; "" removes it (the default). */
+export function withIndexSetting(s: ExtensionsSettings, key: 'indexUrl' | 'indexPublicKey', value: string): ExtensionsSettings {
+  const out: Record<string, unknown> = { ...s }
+  if (value) out[key] = value
+  else delete out[key]
+  return out
+}
+
+/** Keeps what Go keeps: the flag maps, the index's address and key, and an object per valid id. */
 export function coerceExtensions(v: unknown): ExtensionsSettings {
   if (!isObject(v)) return {}
   const out: Record<string, unknown> = {}
@@ -53,6 +93,9 @@ export function coerceExtensions(v: unknown): ExtensionsSettings {
       if (Object.keys(f).length) out[key] = f
     } else if (ID.test(key) && isObject(value)) out[key] = value
   }
+  const index = indexSettings(v)
+  if (index.url) out.indexUrl = index.url
+  if (index.publicKey) out.indexPublicKey = index.publicKey
   return out
 }
 

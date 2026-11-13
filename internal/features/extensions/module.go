@@ -18,6 +18,7 @@ import (
 
 	"flint/internal/extensions/catalog"
 	"flint/internal/extensions/host"
+	"flint/internal/extensions/index"
 	"flint/internal/feature"
 	"flint/internal/lsp"
 	"flint/internal/mcpserver"
@@ -42,7 +43,16 @@ var Module = feature.Module{
 		})
 		langs.list = hst.List
 		cat := catalog.New(catalog.Options{Dir: catalogDir(h), Before: shellenv.Wait})
-		api := &API{host: hst, catalog: cat, fh: h, langs: langs}
+		store := &indexStore{
+			host:     hst,
+			settings: func() Settings { return Section.Get(h.Settings()) },
+			client:   &index.Client{Version: h.Version()},
+			dir:      filepath.Join(h.ConfigDir(), "extension-index"),
+		}
+		api := &API{host: hst, catalog: cat, fh: h, langs: langs, index: store}
+		if req, ok := RequestOf(os.Args[1:], ""); ok {
+			api.pending = &req
+		}
 		return feature.Instance{
 			Services: []application.Service{application.NewService(api)},
 			AgentTools: func() []mcpserver.Tool {

@@ -115,8 +115,8 @@ func TestParseRefuses(t *testing.T) {
 			contributes(m)["commands"] = []any{c, c}
 			m["activation"] = []string{}
 		}},
-		{"table view", `view "table" is not supported`, func(m map[string]any) {
-			contributes(m)["panels"] = []any{map[string]any{"id": "acme.jira.issues", "title": "J", "icon": "files", "view": "table"}}
+		{"cards view", `view "cards" is not supported`, func(m map[string]any) {
+			contributes(m)["panels"] = []any{map[string]any{"id": "acme.jira.issues", "title": "J", "icon": "files", "view": "cards"}}
 		}},
 		{"activation of a missing command", "activation event", func(m map[string]any) { m["activation"] = []string{"onCommand:acme.jira.nope"} }},
 		{"unknown schema keyword", "unknown field", func(m map[string]any) {

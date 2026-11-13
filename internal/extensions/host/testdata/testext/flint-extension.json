@@ -21,7 +21,14 @@
       { "id": "test.ext.decorate", "title": "Decorate" },
       { "id": "test.ext.clear", "title": "Clear decorations" }
     ],
-    "panels": [{ "id": "test.ext.items", "title": "Items", "icon": "files", "order": 300, "view": "tree" }],
+    "panels": [
+      { "id": "test.ext.items", "title": "Items", "icon": "files", "order": 300, "view": "tree" },
+      { "id": "test.ext.table", "title": "Table", "icon": "files", "order": 301, "view": "table" },
+      { "id": "test.ext.form", "title": "Form", "icon": "files", "order": 302, "view": "form" },
+      { "id": "test.ext.badform", "title": "Bad form", "icon": "files", "order": 303, "view": "form" },
+      { "id": "test.ext.chart", "title": "Chart", "icon": "sum", "order": 304, "view": "chart" }
+    ],
+    "tabViews": [{ "id": "test.ext.tab", "title": "Tab", "view": "table", "restore": true }],
     "statusItems": [{ "id": "test.ext.count", "order": 1 }],
     "settings": { "properties": { "greeting": { "type": "string", "default": "hi" }, "count": { "type": "integer", "minimum": 1, "maximum": 9, "default": 3 } } },
     "decorationSets": [

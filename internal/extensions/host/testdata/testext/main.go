@@ -101,8 +101,15 @@ func handle(m msg) {
 		reply(m.ID, nil)
 		os.Exit(0)
 	case "view/resolve":
-		var p struct{ Parent string }
+		var p struct {
+			View, Key, Parent string
+			Data              json.RawMessage
+		}
 		_ = json.Unmarshal(m.Params, &p)
+		if v := richView(p.View, p.Key, p.Data); v != nil {
+			reply(m.ID, v)
+			return
+		}
 		if p.Parent != "" {
 			reply(m.ID, map[string]any{"kind": "tree", "items": []any{map[string]any{"id": p.Parent + "/child", "label": "child of " + p.Parent}}})
 			return
@@ -113,6 +120,18 @@ func handle(m msg) {
 			map[string]any{"id": "b", "label": "Beta", "icon": "<svg>", "command": map[string]any{"id": "git.push"}},
 			map[string]any{"id": "a", "label": "duplicate"},
 		}})
+	case "view/action":
+		notify("log", map[string]string{"level": "info", "message": "view/action " + string(m.Params)})
+		reply(m.ID, nil)
+	case "form/submit":
+		var p struct{ Values map[string]any }
+		_ = json.Unmarshal(m.Params, &p)
+		notify("log", map[string]string{"level": "info", "message": "form/submit " + string(m.Params)})
+		if p.Values["name"] == "taken" {
+			reply(m.ID, map[string]any{"errors": map[string]string{"name": "is taken\x1b[31m", "bogus": "not a field"}, "error": "Nothing was saved."})
+			return
+		}
+		reply(m.ID, map[string]any{"message": "Saved."})
 	case "agentTool/call":
 		var p struct {
 			Name      string
@@ -169,6 +188,10 @@ func command(m msg, id string, args json.RawMessage) {
 	case "status":
 		notify("status/update", map[string]any{"id": "test.ext.count", "text": strings.Repeat("x", 60), "command": "test.ext.status", "severity": "bogus"})
 		notify("view/refresh", map[string]any{"view": "test.ext.items"})
+		if a.Key != "" {
+			notify("view/refresh", map[string]any{"view": "test.ext.tab", "key": a.Key})
+			notify("view/refresh", map[string]any{"view": "test.ext.nope"})
+		}
 		notify("window/showMessage", map[string]any{"type": "warning", "message": "hello " + string(args)})
 	case "read":
 		notify("log", map[string]string{"level": "result", "message": call("workspace/readFile", map[string]string{"path": a.Path})})
@@ -241,4 +264,52 @@ func decorations(n int) []any {
 		map[string]any{"kind": "diagnostic", "line": 7},
 		map[string]any{"kind": "inline", "line": 8},
 	}
+}
+
+// richView answers view/resolve for the table, form and chart views (nil for
+// the tree), each with things Flint must clean.
+func richView(view, key string, data json.RawMessage) any {
+	switch view {
+	case "test.ext.table", "test.ext.tab":
+		return map[string]any{"kind": "table",
+			"columns": []any{
+				map[string]any{"id": "name", "title": "Name\x1b[31m", "type": "text"},
+				map[string]any{"id": "size", "type": "number"},
+				map[string]any{"id": "when", "title": "When", "type": "date", "align": "center"},
+				map[string]any{"id": "state", "title": "State", "type": "badge", "badges": map[string]string{"up": "ok", "down": "error", "odd": "purple"}},
+				map[string]any{"id": "name", "title": "again"},
+				map[string]any{"id": "html", "title": "HTML", "type": "html", "align": "justify"},
+			},
+			"rows": []any{
+				map[string]any{"id": "r1", "cells": map[string]any{"name": "<b>one</b>", "size": 3, "when": "2026-11-01T09:30:00Z", "state": "up", "html": true, "extra": "dropped"},
+					"command": map[string]any{"id": "test.ext.status", "args": map[string]int{"n": 1}}, "actions": []any{map[string]any{"id": "own", "label": "Own"}}},
+				map[string]any{"id": "r2", "cells": map[string]any{"name": 7, "size": "big", "when": "yesterday", "state": map[string]int{"a": 1}},
+					"command": map[string]any{"id": "git.push"}},
+				map[string]any{"id": "r1", "cells": map[string]any{"name": "duplicate"}},
+				map[string]any{"cells": map[string]any{"name": "no id"}},
+				map[string]any{"id": "key:" + key, "cells": map[string]any{"name": string(data)}},
+			},
+			"sort":    map[string]any{"column": "size", "descending": true},
+			"actions": []any{map[string]any{"id": "open", "label": "Open"}},
+		}
+	case "test.ext.form":
+		return map[string]any{"kind": "form", "id": "account", "description": "Your account.", "submit": "Save",
+			"fields": []any{
+				map[string]any{"id": "name", "type": "string", "title": "Name", "required": true, "value": "Ada", "maxLength": 10, "futureKeyword": 1},
+				map[string]any{"id": "token", "type": "string", "secret": true, "value": "leaked-value", "default": "leaked-default"},
+				map[string]any{"id": "count", "type": "integer", "minimum": 1, "maximum": 9, "default": 3, "value": 99},
+				map[string]any{"id": "mode", "type": "string", "enum": []string{"fast", "safe"}, "value": "safe"},
+				map[string]any{"id": "notes", "type": "string", "multiline": true},
+			}}
+	case "test.ext.chart":
+		return map[string]any{"kind": "chart", "type": "line", "title": "Open issues",
+			"x": map[string]any{"type": "date"}, "y": map[string]any{"label": "Issues", "min": 0},
+			"series": []any{
+				map[string]any{"id": "open", "label": "Open", "points": []any{[]any{"2026-10-01", 14}, []any{"2026-10-08", 11}, []any{"soon", 1}, []any{"2026-10-15", "many"}}},
+				map[string]any{"id": "blocked", "points": []any{[]any{"2026-10-01T12:00:00Z", 2}}},
+			}}
+	case "test.ext.badform":
+		return map[string]any{"kind": "form", "fields": []any{map[string]any{"id": "x", "type": "object"}}}
+	}
+	return nil
 }

@@ -57,6 +57,7 @@ type ext struct {
 	status   map[string]StatusText
 	origins  map[string]bool // links the user let it open this session
 	messages []time.Time     // recent showMessage, for the rate limit
+	forms    formCache       // the form views last drawn (richviews.go)
 }
 
 func newExt(h *Host, id, dir string, m *manifest.Manifest, err error) *ext {
@@ -367,7 +368,7 @@ func (e *ext) initializeParams() map[string]any {
 		"roots":        e.roots(),
 		"platform":     runtime.GOOS,
 		"capabilities": map[string]any{
-			"views": []string{"tree", "list", "message"}, "secrets": true, "agent": true, "openUrl": true,
+			"views": ViewKinds, "charts": ChartTypes, "secrets": true, "agent": true, "openUrl": true,
 			"decorations": DecorationKinds, "quickFixes": true,
 		},
 	}

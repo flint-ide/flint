@@ -141,3 +141,58 @@ func TestCheck(t *testing.T) {
 		})
 	}
 }
+
+// viewManifest declares one panel of a declarative kind and one tab view.
+func viewManifest(kind string) string {
+	return `{"contract":1,"id":"test.ext","name":"T","version":"0.1.0","run":{"command":"run.sh"},
+  "contributes":{"panels":[{"id":"test.ext.p","title":"P","icon":"files","order":1,"view":"` + kind + `"}],
+                 "tabViews":[{"id":"test.ext.t","title":"T","view":"` + kind + `"}]}}`
+}
+
+// shellForm is shellExtension that also answers form/submit with submit.
+func shellForm(resolve, submit string) string {
+	return strings.Replace(shellExtension(resolve), `    *'"method":"shutdown"'*)`,
+		`    *'"method":"form/submit"'*) printf '{"jsonrpc":"2.0","id":%s,%s}\n' "$id" '`+submit+`' ;;
+    *'"method":"shutdown"'*)`, 1)
+}
+
+func TestCheckDeclarativeViews(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell extensions")
+	}
+	table := `"result":{"kind":"table","columns":[{"id":"a","title":"A","type":"number"}],"rows":[{"id":"1","cells":{"a":1}}]}`
+	chart := `"result":{"kind":"chart","type":"bar","x":{"type":"category"},"series":[{"id":"s","label":"S","points":[["go",3]]}]}`
+	form := `"result":{"kind":"form","fields":[{"id":"name","type":"string","value":"x"}],"submit":"Save"}`
+	var points []string
+	for i := 0; i < 2001; i++ {
+		points = append(points, `["p",1]`)
+	}
+	for name, tc := range map[string]struct {
+		manifest, script, want string
+	}{
+		"table":              {viewManifest("table"), shellExtension(table), ""},
+		"chart":              {viewManifest("chart"), shellExtension(chart), ""},
+		"form":               {viewManifest("form"), shellForm(form, `"result":{}`), ""},
+		"form refused":       {viewManifest("form"), shellForm(form, `"result":{"errors":{"name":"is taken"}}`), ""},
+		"message for a tab":  {viewManifest("chart"), shellExtension(`"result":{"kind":"message","text":"No such tab."}`), ""},
+		"table, no columns":  {viewManifest("table"), shellExtension(`"result":{"kind":"table","columns":[],"rows":[]}`), "it has no columns"},
+		"list for a table":   {viewManifest("table"), shellExtension(`"result":{"kind":"list","items":[]}`), "sent a list view for a table panel"},
+		"pie chart":          {viewManifest("chart"), shellExtension(`"result":{"kind":"chart","type":"pie","series":[]}`), `chart type "pie"`},
+		"too many points":    {viewManifest("chart"), shellExtension(`"result":{"kind":"chart","type":"line","series":[{"id":"s","points":[` + strings.Join(points, ",") + `]}]}`), "more than Flint shows"},
+		"bad field":          {viewManifest("form"), shellForm(`"result":{"kind":"form","fields":[{"id":"x","type":"object"}]}`, `"result":{}`), "field 1"},
+		"submit not handled": {viewManifest("form"), shellForm(form, `"error":{"code":-32601,"message":"method not found"}`), "form/submit"},
+		"unknown view kind":  {viewManifest("cards"), shellExtension(table), "manifest"},
+		"tab resolve error":  {strings.Replace(viewManifest("table"), `"panels":[{"id":"test.ext.p","title":"P","icon":"files","order":1,"view":"table"}],`, "", 1), shellExtension(`"error":{"code":-32603,"message":"boom"}`), "tab view test.ext.t: view/resolve"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := check(extension(t, tc.manifest, tc.script))
+			got := strings.Join(r.problems, "\n")
+			if tc.want == "" && got != "" {
+				t.Errorf("problems:\n%s", got)
+			}
+			if tc.want != "" && !strings.Contains(got, tc.want) {
+				t.Errorf("problems %q, want one with %q", got, tc.want)
+			}
+		})
+	}
+}

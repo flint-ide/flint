@@ -1,7 +1,8 @@
 // Command flint-extcheck checks extension folders against this Flint's
 // extension contract, with the same code Flint runs: the manifest rules, the
 // webview files, and a run of the program through the extension host
-// (install, initialize, every declarative panel resolved, a file opened for
+// (install, initialize, every declarative panel and tab view resolved and
+// every form submitted, a file opened for
 // every decoration set, agent tools listed, shutdown). It is what the flint-ide/extensions CI runs.
 //
 //	go run ./cmd/flint-extcheck path/to/extension [more folders…]
@@ -117,7 +118,9 @@ func webviews(m *manifest.Manifest) []string {
 		}
 	}
 	for _, t := range m.Contributes.TabViews {
-		out = append(out, t.ID)
+		if t.Webview != nil {
+			out = append(out, t.ID)
+		}
 	}
 	return out
 }
@@ -163,16 +166,14 @@ func runChecks(r *report, dir string, m *manifest.Manifest) {
 			}
 			continue
 		}
-		v, err := h.Resolve(ctx, m.ID, p.ID, "")
-		if err != nil {
-			r.fail("panel %s: view/resolve: %v", p.ID, err)
-			continue
-		}
-		if v.Kind != p.View && v.Kind != "message" {
-			r.fail("panel %s: answered a %q view for a %q panel", p.ID, v.Kind, p.View)
-		}
-		if v.Kind == "message" && strings.HasPrefix(v.Text, "The extension sent a ") {
-			r.fail("panel %s: %s", p.ID, v.Text)
+		checkView(ctx, r, h, m, "panel", p.ID, "", p.View)
+	}
+	// A declarative tab view is resolved as a tab with the key "extcheck" and
+	// no data would be: the program must answer for a tab it doesn't know
+	// (a message view is a fine answer).
+	for _, t := range m.Contributes.TabViews {
+		if t.Webview == nil {
+			checkView(ctx, r, h, m, "tab view", t.ID, "extcheck", t.View)
 		}
 	}
 	checkDecorationSets(ctx, r, h, m, project)
@@ -200,6 +201,38 @@ func runChecks(r *report, dir string, m *manifest.Manifest) {
 		if in.ID == m.ID && in.State != host.StateStopped && in.State != host.StateDisabled {
 			r.fail("after shutdown it is %q, not stopped", in.State)
 		}
+	}
+}
+
+// checkView resolves a declarative panel or tab: the answer must be a view
+// of the declared kind that Flint can draw, or a message. A form is then
+// submitted with the values it shows: the program must answer form/submit
+// (refusing the values is a fine answer; an error is not).
+func checkView(ctx context.Context, r *report, h *host.Host, m *manifest.Manifest, what, id, key, kind string) {
+	v, err := h.ResolveView(ctx, m.ID, id, key, nil, "")
+	if err != nil {
+		r.fail("%s %s: view/resolve: %v", what, id, err)
+		return
+	}
+	if v.Kind != kind && v.Kind != "message" {
+		r.fail("%s %s: answered a %q view for a %q %s", what, id, v.Kind, kind, what)
+	}
+	if v.Kind == "message" && strings.HasPrefix(v.Text, "The extension sent a ") {
+		r.fail("%s %s: %s", what, id, v.Text)
+	}
+	if v.Truncated {
+		r.fail("%s %s: the answer holds more than Flint shows (5,000 rows or items, 10 series of 2,000 points)", what, id)
+	}
+	if v.Form == nil {
+		return
+	}
+	values := map[string]any{}
+	for _, f := range v.Form.Fields {
+		values[f.Property.Key] = f.Value
+	}
+	data, _ := json.Marshal(values)
+	if _, err := h.SubmitForm(ctx, m.ID, id, key, data); err != nil {
+		r.fail("%s %s: form/submit: %v", what, id, err)
 	}
 }
 

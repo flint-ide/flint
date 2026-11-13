@@ -99,7 +99,7 @@ type Panel struct {
 	// Icon is a name from Flint's icon set (frontend/src/components/ui/icons.ts).
 	Icon  string `json:"icon"`
 	Order int    `json:"order"`
-	// View is "tree", "list" or "webview".
+	// View is "tree", "list", "table", "form", "chart" (views.go) or "webview".
 	View string `json:"view"`
 	// Webview is a "webview" panel's HTML (webview.go).
 	Webview *Webview `json:"webview,omitempty"`

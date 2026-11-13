@@ -47,7 +47,9 @@ type StatusEvent struct {
 type RefreshEvent struct {
 	Extension string `json:"extension"`
 	View      string `json:"view"`
-	Item      string `json:"item,omitempty"`
+	// Key names one tab of a tab view; without it every tab of the view.
+	Key  string `json:"key,omitempty"`
+	Item string `json:"item,omitempty"`
 }
 
 // MessageEvent is EventMessage's data: a toast.
@@ -178,10 +180,14 @@ func (e *ext) viewRefresh(params json.RawMessage) error {
 	if err := decode(params, &p); err != nil {
 		return err
 	}
-	if !e.m.HasPanel(p.View) {
-		return invalid("no panel %q in the manifest", p.View)
+	kind, tab, ok := e.m.ViewKind(p.View)
+	if !ok || kind == "webview" {
+		return invalid("no panel or tab view %q drawn by Flint in the manifest", p.View)
 	}
-	e.h.o.App.Emit(EventRefresh, RefreshEvent{Extension: e.id, View: p.View, Item: cleanText(p.Item, maxItemID)})
+	if !tab || len(p.Key) > maxTabKey {
+		p.Key = ""
+	}
+	e.h.o.App.Emit(EventRefresh, RefreshEvent{Extension: e.id, View: p.View, Key: cleanText(p.Key, maxTabKey), Item: cleanText(p.Item, maxItemID)})
 	return nil
 }
 

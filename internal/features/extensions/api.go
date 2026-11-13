@@ -133,6 +133,30 @@ func (a *API) Action(id, view, item, action string) error {
 	return a.host.Action(a.ctx(), id, view, item, action)
 }
 
+// ResolveView returns the content of a panel (key "") or of a tab view's tab
+// (its key and saved data) that Flint draws from data: a table, a form, a
+// chart, or a tree or list.
+func (a *API) ResolveView(id, view, key string, data json.RawMessage) (host.View, error) {
+	return a.host.ResolveView(a.ctx(), id, view, key, data, "")
+}
+
+// ViewAction sends the choice of a row's or a message's action in a panel
+// (key "") or a tab.
+func (a *API) ViewAction(id, view, key, item, action string) error {
+	return a.host.ViewAction(a.ctx(), id, view, key, item, action)
+}
+
+// SubmitForm sends a form view's values (a JSON object by field id) to the
+// extension once Go's checks of them pass; the result says what was refused.
+func (a *API) SubmitForm(id, view, key string, values json.RawMessage) (host.FormResult, error) {
+	return a.host.SubmitForm(a.ctx(), id, view, key, values)
+}
+
+// SetViewVisible tells the host a declarative panel or tab was shown or hidden.
+func (a *API) SetViewVisible(id, view, key string, visible bool) error {
+	return a.host.SetViewVisible(id, view, key, visible)
+}
+
 // SetVisible tells the host a panel was shown or hidden.
 func (a *API) SetVisible(id, view string, visible bool) error {
 	return a.host.SetVisible(id, view, visible)

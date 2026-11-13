@@ -229,7 +229,9 @@ func (m *Manifest) checkContributions() error {
 				return err
 			}
 		default:
-			return fmt.Errorf(`panel %s: view %q is not supported (this Flint draws "tree", "list" and "webview")`, p.ID, p.View)
+			if err := checkDeclarative("panel", p.ID, p.View, PanelViews, p.Webview); err != nil {
+				return err
+			}
 		}
 	}
 	if err := m.checkTabViews(own); err != nil {

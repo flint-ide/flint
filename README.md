@@ -66,7 +66,7 @@ The full reference, with every detail and all keyboard shortcuts, is in [docs/FE
 - Go CPU and memory profiling with a flame graph
 
 **Databases**
-- PostgreSQL and ClickHouse with passwords in the macOS Keychain, schema browsing and SQL autocompletion
+- PostgreSQL and ClickHouse with passwords in the system keyring (macOS Keychain, Secret Service on Linux), schema browsing and SQL autocompletion
 - Query history per connection, visual EXPLAIN / EXPLAIN ANALYZE with warnings, and editing Postgres results by primary key
 
 **HTTP client**

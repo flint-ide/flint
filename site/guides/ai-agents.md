@@ -269,9 +269,10 @@ The panel lists the tasks of every repository open in the window, newest first. 
 
 | What | Meaning |
 |---|---|
-| State | **working**, **waiting for you** (the agent asks for approval in its chat), **finished** (the turn ended: review it), **failed** (the error is shown under the row) or **idle**. It follows the chat's own events; nothing polls. |
+| State | **queued** (waits for a free slot, see [The queue](#the-queue)), **working**, **waiting for you** (the agent asks for approval in its chat), **finished** (the turn ended: review it), **failed** (the error is shown under the row) or **idle**. It follows the chat's own events; nothing polls. |
 | Branch | The task's branch, and **↑N** for the commits its base doesn't have yet. |
 | Changes | Files changed since the branch left its base, committed or not, new files included, with added and removed lines (**merged** once its base has every commit). Refreshed when files or Git change. |
+| Usage | The tokens (input and output) and the cost of the task's chats so far, once it used any. See [Usage and budgets](#usage-and-budgets). |
 
 The actions:
 
@@ -282,11 +283,39 @@ The actions:
 - **Create PR** pushes the task's branch (whatever the worktree has checked out at the moment) and creates a pull request into its base on GitHub (with your [GitHub account](git-and-github.md#signing-in); a branch pushed to your fork becomes `you:branch`), titled with the task's first line and described by its text. Flint asks first, because it publishes the branch. **PR ↗** opens it afterwards.
 - **✕** removes the task: it stops the task's chats, closes its folder and deletes the worktree. Uncommitted work, new files, ignored files such as `.env` or build output, and a branch with commits its base doesn't have are deleted only if you confirm; otherwise the branch is kept.
 
+### Compare agents
+
+To see how different agents, or several attempts of one agent, solve the same task, tick **Compare agents** in "New Agent Task…". The agent in the **Agent** box is always included; tick the others to add them, and set **Attempts per agent** to run each more than once. One description starts at most 6 tasks.
+
+Flint creates one task per agent and attempt, all from the same commit of the base branch, each with its own branch and worktree. The branch names end in the agent's id: `agent/add-rate-limiting-claude`, `agent/add-rate-limiting-codex`, and `agent/add-rate-limiting-codex-2` for a second attempt. If one of them can't be created, none is kept. The same description goes to every agent.
+
+The panel shows these tasks together under the task's title, each with its agent, state, changes, commits ahead and usage. A group has three more actions:
+
+- **Compare** opens the comparison: every file changed by any of the tasks, with the lines each task added and removed in it (`—` where a task left the file alone). Click a file to see each task's changes to it next to each other, against the commit the tasks started from, uncommitted work included. **Open diff** on a column opens that task's side-by-side diff of the file in a tab. Under the columns, **Direct diff** shows the file as one task has it against another task; pick the two tasks when there are more than two. **Refresh** reads the changes again.
+- **Keep: Merge** on a task is **Merge** for that task. When it merged, Flint offers to remove the other tasks of the group.
+- **Keep: PR** is **Create PR** for that task, with the same offer afterwards.
+
+Removing the others works like **✕** on each of them: if one has uncommitted work, new or ignored files, or a branch with commits that are not in its base, Flint asks about that task before deleting anything, and keeps the branch unless you agree to delete it. Say no to the offer to keep them all.
+
+### The queue
+
+Each working agent uses your machine and your budget, so Flint limits how many agent tasks work at the same time: 3 by default (`agentTasks.maxParallel`; Settings ▸ Agents ▸ Agent tasks; 0 turns the limit off). A task counts while its agent is working or waiting for your approval, and while its chat is starting.
+
+A task you start beyond the limit is **queued**. Its branch and worktree are created right away, from the commit the base branch has at that moment, but its chat is not started and its description is not sent to the agent. When a working task finishes, fails, is stopped or removed, the oldest queued task starts by itself: Flint opens its folder, starts the chat and sends the description. The description is sent as Flint saved it, with anything that looks like a credential replaced.
+
+- **Start now** on a queued task starts it at once, whatever the limit.
+- **✕** removes a queued task like any other.
+- Queued tasks can't be reordered: the oldest goes first.
+
+The queue is saved with the tasks, so it survives a restart. After a restart nothing starts until the task's repository is open in a window and a slot is free. Flint never starts a queued task by itself in a folder that is in [Restricted Mode](restricted-mode.md); use **Start now** there. If you turned on **Pause new turns over budget** for a spent [budget](#budgets), queued tasks wait too, and **Start now** is refused, until you choose **Continue anyway** in a chat's budget warning or raise the budget. The limit counts the tasks of one window; a second Flint window counts its own.
+
+### Where tasks are kept
+
 Tasks are remembered per repository in `state.json`, so they survive a restart. A task whose worktree folder was deleted outside Flint shows as **stale** and can only be removed; removing it forgets only that worktree, not other missing ones (for example on a disk that isn't connected).
 
 In [Restricted Mode](restricted-mode.md), a task's worktree is trusted when the checkout it started from is trusted (it holds the same repository's commits); otherwise it stays restricted like any new folder. Removing the task, or the worktree folder disappearing, removes that trust again. Because trust follows folders, a task from an untrusted checkout can't put its worktree inside a trusted folder, and no task worktree may lie inside the checkout itself; Flint refuses and asks you to pick another worktree folder. Worktrees you create by hand with **New Worktree…** don't inherit trust: trust them like any other folder.
 
-The worktree folder and the branch prefix are settings (Settings ▸ Agents ▸ Agent tasks; [`agentTasks`](../reference/settings.md#agenttasks) in `settings.json`).
+The worktree folder, the branch prefix and the number of tasks working at the same time are settings (Settings ▸ Agents ▸ Agent tasks; [`agentTasks`](../reference/settings.md#agenttasks) in `settings.json`).
 
 ## Usage and budgets
 

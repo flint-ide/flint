@@ -14,6 +14,7 @@ import { subscribeLspEvents } from './store/lsp'
 import { subscribeLspEdits } from './store/lspEdits'
 import { subscribeAgentChatEvents } from './store/agentChat'
 import { subscribeUsageEvents } from './store/usage'
+import { subscribeTaskQueue } from './store/agentTasks'
 import { subscribeRunEvents, useRun } from './store/run'
 import { subscribeHttpEvents } from './store/httpClient'
 import { subscribeDebugEvents } from './store/debug'
@@ -86,6 +87,7 @@ export default function App() {
     subscribeLspEdits()
     subscribeAgentChatEvents()
 subscribeUsageEvents()
+    subscribeTaskQueue()
     subscribeRunEvents()
     subscribeHttpEvents()
     subscribeDebugEvents()

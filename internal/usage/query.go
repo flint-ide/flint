@@ -147,6 +147,28 @@ func (s *Store) Summary(q Query, prices Prices) Summary {
 	return out
 }
 
+// TaskTotals sums everything recorded for each of the given tasks (all
+// days that are kept), with estimates from prices: what a task has cost.
+func (s *Store) TaskTotals(tasks []string, prices Prices) map[string]Totals {
+	out := map[string]Totals{}
+	if s == nil || len(tasks) == 0 {
+		return out
+	}
+	want := map[string]bool{}
+	for _, t := range tasks {
+		want[t] = true
+	}
+	s.mu.Lock()
+	f, _ := s.snapshot()
+	s.mu.Unlock()
+	for _, r := range f.Rows {
+		if r.Task != "" && want[r.Task] {
+			out[r.Task] = out[r.Task].add(priced(r, prices).t)
+		}
+	}
+	return out
+}
+
 func addToChat(chats map[string]*Chat, models map[string]map[string]Totals, r Row, t Totals) {
 	if r.Chat == "" {
 		return

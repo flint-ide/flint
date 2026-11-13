@@ -10,6 +10,9 @@ import { Create as $Create } from "@wailsio/runtime";
 import * as accounts$0 from "./internal/accounts/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as agenttask$0 from "./internal/agenttask/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as dap$0 from "./internal/dap/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -429,6 +432,95 @@ export class Collected {
 }
 
 /**
+ * ComparedTask is one task of a comparison with the totals of its changes.
+ */
+export class ComparedTask {
+    "task": TaskView;
+
+    /**
+     * MergeBase is where the task's branch left its base.
+     */
+    "mergeBase": string;
+    "count": number;
+    "added": number;
+    "deleted": number;
+
+    /**
+     * Error says why the task's changes could not be read (its worktree is gone).
+     */
+    "error": string;
+
+    /** Creates a new ComparedTask instance. */
+    constructor($$source: Partial<ComparedTask> = {}) {
+        if (!("task" in $$source)) {
+            this["task"] = (new TaskView());
+        }
+        if (!("mergeBase" in $$source)) {
+            this["mergeBase"] = "";
+        }
+        if (!("count" in $$source)) {
+            this["count"] = 0;
+        }
+        if (!("added" in $$source)) {
+            this["added"] = 0;
+        }
+        if (!("deleted" in $$source)) {
+            this["deleted"] = 0;
+        }
+        if (!("error" in $$source)) {
+            this["error"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ComparedTask instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ComparedTask {
+        const $$createField0_0 = $$createType8;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("task" in $$parsedSource) {
+            $$parsedSource["task"] = $$createField0_0($$parsedSource["task"]);
+        }
+        return new ComparedTask($$parsedSource as Partial<ComparedTask>);
+    }
+}
+
+/**
+ * FileComparison is one file's diff in every task of a group, in the order
+ * of TaskComparison.Tasks.
+ */
+export class FileComparison {
+    "path": string;
+    "tasks": TaskFileDiff[];
+
+    /** Creates a new FileComparison instance. */
+    constructor($$source: Partial<FileComparison> = {}) {
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("tasks" in $$source)) {
+            this["tasks"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new FileComparison instance from a string or object.
+     */
+    static createFrom($$source: any = {}): FileComparison {
+        const $$createField1_0 = $$createType10;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("tasks" in $$parsedSource) {
+            $$parsedSource["tasks"] = $$createField1_0($$parsedSource["tasks"]);
+        }
+        return new FileComparison($$parsedSource as Partial<FileComparison>);
+    }
+}
+
+/**
  * FileHistory is a file's log together with the work tree it was read from.
  */
 export class FileHistory {
@@ -451,7 +543,7 @@ export class FileHistory {
      * Creates a new FileHistory instance from a string or object.
      */
     static createFrom($$source: any = {}): FileHistory {
-        const $$createField1_0 = $$createType9;
+        const $$createField1_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("commits" in $$parsedSource) {
             $$parsedSource["commits"] = $$createField1_0($$parsedSource["commits"]);
@@ -540,6 +632,54 @@ export class NewTask {
     static createFrom($$source: any = {}): NewTask {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new NewTask($$parsedSource as Partial<NewTask>);
+    }
+}
+
+/**
+ * NewTaskGroup is what the New Agent Task form sends: one description for
+ * one or more agents. An agent named twice gets two attempts.
+ */
+export class NewTaskGroup {
+    /**
+     * a folder of the workspace inside the repository
+     */
+    "dir": string;
+    "description": string;
+
+    /**
+     * local branch to start from; "" = Dir's current branch
+     */
+    "base": string;
+    "agents": string[];
+
+    /** Creates a new NewTaskGroup instance. */
+    constructor($$source: Partial<NewTaskGroup> = {}) {
+        if (!("dir" in $$source)) {
+            this["dir"] = "";
+        }
+        if (!("description" in $$source)) {
+            this["description"] = "";
+        }
+        if (!("base" in $$source)) {
+            this["base"] = "";
+        }
+        if (!("agents" in $$source)) {
+            this["agents"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new NewTaskGroup instance from a string or object.
+     */
+    static createFrom($$source: any = {}): NewTaskGroup {
+        const $$createField3_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("agents" in $$parsedSource) {
+            $$parsedSource["agents"] = $$createField3_0($$parsedSource["agents"]);
+        }
+        return new NewTaskGroup($$parsedSource as Partial<NewTaskGroup>);
     }
 }
 
@@ -653,7 +793,7 @@ export class ProfiledTests {
      * Creates a new ProfiledTests instance from a string or object.
      */
     static createFrom($$source: any = {}): ProfiledTests {
-        const $$createField2_0 = $$createType10;
+        const $$createField2_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField2_0($$parsedSource["files"]);
@@ -772,7 +912,7 @@ export class PromptLibrary {
      * Creates a new PromptLibrary instance from a string or object.
      */
     static createFrom($$source: any = {}): PromptLibrary {
-        const $$createField0_0 = $$createType12;
+        const $$createField0_0 = $$createType15;
         const $$createField1_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("prompts" in $$parsedSource) {
@@ -837,7 +977,7 @@ export class ProviderInfo {
      * Creates a new ProviderInfo instance from a string or object.
      */
     static createFrom($$source: any = {}): ProviderInfo {
-        const $$createField3_0 = $$createType14;
+        const $$createField3_0 = $$createType17;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("account" in $$parsedSource) {
             $$parsedSource["account"] = $$createField3_0($$parsedSource["account"]);
@@ -1057,7 +1197,7 @@ export class ReviewRequest {
      * Creates a new ReviewRequest instance from a string or object.
      */
     static createFrom($$source: any = {}): ReviewRequest {
-        const $$createField1_0 = $$createType16;
+        const $$createField1_0 = $$createType19;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
@@ -1099,7 +1239,7 @@ export class ReviewResult {
      */
     static createFrom($$source: any = {}): ReviewResult {
         const $$createField1_0 = $$createType0;
-        const $$createField2_0 = $$createType18;
+        const $$createField2_0 = $$createType21;
         const $$createField3_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
@@ -1165,9 +1305,9 @@ export class RunConfigs {
      * Creates a new RunConfigs instance from a string or object.
      */
     static createFrom($$source: any = {}): RunConfigs {
-        const $$createField0_0 = $$createType20;
-        const $$createField1_0 = $$createType20;
-        const $$createField2_0 = $$createType22;
+        const $$createField0_0 = $$createType23;
+        const $$createField1_0 = $$createType23;
+        const $$createField2_0 = $$createType25;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("saved" in $$parsedSource) {
             $$parsedSource["saved"] = $$createField0_0($$parsedSource["saved"]);
@@ -1255,6 +1395,127 @@ export class SignInCode {
 }
 
 /**
+ * TaskComparison is what the tasks of a group changed.
+ */
+export class TaskComparison {
+    "group": string;
+    "tasks": ComparedTask[];
+
+    /**
+     * Files are the files changed by any task, sorted by path; each row's
+     * changes are in the order of Tasks.
+     */
+    "files": agenttask$0.FileRow[];
+
+    /**
+     * Truncated: more files were changed than are listed.
+     */
+    "truncated": boolean;
+
+    /** Creates a new TaskComparison instance. */
+    constructor($$source: Partial<TaskComparison> = {}) {
+        if (!("group" in $$source)) {
+            this["group"] = "";
+        }
+        if (!("tasks" in $$source)) {
+            this["tasks"] = [];
+        }
+        if (!("files" in $$source)) {
+            this["files"] = [];
+        }
+        if (!("truncated" in $$source)) {
+            this["truncated"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TaskComparison instance from a string or object.
+     */
+    static createFrom($$source: any = {}): TaskComparison {
+        const $$createField1_0 = $$createType27;
+        const $$createField2_0 = $$createType29;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("tasks" in $$parsedSource) {
+            $$parsedSource["tasks"] = $$createField1_0($$parsedSource["tasks"]);
+        }
+        if ("files" in $$parsedSource) {
+            $$parsedSource["files"] = $$createField2_0($$parsedSource["files"]);
+        }
+        return new TaskComparison($$parsedSource as Partial<TaskComparison>);
+    }
+}
+
+/**
+ * TaskFileDiff is one file's diff for one task (or between two tasks).
+ */
+export class TaskFileDiff {
+    "taskId": string;
+
+    /**
+     * OrigPath is the path the task renamed the file from.
+     */
+    "origPath": string;
+
+    /**
+     * Changed is false when the two sides are the same.
+     */
+    "changed": boolean;
+
+    /**
+     * Note says why no lines are shown (a binary or very large file, an error).
+     */
+    "note": string;
+    "lines": agenttask$0.DiffLine[];
+    "added": number;
+    "deleted": number;
+    "truncated": boolean;
+
+    /** Creates a new TaskFileDiff instance. */
+    constructor($$source: Partial<TaskFileDiff> = {}) {
+        if (!("taskId" in $$source)) {
+            this["taskId"] = "";
+        }
+        if (!("origPath" in $$source)) {
+            this["origPath"] = "";
+        }
+        if (!("changed" in $$source)) {
+            this["changed"] = false;
+        }
+        if (!("note" in $$source)) {
+            this["note"] = "";
+        }
+        if (!("lines" in $$source)) {
+            this["lines"] = [];
+        }
+        if (!("added" in $$source)) {
+            this["added"] = 0;
+        }
+        if (!("deleted" in $$source)) {
+            this["deleted"] = 0;
+        }
+        if (!("truncated" in $$source)) {
+            this["truncated"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TaskFileDiff instance from a string or object.
+     */
+    static createFrom($$source: any = {}): TaskFileDiff {
+        const $$createField4_0 = $$createType31;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("lines" in $$parsedSource) {
+            $$parsedSource["lines"] = $$createField4_0($$parsedSource["lines"]);
+        }
+        return new TaskFileDiff($$parsedSource as Partial<TaskFileDiff>);
+    }
+}
+
+/**
  * TaskView is a task as the panel shows it.
  */
 export class TaskView {
@@ -1270,7 +1531,7 @@ export class TaskView {
     "pullRequest": string;
 
     /**
-     * State: idle, working, waiting, finished or failed (agenttask).
+     * State: queued, idle, working, waiting, finished or failed (agenttask).
      */
     "state": string;
     "error": string;
@@ -1289,6 +1550,19 @@ export class TaskView {
      * Merged: the branch has commits and all of them are in base.
      */
     "merged": boolean;
+
+    /**
+     * Group links the tasks started together from one description ("" for
+     * a task on its own).
+     */
+    "group": string;
+
+    /**
+     * Tokens and CostUSD are what the task's chats used so far (input and
+     * output tokens; reported cost plus estimates from settings prices).
+     */
+    "tokens": number;
+    "costUsd": number;
 
     /** Creates a new TaskView instance. */
     constructor($$source: Partial<TaskView> = {}) {
@@ -1336,6 +1610,15 @@ export class TaskView {
         }
         if (!("merged" in $$source)) {
             this["merged"] = false;
+        }
+        if (!("group" in $$source)) {
+            this["group"] = "";
+        }
+        if (!("tokens" in $$source)) {
+            this["tokens"] = 0;
+        }
+        if (!("costUsd" in $$source)) {
+            this["costUsd"] = 0;
         }
 
         Object.assign(this, $$source);
@@ -1466,7 +1749,7 @@ export class UsageView {
      * Creates a new UsageView instance from a string or object.
      */
     static createFrom($$source: any = {}): UsageView {
-        const $$createField0_0 = $$createType23;
+        const $$createField0_0 = $$createType32;
         const $$createField1_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("summary" in $$parsedSource) {
@@ -1488,19 +1771,28 @@ const $$createType4 = $Create.Array($$createType3);
 const $$createType5 = $Create.Map($Create.Any, $Create.Any);
 const $$createType6 = CIJob.createFrom;
 const $$createType7 = $Create.Array($$createType6);
-const $$createType8 = git$0.FileCommit.createFrom;
-const $$createType9 = $Create.Array($$createType8);
-const $$createType10 = testrun$0.Profiles.createFrom;
-const $$createType11 = prompts$0.Prompt.createFrom;
+const $$createType8 = TaskView.createFrom;
+const $$createType9 = TaskFileDiff.createFrom;
+const $$createType10 = $Create.Array($$createType9);
+const $$createType11 = git$0.FileCommit.createFrom;
 const $$createType12 = $Create.Array($$createType11);
-const $$createType13 = accounts$0.Account.createFrom;
-const $$createType14 = $Create.Nullable($$createType13);
-const $$createType15 = ReviewFile.createFrom;
-const $$createType16 = $Create.Array($$createType15);
-const $$createType17 = review$0.Finding.createFrom;
-const $$createType18 = $Create.Array($$createType17);
-const $$createType19 = runconfig$0.Config.createFrom;
-const $$createType20 = $Create.Array($$createType19);
-const $$createType21 = runconfig$0.Capabilities.createFrom;
-const $$createType22 = $Create.Map($Create.Any, $$createType21);
-const $$createType23 = usage$0.Summary.createFrom;
+const $$createType13 = testrun$0.Profiles.createFrom;
+const $$createType14 = prompts$0.Prompt.createFrom;
+const $$createType15 = $Create.Array($$createType14);
+const $$createType16 = accounts$0.Account.createFrom;
+const $$createType17 = $Create.Nullable($$createType16);
+const $$createType18 = ReviewFile.createFrom;
+const $$createType19 = $Create.Array($$createType18);
+const $$createType20 = review$0.Finding.createFrom;
+const $$createType21 = $Create.Array($$createType20);
+const $$createType22 = runconfig$0.Config.createFrom;
+const $$createType23 = $Create.Array($$createType22);
+const $$createType24 = runconfig$0.Capabilities.createFrom;
+const $$createType25 = $Create.Map($Create.Any, $$createType24);
+const $$createType26 = ComparedTask.createFrom;
+const $$createType27 = $Create.Array($$createType26);
+const $$createType28 = agenttask$0.FileRow.createFrom;
+const $$createType29 = $Create.Array($$createType28);
+const $$createType30 = agenttask$0.DiffLine.createFrom;
+const $$createType31 = $Create.Array($$createType30);
+const $$createType32 = usage$0.Summary.createFrom;

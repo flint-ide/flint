@@ -4189,6 +4189,44 @@ button.keymap-chord:hover {
   background: var(--bg-hover);
   white-space: nowrap;
 }
+.task-state.queued {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+}
+.task-group {
+  border-left: 2px solid var(--accent-dim);
+}
+.task-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 10px 2px 10px;
+  font-size: 12px;
+}
+.task-group-head .file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.task-group-head .muted {
+  flex: none;
+  font-size: 11px;
+}
+.task-group-head .link,
+.modal.compare-tasks .link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+}
+.task-group .task:last-child {
+  border-bottom: 1px solid var(--border);
+}
 .task-state.working {
   color: var(--info);
   background: color-mix(in srgb, var(--info) 14%, transparent);
@@ -4270,6 +4308,155 @@ button.keymap-chord:hover {
 }
 .modal.new-task textarea:focus {
   border-color: var(--accent);
+}
+.compare-agent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+}
+.modal.compare-tasks {
+  width: min(1500px, 96vw);
+  height: min(860px, 80vh);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+.compare-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.compare-files {
+  flex: 0 1 32%;
+  min-height: 90px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.compare-files table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.compare-files th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-raised);
+  text-align: left;
+  vertical-align: top;
+  font-weight: 400;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.compare-files th:first-child .link {
+  margin-left: 10px;
+}
+.compare-agent {
+  font-weight: 600;
+  color: var(--fg);
+}
+.compare-keep {
+  display: flex;
+  gap: 8px;
+}
+.compare-files td {
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.compare-files tbody tr {
+  cursor: pointer;
+}
+.compare-files tbody tr:hover {
+  background: var(--bg-hover);
+}
+.compare-files tbody tr.selected {
+  background: var(--bg-active);
+}
+.compare-path {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.compare-columns {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  gap: 8px;
+}
+.compare-column {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.compare-between {
+  flex: 0 1 30%;
+  min-height: 80px;
+}
+.compare-column-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  font-size: 11px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.compare-column-head .truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.compare-diff {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg-editor);
+  font: 11.5px/1.5 var(--font-mono);
+}
+.compare-line {
+  display: flex;
+  white-space: pre;
+  min-width: max-content;
+}
+.compare-line.add {
+  background: var(--diff-ins-bg);
+}
+.compare-line.del {
+  background: var(--diff-del-bg);
+}
+.compare-line.hunk {
+  color: var(--fg-faint);
+  border-top: 1px solid var(--border);
+}
+.compare-no {
+  flex: none;
+  width: 4ch;
+  text-align: right;
+  color: var(--fg-faint);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.compare-mark {
+  flex: none;
+  width: 2ch;
+  text-align: center;
+  color: var(--fg-muted);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.compare-note {
+  padding: 4px 8px;
+  font: 11px var(--font-ui);
 }
 .form-note {
   font-size: 11.5px;

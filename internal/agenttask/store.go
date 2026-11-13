@@ -12,9 +12,12 @@ import (
 // Bounds of what state.json keeps: a few dozen tasks is a busy repository,
 // and the list is read on every refresh of the panel.
 const (
-	MaxPerRepo   = 50
-	maxRepos     = 100
-	MaxPrompt    = 8000 // characters of a description that are kept
+	MaxPerRepo = 50
+	maxRepos   = 100
+	MaxPrompt  = 8000 // characters of a description that are kept
+	// MaxGroup bounds the tasks one description starts at once (agents ×
+	// attempts): each is a worktree on disk and an agent that spends tokens.
+	MaxGroup     = 6
 	idBytes      = 8
 	idHexLength  = 2 * idBytes
 	errDuplicate = "a task with this id already exists"
@@ -43,6 +46,13 @@ type Task struct {
 	Error string `json:"error,omitempty"`
 	// PullRequest is the URL of the pull request created for the branch.
 	PullRequest string `json:"pullRequest,omitempty"`
+	// Group links the tasks started together from one description (the same
+	// base commit, one per agent or attempt) so they can be compared. Empty
+	// for a task on its own, and in state files written before groups.
+	Group string `json:"group,omitempty"`
+	// Queued: the branch and worktree exist, but the chat has not started and
+	// the description was not sent, because too many tasks were working.
+	Queued bool `json:"queued,omitempty"`
 }
 
 // Store holds the tasks per repository, keyed by the repository's common git
@@ -83,6 +93,25 @@ func (s Store) Find(id string) (repo string, task Task, ok bool) {
 		}
 	}
 	return "", Task{}, false
+}
+
+// Group returns the tasks linked by group (an id from NewID), oldest first.
+func (s Store) Group(group string) []Task {
+	if group == "" {
+		return nil
+	}
+	for _, tasks := range s {
+		var out []Task
+		for _, t := range tasks {
+			if t.Group == group {
+				out = append(out, t)
+			}
+		}
+		if len(out) > 0 {
+			return out // a group never spans repositories
+		}
+	}
+	return nil
 }
 
 // ByWorktree returns the id of the task whose worktree is path, "" for none.

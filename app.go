@@ -90,6 +90,7 @@ type App struct {
 	sessions     *restore.Store
 	usage        *usage.Store // agent usage per day (usage_state.go)
 	usageChats   usageChats
+	queue        taskQueue        // slots of agent tasks being started (tasks_queue.go)
 	files        fuzzy.Index      // quick-open file list of the open folder
 	http         *httpfile.Client // requests of .http files, sent only on demand
 	features     *feature.Set     // the feature modules (features.go)

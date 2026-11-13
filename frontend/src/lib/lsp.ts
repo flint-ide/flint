@@ -8,6 +8,7 @@ import type { lsp } from '../wails/models'
 import { onDiagnostics, currentDiagnostics } from '../store/lsp'
 import { agentActions, fixFileProblemsWithAgent } from './lspAgent'
 import { modKey } from './platform'
+import { extensionQuickFixes } from './editorDecorations'
 import { editsToChanges, fromLsp, signatureParts, sortCodeActions, toLsp, type DocChange } from './lspText'
 
 export { fromLsp, toLsp }
@@ -320,22 +321,29 @@ export function lspExtension(root: string, path: string, hooks: LspHooks): Exten
     const to = at ?? sel.to
     await flushed(view)
     const doc = view.state.doc
-    let actions: lsp.CodeAction[]
+    // Fixes that extensions attached to their marks here share the menu.
+    const fromExtensions = await extensionQuickFixes(view, from).catch(() => [])
+    let actions: lsp.CodeAction[] = []
     try {
       actions = await LSP.CodeActions(path, { start: toLsp(doc, from), end: toLsp(doc, to) }, only)
     } catch (err) {
-      return hooks.notify(errorText(err))
+      if (!fromExtensions.length) return hooks.notify(errorText(err))
     }
     if (view.state.doc !== doc) return
-    if (!actions.length) return hooks.notify(only === MENU_KINDS ? 'No quick fixes or refactorings here' : 'The language server has no quick fix here')
+    if (!actions.length && !fromExtensions.length) {
+      return hooks.notify(only === MENU_KINDS ? 'No quick fixes or refactorings here' : 'The language server has no quick fix here')
+    }
     const coords = view.coordsAtPos(to) ?? view.coordsAtPos(from)
     if (!coords) return
-    const items: MenuItem[] = sortCodeActions(actions).map((a) => ({
-      label: a.title,
-      hint: a.disabled || undefined,
-      disabled: !!a.disabled,
-      onSelect: () => void runCodeAction(view, a),
-    }))
+    const items: MenuItem[] = [
+      ...sortCodeActions(actions).map((a) => ({
+        label: a.title,
+        hint: a.disabled || undefined,
+        disabled: !!a.disabled,
+        onSelect: () => void runCodeAction(view, a),
+      })),
+      ...fromExtensions.map((f) => ({ label: f.title, onSelect: () => void f.run() })),
+    ]
     hooks.menu(coords.left, coords.bottom + 2, items, () => view.focus())
   }
 

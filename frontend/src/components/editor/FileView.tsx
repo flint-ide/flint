@@ -17,10 +17,15 @@ import { testMarkMenu } from '../../store/testMenu'
 import { mainGutter } from '../../lib/mainGutter'
 import { mainGutterHooks } from '../../store/mainRun'
 import { blameGutter } from '../../lib/blameGutter'
+import { editorDecorations } from '../../lib/editorDecorations'
 import { indentationFor } from '../../lib/indent'
 import { Git, useGit, useHeadVersion } from '../../store/git'
-import { lspExtension, lspSupported, type LspHooks } from '../../lib/lsp'
+import { lspActions, lspExtension, lspSupported, type LspHooks } from '../../lib/lsp'
 import { useLsp } from '../../store/lsp'
+import { applyWorkspaceEdit } from '../../store/lspEdits'
+import { openContextMenu } from '../../store/contextMenu'
+import { indentUnit } from '@codemirror/language'
+import { useSettings } from '../../store/settings'
 import { useWorkspace } from '../../store/workspace'
 import { rootOf } from '../../lib/workspaceRoots'
 import { isHttpFile } from '../../lib/httpFiles'
@@ -99,6 +104,14 @@ export function FileView({ tab, active }: Props) {
         }),
       showUsages: (locs, symbol) => useLsp.getState().showUsages(symbol, locs),
       notify: (message) => showToast(message),
+      applyEdit: applyWorkspaceEdit,
+      menu: (x, y, items, onClose) =>
+        openContextMenu(x, y, items.map((it, i) => ({ key: String(i), ...it })), { minWidth: 260, onClose }),
+      showOutline: (symbols) => useLsp.getState().showOutline(tab.path, symbols),
+      indent: () => {
+        const state = view.current?.state
+        return { tabSize: state?.tabSize ?? 4, insertSpaces: state ? state.facet(indentUnit) !== '\t' : false }
+      },
     }
     return lspExtension(root, tab.path, hooks)
   }, [root, tab.path])
@@ -111,9 +124,11 @@ export function FileView({ tab, active }: Props) {
   const breakpoints = useMemo(() => (tab.path.endsWith('.go') ? breakpointGutter(tab.path, breakpointHooks) : []), [tab.path])
   const http = useHttpEditor(tab.path)
   const ai = useMemo(() => editorAi(tab.path), [tab.path])
+  // Marks from features and extensions (gutter markers, underlines, hints, quick fixes).
+  const decorations = useMemo(() => editorDecorations(tab.path), [tab.path])
   const extensions = useMemo(
-    () => [language, indentation, breakpoints, gitGutter(), blameGutter(), tests, program, http, lsp, ai, crlf ? EditorState.lineSeparator.of('\r\n') : []],
-    [crlf, language, indentation, breakpoints, tests, program, http, lsp, ai],
+    () => [language, indentation, breakpoints, gitGutter(), blameGutter(), tests, program, http, lsp, ai, decorations, crlf ? EditorState.lineSeparator.of('\r\n') : []],
+    [crlf, language, indentation, breakpoints, tests, program, http, lsp, ai, decorations],
   )
 
   // Gutter baseline: the file at HEAD of the work tree that contains it (which may be
@@ -145,6 +160,7 @@ export function FileView({ tab, active }: Props) {
     saving.current = saving.current.then(async () => {
       const v = view.current
       if (!v) return
+      await tidyBeforeSave(v)
       const text = v.state.sliceDoc() // joined with the file's own line separator
       try {
         // Never silently overwrite what an agent (or anything else) wrote meanwhile.
@@ -305,6 +321,25 @@ export function FileView({ tab, active }: Props) {
 }
 
 /** HTTP client support (▶ / ⌘↵ / environment bar) for .http files, loaded on first use. */
+/** How long a save waits for the language server to organize imports and format. */
+const TIDY_TIMEOUT_MS = 3000
+
+/**
+ * Format on save / organize imports on save (Settings ▸ Editor), through the file's
+ * language server. Quiet and bounded: a server that is missing, has no formatter or
+ * takes too long never blocks the save.
+ */
+async function tidyBeforeSave(view: EditorView): Promise<void> {
+  const { formatOnSave, organizeImportsOnSave } = useSettings.getState().settings.editor
+  const actions = lspActions(view)
+  if (!actions || (!formatOnSave && !organizeImportsOnSave)) return
+  const tidy = (async () => {
+    if (organizeImportsOnSave) await actions.organizeImports(true)
+    if (formatOnSave) await actions.format(true)
+  })()
+  await Promise.race([tidy, new Promise((resolve) => setTimeout(resolve, TIDY_TIMEOUT_MS))])
+}
+
 function useHttpEditor(path: string): Extension {
   const [extension, setExtension] = useState<Extension>([])
   useEffect(() => {

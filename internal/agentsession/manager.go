@@ -141,7 +141,9 @@ type Manager struct {
 	retired  []Driver // replaced or removed drivers that may still run sessions
 	sessions map[string]*managed
 	policy   Policy
-	closed   bool // Close ran; sessions that finish starting afterwards are stopped
+	gate     ActionGate      // Flint's acting tools (actions.go)
+	actions  []pendingAction // their unanswered permission requests, oldest first
+	closed   bool            // Close ran; sessions that finish starting afterwards are stopped
 }
 
 type managed struct {
@@ -321,7 +323,16 @@ func (m *Manager) route(s *managed, e Event) {
 	if owner != nil && owner != s {
 		return
 	}
+	if e.Kind == KindPermissionSettled {
+		m.settleAction(e.SessionID, e.RequestID, "")
+	}
 	if e.Kind == KindPermission && e.Permission != nil {
+		if req, acts := m.gateAction(e.SessionID, s.cwd, *e.Permission); acts {
+			// A tool of Flint that acts: the user answers, whatever the policy.
+			e.Permission = &req
+			m.emit(e)
+			return
+		}
 		if opt, ok := autoOption(policy, s.cwd, *e.Permission); ok {
 			// Answer off the driver's goroutine: drivers may hold locks while emitting.
 			go func() {
@@ -402,6 +413,8 @@ func (m *Manager) Respond(sessionID, requestID, optionID string) error {
 	if err != nil {
 		return err
 	}
+	// Before the agent hears the answer: its call must find the approval.
+	m.settleAction(sessionID, requestID, optionID)
 	return s.driver.Respond(sessionID, requestID, optionID)
 }
 
@@ -415,6 +428,7 @@ func (m *Manager) Stop(sessionID string) error {
 		cancel = s.cancel // read under the lock: the Prompt goroutine writes it
 	}
 	m.mu.Unlock()
+	m.dropActions(sessionID)
 	if s == nil {
 		return nil
 	}

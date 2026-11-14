@@ -126,7 +126,7 @@ This runs `wails3 task package`:
 
 The build targets macOS 12 (`MACOSX_DEPLOYMENT_TARGET=12.0`) with cgo enabled.
 
-`make install` copies the app to `/Applications` and installs `scripts/flint` as `~/.local/bin/flint`. `flint [folder]` opens a folder (default: the current one); a running Flint takes it over and comes to the front.
+`make install` copies the app to `/Applications` and installs `scripts/flint` as `~/.local/bin/flint`. `flint [folder]` opens a folder (default: the current one); a running Flint takes it over and comes to the front. `flint --install-extension <folder>` asks Flint to install an extension from a folder (same confirmation as in the app).
 
 ## Building on Linux
 

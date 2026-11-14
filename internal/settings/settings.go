@@ -65,6 +65,11 @@ type EditorSettings struct {
 	Font
 	// VimMode turns on Vim key bindings in every editor.
 	VimMode bool `json:"vimMode"`
+	// FormatOnSave formats a file with its language server before each save.
+	FormatOnSave bool `json:"formatOnSave"`
+	// OrganizeImportsOnSave runs the language server's "organize imports"
+	// before each save.
+	OrganizeImportsOnSave bool `json:"organizeImportsOnSave"`
 }
 
 // Settings is the whole settings.json document.
@@ -111,6 +116,8 @@ type Settings struct {
 	AgentReview AgentReview `json:"agentReview"`
 	// CI configures following your pull requests' checks (ci.go).
 	CI CI `json:"ci"`
+	// PRReview configures handing review comments to the agent (prreview.go).
+	PRReview PRReview `json:"prReview"`
 	// GitHub configures the GitHub host, sign-in and API limits (github.go).
 	GitHub GitHub `json:"github"`
 
@@ -147,6 +154,7 @@ func Default() Settings {
 		Prompts:            defaultPrompts(),
 		AgentReview:        defaultAgentReview(),
 		CI:                 defaultCI(),
+		PRReview:           defaultPRReview(),
 		GitHub:             defaultGitHub(),
 		CustomTheme:        defaultCustomTheme(),
 		sections:           sectionDefaults(),
@@ -219,6 +227,7 @@ func Normalize(s Settings) Settings {
 	out.Usage = normalizeUsage(s.Usage)
 	out.AgentReview = normalizeAgentReview(s.AgentReview, out.CustomAgents)
 	out.CI = normalizeCI(s.CI)
+	out.PRReview = normalizePRReview(s.PRReview)
 	out.GitHub = normalizeGitHub(s.GitHub)
 	out.sections = normalizeSections(s)
 	return out
@@ -310,6 +319,9 @@ func Validate(s Settings) error {
 		return err
 	}
 	if err := CheckCI(s.CI); err != nil {
+		return err
+	}
+	if err := CheckPRReview(s.PRReview); err != nil {
 		return err
 	}
 	if err := CheckGitHub(s.GitHub); err != nil {

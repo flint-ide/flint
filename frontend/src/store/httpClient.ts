@@ -2,10 +2,10 @@ import { createStore } from '../lib/store'
 import { Workspace, errorMessage } from '../api/backend'
 import * as HTTP from '../../bindings/flint/httpapi'
 import { httpfile, main } from '../wails/models'
-import { ClipboardSetText } from '../wails/runtime'
+import { ClipboardSetText, EventsOn } from '../wails/runtime'
 import { HTTP_FILE_TEMPLATE, envDir, freeHttpFileName, isHttpFile, suggestedFileName } from '../lib/httpFiles'
 import { rootOf } from '../lib/workspaceRoots'
-import { useEditor } from './editor'
+import { httpTabId, useEditor } from './editor'
 import { useWorkspace } from './workspace'
 import { activeRoot } from './activeRoot'
 import { activeFilePath } from './gitHistory'
@@ -96,6 +96,33 @@ export async function showResponse(path: string, id: string): Promise<void> {
   } catch (err) {
     showToast(errorMessage(err), 'error')
   }
+}
+
+/**
+ * A response an agent's send_http_request tool got (Go: eventHTTPAgent): the
+ * file's response tab shows it, without taking the focus, and its history
+ * lists it. A request the user is sending for the file stays in front.
+ */
+async function showAgentResponse(path: string, id: string): Promise<void> {
+  try {
+    const [response, history] = await Promise.all([HTTP.Response(id), HTTP.History(path)])
+    if (viewOf(path).pending) return update(path, { history })
+    update(path, { response, history, error: null })
+    const name = path.slice(path.lastIndexOf('/') + 1)
+    useEditor.getState().addTab({ id: httpTabId(path), kind: 'http', path, title: `Response: ${name}`, dirty: false })
+  } catch {
+    // The response is no longer kept: nothing to show.
+  }
+}
+
+let subscribed = false
+/** Listens for responses agents got through Flint (once, at startup). */
+export function subscribeHttpEvents(): void {
+  if (subscribed) return
+  subscribed = true
+  EventsOn('http:agent-response', (ev: { file?: unknown; id?: unknown }) => {
+    if (typeof ev?.file === 'string' && typeof ev.id === 'string' && isHttpFile(ev.file)) void showAgentResponse(ev.file, ev.id)
+  })
 }
 
 async function copy(text: string, what: string): Promise<void> {

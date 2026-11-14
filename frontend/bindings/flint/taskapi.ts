@@ -32,12 +32,48 @@ export function Changes(id: string): $CancellablePromise<git$0.DiffStat> {
 }
 
 /**
+ * Compare lists the files changed by any task of a group, with what each
+ * task did to them since it left the base (committed or not, new files
+ * included).
+ */
+export function Compare(group: string): $CancellablePromise<$models.TaskComparison> {
+    return $Call.ByID(1149459600, group).then(($result: any) => {
+        return $$createType1($result);
+    });
+}
+
+/**
+ * CompareFile returns one file's changes in every task of a group, each
+ * against where that task left its base, as unified diff lines.
+ */
+export function CompareFile(group: string, path: string): $CancellablePromise<$models.FileComparison> {
+    return $Call.ByID(3082937542, group, path).then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
+/**
  * Create makes the task's branch and worktree and remembers the task. The UI
- * then opens the folder and starts the chat with the description.
+ * then opens the folder and starts the chat with the description, unless the
+ * task came back queued (see CreateGroup).
  */
 export function Create(req: $models.NewTask): $CancellablePromise<$models.TaskView> {
     return $Call.ByID(2933454641, req).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType3($result);
+    });
+}
+
+/**
+ * CreateGroup makes one task per entry of req.Agents from the same
+ * description and the same base commit, each with its own branch and
+ * worktree. Several are linked as a group, to be compared. A task that would
+ * exceed agentTasks.maxParallel comes back queued: the UI starts the chats
+ * of the others only, and the queue starts that one later (tasks_queue.go).
+ * When one cannot be created, none is kept.
+ */
+export function CreateGroup(req: $models.NewTaskGroup): $CancellablePromise<$models.TaskView[]> {
+    return $Call.ByID(33081640, req).then(($result: any) => {
+        return $$createType4($result);
     });
 }
 
@@ -51,11 +87,21 @@ export function CreatePullRequest(id: string): $CancellablePromise<string> {
 }
 
 /**
+ * DiffBetween compares one file as it is now in two tasks of the same
+ * group: what the second task has that the first has not.
+ */
+export function DiffBetween(idA: string, idB: string, path: string): $CancellablePromise<$models.TaskFileDiff> {
+    return $Call.ByID(2887376942, idA, idB, path).then(($result: any) => {
+        return $$createType5($result);
+    });
+}
+
+/**
  * List returns the tasks of the repository containing dir (none outside one).
  */
 export function List(dir: string): $CancellablePromise<$models.TaskView[]> {
     return $Call.ByID(537253645, dir).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType4($result);
     });
 }
 
@@ -66,7 +112,7 @@ export function List(dir: string): $CancellablePromise<$models.TaskView[]> {
  */
 export function ListAll(dirs: string[]): $CancellablePromise<$models.TaskView[]> {
     return $Call.ByID(2179020124, dirs).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType4($result);
     });
 }
 
@@ -77,7 +123,7 @@ export function ListAll(dirs: string[]): $CancellablePromise<$models.TaskView[]>
  */
 export function Merge(id: string): $CancellablePromise<$models.MergeResult> {
     return $Call.ByID(1378419803, id).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType6($result);
     });
 }
 
@@ -88,7 +134,7 @@ export function Merge(id: string): $CancellablePromise<$models.MergeResult> {
  */
 export function Remove(id: string, opts: $models.RemoveOptions): $CancellablePromise<$models.RemoveResult> {
     return $Call.ByID(1802742321, id, opts).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType7($result);
     });
 }
 
@@ -97,8 +143,37 @@ export function Remove(id: string, opts: $models.RemoveOptions): $CancellablePro
  */
 export function RemoveCheck(id: string): $CancellablePromise<$models.RemoveInfo> {
     return $Call.ByID(1339110611, id).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType8($result);
     });
+}
+
+/**
+ * StartDone is the UI's report that it finished starting a task's chat,
+ * whether the turn began or not: the slot held for the start is released (a
+ * running turn holds it from here on), and the queue moves on.
+ */
+export function StartDone(id: string): $CancellablePromise<void> {
+    return $Call.ByID(3451763263, id);
+}
+
+/**
+ * StartNow starts a queued task although no slot is free: the user's
+ * override. A budget that pauses new turns still holds it back. The UI then
+ * starts its chat, as for a new task.
+ */
+export function StartNow(id: string): $CancellablePromise<$models.TaskView> {
+    return $Call.ByID(656043389, id).then(($result: any) => {
+        return $$createType3($result);
+    });
+}
+
+/**
+ * StartQueued starts queued tasks that have a free slot. The UI calls it
+ * when the window's folders are known or change: after a restart the queue
+ * waits for its repository to be opened.
+ */
+export function StartQueued(): $CancellablePromise<void> {
+    return $Call.ByID(956752322);
 }
 
 /**
@@ -108,15 +183,18 @@ export function RemoveCheck(id: string): $CancellablePromise<$models.RemoveInfo>
  */
 export function UpdateFromBase(id: string): $CancellablePromise<string[]> {
     return $Call.ByID(1406706837, id).then(($result: any) => {
-        return $$createType6($result);
+        return $$createType9($result);
     });
 }
 
 // Private type creation functions
 const $$createType0 = git$0.DiffStat.createFrom;
-const $$createType1 = $models.TaskView.createFrom;
-const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = $models.MergeResult.createFrom;
-const $$createType4 = $models.RemoveResult.createFrom;
-const $$createType5 = $models.RemoveInfo.createFrom;
-const $$createType6 = $Create.Array($Create.Any);
+const $$createType1 = $models.TaskComparison.createFrom;
+const $$createType2 = $models.FileComparison.createFrom;
+const $$createType3 = $models.TaskView.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = $models.TaskFileDiff.createFrom;
+const $$createType6 = $models.MergeResult.createFrom;
+const $$createType7 = $models.RemoveResult.createFrom;
+const $$createType8 = $models.RemoveInfo.createFrom;
+const $$createType9 = $Create.Array($Create.Any);

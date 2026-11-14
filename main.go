@@ -10,6 +10,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"flint/internal/diag"
+	"flint/internal/extensions/sandbox"
 	"flint/internal/shellenv"
 )
 
@@ -20,6 +21,7 @@ var assets embed.FS
 const linuxAppID = "io.github.flint_ide.flint"
 
 func main() {
+	sandbox.Main() // first: started as an extension's sandbox launcher, this never returns
 	logger := diag.Setup()
 	slog.Info("start", "version", diag.Version(version))
 	flint, err := NewApp()

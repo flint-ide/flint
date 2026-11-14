@@ -189,6 +189,20 @@ func TestVimModeRoundtrip(t *testing.T) {
 	}
 }
 
+func TestSaveActionsRoundtrip(t *testing.T) {
+	path := write(t, `{"editor":{"formatOnSave":true,"organizeImportsOnSave":true}}`)
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Editor.FormatOnSave || !got.Editor.OrganizeImportsOnSave {
+		t.Errorf("Editor = %+v, want both save actions on", got.Editor)
+	}
+	if d := Default().Editor; d.FormatOnSave || d.OrganizeImportsOnSave {
+		t.Error("save actions are on by default")
+	}
+}
+
 // The frontend filters cached settings with the same allow-list (lib/settings.ts).
 func TestThemeVariablesMatchFrontend(t *testing.T) {
 	src, err := os.ReadFile(filepath.Join("..", "..", "frontend", "src", "lib", "settings.ts"))

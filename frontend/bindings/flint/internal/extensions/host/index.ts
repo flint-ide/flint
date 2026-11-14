@@ -3,10 +3,28 @@
 
 export {
     Action,
+    ActionRequest,
+    ActionResult,
+    Chart,
+    ChartXAxis,
+    ChartYAxis,
+    Column,
     CommandRef,
+    DecorationSetInfo,
+    DocumentInterest,
+    Form,
+    FormField,
+    FormResult,
     Info,
     Item,
+    Point,
+    Row,
+    SandboxInfo,
+    Series,
     StatusItemInfo,
+    Table,
+    TableSort,
+    TextEdit,
     ToolInfo,
     View
 } from "./models.js";

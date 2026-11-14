@@ -6,6 +6,9 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"flint/internal/extensions/manifest"
+	"flint/internal/extensions/sandbox"
 )
 
 // extension writes a folder with a manifest and, when script is set, a shell
@@ -42,6 +45,75 @@ done
 `
 }
 
+const setManifest = `{"contract":1,"id":"test.ext","name":"T","version":"0.1.0","run":{"command":"run.sh"},
+  "permissions":["workspace.read"],
+  "contributes":{"decorationSets":[{"id":"test.ext.marks","title":"Marks","globs":["*.txt"]}]}}`
+
+// decorating answers initialize and shutdown, publishes publish (the params
+// of editor/setDecorations, with %s for the path) when a file opens, and
+// answers editor/action with action.
+func decorating(publish, action string) string {
+	return `while IFS= read -r line; do
+  id=$(printf '%s' "$line" | grep -o '"id":[0-9][0-9]*' | head -n 1 | cut -d: -f2)
+  case "$line" in
+    *'"method":"initialize"'*) printf '{"jsonrpc":"2.0","id":%s,"result":{"capabilities":{}}}\n' "$id" ;;
+    *'"method":"editor/opened"'*)
+      path=$(printf '%s' "$line" | grep -o '"path":"[^"]*"' | head -n 1 | cut -d'"' -f4)
+      printf '{"jsonrpc":"2.0","method":"editor/setDecorations","params":` + publish + `}\n' "$path" ;;
+    *'"method":"editor/action"'*) printf '{"jsonrpc":"2.0","id":%s,%s}\n' "$id" '` + action + `' ;;
+    *'"method":"shutdown"'*) printf '{"jsonrpc":"2.0","id":%s,"result":null}\n' "$id"; exit 0 ;;
+  esac
+done
+`
+}
+
+func TestCheckDecorationSets(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell extensions")
+	}
+	good := `{"set":"test.ext.marks","path":"%s","version":1,"decorations":[{"kind":"gutter","line":1}]}`
+	for name, tc := range map[string]struct {
+		manifest, script, want string
+	}{
+		"good":               {setManifest, decorating(good, `"result":{"edits":[]}`), ""},
+		"no quick fixes":     {setManifest, decorating(good, `"error":{"code":-32601,"message":"method not found"}`), ""},
+		"foreign set":        {setManifest, decorating(strings.Replace(good, "test.ext.marks", "other.ext.marks", 1), `"result":{}`), "editor/setDecorations"},
+		"another file":       {setManifest, decorating(strings.Replace(good, "%s", "%s.bak", 1), `"result":{}`), "editor/setDecorations"},
+		"bad edits":          {setManifest, decorating(good, `"result":{"edits":[{"line":0,"text":"x"}]}`), "editor/action"},
+		"no answer":          {setManifest, "read -r line; echo nope; sleep 5\n", "decoration set test.ext.marks"},
+		"without permission": {strings.Replace(setManifest, `"workspace.read"`, ``, 1), decorating(good, `"result":{}`), "manifest"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := check(extension(t, tc.manifest, tc.script))
+			got := strings.Join(r.problems, "\n")
+			if tc.want == "" && got != "" {
+				t.Errorf("problems:\n%s", got)
+			}
+			if tc.want != "" && !strings.Contains(got, tc.want) {
+				t.Errorf("problems %q, want one with %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSampleFile(t *testing.T) {
+	for _, tc := range []struct {
+		set  manifest.DecorationSet
+		want string
+	}{
+		{manifest.DecorationSet{Extensions: []string{".md"}}, "extcheck.md"},
+		{manifest.DecorationSet{Globs: []string{"Dockerfile*"}}, "Dockerfileextcheck"},
+		{manifest.DecorationSet{Globs: []string{"*.test.t?"}}, "extcheck.test.tx"},
+		{manifest.DecorationSet{Languages: []string{"ruby", "python"}}, "extcheck.py"},
+		{manifest.DecorationSet{Languages: []string{"ruby"}}, ""},
+		{manifest.DecorationSet{Globs: []string{"[a-c]*"}}, ""},
+	} {
+		if got := sampleFile(tc.set); got != tc.want {
+			t.Errorf("sampleFile(%+v) = %q, want %q", tc.set, got, tc.want)
+		}
+	}
+}
+
 func TestCheck(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell extensions")
@@ -68,5 +140,115 @@ func TestCheck(t *testing.T) {
 				t.Errorf("problems %q, want one with %q", got, tc.want)
 			}
 		})
+	}
+}
+
+// viewManifest declares one panel of a declarative kind and one tab view.
+func viewManifest(kind string) string {
+	return `{"contract":1,"id":"test.ext","name":"T","version":"0.1.0","run":{"command":"run.sh"},
+  "contributes":{"panels":[{"id":"test.ext.p","title":"P","icon":"files","order":1,"view":"` + kind + `"}],
+                 "tabViews":[{"id":"test.ext.t","title":"T","view":"` + kind + `"}]}}`
+}
+
+// shellForm is shellExtension that also answers form/submit with submit.
+func shellForm(resolve, submit string) string {
+	return strings.Replace(shellExtension(resolve), `    *'"method":"shutdown"'*)`,
+		`    *'"method":"form/submit"'*) printf '{"jsonrpc":"2.0","id":%s,%s}\n' "$id" '`+submit+`' ;;
+    *'"method":"shutdown"'*)`, 1)
+}
+
+func TestCheckDeclarativeViews(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell extensions")
+	}
+	table := `"result":{"kind":"table","columns":[{"id":"a","title":"A","type":"number"}],"rows":[{"id":"1","cells":{"a":1}}]}`
+	chart := `"result":{"kind":"chart","type":"bar","x":{"type":"category"},"series":[{"id":"s","label":"S","points":[["go",3]]}]}`
+	form := `"result":{"kind":"form","fields":[{"id":"name","type":"string","value":"x"}],"submit":"Save"}`
+	var points []string
+	for i := 0; i < 2001; i++ {
+		points = append(points, `["p",1]`)
+	}
+	for name, tc := range map[string]struct {
+		manifest, script, want string
+	}{
+		"table":              {viewManifest("table"), shellExtension(table), ""},
+		"chart":              {viewManifest("chart"), shellExtension(chart), ""},
+		"form":               {viewManifest("form"), shellForm(form, `"result":{}`), ""},
+		"form refused":       {viewManifest("form"), shellForm(form, `"result":{"errors":{"name":"is taken"}}`), ""},
+		"message for a tab":  {viewManifest("chart"), shellExtension(`"result":{"kind":"message","text":"No such tab."}`), ""},
+		"table, no columns":  {viewManifest("table"), shellExtension(`"result":{"kind":"table","columns":[],"rows":[]}`), "it has no columns"},
+		"list for a table":   {viewManifest("table"), shellExtension(`"result":{"kind":"list","items":[]}`), "sent a list view for a table panel"},
+		"pie chart":          {viewManifest("chart"), shellExtension(`"result":{"kind":"chart","type":"pie","series":[]}`), `chart type "pie"`},
+		"too many points":    {viewManifest("chart"), shellExtension(`"result":{"kind":"chart","type":"line","series":[{"id":"s","points":[` + strings.Join(points, ",") + `]}]}`), "more than Flint shows"},
+		"bad field":          {viewManifest("form"), shellForm(`"result":{"kind":"form","fields":[{"id":"x","type":"object"}]}`, `"result":{}`), "field 1"},
+		"submit not handled": {viewManifest("form"), shellForm(form, `"error":{"code":-32601,"message":"method not found"}`), "form/submit"},
+		"unknown view kind":  {viewManifest("cards"), shellExtension(table), "manifest"},
+		"tab resolve error":  {strings.Replace(viewManifest("table"), `"panels":[{"id":"test.ext.p","title":"P","icon":"files","order":1,"view":"table"}],`, "", 1), shellExtension(`"error":{"code":-32603,"message":"boom"}`), "tab view test.ext.t: view/resolve"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := check(extension(t, tc.manifest, tc.script))
+			got := strings.Join(r.problems, "\n")
+			if tc.want == "" && got != "" {
+				t.Errorf("problems:\n%s", got)
+			}
+			if tc.want != "" && !strings.Contains(got, tc.want) {
+				t.Errorf("problems %q, want one with %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestMain(m *testing.M) {
+	sandbox.Main() // sandboxed test extensions start this binary as their launcher
+	os.Exit(m.Run())
+}
+
+// The effective sandbox is reported, a sandboxed extension is really run
+// confined, and a broken sandbox section fails the manifest.
+func TestCheckReportsTheSandbox(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell extensions")
+	}
+	withSandbox := func(section string) string {
+		return strings.Replace(panelManifest, `"run":{"command":"run.sh"}`, `"run":{"command":"run.sh","sandbox":`+section+`}`, 1)
+	}
+	script := shellExtension(`"result":{"kind":"list","items":[]}`)
+
+	r := check(extension(t, panelManifest, script))
+	if len(r.problems) != 0 || !strings.HasPrefix(r.sandbox, "Not sandboxed: the extension doesn't declare a sandbox") {
+		t.Errorf("no section: %q, %v", r.sandbox, r.problems)
+	}
+	r = check(extension(t, withSandbox(`{"mode":"none"}`), script))
+	if len(r.problems) != 0 || r.sandbox != "Not sandboxed (declared by the extension)" {
+		t.Errorf("mode none: %q, %v", r.sandbox, r.problems)
+	}
+	for _, bad := range []string{`{"read":["../x"]}`, `{"mode":"none","exec":true}`, `{"unknown":1}`} {
+		r = check(extension(t, withSandbox(bad), script))
+		if got := strings.Join(r.problems, "\n"); !strings.Contains(got, "manifest: ") || !strings.Contains(got, "run.sandbox") {
+			t.Errorf("%s: problems %q", bad, got)
+		}
+	}
+
+	// The script runs grep, head and cut: it needs "exec".
+	r = check(extension(t, withSandbox(`{"exec":true}`), script))
+	if len(r.problems) != 0 {
+		t.Errorf("sandboxed with exec: %v", r.problems)
+	}
+	if !sandbox.Probe().Available {
+		if !strings.HasPrefix(r.sandbox, "Not sandboxed: not available on this system") {
+			t.Errorf("sandbox = %q", r.sandbox)
+		}
+		t.Skipf("no sandbox on this system (%s): the confined run is not tested", sandbox.Probe().Reason)
+	}
+	for _, want := range []string{"Sandboxed (", "Reads: its own folder, system files", "Network: blocked", "Other programs: may start any program it can read"} {
+		if !strings.Contains(r.sandbox, want) {
+			t.Errorf("sandbox %q lacks %q", r.sandbox, want)
+		}
+	}
+	// Without "exec" the same script can't start its helpers, and the check
+	// that passes unconfined fails: the sandbox was really applied.
+	r = check(extension(t, withSandbox(`{}`), script))
+	if len(r.problems) == 0 {
+		t.Error("a script that runs other programs passes in the strict sandbox")
 	}
 }

@@ -11,9 +11,12 @@ import { subscribeQuit } from './store/quit'
 import { subscribeSessionAutosave } from './store/session'
 import { subscribeGitEvents } from './store/git'
 import { subscribeLspEvents } from './store/lsp'
+import { subscribeLspEdits } from './store/lspEdits'
 import { subscribeAgentChatEvents } from './store/agentChat'
 import { subscribeUsageEvents } from './store/usage'
+import { subscribeTaskQueue } from './store/agentTasks'
 import { subscribeRunEvents, useRun } from './store/run'
+import { subscribeHttpEvents } from './store/httpClient'
 import { subscribeDebugEvents } from './store/debug'
 import { subscribeAutoSave } from './store/settings'
 import { subscribeScratchAutosave } from './store/scratch'
@@ -29,6 +32,7 @@ import { useVSCodeImport } from './store/vscodeImport'
 import { usePrompts } from './store/prompts'
 import type { DroppedPath } from './lib/drop'
 import { UsagesModal } from './components/lsp/UsagesModal'
+import { SymbolsModal } from './components/lsp/SymbolsModal'
 import { showToast } from './store/dialog'
 import { errorMessage } from './api/backend'
 import { handleGlobalKey, setCommandErrorHandler } from './lib/commands'
@@ -80,9 +84,12 @@ export default function App() {
     subscribeQuit()
     subscribeGitEvents()
     subscribeLspEvents()
+    subscribeLspEdits()
     subscribeAgentChatEvents()
 subscribeUsageEvents()
+    subscribeTaskQueue()
     subscribeRunEvents()
+    subscribeHttpEvents()
     subscribeDebugEvents()
     subscribeSessionAutosave()
     subscribeAutoSave()
@@ -188,6 +195,7 @@ subscribeUsageEvents()
         </Suspense>
       )}
       <UsagesModal />
+      <SymbolsModal />
       <Overlays />
     </div>
   )

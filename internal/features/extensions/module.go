@@ -10,6 +10,7 @@ package extensions
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 
@@ -17,7 +18,9 @@ import (
 
 	"flint/internal/extensions/catalog"
 	"flint/internal/extensions/host"
+	"flint/internal/extensions/index"
 	"flint/internal/feature"
+	"flint/internal/lsp"
 	"flint/internal/mcpserver"
 	"flint/internal/settings"
 	"flint/internal/shellenv"
@@ -33,10 +36,25 @@ var Module = feature.Module{
 			Dir:     filepath.Join(h.ConfigDir(), "extensions"),
 			App:     app{h: h, changed: func() { go langs.sync() }},
 			Secrets: host.Keyring{},
+			LanguageOf: func(path string) string {
+				language, _, _ := lsp.LanguageOf(path)
+				return language
+			},
+
+			RequireSandbox: func() bool { return Section.Get(h.Settings()).RequireSandbox },
 		})
 		langs.list = hst.List
 		cat := catalog.New(catalog.Options{Dir: catalogDir(h), Before: shellenv.Wait})
-		api := &API{host: hst, catalog: cat, fh: h, langs: langs}
+		store := &indexStore{
+			host:     hst,
+			settings: func() Settings { return Section.Get(h.Settings()) },
+			client:   &index.Client{Version: h.Version()},
+			dir:      filepath.Join(h.ConfigDir(), "extension-index"),
+		}
+		api := &API{host: hst, catalog: cat, fh: h, langs: langs, index: store}
+		if req, ok := RequestOf(os.Args[1:], ""); ok {
+			api.pending = &req
+		}
 		return feature.Instance{
 			Services: []application.Service{application.NewService(api)},
 			AgentTools: func() []mcpserver.Tool {
@@ -63,6 +81,9 @@ func catalogDir(h feature.Host) string {
 // settingsChanged tells the host about each extension whose settings or
 // enabled state changed.
 func settingsChanged(h *host.Host, prev, next Settings) {
+	if prev.RequireSandbox != next.RequireSandbox {
+		h.SandboxSettingChanged()
+	}
 	ids := map[string]bool{}
 	for id := range prev.Values {
 		ids[id] = true
@@ -81,6 +102,9 @@ func settingsChanged(h *host.Host, prev, next Settings) {
 			h.SettingsChanged(id)
 		}
 	}
+	if !maps.Equal(prev.Decorations, next.Decorations) {
+		h.SetsChanged()
+	}
 }
 
 // app is what the host sees of Flint; changed runs when the list or a state
@@ -98,9 +122,12 @@ func (a app) Emit(event string, data ...any) {
 	}
 	a.h.Emit(event, data...)
 }
-func (a app) OpenURL(link string) error          { return a.h.OpenURL(link) }
-func (a app) Version() string                    { return a.h.Version() }
-func (a app) Enabled(id string) bool             { return Section.Get(a.h.Settings()).enabled(id) }
+func (a app) OpenURL(link string) error { return a.h.OpenURL(link) }
+func (a app) Version() string           { return a.h.Version() }
+func (a app) Enabled(id string) bool    { return Section.Get(a.h.Settings()).enabled(id) }
+func (a app) SetEnabled(set string, def bool) bool {
+	return Section.Get(a.h.Settings()).setEnabled(set, def)
+}
 func (a app) Settings(id string) json.RawMessage { return Section.Get(a.h.Settings()).Values[id] }
 func (a app) Confirm(title, msg, ok string) bool { return a.h.Confirm(title, msg, ok) }
 func (a app) Choose(title, msg string, buttons []string) string {

@@ -2,20 +2,23 @@
   "contract": 1,
   "id": "example.stats",
   "name": "Project Stats",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "Flint examples",
-  "description": "Counts the files of the open projects by type: a panel, a status bar item and a tool for agents.",
-  "run": { "command": "stats" },
-  "activation": ["onView:example.stats.files", "onCommand:example.stats.refresh", "onAgentTool:summary"],
+  "description": "Counts the files of the open projects by type: a tree, a sortable table, a chart in a tab, a status bar item and a tool for agents.",
+  "run": { "command": "stats", "sandbox": {} },
+  "activation": ["onView:example.stats.files", "onView:example.stats.types", "onView:example.stats.chart", "onCommand:example.stats.refresh", "onCommand:example.stats.showChart", "onAgentTool:summary"],
   "permissions": ["workspace.read"],
   "contributes": {
     "commands": [
       { "id": "example.stats.refresh", "title": "Count Files Again", "category": "Project Stats", "keys": "Mod+Alt+Shift+S" },
-      { "id": "example.stats.open", "title": "Open Largest File", "category": "Project Stats" }
+      { "id": "example.stats.open", "title": "Open Largest File", "category": "Project Stats" },
+      { "id": "example.stats.showChart", "title": "Show Files by Type", "category": "Project Stats" }
     ],
     "panels": [
-      { "id": "example.stats.files", "title": "Project Stats", "icon": "sum", "order": 50, "view": "tree" }
+      { "id": "example.stats.files", "title": "Project Stats", "icon": "sum", "order": 50, "view": "tree" },
+      { "id": "example.stats.types", "title": "File Types", "icon": "sum", "order": 51, "view": "table" }
     ],
+    "tabViews": [{ "id": "example.stats.chart", "title": "Files by Type", "icon": "sum", "view": "chart", "restore": true }],
     "statusItems": [{ "id": "example.stats.count", "order": 10 }],
     "settings": {
       "title": "Project Stats",

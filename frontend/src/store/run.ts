@@ -21,6 +21,7 @@ import { askAgent } from '../lib/askAgent'
 import { failedTestsPrompt } from '../lib/agentPrompt'
 import { runSummary } from '../lib/alerts'
 import { alertDone } from './alerts'
+import { parseRunAdoption } from '../lib/runAdopt'
 
 // Run configurations (.flint/run.json + detected ones) and test runs. Every
 // action is a plain exported function so the toolbar, shortcuts, the editor
@@ -414,6 +415,30 @@ async function startSession(
   }
 }
 
+/**
+ * Shows a run the backend started by itself (an agent's run_tests or
+ * run_configuration tool) in its tab, like one started here. It runs
+ * synchronously in the event handler: the run's first output follows at once.
+ */
+function adoptRun(payload: unknown): void {
+  const a = parseRunAdoption(payload)
+  if (!a || runKeys.has(a.id)) return
+  const key = a.kind === 'tests' ? TESTS_KEY : configKey(a.root, a.config.id)
+  const base: Pick<RunSession, 'kind' | 'title' | 'config' | 'root' | 'request' | 'bases'> = a.kind === 'tests'
+    ? { kind: 'tests', title: 'Tests', request: a.request, bases: [...a.request.dirs, a.root].filter(Boolean) }
+    : { kind: 'config', title: a.config.name, config: runconfig.Config.createFrom(a.config), root: a.root, bases: [resolvePath(a.root, a.config.cwd || '.')] }
+  const prev = useRun.getState().sessions[key]
+  if (prev?.running) void RunAPI.Stop(prev.runId).catch(() => undefined)
+  if (prev) dropRun(prev.runId)
+  runKeys.set(a.id, key)
+  resetConsole(key)
+  const session: RunSession = { key, runId: a.id, running: true, exit: null, tests: emptyTree, startedAt: Date.now(), ...base }
+  useRun.setState((s) => ({ sessions: { ...s.sessions, [key]: session }, lastKey: key }))
+  notifyResults()
+  // In the background: the user is in the chat, and the tab is there to look at.
+  useEditor.getState().openRun(key, a.title || base.title, true)
+}
+
 /** Updates a session only while runId is still its current process. */
 function updateSession(key: string, runId: string, patch: (s: RunSession) => Partial<RunSession>): void {
   useRun.setState((s) => {
@@ -607,6 +632,7 @@ export function subscribeRunEvents(): void {
   if (subscribed) return
   subscribed = true
   EventsOn('run:event', (ev: RunEventMsg) => deliver(ev.id, ev))
+  EventsOn('run:adopt', adoptRun)
 
   // Configurations follow the active tab's workspace folder and edits of its .flint/run.json.
   let unwatch: (() => void) | null = null

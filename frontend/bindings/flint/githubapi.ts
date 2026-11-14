@@ -124,6 +124,20 @@ export function RerunFailed(dir: string, runID: number): $CancellablePromise<voi
 }
 
 /**
+ * ReviewDraft builds the agent chat draft for the review feedback of pull
+ * request number: one thread (threadID), or with "" all unresolved,
+ * non-outdated threads and the reviews that request changes. dir is a folder
+ * of the workspace or an agent task's worktree, where the agent would work.
+ * The pull request comes from Go's cache when it was loaded in the last
+ * seconds; nothing is written to GitHub and nothing is sent to an agent.
+ */
+export function ReviewDraft(dir: string, $number: number, threadID: string): $CancellablePromise<$models.PRReviewDraft> {
+    return $Call.ByID(3732303146, dir, $number, threadID).then(($result: any) => {
+        return $$createType8($result);
+    });
+}
+
+/**
  * SetResolved resolves or unresolves a review thread.
  */
 export function SetResolved(dir: string, $number: number, threadID: string, resolved: boolean): $CancellablePromise<void> {
@@ -146,3 +160,4 @@ const $$createType4 = github$0.Details.createFrom;
 const $$createType5 = github$0.FileDiff.createFrom;
 const $$createType6 = github$0.PullRequest.createFrom;
 const $$createType7 = $Create.Array($$createType6);
+const $$createType8 = $models.PRReviewDraft.createFrom;

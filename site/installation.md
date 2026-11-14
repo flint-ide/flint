@@ -104,6 +104,8 @@ flint ~/src/my-app   # open another folder
 
 If Flint is already running, it takes the folder over and comes to the front instead of starting a second copy. Relative paths are resolved from the directory you run the command in.
 
+`flint --install-extension <folder>` installs the [extension](guides/extensions.md#from-a-folder) in that folder. Flint opens, or the running Flint comes to the front, and shows the same confirmation as **Install Extension from Folder…**; nothing is installed without it.
+
 `make install` (when you build from source) installs the command as `~/.local/bin/flint`. If you installed Flint from a release, you can install the same small script by hand: save [scripts/flint](https://github.com/flint-ide/flint/blob/main/scripts/flint) as `~/.local/bin/flint` and make it executable with `chmod +x ~/.local/bin/flint`. It expects Flint in `/Applications` or `~/Applications`.
 
 > **Tip:** Make sure `~/.local/bin` is on your `PATH`.

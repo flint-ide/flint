@@ -41,6 +41,257 @@ export class Action {
 }
 
 /**
+ * ActionRequest names the quick fix the user chose and where its decoration
+ * is now (it moves with the user's edits).
+ */
+export class ActionRequest {
+    "set": string;
+
+    /**
+     * Path and Version are the document and its version when the user chose.
+     */
+    "path": string;
+    "version": number;
+    "action": string;
+
+    /**
+     * Decoration is the decoration's id, when the extension gave it one.
+     */
+    "decoration"?: string;
+    "line": number;
+    "endLine": number;
+    "from": number;
+    "to": number;
+
+    /** Creates a new ActionRequest instance. */
+    constructor($$source: Partial<ActionRequest> = {}) {
+        if (!("set" in $$source)) {
+            this["set"] = "";
+        }
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("version" in $$source)) {
+            this["version"] = 0;
+        }
+        if (!("action" in $$source)) {
+            this["action"] = "";
+        }
+        if (!("line" in $$source)) {
+            this["line"] = 0;
+        }
+        if (!("endLine" in $$source)) {
+            this["endLine"] = 0;
+        }
+        if (!("from" in $$source)) {
+            this["from"] = 0;
+        }
+        if (!("to" in $$source)) {
+            this["to"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ActionRequest instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ActionRequest {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ActionRequest($$parsedSource as Partial<ActionRequest>);
+    }
+}
+
+/**
+ * ActionResult is a quick fix's answer: edits for the document at Version,
+ * which the editor applies only if that is still its version.
+ */
+export class ActionResult {
+    "version": number;
+    "edits": TextEdit[];
+
+    /** Creates a new ActionResult instance. */
+    constructor($$source: Partial<ActionResult> = {}) {
+        if (!("version" in $$source)) {
+            this["version"] = 0;
+        }
+        if (!("edits" in $$source)) {
+            this["edits"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ActionResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ActionResult {
+        const $$createField1_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("edits" in $$parsedSource) {
+            $$parsedSource["edits"] = $$createField1_0($$parsedSource["edits"]);
+        }
+        return new ActionResult($$parsedSource as Partial<ActionResult>);
+    }
+}
+
+/**
+ * Chart is a chart view: up to maxSeries series of up to maxPoints points.
+ */
+export class Chart {
+    /**
+     * Type is "line", "bar" or "area".
+     */
+    "type": string;
+    "title"?: string;
+    "x": ChartXAxis;
+    "y": ChartYAxis;
+    "series": Series[];
+
+    /** Creates a new Chart instance. */
+    constructor($$source: Partial<Chart> = {}) {
+        if (!("type" in $$source)) {
+            this["type"] = "";
+        }
+        if (!("x" in $$source)) {
+            this["x"] = (new ChartXAxis());
+        }
+        if (!("y" in $$source)) {
+            this["y"] = (new ChartYAxis());
+        }
+        if (!("series" in $$source)) {
+            this["series"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Chart instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Chart {
+        const $$createField2_0 = $$createType2;
+        const $$createField3_0 = $$createType3;
+        const $$createField4_0 = $$createType5;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("x" in $$parsedSource) {
+            $$parsedSource["x"] = $$createField2_0($$parsedSource["x"]);
+        }
+        if ("y" in $$parsedSource) {
+            $$parsedSource["y"] = $$createField3_0($$parsedSource["y"]);
+        }
+        if ("series" in $$parsedSource) {
+            $$parsedSource["series"] = $$createField4_0($$parsedSource["series"]);
+        }
+        return new Chart($$parsedSource as Partial<Chart>);
+    }
+}
+
+/**
+ * ChartXAxis types the points' x values.
+ */
+export class ChartXAxis {
+    /**
+     * Type is "number", "date" or "category".
+     */
+    "type": string;
+    "label"?: string;
+
+    /** Creates a new ChartXAxis instance. */
+    constructor($$source: Partial<ChartXAxis> = {}) {
+        if (!("type" in $$source)) {
+            this["type"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ChartXAxis instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ChartXAxis {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ChartXAxis($$parsedSource as Partial<ChartXAxis>);
+    }
+}
+
+/**
+ * ChartYAxis labels and bounds the y axis.
+ */
+export class ChartYAxis {
+    "label"?: string;
+    "min"?: number | null;
+    "max"?: number | null;
+
+    /** Creates a new ChartYAxis instance. */
+    constructor($$source: Partial<ChartYAxis> = {}) {
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ChartYAxis instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ChartYAxis {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ChartYAxis($$parsedSource as Partial<ChartYAxis>);
+    }
+}
+
+/**
+ * Column types its cells.
+ */
+export class Column {
+    "id": string;
+    "title": string;
+
+    /**
+     * Type is "text", "number", "date" or "badge".
+     */
+    "type": string;
+
+    /**
+     * Align is "start", "center" or "end".
+     */
+    "align": string;
+
+    /**
+     * Badges maps a badge column's values to a severity (info, ok, warning, error).
+     */
+    "badges"?: { [_ in string]?: string };
+
+    /** Creates a new Column instance. */
+    constructor($$source: Partial<Column> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("title" in $$source)) {
+            this["title"] = "";
+        }
+        if (!("type" in $$source)) {
+            this["type"] = "";
+        }
+        if (!("align" in $$source)) {
+            this["align"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Column instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Column {
+        const $$createField4_0 = $$createType6;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("badges" in $$parsedSource) {
+            $$parsedSource["badges"] = $$createField4_0($$parsedSource["badges"]);
+        }
+        return new Column($$parsedSource as Partial<Column>);
+    }
+}
+
+/**
  * CommandRef names a command of the extension and its arguments.
  */
 export class CommandRef {
@@ -62,6 +313,218 @@ export class CommandRef {
     static createFrom($$source: any = {}): CommandRef {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new CommandRef($$parsedSource as Partial<CommandRef>);
+    }
+}
+
+/**
+ * DecorationSetInfo is a contributed decoration set, for Settings and the
+ * palette: the files it is for in words, and its state.
+ */
+export class DecorationSetInfo {
+    "id": string;
+    "title": string;
+
+    /**
+     * Default is whether it is on unless the user says otherwise; Enabled
+     * whether it is on now.
+     */
+    "default": boolean;
+    "enabled": boolean;
+
+    /**
+     * Files names the files it is for ("go, .md, *.test.ts").
+     */
+    "files": string;
+
+    /**
+     * UnsavedText: it sees the text of unsaved edits.
+     */
+    "unsavedText": boolean;
+
+    /** Creates a new DecorationSetInfo instance. */
+    constructor($$source: Partial<DecorationSetInfo> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("title" in $$source)) {
+            this["title"] = "";
+        }
+        if (!("default" in $$source)) {
+            this["default"] = false;
+        }
+        if (!("enabled" in $$source)) {
+            this["enabled"] = false;
+        }
+        if (!("files" in $$source)) {
+            this["files"] = "";
+        }
+        if (!("unsavedText" in $$source)) {
+            this["unsavedText"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new DecorationSetInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): DecorationSetInfo {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new DecorationSetInfo($$parsedSource as Partial<DecorationSetInfo>);
+    }
+}
+
+/**
+ * DocumentInterest says whether any extension wants to hear about a document.
+ */
+export class DocumentInterest {
+    /**
+     * Tracked: an enabled extension has a decoration set, turned on, for the file.
+     */
+    "tracked": boolean;
+
+    /**
+     * Text: one of those sets declared unsavedText, so the editor's text is
+     * passed along with each change.
+     */
+    "text": boolean;
+
+    /** Creates a new DocumentInterest instance. */
+    constructor($$source: Partial<DocumentInterest> = {}) {
+        if (!("tracked" in $$source)) {
+            this["tracked"] = false;
+        }
+        if (!("text" in $$source)) {
+            this["text"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new DocumentInterest instance from a string or object.
+     */
+    static createFrom($$source: any = {}): DocumentInterest {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new DocumentInterest($$parsedSource as Partial<DocumentInterest>);
+    }
+}
+
+/**
+ * Form is a form view: fields with the settings schema's rules and a submit button.
+ */
+export class Form {
+    "id"?: string;
+    "description"?: string;
+    "fields": FormField[];
+
+    /**
+     * Submit is the button's label.
+     */
+    "submit": string;
+
+    /** Creates a new Form instance. */
+    constructor($$source: Partial<Form> = {}) {
+        if (!("fields" in $$source)) {
+            this["fields"] = [];
+        }
+        if (!("submit" in $$source)) {
+            this["submit"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Form instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Form {
+        const $$createField2_0 = $$createType8;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("fields" in $$parsedSource) {
+            $$parsedSource["fields"] = $$createField2_0($$parsedSource["fields"]);
+        }
+        return new Form($$parsedSource as Partial<Form>);
+    }
+}
+
+/**
+ * FormField is a field: a property of the settings schema subset (its key is
+ * the field's id), the value to show and how to draw it.
+ */
+export class FormField {
+    "property": manifest$0.Property;
+
+    /**
+     * Value is the current value, valid for the property; a secret field's
+     * is always "".
+     */
+    "value": any;
+    "multiline"?: boolean;
+    "secret"?: boolean;
+    "required"?: boolean;
+    "placeholder"?: string;
+
+    /** Creates a new FormField instance. */
+    constructor($$source: Partial<FormField> = {}) {
+        if (!("property" in $$source)) {
+            this["property"] = (new manifest$0.Property());
+        }
+        if (!("value" in $$source)) {
+            this["value"] = null;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new FormField instance from a string or object.
+     */
+    static createFrom($$source: any = {}): FormField {
+        const $$createField0_0 = $$createType9;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("property" in $$parsedSource) {
+            $$parsedSource["property"] = $$createField0_0($$parsedSource["property"]);
+        }
+        return new FormField($$parsedSource as Partial<FormField>);
+    }
+}
+
+/**
+ * FormResult is what a submit came to: nothing (accepted), or why not.
+ */
+export class FormResult {
+    /**
+     * Errors are messages for fields, by field id.
+     */
+    "errors"?: { [_ in string]?: string };
+
+    /**
+     * Error is about the form as a whole.
+     */
+    "error"?: string;
+
+    /**
+     * Message is shown after an accepted submit.
+     */
+    "message"?: string;
+
+    /** Creates a new FormResult instance. */
+    constructor($$source: Partial<FormResult> = {}) {
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new FormResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): FormResult {
+        const $$createField0_0 = $$createType6;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("errors" in $$parsedSource) {
+            $$parsedSource["errors"] = $$createField0_0($$parsedSource["errors"]);
+        }
+        return new FormResult($$parsedSource as Partial<FormResult>);
     }
 }
 
@@ -133,6 +596,16 @@ export class Info {
      */
     "debuggers": manifest$0.Debugger[];
     "testRunners": manifest$0.TestRunner[];
+
+    /**
+     * DecorationSets are the groups of editor decorations it draws.
+     */
+    "decorationSets": DecorationSetInfo[];
+
+    /**
+     * Sandbox says how the program is confined, or why it isn't.
+     */
+    "sandbox": SandboxInfo;
 
     /** Creates a new Info instance. */
     constructor($$source: Partial<Info> = {}) {
@@ -208,6 +681,12 @@ export class Info {
         if (!("testRunners" in $$source)) {
             this["testRunners"] = [];
         }
+        if (!("decorationSets" in $$source)) {
+            this["decorationSets"] = [];
+        }
+        if (!("sandbox" in $$source)) {
+            this["sandbox"] = (new SandboxInfo());
+        }
 
         Object.assign(this, $$source);
     }
@@ -216,19 +695,21 @@ export class Info {
      * Creates a new Info instance from a string or object.
      */
     static createFrom($$source: any = {}): Info {
-        const $$createField10_0 = $$createType0;
-        const $$createField11_0 = $$createType0;
-        const $$createField12_0 = $$createType0;
-        const $$createField14_0 = $$createType2;
-        const $$createField15_0 = $$createType4;
-        const $$createField16_0 = $$createType6;
-        const $$createField17_0 = $$createType8;
-        const $$createField18_0 = $$createType10;
-        const $$createField19_0 = $$createType12;
-        const $$createField20_0 = $$createType14;
-        const $$createField21_0 = $$createType16;
-        const $$createField22_0 = $$createType18;
-        const $$createField23_0 = $$createType20;
+        const $$createField10_0 = $$createType10;
+        const $$createField11_0 = $$createType10;
+        const $$createField12_0 = $$createType10;
+        const $$createField14_0 = $$createType12;
+        const $$createField15_0 = $$createType14;
+        const $$createField16_0 = $$createType16;
+        const $$createField17_0 = $$createType18;
+        const $$createField18_0 = $$createType20;
+        const $$createField19_0 = $$createType22;
+        const $$createField20_0 = $$createType24;
+        const $$createField21_0 = $$createType26;
+        const $$createField22_0 = $$createType28;
+        const $$createField23_0 = $$createType30;
+        const $$createField24_0 = $$createType32;
+        const $$createField25_0 = $$createType33;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("warnings" in $$parsedSource) {
             $$parsedSource["warnings"] = $$createField10_0($$parsedSource["warnings"]);
@@ -268,6 +749,12 @@ export class Info {
         }
         if ("testRunners" in $$parsedSource) {
             $$parsedSource["testRunners"] = $$createField23_0($$parsedSource["testRunners"]);
+        }
+        if ("decorationSets" in $$parsedSource) {
+            $$parsedSource["decorationSets"] = $$createField24_0($$parsedSource["decorationSets"]);
+        }
+        if ("sandbox" in $$parsedSource) {
+            $$parsedSource["sandbox"] = $$createField25_0($$parsedSource["sandbox"]);
         }
         return new Info($$parsedSource as Partial<Info>);
     }
@@ -318,8 +805,8 @@ export class Item {
      * Creates a new Item instance from a string or object.
      */
     static createFrom($$source: any = {}): Item {
-        const $$createField6_0 = $$createType22;
-        const $$createField7_0 = $$createType24;
+        const $$createField6_0 = $$createType35;
+        const $$createField7_0 = $$createType37;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("actions" in $$parsedSource) {
             $$parsedSource["actions"] = $$createField6_0($$parsedSource["actions"]);
@@ -328,6 +815,173 @@ export class Item {
             $$parsedSource["command"] = $$createField7_0($$parsedSource["command"]);
         }
         return new Item($$parsedSource as Partial<Item>);
+    }
+}
+
+/**
+ * Point is a value: X is a number (a date is milliseconds since 1970 UTC) or,
+ * on a category axis, a string.
+ */
+export class Point {
+    "x": any;
+    "y": number;
+
+    /** Creates a new Point instance. */
+    constructor($$source: Partial<Point> = {}) {
+        if (!("x" in $$source)) {
+            this["x"] = null;
+        }
+        if (!("y" in $$source)) {
+            this["y"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Point instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Point {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Point($$parsedSource as Partial<Point>);
+    }
+}
+
+/**
+ * Row is a table row; Cells are in the order of the columns: a string (text,
+ * badge, an ISO date), a number, or null for a missing or mistyped value.
+ */
+export class Row {
+    "id": string;
+    "cells": any[];
+    "actions"?: Action[];
+    "command"?: CommandRef | null;
+
+    /** Creates a new Row instance. */
+    constructor($$source: Partial<Row> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("cells" in $$source)) {
+            this["cells"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Row instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Row {
+        const $$createField1_0 = $$createType38;
+        const $$createField2_0 = $$createType35;
+        const $$createField3_0 = $$createType37;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("cells" in $$parsedSource) {
+            $$parsedSource["cells"] = $$createField1_0($$parsedSource["cells"]);
+        }
+        if ("actions" in $$parsedSource) {
+            $$parsedSource["actions"] = $$createField2_0($$parsedSource["actions"]);
+        }
+        if ("command" in $$parsedSource) {
+            $$parsedSource["command"] = $$createField3_0($$parsedSource["command"]);
+        }
+        return new Row($$parsedSource as Partial<Row>);
+    }
+}
+
+/**
+ * SandboxInfo says how an extension's program is confined, for the install
+ * dialog and Settings ▸ Extensions.
+ */
+export class SandboxInfo {
+    /**
+     * State is one of the Sandbox constants.
+     */
+    "state": string;
+
+    /**
+     * Summary is one line: "Sandboxed (…)", "Not sandboxed (declared by the
+     * extension)", "Not sandboxed: not available on this system (…)".
+     */
+    "summary": string;
+
+    /**
+     * Details are what it may read, write and connect to, what this system
+     * can't enforce, and what was asked for but not granted.
+     */
+    "details": string[];
+
+    /**
+     * Refused: the user requires a sandbox and this extension has none, so
+     * Flint doesn't start it.
+     */
+    "refused": boolean;
+
+    /** Creates a new SandboxInfo instance. */
+    constructor($$source: Partial<SandboxInfo> = {}) {
+        if (!("state" in $$source)) {
+            this["state"] = "";
+        }
+        if (!("summary" in $$source)) {
+            this["summary"] = "";
+        }
+        if (!("details" in $$source)) {
+            this["details"] = [];
+        }
+        if (!("refused" in $$source)) {
+            this["refused"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SandboxInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SandboxInfo {
+        const $$createField2_0 = $$createType10;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("details" in $$parsedSource) {
+            $$parsedSource["details"] = $$createField2_0($$parsedSource["details"]);
+        }
+        return new SandboxInfo($$parsedSource as Partial<SandboxInfo>);
+    }
+}
+
+/**
+ * Series is one line, area or group of bars.
+ */
+export class Series {
+    "id": string;
+    "label": string;
+    "points": Point[];
+
+    /** Creates a new Series instance. */
+    constructor($$source: Partial<Series> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("label" in $$source)) {
+            this["label"] = "";
+        }
+        if (!("points" in $$source)) {
+            this["points"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Series instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Series {
+        const $$createField2_0 = $$createType40;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("points" in $$parsedSource) {
+            $$parsedSource["points"] = $$createField2_0($$parsedSource["points"]);
+        }
+        return new Series($$parsedSource as Partial<Series>);
     }
 }
 
@@ -376,6 +1030,126 @@ export class StatusItemInfo {
 }
 
 /**
+ * Table is a table view: typed columns and rows the frontend sorts.
+ */
+export class Table {
+    "columns": Column[];
+    "rows": Row[];
+
+    /**
+     * Sort is the order the table is first shown in.
+     */
+    "sort"?: TableSort | null;
+
+    /**
+     * Actions are the context menu of every row that has none of its own.
+     */
+    "actions"?: Action[];
+
+    /** Creates a new Table instance. */
+    constructor($$source: Partial<Table> = {}) {
+        if (!("columns" in $$source)) {
+            this["columns"] = [];
+        }
+        if (!("rows" in $$source)) {
+            this["rows"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Table instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Table {
+        const $$createField0_0 = $$createType42;
+        const $$createField1_0 = $$createType44;
+        const $$createField2_0 = $$createType46;
+        const $$createField3_0 = $$createType35;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("columns" in $$parsedSource) {
+            $$parsedSource["columns"] = $$createField0_0($$parsedSource["columns"]);
+        }
+        if ("rows" in $$parsedSource) {
+            $$parsedSource["rows"] = $$createField1_0($$parsedSource["rows"]);
+        }
+        if ("sort" in $$parsedSource) {
+            $$parsedSource["sort"] = $$createField2_0($$parsedSource["sort"]);
+        }
+        if ("actions" in $$parsedSource) {
+            $$parsedSource["actions"] = $$createField3_0($$parsedSource["actions"]);
+        }
+        return new Table($$parsedSource as Partial<Table>);
+    }
+}
+
+/**
+ * TableSort names a column to sort by.
+ */
+export class TableSort {
+    "column": string;
+    "descending"?: boolean;
+
+    /** Creates a new TableSort instance. */
+    constructor($$source: Partial<TableSort> = {}) {
+        if (!("column" in $$source)) {
+            this["column"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TableSort instance from a string or object.
+     */
+    static createFrom($$source: any = {}): TableSort {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new TableSort($$parsedSource as Partial<TableSort>);
+    }
+}
+
+/**
+ * TextEdit replaces the text from (Line, From) to (EndLine, To) with Text;
+ * positions as in Decoration.
+ */
+export class TextEdit {
+    "line": number;
+    "from": number;
+    "endLine": number;
+    "to": number;
+    "text": string;
+
+    /** Creates a new TextEdit instance. */
+    constructor($$source: Partial<TextEdit> = {}) {
+        if (!("line" in $$source)) {
+            this["line"] = 0;
+        }
+        if (!("from" in $$source)) {
+            this["from"] = 0;
+        }
+        if (!("endLine" in $$source)) {
+            this["endLine"] = 0;
+        }
+        if (!("to" in $$source)) {
+            this["to"] = 0;
+        }
+        if (!("text" in $$source)) {
+            this["text"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TextEdit instance from a string or object.
+     */
+    static createFrom($$source: any = {}): TextEdit {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new TextEdit($$parsedSource as Partial<TextEdit>);
+    }
+}
+
+/**
  * ToolInfo is a contributed agent tool and the name agents see.
  */
 export class ToolInfo {
@@ -383,6 +1157,11 @@ export class ToolInfo {
     "agentName": string;
     "title": string;
     "description": string;
+
+    /**
+     * Acts: the tool changes something, so Flint asks before each call.
+     */
+    "acts": boolean;
 
     /** Creates a new ToolInfo instance. */
     constructor($$source: Partial<ToolInfo> = {}) {
@@ -398,6 +1177,9 @@ export class ToolInfo {
         if (!("description" in $$source)) {
             this["description"] = "";
         }
+        if (!("acts" in $$source)) {
+            this["acts"] = false;
+        }
 
         Object.assign(this, $$source);
     }
@@ -412,14 +1194,22 @@ export class ToolInfo {
 }
 
 /**
- * View is a panel's content: items of a tree or list, or a message.
+ * View is a panel's or a tab's content: items of a tree or list, a table, a
+ * form or a chart (richviews.go), or a message.
  */
 export class View {
     /**
-     * Kind is "tree", "list" or "message".
+     * Kind is "tree", "list", "table", "form", "chart" or "message".
      */
     "kind": string;
     "items": Item[];
+
+    /**
+     * Table, Form and Chart are the content of a view of that kind.
+     */
+    "table"?: Table | null;
+    "form"?: Form | null;
+    "chart"?: Chart | null;
 
     /**
      * Text and Actions are a message's.
@@ -428,7 +1218,8 @@ export class View {
     "actions"?: Action[];
 
     /**
-     * Truncated: the extension sent more than maxItems items.
+     * Truncated: the extension sent more than maxItems items or rows, or
+     * more series or points than a chart holds.
      */
     "truncated"?: boolean;
 
@@ -448,44 +1239,84 @@ export class View {
      * Creates a new View instance from a string or object.
      */
     static createFrom($$source: any = {}): View {
-        const $$createField1_0 = $$createType26;
-        const $$createField3_0 = $$createType22;
+        const $$createField1_0 = $$createType48;
+        const $$createField2_0 = $$createType50;
+        const $$createField3_0 = $$createType52;
+        const $$createField4_0 = $$createType54;
+        const $$createField6_0 = $$createType35;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("items" in $$parsedSource) {
             $$parsedSource["items"] = $$createField1_0($$parsedSource["items"]);
         }
+        if ("table" in $$parsedSource) {
+            $$parsedSource["table"] = $$createField2_0($$parsedSource["table"]);
+        }
+        if ("form" in $$parsedSource) {
+            $$parsedSource["form"] = $$createField3_0($$parsedSource["form"]);
+        }
+        if ("chart" in $$parsedSource) {
+            $$parsedSource["chart"] = $$createField4_0($$parsedSource["chart"]);
+        }
         if ("actions" in $$parsedSource) {
-            $$parsedSource["actions"] = $$createField3_0($$parsedSource["actions"]);
+            $$parsedSource["actions"] = $$createField6_0($$parsedSource["actions"]);
         }
         return new View($$parsedSource as Partial<View>);
     }
 }
 
 // Private type creation functions
-const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = manifest$0.Command.createFrom;
-const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = manifest$0.Panel.createFrom;
-const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = StatusItemInfo.createFrom;
-const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = manifest$0.Schema.createFrom;
-const $$createType8 = $Create.Nullable($$createType7);
-const $$createType9 = ToolInfo.createFrom;
-const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = manifest$0.TabView.createFrom;
+const $$createType0 = TextEdit.createFrom;
+const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = ChartXAxis.createFrom;
+const $$createType3 = ChartYAxis.createFrom;
+const $$createType4 = Series.createFrom;
+const $$createType5 = $Create.Array($$createType4);
+const $$createType6 = $Create.Map($Create.Any, $Create.Any);
+const $$createType7 = FormField.createFrom;
+const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = manifest$0.Property.createFrom;
+const $$createType10 = $Create.Array($Create.Any);
+const $$createType11 = manifest$0.Command.createFrom;
 const $$createType12 = $Create.Array($$createType11);
-const $$createType13 = manifest$0.Theme.createFrom;
+const $$createType13 = manifest$0.Panel.createFrom;
 const $$createType14 = $Create.Array($$createType13);
-const $$createType15 = manifest$0.Language.createFrom;
+const $$createType15 = StatusItemInfo.createFrom;
 const $$createType16 = $Create.Array($$createType15);
-const $$createType17 = manifest$0.Debugger.createFrom;
-const $$createType18 = $Create.Array($$createType17);
-const $$createType19 = manifest$0.TestRunner.createFrom;
+const $$createType17 = manifest$0.Schema.createFrom;
+const $$createType18 = $Create.Nullable($$createType17);
+const $$createType19 = ToolInfo.createFrom;
 const $$createType20 = $Create.Array($$createType19);
-const $$createType21 = Action.createFrom;
+const $$createType21 = manifest$0.TabView.createFrom;
 const $$createType22 = $Create.Array($$createType21);
-const $$createType23 = CommandRef.createFrom;
-const $$createType24 = $Create.Nullable($$createType23);
-const $$createType25 = Item.createFrom;
+const $$createType23 = manifest$0.Theme.createFrom;
+const $$createType24 = $Create.Array($$createType23);
+const $$createType25 = manifest$0.Language.createFrom;
 const $$createType26 = $Create.Array($$createType25);
+const $$createType27 = manifest$0.Debugger.createFrom;
+const $$createType28 = $Create.Array($$createType27);
+const $$createType29 = manifest$0.TestRunner.createFrom;
+const $$createType30 = $Create.Array($$createType29);
+const $$createType31 = DecorationSetInfo.createFrom;
+const $$createType32 = $Create.Array($$createType31);
+const $$createType33 = SandboxInfo.createFrom;
+const $$createType34 = Action.createFrom;
+const $$createType35 = $Create.Array($$createType34);
+const $$createType36 = CommandRef.createFrom;
+const $$createType37 = $Create.Nullable($$createType36);
+const $$createType38 = $Create.Array($Create.Any);
+const $$createType39 = Point.createFrom;
+const $$createType40 = $Create.Array($$createType39);
+const $$createType41 = Column.createFrom;
+const $$createType42 = $Create.Array($$createType41);
+const $$createType43 = Row.createFrom;
+const $$createType44 = $Create.Array($$createType43);
+const $$createType45 = TableSort.createFrom;
+const $$createType46 = $Create.Nullable($$createType45);
+const $$createType47 = Item.createFrom;
+const $$createType48 = $Create.Array($$createType47);
+const $$createType49 = Table.createFrom;
+const $$createType50 = $Create.Nullable($$createType49);
+const $$createType51 = Form.createFrom;
+const $$createType52 = $Create.Nullable($$createType51);
+const $$createType53 = Chart.createFrom;
+const $$createType54 = $Create.Nullable($$createType53);

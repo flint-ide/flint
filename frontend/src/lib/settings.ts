@@ -15,6 +15,7 @@ import { coerceUsage, DEFAULT_USAGE, type UsageSettings } from './usageSettings'
 import { coercePromptSettings, DEFAULT_PROMPT_SETTINGS, type PromptSettings } from './prompts'
 import { coerceAgentReview, DEFAULT_AGENT_REVIEW, type AgentReviewSettings } from './reviewSettings'
 import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
+import { coercePRReview, DEFAULT_PR_REVIEW, type PRReviewSettings } from './prAgent'
 import { coerceGitHub, DEFAULT_GITHUB, type GitHubSettings } from './githubSettings'
 import { coerceSections, type FeatureSettings } from './settingsSections'
 import { TERMINAL_COLOR_NAMES } from './terminalTheme'
@@ -32,6 +33,10 @@ export interface FontSettings {
 export interface EditorSettings extends FontSettings {
   /** Vim key bindings in every editor. */
   vimMode: boolean
+  /** Format a file with its language server before each save. */
+  formatOnSave: boolean
+  /** Run the language server's "organize imports" before each save. */
+  organizeImportsOnSave: boolean
 }
 
 /** A palette laid over the dark or light one (Theme "custom"), e.g. imported from VS Code. */
@@ -85,6 +90,8 @@ export interface CoreSettings {
   agentReview: AgentReviewSettings
   /** Following your pull requests' CI: poll interval, log excerpt size, notifications. */
   ci: CISettings
+  /** Handing review comments to the agent: threads per draft, context lines (lib/prAgent.ts). */
+  prReview: PRReviewSettings
   /** GitHub host, the OAuth App Flint signs in with, scopes and the retry wait (lib/githubSettings.ts). */
   github: GitHubSettings
 }
@@ -96,7 +103,7 @@ export type AppSettings = CoreSettings & FeatureSettings
 export const DEFAULT_SETTINGS: CoreSettings = Object.freeze({
   version: 1,
   theme: 'dark',
-  editor: Object.freeze({ fontFamily: `'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace`, fontSize: 13, lineHeight: 1.55, vimMode: false }),
+  editor: Object.freeze({ fontFamily: `'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace`, fontSize: 13, lineHeight: 1.55, vimMode: false, formatOnSave: false, organizeImportsOnSave: false }),
   terminal: Object.freeze({ fontFamily: `"JetBrains Mono", "SF Mono", Menlo, monospace`, fontSize: 13, lineHeight: 1.2 }),
   customTheme: Object.freeze({
     name: '', base: 'dark', colors: Object.freeze({}) as Record<string, string>, terminal: Object.freeze({}) as Record<string, string>, source: '',
@@ -117,6 +124,7 @@ export const DEFAULT_SETTINGS: CoreSettings = Object.freeze({
   prompts: DEFAULT_PROMPT_SETTINGS,
   agentReview: DEFAULT_AGENT_REVIEW,
   ci: DEFAULT_CI,
+  prReview: DEFAULT_PR_REVIEW,
   github: DEFAULT_GITHUB,
 }) as CoreSettings
 
@@ -233,6 +241,9 @@ function coerceCore(v: Record<string, unknown>): CoreSettings {
     editor: {
       ...font(v.editor, d.editor),
       vimMode: isObject(v.editor) && typeof v.editor.vimMode === 'boolean' ? v.editor.vimMode : d.editor.vimMode,
+      formatOnSave: isObject(v.editor) && typeof v.editor.formatOnSave === 'boolean' ? v.editor.formatOnSave : d.editor.formatOnSave,
+      organizeImportsOnSave:
+        isObject(v.editor) && typeof v.editor.organizeImportsOnSave === 'boolean' ? v.editor.organizeImportsOnSave : d.editor.organizeImportsOnSave,
     },
     terminal: font(v.terminal, d.terminal),
     customTheme: coerceCustomTheme(v.customTheme, d.customTheme),
@@ -252,6 +263,7 @@ function coerceCore(v: Record<string, unknown>): CoreSettings {
     prompts: coercePromptSettings(v.prompts),
     agentReview: coerceAgentReview(v.agentReview),
     ci: coerceCI(v.ci),
+    prReview: coercePRReview(v.prReview),
     github: coerceGitHub(v.github),
   }
 }

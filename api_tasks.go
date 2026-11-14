@@ -58,7 +58,7 @@ type TaskView struct {
 	Checkout    string `json:"checkout"`
 	CreatedAt   int64  `json:"createdAt"`
 	PullRequest string `json:"pullRequest"`
-	// State: idle, working, waiting, finished or failed (agenttask).
+	// State: queued, idle, working, waiting, finished or failed (agenttask).
 	State string `json:"state"`
 	Error string `json:"error"`
 	// Stale: the worktree folder is gone; the task can only be removed.
@@ -67,6 +67,13 @@ type TaskView struct {
 	Ahead int `json:"ahead"`
 	// Merged: the branch has commits and all of them are in base.
 	Merged bool `json:"merged"`
+	// Group links the tasks started together from one description ("" for
+	// a task on its own).
+	Group string `json:"group"`
+	// Tokens and CostUSD are what the task's chats used so far (input and
+	// output tokens; reported cost plus estimates from settings prices).
+	Tokens  int64   `json:"tokens"`
+	CostUSD float64 `json:"costUsd"`
 }
 
 // MergeResult tells whether a task was merged or which files conflict.
@@ -173,7 +180,25 @@ func (t *TaskAPI) ListAll(dirs []string) ([]TaskView, error) {
 			out = append(out, v)
 		}
 	}
+	t.addUsage(out)
 	return out, nil
+}
+
+// addUsage fills in what each task's chats used (one pass over usage.json's rows).
+func (t *TaskAPI) addUsage(views []TaskView) {
+	if len(views) == 0 || t.app.usage == nil {
+		return
+	}
+	ids := make([]string, len(views))
+	for i, v := range views {
+		ids[i] = v.ID
+	}
+	totals := t.app.usage.TaskTotals(ids, t.app.currentSettings().Usage.Prices)
+	for i, v := range views {
+		if tot, ok := totals[v.ID]; ok {
+			views[i].Tokens, views[i].CostUSD = tot.Tokens(), tot.Spent()
+		}
+	}
 }
 
 // untrustTask removes the trust Flint gave a task's worktree, if any.
@@ -196,7 +221,10 @@ func (t *TaskAPI) view(ctx context.Context, r *git.Repo, task agenttask.Task) Ta
 	v := TaskView{
 		ID: task.ID, Title: task.Title, Prompt: task.Prompt, Agent: task.Agent, Branch: task.Branch, Base: task.Base,
 		Worktree: task.Worktree, Checkout: task.Checkout, CreatedAt: task.CreatedAt, PullRequest: task.PullRequest,
-		State: live.State, Error: live.Error, Stale: !isDir(task.Worktree),
+		State: live.State, Error: live.Error, Stale: !isDir(task.Worktree), Group: task.Group,
+	}
+	if task.Queued && !agenttask.Busy(live.State) {
+		v.State, v.Error = agenttask.Queued, ""
 	}
 	v.Ahead, _ = r.Ahead(ctx, task.Base, task.Branch)
 	if v.Ahead == 0 {
@@ -222,85 +250,154 @@ func (t *TaskAPI) Changes(id string) (git.DiffStat, error) {
 }
 
 // Create makes the task's branch and worktree and remembers the task. The UI
-// then opens the folder and starts the chat with the description.
+// then opens the folder and starts the chat with the description, unless the
+// task came back queued (see CreateGroup).
 func (t *TaskAPI) Create(req NewTask) (TaskView, error) {
+	views, err := t.CreateGroup(NewTaskGroup{Dir: req.Dir, Description: req.Description, Base: req.Base, Agents: []string{req.Agent}})
+	if err != nil {
+		return TaskView{}, err
+	}
+	return views[0], nil
+}
+
+// NewTaskGroup is what the New Agent Task form sends: one description for
+// one or more agents. An agent named twice gets two attempts.
+type NewTaskGroup struct {
+	Dir         string   `json:"dir"` // a folder of the workspace inside the repository
+	Description string   `json:"description"`
+	Base        string   `json:"base"` // local branch to start from; "" = Dir's current branch
+	Agents      []string `json:"agents"`
+}
+
+// CreateGroup makes one task per entry of req.Agents from the same
+// description and the same base commit, each with its own branch and
+// worktree. Several are linked as a group, to be compared. A task that would
+// exceed agentTasks.maxParallel comes back queued: the UI starts the chats
+// of the others only, and the queue starts that one later (tasks_queue.go).
+// When one cannot be created, none is kept.
+func (t *TaskAPI) CreateGroup(req NewTaskGroup) ([]TaskView, error) {
 	a := t.app
 	desc := strings.TrimSpace(req.Description)
 	switch {
 	case desc == "":
-		return TaskView{}, errors.New("describe the task first")
+		return nil, errors.New("describe the task first")
 	case len(desc) > agenttask.MaxPrompt:
-		return TaskView{}, fmt.Errorf("the description is longer than %d characters", agenttask.MaxPrompt)
+		return nil, fmt.Errorf("the description is longer than %d characters", agenttask.MaxPrompt)
 	case strings.ContainsRune(desc, 0):
-		return TaskView{}, errors.New("the description contains a NUL character")
+		return nil, errors.New("the description contains a NUL character")
+	case len(req.Agents) == 0:
+		return nil, errors.New("choose an agent first")
+	case len(req.Agents) > agenttask.MaxGroup:
+		return nil, fmt.Errorf("one description starts at most %d tasks: choose fewer agents or attempts", agenttask.MaxGroup)
 	}
 	if _, err := a.rootOf(req.Dir); err != nil {
-		return TaskView{}, err
+		return nil, err
 	}
 	s := a.currentSettings()
-	if !slices.Contains(installedAgents(s, exec.LookPath), req.Agent) {
-		return TaskView{}, fmt.Errorf("the agent %q is not installed", req.Agent)
+	installed := installedAgents(s, exec.LookPath)
+	for _, agent := range req.Agents {
+		if !slices.Contains(installed, agent) {
+			return nil, fmt.Errorf("the agent %q is not installed", agent)
+		}
 	}
 	ctx, cancel := t.ctx(gitRemoteTimeout) // checkout hooks may run
 	defer cancel()
 	r, err := t.git.repo(ctx, req.Dir)
 	if err != nil {
-		return TaskView{}, err
+		return nil, err
 	}
 	base, err := taskBase(ctx, r, req.Base)
 	if err != nil {
-		return TaskView{}, err
+		return nil, err
 	}
 	baseCommit, err := r.Resolve(ctx, git.HeadRef(base))
 	if err != nil {
-		return TaskView{}, err
+		return nil, err
 	}
 	wts, err := r.Worktrees(ctx)
 	if err != nil || len(wts) == 0 {
-		return TaskView{}, fmt.Errorf("list worktrees: %v", err)
+		return nil, fmt.Errorf("list worktrees: %v", err)
 	}
 	checkout := wts[0].Path
 	home, _ := os.UserHomeDir()
 	pathOf := func(branch string) string {
 		return agenttask.WorktreePath(s.AgentTasks.WorktreeDir, home, checkout, branch)
 	}
-	branch, err := agenttask.Unique(s.AgentTasks.BranchPrefix+agenttask.Slug(desc), func(b string) bool {
+	group := ""
+	if len(req.Agents) > 1 {
+		group = agenttask.NewID()
+	}
+	// One decision at a time about who gets a free slot (tasks_queue.go).
+	a.queue.mu.Lock()
+	defer a.queue.mu.Unlock()
+	var made []agenttask.Task
+	undo := func() {
+		for _, task := range made {
+			a.releaseStart(task.ID)
+			_ = r.RemoveWorktree(ctx, task.Worktree, true)
+			_ = r.DeleteBranch(ctx, task.Branch, true)
+			_ = a.untrustTask(task)
+			_ = a.saveTasks(func(st agenttask.Store) (agenttask.Store, error) { return st.Remove(task.ID), nil })
+		}
+	}
+	for _, agent := range req.Agents {
+		task, err := t.createOne(ctx, r, agenttask.Task{
+			ID: agenttask.NewID(), Title: agenttask.Title(desc), Prompt: redact.Secrets(desc), Agent: agent,
+			Branch: agenttask.BranchName(s.AgentTasks.BranchPrefix, desc, agent, group != ""),
+			Base:   base, BaseCommit: baseCommit, Checkout: cleanFolder(checkout),
+			CreatedAt: time.Now().Unix(), Group: group,
+			Queued: agenttask.Slots(s.AgentTasks.MaxParallel, a.activeTasks()) == 0,
+		}, pathOf, &made)
+		if err != nil {
+			undo()
+			return nil, err
+		}
+		if !task.Queued {
+			a.reserveStart(task.ID) // the UI starts its chat next
+		}
+	}
+	a.emit(eventTasksChanged)
+	views := make([]TaskView, len(made))
+	for i, task := range made {
+		views[i] = t.view(ctx, r, task)
+	}
+	return views, nil
+}
+
+// createOne gives task (whose Branch is the wanted name) a free branch and a
+// worktree at its base commit, remembers it and trusts its folder when the
+// repository is trusted. What it made is appended to made as soon as it
+// exists, for the caller to undo.
+func (t *TaskAPI) createOne(ctx context.Context, r *git.Repo, task agenttask.Task, pathOf func(string) string, made *[]agenttask.Task) (agenttask.Task, error) {
+	a := t.app
+	branch, err := agenttask.Unique(task.Branch, func(b string) bool {
 		_, statErr := os.Lstat(pathOf(b))
 		return r.BranchExists(ctx, b) || statErr == nil
 	})
 	if err != nil {
-		return TaskView{}, err
+		return task, err
 	}
 	path := pathOf(branch)
-	if err := a.checkTaskLocation(r.Root, checkout, path); err != nil {
-		return TaskView{}, err
+	if err := a.checkTaskLocation(r.Root, task.Checkout, path); err != nil {
+		return task, err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return TaskView{}, fmt.Errorf("create the worktree folder: %w", err)
+		return task, fmt.Errorf("create the worktree folder: %w", err)
 	}
-	if err := r.AddWorktree(ctx, path, branch, true, git.HeadRef(base)); err != nil {
-		return TaskView{}, err
+	// From the commit, not the branch name: every task of a group starts
+	// from the same commit even when base moves meanwhile.
+	if err := r.AddWorktree(ctx, path, branch, true, task.BaseCommit); err != nil {
+		return task, err
 	}
-	path = cleanFolder(path)
-	task := agenttask.Task{
-		ID: agenttask.NewID(), Title: agenttask.Title(desc), Prompt: redact.Secrets(desc), Agent: req.Agent,
-		Branch: branch, Base: base, BaseCommit: baseCommit, Worktree: path, Checkout: cleanFolder(checkout),
-		CreatedAt: time.Now().Unix(),
-	}
+	task.Branch, task.Worktree = branch, cleanFolder(path)
+	*made = append(*made, task)
 	err = a.saveTasks(func(st agenttask.Store) (agenttask.Store, error) { return st.Add(cleanFolder(r.CommonDir), task) })
 	if err == nil && a.isTrusted(r.Root) {
 		// The worktree holds the repository's own commits, which the user
 		// trusts in the checkout the task started from.
-		err = a.setTrust(path, true)
+		err = a.setTrust(task.Worktree, true)
 	}
-	if err != nil {
-		_ = r.RemoveWorktree(ctx, path, true)
-		_ = r.DeleteBranch(ctx, branch, true)
-		_ = a.saveTasks(func(st agenttask.Store) (agenttask.Store, error) { return st.Remove(task.ID), nil })
-		return TaskView{}, err
-	}
-	a.emit(eventTasksChanged)
-	return t.view(ctx, r, task), nil
+	return task, err
 }
 
 // checkTaskLocation refuses a worktree path inside the checkout the task
@@ -574,6 +671,7 @@ func (t *TaskAPI) Remove(id string, opts RemoveOptions) (RemoveResult, error) {
 		}
 	}
 	a.tasks.Forget(id)
+	a.releaseStart(id)
 	res := RemoveResult{}
 	err = do(t.git, task.Checkout, gitTimeout, func(ctx context.Context, r *git.Repo) error {
 		if info.Stale {
@@ -603,5 +701,6 @@ func (t *TaskAPI) Remove(id string, opts RemoveOptions) (RemoveResult, error) {
 	}
 	err = a.saveTasks(func(s agenttask.Store) (agenttask.Store, error) { return s.Remove(id), nil })
 	a.emit(eventTasksChanged)
+	a.startQueuedTasks() // a working task that was removed frees its slot
 	return res, err
 }

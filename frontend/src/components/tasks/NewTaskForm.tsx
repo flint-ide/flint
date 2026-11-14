@@ -5,6 +5,7 @@ import { useAgent } from '../../store/agent'
 import { useSettings } from '../../store/settings'
 import { activeRoot } from '../../store/activeRoot'
 import { closeNewTask, startTask } from '../../store/agentTasks'
+import { MAX_GROUP, planAgents, planNote, planProblem } from '../../lib/agentTasks'
 import { Modal } from '../layout/Modal'
 import { Select } from '../ui/Select'
 import type { Branch } from '../../store/git'
@@ -12,11 +13,17 @@ import type { Branch } from '../../store/git'
 /**
  * New Agent Task: what to do, which agent, from which branch. Start creates the
  * branch and worktree, opens it and sends the description as the first message.
+ * With "Compare agents" the same task goes to several agents (or several attempts
+ * of one), each on its own branch from the same commit, linked as a group.
  */
 export function NewTaskForm() {
   const agents = useAgentChat((s) => s.agents)
   const preferred = useAgent((s) => s.preferred)
   const prefix = useSettings((s) => s.settings.agentTasks.branchPrefix)
+  const maxParallel = useSettings((s) => s.settings.agentTasks.maxParallel)
+  const [compare, setCompare] = useState(false)
+  const [extra, setExtra] = useState<string[]>([])
+  const [attempts, setAttempts] = useState(1)
   const [description, setDescription] = useState('')
   const [agent, setAgent] = useState('')
   const [branches, setBranches] = useState<Branch[]>([])
@@ -42,11 +49,15 @@ export function NewTaskForm() {
   const defaultAgent = useSettings((s) => s.settings.defaultAgent)
   const fallback = [defaultAgent, preferred].find((a) => a && agents.includes(a)) ?? agents[0] ?? ''
   const chosen = agent || fallback
+  // The agent of the select is always in; "Compare agents" adds others and attempts.
+  const plan = compare ? planAgents([chosen, ...extra.filter((a) => agents.includes(a))], attempts) : planAgents([chosen], 1)
+  const problem = chosen ? planProblem(plan) : null
+  const ready = !busy && !!description.trim() && !!chosen && !!base && !problem
 
   const submit = async () => {
     setBusy(true)
     setError(null)
-    const err = await startTask({ description, agent: chosen, base })
+    const err = await startTask({ description, agents: plan, base })
     setBusy(false)
     if (err) setError(err)
   }
@@ -72,7 +83,7 @@ export function NewTaskForm() {
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault()
-                if (!busy && description.trim() && chosen && base) void submit()
+                if (ready) void submit()
               }
             }}
           />
@@ -97,15 +108,49 @@ export function NewTaskForm() {
             />
           </label>
         </div>
+        {agents.length > 0 && (
+          <label className="check">
+            <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} />
+            Compare agents: give the same task to several agents or attempts
+          </label>
+        )}
+        {compare && (
+          <div className="form-row compare-agents">
+            <div className="grow compare-agent-list">
+              {agents.filter((a) => a !== chosen).map((a) => (
+                <label key={a} className="check">
+                  <input
+                    type="checkbox"
+                    checked={extra.includes(a)}
+                    onChange={(e) => setExtra((cur) => (e.target.checked ? [...cur, a] : cur.filter((x) => x !== a)))}
+                  />
+                  also {a}
+                </label>
+              ))}
+              {agents.length < 2 && <span className="muted">Only one agent is installed: use several attempts.</span>}
+            </div>
+            <label>
+              Attempts per agent
+              <Select
+                block
+                value={attempts}
+                options={Array.from({ length: MAX_GROUP }, (_, i) => ({ value: i + 1, label: String(i + 1) }))}
+                onChange={setAttempts}
+              />
+            </label>
+          </div>
+        )}
         <p className="muted form-note">
-          Flint creates a branch {prefix || ''}… and a worktree for it, opens the folder here and sends the task to the agent in a new chat.
+          Flint creates a branch {prefix || ''}… and a worktree for it, opens the folder here and sends the task to the agent in a new chat.{' '}
+          {planNote(plan, maxParallel)}
         </p>
+        {problem && <div className="form-status error">{problem}</div>}
         {error && <div className="form-status error">{error}</div>}
         <div className="form-actions">
           <span className="spacer" />
           <button type="button" onClick={closeNewTask}>Cancel</button>
-          <button type="submit" className="primary" disabled={busy || !description.trim() || !chosen || !base}>
-            {busy ? 'Starting…' : 'Start'}
+          <button type="submit" className="primary" disabled={!ready}>
+            {busy ? 'Starting…' : plan.length > 1 ? `Start ${plan.length} tasks` : 'Start'}
           </button>
         </div>
       </form>

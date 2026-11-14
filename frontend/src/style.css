@@ -2416,6 +2416,46 @@ button.small {
   user-select: text;
   -webkit-user-select: text;
 }
+.cm-lsp-signature {
+  max-width: 640px;
+  padding: 5px 10px;
+  font: 12px/1.45 var(--font-mono);
+}
+.cm-lsp-signature-label {
+  white-space: pre-wrap;
+}
+.cm-lsp-signature-label b {
+  color: var(--accent);
+}
+.cm-lsp-signature-doc {
+  max-height: 120px;
+  overflow: auto;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+  color: var(--fg-muted);
+  white-space: pre-wrap;
+}
+.cm-lsp-rename {
+  padding: 3px;
+}
+.cm-lsp-rename input {
+  padding: 3px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg-editor);
+  color: var(--fg);
+  font: 12px/1.45 var(--font-mono);
+  outline: none;
+}
+.symbols .symbol-kind {
+  flex: none;
+  width: 92px;
+  font-size: 11px;
+}
+.quick-empty {
+  padding: 10px 14px;
+}
 .cm-tooltip-autocomplete .cm-completionDetail {
   color: var(--fg-faint);
   font-style: normal;
@@ -4149,6 +4189,44 @@ button.keymap-chord:hover {
   background: var(--bg-hover);
   white-space: nowrap;
 }
+.task-state.queued {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+}
+.task-group {
+  border-left: 2px solid var(--accent-dim);
+}
+.task-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 10px 2px 10px;
+  font-size: 12px;
+}
+.task-group-head .file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.task-group-head .muted {
+  flex: none;
+  font-size: 11px;
+}
+.task-group-head .link,
+.modal.compare-tasks .link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+}
+.task-group .task:last-child {
+  border-bottom: 1px solid var(--border);
+}
 .task-state.working {
   color: var(--info);
   background: color-mix(in srgb, var(--info) 14%, transparent);
@@ -4230,6 +4308,155 @@ button.keymap-chord:hover {
 }
 .modal.new-task textarea:focus {
   border-color: var(--accent);
+}
+.compare-agent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+}
+.modal.compare-tasks {
+  width: min(1500px, 96vw);
+  height: min(860px, 80vh);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+.compare-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.compare-files {
+  flex: 0 1 32%;
+  min-height: 90px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.compare-files table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.compare-files th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-raised);
+  text-align: left;
+  vertical-align: top;
+  font-weight: 400;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.compare-files th:first-child .link {
+  margin-left: 10px;
+}
+.compare-agent {
+  font-weight: 600;
+  color: var(--fg);
+}
+.compare-keep {
+  display: flex;
+  gap: 8px;
+}
+.compare-files td {
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.compare-files tbody tr {
+  cursor: pointer;
+}
+.compare-files tbody tr:hover {
+  background: var(--bg-hover);
+}
+.compare-files tbody tr.selected {
+  background: var(--bg-active);
+}
+.compare-path {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.compare-columns {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  gap: 8px;
+}
+.compare-column {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.compare-between {
+  flex: 0 1 30%;
+  min-height: 80px;
+}
+.compare-column-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  font-size: 11px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.compare-column-head .truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.compare-diff {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg-editor);
+  font: 11.5px/1.5 var(--font-mono);
+}
+.compare-line {
+  display: flex;
+  white-space: pre;
+  min-width: max-content;
+}
+.compare-line.add {
+  background: var(--diff-ins-bg);
+}
+.compare-line.del {
+  background: var(--diff-del-bg);
+}
+.compare-line.hunk {
+  color: var(--fg-faint);
+  border-top: 1px solid var(--border);
+}
+.compare-no {
+  flex: none;
+  width: 4ch;
+  text-align: right;
+  color: var(--fg-faint);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.compare-mark {
+  flex: none;
+  width: 2ch;
+  text-align: center;
+  color: var(--fg-muted);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.compare-note {
+  padding: 4px 8px;
+  font: 11px var(--font-ui);
 }
 .form-note {
   font-size: 11.5px;
@@ -5242,6 +5469,9 @@ body.file-drop-target-active::after {
   margin: 6px 0;
   font-size: 12px;
 }
+.extension-unsandboxed {
+  color: var(--warn);
+}
 .extension-facts {
   display: grid;
   grid-template-columns: max-content 1fr;
@@ -5296,4 +5526,325 @@ body.file-drop-target-active::after {
   min-height: 0;
   border: none;
   background: var(--bg-editor);
+}
+
+/* ---------- declarative views of extensions: table, form, chart ---------- */
+
+.ext-view-tab {
+  background: var(--bg-editor);
+}
+.ext-view-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.ext-table {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ext-table-scroller:focus-visible,
+.ext-header-cell:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.ext-header-cell {
+  padding-right: 8px;
+}
+.ext-table-row:hover .grid-cell {
+  background: var(--bg-hover);
+}
+.ext-table-row.selected .grid-cell {
+  background: var(--accent-dim);
+}
+.ext-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 16px;
+  background: var(--bg-active);
+  color: var(--fg-muted);
+}
+.ext-badge.info {
+  background: var(--info-bg);
+  color: var(--info);
+}
+.ext-badge.ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.ext-badge.warning {
+  color: var(--warn);
+}
+.ext-badge.error {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.ext-table-status {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 10px;
+  font-size: 11px;
+  border-top: 1px solid var(--border);
+}
+
+.ext-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 560px;
+  padding: 10px 12px 16px;
+}
+.ext-form-description {
+  margin: 0;
+}
+.ext-form-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.ext-form-field > label {
+  font-weight: 600;
+}
+.ext-form-field .settings-text,
+.ext-form-field .settings-textarea,
+.ext-form-select {
+  width: 100%;
+  max-width: none;
+}
+.ext-form-required {
+  color: var(--danger);
+}
+.ext-form-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11.5px;
+}
+.ext-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ext-chart {
+  margin: 0;
+  padding: 8px 12px 12px;
+}
+.ext-chart-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.ext-chart-box {
+  width: 100%;
+  min-height: 60px;
+}
+.ext-chart-box svg {
+  display: block;
+}
+.ext-chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.ext-chart-axis {
+  stroke: var(--fg-faint);
+  stroke-width: 1;
+}
+.ext-chart-tick {
+  fill: var(--fg-muted);
+  font-size: 10px;
+  font-family: var(--font-ui);
+}
+/* Series colors come from the theme, in this order; an extension can't set one. */
+.ext-chart .s0 { --series: var(--accent); }
+.ext-chart .s1 { --series: var(--ok); }
+.ext-chart .s2 { --series: var(--warn); }
+.ext-chart .s3 { --series: var(--danger); }
+.ext-chart .s4 { --series: var(--info); }
+.ext-chart .s5 { --series: var(--syn-keyword); }
+.ext-chart .s6 { --series: var(--syn-string); }
+.ext-chart .s7 { --series: var(--syn-number); }
+.ext-chart .s8 { --series: var(--syn-type); }
+.ext-chart .s9 { --series: var(--syn-function); }
+.ext-chart-series .line {
+  fill: none;
+  stroke: var(--series);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.ext-chart-series .area {
+  fill: var(--series);
+  opacity: 0.18;
+}
+.ext-chart-series .bar,
+.ext-chart-series .dot {
+  fill: var(--series);
+}
+.ext-chart-series .bar:hover,
+.ext-chart-series .dot:hover {
+  opacity: 0.75;
+}
+.ext-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 6px;
+  font-size: 11px;
+}
+.ext-chart-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.ext-chart-key i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--series);
+}
+.ext-chart-xlabel {
+  margin-left: auto;
+}
+.ext-chart-note {
+  font-size: 11px;
+  margin-top: 4px;
+}
+.ext-chart-data {
+  margin-top: 8px;
+  font-size: 11.5px;
+}
+.ext-chart-data summary {
+  cursor: pointer;
+  color: var(--fg-muted);
+}
+.ext-chart-data-scroll {
+  max-height: 240px;
+  overflow: auto;
+  margin-top: 4px;
+}
+.ext-chart-data table {
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+}
+.ext-chart-data th,
+.ext-chart-data td {
+  padding: 1px 10px 1px 0;
+  text-align: right;
+  font-weight: normal;
+  white-space: nowrap;
+}
+.ext-chart-data thead th {
+  color: var(--fg-muted);
+}
+.ext-chart-data th[scope='row'] {
+  text-align: left;
+}
+
+/* ---------- editor decorations of extensions (lib/editorDecorations.ts) ---------- */
+
+.cm-ext-info {
+  --ext-color: var(--info);
+}
+.cm-ext-ok {
+  --ext-color: var(--ok);
+}
+.cm-ext-warning {
+  --ext-color: var(--warn);
+}
+.cm-ext-error {
+  --ext-color: var(--danger);
+}
+/* The column takes no room in files nobody marks. */
+.cm-ext-gutter .cm-gutterElement {
+  padding: 0 !important;
+}
+.cm-ext-marker {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--ext-color);
+}
+.cm-ext-marker.cm-ext-actionable {
+  cursor: pointer;
+}
+.cm-ext-diagnostic {
+  text-decoration: underline wavy var(--ext-color);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
+}
+.cm-ext-highlight,
+.cm-ext-highlight-line {
+  background: color-mix(in srgb, var(--ext-color) 14%, transparent);
+}
+.cm-ext-inline {
+  margin-left: 2em;
+  color: var(--fg-faint);
+  font-style: italic;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cm-ext-inline.cm-ext-clickable {
+  cursor: pointer;
+}
+.cm-ext-inline.cm-ext-clickable:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.cm-ext-hover {
+  max-width: 560px;
+  max-height: 320px;
+  overflow: auto;
+  font: 12px/1.45 var(--font-ui);
+}
+.cm-ext-hover-item {
+  padding: 6px 10px;
+  border-left: 3px solid var(--ext-color);
+}
+.cm-ext-hover-item + .cm-ext-hover-item {
+  border-top: 1px solid var(--border);
+}
+.cm-ext-hover-message {
+  white-space: pre-wrap;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.cm-ext-hover-source {
+  color: var(--fg-faint);
+  font-size: 11px;
+}
+.cm-ext-hover-action {
+  margin: 4px 6px 0 0;
+}
+.cm-ext-fixes {
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  max-width: 420px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 3px;
+}
+.cm-ext-fixes button {
+  border: none;
+  background: none;
+  color: var(--fg);
+  text-align: left;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font: 12px/1.5 var(--font-ui);
+}
+.cm-ext-fixes button:hover,
+.cm-ext-fixes button:focus {
+  background: var(--bg-active);
+  outline: none;
+}
+.extension-decoration-set {
+  display: block;
 }

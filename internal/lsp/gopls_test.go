@@ -93,6 +93,31 @@ func TestGoplsEndToEnd(t *testing.T) {
 		t.Errorf("hover = %q, %v", hover, err)
 	}
 
+	// The outline lists both functions, in order.
+	syms, err := m.DocumentSymbols(ctx, path)
+	if err != nil || len(syms) != 2 || syms[0].Name != "greet" || syms[1].Name != "main" {
+		t.Errorf("document symbols = %+v, %v", syms, err)
+	}
+	ws, err := m.WorkspaceSymbols(ctx, []string{root}, "greet")
+	if err != nil || len(ws) == 0 || ws[0].Name != "greet" || ws[0].Path != path {
+		t.Errorf("workspace symbols = %+v, %v", ws, err)
+	}
+	// Renaming greet changes its declaration and its call, in this open file.
+	target, err := m.PrepareRename(ctx, path, Position{Line: 4, Character: 6})
+	if err != nil || !target.Known || target.Range.Start.Character != 5 {
+		t.Errorf("prepare rename = %+v, %v", target, err)
+	}
+	edit, err := m.Rename(ctx, path, Position{Line: 4, Character: 6}, "salute")
+	if err != nil || len(edit.Files) != 1 || !edit.Files[0].Open || len(edit.Files[0].Edits) != 2 {
+		t.Errorf("rename = %+v, %v", edit, err)
+	} else if renamed, err := ApplyTextEdits(sample, edit.Files[0].Edits); err != nil || strings.Count(renamed, "salute()") != 2 || strings.Contains(renamed, "greet") {
+		t.Errorf("renamed text = %q, %v", renamed, err)
+	}
+	help, err := m.SignatureHelp(ctx, path, Position{Line: 7, Character: 13})
+	if err != nil || len(help.Signatures) == 0 || help.Signatures[0].Label == "" {
+		t.Errorf("signature help = %+v, %v", help, err)
+	}
+
 	// The dangling "fmt." is a syntax error gopls must report.
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
@@ -128,6 +153,41 @@ func TestGoplsEndToEnd(t *testing.T) {
 		t.Errorf("diagnostics not cleared after fix: %+v", diags[path])
 	}
 	mu.Unlock()
+
+	// gofmt through gopls: badly indented code gets its tab back, and a
+	// quick fix removes an unused variable.
+	messy := strings.Replace(fixed, "\tfmt.Println", "      var unused int\n      fmt.Println", 1)
+	m.Change(path, messy)
+	edits, err := m.Format(ctx, path, 4, false)
+	if err != nil {
+		t.Fatalf("format: %v", err)
+	}
+	if formatted, err := ApplyTextEdits(messy, edits); err != nil || !strings.Contains(formatted, "\n\tfmt.Println(greet())\n") {
+		t.Errorf("formatted = %q, %v", formatted, err)
+	}
+	var removed string
+	deadline = time.Now().Add(30 * time.Second)
+	for removed == "" && time.Now().Before(deadline) {
+		actions, err := m.CodeActions(ctx, path, Range{Start: Position{Line: 7, Character: 12}, End: Position{Line: 7, Character: 12}}, []string{"quickfix"})
+		if err != nil {
+			t.Fatalf("code actions: %v", err)
+		}
+		for _, a := range actions {
+			if strings.Contains(a.Title, "Remove") {
+				edit, err := m.ApplyCodeAction(ctx, path, a.ID)
+				if err != nil || len(edit.Files) != 1 {
+					t.Fatalf("apply %q = %+v, %v", a.Title, edit, err)
+				}
+				if removed, err = ApplyTextEdits(messy, edit.Files[0].Edits); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		time.Sleep(100 * time.Millisecond) // the diagnostic the fix belongs to isn't published yet
+	}
+	if removed == "" || strings.Contains(removed, "unused") {
+		t.Errorf("after the quick fix: %q", removed)
+	}
 
 	if sts := m.Statuses(); len(sts) != 1 || sts[0].State != StateReady {
 		t.Errorf("statuses = %+v", sts)

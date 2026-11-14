@@ -148,17 +148,30 @@ func (t *Tests) Last(root string) (TestRun, bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for _, r := range slices.Backward(t.runs) {
-		if !within(r.dir, root) {
-			continue
+		if within(r.dir, root) {
+			return r.copy(), true
 		}
-		out := TestRun{
-			Title: r.title, Dir: r.dir, Started: r.started, Done: r.done, ExitCode: r.code,
-			Stopped: r.stopped, ElapsedMs: r.elapsedMs, Error: r.err, Nodes: make([]testrun.Node, 0, len(r.order)),
-		}
-		for _, id := range r.order {
-			out.Nodes = append(out.Nodes, r.nodes[id])
-		}
-		return out, true
 	}
 	return TestRun{}, false
+}
+
+// Get returns run id.
+func (t *Tests) Get(id string) (TestRun, bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if r := t.runLocked(id); r != nil {
+		return r.copy(), true
+	}
+	return TestRun{}, false
+}
+
+func (r *testRunRec) copy() TestRun {
+	out := TestRun{
+		Title: r.title, Dir: r.dir, Started: r.started, Done: r.done, ExitCode: r.code,
+		Stopped: r.stopped, ElapsedMs: r.elapsedMs, Error: r.err, Nodes: make([]testrun.Node, 0, len(r.order)),
+	}
+	for _, id := range r.order {
+		out.Nodes = append(out.Nodes, r.nodes[id])
+	}
+	return out
 }

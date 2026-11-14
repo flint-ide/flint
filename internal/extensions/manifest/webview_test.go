@@ -45,7 +45,7 @@ func TestWebviewRules(t *testing.T) {
 		"absolute":      {`{"panels":[{"id":"flint.database.p","title":"P","icon":"database","view":"webview","webview":{"html":"/x.html"}}]}`, "clean relative path"},
 		"not html":      {`{"panels":[{"id":"flint.database.p","title":"P","icon":"database","view":"webview","webview":{"html":"ui/x.js"}}]}`, "not an .html file"},
 		"tab not ours":  {`{"tabViews":[{"id":"other.x","title":"X","view":"webview","webview":{"html":"x.html"}}]}`, `must start with "flint.database."`},
-		"tab kind":      {`{"tabViews":[{"id":"flint.database.t","title":"X","view":"table"}]}`, "not supported"},
+		"tab kind":      {`{"tabViews":[{"id":"flint.database.t","title":"X","view":"stack"}]}`, "not supported"},
 		"tab no title":  {`{"tabViews":[{"id":"flint.database.t","view":"webview","webview":{"html":"x.html"}}]}`, "title"},
 		"bad activator": {`{"panels":[]}`, "activation event"},
 	} {

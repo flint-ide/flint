@@ -19,12 +19,16 @@ import { activeRoot } from '../../store/activeRoot'
 import { shellCommand } from '../../lib/shellArgs'
 import { useWorkspace } from '../../store/workspace'
 import type { PanelProps } from '../../panels/registry'
-import { contributes, contributionKey, extensionParts, type ExtensionInfo } from './model'
+import { contributes, contributionKey, extensionParts, isTreeView, type ExtensionInfo } from './model'
 import { ExtensionStatusItem } from './ExtensionStatusItem'
 import { deliverWebview, tabKeyOf } from './webviewEvents'
 import type { ContributedTab } from '../../lib/features'
 import { setExtensionLanguages } from '../../lib/extensionLanguages'
 import { setExtensionTools } from '../../lib/extensionTools'
+import { syncDecorationSets } from '../../lib/editorDecorations'
+import { useSettings } from '../../store/settings'
+import { decorationSetEnabled, withDecorationSet } from './settings'
+import { quickFix, resyncDocuments, subscribeDocuments } from './documents'
 
 export type { Info, View }
 
@@ -48,20 +52,32 @@ interface ExtensionsState {
 
 export const useExtensions = createStore<ExtensionsState>(() => ({ list: [], loaded: false, status: {}, refresh: {}, conflicts: {} }))
 
-export const refreshKey = (ext: string, view: string) => `${ext}\n${view}`
+/** The refresh counter of a view; with key, of one tab of a tab view. */
+export const refreshKey = (ext: string, view: string, key = '') => (key ? `${ext}\n${view}\n${key}` : `${ext}\n${view}`)
 
 // ---------- contributions ----------
 
 const ExtensionPanel = lazy(() => import('./ExtensionPanel').then((m) => ({ default: m.ExtensionPanel })))
+const DeclarativeView = lazy(() => import('./DeclarativeView').then((m) => ({ default: m.DeclarativeView })))
 const WebviewFrame = lazy(() => import('./WebviewFrame').then((m) => ({ default: m.WebviewFrame })))
 const ExtensionSettingsPage = lazy(() => import('./ExtensionSettingsPage').then((m) => ({ default: m.ExtensionSettingsPage })))
 
 // One component per contribution, made once per extension version: React keeps
 // a panel's state as long as its component type stays the same.
 function panelComponent(ext: ExtensionInfo, panel: ExtensionInfo['panels'][number]): ComponentType<PanelProps> {
-  const Panel = () => createElement(ExtensionPanel, { ext: ext.id, view: panel.id, title: panel.title, kind: panel.view })
+  const Panel: ComponentType<PanelProps> = isTreeView(panel.view)
+    ? () => createElement(ExtensionPanel, { ext: ext.id, view: panel.id, title: panel.title, kind: panel.view })
+    : () => createElement(DeclarativeView, { ext: ext.id, view: panel.id, title: panel.title, tabKey: '', data: null, active: true })
   Panel.displayName = `ExtensionPanel(${panel.id})`
   return Panel
+}
+
+/** A table, form or chart tab view's component. */
+function viewTabComponent(ext: ExtensionInfo, view: string): ComponentType<{ tab: ContributedTab; active: boolean }> {
+  const Tab = ({ tab, active }: { tab: ContributedTab; active: boolean }) =>
+    createElement(DeclarativeView, { ext: ext.id, view, title: tab.title, tabKey: tabKeyOf(tab), data: tab.data, active })
+  Tab.displayName = `ExtensionViewTab(${view})`
+  return Tab
 }
 
 function webviewPanelComponent(ext: ExtensionInfo, panel: ExtensionInfo['panels'][number]): ComponentType<PanelProps> {
@@ -109,9 +125,14 @@ function syncContributions(list: readonly Info[]): void {
       panel: panelComponent,
       webviewPanel: webviewPanelComponent,
       webviewTab: webviewTabComponent,
+      viewTab: viewTabComponent,
       statusItem: statusComponent,
       settingsPage: settingsComponent,
-      run: (ext, command) => API.Execute(ext, command, null),
+      run: (ext, command, args) => API.Execute(ext, command, args ?? null),
+      setEnabled: (set, byDefault) => decorationSetEnabled(useSettings.getState().settings.extensions, set, byDefault),
+      toggleSet: (set, byDefault) =>
+        useSettings.getState().update((s) => ({ extensions: withDecorationSet(s.extensions, set, !decorationSetEnabled(s.extensions, set, byDefault), byDefault) })),
+      quickFix,
       show: (panel) => useWorkspace.getState().setSidebar(panel),
     })
     try {
@@ -158,6 +179,7 @@ export function loadExtensions(rescan = false): Promise<void> {
       syncContributions(list)
       setExtensionLanguages(list.filter((i) => i.enabled && i.state !== 'invalid').flatMap((i) => i.languages ?? []))
       setExtensionTools(list)
+      resyncDocuments() // an extension came, went or changed: who decorates which open file
     })
     .catch((err: unknown) => showToast(`Extensions: ${errorMessage(err)}`, 'error'))
     .finally(() => {
@@ -209,6 +231,12 @@ export async function restartExtension(id: string): Promise<void> {
   }
 }
 
+/** `flint --install-extension <dir>`: the folder goes through the same confirmation as the picker's. */
+function installRequested(req: { dir?: string; error?: string } | null | undefined): void {
+  if (req?.error) showToast(`Not installed: ${req.error}`, 'error')
+  else if (req?.dir) void installExtension(req.dir)
+}
+
 // ---------- events ----------
 
 interface StatusEvent {
@@ -250,9 +278,10 @@ export function subscribeExtensions(): () => void {
     EventsOn('extensions:status', (e: StatusEvent) =>
       useExtensions.setState((s) => ({ status: { ...s.status, [e.extension]: { ...s.status[e.extension], [e.item.id]: e.item } } })),
     ),
-    EventsOn('extensions:refresh', (e: { extension: string; view: string }) =>
+    EventsOn('extensions:refresh', (e: { extension: string; view: string; key?: string }) =>
       useExtensions.setState((s) => {
-        const key = refreshKey(e.extension, e.view)
+        // With a key, one tab of a tab view; without, the panel or every tab of the view.
+        const key = refreshKey(e.extension, e.view, e.key ?? '')
         return { refresh: { ...s.refresh, [key]: (s.refresh[key] ?? 0) + 1 } }
       }),
     ),
@@ -265,11 +294,18 @@ export function subscribeExtensions(): () => void {
       useEditor.getState().openContributed(e.view, e.key, e.title, e.data ?? null),
     ),
     EventsOn('extensions:openTerminal', (e: OpenTerminalEvent) => openExtensionTerminal(e)),
+    subscribeDocuments(),
+    // A decoration set turned off disappears at once; Go then tells the extension.
+    useSettings.subscribe((s, prev) => {
+      if (s.settings.extensions !== prev.settings.extensions) syncDecorationSets()
+    }),
     EventsOn('extensions:ask', (e: { prompt: string; attachments?: string[] }) =>
       void askAgent({ prompt: e.prompt, attachments: (e.attachments ?? []).map((path) => ({ path })) }),
     ),
   ]
-  void loadExtensions()
+  offs.push(EventsOn('extensions:install-request', installRequested))
+  // The list first, so a replaced version shows as such; then the folder this Flint was started to install.
+  void loadExtensions().then(() => API.PendingInstall().then(installRequested, () => {}))
   return () => {
     offs.forEach((off) => off())
     for (const have of installed.values()) have.withdraw()

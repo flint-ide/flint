@@ -12,7 +12,13 @@ const (
 	Waiting  = "waiting"  // the agent waits for the user to approve something
 	Finished = "finished" // the last turn ended normally: ready for review
 	Failed   = "failed"   // the last turn ended with an error
+	// Queued is shown for a task that waits for a free slot (queue.go); it
+	// is never a chat's state.
+	Queued = "queued"
 )
+
+// Busy reports a state that holds a slot of the queue: a turn is running.
+func Busy(state string) bool { return state == Working || state == Waiting }
 
 // maxError bounds the error text kept for a failed task.
 const maxError = 300

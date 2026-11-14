@@ -37,6 +37,8 @@ In a thread under a line:
 1. Type your reply and press `⌘↵`.
 2. Click **Resolve** when the discussion is settled, or **Unresolve** to reopen it.
 
+If it is your own pull request and the reviewer is right, click **✦ Ask agent** in the thread: the comment, any suggested change and the code around the line go to the agent chat as a draft for you to send. **✦ Address review comments** in the pull request tab does the same for all unresolved threads at once. Check the branch out first (step 7): on another branch the draft tells the agent not to edit anything. See [Handing review comments to the agent](../guides/git-and-github.md#handing-review-comments-to-the-agent).
+
 ## 5. Add your own comments
 
 1. Hover a line inside a changed hunk and click `+` in the gutter.

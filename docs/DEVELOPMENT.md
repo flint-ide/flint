@@ -5,7 +5,7 @@ This guide covers building, running and testing Flint from source. For how the c
 ## Requirements
 
 - macOS 12 or later, or Linux (x86_64 or arm64) with GTK 4 and WebKitGTK 6.0 (see [Building on Linux](#building-on-linux))
-- Go 1.27.3+
+- Go 1.27.4+
 - Node 22+ (only for type checking and running frontend tests; there is no npm build step)
 - macOS: Xcode Command Line Tools (`xcode-select --install`), needed for cgo
 - `wails3` v3.0.0:

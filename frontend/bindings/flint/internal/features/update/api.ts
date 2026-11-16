@@ -26,6 +26,14 @@ export function Check(): $CancellablePromise<update$0.Result> {
 }
 
 /**
+ * OpenLink opens a link of the release notes in the browser: only pages of
+ * the Flint repository, anything else leads to the releases page.
+ */
+export function OpenLink(link: string): $CancellablePromise<void> {
+    return $Call.ByID(595280074, link);
+}
+
+/**
  * OpenRelease opens the latest known release page in the browser. The link
  * comes from Go, not the UI, and is checked again (state.json is a plain file).
  */
@@ -45,12 +53,37 @@ export function Pending(): $CancellablePromise<update$0.Result | null> {
 }
 
 /**
+ * ReleaseNotes is the release notes of the running version, or of the latest
+ * release for a development build (the user asked: "View Release Notes").
+ */
+export function ReleaseNotes(): $CancellablePromise<update$0.Notes> {
+    return $Call.ByID(2529537224).then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
+/**
  * Skip stops the automatic notice for this release; a later one notifies again.
  */
 export function Skip(tag: string): $CancellablePromise<void> {
     return $Call.ByID(856156273, tag);
 }
 
+/**
+ * WhatsNew is the release notes of the running version on its first launch
+ * after an update, and nil on every other launch. A fresh install and a
+ * development build show nothing. With the checkForUpdates setting off Flint
+ * doesn't ask GitHub on its own, so nothing is shown either ("View Release
+ * Notes" still works).
+ */
+export function WhatsNew(): $CancellablePromise<update$0.Notes | null> {
+    return $Call.ByID(324463765).then(($result: any) => {
+        return $$createType3($result);
+    });
+}
+
 // Private type creation functions
 const $$createType0 = update$0.Result.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);
+const $$createType2 = update$0.Notes.createFrom;
+const $$createType3 = $Create.Nullable($$createType2);

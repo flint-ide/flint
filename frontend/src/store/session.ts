@@ -10,15 +10,20 @@ import { chatTabId, useAgentChat } from './agentChat'
 import { restoreRunSelections, useRun } from './run'
 import { setAllBreakpoints, useDebug } from './debug'
 import { breakpointsUnder } from '../lib/breakpoints'
+import { coerceResume, resumeCommand, type TerminalResume } from '../lib/terminalResume'
 
 // What was open in a project (tabs, terminals, agent chats) is saved per project
 // so a restart comes back as it was left. Terminals reopen as new shells in their
-// last directory with the earlier output dimmed above; chats keep their
+// last directory with the earlier output dimmed above, and an agent CLI that ran
+// in one (claude, codex) is started again on its conversation; chats keep their
 // transcript and reconnect to the agent's conversation on the next message.
 
 const SAVE_DELAY_MS = 1500
 const SAVE_MAX_WAIT_MS = 10_000
 const SCROLLBACK_LINES = 400
+
+/** The agent CLI each live terminal ran at its last save (terminal id → what to resume). */
+const agentIn = new Map<string, TerminalResume | null>()
 
 /** All folders of the workspace being saved (the primary one first). */
 let workspaceRoots: string[] = []
@@ -71,8 +76,16 @@ async function captureTab(t: Tab, roots: string[]): Promise<SavedTab | null> {
     case 'terminal': {
       const term = useTerminal.getState().tabs.find((x) => x.id === t.termId)
       if (!term || (!roots.includes(term.project ?? '') && !inWorkspace(term.cwd))) return null
-      const cwd = term.exitCode === null ? await TerminalBackend.Cwd(t.termId).catch(() => '') : ''
-      return { kind: 'terminal', title: t.title, pinned: term.pinned, env: term.env, tag: term.tag, cwd: cwd || term.cwd, output: recentOutput(t.termId, SCROLLBACK_LINES), project: term.project }
+      const live = term.exitCode === null
+      const cwd = live ? await TerminalBackend.Cwd(t.termId).catch(() => '') : ''
+      // Only while a command runs: at the prompt there is no agent to come back to.
+      // A shell that is gone (Flint is quitting) keeps what it ran last.
+      if (live) agentIn.set(t.termId, term.command ? coerceResume(await TerminalBackend.Resume(t.termId).catch(() => null)) : null)
+      const resume = agentIn.get(t.termId) ?? null
+      return {
+        kind: 'terminal', title: t.title, pinned: term.pinned, env: term.env, tag: term.tag, cwd: cwd || term.cwd,
+        output: recentOutput(t.termId, SCROLLBACK_LINES), project: term.project, ...(resume ? { resume } : {}),
+      }
     }
     case 'chat': {
       const s = useAgentChat.getState().sessions[t.sessionId]
@@ -164,7 +177,11 @@ async function apply(root: string, snap: Snapshot, roots: string[]): Promise<voi
       case 'terminal': {
         const project = t.project && roots.includes(t.project) ? t.project : root
         const cwd = dirs.get(t.cwd) ? t.cwd : project
-        const id = useTerminal.getState().create(cwd, { title: t.pinned ? t.title : undefined, restored: t.output || undefined, background: true, project, env: t.env, tag: t.tag })
+        // The agent's conversation belongs to the folder it ran in: elsewhere it would resume another one.
+        const input = cwd === t.cwd ? resumeCommand(t.resume) : ''
+        const id = useTerminal.getState().create(cwd, {
+          title: t.pinned ? t.title : undefined, restored: t.output || undefined, background: true, project, env: t.env, tag: t.tag, input: input || undefined,
+        })
         ids.push(terminalTabId(id))
         break
       }

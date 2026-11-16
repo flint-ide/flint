@@ -10,6 +10,10 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as terminal$0 from "./internal/terminal/models.js";
+
 /**
  * Close terminates the terminal's shell.
  */
@@ -32,6 +36,17 @@ export function Resize(id: string, cols: number, rows: number): $CancellableProm
 }
 
 /**
+ * Resume reports the agent CLI (claude, codex) running in the terminal and its
+ * conversation, so the session can reopen it after a restart; the zero value
+ * when there is nothing to resume.
+ */
+export function Resume(id: string): $CancellablePromise<terminal$0.Resume> {
+    return $Call.ByID(91867187, id).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
+/**
  * Start launches the user's login shell in cwd (home when empty) with extra
  * environment variables (e.g. AWS_PROFILE). The frontend picks the id.
  */
@@ -45,3 +60,6 @@ export function Start(id: string, cwd: string, cols: number, rows: number, env: 
 export function Write(id: string, data: string): $CancellablePromise<void> {
     return $Call.ByID(1365593679, id, data);
 }
+
+// Private type creation functions
+const $$createType0 = terminal$0.Resume.createFrom;

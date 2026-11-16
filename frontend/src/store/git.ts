@@ -9,6 +9,7 @@ import { useWorkspace } from './workspace'
 import { isWithin } from '../lib/fileTree'
 import { followedRoot } from './activeRoot'
 import { useEditor } from './editor'
+import { pullSummary, pullTargets, type PullFailure } from '../lib/pullTargets'
 
 export type FileChange = git.FileChange
 export type GitStatus = git.Status
@@ -61,6 +62,8 @@ interface GitState {
   counts: Record<string, number>
   /** Every repository of the workspace, in folder order, one per work tree (several folders only). */
   repos: RepoView[]
+  /** The "Update Project" picker is open (several repositories: which one to pull). */
+  pullPicker: boolean
 
   load: (folder: string | null) => Promise<void>
   refresh: () => Promise<void>
@@ -76,12 +79,15 @@ interface GitState {
   commit: (push: boolean) => Promise<void>
   rollback: (files: FileChange[], root?: string) => Promise<void>
   remote: (op: 'fetch' | 'pull' | 'push') => Promise<void>
+  /** Pulls the given repositories (work-tree roots) one after another and says what happened. */
+  pull: (roots: string[]) => Promise<void>
 }
 
 export const useGit = createStore<GitState>((set, get) => ({
   folder: null,
   counts: {},
   repos: [],
+  pullPicker: false,
   root: null,
   isRepo: false,
   status: null,
@@ -227,7 +233,54 @@ export const useGit = createStore<GitState>((set, get) => ({
       void get().refresh()
     }
   },
+
+  pull: async (roots) => {
+    if (roots.length === 0) return
+    if (get().busy) {
+      // Started (a shortcut) while the picker was open: say so instead of doing nothing.
+      showToast(`Wait for the ${get().busy} to finish`, 'error')
+      return
+    }
+    set({ busy: 'pull' })
+    const folders = useWorkspace.getState().roots
+    const labels = new Map(pullTargets(get().repos, folders, get().root).map((t) => [t.root, t.label]))
+    const updated: string[] = []
+    const failed: PullFailure[] = []
+    try {
+      // One at a time: each may ask for credentials, and the errors stay readable.
+      for (const root of roots) {
+        const label = labels.get(root) ?? baseName(root)
+        try {
+          await Git.Pull(root)
+          updated.push(label)
+        } catch (err) {
+          failed.push({ label, error: errorMessage(err) })
+        }
+      }
+    } finally {
+      set({ busy: null })
+      void get().refresh()
+      void refreshRepos()
+    }
+    const summary = pullSummary(updated, failed)
+    showToast(summary.message, summary.kind)
+  },
 }))
+
+/**
+ * "Update Project": with several repositories in the workspace asks which one to
+ * pull (like IntelliJ), with one it pulls right away.
+ */
+export function updateProject(): void {
+  const s = useGit.getState()
+  if (s.busy) return
+  if (pullTargets(s.repos, useWorkspace.getState().roots, s.root).length > 1) useGit.setState({ pullPicker: true })
+  else void s.remote('pull')
+}
+
+export function closePullPicker(): void {
+  useGit.setState({ pullPicker: false })
+}
 
 const baseName = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 
@@ -258,11 +311,28 @@ export async function confirmRollback(files: FileChange[], root?: string): Promi
 export async function confirmRollbackIn(groups: RepoChanges[]): Promise<void> {
   const files = groups.flatMap((g) => g.files)
   if (files.length === 0) return
-  const deletes = files.filter((f) => f.kind === 'untracked' || f.kind === 'added').length
-  const what = files.length === 1 ? files[0].path : `${files.length} files`
-  const extra = deletes ? ` ${deletes} new file(s) will be deleted.` : ''
-  if (!(await confirmAction(`Rollback changes in ${what}?${extra}`, 'Rollback'))) return
+  const prompt = rollbackPrompt(files)
+  if (!(await confirmAction(prompt.message, prompt.label))) return
   for (const g of groups) if (g.files.length) await useGit.getState().rollback(g.files, g.root)
+}
+
+/** What the rollback confirmation asks: unversioned files alone are a plain delete. */
+export function rollbackPrompt(files: Pick<FileChange, 'path' | 'kind'>[]): { message: string; label: string } {
+  const one = files.length === 1
+  if (files.every((f) => f.kind === 'untracked')) {
+    const what = one ? files[0].path : `${files.length} unversioned files`
+    return { message: `Delete ${what}? ${one ? 'It is' : 'They are'} removed from disk and cannot be restored.`, label: 'Delete' }
+  }
+  const deletes = files.filter((f) => f.kind === 'untracked' || f.kind === 'added').length
+  const what = one ? files[0].path : `${files.length} files`
+  const extra = deletes ? ` ${deletes} new file(s) will be deleted.` : ''
+  return { message: `Rollback changes in ${what}?${extra}`, label: 'Rollback' }
+}
+
+/** The ticked files among files (a group of the Commit panel), for rolling them back together. */
+export function tickedOf(files: FileChange[], root: string): FileChange[] {
+  const { isIncluded } = useGit.getState()
+  return files.filter((f) => f.kind !== 'conflicted' && isIncluded(f, root))
 }
 
 /** Changed files at or under any of the absolute paths, per repository (file tree ▸ Rollback). */

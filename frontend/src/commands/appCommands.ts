@@ -18,7 +18,7 @@ import { toggleTerminal, useTerminal } from '../store/terminal'
 import { activeRoot } from '../store/activeRoot'
 import { removeFromWorkspace } from '../store/fileOps'
 import { rootLabels } from '../lib/workspaceRoots'
-import { useGit } from '../store/git'
+import { updateProject, useGit } from '../store/git'
 import { useScratch } from '../store/scratch'
 import { useSearch } from '../store/search'
 import { useAgentChat } from '../store/agentChat'
@@ -217,7 +217,7 @@ function appCommands(): Command[] {
       run: () => ws().focusPanel('git'),
     },
     { id: 'git.push', title: 'Push', category: 'Git', keys: 'Mod+Shift+K', keysIgnoredIn: IN_TERMINAL, run: () => useGit.getState().remote('push') },
-    { id: 'git.pull', title: 'Update Project (Pull)', category: 'Git', when: isRepo, run: () => useGit.getState().remote('pull') },
+    { id: 'git.pull', title: 'Update Project (Pull)', category: 'Git', when: isRepo, run: updateProject },
     { id: 'git.fetch', title: 'Fetch', category: 'Git', when: isRepo, run: () => useGit.getState().remote('fetch') },
     { id: 'git.refresh', title: 'Refresh Status', category: 'Git', keywords: 'reload changes', when: isRepo, run: () => useGit.getState().refresh() },
     { id: 'git.branches', title: 'Branches & Worktrees…', category: 'Git', keywords: 'checkout switch', when: hasBranchWidget, run: () => ws().setBranchesPopup('list') },

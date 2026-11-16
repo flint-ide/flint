@@ -2,8 +2,31 @@ package git
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 )
+
+func TestRollbackRefusesPathsOutsideTheRepository(t *testing.T) {
+	r := newRepo(t)
+	outside := filepath.Join(filepath.Dir(r.Root), "outside.txt")
+	if err := os.WriteFile(outside, []byte("keep\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Remove(outside) })
+	writeFile(t, r.Root, "new.txt", "new\n")
+	for _, p := range []string{"../outside.txt", "sub/../../outside.txt", outside, ""} {
+		if err := r.Rollback(context.Background(), []string{"new.txt", p}); err == nil {
+			t.Errorf("Rollback accepted %q", p)
+		}
+	}
+	if _, err := os.Stat(outside); err != nil {
+		t.Errorf("the file outside the repository is gone: %v", err)
+	}
+	if got := readFile(t, r.Root, "new.txt"); got != "new\n" {
+		t.Errorf("new.txt was touched by a refused rollback: %q", got)
+	}
+}
 
 func TestRollback(t *testing.T) {
 	ctx := context.Background()

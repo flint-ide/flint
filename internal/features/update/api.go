@@ -37,6 +37,11 @@ type API struct {
 
 	pendingMu sync.Mutex
 	pending   *update.Result // a newer release the UI should offer; nil = none
+
+	// launch is the state as the application started, before the first
+	// background check wrote to it; nil until rememberLaunch.
+	launchMu sync.Mutex
+	launch   *update.State
 }
 
 func newAPI(h feature.Host) *API {
@@ -46,10 +51,7 @@ func newAPI(h feature.Host) *API {
 // Check asks GitHub now, ignoring the daily limit and the checkForUpdates
 // setting (the user asked).
 func (u *API) Check() (update.Result, error) {
-	ctx := u.host.Context()
-	if ctx == nil {
-		ctx = context.Background()
-	}
+	ctx := u.context()
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	// Repeated clicks reuse an answer a few seconds old instead of asking
@@ -105,6 +107,98 @@ func (u *API) OpenRelease() error {
 		link = update.SafeURL(latest.URL)
 	}
 	return u.host.OpenURL(link)
+}
+
+// WhatsNew is the release notes of the running version on its first launch
+// after an update, and nil on every other launch. A fresh install and a
+// development build show nothing. With the checkForUpdates setting off Flint
+// doesn't ask GitHub on its own, so nothing is shown either ("View Release
+// Notes" still works).
+func (u *API) WhatsNew() (*update.Notes, error) {
+	current := u.host.Version()
+	st := u.state()
+	if !update.IsRelease(current) || st.LastSeen == current {
+		return nil, nil
+	}
+	seen := func() error { return u.saveState(func(s *update.State) { s.LastSeen = current }) }
+	if !updatedFrom(u.atLaunch(st), current) || !Enabled.Get(u.host.Settings()) {
+		return nil, seen()
+	}
+	notes, err := u.updates.Notes(u.context(), current)
+	if errors.Is(err, update.ErrNoRelease) {
+		return nil, seen() // a build GitHub knows nothing about: don't ask at every launch
+	}
+	if err != nil {
+		// Offline: the next launch tries again.
+		slog.Info("release notes failed", "error", err)
+		return nil, err
+	}
+	if err := seen(); err != nil {
+		return nil, err
+	}
+	if notes.Empty() {
+		return nil, nil
+	}
+	return &notes, nil
+}
+
+// rememberLaunch keeps the state the application started with. The background
+// check stamps CheckedAt a few seconds later, which would make a fresh
+// install look like one that has run before.
+func (u *API) rememberLaunch() {
+	st := u.state()
+	u.launchMu.Lock()
+	u.launch = &st
+	u.launchMu.Unlock()
+}
+
+// atLaunch is the state at launch, or now when it was not recorded.
+func (u *API) atLaunch(now update.State) update.State {
+	u.launchMu.Lock()
+	defer u.launchMu.Unlock()
+	if u.launch == nil {
+		return now
+	}
+	return *u.launch
+}
+
+// updatedFrom reports whether current is newer than the version that ran
+// last. An installation older than the LastSeen record has none but did check
+// for updates before, which tells it apart from a fresh install.
+func updatedFrom(st update.State, current string) bool {
+	if st.LastSeen == "" {
+		return !st.CheckedAt.IsZero()
+	}
+	order, ok := update.Compare(current, st.LastSeen)
+	return ok && order > 0
+}
+
+// ReleaseNotes is the release notes of the running version, or of the latest
+// release for a development build (the user asked: "View Release Notes").
+func (u *API) ReleaseNotes() (update.Notes, error) {
+	ctx := u.context()
+	tag := u.host.Version()
+	if !update.IsRelease(tag) {
+		rel, err := u.updates.Latest(ctx)
+		if err != nil {
+			return update.Notes{}, err
+		}
+		tag = rel.Tag
+	}
+	return u.updates.Notes(ctx, tag)
+}
+
+// OpenLink opens a link of the release notes in the browser: only pages of
+// the Flint repository, anything else leads to the releases page.
+func (u *API) OpenLink(link string) error {
+	return u.host.OpenURL(update.SafeURL(link))
+}
+
+func (u *API) context() context.Context {
+	if ctx := u.host.Context(); ctx != nil {
+		return ctx
+	}
+	return context.Background()
 }
 
 // watch checks shortly after launch and then whenever the last check is a

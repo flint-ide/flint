@@ -22,7 +22,10 @@ var Module = feature.Module{
 		api := newAPI(h)
 		return feature.Instance{
 			Services: []application.Service{application.NewService(api)},
-			Start:    func(ctx context.Context) { go api.watch(ctx) },
+			Start: func(ctx context.Context) {
+				api.rememberLaunch() // before the first check changes the state
+				go api.watch(ctx)
+			},
 		}
 	},
 }

@@ -1,14 +1,17 @@
 import { useDialog } from '../../store/dialog'
+import { useGit } from '../../store/git'
+import { PullProjectPopup } from '../git/PullProjectPopup'
 import { Modal } from './Modal'
 import { ContextMenu } from '../ui/ContextMenu'
 import { closeSignInDialog, useAccounts } from '../../store/accounts'
 import { SignInWithGitHub } from '../accounts/SignInWithGitHub'
 
-/** Global confirm dialog, Sign in with GitHub, context menu and toast notification. */
+/** Global confirm dialog, Sign in with GitHub, the Update Project picker, context menu and toast notification. */
 export function Overlays() {
   const confirm = useDialog((s) => s.confirm)
   const toast = useDialog((s) => s.toast)
   const signIn = useAccounts((s) => s.dialog)
+  const pullPicker = useGit((s) => s.pullPicker)
 
   return (
     <>
@@ -33,8 +36,9 @@ export function Overlays() {
           </div>
         </Modal>
       )}
+      {pullPicker && <PullProjectPopup />}
       <ContextMenu />
-      {toast && <div className={`toast ${toast.kind}`}>{toast.message}</div>}
+      {toast && <div className={`toast ${toast.kind}`} role="status">{toast.message}</div>}
     </>
   )
 }

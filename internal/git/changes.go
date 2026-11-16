@@ -148,6 +148,12 @@ func (r *Repo) Rollback(ctx context.Context, paths []string) error {
 	if len(paths) == 0 {
 		return nil
 	}
+	// Files outside HEAD are deleted from disk below: never one outside the work tree.
+	for _, p := range paths {
+		if !filepath.IsLocal(filepath.FromSlash(p)) {
+			return fmt.Errorf("rollback: %q is not a path inside the repository", p)
+		}
+	}
 	inHead, err := r.pathsInHead(ctx, paths)
 	if err != nil {
 		return err

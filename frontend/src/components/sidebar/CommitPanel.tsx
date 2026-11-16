@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { confirmRollback, useGit, type FileChange, type GitStatus } from '../../store/git'
+import { useEventCallback } from '../../lib/useEventCallback'
+import { confirmRollback, tickedOf, updateProject, useGit, type FileChange, type GitStatus } from '../../store/git'
 import { useEditor } from '../../store/editor'
 import { useWorkspace } from '../../store/workspace'
 import { rootLabels } from '../../lib/workspaceRoots'
@@ -127,7 +128,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
         <RepoSwitcher fallback="Commit" />
         <button className="icon" title="Refresh" onClick={() => void refreshAll()}>↻</button>
         <button className="icon" title="Fetch" disabled={!!busy || !isRepo} onClick={() => void remote('fetch')}>⇣</button>
-        <button className="icon" title="Update project (pull)" disabled={!!busy || !isRepo} onClick={() => void remote('pull')}>⤓</button>
+        <button className="icon" title="Update project (pull)" disabled={!!busy || !isRepo} onClick={updateProject}>⤓</button>
         <button className="icon" title={`Push (${formatKeys('Mod+Shift+K')})`} disabled={!!busy || !isRepo} onClick={() => void remote('push')}>⤒</button>
         <button className="icon" title="Stash changes…" disabled={!!busy || !isRepo} onClick={openStashDialog}>⊟</button>
       </div>
@@ -306,6 +307,7 @@ function RepoSection({
 function ChangeGroups({ section, collapsed, toggle }: { section: Section; collapsed: Record<string, boolean>; toggle: (key: string) => void }) {
   const { root, status } = section
   const { isIncluded, setGroup, toggleFile } = useGit.getState()
+  const busy = useGit((s) => s.busy)
   const openDiff = useEditor((s) => s.openDiff)
   const openFile = useEditor((s) => s.openFile)
   const agents = useAgent()
@@ -333,6 +335,9 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
                 />
               )}
               <span className="group-title">{g.title}</span>
+              {g.key !== 'conflicts' && included > 0 && (
+                <RollbackTicked files={g.files} root={root} count={included} untracked={g.key === 'untracked'} disabled={!!busy} />
+              )}
               {g.key === 'conflicts' && agents.conflictAgent && (
                 <button
                   className="link agent-action"
@@ -382,6 +387,27 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
         )
       })}
     </>
+  )
+}
+
+/** ↶ on a group header: rolls back (unversioned files: deletes) every ticked file of the group at once. */
+function RollbackTicked({
+  files, root, count, untracked, disabled,
+}: { files: FileChange[]; root: string; count: number; untracked: boolean; disabled: boolean }) {
+  const onClick = useEventCallback((e: React.MouseEvent) => {
+    e.stopPropagation() // the header itself folds the group
+    void confirmRollback(tickedOf(files, root), root)
+  })
+  const plural = count === 1 ? '' : 's'
+  return (
+    <button
+      className="icon group-action"
+      disabled={disabled}
+      title={untracked ? `Delete the ${count} ticked unversioned file${plural}…` : `Rollback the ${count} ticked file${plural}…`}
+      onClick={onClick}
+    >
+      ↶
+    </button>
   )
 }
 

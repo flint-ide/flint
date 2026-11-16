@@ -131,6 +131,28 @@ func TestReviewDraftReadsTheWorkingTreeOnThePullRequestsBranch(t *testing.T) {
 	}
 }
 
+// A folder opened through a symlink (on macOS already the temporary folder,
+// /var → /private/var): git names the repository by its real path, and the
+// working tree is read all the same.
+func TestReviewDraftReadsTheWorkingTreeOfAFolderOpenedThroughASymlink(t *testing.T) {
+	g, dir := prAgentFixture(t)
+	checkOutPullRequest(t, dir)
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(dir, link); err != nil {
+		t.Skip("no symlinks here")
+	}
+	g.app.roots = []string{link}
+	g.app.settings.PRReview.ContextLines = 1
+	d, err := g.ReviewDraft(link, 7, fakeOpenThread)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantParts(t, d.Prompt,
+		"The code there now, in the working tree (lines 5-7;",
+		"    5| func main() {\n    6| \tfmt.Println(\"hello\")\n    7| }",
+	)
+}
+
 func TestReviewDraftRefusesBadRequests(t *testing.T) {
 	g, dir := prAgentFixture(t)
 	outside := t.TempDir()

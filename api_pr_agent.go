@@ -122,6 +122,17 @@ func prCheckedOut(ctx context.Context, r *git.Repo, d github.Details, branch, oi
 // code excerpts: only a regular file inside an open folder (or inside dir,
 // an agent task's worktree), never a credential file, a symlink, a binary
 // or a file larger than maxReviewFileBytes.
+// withinAnyResolved reports whether real, a path with its symlinks resolved,
+// lies in one of the folders once theirs are resolved too.
+func withinAnyResolved(folders []string, real string) bool {
+	for _, f := range folders {
+		if resolved, err := filepath.EvalSymlinks(f); err == nil && workspace.Within(resolved, real) {
+			return true
+		}
+	}
+	return false
+}
+
 func (g *GitHubAPI) workingTreeReader(root, dir string) func(string) ([]string, bool) {
 	roots := g.app.projectRoots()
 	if g.app.taskByFolder(dir) != "" {
@@ -131,15 +142,12 @@ func (g *GitHubAPI) workingTreeReader(root, dir string) func(string) ([]string, 
 		if !validReviewPath(rel) || redact.SecretFile(rel) {
 			return nil, false
 		}
-		abs := filepath.Join(root, filepath.FromSlash(rel))
-		folder, ok := workspace.RootOf(roots, abs)
-		if !ok {
-			return nil, false
-		}
-		// A symlinked folder may not lead out of the open folder.
-		realFolder, err1 := filepath.EvalSymlinks(folder)
-		real, err2 := filepath.EvalSymlinks(abs)
-		if err1 != nil || err2 != nil || !workspace.Within(realFolder, real) {
+		// Both sides resolved: git reports the repository's real path, while a
+		// folder is kept as it was opened (through a symlink such as macOS's
+		// /var or /tmp, or one of the user's). A symlink inside the folder
+		// may not lead out of it.
+		real, err := filepath.EvalSymlinks(filepath.Join(root, filepath.FromSlash(rel)))
+		if err != nil || !withinAnyResolved(roots, real) {
 			return nil, false
 		}
 		content, binary, ok := readNewVersion(root, rel, maxReviewFileBytes+1)

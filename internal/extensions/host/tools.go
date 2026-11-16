@@ -44,6 +44,9 @@ func (h *Host) tools(want func(*ext) bool) []mcpserver.Tool {
 				Title:       e.m.Name + ": " + title,
 				Description: t.Description + " (from the " + e.m.Name + " extension)",
 				InputSchema: t.InputSchema,
+				// A tool that acts needs the user's yes for each call (the
+				// server asks, showing the arguments).
+				Acts: t.Acts,
 				Call: func(ctx context.Context, root string, args json.RawMessage) (string, error) {
 					return e.callTool(ctx, t.Name, root, args)
 				},

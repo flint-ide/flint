@@ -15,7 +15,9 @@ import (
 	"testing"
 	"time"
 
+	"flint/internal/extensions/manifest"
 	"flint/internal/extensions/rpc"
+	"flint/internal/extensions/sandbox"
 )
 
 // The host's tests drive testdata/testext, a Go program built once per run.
@@ -56,6 +58,7 @@ func testextSource(t *testing.T) string {
 }
 
 func TestMain(m *testing.M) {
+	sandbox.Main() // the tests' sandboxed extensions start this binary as their launcher
 	backoffBase = 20 * time.Millisecond
 	code := m.Run()
 	if buildDir != "" {
@@ -75,6 +78,7 @@ type fakeApp struct {
 	confirm  bool
 	disabled map[string]bool
 	settings map[string]json.RawMessage
+	sets     map[string]bool // decoration sets the user switched
 }
 
 func (a *fakeApp) Roots() []string {
@@ -116,6 +120,15 @@ func (a *fakeApp) Enabled(id string) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return !a.disabled[id]
+}
+
+func (a *fakeApp) SetEnabled(set string, def bool) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if on, ok := a.sets[set]; ok {
+		return on
+	}
+	return def
 }
 
 func (a *fakeApp) Settings(id string) json.RawMessage {
@@ -226,7 +239,9 @@ func (f fixture) log(t *testing.T) string {
 // waitFor polls cond for up to 5 s (tests only).
 func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	// Generous: `go test ./...` runs many packages at once, and stopping an
+	// extension alone may take its 2 s shutdown and 2 s kill grace.
+	deadline := time.Now().Add(15 * time.Second)
 	for !cond() {
 		if time.Now().After(deadline) {
 			t.Fatalf("timed out waiting for %s", what)
@@ -512,6 +527,29 @@ func TestAgentTools(t *testing.T) {
 	f.app.disabled["test.ext"] = true
 	if got := f.h.Tools(func(string) bool { return true }); len(got) != 0 {
 		t.Errorf("tools of a disabled extension: %+v", got)
+	}
+}
+
+// A tool whose manifest says it acts is offered as one (the MCP server then
+// asks before each call), and the install confirmation and the info say so.
+func TestActingAgentTools(t *testing.T) {
+	m, err := manifest.Parse([]byte(`{"id":"acme.jira","name":"Jira","version":"1.0.0","contract":1,"run":{"command":"jira"},
+		"contributes":{"agentTools":[
+			{"name":"issue","description":"An issue by key."},
+			{"name":"comment","description":"Adds a comment.","acts":true}]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg := installMessage(m)
+	if !strings.Contains(msg, "Agent tools: issue, comment (acts)") || !strings.Contains(msg, "Flint asks you before each call") {
+		t.Errorf("the confirmation doesn't say which tool acts:\n%s", msg)
+	}
+	f := setup(t, nil)
+	if tools := f.h.Tools(func(string) bool { return true }); len(tools) != 1 || tools[0].Acts {
+		t.Errorf("a read tool is offered as acting: %+v", tools)
+	}
+	if info := f.h.List()[0]; len(info.AgentTools) != 1 || info.AgentTools[0].Acts {
+		t.Errorf("info = %+v", info.AgentTools)
 	}
 }
 

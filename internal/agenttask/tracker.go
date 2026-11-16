@@ -98,6 +98,29 @@ func (t *Tracker) State(taskID, remembered string) Live {
 	return Combine(t.chats(taskID), remembered)
 }
 
+// Active lists the tasks with a turn running (working or waiting for an
+// approval), sorted: the ones that hold a slot of the queue.
+func (t *Tracker) Active() []string {
+	if t == nil {
+		return nil
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	seen := map[string]bool{}
+	var out []string
+	for _, task := range t.sessions {
+		if seen[task] {
+			continue
+		}
+		seen[task] = true
+		if Busy(t.combined(task).State) {
+			out = append(out, task)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
 // Sessions lists the chat sessions bound to a task.
 func (t *Tracker) Sessions(taskID string) []string {
 	if t == nil {

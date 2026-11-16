@@ -43,7 +43,7 @@ The full reference, with every detail and all keyboard shortcuts, is in [docs/FE
 - One tab area for files, terminals, agent chats, SQL consoles and diffs, with IntelliJ-style back/forward history
 - File tree with in-place rename, Move to Trash and a full context menu; several projects in one window
 - `⌘P` go to file and project-wide search and replace, powered by ripgrep, with no up-front indexing
-- Language servers (gopls, rust-analyzer, vtsls / typescript-language-server, basedpyright / pyright): completion, hover, go to definition, find usages, live diagnostics
+- Language servers (gopls, rust-analyzer, vtsls / typescript-language-server, basedpyright / pyright): completion, hover and parameter info, go to definition, implementations and symbols, find usages, rename, quick fixes and refactorings, formatting (also on save), live diagnostics
 - Files edited by agents reload in place as they change
 - `⌘I` *Edit with Agent* on the selection, optional ghost-text completions from a local model (Ollama or any OpenAI-compatible server), and a Vim mode
 
@@ -66,7 +66,7 @@ The full reference, with every detail and all keyboard shortcuts, is in [docs/FE
 - Go CPU and memory profiling with a flame graph
 
 **Databases**
-- PostgreSQL and ClickHouse with passwords in the macOS Keychain, schema browsing and SQL autocompletion
+- PostgreSQL and ClickHouse with passwords in the system keyring (macOS Keychain, Secret Service on Linux), schema browsing and SQL autocompletion
 - Query history per connection, visual EXPLAIN / EXPLAIN ANALYZE with warnings, and editing Postgres results by primary key
 
 **HTTP client**

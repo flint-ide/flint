@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -82,7 +83,7 @@ func (m *Manifest) check() error {
 func (m *Manifest) checkRun() error {
 	if !m.HasProgram() {
 		if m.NeedsProgram() {
-			return errors.New("run.command is missing, but the extension contributes commands, panels, status items, agent tools or activation events")
+			return errors.New("run.command is missing, but the extension contributes commands, panels, status items, agent tools, decoration sets or activation events")
 		}
 		return nil // data only: themes and settings
 	}
@@ -93,6 +94,9 @@ func (m *Manifest) checkRun() error {
 		return err
 	}
 	if err := checkRunEnv(m.Run.Env); err != nil {
+		return err
+	}
+	if err := m.checkSandbox(); err != nil {
 		return err
 	}
 	for _, o := range []*RunOS{m.Run.Darwin, m.Run.Linux} {
@@ -228,7 +232,9 @@ func (m *Manifest) checkContributions() error {
 				return err
 			}
 		default:
-			return fmt.Errorf(`panel %s: view %q is not supported (this Flint draws "tree", "list" and "webview")`, p.ID, p.View)
+			if err := checkDeclarative("panel", p.ID, p.View, PanelViews, p.Webview); err != nil {
+				return err
+			}
 		}
 	}
 	if err := m.checkTabViews(own); err != nil {
@@ -265,6 +271,9 @@ func (m *Manifest) checkContributions() error {
 		return err
 	}
 	if err := m.checkTestRunners(); err != nil {
+		return err
+	}
+	if err := m.checkDecorationSets(own); err != nil {
 		return err
 	}
 	return m.checkThemes(own)
@@ -330,9 +339,13 @@ func (m *Manifest) checkActivation() error {
 			ok = m.HasPanel(arg) || tab
 		case "onAgentTool":
 			ok = tools[arg]
+		case "onLanguage":
+			// Implied by a decoration set that lists the language; accepted so
+			// a manifest may say it.
+			ok = slices.ContainsFunc(m.Contributes.DecorationSets, func(s DecorationSet) bool { return slices.Contains(s.Languages, arg) })
 		}
 		if !ok {
-			return fmt.Errorf("activation event %q: use onStartup, or onCommand / onView / onAgentTool with one of the extension's own ids", ev)
+			return fmt.Errorf("activation event %q: use onStartup, onCommand / onView / onAgentTool with one of the extension's own ids, or onLanguage with a decoration set's language", ev)
 		}
 	}
 	return nil

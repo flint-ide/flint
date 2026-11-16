@@ -77,6 +77,7 @@ func (u *UsageAPI) Override(sessionID string) error {
 		return err
 	}
 	u.app.emit(eventUsageChanged)
+	u.app.startQueuedTasks() // queued agent tasks the budget held back
 	return nil
 }
 

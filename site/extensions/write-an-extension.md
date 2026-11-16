@@ -7,7 +7,7 @@ An extension is a folder with two things:
 - `flint-extension.json`, the **manifest**: who the extension is, the program Flint runs, what it adds to Flint and which permissions it needs.
 - **A program** in any language. Flint starts it when it is first needed and talks to it with [JSON-RPC 2.0](https://www.jsonrpc.org/specification), one JSON message per line, over the program's standard input and output. Whatever the program writes to standard error goes to its log in **Settings ▸ Extensions**.
 
-A complete example in Go, using only the standard library, is in Flint's repository: [`examples/extensions/stats`](https://github.com/flint-ide/flint/tree/main/examples/extensions/stats). It counts the files of the open projects by type.
+A complete example in Go, using only the standard library, is in Flint's repository: [`examples/extensions/stats`](https://github.com/flint-ide/flint/tree/main/examples/extensions/stats). It counts the files of the open projects by type and shows them as a tree, a sortable table and a chart in a tab. [`examples/extensions/todos`](https://github.com/flint-ide/flint/tree/main/examples/extensions/todos) marks TODO lines in the editor, with a quick fix.
 
 ## 1. The manifest
 
@@ -98,6 +98,8 @@ Change the panel's `view` to `tree` and return items with `hasChildren`. Flint a
 - `icon` is a name from Flint's icon set (`files`, `search`, `branch`, `database`, `checkbox`, `terminal`, `sum`, `puzzle` and a few others); an unknown name shows no icon.
 - When the content changes, send the `view/refresh` notification and Flint asks again.
 
+A panel can also be a table, a form or a chart: see [Tables, forms and charts](#13-tables-forms-and-charts).
+
 ## 5. A setting
 
 Add a settings schema to `contributes`:
@@ -142,7 +144,7 @@ Agents that Flint starts (Claude Code, Codex, custom ACP agents) can call your t
 }]
 ```
 
-The agent sees it as `hello_greeting` (your id's name part, then the tool's name). A call arrives as `agentTool/call` with the tool's `name`, the agent's project folder (`root`) and the `arguments`; answer with `{ "text": "…" }`. Tools are read-only: return information, don't change things.
+The agent sees it as `hello_greeting` (your id's name part, then the tool's name). A call arrives as `agentTool/call` with the tool's `name`, the agent's project folder (`root`) and the `arguments`; answer with `{ "text": "…" }`. Tools are read-only by default: return information, don't change things. A tool that does change something declares `"acts": true`, and Flint asks the user before each call.
 
 ## 8. Ask Flint for more
 
@@ -159,9 +161,83 @@ Requests your program can send to Flint, each needing a permission declared in t
 
 Your program also gets a private folder for its own data in `FLINT_EXTENSION_DATA`, and the variables of the user's environment it names in the manifest's `run.env` (for example `["KUBECONFIG"]`). For a panel or tab drawn by your own HTML, see [Webviews](protocol.md#webviews) and the [`notes`](https://github.com/flint-ide/flint/tree/main/examples/extensions/notes) example.
 
-A request without its permission fails with error `-32001`. The user sees the permissions when installing, so ask only for what you need. If your program talks to the network, declare `network:<host>` so users know where; Flint shows it but can't enforce it.
+A request without its permission fails with error `-32001`. The user sees the permissions when installing, so ask only for what you need. If your program talks to the network, declare `network:<host>` so users know where; Flint shows the hosts but can't limit the program to them.
 
-## 9. A color theme
+## 9. Marks in the editor
+
+A linter, a coverage tool or an issue tracker marks lines in open files. Declare a **decoration set** and the files it is for; it needs the `workspace.read` permission:
+
+```json
+"permissions": ["workspace.read"],
+"contributes": {
+  "decorationSets": [{ "id": "me.hello.todos", "title": "TODO Marks", "globs": ["*"], "unsavedText": true }]
+}
+```
+
+`languages` (`go`, `typescript`, `python`, `rust`, or an extension's language), `extensions` (`.md`) and `globs` (patterns for the file's name) say which files; `"default": false` leaves the set off until the user turns it on in Settings ▸ Extensions.
+
+When a matching file in a trusted folder is opened in an editor, Flint starts your program and sends `editor/opened`, then `editor/changed` (at most every 300 ms while the user types) and `editor/closed`:
+
+```json
+{ "jsonrpc": "2.0", "method": "editor/opened",
+  "params": { "path": "/path/to/main.go", "language": "go", "version": 1, "sets": ["me.hello.todos"], "text": "…" } }
+```
+
+`text` is there because the set says `unsavedText` (the install dialog tells the user); without it, read the saved file with `workspace/readFile`. Answer with the set's decorations for that version of the document:
+
+```json
+{ "jsonrpc": "2.0", "method": "editor/setDecorations", "params": {
+  "set": "me.hello.todos", "path": "/path/to/main.go", "version": 1, "decorations": [
+    { "kind": "diagnostic", "line": 3, "from": 3, "to": 7, "severity": "info", "message": "To do: tidy up",
+      "actions": [{ "id": "remove", "label": "Remove TODO marker" }] }
+  ] } }
+```
+
+- Kinds are `diagnostic` (underline, gutter marker, message on hover), `gutter` (a marker with a hover), `inline` (dim text after the line, clickable with a `command`) and `highlight` (a background). Colors come from `severity` (`info`, `ok`, `warning`, `error`).
+- Lines are 1-based; columns count UTF-16 code units, as in LSP.
+- Always send the `version` you computed for: Flint drops a publish for a version the editor has moved past, and moves what is shown with the user's edits until your next publish.
+- When the user picks an action, Flint sends the `editor/action` request with the set, path, version, action id and the decoration's current place. Answer `{ "edits": [{ "line": 3, "from": 3, "to": 9, "text": "" }] }`; Flint applies the edits as one undo step, and only if the document is still at that version. An action with a `command` runs that command instead.
+- While a document you decorate is open your program is not stopped for being idle. If it stops or crashes, its decorations are removed.
+
+The complete example is [`todos`](https://github.com/flint-ide/flint/tree/main/examples/extensions/todos); every field and limit is in the [protocol reference](protocol.md#editor-decorations).
+
+## 10. Declare a sandbox
+
+Add `"sandbox": {}` to `run` and Flint confines your program with the operating system's sandbox (Landlock and seccomp on Linux, `sandbox-exec` on macOS): it can read its own folder and the system's files, write only `FLINT_EXTENSION_DATA` and its own `TMPDIR`, open no socket and start no other program. Without the object the program runs unconfined, Flint tells the user "Not sandboxed" when installing and in Settings, and users who turned on **Only run sandboxed extensions** can't run it.
+
+```json
+"run": { "command": "hello.py", "sandbox": {} }
+```
+
+Then say what your program needs beyond that, and nothing more; the install dialog lists it:
+
+| It… | Declare |
+|---|---|
+| reads the project's files itself | the `workspace.read` permission |
+| calls a web API | `"network": true`, or the `network:<host>` permission |
+| reads a tool's configuration | `"read": ["~/.config/tool", "${env:TOOL_CONFIG}"]` (the variable must be in `run.env`) |
+| keeps a cache outside its data folder | `"write": ["~/.cache/tool"]` |
+| talks to Docker or another local service | `"localSockets": true` |
+| runs command-line tools | `"exec": true`; they run in the same sandbox, so they need the same paths and network |
+
+For example, an extension that drives the Docker CLI and Engine API:
+
+```json
+"run": {
+  "command": "docker-ext",
+  "env": ["DOCKER_HOST", "DOCKER_CONFIG", "DOCKER_CERT_PATH"],
+  "sandbox": {
+    "read": ["~/.docker", "${env:DOCKER_CONFIG}", "${env:DOCKER_CERT_PATH}"],
+    "network": true, "localSockets": true, "exec": true
+  }
+}
+```
+
+An extension that can't be described this way, typically one that runs tools with credential plugins that read and write all over the home folder, declares `"sandbox": { "mode": "none" }`. It runs as before, and Flint shows "Not sandboxed (declared by the extension)", which is more honest than no declaration.
+
+Things that surprise a program in the strict profile: its own folder is read-only (write to `FLINT_EXTENSION_DATA`); `~` is unreadable, so libraries that keep caches there fail unless you point them at `TMPDIR` or the data folder; a script whose interpreter is a wrapper that starts another program (a version manager's shim) needs `exec`; an interpreter installed in the home folder needs its folder in `read`. All the rules are in the [protocol reference](protocol.md#runsandbox). `flint-extcheck` (below) runs your program inside its sandbox and prints what it was allowed.
+
+## 11. A color theme
 
 A theme is data, so it needs no program: an extension with only `themes` (and settings) leaves out `run` and never runs code.
 
@@ -177,7 +253,7 @@ A theme is data, so it needs no program: an extension with only `themes` (and se
 
 `colors` takes the CSS variables of a custom theme and `terminal` the terminal colors (`background`, `foreground`, `cursor`, `cursorAccent`, `selectionBackground`, the 16 ANSI colors); see [customTheme](../reference/settings.md#customtheme) for the full lists. Values are hex colors. Any other name or value refuses the whole manifest, with the reason shown in Settings ▸ Extensions. The user picks a theme under Settings ▸ Appearance ▸ Color theme, or with **Use …** on your extension; Flint copies it into their custom theme.
 
-## 10. A programming language
+## 12. A programming language
 
 An extension can teach Flint a language it doesn't know: which files are in it, its comments, its language server and its syntax highlighting. Like a theme this is data, so a language-only extension needs no program of its own.
 
@@ -216,7 +292,7 @@ An extension can teach Flint a language it doesn't know: which files are in it, 
 
 Flint's own languages (Go, TypeScript and JavaScript, Python, Rust, and the formats it highlights) always win: an extension can't take over their files.
 
-## 11. A debugger and a test runner
+## 13. A debugger and a test runner
 
 An extension can debug and test files of a language: yours from section 10, or another one, such as Python. Both are data that name programs to run, so they need no program of their own either.
 
@@ -247,11 +323,85 @@ An extension can debug and test files of a language: yours from section 10, or a
 
 The user runs them with **Debug File** and **Run Tests in File** in the command palette, the run configuration menu in the toolbar, or a file's context menu in the sidebar. Both run the project's code, so they start only in [trusted folders](../guides/restricted-mode.md), and the install confirmation lists the programs they start.
 
+## 13. Tables, forms and charts
+
+A panel's `view` can also be `table`, `form` or `chart`, and so can a tab view (`contributes.tabViews`), which opens in the editor area where there is more room. Flint draws them with its own components, in the user's theme, from the answer to `view/resolve`. You send data, never markup or colors: text is shown as text.
+
+**A table** has typed columns and rows with an id. The user sorts it by clicking a column header; Flint does that itself, so send numbers and dates as values, not as formatted text:
+
+```json
+{ "kind": "table",
+  "columns": [{ "id": "type", "title": "Type" },
+              { "id": "files", "title": "Files", "type": "number" },
+              { "id": "changed", "title": "Changed", "type": "date" },
+              { "id": "share", "title": "Share", "type": "badge", "badges": { "large": "warning", "small": "info" } }],
+  "rows": [{ "id": "type:.go", "cells": { "type": ".go", "files": 212, "changed": "2026-11-01T09:30:00Z", "share": "large" },
+             "command": { "id": "me.hello.open", "args": { "path": "/path/to/main.go" } },
+             "actions": [{ "id": "open", "label": "Open Largest File" }] }],
+  "sort": { "column": "files", "descending": true } }
+```
+
+- `command` runs on Enter or a double click; `actions` are the row's context menu (right click, or `Shift+F10`), sent as `view/action` with the row's id as `item`.
+- A `badge` column shows its values as labels colored by severity (`info`, `ok`, `warning`, `error`).
+- Flint shows 5,000 rows. Send fewer: sort and cut on your side when you have more.
+
+**A form** has fields with the keywords of a [setting](#5-a-setting), and a submit button:
+
+```json
+{ "kind": "form", "submit": "Sign In",
+  "fields": [{ "id": "site", "type": "string", "format": "hostname", "title": "Site", "required": true, "value": "acme.example" },
+             { "id": "token", "type": "string", "title": "API token", "secret": true, "required": true },
+             { "id": "remember", "type": "boolean", "title": "Stay signed in", "default": true }] }
+```
+
+When the user submits, Flint checks every value against its field and sends you `form/submit` only when all of them pass:
+
+```json
+{ "jsonrpc": "2.0", "id": 11, "method": "form/submit",
+  "params": { "view": "me.hello.signin", "values": { "site": "acme.example", "token": "…", "remember": true } } }
+```
+
+Answer `{}` to accept, or `{ "errors": { "token": "was rejected by the server" }, "error": "Not signed in." }`: the messages appear under the fields and above the button. A `secret` field is a password field that always starts empty: Flint never shows a value in it, sends what the user typed with the submit only and keeps it nowhere. Store it with `secrets/set` (permission `secrets`), never in a file or a setting.
+
+**A chart** is a `line`, `bar` or `area` chart of up to 10 series of 2,000 points, each point `[x, y]`:
+
+```json
+{ "kind": "chart", "type": "bar", "title": "Files by type",
+  "x": { "type": "category", "label": "File type" }, "y": { "label": "Files", "min": 0 },
+  "series": [{ "id": "files", "label": "Files", "points": [[".go", 212], [".md", 40], [".json", 9]] }] }
+```
+
+`x.type` is `category`, `number` or `date` (ISO 8601). Colors come from the theme, one per series.
+
+**A tab view** is declared in the manifest and opened by you, for example from a command:
+
+```json
+"tabViews": [{ "id": "me.hello.chart", "title": "Files by Type", "icon": "sum", "view": "chart", "restore": true }]
+```
+
+```json
+{ "jsonrpc": "2.0", "id": 3, "method": "window/openTab", "params": { "view": "me.hello.chart", "key": "files", "title": "Files by Type" } }
+```
+
+Flint opens the tab (or focuses the one with that key) and sends `view/resolve` with `view`, `key` and the tab's `data`; the key is how one view shows different things in different tabs. `view/refresh` with a `key` reloads one tab, without it every tab of the view. With `restore`, the tab comes back with the session and is resolved when it is first shown, so answer `view/resolve` for any key, with a `message` view when the key means nothing any more.
+
+Any of these may answer `{ "kind": "message", "text": "…", "actions": […] }` instead, for empty and sign-in states. `initialize`'s `capabilities.views` and `capabilities.charts` list what the running Flint draws. Every field and limit is in the [protocol reference](protocol.md#table-views); the [`stats`](https://github.com/flint-ide/flint/tree/main/examples/extensions/stats) example has a table panel and a chart tab.
+## Getting into the extension index
+
+Flint installs prebuilt extensions from a signed [index](index-format.md) that the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository publishes. There is no upload and no account: an extension gets into the index by being in that repository.
+
+1. Open a pull request there that adds your extension's folder (the manifest, a `README.md`, and for a program its source as a Go module). CI checks it with `flint-extcheck`.
+2. Once it is merged, the repository's release workflow builds every program for `darwin-arm64`, `darwin-amd64`, `linux-amd64` and `linux-arm64`, packs each extension, writes `index.json` with `flint-extindex` and signs it. Users see your extension after their next **Browse Extensions** or **Check for Updates**.
+3. To publish an update, raise `version` in the manifest in a pull request. Flint offers **Update to x.y.z…** only for a higher version, and its confirmation lists every permission and agent tool the update adds, so add only what you need.
+
+To distribute extensions without that repository, hand out the folder (**Install from Folder…**, or `flint --install-extension <folder>`), or [run your own index](index-format.md#your-own-index).
+
 ## Checklist before you share an extension
 
 - The manifest has `contract`, a `publisher.name` id, `name` and a `major.minor.patch` version.
 - The program starts in under 10 seconds and answers `initialize`; `view/resolve` answers in under 5 seconds; other requests in under 30 (agent tools: 120).
 - Nothing but protocol messages on standard output; one message is at most 4 MiB.
 - The program exits when its standard input closes.
+- `run.sandbox` is declared: `{}` if the program only needs its own folder, its data folder and Flint; otherwise the paths, `network`, `localSockets` and `exec` it needs; `"mode": "none"` only when it can't work confined.
 - Build the program for both macOS and Linux if you can, using `run.darwin` and `run.linux` for separate binaries.
-- Run the contract checker from a Flint checkout: `go run ./cmd/flint-extcheck path/to/hello`. It checks the manifest and webview files with Flint's own code, then starts the program, sends `initialize`, resolves every declarative panel and lists the agent tools. The [flint-ide/extensions](https://github.com/flint-ide/extensions) repository runs it in CI; a Go extension there is built by Flint on the user's machine when they install it from Settings ▸ Extensions.
+- Run the contract checker from a Flint checkout: `go run ./cmd/flint-extcheck path/to/hello`. It checks the manifest and webview files with Flint's own code, then starts the program (in its sandbox, on a system that has one), sends `initialize`, resolves every declarative panel and tab view (a table, form or chart Flint can't draw, or one that is cut, fails the check), submits every form with the values it shows and lists the agent tools. It prints the sandbox the program ran in, and a wrong `run.sandbox` fails the check. The [flint-ide/extensions](https://github.com/flint-ide/extensions) repository runs it in CI; a Go extension there is built by Flint on the user's machine when they install it from Settings ▸ Extensions.

@@ -3,6 +3,8 @@ import type { ReviewThread as Thread } from '../../api/backend'
 import { addReviewComment, openInBrowser, replyToThread, setThreadResolved, usePullRequests, detailsKey } from '../../store/pullRequests'
 import { timeAgo } from '../../lib/prReview'
 import { formatKeys } from '../../lib/commands'
+import { canAskAgent } from '../../lib/prAgent'
+import { AskAgentAboutThread } from './ReviewAgent'
 
 /** Markdown rendered in Go (no raw HTML); links open in the browser. */
 export function HtmlBody({ html, className = '' }: { html: string; className?: string }) {
@@ -103,6 +105,7 @@ export function ReviewThread({ root, number, thread, label }: ThreadProps) {
                 <button className="primary" disabled={!reply.trim() || busy} onClick={() => void send()}>Reply</button>
               )}
               <span className="spacer" />
+              {canAskAgent(thread) && <AskAgentAboutThread root={root} number={number} threadId={thread.id} />}
               {canToggle && (
                 <button disabled={busy} onClick={() => void setThreadResolved(root, number, thread.id, !thread.resolved)}>
                   {thread.resolved ? 'Unresolve' : 'Resolve'}

@@ -3,6 +3,7 @@ import { checkName } from '../../lib/ci'
 import { checksSummary } from '../../lib/prReview'
 import { ciKey, useCI } from '../../store/ci'
 import { FixWithAgentButton } from '../github/CIStatus'
+import { AddressReviewButton } from '../github/ReviewAgent'
 
 const LABEL = { failure: '✗ CI', pending: '● CI', success: '✓ CI' } as const
 
@@ -28,4 +29,11 @@ export function TaskCIFix({ t }: { t: TaskView }) {
   const pr = entry?.data?.pr
   if (!entry || !pr || entry.state !== 'failure') return null
   return <FixWithAgentButton target={{ root: t.worktree, pr, checks: entry.data!.checks, task: t }} label="✦ Fix CI" />
+}
+
+/** Address review comments for a task with an open pull request: the draft goes to the task's chat. */
+export function TaskReviewComments({ t }: { t: TaskView }) {
+  const pr = useTaskCI(t)?.data?.pr
+  if (!pr || pr.state !== 'OPEN') return null
+  return <AddressReviewButton target={{ root: t.worktree, number: pr.number, task: t }} label="✦ Review comments" />
 }

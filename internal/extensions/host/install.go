@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	"flint/internal/extensions/manifest"
+	"flint/internal/extensions/sandbox"
 )
 
 // Limits on a folder being installed.
@@ -28,7 +29,26 @@ const (
 // after the user confirmed its id, name, program and permissions in a native
 // dialog. An installed extension with the same id is replaced (stopped
 // first); its settings in settings.json stay.
-func (h *Host) Install(src string) (Info, error) {
+func (h *Host) Install(src string) (Info, error) { return h.install(src, nil) }
+
+// Expected is what an install from the signed extension index requires of
+// the unpacked folder (internal/extensions/index).
+type Expected struct {
+	// ID and Version are the index entry's: the folder's manifest must have
+	// exactly these, or nothing is installed and nothing is asked.
+	ID, Version string
+	// Note opens the confirmation: where the folder came from.
+	Note string
+}
+
+// InstallExpected is Install for a folder unpacked from the extension
+// index: the same checks, confirmation and copy, after the manifest's id
+// and version were compared with the index entry's.
+func (h *Host) InstallExpected(src string, want Expected) (Info, error) {
+	return h.install(src, &want)
+}
+
+func (h *Host) install(src string, want *Expected) (Info, error) {
 	h.ensureDiscovered()
 	src, err := filepath.Abs(src)
 	if err != nil {
@@ -44,14 +64,24 @@ func (h *Host) Install(src string) (Info, error) {
 	if err != nil {
 		return Info{}, err
 	}
+	message := installMessage(m)
+	if want != nil {
+		if m.ID != want.ID || m.Version != want.Version {
+			return Info{}, fmt.Errorf("the download holds %s %s, but the extension index lists %s %s; nothing was installed", m.ID, m.Version, want.ID, want.Version)
+		}
+		if want.Note != "" {
+			message = want.Note + "\n\n" + message
+		}
+	}
 	h.mu.Lock()
 	old := h.exts[m.ID]
 	h.mu.Unlock()
 	title := fmt.Sprintf("Install the extension %q?", m.Name)
 	if old != nil && old.m != nil {
 		title = fmt.Sprintf("Replace %s %s with %s?", old.m.Name, old.m.Version, m.Version)
+		message = changesMessage(old.m, m) + "\n" + message
 	}
-	if !h.o.App.Confirm(title, installMessage(m), "Install") {
+	if !h.o.App.Confirm(title, message, "Install") {
 		return Info{}, ErrCancelled
 	}
 	if err := os.MkdirAll(h.o.Dir, 0o700); err != nil {
@@ -94,6 +124,52 @@ func (h *Host) Install(src string) (Info, error) {
 		return Info{}, err
 	}
 	return e.info(), nil
+}
+
+// changesMessage says what replacing the installed old with next changes:
+// the version, and every permission and agent tool next adds (what the user
+// has not agreed to yet).
+func changesMessage(old, next *manifest.Manifest) string {
+	var b strings.Builder
+	b.WriteString("Changes from the installed version:\n")
+	if old.Version == next.Version {
+		fmt.Fprintf(&b, "• Version: %s (the same)\n", next.Version)
+	} else {
+		fmt.Fprintf(&b, "• Version: %s → %s\n", old.Version, next.Version)
+	}
+	added := false
+	for _, p := range next.Permissions {
+		if !slices.Contains(old.Permissions, p) {
+			fmt.Fprintf(&b, "• New permission: %s\n", PermissionText(p))
+			added = true
+		}
+	}
+	had := map[string]bool{} // tool name → acts
+	for _, t := range old.Contributes.AgentTools {
+		had[t.Name] = t.Acts
+	}
+	for _, t := range next.Contributes.AgentTools {
+		acted, known := had[t.Name]
+		switch {
+		case !known && t.Acts:
+			fmt.Fprintf(&b, "• New agent tool: %s (acts)\n", t.Name)
+		case !known:
+			fmt.Fprintf(&b, "• New agent tool: %s\n", t.Name)
+		case t.Acts && !acted:
+			fmt.Fprintf(&b, "• The agent tool %s now acts (it was read-only)\n", t.Name)
+		default:
+			continue
+		}
+		added = true
+	}
+	if !old.HasProgram() && next.HasProgram() {
+		b.WriteString("• It now runs a program (the installed version only added data)\n")
+		added = true
+	}
+	if !added {
+		b.WriteString("• No new permissions or agent tools\n")
+	}
+	return b.String()
 }
 
 // languagesMessage lists the languages and the language servers they run;
@@ -176,10 +252,27 @@ func installMessage(m *manifest.Manifest) string {
 	if m.HasWebviews() {
 		b.WriteString("Shows its own UI in Flint (webviews, in a sandboxed frame without network)\n")
 	}
+	if sets := m.Contributes.DecorationSets; len(sets) > 0 {
+		titles := make([]string, len(sets))
+		unsaved := false
+		for i, s := range sets {
+			titles[i] = s.Title
+			unsaved = unsaved || s.UnsavedText
+		}
+		fmt.Fprintf(&b, "Marks lines in editors: %s (it learns which matching files are open in trusted folders", strings.Join(titles, ", "))
+		if unsaved {
+			b.WriteString(", and sees their text as you type, unsaved edits included")
+		}
+		b.WriteString(")\n")
+	}
 	if m.RunsAtStartup() {
 		b.WriteString("Starts: when Flint starts (onStartup)\n")
 	} else {
-		b.WriteString("Starts: when you first use it\n")
+		if len(m.Contributes.DecorationSets) > 0 {
+			b.WriteString("Starts: when you first use it, or open a file it marks\n")
+		} else {
+			b.WriteString("Starts: when you first use it\n")
+		}
 	}
 	b.WriteString("\nPermissions:\n")
 	if len(m.Permissions) == 0 {
@@ -190,12 +283,20 @@ func installMessage(m *manifest.Manifest) string {
 	}
 	if n := len(m.Contributes.AgentTools); n > 0 {
 		names := make([]string, n)
+		acts := false
 		for i, t := range m.Contributes.AgentTools {
 			names[i] = t.Name
+			if t.Acts {
+				names[i] += " (acts)"
+				acts = true
+			}
 		}
 		fmt.Fprintf(&b, "• Agent tools: %s\n", strings.Join(names, ", "))
+		if acts {
+			b.WriteString("  Tools marked (acts) change things for an agent; Flint asks you before each call.\n")
+		}
 	}
-	b.WriteString("\nThe program runs with your user's permissions: Flint shows what it declares but cannot confine what it does. Install only extensions you trust.")
+	sandboxMessage(&b, describeSandbox(m, sandbox.Probe(), nil))
 	return b.String()
 }
 

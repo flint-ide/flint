@@ -78,6 +78,18 @@ func Slug(description string) string {
 	return slug
 }
 
+// BranchName is the branch of a task before it is made unique: prefix and
+// the description's slug, and for a task of a group the agent's id too, so
+// the branches of one comparison tell the agents apart
+// ("agent/add-retry-codex").
+func BranchName(prefix, description, agent string, grouped bool) string {
+	name := prefix + Slug(description)
+	if grouped {
+		name += "-" + Slug(agent)
+	}
+	return name
+}
+
 // Title is the description's first non-empty line with runs of spaces
 // collapsed, cut to maxTitle runes.
 func Title(description string) string {

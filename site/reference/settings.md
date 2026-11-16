@@ -29,7 +29,9 @@ The file is readable only by your user. It never contains secrets: database pass
     "fontFamily": "'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace",
     "fontSize": 14,
     "lineHeight": 1.55,
-    "vimMode": false
+    "vimMode": false,
+    "formatOnSave": false,
+    "organizeImportsOnSave": false
   },
   "terminal": {
     "fontFamily": "\"JetBrains Mono\", \"SF Mono\", Menlo, monospace",
@@ -63,7 +65,9 @@ The file is readable only by your user. It never contains secrets: database pass
   "mcpServer": {
     "enabled": true,
     "tools": { "diagnostics": true, "editor": true, "terminals": true, "tests": true },
-    "terminalLines": 200
+    "actions": { "tests": true, "run": false, "http": false, "sql": false },
+    "terminalLines": 200,
+    "testWaitSeconds": 120
   },
   "completions": {
     "enabled": true,
@@ -75,7 +79,7 @@ The file is readable only by your user. It never contains secrets: database pass
     "contextLines": 100
   },
   "inlineEdit": { "contextLines": 60 },
-  "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/" },
+  "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/", "maxParallel": 3 },
   "usage": {
     "retentionDays": 90,
     "dailyBudgetUsd": 20,
@@ -85,6 +89,7 @@ The file is readable only by your user. It never contains secrets: database pass
   },
   "agentReview": { "scope": "selected", "maxDiffKB": 128, "agent": "", "timeoutSeconds": 300 },
   "ci": { "pollSeconds": 60, "logTailLines": 80, "logErrorLines": 40, "notify": true },
+  "prReview": { "maxThreads": 20, "contextLines": 8 },
   "github": { "host": "github.com", "clientId": "", "scopes": ["repo", "read:org", "workflow"], "maxRetryWaitSeconds": 60 }
 }
 ```
@@ -95,7 +100,7 @@ The file is readable only by your user. It never contains secrets: database pass
 |---|---|---|---|
 | `version` | number | `1` | Schema version. Written by Flint; you don't need to change it. |
 | `theme` | string | `"dark"` | `"dark"`, `"light"`, `"system"` (follows the macOS appearance) or `"custom"` (uses `customTheme`). |
-| `editor` | object | see below | Font for all editors (files, diffs and scratchpads), and `vimMode`: Vim key bindings in every editor (default `false`). |
+| `editor` | object | see below | Font for all editors (files, diffs and scratchpads), `vimMode`: Vim key bindings in every editor (default `false`), and `formatOnSave` / `organizeImportsOnSave` (default `false`). |
 | `terminal` | object | see below | Font for terminals and run consoles. |
 | `customTheme` | object | see below | The palette of the `"custom"` theme, usually imported from VS Code. See [customTheme](#customtheme). |
 | `defaultAgent` | string | `""` | Agent for new chats, commit messages and conflict resolution: `"claude"`, `"codex"` or the `id` of a custom agent. Empty means the first installed agent. Conflict resolution always uses Claude Code or Codex. |
@@ -108,11 +113,12 @@ The file is readable only by your user. It never contains secrets: database pass
 | `mcpServer` | object | see below | What Flint's own MCP server tells the agents Flint starts. See [mcpServer](#mcpserver). |
 | `completions` | object | see below | Inline suggestions from a code model (off by default). See [completions](#completions). |
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
-| `agentTasks` | object | see below | Where agent task worktrees go and how their branches are named. See [agentTasks](#agenttasks). |
+| `agentTasks` | object | see below | Where agent task worktrees go, how their branches are named and how many tasks work at the same time. See [agentTasks](#agenttasks). |
 | `usage` | object | see below | How long agent usage is kept, budgets, and prices for estimates. See [usage](#usage). |
 | `prompts` | object | see below | The prompt library of the agent chat (`/`). See [prompts](#prompts). |
 | `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
 | `ci` | object | see below | Following your pull requests' CI: poll interval, Fix with agent's log excerpt, notifications. See [ci](#ci). |
+| `prReview` | object | see below | Handing a pull request's review comments to the agent: threads per draft, code lines around a comment. See [prReview](#prreview). |
 | `github` | object | see below | The GitHub host, the OAuth App Sign in with GitHub uses, scopes and the retry wait. See [github](#github). |
 <!-- include-rows _settings/*.md -->
 
@@ -129,6 +135,8 @@ The file is readable only by your user. It never contains secrets: database pass
 `fontFamily` is a CSS font list; the first installed font is used. It may not contain `;`, `{`, `}`, `<`, `>` or `\`.
 
 `editor` also has `vimMode` (boolean, default `false`): Vim key bindings in every editor. See [Use Vim key bindings](../how-to/customize-flint.md#use-vim-key-bindings).
+
+`editor.formatOnSave` and `editor.organizeImportsOnSave` (booleans, default `false`) make the file's language server format it, or put its imports in order, before every save. Files whose server has no formatter are saved as they are, and a save never waits more than 3 seconds for the server. See [Language servers](../guides/editor-and-navigation.md#language-servers).
 
 ### customTheme
 
@@ -224,7 +232,7 @@ A change made in the Settings tab restarts that language's servers. Servers that
 
 ### mcpServer
 
-Flint's own read-only MCP server for agent chats. See [What agents can see in Flint](../guides/ai-agents.md#what-agents-can-see-in-flint).
+Flint's own MCP server for agent chats: read-only tools, and tools that act when you switch them on. See [What agents can see in Flint](../guides/ai-agents.md#what-agents-can-see-in-flint).
 
 | Key | Type | Range | Default | Meaning |
 |---|---|---|---|---|
@@ -233,7 +241,12 @@ Flint's own read-only MCP server for agent chats. See [What agents can see in Fl
 | `tools.editor` | boolean | | `true` | `get_editor_state`: open files, the active file and the selection. When `false`, Flint also stops sending the editor state to its backend. |
 | `tools.terminals` | boolean | | `false` | `get_terminal_output`: recent output terminals and run consoles printed in the project. The agent asks before each call. |
 | `tools.tests` | boolean | | `true` | `get_test_results`: the last test run. |
-| `terminalLines` | integer | 10–2000 | `200` | The most lines of one terminal's output an agent gets (clamped into the range). |
+| `actions.tests` | boolean | | `false` | `run_tests`: run tests in Flint's test runner. Like every `actions` tool, it isn't offered while `false`, and you are asked before each call. |
+| `actions.run` | boolean | | `false` | `run_configuration` (start a run configuration by name) and `get_run_output` (read a run's output and state). |
+| `actions.http` | boolean | | `false` | `send_http_request`: send a named request of a `.http` file in the project. |
+| `actions.sql` | boolean | | `false` | `run_sql_query`: one reading statement on a saved connection that is read-only. Needs the Database feature. |
+| `terminalLines` | integer | 10–2000 | `200` | The most lines of one terminal's or run's output an agent gets (clamped into the range). |
+| `testWaitSeconds` | integer | 10–540 | `120` | How long `run_tests` waits for a test run before it answers with the results so far (clamped into the range). |
 
 Tool switches apply right away, also to running chats.
 ### completions
@@ -267,6 +280,7 @@ Used by [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel).
 |---|---|---|---|
 | `worktreeDir` | string | `""` | Folder for task worktrees, which go to `<worktreeDir>/<repository>/<branch>`. An absolute path or one starting with `~/`, up to 1024 characters. Empty puts them in `<repository>.worktrees/<branch>` next to the main checkout, like **New Worktree…** in the branch widget. |
 | `branchPrefix` | string | `"agent/"` | Starts every task branch, followed by a name made from the task's first line. Letters, digits, `.`, `_`, `-` and `/`, up to 40 characters; may be empty. It may not start with `-`, `/` or `.`, or contain `..`, `//` or `/.`. |
+| `maxParallel` | integer | `3` | How many agent tasks may work at the same time, from 0 to 32. A task started beyond it waits in [the queue](../guides/ai-agents.md#the-queue) until a working task settles. `0` means no limit. |
 
 Slashes in a branch name become dashes in the folder name. The tasks themselves are kept in `state.json`.
 
@@ -316,6 +330,17 @@ Used by [When CI fails](../guides/git-and-github.md#when-ci-fails).
 | `notify` | boolean | | `true` | A notification when your pull request's CI fails or turns green while Flint is in the background. Also needs `notifyInBackground`. |
 
 Flint keeps at most the last 8 MB of each failed job's log (and says when it cut one), describes at most 4 failed jobs per run, cuts log lines at 2,000 characters and workflow, job and step names at 120, and the Log tab keeps the last 20,000 lines; these limits are not settings.
+
+### prReview
+
+Used by [Handing review comments to the agent](../guides/git-and-github.md#handing-review-comments-to-the-agent). Edited in **Settings ▸ CI ▸ Review comments**.
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `maxThreads` | integer | 1–50 | `20` | Unresolved threads one **Address review comments** draft carries, in the pull request's file order. The rest are listed at the end of the draft. |
+| `contextLines` | integer | 0–50 | `8` | Lines of code before and after a commented line in the draft: from the working tree when the pull request's branch is checked out, else from the pull request's diff. `0` leaves the code out. |
+
+Flint cuts a comment and a suggestion at 4,000 bytes, quotes the first and the latest 7 comments of a thread and the latest 5 reviews that request changes, cuts code lines at 400 characters and keeps a draft under 64 kB; these limits are not settings.
 
 ### github
 

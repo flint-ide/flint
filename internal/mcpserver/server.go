@@ -1,5 +1,6 @@
-// Package mcpserver serves Flint's read-only context (diagnostics, open
-// editors, terminal output, test results, cluster status) to the coding
+// Package mcpserver serves Flint's context (diagnostics, open editors,
+// terminal output, test results) and, when the user switched them on, tools
+// that act (run tests, a run configuration, a request, a query) to the coding
 // agents Flint starts, over the Model Context Protocol's Streamable HTTP
 // transport: JSON-RPC 2.0 messages POSTed to one endpoint, answered with
 // application/json (protocol 2025-06-18; no server-sent events, no
@@ -10,7 +11,8 @@
 // gets its own random bearer token, revoked when the session ends, and a
 // request only ever sees the project its token belongs to. Requests are
 // checked against DNS rebinding (Host, Origin), their bodies are capped, and
-// every tool answer is redacted (internal/redact) and bounded.
+// every tool answer is redacted (internal/redact) and bounded. A tool that
+// acts runs only after Options.Approve said yes to that one call.
 package mcpserver
 
 import (
@@ -31,11 +33,16 @@ import (
 
 // Security limits: constants, not settings.
 const (
-	maxBody         = 1 << 20  // bytes of one request
-	maxToolOutput   = 64 << 10 // bytes of one tool answer
-	maxTokens       = 256      // live tokens (agent sessions)
-	maxConcurrent   = 4        // tool calls running at once per project (an extension's may start a process)
-	callTimeout     = 30 * time.Second
+	maxBody       = 1 << 20  // bytes of one request
+	maxToolOutput = 64 << 10 // bytes of one tool answer
+	maxTokens     = 256      // live tokens (agent sessions)
+	maxConcurrent = 4        // tool calls running at once per project (an extension's may start a process)
+	callTimeout   = 30 * time.Second
+	// An acting tool waits for the user's answer, then may run for longer
+	// than a read (a test run); both waits are bounded.
+	approvalTimeout = 5 * time.Minute
+	maxToolTimeout  = 10 * time.Minute
+	maxSummary      = 2000 // bytes of what an acting call says it will do
 	shutdownTimeout = 2 * time.Second
 	endpointPath    = "/mcp"
 )
@@ -43,7 +50,7 @@ const (
 // ErrClosed is returned by Endpoint after Close.
 var ErrClosed = errors.New("mcpserver: closed")
 
-// Tool is one read-only tool.
+// Tool is one tool: read-only, unless Acts.
 type Tool struct {
 	Name        string
 	Title       string
@@ -54,7 +61,36 @@ type Tool struct {
 	// args are the raw "arguments" (an object, or null). An error is shown to
 	// the agent as a failed tool call.
 	Call func(ctx context.Context, root string, args json.RawMessage) (string, error)
+	// Acts marks a tool that does something (starts a process, sends a
+	// request, runs a query): every call needs Options.Approve's yes first.
+	Acts bool
+	// Plan, for a tool that Acts, checks the arguments and says what the call
+	// would do, before the user is asked; what was planned is what runs. Nil:
+	// the user is shown the arguments only, and Call runs.
+	Plan func(ctx context.Context, root string, args json.RawMessage) (Planned, error)
+	// Timeout bounds one call (after the approval); 0 is the default of 30 s.
+	Timeout time.Duration
 }
+
+// Planned is one checked call of an acting tool.
+type Planned struct {
+	// Summary says what will happen, for the user (one or a few lines).
+	Summary string
+	// Run does it.
+	Run func(ctx context.Context) (string, error)
+}
+
+// Approval is one call of an acting tool, waiting for the user's answer.
+type Approval struct {
+	Root    string
+	Tool    string // the tool's name, as the agent called it
+	Title   string
+	Args    json.RawMessage // the call's arguments (an object)
+	Summary string          // Planned.Summary, bounded; "" without a Plan
+}
+
+// ErrNotApproved is the answer to an acting call the user didn't allow.
+var ErrNotApproved = errors.New("the user did not approve this action in Flint; do not try again unless they ask")
 
 // Options configure a Server.
 type Options struct {
@@ -64,6 +100,10 @@ type Options struct {
 	// Allow reports whether a project may use the server now (enabled in
 	// Settings, trusted). Nil allows every project that has a token.
 	Allow func(root string) bool
+	// Approve asks the user about one call of an acting tool and returns nil
+	// for a yes (ErrNotApproved, or why it could not ask, otherwise). It is
+	// called for every such call; nil refuses them all.
+	Approve func(ctx context.Context, call Approval) error
 	// Version is serverInfo.version.
 	Version string
 	// Instructions are sent with initialize: how the agent should use the tools.
@@ -170,7 +210,7 @@ func (s *Server) listenLocked() error {
 		Handler:           s,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      callTimeout + 10*time.Second,
+		WriteTimeout:      approvalTimeout + maxToolTimeout + 10*time.Second,
 		IdleTimeout:       time.Minute,
 		MaxHeaderBytes:    16 << 10,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
@@ -255,6 +295,16 @@ func (s *Server) tools() []Tool {
 		return nil
 	}
 	return s.opts.Tools()
+}
+
+// Acts reports whether name is a tool offered right now that acts.
+func (s *Server) Acts(name string) bool {
+	for _, t := range s.tools() {
+		if t.Name == name {
+			return t.Acts
+		}
+	}
+	return false
 }
 
 // newToken returns 32 random bytes, base64url-encoded (43 characters).

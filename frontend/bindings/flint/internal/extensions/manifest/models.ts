@@ -263,7 +263,7 @@ export class Panel {
     "order": number;
 
     /**
-     * View is "tree", "list" or "webview".
+     * View is "tree", "list", "table", "form", "chart" (views.go) or "webview".
      */
     "view": string;
 
@@ -440,7 +440,7 @@ export class TabView {
     "icon"?: string;
 
     /**
-     * View is "webview" (the only kind of tab view this Flint draws).
+     * View is "webview", or a declarative kind (views.go: "table", "form", "chart").
      */
     "view": string;
     "webview"?: Webview | null;

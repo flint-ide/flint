@@ -1,6 +1,7 @@
 // Package lsp runs language servers (gopls, tsserver, pyright, rust-analyzer) and
-// exposes the handful of features Flint needs: completion, hover, definition,
-// references and diagnostics.
+// exposes the features Flint needs: completion, hover, signature help,
+// navigation (definition, type definition, implementations, references,
+// symbols), rename, code actions, formatting and diagnostics.
 package lsp
 
 import (

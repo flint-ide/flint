@@ -59,24 +59,10 @@ func (h *Host) Resolve(ctx context.Context, id, view, parent string) (View, erro
 	if e.m == nil {
 		return View{}, e.usable()
 	}
-	i := -1
-	for j, p := range e.m.Contributes.Panels {
-		if p.ID == view {
-			i = j
-		}
-	}
-	if i < 0 {
+	if !e.m.HasPanel(view) {
 		return View{}, fmt.Errorf("%s has no panel %q", e.name(), view)
 	}
-	params := map[string]any{"view": view}
-	if parent != "" {
-		params["parent"] = parent
-	}
-	var v View
-	if err := e.call(ctx, h.o.ResolveTimeout, "view/resolve", params, &v); err != nil {
-		return View{}, err
-	}
-	return cleanView(v, e.m.Contributes.Panels[i], e.m), nil
+	return h.ResolveView(ctx, id, view, "", nil, parent)
 }
 
 // Action sends the choice of an item's action (item "" for a message's).

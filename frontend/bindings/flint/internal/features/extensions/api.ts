@@ -24,6 +24,10 @@ import * as catalog$0 from "../../extensions/catalog/models.js";
 // @ts-ignore: Unused imports
 import * as host$0 from "../../extensions/host/models.js";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 /**
  * Action sends the choice of an item's action ("" item: a message's).
  */
@@ -42,10 +46,73 @@ export function Catalog(): $CancellablePromise<catalog$0.Listing> {
 }
 
 /**
+ * EditorAction asks the extension for the edits of a quick fix the user
+ * chose on one of its decorations.
+ */
+export function EditorAction(id: string, req: host$0.ActionRequest): $CancellablePromise<host$0.ActionResult> {
+    return $Call.ByID(4150286204, id, req).then(($result: any) => {
+        return $$createType1($result);
+    });
+}
+
+/**
+ * EditorChanged reports an open document's new version, debounced.
+ */
+export function EditorChanged(path: string, version: number, text: string, hasText: boolean): $CancellablePromise<void> {
+    return $Call.ByID(2336310738, path, version, text, hasText);
+}
+
+/**
+ * EditorClosed reports that a document's editor closed.
+ */
+export function EditorClosed(path: string): $CancellablePromise<void> {
+    return $Call.ByID(3195720386, path);
+}
+
+/**
+ * EditorInterest reports whether an extension's decoration set, turned on,
+ * is for the file: only then does the editor report the document.
+ */
+export function EditorInterest(path: string): $CancellablePromise<host$0.DocumentInterest> {
+    return $Call.ByID(1853698612, path).then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
+/**
+ * EditorOpened reports a document open in an editor, at version; text is its
+ * content when hasText (asked for by EditorInterest). Extensions with a
+ * decoration set for the file hear of it, and start.
+ */
+export function EditorOpened(path: string, version: number, text: string, hasText: boolean): $CancellablePromise<void> {
+    return $Call.ByID(2865282615, path, version, text, hasText);
+}
+
+/**
  * Execute runs one of the extension's commands; args is JSON or null.
  */
 export function Execute(id: string, command: string, args: json$0.RawMessage): $CancellablePromise<void> {
     return $Call.ByID(1357956182, id, command, args);
+}
+
+/**
+ * FetchIndex downloads the index and its signature and verifies them. It
+ * runs only when the user asks: Browse Extensions or Check for Updates.
+ */
+export function FetchIndex(): $CancellablePromise<$models.IndexStatus> {
+    return $Call.ByID(1297388579).then(($result: any) => {
+        return $$createType3($result);
+    });
+}
+
+/**
+ * Index is the signed extension index as last downloaded and verified (or
+ * read from its cache); it makes no request.
+ */
+export function Index(): $CancellablePromise<$models.IndexStatus> {
+    return $Call.ByID(1009083113).then(($result: any) => {
+        return $$createType3($result);
+    });
 }
 
 /**
@@ -54,7 +121,7 @@ export function Execute(id: string, command: string, args: json$0.RawMessage): $
  */
 export function Install(dir: string): $CancellablePromise<host$0.Info | null> {
     return $Call.ByID(16206978, dir).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType5($result);
     });
 }
 
@@ -66,7 +133,18 @@ export function Install(dir: string): $CancellablePromise<host$0.Info | null> {
  */
 export function InstallFromCatalog(folder: string): $CancellablePromise<host$0.Info | null> {
     return $Call.ByID(1569663597, folder).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType5($result);
+    });
+}
+
+/**
+ * InstallFromIndex downloads, verifies and unpacks an extension of the
+ * index, then installs it like Install (native confirmation); nil when the
+ * user cancelled.
+ */
+export function InstallFromIndex(id: string): $CancellablePromise<host$0.Info | null> {
+    return $Call.ByID(269599146, id).then(($result: any) => {
+        return $$createType5($result);
     });
 }
 
@@ -76,7 +154,7 @@ export function InstallFromCatalog(folder: string): $CancellablePromise<host$0.I
  */
 export function List(): $CancellablePromise<host$0.Info[]> {
     return $Call.ByID(3916864187).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType6($result);
     });
 }
 
@@ -85,6 +163,18 @@ export function List(): $CancellablePromise<host$0.Info[]> {
  */
 export function Log(id: string): $CancellablePromise<string> {
     return $Call.ByID(3101205875, id);
+}
+
+/**
+ * PendingInstall is the folder this Flint was started to install
+ * (`flint --install-extension <dir>`), handed out once; an empty request
+ * when there is none. The frontend then calls Install with it, so the
+ * native confirmation is the same as for "Install Extension from Folder…".
+ */
+export function PendingInstall(): $CancellablePromise<$models.InstallRequest> {
+    return $Call.ByID(340403297).then(($result: any) => {
+        return $$createType7($result);
+    });
 }
 
 /**
@@ -101,7 +191,7 @@ export function RefreshCatalog(): $CancellablePromise<catalog$0.Listing> {
  */
 export function Rescan(): $CancellablePromise<host$0.Info[]> {
     return $Call.ByID(2973147495).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType6($result);
     });
 }
 
@@ -110,7 +200,18 @@ export function Rescan(): $CancellablePromise<host$0.Info[]> {
  */
 export function Resolve(id: string, view: string, parent: string): $CancellablePromise<host$0.View> {
     return $Call.ByID(1596846045, id, view, parent).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType8($result);
+    });
+}
+
+/**
+ * ResolveView returns the content of a panel (key "") or of a tab view's tab
+ * (its key and saved data) that Flint draws from data: a table, a form, a
+ * chart, or a tree or list.
+ */
+export function ResolveView(id: string, view: string, key: string, data: json$0.RawMessage): $CancellablePromise<host$0.View> {
+    return $Call.ByID(2662881856, id, view, key, data).then(($result: any) => {
+        return $$createType8($result);
     });
 }
 
@@ -119,6 +220,13 @@ export function Resolve(id: string, view: string, parent: string): $CancellableP
  */
 export function Restart(id: string): $CancellablePromise<void> {
     return $Call.ByID(3225680282, id);
+}
+
+/**
+ * SetViewVisible tells the host a declarative panel or tab was shown or hidden.
+ */
+export function SetViewVisible(id: string, view: string, key: string, visible: boolean): $CancellablePromise<void> {
+    return $Call.ByID(3235295502, id, view, key, visible);
 }
 
 /**
@@ -136,11 +244,29 @@ export function SetWebviewVisible(id: string, view: string, key: string, visible
 }
 
 /**
+ * SubmitForm sends a form view's values (a JSON object by field id) to the
+ * extension once Go's checks of them pass; the result says what was refused.
+ */
+export function SubmitForm(id: string, view: string, key: string, values: json$0.RawMessage): $CancellablePromise<host$0.FormResult> {
+    return $Call.ByID(3332730897, id, view, key, values).then(($result: any) => {
+        return $$createType9($result);
+    });
+}
+
+/**
  * Uninstall removes an extension after a native confirmation; false when
  * the user cancelled.
  */
 export function Uninstall(id: string): $CancellablePromise<boolean> {
     return $Call.ByID(4215234639, id);
+}
+
+/**
+ * ViewAction sends the choice of a row's or a message's action in a panel
+ * (key "") or a tab.
+ */
+export function ViewAction(id: string, view: string, key: string, item: string, action: string): $CancellablePromise<void> {
+    return $Call.ByID(2805817436, id, view, key, item, action);
 }
 
 /**
@@ -159,7 +285,12 @@ export function WebviewRequest(id: string, view: string, key: string, method: st
 
 // Private type creation functions
 const $$createType0 = catalog$0.Listing.createFrom;
-const $$createType1 = host$0.Info.createFrom;
-const $$createType2 = $Create.Nullable($$createType1);
-const $$createType3 = $Create.Array($$createType1);
-const $$createType4 = host$0.View.createFrom;
+const $$createType1 = host$0.ActionResult.createFrom;
+const $$createType2 = host$0.DocumentInterest.createFrom;
+const $$createType3 = $models.IndexStatus.createFrom;
+const $$createType4 = host$0.Info.createFrom;
+const $$createType5 = $Create.Nullable($$createType4);
+const $$createType6 = $Create.Array($$createType4);
+const $$createType7 = $models.InstallRequest.createFrom;
+const $$createType8 = host$0.View.createFrom;
+const $$createType9 = host$0.FormResult.createFrom;

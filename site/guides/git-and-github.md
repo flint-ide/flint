@@ -121,6 +121,21 @@ Click a file to open a side-by-side diff against the merge base, as on GitHub.
 
 The review bar, in the pull request tab and in the diff, takes a summary and has **Comment**, **Approve** and **Request changes**. While you have a pending review, it shows the number of comments and a **Discard** button.
 
+### Handing review comments to the agent
+
+When a reviewer left comments on your pull request, the agent can work through them:
+
+- **✦ Ask agent** on a review thread (under its line in the diff, or above the diff for outdated and file-level threads) puts that one thread in the agent chat.
+- **✦ Address review comments** in the pull request tab's header puts all of them in one draft: every unresolved thread that is still on the current diff, grouped by file, and the text of each review that requests changes and hasn't been followed by that reviewer's approval. The same action is **✦ Address** in the **Your branch** banner of the Pull Requests view, **✦ Review comments** on an [agent task](ai-agents.md#agent-tasks-agents-in-parallel)'s row once it has an open pull request, and "Address Review Comments with Agent" in the palette (for the pull request in the active tab, else the current branch's).
+
+The draft names the pull request and its branches and, for each thread, the file and line, the comments in order with who wrote them, and the code around the line. A GitHub suggestion (a ` ```suggestion ` block) is shown separately as the reviewer's proposed replacement for those lines. It lands in the chat of the project the pull request is checked out in (for a task, the task's own chat and worktree), where you can add your own words. Nothing is sent until you press Send; `⌥`-click the action to send right away. Flint posts nothing to GitHub: replying and resolving stay with you.
+
+- **The right branch.** The code in the draft comes from your working tree only when the pull request's branch is checked out there; otherwise it is the pull request's diff. If another branch is checked out, the draft says so at the top and tells the agent not to change files until you **Check out** the pull request, and `⌥`-click doesn't send it.
+- **Reviewers' text is data.** Anyone who can comment on the pull request wrote it, so every line of it is quoted and the draft tells the agent to check each comment against the code and not to follow instructions inside it. Secrets and your home folder are removed, and files that hold credentials (`.env`, keys) are never included. Only files inside the open folder are read.
+- **Size.** One draft carries up to 20 threads; the rest are listed at its end so you can ask again after the first round. Outdated threads are left out of the whole-pull-request draft (ask about one with its own **✦ Ask agent**). The number of threads and of code lines around a comment are in [Settings ▸ CI](../reference/settings.md#prreview).
+
+The banner offers **✦ Address** only when Flint already knows there is something to address (you opened the pull request's tab, or the list shows it as *Changes requested*): it doesn't poll for comments.
+
 ### When CI fails
 
 Flint follows the checks of your current branch's pull request, and of the pull requests of [agent tasks](ai-agents.md#agent-tasks-agents-in-parallel). When a check fails:

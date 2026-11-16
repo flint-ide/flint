@@ -86,7 +86,7 @@ export function setActiveFeatures(ids: readonly string[]): void {
 
 function install(m: FeatureModule): void {
   const withdraw = contribute(`feature:${m.id}`, {
-    panels: m.panels, settingsPages: m.settingsPages, statusItems: m.statusItems, tabKinds: m.tabKinds, fileMenu: m.fileMenu, themes: m.themes,
+    panels: m.panels, settingsPages: m.settingsPages, statusItems: m.statusItems, tabKinds: m.tabKinds, fileMenu: m.fileMenu, themes: m.themes, decorationSets: m.decorationSets,
   })
   installed.set(m.id, { withdraw, deactivate: activated ? activate(m) : null })
 }

@@ -1,22 +1,41 @@
 #!/bin/sh
 # flint [folder] — opens a folder (default: the current one) in Flint. A running
 # Flint takes it over (single instance) and comes to the front.
+# flint --install-extension <folder> — asks Flint to install the extension in
+# that folder; Flint shows its usual confirmation first.
 set -eu
 
 case "${1:-}" in
 -h | --help)
 	echo "usage: flint [folder]"
+	echo "       flint --install-extension <folder>"
 	exit 0
+	;;
+esac
+
+if [ ! -d /Applications/flint.app ] && [ ! -d "$HOME/Applications/flint.app" ]; then
+	echo "flint: Flint.app is not installed (run \`make install\` in the flint repo)" >&2
+	exit 1
+fi
+
+case "${1:-}" in
+--install-extension | --install-extension=*)
+	if [ "$1" = --install-extension ]; then
+		target=${2:-}
+	else
+		target=${1#--install-extension=}
+	fi
+	if [ -z "$target" ] || [ ! -d "$target" ]; then
+		echo "flint: --install-extension needs a folder with flint-extension.json" >&2
+		exit 1
+	fi
+	exec open -n -a flint --args --install-extension "$(cd "$target" && pwd -P)"
 	;;
 esac
 
 target=${1:-.}
 if [ ! -d "$target" ]; then
 	echo "flint: $target is not a folder" >&2
-	exit 1
-fi
-if [ ! -d /Applications/flint.app ] && [ ! -d "$HOME/Applications/flint.app" ]; then
-	echo "flint: Flint.app is not installed (run \`make install\` in the flint repo)" >&2
 	exit 1
 fi
 exec open -n -a flint --args "$(cd "$target" && pwd -P)"

@@ -1,6 +1,7 @@
 // Command stats is an example Flint extension, "Project Stats": it counts
 // the files of the open (trusted) projects by type and shows them in a
-// panel, a status bar item and a tool for agents, with settings of its own.
+// tree panel, a table panel, a chart in an editor tab, a status bar item and
+// a tool for agents, with settings of its own.
 // It uses only the standard library and talks to Flint over stdin and
 // stdout (see the extension guide on the docs site).
 //
@@ -23,7 +24,16 @@ import (
 
 const (
 	panelID  = "example.stats.files"
+	tableID  = "example.stats.types" // a "table" panel
+	chartID  = "example.stats.chart" // a "chart" tab view
 	statusID = "example.stats.count"
+)
+
+// Flint shows at most 5,000 rows of a table and 2,000 points of a chart
+// series; the extension sends no more than it wants shown.
+const (
+	maxRows = 5000
+	maxBars = 12
 )
 
 type ext struct {
@@ -67,14 +77,27 @@ func (e *ext) handle(method string, params json.RawMessage) (any, error) {
 	case "shutdown":
 		return nil, nil
 	case "view/resolve":
-		var p struct{ Parent string }
+		var p struct{ View, Key, Parent string }
 		_ = json.Unmarshal(params, &p)
+		switch p.View {
+		case tableID:
+			return e.table(), nil
+		case chartID:
+			return e.chart(p.Key), nil
+		}
 		return e.view(p.Parent), nil
 	case "view/action":
 		var p struct{ Item, Action string }
 		_ = json.Unmarshal(params, &p)
 		if path, ok := strings.CutPrefix(p.Item, "file:"); ok && p.Action == "open" {
 			return nil, e.c.call("window/openFile", map[string]any{"path": path}, nil)
+		}
+		if name, ok := strings.CutPrefix(p.Item, "type:"); ok && p.Action == "open" { // a row of the table
+			for _, t := range e.stats().Types {
+				if t.Name == name && len(t.Largest) > 0 {
+					return nil, e.c.call("window/openFile", map[string]any{"path": t.Largest[0].Path}, nil)
+				}
+			}
 		}
 		return nil, nil
 	case "command/execute":
@@ -138,14 +161,20 @@ func (e *ext) command(id, path string) error {
 			path = s.Types[0].Largest[0].Path
 		}
 		return e.c.call("window/openFile", map[string]any{"path": path}, nil)
+	case "example.stats.showChart":
+		// One tab per metric: the key tells view/resolve which one to draw.
+		return e.c.call("window/openTab", map[string]any{"view": chartID, "key": "files", "title": "Files by Type"}, nil)
 	}
 	return nil
 }
 
-// changed counts again, then refreshes the panel and the status item.
+// changed counts again, then refreshes the panels, the chart tabs and the
+// status item.
 func (e *ext) changed() stats {
 	s := e.stats()
 	e.c.notify("view/refresh", map[string]string{"view": panelID})
+	e.c.notify("view/refresh", map[string]string{"view": tableID})
+	e.c.notify("view/refresh", map[string]string{"view": chartID}) // no key: every tab of the view
 	e.c.notify("status/update", map[string]string{
 		"id":      statusID,
 		"text":    thousands(s.Files) + " files",
@@ -210,6 +239,86 @@ func (e *ext) view(parent string) map[string]any {
 		})
 	}
 	return map[string]any{"kind": "tree", "items": items}
+}
+
+// table is the File Types panel: one row per file type. Flint sorts it when
+// the user clicks a column, so the cells are numbers, not formatted text.
+func (e *ext) table() map[string]any {
+	e.mu.Lock()
+	none := len(e.roots) == 0
+	e.mu.Unlock()
+	if none {
+		return map[string]any{"kind": "message", "text": "Open a trusted folder to count its files."}
+	}
+	s := e.stats()
+	rows := []map[string]any{}
+	for i, t := range s.Types {
+		if i == maxRows {
+			break
+		}
+		share := "small"
+		if s.Bytes > 0 && t.Bytes*10 >= s.Bytes {
+			share = "large"
+		}
+		row := map[string]any{
+			"id":    "type:" + t.Name,
+			"cells": map[string]any{"type": t.Name, "files": t.Files, "bytes": t.Bytes, "share": share},
+		}
+		if len(t.Largest) > 0 {
+			row["cells"].(map[string]any)["largest"] = filepath.Base(t.Largest[0].Path)
+			row["command"] = map[string]any{"id": "example.stats.open", "args": map[string]string{"path": t.Largest[0].Path}}
+			row["actions"] = []map[string]string{{"id": "open", "label": "Open Largest File"}}
+		}
+		rows = append(rows, row)
+	}
+	sortBy := "files"
+	e.mu.Lock()
+	if e.settings.SortBy == "size" {
+		sortBy = "bytes"
+	}
+	e.mu.Unlock()
+	return map[string]any{
+		"kind": "table",
+		"columns": []map[string]any{
+			{"id": "type", "title": "Type", "type": "text"},
+			{"id": "files", "title": "Files", "type": "number"},
+			{"id": "bytes", "title": "Bytes", "type": "number"},
+			{"id": "share", "title": "Share", "type": "badge", "badges": map[string]string{"large": "warning", "small": "info"}},
+			{"id": "largest", "title": "Largest file", "type": "text"},
+		},
+		"rows": rows,
+		"sort": map[string]any{"column": sortBy, "descending": true},
+	}
+}
+
+// chart is a tab of the Files by Type view: a bar per file type, for the
+// metric the tab's key names ("files" or "bytes").
+func (e *ext) chart(key string) map[string]any {
+	s := e.stats()
+	if len(s.Types) == 0 {
+		return map[string]any{"kind": "message", "text": "No files counted. Open a trusted folder first."}
+	}
+	label := "Files"
+	if key == "bytes" {
+		label = "Bytes"
+	}
+	points := [][]any{}
+	for i, t := range s.Types {
+		if i == maxBars {
+			break
+		}
+		if key == "bytes" {
+			points = append(points, []any{t.Name, t.Bytes})
+		} else {
+			points = append(points, []any{t.Name, t.Files})
+		}
+	}
+	return map[string]any{
+		"kind": "chart", "type": "bar", "title": label + " by type",
+		"x":      map[string]any{"type": "category", "label": "File type"},
+		"y":      map[string]any{"label": label, "min": 0},
+		"series": []map[string]any{{"id": key, "label": label, "points": points}},
+	}
 }
 
 // summary is the agent tool's answer for one project folder.

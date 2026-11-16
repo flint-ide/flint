@@ -6,6 +6,8 @@ import (
 	"os"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+
+	"flint/internal/features/extensions"
 )
 
 // The few places Flint talks to the Wails runtime, so the bound APIs only see
@@ -46,10 +48,16 @@ func (a *App) setWindowBackground(c application.RGBA) {
 }
 
 // secondLaunch handles `flint <folder>` while Flint already runs: the folder is
-// opened (like Open Recent) and the window comes to the front.
+// opened (like Open Recent) and the window comes to the front. With
+// `flint --install-extension <dir>` the frontend is asked to install that
+// folder, which shows the usual native confirmation.
 func (a *App) secondLaunch(args []string, cwd string) {
-	if folder := folderFromArgs(args[min(1, len(args)):], cwd); folder != "" {
+	args = args[min(1, len(args)):]
+	if folder := folderFromArgs(args, cwd); folder != "" {
 		a.emit(eventMenuOpenFolder, folder)
+	}
+	if req, ok := extensions.RequestOf(args, cwd); ok {
+		a.emit(extensions.EventInstallRequest, req)
 	}
 	if a.window != nil {
 		a.window.UnMinimise()

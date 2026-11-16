@@ -19,7 +19,7 @@ Flint is a single native process that uses the macOS system WebView (WKWebView) 
 
 - Files, terminals, agent chats, SQL consoles and diffs share one tab area with back/forward history.
 - Go to file with `⌘P`, search and replace across the project with `⇧⌘F` / `⇧⌘R`.
-- Language servers for Go, Rust, TypeScript and Python: completion, hover, go to definition, find usages and live diagnostics.
+- Language servers for Go, Rust, TypeScript and Python: completion, hover, go to definition, find usages, rename, quick fixes, formatting and live diagnostics.
 - Several projects in one window.
 
 See [Editor and navigation](guides/editor-and-navigation.md) and [Terminals](guides/terminals.md).

@@ -150,3 +150,15 @@ func (r *Repo) defaultRemote(ctx context.Context) (string, error) {
 	}
 	return remotes[0], nil
 }
+
+// Head returns the checked-out branch ("" when HEAD is detached) and HEAD's
+// commit ("" before the first commit).
+func (r *Repo) Head(ctx context.Context) (branch, oid string) {
+	if out, err := r.git(ctx, "symbolic-ref", "--short", "-q", "HEAD"); err == nil {
+		branch = strings.TrimSpace(string(out))
+	}
+	if out, err := r.git(ctx, "rev-parse", "--verify", "-q", "HEAD"); err == nil {
+		oid = strings.TrimSpace(string(out))
+	}
+	return branch, oid
+}

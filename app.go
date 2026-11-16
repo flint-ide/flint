@@ -21,6 +21,7 @@ import (
 	"flint/internal/config"
 	"flint/internal/dap"
 	"flint/internal/feature"
+	"flint/internal/features/extensions"
 	"flint/internal/fuzzy"
 	"flint/internal/git"
 	"flint/internal/github"
@@ -81,15 +82,19 @@ type App struct {
 	profiles    *profiles // temporary profiles and recordings in progress
 	lsp         *lsp.Manager
 	agents      *agentsession.Manager
-	mcp         *mcpserver.Server  // Flint's MCP server for its agents (api_mcp.go)
-	mcpSources  *mcptools.Sources  // what the MCP server's tools read
-	tasks       *agenttask.Tracker // state of agent tasks from their chats
-	sessions    *restore.Store
-	usage       *usage.Store // agent usage per day (usage_state.go)
-	usageChats  usageChats
-	files       fuzzy.Index      // quick-open file list of the open folder
-	http        *httpfile.Client // requests of .http files, sent only on demand
-	features    *feature.Set     // the feature modules (features.go)
+	mcp         *mcpserver.Server // Flint's MCP server for its agents (api_mcp.go)
+	mcpSources  *mcptools.Sources // what the MCP server's tools read
+	// actionGrants and configRuns serve the MCP tools that act (api_mcp_actions.go).
+	actionGrants actionGrants
+	configRuns   configRuns
+	tasks        *agenttask.Tracker // state of agent tasks from their chats
+	sessions     *restore.Store
+	usage        *usage.Store // agent usage per day (usage_state.go)
+	usageChats   usageChats
+	queue        taskQueue        // slots of agent tasks being started (tasks_queue.go)
+	files        fuzzy.Index      // quick-open file list of the open folder
+	http         *httpfile.Client // requests of .http files, sent only on demand
+	features     *feature.Set     // the feature modules (features.go)
 
 	projMu   sync.Mutex
 	roots    []string                    // open project folders, the primary one first
@@ -243,9 +248,11 @@ func (a *App) recentFolders() []string {
 }
 
 // folderFromArgs supports `flint <dir>`; flags (e.g. injected by macOS) are
-// ignored. Relative paths are resolved against cwd ("" = this process's).
+// ignored, and so is the folder of `--install-extension <dir>`, which is an
+// extension to install, not a project. Relative paths are resolved against
+// cwd ("" = this process's).
 func folderFromArgs(args []string, cwd string) string {
-	for _, arg := range args {
+	for _, arg := range extensions.WithoutInstallArg(args) {
 		if strings.HasPrefix(arg, "-") {
 			continue
 		}

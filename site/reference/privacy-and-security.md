@@ -21,10 +21,13 @@ Apart from the update check, data leaves your Mac only when you do something tha
 | HTTP client | The request you send | The server in the request |
 | Databases, and the Kubernetes, AWS and Docker extensions | The commands and queries you run | Your servers and cloud accounts, through your own credentials |
 | Settings ▸ Extensions (when first opened, and **Refresh Repository**) | A `git` clone or fetch of the extensions repository, with your own git credentials | GitHub (`github.com/flint-ide/extensions`), or the URL in `FLINT_EXTENSIONS_REPO` |
+| The [extension index](../extensions/index-format.md) (only **Browse Extensions**, **Check for Updates**, and **Install…** / **Update…** of an extension in it) | Anonymous requests for the index, its signature and the archive you chose, described under [Extensions](#extensions) | GitHub (`github.com/flint-ide/extensions` release files, served from GitHub's download hosts), or the address in `extensions.indexUrl` |
 | Markdown preview | Requests for remote images, only after you click **Load remote images** | The image hosts |
 | Update check (on its own once a day, or Help ▸ Check for Updates…) | One anonymous request for the latest release, described below | GitHub's API (`api.github.com`) |
 
 Agents decide what they read and send to their provider. The [approval policy](../guides/ai-agents.md#what-the-agent-may-do-without-asking) controls what they may do without asking.
+
+Flint's own tools for agents only read, unless you turn on [tools that act](../guides/ai-agents.md#letting-agents-act-in-flint) (run tests, run a configuration, send a request from a `.http` file, query a read-only database connection). Those are off by default, and each call needs your yes, in the chat or in a dialog Flint shows itself: no approval policy and no "always allow" covers them. What they return goes to the agent's provider like anything else the agent reads, so a response body or query result you approve is shared with it (bounded, with recognized credentials removed).
 
 ## Update check
 
@@ -55,14 +58,24 @@ Query history masks passwords in `CREATE/ALTER ROLE … PASSWORD` and ClickHouse
 
 ## Extensions
 
-[Extensions](../guides/extensions.md) are programs you install yourself, from the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository in Settings ▸ Extensions or from a folder, after a confirmation that shows the program, its permissions and the tools it offers agents. Flint never installs, updates or enables one on its own, and sends nothing about them anywhere.
+[Extensions](../guides/extensions.md) are programs you install yourself, from the [flint-ide/extensions](https://github.com/flint-ide/extensions) repository in Settings ▸ Extensions (its signed index of prebuilt extensions, or its sources) or from a folder, after a confirmation that shows the program, its permissions and the tools it offers agents. Flint never installs, updates or enables one on its own, and sends nothing about them anywhere.
 
-- An extension runs with your user's permissions. Flint can't confine the program itself, so install only extensions you trust.
-- Flint checks what an extension asks of it against the permissions in its manifest: reading files (`workspace.read`), keychain secrets (`secrets`), agent chat drafts (`agent.ask`), terminal tabs (`terminal`). It never passes folders in Restricted Mode, never returns files inside `.git` or credential files such as `.env`, and asks before the first link an extension opens to each site.
-- Declared network hosts (`network:<host>`) are shown, not enforced.
+The signed [extension index](../extensions/index-format.md):
+
+- **When**: only when you click **Browse Extensions** or **Check for Updates** in Settings ▸ Extensions, run the palette commands of the same names, or click **Install…** / **Update to x.y.z…** on an extension of the index. Never at startup, never on a timer. The update check above remains the only request Flint makes on its own.
+- **What is requested**: `GET` of the index (`https://github.com/flint-ide/extensions/releases/latest/download/index.json`, or `extensions.indexUrl`) and of its signature (the same address plus `.sig`); for an install, `GET` of that extension's archive at the address the signed index gives. GitHub redirects release files to its download hosts; Flint follows redirects to `https` addresses only.
+- **What is sent**: only the requests, with `User-Agent: Flint/<version>`. No account, token, cookie or machine identifier, and nothing about your projects or the extensions you have installed. The server sees your IP address and which archive you downloaded.
+- **What is trusted**: nothing before the index's Ed25519 signature verified against the public key built into Flint (or `extensions.indexPublicKey`). A download must have the size and SHA-256 the signed index gives, is unpacked with limits (no links, no paths outside its folder, bounded size and file count), must hold the extension and version the index lists, and is installed only after the same native confirmation as a folder. For an update, the confirmation lists the permissions and agent tools it adds.
+- **What is kept**: the verified index and its signature in `extension-index/` in Flint's configuration folder, checked again when read. Downloads are unpacked in a temporary folder that is deleted afterwards.
+- While no public key is configured (the official one is not built in yet), Flint requests nothing for the index.
+
+- An extension whose manifest declares a [sandbox](../guides/extensions.md#the-sandbox) is confined by the operating system (Landlock and seccomp on Linux, `sandbox-exec` on macOS): it reads its own folder, the system's files and, with `workspace.read`, your trusted project folders; writes only its own data and temporary folders; and has no network and starts no other program unless it declares that. Your keys, cloud credentials, browser profiles, keyrings, shell history, Flint's settings and other extensions' files are unreadable to it unless its manifest names them, which the confirmation shows.
+- An extension without a sandbox (none declared, declared off, or none available on your system) runs with your user's permissions, and Flint can't confine it. The confirmation and Settings ▸ Extensions say which case it is, and **Only run sandboxed extensions** (`extensions.requireSandbox`) refuses to start those. Install only extensions you trust either way: the sandbox limits what a program can reach, not what it does with it, and it does not limit memory or CPU.
+- Flint checks what an extension asks of it against the permissions in its manifest: reading files (`workspace.read`), keychain secrets (`secrets`), agent chat drafts (`agent.ask`), terminal tabs (`terminal`). It never passes folders in Restricted Mode, never returns files inside `.git` or credential files such as `.env`, and asks before the first link an extension opens to each site. An extension that marks lines in editors is told which matching files are open under the same rules (trusted folders only, never `.git` or credential files), and gets unsaved text only if its manifest asks for it, which the install confirmation shows.
+- Declared network hosts (`network:<host>`) are shown, not enforced: a sandbox allows the network as a whole or not at all.
 - An extension's secrets are in the keychain (service `flint-extensions`, account `<id>:<key>`), never in `settings.json`, and one extension can't read another's.
 - Its process gets a minimal environment, plus only the variables its manifest names in `run.env` (the confirmation lists them), so no tokens or keys from Flint's own environment unless named there, and runs in its own process group, which Flint kills when it stops it or quits.
-- Its tools for agents are offered only in trusted folders while Flint's MCP server is on, and can be turned off per extension.
+- Its tools for agents are offered only in trusted folders while Flint's MCP server is on, and can be turned off per extension. A tool the extension declares as acting (`"acts": true`, shown when you install it and in Settings ▸ Extensions) needs your yes before each call.
 - Everything it shows is drawn by Flint from plain data; it can't run code in Flint's window.
 
 ## Untrusted content
@@ -71,7 +84,7 @@ Query history masks passwords in `CREATE/ALTER ROLE … PASSWORD` and ClickHouse
 - Markdown, pull request descriptions and comments are rendered without raw HTML, and `javascript:` links are dropped.
 - HTTP response bodies are shown as text in a read-only editor, never rendered as HTML.
 - Names that come from the UI or from tool output (containers, contexts, namespaces, pods) are validated before Flint passes them to a command.
-- Extensions are installed only when you choose to, from the extensions repository or a folder you pick, after a dialog that Flint's native code shows (code in the window can't answer it) with the extension's program and permissions. What an extension adds is data that Flint draws with its own components: it can't run code in the window. Its theme colors pass the same check as an imported theme (known color names, hex values only). Symlinks inside an extension's folder are refused when it is installed.
+- Extensions are installed only when you choose to, from the signed extension index, the extensions repository or a folder you pick (also with `flint --install-extension <folder>`, which shows the same dialog), after a dialog that Flint's native code shows (code in the window can't answer it) with the extension's program and permissions. What an extension adds is data that Flint draws with its own components: it can't run code in the window. Its theme colors pass the same check as an imported theme (known color names, hex values only). Symlinks inside an extension's folder are refused when it is installed.
 
 ## Reporting a vulnerability
 

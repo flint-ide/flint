@@ -405,3 +405,36 @@ func must(t *testing.T, err error) {
 }
 
 func near(a, b float64) bool { d := a - b; return d < 1e-9 && d > -1e-9 }
+
+func TestTaskTotals(t *testing.T) {
+	s, c, _ := newStore(t, "2026-03-10 09:00")
+	add := func(chat, task string, tot Totals) {
+		t.Helper()
+		if err := s.Add(entry(chat, "/p", "claude", "m", task, tot)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	add("c1", "t1", turn(100, 10, 0.5))
+	add("c2", "t2", turn(7, 3, 0))
+	add("c3", "", turn(1000, 1000, 9)) // a chat of no task
+	c.t = day("2026-03-12 09:00")
+	add("c1", "t1", turn(50, 5, 0.25)) // another day counts for the task too
+
+	got := s.TaskTotals([]string{"t1", "t2", "t9"}, nil)
+	if tot := got["t1"]; tot.Tokens() != 165 || !near(tot.Spent(), 0.75) || tot.Turns != 2 {
+		t.Errorf("t1 = %+v", tot)
+	}
+	if tot := got["t2"]; tot.Tokens() != 10 {
+		t.Errorf("t2 = %+v", tot)
+	}
+	if _, ok := got["t9"]; ok || len(got) != 2 {
+		t.Errorf("tasks without usage are left out: %+v", got)
+	}
+	if got := s.TaskTotals(nil, nil); len(got) != 0 {
+		t.Errorf("no tasks = %+v", got)
+	}
+	var none *Store
+	if got := none.TaskTotals([]string{"t1"}, nil); len(got) != 0 {
+		t.Errorf("no store = %+v", got)
+	}
+}

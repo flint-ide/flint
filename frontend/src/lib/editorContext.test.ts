@@ -83,4 +83,13 @@ describe('MCP server settings', () => {
     assert.equal(sharesEditor(m), false)
     assert.equal(sharesEditor({ ...DEFAULT_MCP_SERVER, tools: { ...DEFAULT_MCP_SERVER.tools, editor: false } }), false)
   })
+  it('keeps the tools that act off unless a group is switched on', () => {
+    assert.deepEqual(DEFAULT_MCP_SERVER.actions, { tests: false, run: false, http: false, sql: false })
+    assert.equal(DEFAULT_MCP_SERVER.testWaitSeconds, 120)
+    const m = coerceMcpServer({ actions: { tests: true, run: 'true', http: 1, shell: true }, testWaitSeconds: 5 })
+    assert.deepEqual(m.actions, { tests: true, run: false, http: false, sql: false })
+    assert.equal(m.testWaitSeconds, 10)
+    assert.equal(coerceMcpServer({ actions: 'all', testWaitSeconds: 'long' }).testWaitSeconds, 120)
+    assert.deepEqual(coerceMcpServer({ actions: 'all' }).actions, DEFAULT_MCP_SERVER.actions)
+  })
 })

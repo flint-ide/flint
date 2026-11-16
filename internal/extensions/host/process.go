@@ -33,6 +33,8 @@ type proc struct {
 	stdin    *os.File
 	exited   chan struct{}
 	stopping atomic.Bool
+	// confined is the process's sandbox; nil when it runs unconfined.
+	confined *confined
 }
 
 func (p *proc) hasExited() bool {
@@ -65,18 +67,27 @@ func (e *ext) start() (*proc, error) {
 			cmd.Env = append(cmd.Env, name+"="+v)
 		}
 	}
+	// The sandbox, when the manifest declares one: cmd becomes Flint's
+	// launcher, which confines itself and then runs the program (sandbox.go).
+	box, err := e.confine(cmd)
+	if err != nil {
+		return nil, err
+	}
 	proctree.Isolate(cmd)
 	inR, inW, err := os.Pipe()
 	if err != nil {
+		box.cleanup()
 		return nil, err
 	}
 	outR, outW, err := os.Pipe()
 	if err != nil {
+		box.cleanup()
 		closeAll(inR, inW)
 		return nil, err
 	}
 	errR, errW, err := os.Pipe()
 	if err != nil {
+		box.cleanup()
 		closeAll(inR, inW, outR, outW)
 		return nil, err
 	}
@@ -84,10 +95,11 @@ func (e *ext) start() (*proc, error) {
 	err = cmd.Start()
 	closeAll(inR, outW, errW) // the child has its copies
 	if err != nil {
+		box.cleanup()
 		closeAll(inW, outR, errR)
 		return nil, err
 	}
-	p := &proc{cmd: cmd, stdin: inW, exited: make(chan struct{})}
+	p := &proc{cmd: cmd, stdin: inW, exited: make(chan struct{}), confined: box}
 	p.conn = rpc.New(inW, rpc.Options{
 		OnRequest: e.handle,
 		OnNotify:  e.notified,
@@ -106,6 +118,7 @@ func (e *ext) start() (*proc, error) {
 	go func() {
 		werr := cmd.Wait()
 		_ = proctree.Kill(cmd.Process) // what it left behind in its group
+		box.cleanup()
 		reason := "exit status 0"
 		if werr != nil {
 			reason = werr.Error()

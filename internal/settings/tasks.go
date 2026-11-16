@@ -19,15 +19,24 @@ type AgentTasks struct {
 	// BranchPrefix starts every task branch, e.g. "agent/" gives
 	// "agent/add-rate-limiting". May be empty.
 	BranchPrefix string `json:"branchPrefix"`
+	// MaxParallel is how many agent tasks may work at the same time; a task
+	// started beyond it waits in the queue until one settles. 0 = no limit.
+	MaxParallel int `json:"maxParallel"`
 }
 
 const (
 	maxWorktreeDirLen   = 1024
 	maxBranchPrefixLen  = 40
 	defaultBranchPrefix = "agent/"
+	defaultMaxParallel  = 3
+	// maxMaxParallel bounds the setting: every working task is an agent
+	// process (and usually a language toolchain) on this machine.
+	maxMaxParallel = 32
 )
 
-func defaultAgentTasks() AgentTasks { return AgentTasks{BranchPrefix: defaultBranchPrefix} }
+func defaultAgentTasks() AgentTasks {
+	return AgentTasks{BranchPrefix: defaultBranchPrefix, MaxParallel: defaultMaxParallel}
+}
 
 // prefixChars are the characters a prefix may use; git allows more, but these
 // keep branch names easy to type and safe in a shell.
@@ -38,7 +47,17 @@ func CheckAgentTasks(a AgentTasks) error {
 	if err := checkWorktreeDir(a.WorktreeDir); err != nil {
 		return err
 	}
-	return checkBranchPrefix(a.BranchPrefix)
+	if err := checkBranchPrefix(a.BranchPrefix); err != nil {
+		return err
+	}
+	return checkMaxParallel(a.MaxParallel)
+}
+
+func checkMaxParallel(n int) error {
+	if n < 0 || n > maxMaxParallel {
+		return fmt.Errorf("agentTasks.maxParallel must be between 0 (no limit) and %d", maxMaxParallel)
+	}
+	return nil
 }
 
 func checkWorktreeDir(dir string) error {
@@ -81,6 +100,9 @@ func normalizeAgentTasks(a AgentTasks) AgentTasks {
 	}
 	if checkBranchPrefix(a.BranchPrefix) != nil {
 		a.BranchPrefix = def.BranchPrefix
+	}
+	if checkMaxParallel(a.MaxParallel) != nil {
+		a.MaxParallel = def.MaxParallel
 	}
 	return a
 }

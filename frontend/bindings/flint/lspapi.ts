@@ -15,6 +15,24 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as lsp$0 from "./internal/lsp/models.js";
 
 /**
+ * ApplyCodeAction returns the edits of an action CodeActions listed.
+ */
+export function ApplyCodeAction(path: string, id: number): $CancellablePromise<lsp$0.WorkspaceEdit> {
+    return $Call.ByID(4068800114, path, id).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
+/**
+ * ApplyToDisk applies a language server's edits to a file that is not open
+ * in an editor (the other files of a rename). Only files inside an open
+ * folder with a running language server are written.
+ */
+export function ApplyToDisk(path: string, edits: lsp$0.TextEdit[]): $CancellablePromise<void> {
+    return $Call.ByID(1679627485, path, edits);
+}
+
+/**
  * Change sends the document's full new text.
  */
 export function Change(path: string, text: string): $CancellablePromise<void> {
@@ -29,11 +47,21 @@ export function Close(path: string): $CancellablePromise<void> {
 }
 
 /**
+ * CodeActions lists the quick fixes and refactorings for a range; only
+ * narrows them to kinds ("quickfix", "refactor", "source", …).
+ */
+export function CodeActions(path: string, rng: lsp$0.Range, only: string[]): $CancellablePromise<lsp$0.CodeAction[]> {
+    return $Call.ByID(1601191941, path, rng, only).then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
+/**
  * Completion returns completion items at a position.
  */
 export function Completion(path: string, line: number, character: number): $CancellablePromise<lsp$0.CompletionList> {
     return $Call.ByID(3028877841, path, line, character).then(($result: any) => {
-        return $$createType0($result);
+        return $$createType3($result);
     });
 }
 
@@ -42,7 +70,25 @@ export function Completion(path: string, line: number, character: number): $Canc
  */
 export function Definition(path: string, line: number, character: number): $CancellablePromise<lsp$0.Location[]> {
     return $Call.ByID(3510712290, path, line, character).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType5($result);
+    });
+}
+
+/**
+ * DocumentSymbols returns the outline of an open document.
+ */
+export function DocumentSymbols(path: string): $CancellablePromise<lsp$0.Symbol[]> {
+    return $Call.ByID(2157055067, path).then(($result: any) => {
+        return $$createType7($result);
+    });
+}
+
+/**
+ * Format returns the edits that format the document.
+ */
+export function Format(path: string, tabSize: number, insertSpaces: boolean): $CancellablePromise<lsp$0.TextEdit[]> {
+    return $Call.ByID(4151516088, path, tabSize, insertSpaces).then(($result: any) => {
+        return $$createType9($result);
     });
 }
 
@@ -54,12 +100,21 @@ export function Hover(path: string, line: number, character: number): $Cancellab
 }
 
 /**
+ * Implementation returns the implementations of the symbol at a position.
+ */
+export function Implementation(path: string, line: number, character: number): $CancellablePromise<lsp$0.Location[]> {
+    return $Call.ByID(2362958477, path, line, character).then(($result: any) => {
+        return $$createType5($result);
+    });
+}
+
+/**
  * Languages lists the languages with language servers and their known servers,
  * for Settings.
  */
 export function Languages(): $CancellablePromise<lsp$0.LanguageInfo[]> {
     return $Call.ByID(1292416102).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType11($result);
     });
 }
 
@@ -68,7 +123,26 @@ export function Languages(): $CancellablePromise<lsp$0.LanguageInfo[]> {
  */
 export function Open(root: string, path: string, text: string): $CancellablePromise<lsp$0.Status> {
     return $Call.ByID(1752305043, root, path, text).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType12($result);
+    });
+}
+
+/**
+ * OrganizeImports returns the edits of the server's "organize imports"
+ * (empty when it has nothing to do or doesn't offer it).
+ */
+export function OrganizeImports(path: string): $CancellablePromise<lsp$0.WorkspaceEdit> {
+    return $Call.ByID(2248420988, path).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
+/**
+ * PrepareRename says what a rename at a position would rename.
+ */
+export function PrepareRename(path: string, line: number, character: number): $CancellablePromise<lsp$0.RenameTarget> {
+    return $Call.ByID(4172261940, path, line, character).then(($result: any) => {
+        return $$createType13($result);
     });
 }
 
@@ -77,7 +151,18 @@ export function Open(root: string, path: string, text: string): $CancellableProm
  */
 export function References(path: string, line: number, character: number): $CancellablePromise<lsp$0.Location[]> {
     return $Call.ByID(2498596285, path, line, character).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType5($result);
+    });
+}
+
+/**
+ * Rename returns the edits that rename the symbol at a position. Nothing is
+ * written: the UI applies them (open files in their editors, the rest with
+ * ApplyToDisk).
+ */
+export function Rename(path: string, line: number, character: number, newName: string): $CancellablePromise<lsp$0.WorkspaceEdit> {
+    return $Call.ByID(1167346117, path, line, character, newName).then(($result: any) => {
+        return $$createType0($result);
     });
 }
 
@@ -89,11 +174,29 @@ export function Saved(path: string): $CancellablePromise<void> {
 }
 
 /**
+ * SignatureHelp describes the call around a position.
+ */
+export function SignatureHelp(path: string, line: number, character: number): $CancellablePromise<lsp$0.SignatureHelp> {
+    return $Call.ByID(1280627696, path, line, character).then(($result: any) => {
+        return $$createType14($result);
+    });
+}
+
+/**
+ * SignatureTriggers lists the characters that open signature help in a document.
+ */
+export function SignatureTriggers(path: string): $CancellablePromise<string[]> {
+    return $Call.ByID(208068234, path).then(($result: any) => {
+        return $$createType15($result);
+    });
+}
+
+/**
  * Statuses lists language servers and their state.
  */
 export function Statuses(): $CancellablePromise<lsp$0.Status[]> {
     return $Call.ByID(211971877).then(($result: any) => {
-        return $$createType6($result);
+        return $$createType16($result);
     });
 }
 
@@ -104,11 +207,42 @@ export function Supported(path: string): $CancellablePromise<boolean> {
     return $Call.ByID(2455451515, path);
 }
 
+/**
+ * TypeDefinition returns where the type of the symbol at a position is defined.
+ */
+export function TypeDefinition(path: string, line: number, character: number): $CancellablePromise<lsp$0.Location[]> {
+    return $Call.ByID(4185880010, path, line, character).then(($result: any) => {
+        return $$createType5($result);
+    });
+}
+
+/**
+ * WorkspaceSymbols searches the declarations of the open folders' running
+ * language servers.
+ */
+export function WorkspaceSymbols(query: string): $CancellablePromise<lsp$0.WorkspaceSymbol[]> {
+    return $Call.ByID(1146387065, query).then(($result: any) => {
+        return $$createType18($result);
+    });
+}
+
 // Private type creation functions
-const $$createType0 = lsp$0.CompletionList.createFrom;
-const $$createType1 = lsp$0.Location.createFrom;
+const $$createType0 = lsp$0.WorkspaceEdit.createFrom;
+const $$createType1 = lsp$0.CodeAction.createFrom;
 const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = lsp$0.LanguageInfo.createFrom;
-const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = lsp$0.Status.createFrom;
-const $$createType6 = $Create.Array($$createType5);
+const $$createType3 = lsp$0.CompletionList.createFrom;
+const $$createType4 = lsp$0.Location.createFrom;
+const $$createType5 = $Create.Array($$createType4);
+const $$createType6 = lsp$0.Symbol.createFrom;
+const $$createType7 = $Create.Array($$createType6);
+const $$createType8 = lsp$0.TextEdit.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = lsp$0.LanguageInfo.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = lsp$0.Status.createFrom;
+const $$createType13 = lsp$0.RenameTarget.createFrom;
+const $$createType14 = lsp$0.SignatureHelp.createFrom;
+const $$createType15 = $Create.Array($Create.Any);
+const $$createType16 = $Create.Array($$createType12);
+const $$createType17 = lsp$0.WorkspaceSymbol.createFrom;
+const $$createType18 = $Create.Array($$createType17);

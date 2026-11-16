@@ -6,9 +6,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"flint/internal/extensions/sandbox"
 )
 
 // The conformance test of the example extension (examples/extensions/stats):
@@ -60,8 +63,13 @@ func TestExampleExtension(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.ID != "example.stats" || info.State != StateStopped || len(info.Commands) != 2 || len(info.Panels) != 1 || info.Settings == nil {
+	if info.ID != "example.stats" || info.State != StateStopped || len(info.Commands) != 3 || len(info.Panels) != 2 || len(info.TabViews) != 1 || info.Settings == nil {
 		t.Fatalf("installed: %+v", info)
+	}
+	// The example declares the strict sandbox ("sandbox": {}): it runs
+	// confined wherever this system can confine it.
+	if s := sandbox.Probe(); (info.Sandbox.State == SandboxOn) != s.Available || (!s.Available && info.Sandbox.State != SandboxUnavailable) {
+		t.Errorf("sandbox = %+v on a system with %+v", info.Sandbox, s)
 	}
 	ctx := context.Background()
 
@@ -95,6 +103,51 @@ func TestExampleExtension(t *testing.T) {
 	open := app.eventsLike(EventOpenFile)
 	if len(open) != 2 || !strings.Contains(open[0], filepath.Join(root, "a.go")) || !strings.Contains(open[1], filepath.Join(root, "b.go")) {
 		t.Errorf("opened = %v", open)
+	}
+
+	// The table panel: a row per file type with typed cells, sorted by Flint.
+	tv, err := h.ResolveView(ctx, "example.stats", "example.stats.types", "", nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tv.Kind != "table" || tv.Table == nil || len(tv.Table.Columns) != 5 || len(tv.Table.Rows) != 2 || tv.Truncated {
+		t.Fatalf("table = %+v", tv)
+	}
+	if c := tv.Table.Columns; c[1].Type != "number" || c[1].Align != "end" || c[3].Badges["large"] != "warning" {
+		t.Errorf("columns = %+v", c)
+	}
+	row := tv.Table.Rows[0]
+	if row.ID != "type:.go" || !reflect.DeepEqual(row.Cells, []any{".go", float64(2), float64(400), "large", "a.go"}) || row.Command == nil || len(row.Actions) != 1 {
+		t.Errorf("row = %+v", row)
+	}
+	if tv.Table.Sort == nil || tv.Table.Sort.Column != "files" || !tv.Table.Sort.Descending {
+		t.Errorf("sort = %+v", tv.Table.Sort)
+	}
+	if err := h.ViewAction(ctx, "example.stats", "example.stats.types", "", row.ID, "open"); err != nil {
+		t.Fatal(err)
+	}
+	if open := app.eventsLike(EventOpenFile); len(open) != 3 || !strings.Contains(open[2], filepath.Join(root, "a.go")) {
+		t.Errorf("opened from the table = %v", open)
+	}
+
+	// The chart: a command opens its tab, and the tab's key picks the metric.
+	if err := h.Execute(ctx, "example.stats", "example.stats.showChart", nil); err != nil {
+		t.Fatal(err)
+	}
+	if tabs := app.eventsLike(EventOpenTab); len(tabs) != 1 || !strings.Contains(tabs[0], `"view":"example.stats.chart"`) || !strings.Contains(tabs[0], `"key":"files"`) {
+		t.Errorf("opened tabs = %v", tabs)
+	}
+	for key, want := range map[string]Point{"files": {X: ".go", Y: 2}, "bytes": {X: ".go", Y: 400}} {
+		cv, err := h.ResolveView(ctx, "example.stats", "example.stats.chart", key, nil, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cv.Kind != "chart" || cv.Chart == nil || cv.Chart.Type != "bar" || cv.Chart.X.Type != "category" || len(cv.Chart.Series) != 1 {
+			t.Fatalf("chart %s = %+v", key, cv)
+		}
+		if pts := cv.Chart.Series[0].Points; len(pts) != 2 || pts[0] != want {
+			t.Errorf("chart %s points = %+v", key, pts)
+		}
 	}
 
 	// The command from the palette counts again and says so.

@@ -1,0 +1,15 @@
+{
+  "contract": 1,
+  "id": "example.todos",
+  "name": "TODO Marks",
+  "version": "0.1.0",
+  "publisher": "Flint examples",
+  "description": "Marks the lines with a TODO in open files, with a quick fix that removes the marker.",
+  "run": { "command": "todos", "sandbox": {} },
+  "permissions": ["workspace.read"],
+  "contributes": {
+    "decorationSets": [
+      { "id": "example.todos.marks", "title": "TODO Marks", "globs": ["*"], "unsavedText": true }
+    ]
+  }
+}

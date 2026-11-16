@@ -34,7 +34,7 @@ type TabView struct {
 	Title string `json:"title"`
 	// Icon is a name from Flint's icon set; empty shows the title only.
 	Icon string `json:"icon,omitempty"`
-	// View is "webview" (the only kind of tab view this Flint draws).
+	// View is "webview", or a declarative kind (views.go: "table", "form", "chart").
 	View    string   `json:"view"`
 	Webview *Webview `json:"webview,omitempty"`
 	// Restore: open tabs of this view are saved with the session.
@@ -66,7 +66,8 @@ func (m *Manifest) WebviewOf(view string) (*Webview, bool) {
 // HasWebviews reports whether the extension shows its own UI (the install
 // dialog says so).
 func (m *Manifest) HasWebviews() bool {
-	return slices.ContainsFunc(m.Contributes.Panels, func(p Panel) bool { return p.Webview != nil }) || len(m.Contributes.TabViews) > 0
+	return slices.ContainsFunc(m.Contributes.Panels, func(p Panel) bool { return p.Webview != nil }) ||
+		slices.ContainsFunc(m.Contributes.TabViews, func(t TabView) bool { return t.Webview != nil })
 }
 
 func checkWebview(kind, id string, w *Webview) error {
@@ -100,7 +101,10 @@ func (m *Manifest) checkTabViews(own func(kind, id string) error) error {
 			return fmt.Errorf("tab view %s: icon %q is not a name from Flint's icon set", t.ID, t.Icon)
 		}
 		if t.View != "webview" {
-			return fmt.Errorf(`tab view %s: view %q is not supported (this Flint draws "webview" tabs)`, t.ID, t.View)
+			if err := checkDeclarative("tab view", t.ID, t.View, TabViewKinds, t.Webview); err != nil {
+				return err
+			}
+			continue
 		}
 		if err := checkWebview("tab view", t.ID, t.Webview); err != nil {
 			return err

@@ -2,14 +2,18 @@ import { useEffect, useState } from 'react'
 import * as API from '../../../bindings/flint/internal/features/extensions/api'
 import { errorMessage } from '../../api/backend'
 import { useSettings } from '../../store/settings'
-import { extensionEnabled, toolsOffered, withFlag } from './settings'
+import { decorationSetEnabled, extensionEnabled, sandboxRequired, toolsOffered, withDecorationSet, withFlag, withSandboxRequired } from './settings'
 import { installFromFolder, loadExtensions, restartExtension, uninstallExtension, useExtensions, type Info } from './store'
 import { themeContributions, type ExtensionInfo } from './model'
 import { activeThemeId, customThemeFrom } from '../../lib/contributedThemes'
 import { useContributions } from '../../lib/contributions'
 import type { ThemeContribution } from '../../lib/features'
+import { Row } from '../../components/settings/fields'
 import { BuiltinExtensions } from './BuiltinExtensions'
 import { CatalogSection } from './CatalogSection'
+import { IndexSection } from './IndexSection'
+import { installFromIndex, useIndex } from './indexStore'
+import { availableUpdates } from './indexModel'
 
 const STATE_LABELS: Record<string, string> = {
   invalid: 'Broken',
@@ -25,20 +29,34 @@ const STATE_LABELS: Record<string, string> = {
 export function ExtensionsSection() {
   const list = useExtensions((s) => s.list)
   const loaded = useExtensions((s) => s.loaded)
+  const extensions = useSettings((s) => s.settings.extensions)
+  const update = useSettings((s) => s.update)
   useEffect(() => void loadExtensions(), [])
   return (
     <section>
       <h2>Extensions</h2>
       <p className="muted settings-note">
         Extensions add color themes, or are programs that add commands, panels, settings, status bar items and agent tools. Flint draws everything they
-        show and checks every request against the permissions they declare, but a program runs with your user's permissions: install only ones you trust.
-        One starts when you first use it and stops after five idle minutes. A theme-only extension has no program and runs no code.
+        show and checks every request against the permissions they declare. A program that declares a sandbox is confined by the operating system to
+        the files and network access shown on its card; one that doesn't runs with your user's permissions. Install only ones you trust. One starts
+        when you first use it and stops after five idle minutes. A theme-only extension has no program and runs no code.
       </p>
+      <Row
+        label="Only run sandboxed extensions"
+        hint="Extensions whose program would run unconfined (no sandbox declared, or none on this system) stay installed but are not started."
+      >
+        <input
+          type="checkbox"
+          checked={sandboxRequired(extensions)}
+          onChange={(e) => update((s) => ({ extensions: withSandboxRequired(s.extensions, e.target.checked) }))}
+        />
+      </Row>
       <div className="settings-actions">
         <button onClick={() => void installFromFolder()}>Install from Folder…</button>
         <button onClick={() => void loadExtensions(true)}>Reload Installed</button>
       </div>
       <BuiltinExtensions />
+      <IndexSection />
       <CatalogSection />
       <h3>Installed</h3>
       {loaded && list.length === 0 && <p className="muted settings-note">No extensions installed.</p>}
@@ -54,6 +72,9 @@ function ExtensionCard({ info }: { info: Info }) {
   const update = useSettings((s) => s.update)
   const conflicts = useExtensions((s) => s.conflicts[info.id])
   const [log, setLog] = useState<string | null>(null)
+  // A newer version in the signed index, once the user fetched it (IndexSection).
+  const newer = useIndex((s) => availableUpdates(s.status?.entries ?? [], [info]).get(info.id))
+  const updating = useIndex((s) => s.busy.includes(info.id))
   const showLog = () =>
     API.Log(info.id).then(
       (text) => setLog(text || '(empty)'),
@@ -156,8 +177,40 @@ function ExtensionCard({ info }: { info: Info }) {
               </dd>
             </>
           )}
+          {(info.decorationSets?.length ?? 0) > 0 && (
+            <>
+              <dt>Editor decorations</dt>
+              <dd>
+                {info.decorationSets.map((set) => (
+                  <label key={set.id} className="extension-decoration-set">
+                    <input
+                      type="checkbox"
+                      checked={decorationSetEnabled(extensions, set.id, set.default)}
+                      onChange={(e) => update((s) => ({ extensions: withDecorationSet(s.extensions, set.id, e.target.checked, set.default) }))}
+                    />{' '}
+                    {set.title}{' '}
+                    <span className="muted">
+                      (in {set.files} files{set.unsavedText ? '; sees their text as you type, unsaved edits included' : ''})
+                    </span>
+                  </label>
+                ))}
+                <div className="muted">It starts when a matching file in a trusted folder is opened, and keeps running while one is open.</div>
+              </dd>
+            </>
+          )}
           <dt>Permissions</dt>
           <dd>{info.permissionTexts.length ? info.permissionTexts.map((p) => <div key={p}>{p}</div>) : 'None'}</dd>
+          {info.program && info.sandbox && (
+            <>
+              <dt>Sandbox</dt>
+              <dd>
+                <div className={info.sandbox.state === 'sandboxed' ? '' : 'extension-unsandboxed'}>{info.sandbox.summary}</div>
+                {info.sandbox.details.map((d) => (
+                  <div key={d} className="muted">{d}</div>
+                ))}
+              </dd>
+            </>
+          )}
           {info.agentTools.length > 0 && (
             <>
               <dt>Agent tools</dt>
@@ -168,11 +221,12 @@ function ExtensionCard({ info }: { info: Info }) {
                     checked={toolsOffered(extensions, info.id)}
                     onChange={(e) => update((s) => ({ extensions: withFlag(s.extensions, 'agentTools', info.id, e.target.checked) }))}
                   />{' '}
-                  Offer to agents (read-only, in trusted folders, when Settings ▸ Agent Context is on)
+                  Offer to agents (in trusted folders, when Settings ▸ Agent Context is on)
                 </label>
                 {info.agentTools.map((t) => (
                   <div key={t.name} className="muted">
-                    <code>{t.agentName || t.name}</code> {t.description}
+                    <code>{t.agentName || t.name}</code> {t.acts ? <strong>Acts (Flint asks you before each call). </strong> : 'Read-only. '}
+                    {t.description}
                   </div>
                 ))}
               </dd>
@@ -181,6 +235,11 @@ function ExtensionCard({ info }: { info: Info }) {
         </dl>
       )}
       <div className="settings-actions">
+        {newer && (
+          <button disabled={updating} onClick={() => void installFromIndex(info.id)}>
+            {updating ? 'Downloading…' : `Update to ${newer}…`}
+          </button>
+        )}
         <button onClick={() => (log === null ? void showLog() : setLog(null))}>{log === null ? 'Show Log' : 'Hide Log'}</button>
         {log !== null && <button onClick={() => void showLog()}>Refresh Log</button>}
         {(info.state === 'failed' || info.state === 'crashed') && <button onClick={() => void restartExtension(info.id)}>Restart</button>}

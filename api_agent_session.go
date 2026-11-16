@@ -27,6 +27,7 @@ func newAgentManager(a *App) *as.Manager {
 		a.tasks.Observe(e) // agent tasks follow their chats (tasks_state.go)
 		a.observeUsage(e)  // usage_state.go
 	})
+	m.SetActionGate(a.actionGate()) // Flint's tools that act always ask (api_mcp_actions.go)
 	registerDrivers(m, a.untrusted, a.agentConfig, a.offerMCP)
 	syncCustomAgents(m, nil, a.currentSettings().CustomAgents, a.untrusted, a.offerMCP)
 	if p, ok := a.agentPolicy(); ok {

@@ -365,11 +365,16 @@ func (s *session) onControlRequest(m *inbound) {
 	if st := s.tr.tools[req.ToolUseID]; st != nil && !st.hidden {
 		call = st.call
 	}
-	s.emit(agentsession.Event{Kind: agentsession.KindPermission, Permission: &agentsession.PermissionRequest{
+	perm := &agentsession.PermissionRequest{
 		ID:       m.RequestID,
 		ToolCall: call,
 		Options:  permissionOptions(len(req.PermissionSuggestion) > 0),
-	}})
+	}
+	if tool, ok := flintToolName(req.ToolName, s.flintMCP); ok {
+		// A tool of Flint's own server: the manager decides about the ones that act.
+		perm.FlintTool, perm.FlintArgs = tool, req.Input
+	}
+	s.emit(agentsession.Event{Kind: agentsession.KindPermission, Permission: perm})
 }
 
 // permissionOptions are the answers offered for a can_use_tool request.

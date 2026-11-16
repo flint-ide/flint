@@ -78,6 +78,22 @@ Flint starts a language server in the background when you open the first file of
 
 You get completion, hover information, go to definition (`⌘`-click, `⌘B` or `F12`), find usages (`⌥F7` or `⇧F12`) and live diagnostics. `⇧⌘M` opens the problems list and `F8` jumps to the next problem.
 
+The language server also does the work behind these:
+
+| What | Keys | Notes |
+|---|---|---|
+| Go to implementation, to the type's declaration | `⌥⌘B`, `⇧⌘B` | Several results open as a list. |
+| Go to symbol in this file | `⌘F12` | The file's outline; type to filter. |
+| Go to symbol in the workspace | `⌥⌘O` | Searches the servers that are running, so open a file of the language first. |
+| Rename a symbol everywhere | `⇧F6` or `F2` | Type the new name and press `↵`. |
+| Quick fixes and refactorings | `⌥↵` or `⌘.` | Also **Quick fix…** in a problem's tooltip. |
+| Reformat the file, organize imports | `⌥⌘L` (or `⇧⌥F`), `⇧⌥O` | |
+| Parameter info | appears after `(` and `,`; `⇧⌘Space` | `Esc` closes it. |
+
+A rename or a fix can touch several files. Files you have open are changed in the editor, where `⌘Z` takes the change back, and stay unsaved until you save them; the others are written to disk, so review them in the Commit panel. Flint only applies text edits: a change that would create, move or delete files is refused with a message.
+
+To format every file as you save it, turn on **Format on save** (and **Organize imports on save**) in Settings ▸ Editor. Both use the file's language server, so they do nothing for files without one.
+
 The status bar shows each server's state. If a server isn't installed, it shows the command to install it.
 
 On any error or warning, **Fix with agent** sends the problem (file, position, severity, source, message and the surrounding lines) to the agent chat. **Fix all N in file** (`⌥⇧⌘L`) sends every problem in the file at once.

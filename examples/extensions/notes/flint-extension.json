@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "publisher": "Flint",
   "description": "An example of webviews: a panel and tabs with the extension's own UI.",
-  "run": { "command": "notes" },
+  "run": { "command": "notes", "sandbox": {} },
   "activation": ["onView:example.notes.list", "onView:example.notes.note", "onCommand:example.notes.new"],
   "contributes": {
     "commands": [{ "id": "example.notes.new", "title": "New Note", "category": "Notes" }],

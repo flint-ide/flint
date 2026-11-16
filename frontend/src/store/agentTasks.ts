@@ -1,12 +1,23 @@
 // Agent tasks (TaskAPI in Go): the Tasks panel's list, the New Agent Task dialog
 // and the row actions. State changes come as "tasks:changed" events (derived in
 // Go from the chats' agent events); changed-file counts follow git and file events.
+// Go also keeps the queue: it says which new tasks start now and announces each
+// queued one with "tasks:start" when a slot is free; this store starts the chats.
 import { createStore } from '../lib/store'
 import * as TaskAPI from '../../bindings/flint/taskapi'
 import { EventsOn } from '../wails/runtime'
 import { git, main } from '../wails/models'
 import { errorMessage } from '../api/backend'
-import { failurePrompt, mergeTaskLists, pruneChanges, removeQuestions, tasksTouchedBy, type TaskView } from '../lib/agentTasks'
+import {
+  failurePrompt,
+  groupMates,
+  mergeTaskLists,
+  pruneChanges,
+  removeOthersQuestion,
+  removeQuestions,
+  tasksTouchedBy,
+  type TaskView,
+} from '../lib/agentTasks'
 import { isWithin } from '../lib/fileTree'
 import { askAgent } from '../lib/askAgent'
 import { confirmAction, showToast } from './dialog'
@@ -19,6 +30,22 @@ import { resolveConflictsWithAgent } from './agent'
 import { activeRoot } from './activeRoot'
 
 export type TaskChanges = git.DiffStat
+export type TaskComparison = main.TaskComparison
+export type FileComparison = main.FileComparison
+export type TaskFileDiff = main.TaskFileDiff
+
+/** The comparison of a group of tasks that is open (components/tasks/CompareView.tsx). */
+export interface CompareState {
+  group: string
+  data: TaskComparison | null
+  /** The selected file and its diff in every task. */
+  path: string | null
+  file: FileComparison | null
+  /** The two tasks of the direct diff (ids), and that diff of the selected file. */
+  pair: [string, string] | null
+  between: TaskFileDiff | null
+  error: string | null
+}
 
 interface TasksState {
   tasks: TaskView[]
@@ -30,6 +57,7 @@ interface TasksState {
   busy: Record<string, boolean>
   error: string | null
   newTaskOpen: boolean
+  compare: CompareState | null
 }
 
 export const useTasks = createStore<TasksState>(() => ({
@@ -39,6 +67,7 @@ export const useTasks = createStore<TasksState>(() => ({
   busy: {},
   error: null,
   newTaskOpen: false,
+  compare: null,
 }))
 
 /** Lists the tasks of every repository open in the window (Go reads each repository once). */
@@ -93,6 +122,8 @@ export function followTasks(): () => void {
   }
   const all = () => useTasks.getState().tasks.map((t) => t.id)
   const offs = [
+    // Usage of a turn arrives after its end: the tokens of a task follow it.
+    EventsOn('usage:changed', relist),
     EventsOn('tasks:changed', relist),
     // A commit, merge or checkout anywhere changes ahead/merged and the counts.
     EventsOn('git:changed', () => {
@@ -142,31 +173,94 @@ function chatOf(t: TaskView): string | null {
 
 export interface NewTaskInput {
   description: string
-  agent: string
+  /** One task per entry; an agent named twice gets two attempts (lib planAgents). */
+  agents: string[]
   base: string
 }
 
 /**
- * Creates the task (branch + worktree), opens its folder, starts a chat with the
- * chosen agent there and sends the description, which the user wrote and started.
- * Returns an error message, or null when the task started.
+ * Creates the tasks (a branch and a worktree each) and starts the ones Go gave a
+ * slot: opens the folder, starts a chat with the agent there and sends the
+ * description, which the user wrote and started. The others are queued; Go
+ * announces them later. Returns an error message, or null when the tasks exist.
  */
 export async function startTask(input: NewTaskInput): Promise<string | null> {
-  let task: TaskView
+  let tasks: TaskView[]
   try {
-    task = (await TaskAPI.Create(main.NewTask.createFrom({ dir: activeRoot(), ...input }))) as TaskView
+    const req = main.NewTaskGroup.createFrom({ dir: activeRoot(), description: input.description, base: input.base, agents: input.agents })
+    tasks = ((await TaskAPI.CreateGroup(req)) ?? []) as TaskView[]
   } catch (err) {
     return errorMessage(err)
   }
   closeNewTask()
   void loadTasks()
-  await showFolder(task.worktree)
-  const chat = useAgentChat.getState()
-  const id = await chat.start(input.agent, task.worktree)
-  if (!id) return null // start() told the user why; the task stays, Open retries
-  chat.setDraft(id, input.description.trim())
-  await useAgentChat.getState().send(id)
+  const queued = tasks.filter((t) => t.state === 'queued').length
+  if (queued > 0) showToast(`${queued} ${queued === 1 ? 'task is' : 'tasks are'} queued: ${queued === 1 ? 'it starts' : 'they start'} when a working task settles`)
+  for (const t of tasks) if (t.state !== 'queued') await beginTask(t, input.description.trim())
   return null
+}
+
+/**
+ * Starts a task's chat and sends its description, then tells Go the start is
+ * over (whether the turn began or not), so the slot held for it is counted right.
+ */
+async function beginTask(t: TaskView, text: string): Promise<void> {
+  try {
+    if (!(await showFolder(t.worktree))) return
+    const chat = useAgentChat.getState()
+    const id = await chat.start(t.agent, t.worktree)
+    if (!id) return // start() told the user why; the task stays, Open retries
+    chat.setDraft(id, text)
+    await useAgentChat.getState().send(id)
+  } finally {
+    await TaskAPI.StartDone(t.id).catch(() => undefined)
+  }
+}
+
+/** A task Go took off the queue: started with the description as it was saved (secrets redacted). */
+async function beginQueuedTask(id: string): Promise<void> {
+  let task: TaskView | undefined
+  try {
+    const tasks = ((await TaskAPI.ListAll(useWorkspace.getState().roots)) ?? []) as TaskView[]
+    task = tasks.find((t) => t.id === id)
+  } catch {
+    // Listed below as not found.
+  }
+  if (!task || task.stale) {
+    await TaskAPI.StartDone(id).catch(() => undefined)
+    return
+  }
+  await beginTask(task, task.prompt)
+}
+
+/** Starts a queued task now, although the limit of working tasks is reached. */
+export async function startQueuedNow(t: TaskView): Promise<void> {
+  const started = await withBusy(t, () => TaskAPI.StartNow(t.id))
+  if (!started) return
+  void loadTasks()
+  await beginTask(started as TaskView, t.prompt)
+}
+
+let subscribed = false
+/**
+ * Follows the queue for the whole session (not only while the panel is shown):
+ * starts the chats of tasks Go takes off the queue, and lets Go look at the queue
+ * when the window's folders are known or change (after a restart queued tasks
+ * wait for their repository to be open).
+ */
+export function subscribeTaskQueue(): void {
+  if (subscribed) return
+  subscribed = true
+  // One at a time: starting a chat opens a folder and a tab.
+  let chain: Promise<void> = Promise.resolve()
+  EventsOn('tasks:start', (id: string) => {
+    chain = chain.then(() => beginQueuedTask(id)).catch(() => undefined)
+  })
+  const pump = () => void TaskAPI.StartQueued().catch(() => undefined)
+  useWorkspace.subscribe((s, prev) => {
+    if (s.roots !== prev.roots && s.roots.length > 0) pump()
+  })
+  if (useWorkspace.getState().roots.length > 0) pump()
 }
 
 /** Shows the task's folder and its chat (a new one when none is open). */
@@ -209,14 +303,14 @@ async function withBusy<T>(t: TaskView, fn: () => Promise<T>): Promise<T | undef
   }
 }
 
-/** Merges the task into its base checkout; on conflicts offers the agent hand-off. */
-export async function mergeTask(t: TaskView): Promise<void> {
-  if (!(await confirmAction(`Merge ${t.branch} (${t.ahead} commit(s)) into ${t.base}?`, 'Merge'))) return
+/** Merges the task into its base checkout; on conflicts offers the agent hand-off. True when it was merged. */
+export async function mergeTask(t: TaskView): Promise<boolean> {
+  if (!(await confirmAction(`Merge ${t.branch} (${t.ahead} commit(s)) into ${t.base}?`, 'Merge'))) return false
   const res = await withBusy(t, () => TaskAPI.Merge(t.id))
-  if (!res) return
+  if (!res) return false
   if (res.merged) {
     showToast(`Merged ${t.branch} into ${t.base}`)
-    return
+    return true
   }
   const list = res.conflicts.slice(0, 5).join(', ') + (res.conflicts.length > 5 ? ', …' : '')
   const ok = await confirmAction(
@@ -224,6 +318,7 @@ export async function mergeTask(t: TaskView): Promise<void> {
     'Resolve with agent',
   )
   if (ok) await resolveInTask(t)
+  return false
 }
 
 async function resolveInTask(t: TaskView): Promise<void> {
@@ -237,16 +332,18 @@ async function resolveInTask(t: TaskView): Promise<void> {
   await resolveConflictsWithAgent(t.worktree, 'merging', files)
 }
 
-/** Pushes the branch and opens a pull request (Go asks for confirmation first). */
-export async function createTaskPullRequest(t: TaskView): Promise<void> {
+/** Pushes the branch and opens a pull request (Go asks for confirmation first). True when it was created. */
+export async function createTaskPullRequest(t: TaskView): Promise<boolean> {
   try {
     useTasks.setState((s) => ({ busy: { ...s.busy, [t.id]: true } }))
     const url = await TaskAPI.CreatePullRequest(t.id)
     showToast(`Pull request created: ${url}`)
+    return true
   } catch (err) {
     const msg = errorMessage(err)
     if (isSignInError(msg)) requestGitHubSignIn()
     else if (!msg.includes('cancelled')) showToast(msg, 'error')
+    return false
   } finally {
     useTasks.setState((s) => ({ busy: { ...s.busy, [t.id]: false } }))
   }
@@ -258,8 +355,97 @@ export async function askAgentAboutTask(t: TaskView): Promise<void> {
   await askAgent({ prompt: failurePrompt(t), root: t.worktree })
 }
 
-/** Removes a task after confirming; closes its chats and its folder first. */
-export async function removeTask(t: TaskView): Promise<void> {
+/**
+ * Keeps one task of a group: merges it (or opens its pull request), exactly as
+ * Merge and Create PR do, then offers to remove the others. Each removal goes
+ * through removeTask's own questions about uncommitted work and unmerged branches.
+ */
+export async function keepTask(t: TaskView, how: 'merge' | 'pr'): Promise<void> {
+  const kept = how === 'merge' ? await mergeTask(t) : await createTaskPullRequest(t)
+  if (!kept) return
+  await loadTasks()
+  const others = groupMates(t, useTasks.getState().tasks)
+  if (others.length === 0) return
+  if (!(await confirmAction(removeOthersQuestion(t, others), others.length === 1 ? 'Remove it' : 'Remove them'))) return
+  for (const o of others) await removeTask(o, true)
+  if (useTasks.getState().compare?.group === t.group) closeCompare()
+}
+
+/** Opens the comparison of a group of tasks. */
+export async function openCompare(group: string): Promise<void> {
+  useTasks.setState({ compare: { group, data: null, path: null, file: null, pair: null, between: null, error: null } })
+  await refreshCompare()
+}
+
+export function closeCompare(): void {
+  useTasks.setState({ compare: null })
+}
+
+const patchCompare = (group: string, patch: Partial<CompareState>) =>
+  useTasks.setState((s) => (s.compare?.group === group ? { compare: { ...s.compare, ...patch } } : {}))
+
+/** Re-reads the open comparison (the file list, and the selected file's diffs). */
+export async function refreshCompare(): Promise<void> {
+  const open = useTasks.getState().compare
+  if (!open) return
+  try {
+    const data = await TaskAPI.Compare(open.group)
+    const live = data.tasks.filter((c) => !c.task.stale).map((c) => c.task.id)
+    const now = useTasks.getState().compare
+    const pair = now?.pair && now.pair.every((id) => live.includes(id)) ? now.pair : live.length >= 2 ? ([live[0], live[1]] as [string, string]) : null
+    patchCompare(open.group, { data, pair, error: null })
+    const path = now?.path && data.files.some((f) => f.path === now.path) ? now.path : (data.files[0]?.path ?? null)
+    await selectCompareFile(path)
+  } catch (err) {
+    patchCompare(open.group, { error: errorMessage(err) })
+  }
+}
+
+/** Shows one file of the open comparison: its diff in every task, and between the chosen pair. */
+export async function selectCompareFile(path: string | null): Promise<void> {
+  const open = useTasks.getState().compare
+  if (!open) return
+  if (path === null) {
+    patchCompare(open.group, { path: null, file: null, between: null })
+    return
+  }
+  if (path !== open.path) patchCompare(open.group, { path, file: null, between: null })
+  try {
+    const [file, between] = await Promise.all([
+      TaskAPI.CompareFile(open.group, path),
+      open.pair ? TaskAPI.DiffBetween(open.pair[0], open.pair[1], path) : Promise.resolve(null),
+    ])
+    if (useTasks.getState().compare?.path === path) patchCompare(open.group, { file, between, error: null })
+  } catch (err) {
+    patchCompare(open.group, { error: errorMessage(err) })
+  }
+}
+
+/** Chooses the two tasks of the direct diff. */
+export async function setComparePair(pair: [string, string]): Promise<void> {
+  const open = useTasks.getState().compare
+  if (!open || pair[0] === pair[1]) return
+  patchCompare(open.group, { pair, between: null })
+  await selectCompareFile(open.path)
+}
+
+/** Opens a compared file in the diff view of one task, against where it left its base. */
+export function openComparedFileDiff(c: main.ComparedTask, path: string, origPath: string): void {
+  useEditor.getState().openRevisionDiff({
+    repoRoot: c.task.worktree,
+    path: `${c.task.worktree}/${path}`,
+    basePath: `${c.task.worktree}/${origPath || path}`,
+    baseRev: c.mergeBase,
+    baseLabel: c.task.base,
+  })
+}
+
+/**
+ * Removes a task after confirming; closes its chats and its folder first.
+ * asked: the user already said yes to removing it (the questions about work that
+ * would be lost are still asked).
+ */
+export async function removeTask(t: TaskView, asked = false): Promise<void> {
   const { roots } = useWorkspace.getState()
   if (roots[0] === t.worktree) {
     showToast("The task's folder is this window's main project: open another folder first", 'error')
@@ -273,10 +459,11 @@ export async function removeTask(t: TaskView): Promise<void> {
     return
   }
   const what = t.stale ? 'The task is forgotten (its folder is already gone).' : `Its chats are stopped and the folder ${t.worktree} is deleted.`
-  if (!(await confirmAction(`Remove the task "${t.title}"? ${what}`, 'Remove'))) return
+  if (!asked && !(await confirmAction(`Remove the task "${t.title}"? ${what}`, 'Remove'))) return
   const q = removeQuestions(info)
-  if (q.discard && !(await confirmAction(q.discard, 'Delete them'))) return
-  const deleteBranch = q.branch ? await confirmAction(q.branch, 'Delete branch') : false
+  const which = asked ? `${t.branch}: ` : ''
+  if (q.discard && !(await confirmAction(which + q.discard, 'Delete them'))) return
+  const deleteBranch = q.branch ? await confirmAction(which + q.branch, 'Delete branch') : false
   const chat = useAgentChat.getState()
   for (const s of Object.values(chat.sessions)) if (isWithin(t.worktree, s.cwd)) await chat.stop(s.id)
   if (roots.includes(t.worktree)) await useWorkspace.getState().removeRoot(t.worktree)

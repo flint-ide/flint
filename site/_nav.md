@@ -43,6 +43,7 @@
 ## Write extensions
 - [Write an extension](extensions/write-an-extension.md)
 - [Extension protocol](extensions/protocol.md)
+- [The extension index](extensions/index-format.md)
 
 ## Reference
 - [Keyboard shortcuts](reference/keyboard-shortcuts.md)

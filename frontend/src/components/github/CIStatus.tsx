@@ -3,6 +3,7 @@ import { checkName, failedRuns } from '../../lib/ci'
 import { fixCIWithAgent, openCILog, rerunFailedJobs, useCI, type CIEntry, type FixTarget } from '../../store/ci'
 import { openPullRequest } from '../../store/pullRequests'
 import { checksSummary, ROLLUP_GLYPH } from '../../lib/prReview'
+import { AddressReviewButton, useReviewHint } from './ReviewAgent'
 
 /** "✦ Fix with agent" for a target (all its failed runs, or one run / job). */
 export function FixWithAgentButton({ target, only, label = '✦ Fix with agent' }: { target: FixTarget; only?: { runId: number; jobId: number }; label?: string }) {
@@ -37,21 +38,36 @@ export function FailedCheckActions({ root, check, target }: { root: string; chec
   )
 }
 
-/** The current branch's pull request CI, on top of the Pull Requests view. */
+const BANNER_STATE = { failure: ' · CI failing', pending: ' · CI running', success: ' · CI passed', none: '' } as const
+
+/**
+ * The current branch's pull request on top of the Pull Requests view: its CI,
+ * and its review feedback when the loaded data shows some.
+ */
 export function CIBanner({ entry }: { entry: CIEntry | null }) {
   const pr = entry?.data?.pr
-  if (!entry || !pr || entry.state === 'none') return null
+  const feedback = useReviewHint(entry?.root, pr?.state === 'OPEN' ? pr.number : undefined)
+  if (!entry || !pr || (entry.state === 'none' && !feedback)) return null
   const failed = entry.data!.checks.filter((c) => c.state === 'failure')
   const runs = failedRuns(entry.data!.checks)
   const target: FixTarget = { root: entry.root, pr, checks: entry.data!.checks }
   return (
     <div className={`ci-banner ${entry.state}`}>
       <div className="ci-banner-head" onClick={() => openPullRequest(entry.root, pr)} title={`${pr.title}\n${checksSummary(entry.data!.counts)}`}>
-        <span className={`pr-ci ${entry.state}`}>{ROLLUP_GLYPH[entry.state]}</span>
+        {entry.state !== 'none' && <span className={`pr-ci ${entry.state}`}>{ROLLUP_GLYPH[entry.state]}</span>}
         <span className="truncate">
-          Your branch: #{pr.number} · {entry.state === 'failure' ? 'CI failing' : entry.state === 'pending' ? 'CI running' : 'CI passed'}
+          Your branch: #{pr.number}{BANNER_STATE[entry.state]}
         </span>
       </div>
+      {feedback && (
+        <div className="ci-banner-check">
+          <span className="truncate muted" title={feedback}>{feedback}</span>
+          <span className="spacer" />
+          <span className="ci-actions">
+            <AddressReviewButton target={{ root: entry.root, number: pr.number }} label="✦ Address" />
+          </span>
+        </div>
+      )}
       {failed.length > 0 && (
         <>
           {failed.slice(0, 4).map((c, i) => (

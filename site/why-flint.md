@@ -61,7 +61,7 @@ Flint is a single native process using the system WebView, not Electron. On an A
 Elsewhere:
 
 - secrets are redacted before anything reaches an agent;
-- database passwords and API keys live in the macOS Keychain;
+- database passwords and API keys live in the system keyring (the macOS Keychain, or the Secret Service on Linux);
 - there is no telemetry.
 
 ### Open and simple
@@ -83,7 +83,7 @@ A rough guide, from Flint's point of view. Every tool here is good at what it wa
 ## When Flint isn't the right choice (yet)
 
 - **You rely on a particular extension.** Flint has no extension marketplace: its [extensions](guides/extensions.md) come from one repository, [flint-ide/extensions](https://github.com/flint-ide/extensions), or from a folder, and there are only a few of them so far.
-- **You work on Windows or Linux.** Flint runs on macOS; Linux is in progress and Windows is planned.
+- **You work on Windows.** Flint runs on macOS and Linux (x86_64 and arm64, with GTK 4 and WebKitGTK 6.0); Windows is planned.
 - **Your language isn't Go, TypeScript/JavaScript, Python or Rust.** Other languages get editing and search, but no language server out of the box.
 - **You want AI completion as you type, above all.** Flint has optional ghost-text completion from a local model, but its focus is agents, not completion.
 - **You develop on a remote machine over SSH, or edit together in real time.** Neither is supported yet.

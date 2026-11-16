@@ -8,11 +8,11 @@ Flint is open source under the MIT license. The agent CLIs you use with it (Clau
 
 ### Does Flint run on Windows or Linux?
 
-No. Flint is a macOS app and needs macOS 12 or later. Release builds run on both Apple silicon and Intel Macs.
+Flint runs on macOS and Linux; Windows is not supported yet. On macOS it needs macOS 12 or later, and release builds run on both Apple silicon and Intel Macs. On Linux it needs x86_64 or arm64 with GTK 4 and WebKitGTK 6.0 (Ubuntu 24.04+, Debian 13+, Fedora 39+) and a Secret Service (GNOME Keyring or KWallet) for stored passwords. See [Installation](../installation.md#linux).
 
 ### Is Flint built on Electron?
 
-No. Flint is a single native process that uses the macOS system WebView (WKWebView), which keeps it fast to start and light on memory.
+No. Flint is a single native process that uses the system WebView (WKWebView on macOS, WebKitGTK on Linux), which keeps it fast to start and light on memory.
 
 ### Does Flint collect telemetry?
 
@@ -78,7 +78,7 @@ PostgreSQL and ClickHouse.
 
 ### Where are my database passwords?
 
-In the macOS Keychain, never in files. See [Files and data](files-and-data.md#keychain).
+In the system keyring (the macOS Keychain, or the Secret Service on Linux), never in files. See [Files and data](files-and-data.md#keychain).
 
 ### Can Flint change my current Kubernetes context?
 

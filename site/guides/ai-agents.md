@@ -150,11 +150,38 @@ An agent chat in Flint can also look things up by itself. Flint runs a small [MC
 | `get_test_results` | The last test run in Flint: totals, and each failed test with its location and output. | On |
 | `get_terminal_output` | The recent output your terminals and run consoles printed while they were in the project (dev servers, builds), as plain text without colors. | Off |
 
-The tools only read. Claude Code shows them as `mcp__flint__…`.
+These tools only read. Claude Code shows them as `mcp__flint__…`.
 
 - Diagnostics, editor state and test results show only the project's own state. With the default approval policy ("Read and search the project" on) Claude Code runs them without asking, so the agent can look at what you are looking at without a prompt each time.
 - Terminal output can show anything you saw, such as a token printed in a terminal. It is off until you turn it on, and then the agent asks before each call, even with "Read and search" on. This keeps Flint's rule that nothing goes to an AI provider without you seeing it.
 - Codex and custom agents decide about all of them with their own rules.
+
+### Letting agents act in Flint
+
+You can also let an agent do a few things the way you do them in Flint, so the result shows in Flint's own tabs and not only in the chat. These tools are off until you turn their group on in Settings (`⌘,`) ▸ **Agent Context** ▸ **Actions**; a tool that is off isn't offered to agents at all.
+
+| Tool | What it does | Where you see it |
+|---|---|---|
+| `run_tests` | Runs a Go package, a `_test.go` file or a JS/TS test file (optionally single tests) in Flint's test runner, like the ▶ in the gutter, and waits for the results (two minutes by default; a longer run answers with the results so far). | The **Tests** tab |
+| `run_configuration` | Starts or restarts one of the project's [run configurations](run-debug-test.md) by name and returns once it started. | The configuration's run tab |
+| `get_run_output` | Reads the last lines of a run and whether it exited. Offered with `run_configuration`; it only reads. | |
+| `send_http_request` | Sends one named request (`### name`) of a `.http` or `.rest` file in the project, as saved on disk, optionally with an environment. Returns the status, the headers and the start of the body. | The file's response tab and history |
+| `run_sql_query` | Runs one reading statement (`SELECT`, `WITH`, `SHOW`, …) on a saved database connection, **only if that connection is read-only**, and returns up to 500 rows. | The connection's query history |
+
+**You are asked before every call.** Nothing an agent starts this way runs without your yes to that one call:
+
+- **Claude Code** asks in the chat: a permission card with the tool and its arguments, with **Allow once** and **Reject** only. There is no "Always allow" for these tools, and the approval policy doesn't answer them, not even "Do everything".
+- **Codex and custom agents**, and Claude Code when its own settings already allow the tool, don't reliably ask in the chat. Flint then asks in a dialog of its own that shows the project, the tool, what it would do (the command, the request's URL, the SQL) and its arguments.
+- If you don't answer within five minutes, nothing runs.
+
+What the tools accept is narrow on purpose:
+
+- Paths, test names, run configurations, requests and environments must exist in the chat's project. The agent never passes a command line, a URL or connection details: it can only name what is already there. It can still edit those files like any other, so read the dialog or the card.
+- A request's body file must be inside the project, as in the editor.
+- `run_sql_query` refuses a connection that isn't read-only and says how to make it one (Edit Connection ▸ Read-only). It takes one statement without a semicolon inside it. Saved connections aren't tied to a project, so a chat in any trusted folder can ask for any read-only connection.
+- Answers are bounded and redacted like the read tools' (response cookies are hidden).
+
+Codex decides about MCP tools by its own rules and may refuse a tool that isn't read-only before Flint is asked.
 
 How it is protected:
 
@@ -172,7 +199,7 @@ Which agents get it:
 - **Custom (ACP) agents**: when the agent says it can connect to HTTP MCP servers (`mcpCapabilities.http`); otherwise not.
 - Commit messages and other one-shot runs don't use it.
 
-To turn it off, or to switch single tools on or off, open Settings (`⌘,`) ▸ **Agent Context**. Switching the server off closes it and cuts running chats off at once. See [`mcpServer`](../reference/settings.md#mcpserver) for the keys.
+To turn it off, or to switch single tools and action groups on or off, open Settings (`⌘,`) ▸ **Agent Context**. Switching the server off closes it and cuts running chats off at once. See [`mcpServer`](../reference/settings.md#mcpserver) for the keys.
 
 ## What the agent may do without asking
 
@@ -242,9 +269,10 @@ The panel lists the tasks of every repository open in the window, newest first. 
 
 | What | Meaning |
 |---|---|
-| State | **working**, **waiting for you** (the agent asks for approval in its chat), **finished** (the turn ended: review it), **failed** (the error is shown under the row) or **idle**. It follows the chat's own events; nothing polls. |
+| State | **queued** (waits for a free slot, see [The queue](#the-queue)), **working**, **waiting for you** (the agent asks for approval in its chat), **finished** (the turn ended: review it), **failed** (the error is shown under the row) or **idle**. It follows the chat's own events; nothing polls. |
 | Branch | The task's branch, and **↑N** for the commits its base doesn't have yet. |
 | Changes | Files changed since the branch left its base, committed or not, new files included, with added and removed lines (**merged** once its base has every commit). Refreshed when files or Git change. |
+| Usage | The tokens (input and output) and the cost of the task's chats so far, once it used any. See [Usage and budgets](#usage-and-budgets). |
 
 The actions:
 
@@ -255,11 +283,39 @@ The actions:
 - **Create PR** pushes the task's branch (whatever the worktree has checked out at the moment) and creates a pull request into its base on GitHub (with your [GitHub account](git-and-github.md#signing-in); a branch pushed to your fork becomes `you:branch`), titled with the task's first line and described by its text. Flint asks first, because it publishes the branch. **PR ↗** opens it afterwards.
 - **✕** removes the task: it stops the task's chats, closes its folder and deletes the worktree. Uncommitted work, new files, ignored files such as `.env` or build output, and a branch with commits its base doesn't have are deleted only if you confirm; otherwise the branch is kept.
 
+### Compare agents
+
+To see how different agents, or several attempts of one agent, solve the same task, tick **Compare agents** in "New Agent Task…". The agent in the **Agent** box is always included; tick the others to add them, and set **Attempts per agent** to run each more than once. One description starts at most 6 tasks.
+
+Flint creates one task per agent and attempt, all from the same commit of the base branch, each with its own branch and worktree. The branch names end in the agent's id: `agent/add-rate-limiting-claude`, `agent/add-rate-limiting-codex`, and `agent/add-rate-limiting-codex-2` for a second attempt. If one of them can't be created, none is kept. The same description goes to every agent.
+
+The panel shows these tasks together under the task's title, each with its agent, state, changes, commits ahead and usage. A group has three more actions:
+
+- **Compare** opens the comparison: every file changed by any of the tasks, with the lines each task added and removed in it (`—` where a task left the file alone). Click a file to see each task's changes to it next to each other, against the commit the tasks started from, uncommitted work included. **Open diff** on a column opens that task's side-by-side diff of the file in a tab. Under the columns, **Direct diff** shows the file as one task has it against another task; pick the two tasks when there are more than two. **Refresh** reads the changes again.
+- **Keep: Merge** on a task is **Merge** for that task. When it merged, Flint offers to remove the other tasks of the group.
+- **Keep: PR** is **Create PR** for that task, with the same offer afterwards.
+
+Removing the others works like **✕** on each of them: if one has uncommitted work, new or ignored files, or a branch with commits that are not in its base, Flint asks about that task before deleting anything, and keeps the branch unless you agree to delete it. Say no to the offer to keep them all.
+
+### The queue
+
+Each working agent uses your machine and your budget, so Flint limits how many agent tasks work at the same time: 3 by default (`agentTasks.maxParallel`; Settings ▸ Agents ▸ Agent tasks; 0 turns the limit off). A task counts while its agent is working or waiting for your approval, and while its chat is starting.
+
+A task you start beyond the limit is **queued**. Its branch and worktree are created right away, from the commit the base branch has at that moment, but its chat is not started and its description is not sent to the agent. When a working task finishes, fails, is stopped or removed, the oldest queued task starts by itself: Flint opens its folder, starts the chat and sends the description. The description is sent as Flint saved it, with anything that looks like a credential replaced.
+
+- **Start now** on a queued task starts it at once, whatever the limit.
+- **✕** removes a queued task like any other.
+- Queued tasks can't be reordered: the oldest goes first.
+
+The queue is saved with the tasks, so it survives a restart. After a restart nothing starts until the task's repository is open in a window and a slot is free. Flint never starts a queued task by itself in a folder that is in [Restricted Mode](restricted-mode.md); use **Start now** there. If you turned on **Pause new turns over budget** for a spent [budget](#budgets), queued tasks wait too, and **Start now** is refused, until you choose **Continue anyway** in a chat's budget warning or raise the budget. The limit counts the tasks of one window; a second Flint window counts its own.
+
+### Where tasks are kept
+
 Tasks are remembered per repository in `state.json`, so they survive a restart. A task whose worktree folder was deleted outside Flint shows as **stale** and can only be removed; removing it forgets only that worktree, not other missing ones (for example on a disk that isn't connected).
 
 In [Restricted Mode](restricted-mode.md), a task's worktree is trusted when the checkout it started from is trusted (it holds the same repository's commits); otherwise it stays restricted like any new folder. Removing the task, or the worktree folder disappearing, removes that trust again. Because trust follows folders, a task from an untrusted checkout can't put its worktree inside a trusted folder, and no task worktree may lie inside the checkout itself; Flint refuses and asks you to pick another worktree folder. Worktrees you create by hand with **New Worktree…** don't inherit trust: trust them like any other folder.
 
-The worktree folder and the branch prefix are settings (Settings ▸ Agents ▸ Agent tasks; [`agentTasks`](../reference/settings.md#agenttasks) in `settings.json`).
+The worktree folder, the branch prefix and the number of tasks working at the same time are settings (Settings ▸ Agents ▸ Agent tasks; [`agentTasks`](../reference/settings.md#agenttasks) in `settings.json`).
 
 ## Usage and budgets
 

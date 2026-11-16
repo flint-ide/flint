@@ -24,15 +24,21 @@ const (
 	maxArgs        = 16 << 10
 )
 
-// View is a panel's content: items of a tree or list, or a message.
+// View is a panel's or a tab's content: items of a tree or list, a table, a
+// form or a chart (richviews.go), or a message.
 type View struct {
-	// Kind is "tree", "list" or "message".
+	// Kind is "tree", "list", "table", "form", "chart" or "message".
 	Kind  string `json:"kind"`
 	Items []Item `json:"items"`
+	// Table, Form and Chart are the content of a view of that kind.
+	Table *Table `json:"table,omitempty"`
+	Form  *Form  `json:"form,omitempty"`
+	Chart *Chart `json:"chart,omitempty"`
 	// Text and Actions are a message's.
 	Text    string   `json:"text,omitempty"`
 	Actions []Action `json:"actions,omitempty"`
-	// Truncated: the extension sent more than maxItems items.
+	// Truncated: the extension sent more than maxItems items or rows, or
+	// more series or points than a chart holds.
 	Truncated bool `json:"truncated,omitempty"`
 }
 

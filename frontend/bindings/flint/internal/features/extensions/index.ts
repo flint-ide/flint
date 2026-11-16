@@ -5,3 +5,9 @@ import * as API from "./api.js";
 export {
     API
 };
+
+export {
+    IndexEntry,
+    IndexStatus,
+    InstallRequest
+} from "./models.js";

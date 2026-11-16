@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"flint/internal/extensions/manifest"
+	"flint/internal/extensions/sandbox"
 )
 
 // App is what the host needs from Flint.
@@ -42,6 +43,9 @@ type App interface {
 	Choose(title, message string, actions []string) string
 	// Enabled reports whether the user left the extension on (Settings).
 	Enabled(id string) bool
+	// SetEnabled reports whether a decoration set is on: the user's choice
+	// in Settings, else def (the manifest's default).
+	SetEnabled(set string, def bool) bool
 	// Settings is the extension's stored settings object (nil: none).
 	Settings(id string) json.RawMessage
 	// Version is Flint's version.
@@ -58,6 +62,17 @@ type Options struct {
 	// Environ is the base environment of extension processes; nil uses
 	// MinimalEnv after the login-shell PATH was imported.
 	Environ func() []string
+	// LanguageOf names a file's language (Flint's id, "" for none), which
+	// decoration sets select files by; nil knows no languages.
+	LanguageOf func(path string) string
+	// Sandbox reports what this system can confine; nil asks the system
+	// (sandbox.Probe). Launcher is the program started as the sandbox
+	// launcher; "" is Flint's own executable, whose main calls sandbox.Main.
+	Sandbox  func() sandbox.Support
+	Launcher string
+	// RequireSandbox: the user only runs extensions that are sandboxed
+	// (the "extensions.requireSandbox" setting); nil means no.
+	RequireSandbox func() bool
 	// Timeouts; zero values use the defaults below.
 	IdleTimeout    time.Duration
 	InitTimeout    time.Duration
@@ -102,6 +117,7 @@ type Host struct {
 
 	mu         sync.Mutex
 	exts       map[string]*ext
+	docs       map[string]*document // open in editors, by path (decorations.go)
 	discovered bool
 	closed     bool
 }
@@ -129,7 +145,7 @@ func New(o Options) *Host {
 	if o.Environ == nil {
 		o.Environ = loginEnv
 	}
-	return &Host{o: o, exts: map[string]*ext{}}
+	return &Host{o: o, exts: map[string]*ext{}, docs: map[string]*document{}}
 }
 
 // Discover reads the manifests again: new folders are added, changed ones
@@ -164,7 +180,9 @@ func (h *Host) Discover() {
 	h.mu.Unlock()
 	for _, e := range stop {
 		e.stop("replaced or removed")
+		e.dropDocuments()
 	}
+	h.syncDocuments() // a new extension may decorate open documents
 	h.changed()
 }
 
@@ -279,9 +297,11 @@ func (h *Host) SettingsChanged(id string) {
 	}
 	if !h.o.App.Enabled(id) {
 		e.stop("turned off")
+		h.syncDocuments()
 		h.changed()
 		return
 	}
+	h.syncDocuments() // a decoration set turned on or off
 	p := e.running()
 	switch {
 	case p != nil && e.m.Contributes.Settings != nil:
@@ -296,10 +316,22 @@ func (h *Host) SettingsChanged(id string) {
 	h.changed()
 }
 
+// SetsChanged follows the user turning decoration sets on or off: extensions
+// hear of the open documents their sets now apply to, or no longer do.
+func (h *Host) SetsChanged() {
+	h.syncDocuments()
+	h.changed()
+}
+
 // RootsChanged tells running extensions the trusted folders changed.
 func (h *Host) RootsChanged() {
+	defer h.syncDocuments() // open documents of a folder that is trusted now, or no more
 	for _, e := range h.all() {
 		if p := e.running(); p != nil {
+			if e.rootsOutgrew(p) {
+				go e.restartForRoots()
+				continue
+			}
 			_ = p.conn.Notify("workspace/rootsChanged", map[string]any{"roots": e.roots()})
 		}
 	}
@@ -314,15 +346,25 @@ func (h *Host) Restart(id string) error {
 	e.stop("restarted by the user")
 	e.resetCrashes()
 	h.changed()
+	if len(e.followed()) > 0 { // open documents it decorates: start it again
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), h.o.InitTimeout+time.Second)
+			defer cancel()
+			_, _ = e.session(ctx)
+		}()
+	}
 	return nil
 }
 
 // Log is the extension's log: its stderr, its log notifications and what
 // Flint saw happen to its process.
 func (h *Host) Log(id string) (string, error) {
-	e, err := h.get(id)
-	if err != nil {
-		return "", err
+	h.ensureDiscovered()
+	h.mu.Lock()
+	e := h.exts[id] // also after Close: the log says how the processes ended
+	h.mu.Unlock()
+	if e == nil {
+		return "", fmt.Errorf("extension %q is not installed", id)
 	}
 	return e.log.String(), nil
 }

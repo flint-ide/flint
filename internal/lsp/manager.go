@@ -50,6 +50,9 @@ type document struct {
 type Manager struct {
 	OnDiagnostics func(path string, diags []Diagnostic)
 	OnStatus      func(Status)
+	// OnApplyEdit receives an edit a language server asks Flint to apply on
+	// its own (not as the answer to a request). Nil refuses such edits.
+	OnApplyEdit func(WorkspaceEdit)
 	// Trusted reports whether a workspace folder is trusted; servers that run
 	// the project's code (needsTrust) start only in trusted folders. Nil
 	// trusts everything (tests).
@@ -64,8 +67,11 @@ type Manager struct {
 	servers  map[key]*entry
 	docs     map[string]*document
 	restarts map[key]int // crash restarts per server, to stop a crash loop
-	closed   bool
-	stopping sync.WaitGroup // servers Reconfigure stops, so Shutdown waits for them too
+	// actions are the code actions last listed per document, by id.
+	actions    map[string]map[int]storedAction
+	nextAction int
+	closed     bool
+	stopping   sync.WaitGroup // servers Reconfigure stops, so Shutdown waits for them too
 }
 
 // maxRestarts bounds automatic restarts of a crashing server.
@@ -160,6 +166,7 @@ func (m *Manager) Close(path string) {
 	defer m.mu.Unlock()
 	doc := m.docs[path]
 	delete(m.docs, path)
+	delete(m.actions, path)
 	if doc == nil || !doc.opened {
 		return
 	}
@@ -317,7 +324,7 @@ func (m *Manager) start(k key, e *entry) {
 	var srv *server
 	argv, err := m.commandFor(k)
 	if err == nil {
-		srv, err = startServer(context.Background(), k.language, k.root, argv, m.diagnostics)
+		srv, err = startServer(context.Background(), k.language, k.root, argv, m.diagnostics, m.applyEdit)
 	}
 
 	m.mu.Lock()

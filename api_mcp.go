@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"time"
 
 	as "flint/internal/agentsession"
 	"flint/internal/diag"
@@ -12,7 +13,9 @@ import (
 
 // Flint's MCP server gives the agents Flint starts read-only access to what
 // Flint knows (diagnostics, editors, terminal output, test results). The stores in a.mcpSources are fed by the services as things
-// happen; the server starts with the first agent session that gets it.
+// happen; the server starts with the first agent session that gets it. Tools
+// that act are off unless switched on in Settings, and ask the user before
+// every call (api_mcp_actions.go).
 //
 // Restricted Mode: untrusted folders get no server (no token, and a token
 // stops working if the folder loses its trust), like custom agents and the
@@ -21,11 +24,13 @@ import (
 // newMCP builds the (not yet listening) server and its empty stores.
 func newMCP(a *App) (*mcpserver.Server, *mcptools.Sources) {
 	sources := mcptools.NewSources()
+	sources.Actor = mcpActor{a}
 	server := mcpserver.New(mcpserver.Options{
 		Tools: func() []mcpserver.Tool {
 			return append(sources.Tools(mcpToolConfig(a.currentSettings().MCPServer)), a.features.AgentTools()...)
 		},
 		Allow:        a.allowMCP,
+		Approve:      a.approveAction,
 		Version:      diag.Version(version),
 		Instructions: mcptools.Instructions,
 	})
@@ -36,6 +41,8 @@ func mcpToolConfig(m settings.MCPServer) mcptools.Config {
 	return mcptools.Config{
 		Diagnostics: m.Tools.Diagnostics, Editor: m.Tools.Editor, Terminals: m.Tools.Terminals,
 		Tests: m.Tools.Tests, TerminalLines: m.TerminalLines,
+		RunTests: m.Actions.Tests, RunConfigs: m.Actions.Run, HTTP: m.Actions.HTTP,
+		TestWait: time.Duration(m.TestWaitSeconds) * time.Second,
 	}
 }
 

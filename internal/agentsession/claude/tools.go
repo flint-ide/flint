@@ -174,6 +174,16 @@ func flintTool(tc agentsession.ToolCall, name, cwd string, flintMCP bool) agents
 	return tc
 }
 
+// flintToolName is the name a tool of Flint's own MCP server has there
+// ("mcp__flint__run_tests" → "run_tests"), in a session that was given it.
+func flintToolName(name string, flintMCP bool) (string, bool) {
+	server, tool, ok := splitMCPName(name)
+	if !flintMCP || !ok || server != agentsession.MCPServerName {
+		return "", false
+	}
+	return tool, true
+}
+
 // splitMCPName splits "mcp__server__tool".
 func splitMCPName(name string) (server, tool string, ok bool) {
 	rest, found := strings.CutPrefix(name, "mcp__")

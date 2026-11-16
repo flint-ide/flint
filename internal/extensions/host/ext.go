@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"runtime"
 	"sync"
 	"time"
@@ -47,18 +48,24 @@ type ext struct {
 	lastErr  string // why it last stopped on its own
 	failed   bool
 	visible  map[string]bool // its panels on screen
-	busy     int             // requests in flight, both ways
+	// docs are the open documents it was told about (editor/opened), with
+	// the sets that apply (documentKey); they keep it running like a panel.
+	docs     map[string]string
+	busy     int // requests in flight, both ways
 	idle     *time.Timer
 	restart  *time.Timer
 	status   map[string]StatusText
 	origins  map[string]bool // links the user let it open this session
 	messages []time.Time     // recent showMessage, for the rate limit
+	forms    formCache       // the form views last drawn (richviews.go)
+	// sandboxed: the process last started runs confined (sandbox.go).
+	sandboxed bool
 }
 
 func newExt(h *Host, id, dir string, m *manifest.Manifest, err error) *ext {
 	return &ext{
 		h: h, id: id, dir: dir, m: m, loadErr: err, log: newRing(),
-		visible: map[string]bool{}, status: map[string]StatusText{}, origins: map[string]bool{},
+		visible: map[string]bool{}, docs: map[string]string{}, status: map[string]StatusText{}, origins: map[string]bool{},
 	}
 }
 
@@ -128,8 +135,10 @@ func (e *ext) session(ctx context.Context) (*proc, error) {
 		}
 		e.starting = nil
 		close(ch)
+		var docs map[string]string
 		if err == nil {
 			e.proc, e.lastErr = p, ""
+			docs = maps.Clone(e.docs) // in the same step: a later one is announced by syncDocument
 		}
 		e.mu.Unlock()
 		if err != nil {
@@ -141,6 +150,7 @@ func (e *ext) session(ctx context.Context) (*proc, error) {
 			return nil, fmt.Errorf("%s did not start: %w", e.name(), err)
 		}
 		e.h.changed()
+		e.announceDocuments(p, docs)
 		e.touch()
 		return p, nil
 	}
@@ -172,6 +182,9 @@ func (e *ext) usable() error {
 	e.h.mu.Unlock()
 	if closed {
 		return errors.New("Flint is quitting")
+	}
+	if err := e.sandboxRefusal(); err != nil {
+		return err
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -209,7 +222,7 @@ func (e *ext) crashed(reason string) {
 	if failed {
 		e.failed = true
 	}
-	wanted := !e.failed && (e.m.RunsAtStartup() || len(e.visible) > 0)
+	wanted := !e.failed && (e.m.RunsAtStartup() || len(e.visible) > 0 || len(e.docs) > 0)
 	if wanted {
 		e.stopTimer(&e.restart)
 		e.restart = time.AfterFunc(e.backoff(now), func() {
@@ -246,6 +259,8 @@ func (e *ext) exited(p *proc, reason string) {
 	if !current {
 		return
 	}
+	// Nobody keeps its decorations up to date any more.
+	e.h.o.App.Emit(EventDecorationsCleared, ClearDecorationsEvent{Extension: e.id})
 	if p.stopping.Load() {
 		e.log.add("flint", "stopped")
 	} else {
@@ -288,13 +303,13 @@ func (e *ext) touch() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.stopTimer(&e.idle)
-	if e.proc == nil || e.busy > 0 || len(e.visible) > 0 || e.m.RunsAtStartup() {
+	if e.proc == nil || e.busy > 0 || len(e.visible) > 0 || len(e.docs) > 0 || e.m.RunsAtStartup() {
 		return
 	}
 	p := e.proc
 	e.idle = time.AfterFunc(e.h.o.IdleTimeout, func() {
 		e.mu.Lock()
-		still := e.proc == p && e.busy == 0 && len(e.visible) == 0
+		still := e.proc == p && e.busy == 0 && len(e.visible) == 0 && len(e.docs) == 0
 		e.mu.Unlock()
 		if still {
 			e.stop(fmt.Sprintf("idle for %s", e.h.o.IdleTimeout))
@@ -309,6 +324,14 @@ func (e *ext) stopTimer(t **time.Timer) {
 		(*t).Stop()
 		*t = nil
 	}
+}
+
+// dropDocuments forgets the documents of an extension that was removed or
+// replaced: it gets no editor/* notifications any more.
+func (e *ext) dropDocuments() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	clear(e.docs)
 }
 
 func (e *ext) name() string {
@@ -349,7 +372,11 @@ func (e *ext) initializeParams() map[string]any {
 		"settings":     e.settings(),
 		"roots":        e.roots(),
 		"platform":     runtime.GOOS,
-		"capabilities": map[string]any{"views": []string{"tree", "list", "message"}, "secrets": true, "agent": true, "openUrl": true},
+		"sandbox":      e.sandboxParams(),
+		"capabilities": map[string]any{
+			"views": ViewKinds, "charts": ChartTypes, "secrets": true, "agent": true, "openUrl": true,
+			"decorations": DecorationKinds, "quickFixes": true,
+		},
 	}
 }
 

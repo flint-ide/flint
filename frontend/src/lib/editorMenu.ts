@@ -21,7 +21,8 @@ export interface EditorMenuInput {
   file: { copyPath: () => void; copyRelativePath: () => void; reveal: () => void } | null
 }
 
-const NAVIGATION = ['nav.goToDeclaration', 'nav.findUsages']
+const NAVIGATION = ['nav.goToDeclaration', 'nav.goToImplementation', 'nav.findUsages']
+const REFACTOR = ['editor.rename', 'editor.quickFix', 'editor.format']
 // run.context ("Run Test at Cursor") only makes sense in a test file, i.e. when test.file is available.
 const TESTS = ['run.context', 'test.file', 'debug.testsInFile', 'debug.file']
 const AGENT = ['agent.inlineEdit', 'agent.sendSelection', 'agent.fixFileProblems']
@@ -37,6 +38,7 @@ export function editorContextMenu(input: EditorMenuInput): DropdownItem[] {
   const tests = input.command('test.file') ? TESTS : TESTS.filter((id) => id !== 'run.context')
   const groups: DropdownItem[][] = [
     commands(NAVIGATION),
+    commands(REFACTOR),
     [
       { key: 'cut', label: 'Cut', kbd: k.cut, disabled: !input.hasSelection, onSelect: c.cut },
       { key: 'copy', label: 'Copy', kbd: k.copy, disabled: !input.hasSelection, onSelect: c.copy },

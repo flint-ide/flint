@@ -56,6 +56,10 @@ type Run struct {
 	Env    []string `json:"env,omitempty"`
 	Darwin *RunOS   `json:"darwin,omitempty"`
 	Linux  *RunOS   `json:"linux,omitempty"`
+
+	// Sandbox is what the program needs beyond the strict sandbox profile
+	// (sandbox.go); nil runs it unconfined, with a warning.
+	Sandbox *Sandbox `json:"sandbox,omitempty"`
 }
 
 // RunOS is a platform's Run.
@@ -76,6 +80,8 @@ type Contributes struct {
 	Languages   []Language   `json:"languages,omitempty"`
 	Debuggers   []Debugger   `json:"debuggers,omitempty"`
 	TestRunners []TestRunner `json:"testRunners,omitempty"`
+	// DecorationSets are groups of marks it draws in editors (decorations.go).
+	DecorationSets []DecorationSet `json:"decorationSets,omitempty"`
 	// Unsupported names contribution points this Flint doesn't offer yet
 	// (fileMenu): ignored, and listed as warnings in Settings.
 	Unsupported []string `json:"-"`
@@ -97,7 +103,7 @@ type Panel struct {
 	// Icon is a name from Flint's icon set (frontend/src/components/ui/icons.ts).
 	Icon  string `json:"icon"`
 	Order int    `json:"order"`
-	// View is "tree", "list" or "webview".
+	// View is "tree", "list", "table", "form", "chart" (views.go) or "webview".
 	View string `json:"view"`
 	// Webview is a "webview" panel's HTML (webview.go).
 	Webview *Webview `json:"webview,omitempty"`
@@ -109,12 +115,16 @@ type StatusItem struct {
 	Order int    `json:"order"`
 }
 
-// AgentTool is a read-only tool offered to agents on Flint's MCP server.
+// AgentTool is a tool offered to agents on Flint's MCP server: read-only,
+// unless Acts.
 type AgentTool struct {
 	Name        string          `json:"name"`
 	Title       string          `json:"title,omitempty"`
 	Description string          `json:"description"`
 	InputSchema json.RawMessage `json:"inputSchema,omitempty"`
+	// Acts declares that the tool changes something (it starts, sends,
+	// writes or deletes): Flint asks the user before every call.
+	Acts bool `json:"acts,omitempty"`
 }
 
 // Theme is a color theme: the CSS variables and terminal colors of a custom
@@ -179,10 +189,11 @@ func (m *Manifest) HasProgram() bool {
 }
 
 // NeedsProgram: something the manifest contributes is served by a running
-// program (commands, panels, status items, agent tools, activation events).
+// program (commands, panels, status items, agent tools, decoration sets,
+// activation events).
 func (m *Manifest) NeedsProgram() bool {
 	c := m.Contributes
-	return len(c.Commands)+len(c.Panels)+len(c.StatusItems)+len(c.AgentTools)+len(m.Activation) > 0
+	return len(c.Commands)+len(c.Panels)+len(c.StatusItems)+len(c.AgentTools)+len(c.DecorationSets)+len(m.Activation) > 0
 }
 
 // Parse decodes and checks a manifest.
@@ -221,6 +232,8 @@ func Parse(data []byte) (*Manifest, error) {
 			err = json.Unmarshal(raw, &m.Contributes.Debuggers)
 		case "testRunners":
 			err = json.Unmarshal(raw, &m.Contributes.TestRunners)
+		case "decorationSets":
+			err = json.Unmarshal(raw, &m.Contributes.DecorationSets)
 		case "settings":
 			m.Contributes.Settings, err = parseSchema(raw)
 		default:

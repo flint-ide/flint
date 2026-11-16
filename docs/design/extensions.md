@@ -1,13 +1,13 @@
 # Extensions: feature modules (level 1) and external extensions (level 2)
 
-Status: level 1 implemented (Docker, TODO list and the release check migrated; Docker, Kubernetes and AWS Profiles have since moved on to level-2 extensions, see [Separate packages](#separate-packages-database-kubernetes-docker-aws)). Level 2 implemented in its first version (contract 1), color themes included: see [what is implemented and the decisions taken](#level-2-implemented-v1). The richer component catalog, tab views, editor decorations and file icons are designed, not implemented ([plan](#implementation-plan-level-2)).
+Status: level 1 implemented (Docker, TODO list and the release check migrated; Docker, Kubernetes and AWS Profiles have since moved on to level-2 extensions, see [Separate packages](#separate-packages-database-kubernetes-docker-aws)). Level 2 implemented in its first version (contract 1), color themes included: see [what is implemented and the decisions taken](#level-2-implemented-v1). Editor decorations and quick fixes are implemented ([decisions](#editor-decorations-implemented)). Of the component catalog, `table`, `form` and `chart` are implemented, for panels and tab views ([decisions](#table-form-and-chart-implemented)); Extension processes that declare a sandbox are confined by the operating system ([Sandbox](#sandbox)). `markdown`, `cards`, `stack`, the file menu and file icons are designed, not implemented ([plan](#implementation-plan-level-2)).
 
 Flint should be easy to extend through an explicit contract. Two levels:
 
 1. **Feature modules** (level 1): features inside Flint's repository. A feature is one Go package plus one frontend directory, listed once on each side. No edits to `settings.go`, `settings.ts`, `SettingsView`, `main.go`'s service list, the tool table or the panel list.
 2. **External extensions** (level 2): separate processes in any language, installed explicitly by the user, talking JSON-RPC 2.0 over stdio and described by a manifest. Flint renders their UI from data (no extension JavaScript or HTML in the WebView). Level 2 is built on level 1: an extension's contributions land in the same registries as a feature module's.
 
-Contents: [Goals](#goals) · [Level 1](#level-1-feature-modules) · [Level 2](#level-2-external-extensions) ([themes](#themes-and-file-icons) · [components](#component-catalog) · [tab views](#tab-views) · [editor decorations](#editor-decorations) · [implemented](#level-2-implemented-v1)) · [Remaining migration](#what-remains-to-migrate) · [Open questions](#open-questions)
+Contents: [Goals](#goals) · [Level 1](#level-1-feature-modules) · [Level 2](#level-2-external-extensions) ([themes](#themes-and-file-icons) · [components](#component-catalog) ([implemented](#table-form-and-chart-implemented)) · [tab views](#tab-views) · [editor decorations](#editor-decorations) · [sandbox](#sandbox) · [implemented](#level-2-implemented-v1)) · [Remaining migration](#what-remains-to-migrate) · [Open questions](#open-questions)
 
 ## Goals
 
@@ -134,7 +134,7 @@ A key can move between `Settings` and a section without a migration. The tests i
 
 #### Agent tools
 
-`Instance.AgentTools` are appended to the MCP server's tool list (`api_mcp.go`). The server's gates still apply: the server must be on and the root trusted. A feature decides from its own settings which of its tools to offer. The extension host uses it to offer the extensions' tools; Kubernetes' `get_kubernetes_status` became the Kubernetes extension's tool.
+`Instance.AgentTools` are appended to the MCP server's tool list (`api_mcp.go`). The server's gates still apply: the server must be on and the root trusted, and a tool with `Acts` set runs only after the user approved that call. A feature decides from its own settings which of its tools to offer. The extension host uses it to offer the extensions' tools; Kubernetes' `get_kubernetes_status` became the Kubernetes extension's tool.
 
 #### Bindings
 
@@ -153,6 +153,7 @@ interface FeatureModule {
   tabKinds?: readonly TabKind[]               // { id, component: ComponentType<{ tab, active }>, icon? }
   fileMenu?: readonly FileMenuItem[]          // { id, label, when?(paths), run(paths) }
   themes?: readonly ThemeContribution[]       // { id, label, group, base, colors, terminal }
+  decorationSets?: readonly DecorationSetContribution[] // { id, title, group, enabled?, action?, command? }
   activate?: () => void | (() => void)        // after the first render: event subscriptions
 }
 ```
@@ -201,6 +202,7 @@ export const dockerSettings = defineSection('docker', DEFAULT_DOCKER, coerceDock
 | Tab kinds | `contributions.tabKinds` + `useEditor().openContributed(view, key, title, data)` | a `kind: 'contrib'` tab with JSON `data`; `EditorArea` renders the kind's component, or "not available" when its source is gone; not saved in sessions |
 | File tree menu | `contributions.fileMenu` | appended after "Add to Agent Chat" for the right-clicked paths; failures become a toast |
 | Color themes | `contributions.themes` | Settings ▸ Appearance ▸ Color theme (shown when there is one); choosing one copies it into `customTheme` (`lib/contributedThemes.ts`) |
+| Decoration sets | `contributions.decorationSets` + `lib/editorDecorations.ts` | a contributed set that is on may publish marks for open documents (`publishDecorations`), hears of them with `watchDocuments`, and answers quick fixes ([Editor decorations](#editor-decorations)) |
 | Settings sections | `lib/settingsSections.ts` | see above |
 | Hand to agent | `lib/askAgent.ts` (existing) | features call `askAgent({ prompt, attachments })`; no separate registry is needed |
 
@@ -241,7 +243,7 @@ Inside Flint, level 2 is one level-1 feature, `extensions`:
 
 ### Installation and discovery
 
-- **Global extensions** live in `<config>/extensions/<id>/` (macOS `~/Library/Application Support/flint/extensions/`). The user installs one explicitly: **Settings ▸ Extensions ▸ Install from Folder…** copies a directory after showing its manifest and permissions, and the CLI equivalent is `flint --install-extension <dir>`. There is no marketplace and no automatic download in v1.
+- **Global extensions** live in `<config>/extensions/<id>/` (macOS `~/Library/Application Support/flint/extensions/`). The user installs one explicitly: **Settings ▸ Extensions ▸ Install from Folder…** copies a directory after showing its manifest and permissions, and the CLI equivalent is `flint --install-extension <dir>`. There is no marketplace and no automatic download; prebuilt extensions come from one signed index, fetched only when the user asks ([Distribution](#distribution-the-signed-index)).
 - **Project extensions** live in `<project>/.flint/extensions/<id>/`. They are only discovered in trusted folders (Restricted Mode, `trust.go`), and the user approves each one once per folder, like a custom agent's command line.
 - Discovery reads manifests only, without starting any process: at startup, on a background goroutine after launch, and again when a project folder is opened. Uninstalling removes the directory. The extension's settings stay in `settings.json`, so reinstalling restores them.
 
@@ -259,7 +261,8 @@ Inside Flint, level 2 is one level-1 feature, `extensions`:
     "command": "bin/flint-jira",
     "args": ["--stdio"],
     "darwin": { "command": "bin/flint-jira-darwin" },
-    "linux": { "command": "bin/flint-jira-linux" }
+    "linux": { "command": "bin/flint-jira-linux" },
+    "sandbox": { "network": true }
   },
   "activation": ["onCommand:acme.jira.refresh", "onView:acme.jira.issues", "onAgentTool:jira_issue"],
   "permissions": ["network:acme.atlassian.net", "secrets", "workspace.read", "agent.ask"],
@@ -302,6 +305,7 @@ Rules, checked at discovery, where a violation disables the extension and is sho
 - `contract` is the integer major version of this protocol (below).
 - `id` is `publisher.name` with lower-case letters, digits and dashes, unique across installed extensions. Every contributed id must start with `<id>.`, so an extension can't shadow Flint's own ids or another extension's (`git.push`, `view.docker`).
 - `run.command` is a path inside the extension directory, written as a clean relative path with forward slashes. It is never resolved through `PATH` or run through a shell. Arguments are a fixed list. `run` may be left out when the extension contributes only data (themes, file icons, settings): such an extension never runs code.
+- `run.sandbox` says what the program needs from the machine beyond the strict profile it is confined to ([Sandbox](#sandbox)): `read` and `write` paths, `network`, `localSockets`, `exec`, or `"mode": "none"`. Unlike the rest of the manifest, an unknown field inside it is an error: an extension must never count on a restriction, or be granted an access, that Flint skipped.
 - `activation` events must name something the manifest contributes (`onCommand:<command id>`, `onView:<panel or tab view id>`, `onAgentTool:<name>`, `onLanguage:<language>` for a decoration set's language) or be `onStartup`.
 - Every list is bounded (100 entries per kind, 50 themes) and every string has a maximum length; text may not contain control characters. The manifest is at most 1 MiB.
 - Settings may use only the schema subset below. An unknown keyword is an error rather than ignored, so an extension never relies on a check Flint would skip. Unknown top-level fields are ignored, so a newer manifest with a new optional field still installs (additive changes within a contract).
@@ -320,7 +324,7 @@ Rules, checked at discovery, where a violation disables the extension and is sho
 | `fileMenu` | `contribute(...fileMenu)` | runs the named command with `{ paths }` |
 | `themes` | `contribute(...themes)` (implemented) | offered in Settings ▸ Appearance; choosing one copies it into `customTheme` ([Themes](#themes-and-file-icons)) |
 | `fileIcons` | `contribute(...fileIcons)` (new level-1 point) | badges in the file tree and tab strip, merged after Flint's own |
-| `decorations` | `contribute(...decorationSets)` (new level-1 point) | gutter markers, inline hints, warnings and highlights in editors ([Editor decorations](#editor-decorations)) |
+| `decorationSets` | `contribute(...decorationSets)` (implemented) | gutter markers, inline hints, warnings and highlights in editors ([Editor decorations](#editor-decorations)) |
 | `agentTools` | `Instance.AgentTools` of the `extensions` feature | offered on Flint's MCP server as `<short>_<name>` (see below) |
 | notifications | `showToast`, OS notification when in the background (`notifyInBackground`) | `window/showMessage` |
 | hand to agent | `askAgent` | `agent/ask`, needs the `agent.ask` permission, always ends in a draft the user sends |
@@ -395,6 +399,8 @@ There is no `exec` and no generic HTTP proxy. The extension is its own process a
 
 ### Component catalog
 
+`tree`, `list`, `table`, `form`, `chart` and `message` are implemented; where the code differs from this section, [Table, form and chart: implemented](#table-form-and-chart-implemented) below says so and the [protocol reference](../../site/extensions/protocol.md#table-views) is authoritative.
+
 An extension describes what to show; Flint draws it with its own components, in its theme, with its keyboard handling and virtualization. Most extension UIs are dashboards, lists of results and reports, and these components cover them while keeping Flint's look and its speed. The catalog is the `kind` of a view model, the answer to `view/resolve`. The same kinds work in a sidebar panel and in an editor tab.
 
 | Kind | Draws | Built on |
@@ -467,7 +473,27 @@ Rules:
 - **Bounds.** A response holds at most 5,000 rows or items in total (tables page with `view/resolve { parent: "<cursor>" }` beyond that), 10 chart series of 2,000 points, 50 cards, 10 children in a stack, 200 KiB of Markdown and 2,000 characters per label. Larger answers are cut, and the view says so.
 - **Unknown kinds or fields** within the contract are ignored by an older Flint, which shows a message for a kind it doesn't know. That is why `initialize` lists the supported kinds and chart types: an extension can fall back to a table.
 
+#### Table, form and chart: implemented
+
+Code: `internal/extensions/manifest/views.go`, `internal/extensions/host/richviews.go`, `frontend/src/lib/{viewTable,chartScale}.ts`, `frontend/src/features/extensions/{DeclarativeView,ViewTable,ViewForm,ViewChart}.tsx` and `formModel.ts`, the example `examples/extensions/stats` (a table panel and a chart tab view). The reference is [site/extensions/protocol.md](../../site/extensions/protocol.md#table-views). What was built follows the section above, with these decisions where it was open or is changed:
+
+- **Where.** A panel's `view` may be `tree`, `list`, `table`, `form`, `chart` or `webview`; a tab view's `table`, `form`, `chart` or `webview`. `tree` and `list` stay panel-only (their component is the sidebar's row list). The views take no options in the manifest: everything else is in the view model. Any other kind (`markdown`, `cards`, `stack`) still refuses the manifest, as `table` and `form` did before, so an extension never installs with a view that would show nothing. `"webview": {…}` on a declarative view is an error.
+- **One Go type for the page.** `host.View` gained `table`, `form` and `chart` next to `items`; the extension's flat answer (`{ "kind": "table", "columns": … }`) is decoded per kind and rebuilt, never passed through. A kind other than the declared one, an answer Flint can't draw (no columns, an unknown chart type, a bad field) becomes a `message` view that says why. `initialize` lists `views` (now with `table`, `form`, `chart`) and `charts` (`line`, `bar`, `area`).
+- **Cells are typed in Go.** Rows carry `cells` as an object by column id, as designed; the page gets them as an array in column order, each a string, a number or null. A value that isn't of its column's type is an empty cell, not text. Dates are ISO 8601 dates or date-times (a time without a zone is UTC); the page shows local time to the minute.
+- **Sorting is Flint's, client-side.** A header click cycles ascending, descending, the extension's order; `sort` in the view model is only the first order. There is no multi-column sort and no filter. **No paging:** the design's `view/resolve { parent: "<cursor>" }` beyond 5,000 rows is not implemented; more rows are cut and the table says so. Up to 30 columns.
+- **Row actions.** The table's `actions` are every row's context menu, as designed; a row may carry its own `actions`, which replace them for that row (a stopped and a running container want different entries). A row's `command` runs on Enter or a double click, not on a single click, which selects. Selection is one row; it is not reported to the extension.
+- **Forms reuse the settings schema.** A field is a settings property (`manifest.ParseProperty`, the same Go checks; `schema.ts`'s `checkValue` in the page) with `id`, `value`, `required`, `multiline`, `secret` and `placeholder`. `enum` is the menu: there is no separate `select` type, and the read-only Markdown field waits for the `markdown` view. `maxLength` above the settings limit of 4,096 is lowered to it (the design's example asks for 5,000). Unknown keywords are ignored, but a field Flint can't draw turns the form into a message that names it, rather than a form with a field missing. Up to 50 fields. The form's controls are its own small component (stacked labels fit a sidebar; Settings' rows are two columns and save on blur), with Settings' input styles, `Select` and validation.
+- **Submit is checked twice.** The page checks the values and shows the reasons; Go checks them again against the fields it last sent for that panel or tab (kept per extension, 64 forms) and only then sends `form/submit { view, key?, values }`. Values for keys that aren't fields are dropped, missing ones get the default. The answer is `{ errors?, error?, message? }`: the design had only `errors`; `error` is for the form as a whole and `message` a note after success. After an accepted submit the view is resolved again. `form` (a form inside a stack) is not sent, since there are no stacks.
+- **Secret fields.** The design says secrets are never settings and live in the keyring through `secrets/*`; it doesn't say how one is typed. A field with `"secret": true` is a password input. Go drops its `value` and `default`, so no secret travels from the extension to the page, and what the user types goes to the extension with the submit and is cleared from the page afterwards. Flint doesn't store it: the extension calls `secrets/set`. Form values are not written to the extension's log.
+- **Buttons on a form** other than submit (`view/action` with `values`) are not implemented.
+- **Charts.** `line`, `bar` and `area`; x is `number`, `date` or `category`, sent to the page as a number (a date as milliseconds) or text. Go drops points that don't fit the axis and cuts to 10 series of 2,000 points, flagged as truncated. The page draws plain SVG (`lib/chartScale.ts`: round ticks, bands, paths), with series colors from ten theme variables in a fixed order, a legend, and the values again as an HTML table under **Values** for keyboards and screen readers. Bars over numbers or dates are grouped per x value like categories; at most 500 bands are drawn. No stacking, no second axis, no zoom.
+- **Tab views.** A declarative tab view is a contributed tab kind like a webview's: opened with `window/openTab`, resolved with `{ view, key, data }` when first shown (a restored tab too), `view/visible` and `view/action` with `key`. `view/refresh { view, key }` reloads one tab and without `key` every tab of the view; it is now accepted for tab views as well as panels. The command shortcut of the design (`"opens": { view, key }` on a command) is not implemented: a command calls `window/openTab`.
+- **Timeouts and limits** are those of `view/resolve` (5 s) and other requests (30 s for `form/submit`); labels are 2,000 characters, titles 100, form messages 500.
+- **Checks**: manifest table tests (`views_test.go`); `host/richviews_test.go` covers the cleaning of each kind, the bounds, and resolve, action, visibility, refresh and submit against `testdata/testext`; the conformance test drives the `stats` example's table and chart; `flint-extcheck` resolves every declarative panel and tab view (key `extcheck`), fails on an answer Flint can't draw or has to cut, and submits every form with the values it shows; `lib/viewTable.test.ts`, `lib/chartScale.test.ts` and `formModel.test.ts` cover sorting, formatting, ticks, geometry and validation.
+
 ### Tab views
+
+Declarative tab views (`table`, `form`, `chart`) and webview tab views are implemented, with session restore; `"opens"` on a command is not ([decisions](#table-form-and-chart-implemented)).
 
 Panels are narrow; reports, dashboards and long forms want an editor tab. A tab view is declared in `contributes.tabViews` and behaves like a panel with a key:
 
@@ -522,6 +548,8 @@ Messages from the frame are accepted only from that frame's window, are size-che
 
 ### Editor decorations
 
+Implemented; where the code differs from this section (the manifest key and fields, quick fixes that return edits, what happens when the extension stops), [Editor decorations: implemented](#editor-decorations-implemented) below says so and the [protocol reference](../../site/extensions/protocol.md#editor-decorations) is authoritative.
+
 Linters, test runners, coverage tools and issue trackers want to mark lines in the editor. An extension declares a decoration set and then publishes decorations for files:
 
 ```json
@@ -554,6 +582,27 @@ How it works:
 - **Actions.** A diagnostic's actions appear as quick fixes (`⌥↩`) and send `view/action { view: set, item: "<path>:<line>", action }`. Edits are not part of the protocol: an extension that fixes code does so through the agent (`agent/ask`) or by writing the file itself, which the editor then reloads.
 - **Level 1.** A new contribution point, `decorationSets`, with a registry in `lib/editorDecorations.ts` that a feature module can use too (coverage from `go test -cover` is a natural first one).
 
+#### Editor decorations: implemented
+
+Code: `internal/extensions/manifest/decorations.go`, `internal/extensions/host/decorations.go`, `frontend/src/lib/{decorationModel,editorDecorations}.ts`, `frontend/src/features/extensions/documents.ts`, the example `examples/extensions/todos`. The reference is [site/extensions/protocol.md](../../site/extensions/protocol.md#editor-decorations). What was built follows the section above, with these decisions where it was open or is changed:
+
+- **The manifest key is `decorationSets`**, the name of the level-1 point, not `decorations`; a set has `title` (not `label`), and selects files by `languages`, `extensions` and `globs` (patterns for the file's name), at least one of them. `"default": false` leaves a set off until the user turns it on. At most 20 sets. An older Flint lists the key as an unsupported contribution point, like any it doesn't know.
+- **Declaring a set needs `workspace.read`** (a manifest error otherwise): the `editor/*` notifications tell the extension which files are open, and it reads them. No new permission.
+- **An extension hears only of files `workspace/readFile` would return**: inside a trusted folder with symbolic links resolved, not in `.git`, not a credential file. The check is made in Go for every document and repeated when folders, settings or extensions change.
+- **Languages** are Flint's server languages (`go`, `typescript` for JavaScript too, `python`, `rust`) and the languages extensions contribute; files of other types are selected by extension or glob. Go decides the language (`lsp.LanguageOf`), so the frontend can't claim one.
+- **Positions**: lines are 1-based, columns UTF-16 code units, as in LSP and CodeMirror.
+- **`editor/opened` carries `sets`**, the extension's sets that are on and match, and is sent again when that list changes, so turning a set on needs no other signal. There is no `editor/visible`: the three notifications of the design are enough.
+- **Unsaved text** is sent only for a set with `unsavedText`, up to 1 MiB; a larger document is announced without text.
+- **Versions**: a publish must be for exactly the editor's version (Go drops older ones against the version last reported, the editor checks the exact one); a publish without a version is drawn as is. Positions are clamped; marks are mapped through edits until the next publish.
+- **Diagnostics are not merged into the lint gutter and the Problems list.** They are drawn by `lib/editorDecorations.ts` (underline, gutter marker, hover), so the language server client stays untouched. Merging is a later step.
+- **Gutter icons** are six glyphs (`dot`, `check`, `cross`, `alert`, `info`, `arrow`), not Flint's icon set, whose icons are panel-sized line drawings.
+- **Quick fixes return edits**, unlike the design ("edits are not part of the protocol"): choosing an action sends the new request `editor/action { set, path, version, action, decoration?, line, endLine, from, to }` (not `view/action`), and the answer's `edits` are applied as one transaction only if the document is still at that version. Edits outside the document or overlapping are refused as a whole, never clamped. An action with `command` runs one of the extension's commands instead. Actions are allowed on every kind, not only diagnostics.
+- **Where quick fixes show**: buttons in the hover, a list on a click on the gutter marker, and the command *Show Extension Quick Fixes* (`Alt+Shift+Enter`). `⌥↩` / `⌘.` belong to the language server's code actions; `extensionQuickFixes(view, pos)` in `lib/editorDecorations.ts` returns `{ title, run }[]` for a shared menu later.
+- **Lifecycle differs from the design in one point:** decorations are removed when the extension's process ends for any reason (stopped, crashed, turned off, uninstalled), instead of staying until the file changes, so the editor never shows marks nobody maintains. To make that rare, a document an extension decorates keeps it from the idle stop, like a panel on screen, and a crashed extension with such a document is started again after its backoff and gets `editor/opened` for each. Opening a file starts an extension only when one of its sets is on and matches the file.
+- **Toggles** are `extensions.decorations` in `settings.json` (`{ "<set id>": bool }`, only where it differs from the manifest's default), a checkbox per set in Settings ▸ Extensions and a *Toggle … in Editors* command per set. *Toggle Extension Decorations in This Editor* hides them in one editor (not saved).
+- **Cost**: `editor/changed` at most every 300 ms per file; publishes for one editor applied together at most every 50 ms; 5,000 decorations per set and file; 500 tracked documents. A file open in two editors is decorated in the first.
+- **Checks**: `flint-extcheck` opens a file for every decoration set, sends `editor/action` and fails on a publish Flint refuses; `host/decorations_test.go` covers trust, credential files, versions, bounds, toggles, stops and the quick-fix round trip against `testdata/testext`; `decorations_conformance_test.go` drives the `todos` example.
+
 ### Themes and file icons
 
 A theme is data and runs no code, so it needs neither a program nor a permission.
@@ -574,18 +623,118 @@ A theme is data and runs no code, so it needs neither a program nor a permission
 - **Lazy.** A process starts on its first activation event: a command run, a panel or tab view shown, an agent tool called, or `onStartup`. `onStartup` needs to be declared and is shown as "runs at startup" when installing. Even then the process starts after launch, never before the window.
 - **Idle stop.** With no request for 5 minutes, no visible view and no pending request, Flint sends `shutdown`. The next event starts the process again. Status items keep their last text, and the next start refreshes them.
 - **Timeouts.** `initialize`: 10 s. `view/resolve`: 5 s, after which the view shows "not responding". Other requests: 30 s, or 120 s for `agentTool/call`. A request the user cancels sends `$/cancelRequest`, as in LSP.
-- **Resources.** One process per extension. Processes are killed as a process group (`internal/proctree`). Stdout throughput above 8 MiB/s for 5 s stops the process. Memory and CPU are not limited by the OS in v1 (see open questions). Settings ▸ Extensions shows each process's state and RSS.
+- **Resources.** One process per extension. Processes are killed as a process group (`internal/proctree`). Stdout throughput above 8 MiB/s for 5 s stops the process. A sandboxed process can't write core dumps and has at most 4,096 open files; memory and CPU are not limited ([Sandbox](#sandbox) says why). Settings ▸ Extensions shows each process's state.
 - **Crashes.** A crash ends the extension's pending requests with an error and withdraws nothing; the next event restarts the process. After 3 crashes in 10 minutes the extension is disabled until the user re-enables it, and a toast says so once.
 
 ### Security model
 
 - **Trust is explicit.** Installing is a user action that shows the manifest, its permissions and its program path. Flint never installs, updates or enables an extension on its own.
 - **Restricted Mode.** Project extensions are never discovered in untrusted folders. Global extensions run, but untrusted roots are passed as `trusted: false`; `workspace/readFile`, `window/openFile` and `agent/ask` refuse paths in them; and an extension's agent tools are not offered for them (the MCP server already refuses untrusted roots).
-- **Permissions** gate what Flint does on an extension's behalf. Flint enforces them; a request without the permission fails with JSON-RPC error `-32001`. The permissions are `workspace.read`, `secrets`, `agent.ask` and `network:<host>[,<host>…]`. Network is declarative only: it is shown at install and in Settings, but an extension is a native process that Flint can't confine. This is said plainly in the install dialog ("runs with your user's permissions"). Sandboxing is an open question.
+- **Permissions** gate what Flint does on an extension's behalf. Flint enforces them; a request without the permission fails with JSON-RPC error `-32001`. The permissions are `workspace.read`, `secrets`, `agent.ask` and `network:<host>[,<host>…]`. The hosts of `network:` are shown at install and in Settings and never enforced: the [sandbox](#sandbox) can block the network as a whole, not per host.
+- **The process is confined by the operating system when its manifest declares a sandbox** ([Sandbox](#sandbox)): Landlock and seccomp on Linux, `sandbox-exec` on macOS. One that doesn't, or that declares `"mode": "none"`, runs with the user's permissions, and the install dialog and Settings say which of the two it is.
 - **Secrets** are stored only in the OS keyring through Flint, under service `flint-extensions` and account `<id>:<key>`. Settings and `state.json` never hold them, and an extension can't read another extension's keys.
 - **No telemetry.** Flint sends nothing about extensions anywhere, and the protocol has no telemetry channel. Extensions whose description or permissions suggest analytics endpoints are the user's call; the install dialog shows every declared network host.
 - **No WebView code, except in webviews.** Contributions are data rendered by Flint's components. The one exception, [webviews](#webviews), runs the extension's script in a sandboxed frame with an opaque origin and no network, which can't read Flint's or other extensions' state.
-- **Agent tools.** Extension tools are read-only from Flint's point of view: Flint passes the arguments and returns the text. The tool names carry the extension's short name (`jira_jira_issue` → `mcp__flint__jira_jira_issue`). MCP limits tool names to 64 characters of `[A-Za-z0-9_-]`, so names are shortened and deduplicated. Each extension's tools can be turned off in Settings ▸ Agent Context.
+- **Agent tools.** Extension tools are read-only from Flint's point of view unless the manifest says `"acts": true` (then the user approves each call): Flint passes the arguments and returns the text. The tool names carry the extension's short name (`jira_jira_issue` → `mcp__flint__jira_jira_issue`). MCP limits tool names to 64 characters of `[A-Za-z0-9_-]`, so names are shortened and deduplicated. Each extension's tools can be turned off in Settings ▸ Agent Context.
+
+### Distribution: the signed index
+
+Open question 3, decided. "Install from Folder…" left building, integrity and updates to the user; the repository view (a git clone, built with Go on the user's machine) needs `git` and Go. The index adds prebuilt, verified installs and updates without becoming a marketplace: **one index, curated in one repository, trusted through one key.** The protocol and the manifest are unchanged. Format reference: [site/extensions/index-format.md](../../site/extensions/index-format.md). Code: `internal/extensions/index` (format, signature, download, archives, building), `internal/features/extensions/index.go` (the store and the bound methods), `cmd/flint-extindex`.
+
+- **Index.** A JSON document: `format` (1), `generatedAt`, and per extension the manifest's id, name, description, publisher, version, contract, permissions and agent tool names (for display before download), a `kind` (`program`, `themes`, `languages`, `data`) and archives by platform (`darwin-arm64`, `darwin-amd64`, `linux-amd64`, `linux-arm64`, or `any` for an extension without a program), each with URL, SHA-256 and size. What the index says about an extension is only a preview: the manifest inside the archive is what is checked and confirmed.
+- **Signature.** A detached Ed25519 signature over the exact bytes of the index, in a file next to it (`index.json.sig`: the signature in base64, one line). Keys are base64 too (public: 32 bytes; secret: the 64-byte private key). *Not minisign:* its file format needs BLAKE2b, which is in neither Go's standard library nor `go.mod`, and principle 1 (few dependencies) outweighs compatibility with a tool nobody here uses; `crypto/ed25519` is all this needs. The signed bytes are the file as served, so there is no canonical-JSON question.
+- **Key.** The official public key is a constant (`index.OfficialPublicKey`), **empty until the maintainer generates the pair** (`flint-extindex keygen`), like `github.clientId`: with an empty key the official index is "not configured", Settings says how a maintainer sets it up, and no request is made. No key was generated for this; a key someone else made must never be shipped as the official one. The secret key lives only in the extensions repository's signing secret.
+- **Settings.** `extensions.indexUrl` (empty: the release asset `https://github.com/flint-ide/extensions/releases/latest/download/index.json`) and `extensions.indexPublicKey` (empty: the built-in key), so a company can run its own index with its own key. They are user settings: `settings.json` is per user and Flint has no project-level settings, so a repository can't point Flint at another index. Both are validated on save (https, or http for loopback; a 32-byte base64 key).
+- **Fetching.** Only on a user action: **Browse Extensions** / **Check for Updates** in Settings ▸ Extensions and the palette commands of the same names. No timer, nothing at startup: the release check stays the only request Flint makes on its own. Two anonymous GETs (index, then `<url>.sig`), `User-Agent: Flint/<version>`, no cookie jar, https only (http for loopback, for tests), 20 s and 4 MiB at most. Redirects are followed (GitHub serves release assets from another host) to addresses that pass the same check, never from https to http. The signature is verified before the document is parsed, and nothing is shown otherwise. The verified pair is cached in `<config>/extension-index/` with the address it came from and verified again whenever it is read, so "Update to x.y.z" survives a restart without a request; a changed address or key drops it.
+- **Install and update.** For the entry the user chose: download this platform's archive (exactly the index's size, at most 256 MiB; SHA-256 must match), unpack it into a temporary folder (tar.gz with the standard library; folders and regular files only, written through an `os.Root`; absolute paths, `..`, links, devices, duplicate names, more than 10,000 entries, depth over 32 or more than 512 MiB fail the whole archive), then `host.InstallExpected`: the manifest is loaded with the usual rules, its id and version must equal the entry's, and the **same native confirmation and copy** as Install from Folder follow. The confirmation says where the download came from; when an extension with that id is installed (from the index or from a folder) it starts with what changes: the version, every added permission and agent tool, a tool that now acts, a program where there was none. That list is shown for every replacing install, also from a folder.
+- **Updates are never automatic.** After a fetch, an installed extension with a higher version in the index shows **Update to x.y.z…** (on its card and in the index list). Extensions installed from a folder are untouched unless the user clicks it. An entry for another contract or without an archive for this platform is listed with the reason and can't be installed.
+- **CLI.** `flint --install-extension <dir>` (also `--install-extension=<dir>`, and through `scripts/flint`) is the command-line form of Install from Folder. The flag is parsed in Go (`extensions.InstallArg`: the value must be an existing folder; it is not taken for a project to open). A Flint started with it hands the folder to the frontend once the window is up (`PendingInstall`); a second launch hands it to the running instance (`extensions:install-request`). Either way the frontend calls the same `Install` binding as the folder picker, so the native confirmation can't be skipped. There is no headless install.
+- **Tooling.** `cmd/flint-extindex`: `keygen`, `build` (packs built folders or takes archives, checks manifests with the manifest package and each platform's program, writes reproducible archives and `index.json`), `sign` (secret key from an environment variable or a file, never an argument; refuses without a key and refuses an index Flint would refuse), `verify` (signature, content and, with `-archives`, the files). The release workflow of flint-ide/extensions runs it from a Flint checkout, as its `contract` job runs `flint-extcheck`.
+- **What this does not do.** It does not make an extension safe: a signature says the index came from the key's holder, not that a program is harmless, and the install confirmation stays the trust decision. There is no revocation list beyond publishing a new index (Flint only ever uses the last one fetched), no key rotation scheme (a new key ships with a new Flint, or goes into settings), no rollback protection against a server replaying an older signed index, and no ratings, search or accounts.
+
+### Sandbox
+
+Code: `internal/extensions/sandbox` (the policy, the Linux rules, the macOS profile, the launcher), `internal/extensions/manifest/sandbox.go` (the manifest section), `internal/extensions/host/sandbox.go` (from a manifest to a confined process, and the words shown to the user).
+
+**What a manifest declares.** `run.sandbox` is an object; every field is optional:
+
+```json
+"run": {
+  "command": "bin/ext",
+  "env": ["KUBECONFIG"],
+  "sandbox": {
+    "read": ["~/.kube", "${env:KUBECONFIG}", "${XDG_CONFIG_HOME}/tool"],
+    "write": ["~/.cache/tool"],
+    "network": true,
+    "localSockets": true,
+    "exec": true
+  }
+}
+```
+
+With `"sandbox": {}` the program gets the **strict profile**:
+
+| | Allowed |
+|---|---|
+| Read | The extension's own folder; the system (programs, shared libraries, CA certificates, time zones, `/etc`, on Linux `/proc` and `/sys`); the trusted project folders, only with the `workspace.read` permission |
+| Write | Its data folder (`FLINT_EXTENSION_DATA`, `<config>/extension-data/<id>`) and a private temporary folder made for each run (`TMPDIR`), deleted when the process ends. Not its own folder |
+| Network | None: no socket of any kind, unless the manifest has a `network:` permission or `"network": true` |
+| Other programs | Only files in its own folder, plus what the system needs to run its program (the ELF loader, a script's `#!` interpreter and the command `env` runs) |
+| Everything else | Unreadable: the rest of the home folder (`~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.kube`, `~/.docker`, `~/.config/gcloud`, browser profiles, keyrings and Keychains, shell history), Flint's configuration, other extensions' folders and data, other temporary files |
+
+What the section adds: `read` and `write` name more files and folders; `network` opens the Internet (IPv4 and IPv6); `localSockets` opens Unix sockets (the Docker socket, the desktop's message bus); `exec` lets the program run anything it can read, adds the folders of `PATH` to what it can read, and what it starts is confined exactly like itself. A path is absolute, starts with `~/` or with one of `${XDG_CONFIG_HOME}`, `${XDG_DATA_HOME}`, `${XDG_CACHE_HOME}`, `${XDG_STATE_HOME}`, `${XDG_RUNTIME_DIR}` (with the usual defaults when unset), or is exactly `${env:NAME}` for a variable listed in `run.env`, meaning the path or `:`-separated paths it holds (`KUBECONFIG`, `AWS_SHARED_CREDENTIALS_FILE`). The manifest check refuses `..`, `.`, doubled and trailing slashes, wildcards, control characters, the root and the home folder themselves, more than 32 paths per list and paths over 512 bytes.
+
+**Three rules when the process starts** (`sandbox.Build`), because a path can be wider than it looks and Landlock has no "except":
+
+1. Nothing inside Flint's configuration folder is ever granted, except the extension's own folder and data folder.
+2. A path that *contains* a protected location is not granted: `~/.config` (a browser profile and Flint's settings are in it), the home folder, a project folder that is the home folder. The extension names the folders it needs instead.
+3. A protected location itself (`~/.kube`) is granted only when the manifest names it as written, so the install dialog showed it. A project folder, a `PATH` folder or a symbolic link that leads into one is not granted.
+
+A path that doesn't exist when the process starts is not granted either. Whatever was asked for and not granted is listed on the extension's card in Settings and in its log, with the reason.
+
+**Mechanism.**
+
+- **Linux: Landlock, seccomp and `no_new_privs`, without cgo.** Go can't run code between `fork` and `exec`, so Flint starts *itself* as a launcher: `flint --flint-sandbox-launch`, handled by `sandbox.Main()`, the first statement of `main` (also in `cmd/flint-extcheck` and the tests' binaries). The launcher reads what to apply from one environment variable, lowers the resource limits, sets `no_new_privs`, builds a Landlock ruleset and restricts itself, installs the seccomp filter, removes the variable and `exec`s the program. The pid and the process group stay the same, so stdio, the process-group kill, crash handling and idle stop are untouched. The rules are raw system calls through `golang.org/x/sys/unix`, which Flint already uses. Starting Flint's binary once more adds a few tens of milliseconds to an extension's start (35 to 60 ms measured on Linux).
+  - *Landlock* (files): every access right the kernel's Landlock version knows is denied, then allowed per path: read on the system and the policy's read paths, write on the write paths, execute on the extension's folder and its interpreters (everything readable with `exec`). Device files can't be created anywhere. With Landlock 4 and no network, TCP connect and bind are denied too; with Landlock 6, signals to processes outside the sandbox and, without `localSockets`, abstract Unix sockets.
+  - *seccomp* (sockets): a filter of a dozen instructions makes `socket(2)` fail with `EACCES` except for the families the policy allows (none; IPv4, IPv6 and netlink for `network`; Unix for `localSockets`), and reports `io_uring` as missing, since it can create sockets without that call. This is what blocks UDP and Unix sockets, which Landlock can't, and it works on every kernel with Landlock.
+  - *Degrading.* `sandbox.Probe` asks the kernel for its Landlock version. No Landlock (before Linux 5.13, or left out of the kernel's LSM list) means no sandbox, and Flint says "not available on this system" with the reason. With Landlock, older versions lose single protections, and each loss is a sentence shown on every sandboxed extension's card: before 6.2 a readable file can still be truncated; before 6.12 the process can signal the user's other processes; without seccomp (an architecture Flint has no filter for: anything but amd64, arm64, riscv64 and loong64) only TCP is blocked from 6.7, and nothing before.
+- **macOS: `sandbox-exec` with a generated profile.** Apple has marked `sandbox-exec` deprecated since macOS 10.12 without removing it or offering a replacement for programs that aren't app bundles; the system's own tools and other editors still use it. If `/usr/bin/sandbox-exec` is missing, refuses to work, or refuses a profile of the shape Flint generates (Flint runs `/usr/bin/true` once under a strict profile to find out), there is no sandbox and Flint says so, instead of extensions that can't start. The profile allows everything by default, then: denies all file writes except the write paths; denies reading the *contents* of `/Users`, `/Volumes`, the shared temporary folders and the system Keychains except the extension's folder and the policy's paths (names and attributes stay visible, so path lookups work); denies all sockets unless `network` or `localSockets` is declared (the profile doesn't tell the two apart, and Settings says so); denies running programs other than the extension's own and its interpreters unless `exec`; and limits signals to the sandboxed processes. The same launcher sets the resource limits and then runs `sandbox-exec`. Mach services, `sysctl` and IOKit are not restricted: a profile that denies them by default has to be verified against every macOS release, and Flint's CI can't do that yet.
+- **Elsewhere:** nothing, reported as "not available on this system".
+
+**Resource limits (open question 2, decided).** The launcher turns core dumps off (they would write the process's memory to disk) and caps open files at 4,096, on both systems. There is **no memory or CPU limit**, on purpose: `RLIMIT_AS` counts address space, not memory, and stops runtimes that reserve large ranges long before they use them (V8, the JVM, Go with the race detector); macOS doesn't enforce `RLIMIT_RSS`; `RLIMIT_NPROC` counts all of the user's processes and threads, so a value low enough to stop a fork bomb would stop the extension's first thread on a busy desktop; cgroups need a delegated systemd scope Flint can't count on. Flint doesn't watch RSS: a watcher that kills a process needs a threshold nobody can choose for every extension. What bounds a runaway extension stays what it was: the output rate limit, timeouts, idle stop, the crash policy and the user turning it off.
+
+**Manifests without `run.sandbox` run unconfined, loudly.** The alternative, treating them as strict, would have broken extensions that are already published the day Flint updated: Docker, Kubernetes and AWS declare no `network:` permission, read `~/.docker`, `~/.kube` and `~/.aws`, and run `docker`, `kubectl`, `aws` and their credential plugins. The contract promises that changes within a major version are additive, so within contract 1 a missing section means what it meant before the section existed. To keep that state from being comfortable: the install dialog and the extension's card say "Not sandboxed: the extension doesn't declare a sandbox", in the warning color, the log says it at every start, `flint-extcheck` prints it for every folder, and the setting below refuses to run such extensions at all. `"sandbox": {}` is one line for a self-contained extension (`stats` and `notes` declare it and pass their conformance tests confined). Contract 2, whenever it comes, should make the strict profile the default.
+
+**The four states, as shown** (install dialog, Settings ▸ Extensions, the extension's log, `flint-extcheck`):
+
+| State | When | The program |
+|---|---|---|
+| Sandboxed (Landlock (ABI 7) and seccomp) | `run.sandbox` declared, and the system has a sandbox | confined; the lines under it say what it reads, writes and reaches, what this system can't enforce and what was not granted |
+| Not sandboxed (declared by the extension) | `"mode": "none"` | runs with the user's permissions |
+| Not sandboxed: the extension doesn't declare a sandbox | no `run.sandbox` | runs with the user's permissions |
+| Not sandboxed: not available on this system (reason) | declared, but no Landlock or no `sandbox-exec` | runs with the user's permissions |
+
+**`extensions.requireSandbox`** (Settings ▸ Extensions ▸ Only run sandboxed extensions, off by default): Flint doesn't start an extension in any of the three unsandboxed states. It stays installed and its card says why; this is not counted as a crash. Turning the setting on stops such extensions that are running.
+
+**What the process is told.** `FLINT_EXTENSION_SANDBOX=1` and `TMPDIR` (its private temporary folder) in the environment, and `initialize`'s `sandbox: { active, network, localSockets, exec }`. A confined process whose trusted project folders change is stopped and started again (when its panel is on screen, a file it decorates is open or it runs at startup; otherwise on its next use) instead of being sent `workspace/rootsChanged`: a sandbox can't be widened while the process runs.
+
+**Limits, stated plainly.**
+
+- The sandbox confines what a program can reach, not what it does with what it may reach. With `workspace.read` it reads every file of a trusted project folder directly, including `.env` files that `workspace/readFile` refuses to return. With `network` it can send what it reads anywhere: hosts are not filtered.
+- With `localSockets`, every Unix socket the user can connect to is reachable on Linux: the Docker socket, and also the session's message bus (and through it the desktop keyring) and the display server. Landlock can't filter Unix sockets by path in the kernels it was tested with.
+- On Linux `/proc` is readable: other processes' command lines are visible (their environment and memory are not: Landlock denies that for processes outside the sandbox).
+- The seccomp filter is about sockets only. The rest of the kernel's system call surface is open to the process, as it is to any program the user runs.
+- On macOS the profile does not restrict Mach services, so a sandboxed program can still talk to system services that answer any process; Keychain items keep the protection of their own access lists, and the Keychain files themselves are unreadable.
+- The macOS profile is covered by tests of its text on every system and was not run on macOS when this was written (the Linux sandbox is exercised by real tests: `internal/extensions/sandbox/launch_linux_test.go`, `internal/extensions/host/sandbox_test.go`).
+
+**Still missing before project-local extensions can be allowed** (they stay disabled; a repository must not be able to make Flint run anything):
+
+1. *The policy must come from the user, not from the repository.* Today the manifest chooses its sandbox, including `"mode": "none"` and extra paths. A project extension would need a fixed profile it can't widen (strict, no declared paths, no `localSockets`, no `exec`), or a per-folder approval of exactly what it asks for, stored outside the repository and invalidated when the manifest or the program changes (a content hash, as for custom agent command lines).
+2. *The sandbox must be required, not best-effort.* On a kernel without Landlock, on macOS without `sandbox-exec`, or with any of the gaps above, a project extension would have to be refused rather than run unconfined, which means deciding a minimum (Landlock 6 with seccomp; a macOS profile verified in CI).
+3. *A deny-by-default macOS profile* (Mach services, IOKit, `sysctl`), tested on the macOS versions Flint supports, and a plan for the day `sandbox-exec` is removed.
+4. *Secrets in the project folder.* Granting a project folder grants its `.env` files and private keys; a project extension would need the folder without them, which Landlock can only do by granting every other entry one by one.
+5. *Resource limits that hold:* memory and CPU (a delegated cgroup on Linux, a watcher or nothing on macOS).
+6. *What reaches agents.* A project extension's agent tools and `agent/ask` drafts put text chosen by the repository in front of an agent; that needs the same treatment as other untrusted input.
 
 ### Versioning
 
@@ -627,10 +776,12 @@ Each step is one pull request that leaves Flint shippable.
 1. **Done (v1).** Manifest, RPC, host, the `extensions` module and settings section, commands, `tree`/`list` panels, status items, agent tools, docs and the conformance test ([implemented](#level-2-implemented-v1)).
 2. **Done.** Color themes, with no program needed, and terminal colors in custom themes ([Themes](#themes-and-file-icons)).
 3. **File icons.** `fileIcons` in the manifest, a `fileIcons` contribution point and its use in `FileIcon.tsx`. Data only, like themes.
-4. **Declarative views, part 1.** `table` and `form` in `DeclarativeView` (today's manifests with them are refused), and the file menu.
-5. **Declarative views, part 2.** `markdown`, `chart`, `cards` and `stack`, and tab views with session restore (`TabKind.restore`).
-6. **Editor decorations.** The `decorationSets` point and `lib/editorDecorations.ts`, the `editor/*` notifications, quick-fix actions, per-set toggles.
-7. Later: project extensions (after sandboxing), `flint --install-extension <dir>`, a protocol reference generated from the Go types.
+4. **Declarative views, part 1.** **Done:** `table` and `form` in `DeclarativeView`, for panels and tab views ([implemented](#table-form-and-chart-implemented)). Open: the file menu.
+5. **Declarative views, part 2.** **Done:** `chart`, and declarative tab views with session restore (`TabKind.restore`, which webviews brought). Open: `markdown`, `cards` and `stack` (manifests with them are refused).
+6. **Done.** Editor decorations: the `decorationSets` point and `lib/editorDecorations.ts`, the `editor/*` notifications, quick-fix actions, per-set toggles ([implemented](#editor-decorations-implemented)).
+7. **Done:** `flint --install-extension <dir>` and the signed index ([Distribution](#distribution-the-signed-index)).
+8. **Done.** The [sandbox](#sandbox) for extension processes (`run.sandbox`, Landlock and seccomp on Linux, `sandbox-exec` on macOS, `extensions.requireSandbox`).
+9. Later: project extensions (the sandbox exists; [what is still missing](#sandbox)), a protocol reference generated from the Go types.
 
 ### Level 2: implemented (v1)
 
@@ -640,17 +791,17 @@ Code: `internal/extensions/{manifest,rpc,host}`, the module `internal/features/e
 
 **Decisions where this design was open or is narrowed in v1:**
 
-- **Project-local extensions are not supported.** Only user-installed extensions in `<config>/extensions/<id>/`. Project ones wait for sandboxing (open question 1); a repository can't make Flint run anything.
+- **Project-local extensions are not supported.** Only user-installed extensions in `<config>/extensions/<id>/`. A repository can't make Flint run anything. The [sandbox](#sandbox) that now exists is chosen by the manifest; what is still missing before project extensions can be allowed is listed there.
 - **Restricted Mode is stricter than designed:** untrusted roots are not passed at all (instead of `trusted: false`), so an extension learns only of folders the user trusts. `roots` keeps the `trusted` field for compatibility; it is always `true`.
-- **Installation** is the palette command and Settings ▸ Extensions ▸ Install from Folder…; the folder picker is the frontend's, the confirmation is Go's native dialog (in the dev-only server build it says yes, like every native confirmation there). No `flint --install-extension` CLI yet. A copy skips `.git`, follows symbolic links only inside the folder, and is limited to 10,000 files and 512 MiB; the old version is stopped before it is replaced.
+- **Installation** is the palette command and Settings ▸ Extensions ▸ Install from Folder…; the folder picker is the frontend's, the confirmation is Go's native dialog (in the dev-only server build it says yes, like every native confirmation there). `flint --install-extension <dir>` came later ([Distribution](#distribution-the-signed-index)). A copy skips `.git`, follows symbolic links only inside the folder, and is limited to 10,000 files and 512 MiB; the old version is stopped before it is replaced.
 - **Discovery** happens on the frontend's first `List` after the first render (and on install, uninstall, **Reload**), not on a goroutine at launch; folders aren't watched. `onStartup` extensions start after that first `List`.
-- **Contribution points in v1:** commands, panels (`tree`, `list`, plus `message`), the settings page, status items, toasts, `window/showMessageRequest` (a native question with up to three buttons), files and links, chat drafts and agent tools. `table` and `form` views, `tabViews` / `window/openTab` and `fileMenu` are not implemented: a manifest with a `table` or `form` panel is refused, and unknown contribution points are ignored with a warning in Settings.
+- **Contribution points in v1:** commands, panels (`tree`, `list`, plus `message`), the settings page, status items, toasts, `window/showMessageRequest` (a native question with up to three buttons), files and links, chat drafts and agent tools. `table` and `form` views, `tabViews` / `window/openTab` and `fileMenu` were not part of v1 (tab views came with webviews; `table`, `form` and `chart` [later](#table-form-and-chart-implemented)): a manifest with a view kind Flint doesn't draw is refused, and unknown contribution points are ignored with a warning in Settings.
 - **`window/openUrl`** (not in the original tables) opens `http(s)` links only, after a native confirmation once per extension and origin per session. The extension could open a browser itself, so this is about not surprising the user, not containment.
 - **Settings are checked when they are written and when they are used,** not when `settings.json` is saved: Go's save check is structural (ids, sizes). The generated page refuses invalid values, and the extension always receives schema-valid values (invalid ones become defaults). This way a newer manifest with a stricter schema can never make `settings.json` unsavable. `enabled` and `agentTools` are maps where a missing id means on.
 - **Crash policy details:** the next start waits 1 s after the first crash and 4 s after the second; an extension with a panel on screen or `onStartup` is restarted on its own after that delay, others on their next use. "Failed" lasts for the session; **Restart** (or turning it off and on) clears it. Contributions stay while an extension is crashed or failed; their use reports why.
 - **Idle stop** doesn't apply to `onStartup` extensions: the user saw "starts with Flint" when installing, so they run for the session.
-- **Agent tools are read-only only** (open question 4 stays open): there is no approval path for acting tools. They are listed from manifests (no process starts for `tools/list`), offered only for trusted roots while the MCP server is on, and can be turned off per extension in Settings ▸ Extensions (`extensions.agentTools`), not in Settings ▸ Agent Context.
-- **Environment:** `PATH` (with the login shell's additions), `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `TZ`, `LANG`, `LC_ALL`, `LC_CTYPE`, proxy variables, and `FLINT_EXTENSION_ID`, `FLINT_EXTENSION_DIR`, `FLINT_VERSION`. The working directory is the extension's folder.
+- **Agent tools were read-only only in v1**; acting tools came later with a per-call approval (open question 4). They are listed from manifests (no process starts for `tools/list`), offered only for trusted roots while the MCP server is on, and can be turned off per extension in Settings ▸ Extensions (`extensions.agentTools`), not in Settings ▸ Agent Context.
+- **Environment:** `PATH` (with the login shell's additions), `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `TZ`, `LANG`, `LC_ALL`, `LC_CTYPE`, proxy variables, and `FLINT_EXTENSION_ID`, `FLINT_EXTENSION_DIR`, `FLINT_EXTENSION_DATA`, `FLINT_VERSION`; a sandboxed process also gets `FLINT_EXTENSION_SANDBOX=1` and its own `TMPDIR`. The working directory is the extension's folder.
 - **Logs** are in memory (the last 256 KiB per extension, stderr lines cut at 2,000 characters), shown in Settings ▸ Extensions; they are not written to Flint's log file. RSS is not shown yet.
 - **Uninstall** deletes the folder and keeps the settings and keychain secrets (the keyring API can't list an extension's keys).
 - **Level-1 contract additions** this needed: `Host.Trusted`, `ConfigDir`, `Confirm`, `Choose`, and `Instance.SettingsChanged`, `RootsChanged`.
@@ -702,14 +853,14 @@ Points not yet in the contract, to add when a migration needs them:
 - **Native menu items.** The Help ▸ Check for Updates… item is still built in `menu.go` and emits an event the update module listens for.
 - **Ordering among status items.** Flint's own status items are not in the registry; contributed items come after them.
 - **Session restore for contributed tabs.** Their `data` is JSON, so saving them is a small step, but a view must be able to rebuild itself from it. Needed by [tab views](#tab-views).
-- **File icons and editor decorations.** New points for [file icons](#themes-and-file-icons) and [decoration sets](#editor-decorations); both are useful to feature modules too.
+- **File icons.** A new point for [file icons](#themes-and-file-icons), useful to feature modules too. ([Decoration sets](#editor-decorations) exist; no feature module uses them yet.)
 
 ## Open questions
 
-1. **Sandboxing extension processes.** On macOS, `sandbox-exec` is deprecated but works, and an App Sandbox helper is heavy. On Linux, Landlock or seccomp would need cgo or a helper. v1 relies on explicit installation and honest disclosure. *Decided for v1:* project-local extensions are disabled entirely until sandboxing exists.
-2. **Memory and CPU limits.** `setrlimit` on Linux is easy; macOS has no reliable per-process memory cap. Should Flint watch RSS and stop a runaway extension instead?
-3. **Distribution.** "Install from folder" leaves signing and updates to the user. A signed index (minisign) could come later without changing the protocol.
-4. **Agent tools that act.** v1 extension tools are read-only, like Flint's own MCP tools. Tools that change state would need the agent approval policy (`agentsession.Policy`) to apply to them.
+1. **Sandboxing extension processes.** *Decided and implemented:* an extension that declares `run.sandbox` is confined with Landlock, seccomp and `no_new_privs` on Linux (no cgo: Flint re-executes itself as a launcher) and with `sandbox-exec` on macOS (deprecated by Apple, still present); one that doesn't runs unconfined and is shown as such ([Sandbox](#sandbox)). Project-local extensions stay disabled; the same section lists what they still need.
+2. **Memory and CPU limits.** *Decided:* a sandboxed process gets no core dumps and at most 4,096 open files (`setrlimit` in the launcher). No memory or CPU limit and no RSS watcher: the limits that exist are either unreliable (`RLIMIT_AS`, `RLIMIT_NPROC`), not enforced (macOS) or need a delegated cgroup ([Sandbox](#sandbox), "Resource limits").
+3. **Distribution. Decided:** a signed index of prebuilt archives, fetched only when the user asks, with Ed25519 signatures in a small format of Flint's own instead of minisign (see [Distribution](#distribution-the-signed-index)). Still open: key rotation and protection against replaying an older signed index.
+4. **Agent tools that act. Done.** A tool on Flint's MCP server can be marked as acting (`mcpserver.Tool.Acts`; in a manifest `"acts": true` on a `contributes.agentTools` entry). The server runs such a call only after the user said yes to it: the answer to the agent's own permission request in the chat when there is one (kept out of `agentsession.Policy`'s auto-approvals and of "always allow"), otherwise a native dialog. Flint's own acting tools (`run_tests`, `run_configuration`, `send_http_request`, `run_sql_query`) are off by default (`mcpServer.actions`); an extension's acting tools follow its "Offer to agents" switch and are marked in the install confirmation and Settings ▸ Extensions. An extension tool has no plan step: the user sees its name and arguments, not what it will do.
 5. **Shared views between extensions.** A tab kind from one extension used by another is out of scope; ids are namespaced per extension.
 6. **The Wails `Settings` type is `any` in TypeScript.** If typed bindings for settings are wanted back, `SettingsAPI` could return a wrapper type, at the cost of a second representation. Today the frontend's own `AppSettings` is the typed view and nothing was lost.
 7. **Contract checks in CI.** Level 1 is checked by tests (Go and frontend keys, documentation partials, duplicate ids). Level 2 has `host/testdata/testext` and the conformance test of `examples/extensions/stats`, which build with `go` and are skipped without it; they run wherever `go test ./...` runs, which includes CI's macOS and Linux jobs.

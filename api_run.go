@@ -60,6 +60,7 @@ type runEvents struct {
 	mu    sync.Mutex
 	seq   map[string]uint64
 	tests map[string]*testSink
+	done  map[string]chan struct{} // closed when the run ended (watch, api_mcp_actions.go)
 }
 
 func newRunEvents(app *App) *runEvents {
@@ -98,6 +99,10 @@ func (e *runEvents) Exited(id string, res runner.Result) {
 	e.mu.Lock()
 	delete(e.seq, id)
 	delete(e.tests, id)
+	if done := e.done[id]; done != nil {
+		close(done)
+		delete(e.done, id)
+	}
 	e.mu.Unlock()
 }
 
@@ -195,6 +200,12 @@ func (r *RunAPI) SaveConfigs(root string, configs []runconfig.Config) ([]runconf
 // Start runs a configuration (saved or detected) under id, chosen by the
 // frontend. cols/rows size the PTY.
 func (r *RunAPI) Start(id, root string, cfg runconfig.Config, cols, rows int) error {
+	return r.app.startConfig(id, root, cfg, cols, rows)
+}
+
+// startConfig runs a configuration under id (also for an agent's
+// run_configuration, api_mcp_actions.go).
+func (a *App) startConfig(id, root string, cfg runconfig.Config, cols, rows int) error {
 	if err := checkRoot(root); err != nil {
 		return err
 	}
@@ -202,14 +213,18 @@ func (r *RunAPI) Start(id, root string, cfg runconfig.Config, cols, rows int) er
 	if err != nil {
 		return err
 	}
-	opened := r.app.mcpSources.Terminals.OpenNew(id, mcptools.KindRun, cfg.Name, launch.Cwd)
-	err = r.app.runs.Start(id, runner.Spec{
+	opened := a.mcpSources.Terminals.OpenNew(id, mcptools.KindRun, cfg.Name, launch.Cwd)
+	err = a.runs.Start(id, runner.Spec{
 		Steps: launch.Steps, Cwd: launch.Cwd, Env: launch.Env, PTY: true, Cols: cols, Rows: rows,
 	})
-	if err != nil && opened {
-		r.app.mcpSources.Terminals.Close(id)
+	if err != nil {
+		if opened {
+			a.mcpSources.Terminals.Close(id)
+		}
+		return err
 	}
-	return err
+	a.configRuns.set(root, cfg.ID, id)
+	return nil
 }
 
 // StartTests runs tests under id and returns the run's title. Results stream

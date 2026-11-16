@@ -49,7 +49,8 @@ func (a *App) taskByFolder(cwd string) string {
 
 // taskChanged remembers a task's settled state (so a restart still shows
 // finished or failed), forgets it when a new turn starts, and tells the UI.
-// A chat closing (idle) leaves the remembered state alone.
+// A chat closing (idle) leaves the remembered state alone. A task that
+// settles frees its slot for the oldest queued task (tasks_queue.go).
 func (a *App) taskChanged(id string, l agenttask.Live) {
 	settled := agenttask.Settled(l.State)
 	errText := ""
@@ -57,10 +58,17 @@ func (a *App) taskChanged(id string, l agenttask.Live) {
 		errText = l.Error
 	}
 	_, task, ok := a.taskStore().Find(id)
-	if ok && l.State != agenttask.Idle && (task.State != settled || task.Error != errText) {
+	busy := agenttask.Busy(l.State)
+	// A turn in a queued task's folder (a chat the user started there by
+	// hand) means it is not waiting any more.
+	unqueue := busy && task.Queued
+	if ok && l.State != agenttask.Idle && (task.State != settled || task.Error != errText || unqueue) {
 		err := a.saveTasks(func(s agenttask.Store) (agenttask.Store, error) {
 			return s.Update(id, func(t agenttask.Task) agenttask.Task {
 				t.State, t.Error = settled, errText
+				if unqueue {
+					t.Queued = false
+				}
 				return t
 			}), nil
 		})
@@ -69,4 +77,9 @@ func (a *App) taskChanged(id string, l agenttask.Live) {
 		}
 	}
 	a.emit(eventTasksChanged)
+	if busy {
+		a.releaseStart(id) // the running turn holds the slot from here on
+	} else {
+		a.startQueuedTasks() // settled (finished, failed, cancelled or closed): a slot is free
+	}
 }

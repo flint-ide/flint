@@ -2,6 +2,7 @@ package agentsession
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"sync"
@@ -14,6 +15,7 @@ type fakeDriver struct {
 	mu        sync.Mutex
 	sinks     map[string]Sink
 	responses map[string]string // request id → option id
+	flintTool string            // the request is for this tool of Flint's MCP server
 	permKind  string            // tool kind of the permission request ("" = none)
 	paths     []string          // paths of that tool call
 	release   chan struct{}     // closed to let the turn finish
@@ -42,7 +44,8 @@ func (f *fakeDriver) Prompt(ctx context.Context, id, text string, _ []Attachment
 	if f.permKind != "" {
 		sink(Event{SessionID: id, Kind: KindPermission, Permission: &PermissionRequest{
 			ID: "p1", ToolCall: ToolCall{ID: "t1", Kind: f.permKind, Paths: f.paths},
-			Options: []PermissionOption{{ID: "no", Kind: RejectOnce}, {ID: "always", Kind: AllowAlways}, {ID: "yes", Kind: AllowOnce}},
+			Options:   []PermissionOption{{ID: "no", Kind: RejectOnce}, {ID: "always", Kind: AllowAlways}, {ID: "yes", Kind: AllowOnce}},
+			FlintTool: f.flintTool, FlintArgs: json.RawMessage(`{"path":"pkg"}`),
 		}})
 	}
 	sink(Event{SessionID: id, Kind: KindMessageChunk, Text: "echo: " + text})
@@ -509,5 +512,107 @@ func TestSessionStartedDuringCloseIsStopped(t *testing.T) {
 	}
 	if _, err := m.Start(context.Background(), "gemini", t.TempDir()); !errors.Is(err, ErrClosed) {
 		t.Errorf("Start after Close = %v, want ErrClosed", err)
+	}
+}
+
+// A tool of Flint's MCP server that acts is never answered by a policy, not
+// even "do everything": the user sees the request, without "always allow",
+// and only their "allow" is handed on as an approval of that one call.
+func TestActingFlintToolsAlwaysAskTheUser(t *testing.T) {
+	type approval struct{ cwd, tool, args string }
+	for _, tc := range []struct {
+		name     string
+		tool     string
+		answer   string
+		approved bool
+	}{
+		{"allowed", "run_tests", "yes", true},
+		{"rejected", "run_tests", "no", false},
+		{"always allow is not an answer", "run_tests", "always", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := &recorder{}
+			m := NewManager(rec.emit)
+			var mu sync.Mutex
+			var got []approval
+			m.SetActionGate(ActionGate{
+				Acts: func(tool string) bool { return tool == "run_tests" },
+				Approved: func(cwd, tool string, args json.RawMessage) {
+					mu.Lock()
+					defer mu.Unlock()
+					got = append(got, approval{cwd, tool, string(args)})
+				},
+			})
+			m.SetPolicy(Policy{AutoApproveEdits: true, AutoApproveReads: true, AutoApproveAll: true})
+			fake := newFake(ToolRead, "/p/a.go") // even dressed up as a read inside the project
+			fake.flintTool = tc.tool
+			m.Register("fake", fake)
+			info, _ := m.Start(context.Background(), "fake", "/p")
+			if err := m.Prompt(info.ID, "go", nil); err != nil {
+				t.Fatal(err)
+			}
+			waitFor(t, func() bool { return contains(rec.kinds(), KindPermission) })
+			select {
+			case opt := <-fake.answered:
+				t.Fatalf("answered %q without the user", opt)
+			default:
+			}
+			rec.mu.Lock()
+			var perm *PermissionRequest
+			for _, e := range rec.events {
+				if e.Kind == KindPermission {
+					perm = e.Permission
+				}
+			}
+			rec.mu.Unlock()
+			if len(perm.Options) != 2 || perm.Options[0].Kind != RejectOnce || perm.Options[1].Kind != AllowOnce {
+				t.Fatalf("options offered: %+v", perm.Options)
+			}
+			if err := m.Respond(info.ID, "p1", tc.answer); err != nil {
+				t.Fatal(err)
+			}
+			<-fake.answered
+			mu.Lock()
+			defer mu.Unlock()
+			if tc.approved != (len(got) == 1) {
+				t.Fatalf("approvals = %+v", got)
+			}
+			if tc.approved && got[0] != (approval{"/p", "run_tests", `{"path":"pkg"}`}) {
+				t.Fatalf("approval = %+v", got[0])
+			}
+			// Answering again approves nothing more.
+			_ = m.Respond(info.ID, "p1", "yes")
+			if tc.approved != (len(got) == 1) {
+				t.Fatalf("a second answer changed the approvals: %+v", got)
+			}
+			close(fake.release)
+		})
+	}
+}
+
+// Flint's read tools, and tools that don't act right now, keep following
+// the policy.
+func TestOtherFlintToolsFollowThePolicy(t *testing.T) {
+	rec := &recorder{}
+	m := NewManager(rec.emit)
+	approved := 0
+	m.SetActionGate(ActionGate{
+		Acts:     func(tool string) bool { return tool == "run_tests" },
+		Approved: func(string, string, json.RawMessage) { approved++ },
+	})
+	fake := newFake(ToolRead, "/p/a.go")
+	fake.flintTool = "get_diagnostics"
+	m.Register("fake", fake)
+	info, _ := m.Start(context.Background(), "fake", "/p")
+	if err := m.Prompt(info.ID, "go", nil); err != nil {
+		t.Fatal(err)
+	}
+	if opt := <-fake.answered; opt != "yes" {
+		t.Fatalf("auto-approve picked %q", opt)
+	}
+	close(fake.release)
+	waitFor(t, func() bool { return contains(rec.kinds(), KindTurnEnd) })
+	if approved != 0 || contains(rec.kinds(), KindPermission) {
+		t.Fatalf("a read tool was treated as acting (approved %d)", approved)
 	}
 }

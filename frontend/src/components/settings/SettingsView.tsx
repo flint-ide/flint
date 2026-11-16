@@ -158,6 +158,16 @@ function EditorSection() {
       <Row label="Save files when Flint loses focus" hint="Modified files are written when you switch to another app.">
         <input type="checkbox" checked={autoSave} onChange={(e) => update({ autoSave: e.target.checked })} />
       </Row>
+      <Row label="Format on save" hint="The file's language server formats it before each save (gofmt through gopls, rustfmt through rust-analyzer, …). Files without a formatter are saved as they are.">
+        <input type="checkbox" checked={editor.formatOnSave} onChange={(e) => update({ editor: { ...editor, formatOnSave: e.target.checked } })} />
+      </Row>
+      <Row label="Organize imports on save" hint="The language server sorts the file's imports, adds missing ones and removes unused ones before each save, where it offers that.">
+        <input
+          type="checkbox"
+          checked={editor.organizeImportsOnSave}
+          onChange={(e) => update({ editor: { ...editor, organizeImportsOnSave: e.target.checked } })}
+        />
+      </Row>
       <h3>Keys</h3>
       <Row label="Vim mode" hint={`Vim key bindings in every editor; :w saves, :q closes the tab. ${isMac() ? "A focused Vim editor keeps Vim's ⌃ keys (⌃R redo, not Run)" : 'A focused Vim editor keeps Ctrl+R, Ctrl+D, Ctrl+U, Ctrl+V, Ctrl+A, Ctrl+X and Ctrl+['}; other Flint shortcuts keep working.`}>
         <input type="checkbox" checked={editor.vimMode} onChange={(e) => update({ editor: { ...editor, vimMode: e.target.checked } })} />

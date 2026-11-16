@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"slices"
 	"unicode/utf8"
@@ -179,7 +180,8 @@ func (s *Server) listTools() any {
 		}
 		list = append(list, toolInfo{
 			Name: t.Name, Title: t.Title, Description: t.Description, InputSchema: schema,
-			Annotations: toolAnnotations{Title: t.Title, ReadOnly: true, Idempotent: true},
+			// An acting tool is announced as one: agents ask before those.
+			Annotations: toolAnnotations{Title: t.Title, ReadOnly: !t.Acts, Destructive: t.Acts, Idempotent: !t.Acts, OpenWorldHint: t.Acts},
 		})
 	}
 	return map[string]any{"tools": list}
@@ -205,27 +207,84 @@ func (s *Server) callTool(ctx context.Context, root string, params json.RawMessa
 	}
 	tools := s.tools()
 	i := slices.IndexFunc(tools, func(t Tool) bool { return t.Name == p.Name })
-	if i < 0 || p.Name == "" || tools[i].Call == nil {
+	if i < 0 || p.Name == "" || (tools[i].Call == nil && tools[i].Plan == nil) {
 		return nil, &rpcError{Code: codeInvalidParams, Message: "unknown tool: " + cutName(p.Name)}
 	}
 	tool := tools[i]
 	if len(p.Arguments) == 0 || string(p.Arguments) == "null" {
 		p.Arguments = json.RawMessage("{}")
 	}
-	ctx, cancel := context.WithTimeout(ctx, callTimeout)
+	run := func(ctx context.Context) (string, error) { return tool.Call(ctx, root, p.Arguments) }
+	if tool.Acts {
+		approved, err := s.approve(ctx, root, tool, p.Arguments)
+		if err != nil {
+			return textResult(err.Error(), true), nil
+		}
+		run = approved
+	}
+	timeout := callTimeout
+	if tool.Timeout > 0 {
+		timeout = min(tool.Timeout, maxToolTimeout)
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	sem := s.sem(root) // per project: one busy project doesn't stall another
 	select {
 	case sem <- struct{}{}:
 		defer func() { <-sem }()
 	case <-ctx.Done():
-		return callResult{Content: []textContent{{Type: "text", Text: "Flint is busy; try again."}}, IsError: true}, nil
+		return textResult("Flint is busy; try again.", true), nil
 	}
-	text, err := tool.Call(ctx, root, p.Arguments)
+	text, err := run(ctx)
 	if err != nil {
 		text = err.Error()
 	}
-	return callResult{Content: []textContent{{Type: "text", Text: bound(redact.Secrets(text))}}, IsError: err != nil}, nil
+	return textResult(text, err != nil), nil
+}
+
+// approve checks one call of an acting tool (Tool.Plan) and asks the user
+// (Options.Approve); it returns what to run after a yes. Waiting for the
+// answer holds none of the project's call slots.
+func (s *Server) approve(ctx context.Context, root string, tool Tool, args json.RawMessage) (func(context.Context) (string, error), error) {
+	if s.opts.Approve == nil {
+		return nil, errors.New("this tool acts, and Flint has no way to ask the user here")
+	}
+	ctx, cancel := context.WithTimeout(ctx, approvalTimeout)
+	defer cancel()
+	run := func(ctx context.Context) (string, error) { return tool.Call(ctx, root, args) }
+	summary := ""
+	if tool.Plan != nil {
+		planned, err := tool.Plan(ctx, root, args)
+		if err != nil {
+			return nil, err
+		}
+		if planned.Run == nil {
+			return nil, errors.New("nothing to do")
+		}
+		run, summary = planned.Run, cutText(redact.Secrets(planned.Summary), maxSummary)
+	} else if tool.Call == nil {
+		return nil, errors.New("nothing to do")
+	}
+	if err := s.opts.Approve(ctx, Approval{Root: root, Tool: tool.Name, Title: tool.Title, Args: args, Summary: summary}); err != nil {
+		return nil, err
+	}
+	return run, nil
+}
+
+func textResult(text string, isError bool) callResult {
+	return callResult{Content: []textContent{{Type: "text", Text: bound(redact.Secrets(text))}}, IsError: isError}
+}
+
+// cutText cuts text at limit bytes without splitting a character.
+func cutText(text string, limit int) string {
+	if len(text) <= limit {
+		return text
+	}
+	cut := limit
+	for cut > 0 && !utf8.RuneStart(text[cut]) {
+		cut--
+	}
+	return text[:cut] + "…"
 }
 
 // cutName bounds a tool name echoed in an error.

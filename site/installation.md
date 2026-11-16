@@ -52,7 +52,7 @@ The system still needs GTK 4 and WebKitGTK 6 (see below; the development package
 
 - x86_64 or arm64, with GTK 4 and WebKitGTK 6.0: Ubuntu 24.04 or later, Debian 13 or later, Fedora 39 or later, Arch, or another distribution that ships them. Older ones (Ubuntu 22.04) only have WebKitGTK 4.1 and aren't supported.
 - To store database passwords and API keys: a Secret Service, which GNOME and KDE run already (GNOME Keyring, KWallet). Without one, saving a password fails with an error; nothing is written to disk instead.
-- To build: Go 1.27.3 or later, Node 22 or later, a C compiler, and the development packages. On Debian and Ubuntu:
+- To build: Go 1.27.4 or later, Node 22 or later, a C compiler, and the development packages. On Debian and Ubuntu:
 
   ```bash
   sudo apt install build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev libx11-dev

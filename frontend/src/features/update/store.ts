@@ -8,6 +8,9 @@ import { createStore } from '../../lib/store'
 import { coerceUpdate, offerable, offerText, upToDateText, type UpdateResult } from './update'
 import { errorMessage } from '../../api/backend'
 import { showToast } from '../../store/dialog'
+import { useEditor } from '../../store/editor'
+import { useWorkspace } from '../../store/workspace'
+import { coerceNotes, notesTitle, RELEASE_NOTES_VIEW, type ReleaseNotes } from './notes'
 
 interface UpdateState {
   /** The release the notice offers; null = no notice. */
@@ -68,6 +71,50 @@ export async function skipUpdate(): Promise<void> {
   } catch (err) {
     showToast(errorMessage(err), 'error')
   }
+}
+
+const showNotes = (notes: ReleaseNotes) =>
+  useEditor.getState().openContributed(RELEASE_NOTES_VIEW, notes.tag, notesTitle(notes), notes)
+
+/** Resolves once the startup folder is open and its session restored. */
+function workspaceReady(): Promise<void> {
+  if (useWorkspace.getState().ready) return Promise.resolve()
+  return new Promise((resolve) => {
+    const off = useWorkspace.subscribe((s) => {
+      if (!s.ready) return
+      off()
+      resolve()
+    })
+  })
+}
+
+/** On the first launch after an update: opens what changed in this version (Go decides whether it is that launch). */
+export async function showWhatsNew(): Promise<void> {
+  try {
+    const notes = coerceNotes(await UpdateAPI.WhatsNew())
+    if (!notes) return
+    // After the session's tabs came back, so the notes end up in front of them.
+    await workspaceReady()
+    showNotes(notes)
+  } catch {
+    // Offline at startup is not worth an error; Go tries again at the next launch.
+  }
+}
+
+/** "View Release Notes": what changed in the running version, whenever asked. */
+export async function openReleaseNotes(): Promise<void> {
+  try {
+    const notes = coerceNotes(await UpdateAPI.ReleaseNotes())
+    if (!notes) throw new Error('unexpected answer')
+    showNotes(notes)
+  } catch (err) {
+    showToast(`Release notes are not available: ${errorMessage(err)}`, 'error')
+  }
+}
+
+/** Opens a link of the notes in the browser (Go lets only Flint's repository through). */
+export function openNotesLink(url: string): void {
+  UpdateAPI.OpenLink(url).catch((err) => showToast(errorMessage(err), 'error'))
 }
 
 /** Hides the notice until the next launch. */

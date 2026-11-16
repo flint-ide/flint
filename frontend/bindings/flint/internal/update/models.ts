@@ -6,6 +6,106 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
+ * NoteItem is one entry of the release notes.
+ */
+export class NoteItem {
+    /**
+     * "Pull asks which project to update"
+     */
+    "text": string;
+
+    /**
+     * its pull request, under https://github.com/flint-ide/flint/, or empty
+     */
+    "url": string;
+
+    /** Creates a new NoteItem instance. */
+    constructor($$source: Partial<NoteItem> = {}) {
+        if (!("text" in $$source)) {
+            this["text"] = "";
+        }
+        if (!("url" in $$source)) {
+            this["url"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new NoteItem instance from a string or object.
+     */
+    static createFrom($$source: any = {}): NoteItem {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new NoteItem($$parsedSource as Partial<NoteItem>);
+    }
+}
+
+/**
+ * Notes is what changed in one release, sorted the way the "What's New" page
+ * shows it.
+ */
+export class Notes {
+    "tag": string;
+    "name": string;
+
+    /**
+     * release page
+     */
+    "url": string;
+    "publishedAt": string;
+    "features": NoteItem[];
+    "fixes": NoteItem[];
+    "other": NoteItem[];
+
+    /** Creates a new Notes instance. */
+    constructor($$source: Partial<Notes> = {}) {
+        if (!("tag" in $$source)) {
+            this["tag"] = "";
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("url" in $$source)) {
+            this["url"] = "";
+        }
+        if (!("publishedAt" in $$source)) {
+            this["publishedAt"] = "0001-01-01T00:00:00.000Z";
+        }
+        if (!("features" in $$source)) {
+            this["features"] = [];
+        }
+        if (!("fixes" in $$source)) {
+            this["fixes"] = [];
+        }
+        if (!("other" in $$source)) {
+            this["other"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Notes instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Notes {
+        const $$createField4_0 = $$createType1;
+        const $$createField5_0 = $$createType1;
+        const $$createField6_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("features" in $$parsedSource) {
+            $$parsedSource["features"] = $$createField4_0($$parsedSource["features"]);
+        }
+        if ("fixes" in $$parsedSource) {
+            $$parsedSource["fixes"] = $$createField5_0($$parsedSource["fixes"]);
+        }
+        if ("other" in $$parsedSource) {
+            $$parsedSource["other"] = $$createField6_0($$parsedSource["other"]);
+        }
+        return new Notes($$parsedSource as Partial<Notes>);
+    }
+}
+
+/**
  * Release is what Flint keeps of GitHub's latest release.
  */
 export class Release {
@@ -106,7 +206,7 @@ export class Result {
      * Creates a new Result instance from a string or object.
      */
     static createFrom($$source: any = {}): Result {
-        const $$createField1_0 = $$createType0;
+        const $$createField1_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("latest" in $$parsedSource) {
             $$parsedSource["latest"] = $$createField1_0($$parsedSource["latest"]);
@@ -116,4 +216,6 @@ export class Result {
 }
 
 // Private type creation functions
-const $$createType0 = Release.createFrom;
+const $$createType0 = NoteItem.createFrom;
+const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = Release.createFrom;

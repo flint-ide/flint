@@ -1,6 +1,7 @@
 // Pure helpers for session snapshots (see store/session.ts).
 import { parseBreakpoints, type BreakpointMap } from './breakpoints'
 import type { ChatItem, ChatState, ToolCall } from './agentReducer'
+import type { TerminalResume } from './terminalResume'
 
 export const SNAPSHOT_VERSION = 1
 const CHAT_ITEMS = 200
@@ -32,7 +33,18 @@ export type SavedTab =
       label?: string
     }
   | { kind: 'history'; path: string }
-  | { kind: 'terminal'; title: string; cwd: string; output: string; project?: string; pinned?: boolean; env?: Record<string, string>; tag?: string }
+  | {
+      kind: 'terminal'
+      title: string
+      cwd: string
+      output: string
+      project?: string
+      pinned?: boolean
+      env?: Record<string, string>
+      tag?: string
+      /** The agent CLI (claude, codex) that ran in it, started again when the terminal reopens. */
+      resume?: TerminalResume
+    }
   | { kind: 'chat'; title: string; chat: SavedChat }
   /** A tab of a kind that restores (an extension's tab view): reopened from its key and data. */
   | { kind: 'contrib'; view: string; key: string; title: string; data?: unknown }

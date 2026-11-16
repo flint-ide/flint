@@ -1,6 +1,7 @@
 import { beforeEach, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { changesUnder, commitTargets, useGit, type FileChange, type GitStatus } from './git'
+import { changesUnder, closePullPicker, commitTargets, rollbackPrompt, tickedOf, updateProject, useGit, type FileChange, type GitStatus } from './git'
+import { useWorkspace } from './workspace'
 
 const file = (path: string, kind = 'modified'): FileChange => ({ path, kind, index: '', worktree: 'M' }) as unknown as FileChange
 const status = (files: FileChange[]): GitStatus =>
@@ -83,5 +84,53 @@ describe('changesUnder', () => {
         ['/ws/b', ['b.go']],
       ],
     )
+  })
+})
+
+describe('rollback of the ticked files', () => {
+  it('takes the ticked files of a group: tracked by default, unversioned once ticked', () => {
+    const paths = () => tickedOf(a.files, '/ws/a').map((f) => f.path)
+    assert.deepEqual(paths(), ['a.go'])
+    useGit.getState().setGroup([file('new.txt', 'untracked')], true, '/ws/a')
+    assert.deepEqual(paths(), ['a.go', 'new.txt'])
+    useGit.getState().toggleFile(file('a.go'), '/ws/a')
+    assert.deepEqual(paths(), ['new.txt'])
+    assert.deepEqual(tickedOf([file('c.go', 'conflicted')], '/ws/a'), [])
+  })
+
+  it('asks to delete when only unversioned files are chosen', () => {
+    assert.deepEqual(rollbackPrompt([file('new.txt', 'untracked')]), {
+      message: 'Delete new.txt? It is removed from disk and cannot be restored.',
+      label: 'Delete',
+    })
+    assert.deepEqual(rollbackPrompt([file('a.txt', 'untracked'), file('b.txt', 'untracked')]), {
+      message: 'Delete 2 unversioned files? They are removed from disk and cannot be restored.',
+      label: 'Delete',
+    })
+  })
+
+  it('asks to roll back otherwise, counting the files that get deleted', () => {
+    assert.deepEqual(rollbackPrompt([file('a.go')]), { message: 'Rollback changes in a.go?', label: 'Rollback' })
+    assert.deepEqual(rollbackPrompt([file('a.go'), file('n.go', 'added'), file('u.txt', 'untracked')]), {
+      message: 'Rollback changes in 3 files? 2 new file(s) will be deleted.',
+      label: 'Rollback',
+    })
+  })
+})
+
+describe('update project', () => {
+  it('asks which repository to pull when the workspace has several', () => {
+    useWorkspace.setState({ roots: ['/ws/a', '/ws/b'] })
+    updateProject()
+    assert.equal(useGit.getState().pullPicker, true)
+    closePullPicker()
+    assert.equal(useGit.getState().pullPicker, false)
+  })
+
+  it('does not ask while another remote operation runs', () => {
+    useGit.setState({ busy: 'fetch' })
+    updateProject()
+    assert.equal(useGit.getState().pullPicker, false)
+    useGit.setState({ busy: null })
   })
 })

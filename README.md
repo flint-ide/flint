@@ -119,7 +119,7 @@ To run Flint:
 
 To build Flint:
 
-- Go 1.27.3+
+- Go 1.27.4+
 - Node 22+
 - macOS: Xcode Command Line Tools; Linux: `libgtk-4-dev`, `libwebkitgtk-6.0-dev`, `libx11-dev` and a C compiler (see [Building on Linux](docs/DEVELOPMENT.md#building-on-linux))
 - `wails3` v3.0.0: `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0`

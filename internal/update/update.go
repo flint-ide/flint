@@ -47,11 +47,15 @@ type Release struct {
 }
 
 // State is remembered between launches (in state.json): when GitHub was last
-// asked, what it answered, and the release the user chose to skip.
+// asked, what it answered, the release the user chose to skip, and the version
+// that ran last.
 type State struct {
 	CheckedAt time.Time `json:"checkedAt,omitzero"`
 	Latest    *Release  `json:"latest,omitempty"`
 	Skipped   string    `json:"skipped,omitempty"`
+	// LastSeen is the release version that ran last, so the first launch of a
+	// newer one can show what changed.
+	LastSeen string `json:"lastSeen,omitempty"`
 }
 
 // Result is the outcome of a check, for the UI.
@@ -149,9 +153,20 @@ type apiRelease struct {
 // leaves out drafts and pre-releases; they are refused here too in case that
 // ever changes.
 func (c *Client) Latest(ctx context.Context) (Release, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(c.Base, "/")+latestPath, nil)
+	resp, err := c.get(ctx, latestPath)
 	if err != nil {
 		return Release{}, err
+	}
+	defer resp.Body.Close()
+	return decodeRelease(io.LimitReader(resp.Body, maxBody))
+}
+
+// get sends the one kind of request Flint makes to GitHub and returns the
+// answer when it is 200 (the caller closes its body).
+func (c *Client) get(ctx context.Context, path string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(c.Base, "/")+path, nil)
+	if err != nil {
+		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
@@ -162,18 +177,18 @@ func (c *Client) Latest(ctx context.Context) (Release, error) {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return Release{}, err
+		return nil, err
 	}
-	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxBody))
+		_ = resp.Body.Close()
 		// GitHub answers 404 both before the first release and for a private repository.
 		if resp.StatusCode == http.StatusNotFound {
-			return Release{}, errors.New("no published release found on GitHub")
+			return nil, ErrNoRelease
 		}
-		return Release{}, fmt.Errorf("GitHub answered %s", resp.Status)
+		return nil, fmt.Errorf("GitHub answered %s", resp.Status)
 	}
-	return decodeRelease(io.LimitReader(resp.Body, maxBody))
+	return resp, nil
 }
 
 func decodeRelease(r io.Reader) (Release, error) {

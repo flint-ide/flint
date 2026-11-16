@@ -81,6 +81,7 @@ flowchart LR
 - `fuzzy.Index` keeps a file list per root; with several roots it searches a combined `label/path` list (labels: `workspace.Labels`; in the UI, `lib/workspaceRoots.ts`).
 - `SearchAPI.Start` receives the list of roots (`search.RunRoots`, with a shared result limit), and every match carries its root. `git:changed` carries the root it concerns.
 - Run configurations, tests and the debugger receive the root from the frontend (`RunAPI.Configs(root)`, `Start(id, root, …)`), so Go has no notion of a "current" project.
+- Update Project (pull) with several roots is decided in the frontend: `lib/pullTargets.ts` builds the target list (labels, branch, commits to pull) and `components/git/PullProjectPopup.tsx` shows the chooser. `store/git.ts` then pulls each chosen root through `GitAPI` and collects the successes and failures for one summary, so Go still sees one repository per call.
 
 ### Agents
 
@@ -307,7 +308,7 @@ Flint drives many CLIs (git, rg, dlv, claude, codex). Names and identifiers that
 
 ### Network requests Flint makes on its own
 
-Every other connection is the result of a user action or of a CLI the user runs, and GitHub's API is only called while a view needs it, plus CI polls (conditional requests) while a check of a followed pull request runs. The one exception is the update check (`internal/update`, `internal/features/update`): an anonymous `GET https://api.github.com/repos/flint-ide/flint/releases/latest` (no token, no cookie jar, `User-Agent: Flint/<version>`, 10 s timeout, 1 MB body limit, redirects only within the same host), a few seconds after launch and then at most once per 24 hours, only in release builds and only while the `checkForUpdates` setting is on. The response is treated as untrusted: the tag must be a SemVer version, the title is stripped of control characters and capped, and the release link is opened only if it is an `https://github.com/flint-ide/flint/` URL (otherwise the releases page). The browser is opened from Go (the update feature's `API.OpenRelease`), so the UI cannot pass it a URL. Flint never downloads or installs a release.
+Every other connection is the result of a user action or of a CLI the user runs, and GitHub's API is only called while a view needs it, plus CI polls (conditional requests) while a check of a followed pull request runs. The one exception is the update check (`internal/update`, `internal/features/update`): an anonymous `GET https://api.github.com/repos/flint-ide/flint/releases/latest` (no token, no cookie jar, `User-Agent: Flint/<version>`, 10 s timeout, 1 MB body limit, redirects only within the same host), a few seconds after launch and then at most once per 24 hours, only in release builds and only while the `checkForUpdates` setting is on. The response is treated as untrusted: the tag must be a SemVer version, the title is stripped of control characters and capped, and the release link is opened only if it is an `https://github.com/flint-ide/flint/` URL (otherwise the releases page). The browser is opened from Go (the update feature's `API.OpenRelease`, and `API.OpenLink` for the links in the release notes), so the UI cannot pass it a URL; `OpenLink` accepts only pages of the Flint repository. The release notes ("What's New") add one more request of the same kind: after an update, one anonymous `GET https://api.github.com/repos/flint-ide/flint/releases/tags/vX.Y.Z` for the version that just ran (`internal/update/notes.go`), under the same conditions as the update check (release builds, `checkForUpdates` on). Flint never downloads or installs a release.
 
 ### Redaction
 
@@ -323,7 +324,7 @@ Paths are the macOS ones. On Linux, `~/Library/Application Support/flint` is `$X
 
 | What | Where | Notes |
 |---|---|---|
-| Recent folders, agent permission policy, trusted folders, whether the first-run tool check was shown, update check (last check time, the latest release found, the skipped version), signed-in accounts (provider, host, login, name, avatar URL, scopes; no token) | `~/Library/Application Support/flint/state.json` | the preferred agent stored here before `settings.json` existed is read from it until you pick a default in Settings |
+| Recent folders, agent permission policy, trusted folders, whether the first-run tool check was shown, update check (last check time, the latest release found, the skipped version, `lastSeen`: the version that ran last, for What's New), signed-in accounts (provider, host, login, name, avatar URL, scopes; no token) | `~/Library/Application Support/flint/state.json` | the preferred agent stored here before `settings.json` existed is read from it until you pick a default in Settings |
 | Settings: theme, editor and terminal fonts, default agent, autosave, shortcut overrides (`keymap`: command id → shortcut, `""` = none), agent CLIs (`agents`), custom ACP agents (`customAgents`: id, name, command, arguments), language servers (`languageServers`) | `~/Library/Application Support/flint/settings.json` | has a schema version; missing keys get defaults, unknown keys are ignored, invalid values are replaced with defaults on load (writes validate strictly); `0600`; **no secrets**. A copy for the first render lives in `localStorage` (`flint.settings`) |
 | Database connection profiles (host, port, user, optional default database, TLS, read-only) | `~/Library/Application Support/flint/connections.json` | **no passwords**, mode `0600` |
 | Database passwords | OS keyring (Keychain / Secret Service), service `flint-db`, account = connection id | deleted together with the profile |
@@ -351,7 +352,7 @@ A project session contains:
 
 - Attached projects (`roots`, when there is more than one). Opening the main project attaches them again (folders that no longer exist are skipped), and the same folder opened on its own has its own single-project session. Sessions saved before workspaces existed load unchanged.
 - File tabs with cursor positions, scratchpads and diffs.
-- Terminals: the project they belong to, the shell's last directory (it follows `cd`) and the last ~400 lines of output. After a restart a new shell starts in that directory, with the old output shown dimmed above it. Full-screen programs (for example the claude TUI) are not saved.
+- Terminals: the project they belong to, the shell's last directory (it follows `cd`) and the last ~400 lines of output. After a restart a new shell starts in that directory, with the old output shown dimmed above it. The screen of a full-screen program (for example the claude TUI) is not saved, but an agent CLI that was running in the terminal is started again on its conversation: `internal/terminal/resume.go` names the foreground program (`claude` or `codex`, not their one-shot subcommands such as `claude -p` or `codex exec`) and, for Claude Code, reads the conversation id from the record it keeps of its running process (`~/.claude/sessions/<pid>.json`, not a documented interface: anything unexpected means no id). The snapshot keeps `{agent, session}`, never a command line; on restore `lib/terminalResume.ts` accepts only a known agent and a well-formed id and types `claude --resume <id>` (without an id `claude --continue`; `codex resume --last`) into the new shell, and only when the terminal reopens in the folder it was in.
 - Agent conversations: the transcript (last 200 entries, long tool outputs truncated), token usage and cost. The agent is reconnected on the first new message. If a conversation cannot be resumed, Flint starts a new one and says so.
 - The selected run configuration of each project, and debugger breakpoints in the files of all workspace projects.
 
@@ -403,7 +404,8 @@ internal/github             GitHub REST/GraphQL client: repository from remotes,
 internal/cilog              CI logs for the agent: parse --log-failed output, excerpt the failing step, map file:line references to the workspace
 internal/diag               Flint's log file, bug report and diagnostics
 internal/tools              external tools Flint drives: one table (feature, install command, docs; features register theirs) and the installed-version check
-internal/update             new-release check: GitHub's latest-release API (net/http), SemVer compare, link allow-list
+internal/update             new-release check: GitHub's latest-release API (net/http), SemVer compare, link allow-list;
+                            release notes of a tag (notes.go: grouped by Conventional Commits type)
 internal/redact             removes credentials and the home path from logs, reports and agent context
 internal/prompts            prompt library: Markdown prompts (project, personal, built-in), front matter, placeholders
 internal/agent              claude / codex: headless runs and interactive commands

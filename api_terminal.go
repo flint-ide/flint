@@ -133,6 +133,17 @@ func (t *TerminalAPI) Cwd(id string) string {
 	return cwd
 }
 
+// Resume reports the agent CLI (claude, codex) running in the terminal and its
+// conversation, so the session can reopen it after a restart; the zero value
+// when there is nothing to resume.
+func (t *TerminalAPI) Resume(id string) terminal.Resume {
+	r, err := t.app.terminals.Resume(id)
+	if err != nil {
+		return terminal.Resume{}
+	}
+	return r
+}
+
 // Close terminates the terminal's shell.
 func (t *TerminalAPI) Close(id string) {
 	t.app.terminals.Close(id)

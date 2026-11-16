@@ -46,12 +46,14 @@ You can attach more folders to an open project (like "Attach project" in Intelli
 - The tree then has one section per project, each with "Remove from Workspace".
 - `⌘P` and Search cover all projects (results are prefixed with the project; Find in Folder narrows to one).
 - The Commit panel shows the repository of the active tab's project and has a switcher with the number of changes per project.
+- Update Project (pull) asks which repository to update when the workspace has several (see [Git](#git-intellij-style)).
 - New terminals and chats start in the active tab's project (the `+` menu has a section per project).
 - Run configurations follow the active tab too: the ▶ selector in the title bar shows the configurations (`.flint/run.json` and detected ones) of the active tab's project, with its name. Each project remembers its own selection, and Run / Debug start in that project.
 - "Fix with agent", `⌘L` and test results go to the chat of the project the file belongs to.
 - The command palette has "Add Project to Workspace…" and "Remove <project> from Workspace".
 - LSP servers and the file watcher run per project.
 - The set of projects is restored after a restart, together with the session of the main project.
+- Terminals come back as new shells in their last directory. If Claude Code or Codex was running in one, it is started again on the same conversation (`claude --resume <id>`, or `claude --continue` / `codex resume --last` when the conversation's id is not known).
 
 ### Live agent changes
 
@@ -160,8 +162,10 @@ Persistent SQL consoles and notes (MD/TXT) with autosave. `⌘↵` runs the quer
 ### Git (IntelliJ-style)
 
 - Commit panel (`⌘K`) with checkboxes, Amend, Commit and Push, and Rollback. Side-by-side diff in a tab.
+- The ↶ button on the "Changes" and "Unversioned Files" group headers rolls back all ticked files of that group at once. For unversioned files this deletes them from disk, after a confirmation ("Delete N unversioned files?").
 - Changed-line markers in the gutter, which also show what the agent touched.
 - Branch widget in the status bar: checkout, new branch, fetch, pull, push (`⇧⌘K`).
+- **Update Project (pull)**: from the palette, the ⤓ button in the Commit panel, or the Branches popup. With one repository the pull starts at once. With several repositories in the workspace (like "Attach project" in IntelliJ) a chooser lists each one by folder name, with its branch and the number of commits to pull. The repository shown in the Commit panel is preselected, and an **All Projects** entry updates every repository in turn. Arrow keys and Enter work in the chooser.
 - A commit during a merge includes the whole index.
 - **Merge editor** for conflicted files (merge, rebase, cherry-pick, stash pop): *Resolve…* in the Commit panel, which also shows the conflicts left in each file. The file as git left it (clean hunks merged), each conflict an inline block with Accept Current / Incoming / Both (in either order) and ✦ Ask Agent (the block with both sides and its base from the index stages in the chat draft), or edited by hand. Labels say what current and incoming are for the operation: in a rebase, current is the branch being rebased onto and incoming your replayed commit. Next/previous conflict, Δ Current / Δ Incoming against the base, Save, and *Mark as Resolved* (save + `git add`, with a confirmation if markers remain). Shortcuts `⌥⌘N`/`⌥⌘P`, `⌥⌘1`–`⌥⌘4`, `⇧⌘↵`, all rebindable.
 - **Annotate** (blame): a column with date and author next to every line (*Blame* button in the status bar, or right-click on the editor gutter), with a tooltip (full hash, author, date, message). Click opens the change from that commit. Uncommitted lines (including unsaved ones) show "Not committed".
@@ -328,7 +332,7 @@ Docker / Compose, Kubernetes and AWS Profiles are not part of Flint any more: th
 - **Agents**: the default agent for new chats, commit messages and conflict resolution (a custom agent can be the default; conflicts then go to a native agent). Per agent (Claude Code, Codex): the executable (empty = looked up on the login PATH; otherwise a command name or an absolute path, never one relative to the project), the model (empty = the CLI's default) and extra command-line arguments, one per line. Extra arguments go before Flint's own flags, so Flint's flags are parsed last and win; arguments that name a flag Flint sets (the stream protocol, the permission prompt and mode, `--setting-sources`, `--settings`, `--resume`, `--model`; for Codex the sandbox, approval policy, `--yolo`, `--listen` and `-c approval_policy/sandbox*/projects*`) and `--` are refused, as are newlines, more than 32 arguments or arguments over 512 characters. In Restricted Mode the extra arguments are left out entirely, since a flag such as `--mcp-config` or `--add-dir` with a relative path would load the project's files. Changes apply to new chats, commit messages and conflict resolution; running chats keep their settings. Custom ACP agents are added, edited, checked and removed in the same section (see [Custom agents (ACP)](#custom-agents-acp)). *Review* sets what Review Changes with Agent covers (ticked or all changes), its agent, the largest diff it sends and its time limit (`agentReview`). Background notifications can be turned off here.
 - **Language Servers**: per language (Go, TypeScript/JavaScript, Python, Rust): on/off, which server (a known server's name such as `pylsp`, an absolute path to one, or another server; empty tries the known servers in order) and extra arguments, added after the server's own (`--stdio`). A change restarts that language's servers for the open files. Restricted Mode still applies: servers that run the project's code and servers Flint doesn't know start only in trusted folders, and extra arguments are ignored there. typescript-language-server, also under another name or path, is always pinned to its own TypeScript, and `--tsserver-path` is refused.
 - **Keymap**: a searchable list of all commands (by name or by shortcut, for example `⌘K`). Click a shortcut and press a new combination to change it; conflicts with other commands are shown, `↺` restores the default and `✕` removes it. Shortcuts handled by CodeMirror (`⌘F`, `⌘S`, `⌘↵`, and so on) are display-only. Overrides go into a layer of the command registry (`lib/commands.ts`), so the palette and the dispatcher use the effective shortcuts.
-- **Updates**: the daily release check (see [Update check](#update-check)) can be turned off; **Check Now** checks right away.
+- **Updates**: the daily release check (see [Update check](#update-check)) can be turned off, and with it the "What's New" tab; **Check Now** checks right away.
 - **Agent Context**, **Usage** and **AI in the Editor**: see [Agent context](#agent-context-flints-mcp-server), [Usage and budgets](#usage-and-budgets) and [AI in the editor](#ai-in-the-editor).
 - **Import** ("Import from VS Code…" in the palette): reads VS Code's, Cursor's or VSCodium's `settings.json`, `keybindings.json` and active color theme (from its extension, following `include`), and shows what it would change and what it skips and why (chords, `when` clauses, settings Flint doesn't have, built-in themes). Nothing is written until you confirm. An imported theme becomes `theme: "custom"`: a palette over the dark or light base, limited to Flint's own color variables and hex colors, plus the theme's terminal colors (`terminal.ansi*`, background, cursor, selection).
 - **Extensions**: see [Extensions](#extensions). Their color themes appear under Appearance ▸ **Color theme** and as **Use …** buttons on the extension; choosing one copies it into the custom theme (interface, editor and terminal colors), checked by the same Go rules as an imported theme.
@@ -338,6 +342,7 @@ Docker / Compose, Kubernetes and AWS Profiles are not part of Flint any more: th
 
 - **Drag from Finder**: a folder dropped on the window opens as a project (or is attached to the workspace when one is already open); a file opens in a tab (up to 20 at a time). While dragging, the window shows what will happen.
 - **Single instance**: `flint <folder>` with Flint already running hands the folder over (relative paths resolve from the calling directory) and brings the window to the front. A Flint with a different `FLINT_CONFIG_DIR` (for example a dev build) is a separate instance.
+- **Toasts**: messages inside the window (toasts) appear in the bottom-right corner, above the status bar.
 - **Background notifications**: when a run, a test run or an agent turn finishes while Flint is not active, you get a macOS notification (clicking it shows the tab) and a badge on the Dock icon, cleared when you return to the window. Can be turned off in Settings ▸ Agents.
 - The application menu (with `Settings… ⌘,`) and the compact title bar are native Wails v3 options, with no Objective-C additions.
 
@@ -364,7 +369,7 @@ External extensions are separate programs in any language that talk JSON-RPC 2.0
 - **Help ▸ Report an Issue…** opens a prefilled GitHub issue in your browser and copies the full report to the clipboard. The report contains the versions of Flint, macOS, Go and Wails, the versions of the tools in the tool check, and the last 150 log lines, all redacted. You review the issue before submitting it.
 - **Help ▸ Copy Diagnostics** copies the same redacted report to the clipboard.
 - **Help ▸ Show Logs in Finder** reveals the log file in Finder.
-- There is no telemetry. The only request Flint makes on its own is the update check below.
+- There is no telemetry. The only requests Flint makes on its own are the update check and the release notes below.
 
 ### Update check
 
@@ -373,6 +378,9 @@ External extensions are separate programs in any language that talk JSON-RPC 2.0
 - The running version (`vX.Y.Z` from `-ldflags`) is compared with the release tag by Flint's own SemVer compare; a pre-release sorts below its release.
 - A newer release shows a notice in the status bar: **Download** opens the release page in the browser (only a `https://github.com/flint-ide/flint/…` link from the API; anything else falls back to the releases page), **Skip This Version** stays quiet until a later release, **✕** hides it until the next launch.
 - **Help ▸ Check for Updates…** (also in the palette and Settings ▸ Updates ▸ Check Now) checks immediately, ignoring the daily limit and the setting, and says "You're up to date (vX.Y.Z)" when there is nothing new.
+- **What's New**: the first launch of a newer version opens a "What's New in vX.Y.Z" tab with that release's notes, grouped into New Features, Bug Fixes and Other Changes. Items link to their pull requests, and the header links to the release page on GitHub. The notes come from the GitHub Release of that tag (one anonymous GET, under the same rules as the update check). They are sorted by Conventional Commits type: `feat` goes to New Features, `fix` and `perf` to Bug Fixes, and everything else to Other Changes.
+- The tab is not shown on a fresh install, in development builds, or when `checkForUpdates` is off, and then Flint does not ask GitHub for the notes at all. The version that ran last is kept as `lastSeen` in `state.json`.
+- **View Release Notes** (palette, category Help) opens the notes of the running version at any time.
 - Flint never downloads or installs anything: there is no auto-update framework.
 
 ## Restricted Mode (workspace trust)

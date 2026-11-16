@@ -53,6 +53,7 @@ You can attach more folders to an open project (like "Attach project" in Intelli
 - The command palette has "Add Project to Workspace…" and "Remove <project> from Workspace".
 - LSP servers and the file watcher run per project.
 - The set of projects is restored after a restart, together with the session of the main project.
+- Terminals come back as new shells in their last directory. If Claude Code or Codex was running in one, it is started again on the same conversation (`claude --resume <id>`, or `claude --continue` / `codex resume --last` when the conversation's id is not known).
 
 ### Live agent changes
 

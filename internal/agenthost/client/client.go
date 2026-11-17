@@ -81,8 +81,9 @@ const (
 
 // Client is a connection to the host.
 type Client struct {
-	conn *jsonrpc.Conn
-	h    Handlers
+	conn  *jsonrpc.Conn
+	h     Handlers
+	hello agenthost.HelloResult // what the host said at the handshake; set before New returns
 
 	jobs   chan func()
 	wake   chan struct{}
@@ -124,6 +125,7 @@ func New(rwc io.ReadWriteCloser, cfg Config) (*Client, error) {
 	err := c.call(ctx, agenthost.MethodHello, agenthost.HelloParams{
 		Protocol: agenthost.Protocol, Version: cfg.Version, Token: cfg.Token,
 	}, &res)
+	c.hello = res
 	switch {
 	case err != nil:
 		c.Close()
@@ -132,6 +134,16 @@ func New(rwc io.ReadWriteCloser, cfg Config) (*Client, error) {
 		return c, &ProtocolError{Host: res.Protocol, Version: res.Version}
 	}
 	return c, nil
+}
+
+// Hello is what the host reported at the handshake: its pid and version, and
+// the ids of the terminals and chats it held then, so a newly attached window
+// can find its sessions (AttachTerminal, AttachChat). It is a copy.
+func (c *Client) Hello() agenthost.HelloResult {
+	h := c.hello
+	h.Terminals = append([]string{}, h.Terminals...)
+	h.Chats = append([]string{}, h.Chats...)
+	return h
 }
 
 // Terminals is the terminal side, a sessions.Terminals.
@@ -154,7 +166,13 @@ func (c *Client) Close() error {
 
 // Shutdown asks the host to exit, stopping its sessions first when asked to.
 func (c *Client) Shutdown(ctx context.Context, stopSessions bool) error {
-	return c.call(ctx, agenthost.MethodHostShutdown, agenthost.ShutdownParams{StopSessions: stopSessions}, nil)
+	err := c.call(ctx, agenthost.MethodHostShutdown, agenthost.ShutdownParams{StopSessions: stopSessions}, nil)
+	if errors.Is(err, ErrDisconnected) {
+		// The host may close the connection while exiting, before its reply
+		// is delivered: that is the shutdown, not a failure of it.
+		return nil
+	}
+	return err
 }
 
 // AckUsage tells the host usage events up to upTo are accounted for.

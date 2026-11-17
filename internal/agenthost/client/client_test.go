@@ -341,6 +341,27 @@ func TestWrongProtocolLeavesOnlyShutdown(t *testing.T) {
 	}
 }
 
+// A window that attaches later finds its sessions in what hello reported.
+func TestHelloTellsWhatTheHostHolds(t *testing.T) {
+	end, host := newFakeHost(t)
+	host.hello.Pid = 4242
+	host.hello.Terminals = []string{"t1", "t2"}
+	host.hello.Chats = []string{"c1"}
+	c, err := client.New(end, client.Config{Token: token})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	got := c.Hello()
+	if got.Pid != 4242 || strings.Join(got.Terminals, ",") != "t1,t2" || strings.Join(got.Chats, ",") != "c1" {
+		t.Errorf("Hello() = %+v", got)
+	}
+	got.Terminals[0] = "changed"
+	if c.Hello().Terminals[0] != "t1" {
+		t.Error("Hello() shares its slices with the client")
+	}
+}
+
 func TestRealServerRefusesAWrongToken(t *testing.T) {
 	srv, err := agenthost.New(agenthost.Config{Token: token})
 	if err != nil {

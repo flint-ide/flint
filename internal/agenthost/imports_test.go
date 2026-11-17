@@ -13,7 +13,7 @@ func TestImportGraphHasNoWails(t *testing.T) {
 	if err != nil {
 		t.Skip("no go tool to list dependencies")
 	}
-	out, err := exec.Command(goTool, "list", "-deps", "-f", "{{.ImportPath}}", ".", "./client").CombinedOutput()
+	out, err := exec.Command(goTool, "list", "-deps", "-f", "{{.ImportPath}}", ".", "./client", "./hostmode").CombinedOutput()
 	if err != nil {
 		t.Skipf("go list failed: %v\n%s", err, out)
 	}

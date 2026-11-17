@@ -107,6 +107,7 @@ func (s *Server) register(cl *client, id string) error {
 	c.stopped = false
 	c.subs[cl] = struct{}{}
 	c.mu.Unlock()
+	s.changed()
 	return nil
 }
 
@@ -227,6 +228,7 @@ func (s *Server) agentStop(_ context.Context, _ *client, raw json.RawMessage) (a
 		c.mu.Lock()
 		c.stopped = true
 		c.mu.Unlock()
+		s.changed()
 	}
 	return struct{}{}, err
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
+	"flint/internal/agenthost/hostmode"
 	"flint/internal/diag"
 	"flint/internal/extensions/sandbox"
 	"flint/internal/shellenv"
@@ -22,6 +23,9 @@ const linuxAppID = "io.github.flint_ide.flint"
 
 func main() {
 	sandbox.Main() // first: started as an extension's sandbox launcher, this never returns
+	// Started with --agent-host this runs the background session host and never
+	// returns, before anything of Wails or the App exists.
+	hostmode.Main(hostmode.Options{Version: diag.Version(version), Drivers: registerHostDrivers})
 	logger := diag.Setup()
 	slog.Info("start", "version", diag.Version(version))
 	flint, err := NewApp()

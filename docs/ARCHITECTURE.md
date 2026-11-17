@@ -303,6 +303,10 @@ An installed extension is a native program, so its install is the trust decision
   - A manifest without `run.sandbox`, one with `"mode": "none"`, and a system without a sandbox all mean the process runs with the user's rights; the install dialog, Settings and the log say which. `extensions.requireSandbox` makes the host refuse to start those. Memory and CPU are not limited.
 - Project-local extensions are not supported: the sandbox is chosen by the manifest, and a repository's extension would need one imposed by the user, required rather than best-effort (the list is in the design document).
 
+### Background session host socket
+
+The background session host (`flint --agent-host`, `internal/agenthost`; the GUI does not start it yet) listens on a Unix socket in its run directory (see [Where Flint stores data](#where-flint-stores-data)). Three checks apply, in order. The directory is `0700` and the socket `0600` (the umask is tightened around the bind, so it never exists wider). The host then compares the connecting process's uid with its own (`SO_PEERCRED` on Linux, `LOCAL_PEERCRED` on macOS) before reading a byte, and refuses to start on a platform that cannot do this. Finally `hello` must carry the token from `host.token`, compared in constant time. The token exists because a sandboxed extension runs as the same user and could otherwise connect: the run directory is still to be added to the paths `sandbox.Build` never grants (not done yet), and the token file is created with `O_EXCL` so a planted file or symlink is replaced, never followed. A connection that fails any check is closed without an answer. The host accepts at most 64 connections at once.
+
 ### Untrusted rendered content
 
 Markdown files, PR descriptions and comments, HTTP responses and terminal output are untrusted. With Wails, any script running in the page can call every bound Go method, so injected markup must never execute.
@@ -356,6 +360,7 @@ Paths are the macOS ones. On Linux, `~/Library/Application Support/flint` is `$X
 | Run configurations | `.flint/run.json` in the project | meant to be committed; format version, validated in Go (unknown fields and types are errors) |
 | Selected run configuration (separately for each workspace project) | the project session (`sessions/<path hash>.json`) | running processes are not restored |
 | Binaries of `go` configurations | `$TMPDIR/flint-run/<hash>/` | overwritten on every run |
+| Run directory of the background session host (`internal/agenthost/hostmode`; nothing in the app starts it yet) | Linux: `$XDG_RUNTIME_DIR/flint-<8 hex of a hash of the config dir>/`; macOS: `~/Library/Application Support/flint/run/`; when the socket path would pass 100 bytes (or there is no `XDG_RUNTIME_DIR`): `/tmp/flint-<uid>-<hash>/` | directory `0700`, refused if it is a symlink or another user's. Three files: `host.lock` (`flock`, so there is one host per config directory; kept after exit), `host.sock` (`0600`) and `host.token` (`0600`, a fresh 256-bit random token written before the host listens). The host removes the socket and the token when it exits; a crashed host's leftovers are replaced by the next one, which holds the lock |
 | Profiles (CPU, memory) and profiled test binaries | `$TMPDIR/flint-profile-*/` | removed when the profile tab closes and on exit; directories older than a day (after a crash) are removed on the next profiling run. Files opened from disk are left alone |
 | Files deleted from the tree | the Trash (`~/.Trash` on macOS, `~/.local/share/Trash` on Linux) | "Put Back" in Finder, "Restore" in a Linux file manager |
 | LSP server caches | the servers' own directories, for example `~/Library/Caches/gopls` | |

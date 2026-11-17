@@ -102,13 +102,19 @@ type HelloParams struct {
 	Token    string `json:"token"`
 }
 
-// HelloResult says what the host speaks. Compatible is false when the
+// HelloResult says what the host speaks and holds. Compatible is false when the
 // protocols differ: the host then only answers host.shutdown, so a newer
 // Flint can replace an older host.
 type HelloResult struct {
 	Protocol   int    `json:"protocol"`
 	Version    string `json:"version"`
 	Compatible bool   `json:"compatible"`
+	// Pid is the host process, so a window can tell which host it found.
+	Pid int `json:"pid"`
+	// Terminals and Chats are the ids the host holds (running, or exited but
+	// not yet released), so a window that attaches later finds its sessions.
+	Terminals []string `json:"terminals"`
+	Chats     []string `json:"chats"`
 }
 
 // TermStartParams is term.start: terminal.Options plus the id.

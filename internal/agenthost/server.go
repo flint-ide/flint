@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"sync"
 	"sync/atomic"
 
@@ -50,6 +51,10 @@ type Config struct {
 	// OnShutdown is called after host.shutdown stopped what it was asked to;
 	// the host mode exits the process from there.
 	OnShutdown func(stopSessions bool)
+	// OnChange is called after the connections or the sessions changed (see
+	// Load), from any goroutine and with no lock held; it must return
+	// quickly. The host mode uses it to start and stop its idle timer.
+	OnChange func()
 }
 
 // Server serves any number of clients.
@@ -149,11 +154,13 @@ func (s *Server) Serve(rwc io.ReadWriteCloser) error {
 	s.mu.Lock()
 	s.clients[cl] = struct{}{}
 	s.mu.Unlock()
+	s.changed()
 	go cl.send()
 
 	err := cl.conn.Serve(rwc)
 	cl.conn.Close(err) // already closed by Serve; makes the dependent goroutines end
 	s.forget(cl)
+	s.changed()
 	return err
 }
 
@@ -215,7 +222,11 @@ func (s *Server) hello(cl *client, raw json.RawMessage) (any, error) {
 	}
 	cl.authed.Store(true)
 	cl.compatible.Store(p.Protocol == Protocol)
-	return HelloResult{Protocol: Protocol, Version: s.cfg.Version, Compatible: p.Protocol == Protocol}, nil
+	terms, chats := s.held()
+	return HelloResult{
+		Protocol: Protocol, Version: s.cfg.Version, Compatible: p.Protocol == Protocol,
+		Pid: os.Getpid(), Terminals: terms, Chats: chats,
+	}, nil
 }
 
 func (s *Server) shutdown(raw json.RawMessage) (any, error) {

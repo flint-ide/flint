@@ -54,10 +54,14 @@ func (s *Server) term(id string) *termEntry {
 // removeTerm deletes the entry if it is still e (the id may have been reused).
 func (s *Server) removeTerm(id string, e *termEntry) {
 	s.termsMu.Lock()
-	if s.termMap[id] == e {
+	removed := s.termMap[id] == e
+	if removed {
 		delete(s.termMap, id)
 	}
 	s.termsMu.Unlock()
+	if removed {
+		s.changed()
+	}
 }
 
 // termEvents is what the terminal manager reports to; it runs on the PTY pump,
@@ -94,6 +98,7 @@ func (ev termEvents) Exited(id string, code int) {
 	if gone {
 		ev.s.removeTerm(id, e)
 	}
+	ev.s.changed() // an exited shell no longer keeps the host running
 }
 
 func (ev termEvents) Title(id string, info terminal.Info) {
@@ -135,6 +140,7 @@ func (s *Server) termStart(_ context.Context, cl *client, raw json.RawMessage) (
 	}
 	s.termMap[p.ID] = e
 	s.termsMu.Unlock()
+	s.changed()
 
 	if err := s.terms.Start(p.ID, p.Options()); err != nil {
 		s.removeTerm(p.ID, e)

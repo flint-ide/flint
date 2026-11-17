@@ -91,7 +91,8 @@ export function Start(agent: string, cwd: string): $CancellablePromise<agentsess
 }
 
 /**
- * Stop ends a conversation and its agent process.
+ * Stop ends a conversation and its agent process, and the agents it started:
+ * they ran under its grant, which ends with it.
  */
 export function Stop(sessionID: string): $CancellablePromise<void> {
     return $Call.ByID(884312191, sessionID);

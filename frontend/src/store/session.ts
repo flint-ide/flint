@@ -94,6 +94,7 @@ async function captureTab(t: Tab, roots: string[]): Promise<SavedTab | null> {
         kind: 'chat',
         title: t.title,
         chat: { id: s.id, agent: s.agent, cwd: s.cwd, model: s.model, draft: s.draft, chat: trimChat(s.chat) },
+        ...(useEditor.getState().hidden.includes(t.id) ? { settled: true } : {}),
       }
     }
     case 'run':
@@ -142,6 +143,7 @@ async function apply(root: string, snap: Snapshot, roots: string[]): Promise<voi
   )
 
   const ids: (string | null)[] = []
+  const settled: string[] = []
   for (const t of snap.tabs) {
     switch (t.kind) {
       case 'file':
@@ -188,6 +190,7 @@ async function apply(root: string, snap: Snapshot, roots: string[]): Promise<voi
       case 'chat':
         useAgentChat.getState().restore(t.chat)
         ids.push(chatTabId(t.chat.id))
+        if (t.settled) settled.push(chatTabId(t.chat.id))
         break
       case 'contrib': {
         // Shown as soon as its extension's tab kind is contributed (after the extensions load).
@@ -200,6 +203,8 @@ async function apply(root: string, snap: Snapshot, roots: string[]): Promise<voi
   }
   const active = ids[snap.active]
   if (active && useEditor.getState().tabs.some((t) => t.id === active)) useEditor.getState().setActive(active)
+  // After the active tab is chosen: a settled tab is never the one shown (hideTab refuses when it would be the last drawn).
+  for (const id of settled) if (id !== active) useEditor.getState().hideTab(id)
 }
 
 let restoring = false
@@ -269,7 +274,7 @@ export function subscribeSessionAutosave(): void {
   if (subscribed) return
   subscribed = true
   useEditor.subscribe((s, prev) => {
-    if (s.tabs !== prev.tabs || s.activeId !== prev.activeId) scheduleSave()
+    if (s.tabs !== prev.tabs || s.activeId !== prev.activeId || s.hidden !== prev.hidden) scheduleSave()
   })
   useTerminal.subscribe((s, prev) => {
     if (s.tabs !== prev.tabs) scheduleSave()

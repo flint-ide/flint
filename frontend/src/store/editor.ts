@@ -1,4 +1,5 @@
 import { createStore } from '../lib/store'
+import { neighbourTab } from '../lib/settledTabs'
 import type { EditorView } from '@codemirror/view'
 import type { ScratchKind, ScratchPad } from '../api/backend'
 import { isWithin, remapPath } from '../lib/fileTree'
@@ -210,6 +211,8 @@ interface EditorState {
   /** Previously active tabs (most recent last), for ⌘[ like IntelliJ's Back. */
   backStack: string[]
   forwardStack: string[]
+  /** Tabs kept but not drawn in the tab strip (settled agent chats); activating one draws it again. */
+  hidden: string[]
   /** background: add the tab without switching to it (session restore). */
   openTerminal: (termId: string, title: string, background?: boolean) => void
   openChat: (sessionId: string, title: string, background?: boolean) => void
@@ -250,6 +253,10 @@ interface EditorState {
   /** Closes file, diff, history and response tabs at or under the given (deleted) paths, and pull requests of removed projects. */
   closePaths: (paths: string[]) => void
   setActive: (id: string) => void
+  /** Stops drawing a tab (it still counts as open); shows a drawn neighbour if it was active. False when no other tab is drawn. */
+  hideTab: (id: string) => boolean
+  /** Draws a hidden tab again without switching to it. */
+  showTab: (id: string) => void
   setDirty: (id: string, dirty: boolean) => void
   /** Replaces a contributed tab's data (saved with the session when its kind restores). */
   setTabData: (id: string, data: unknown) => void
@@ -273,16 +280,18 @@ let revealSeq = 0
 
 /** Switches to id, remembering the previous tab for Back. */
 function activate(s: EditorState, id: string): Partial<EditorState> {
+  const hidden = s.hidden.includes(id) ? s.hidden.filter((x) => x !== id) : s.hidden
   if (s.activeId === id) return {} // no-op: subscribers are not notified
   const backStack = s.activeId ? [...s.backStack, s.activeId].slice(-HISTORY_LIMIT) : s.backStack
-  return { activeId: id, backStack, forwardStack: [] }
+  return { activeId: id, backStack, forwardStack: [], ...(hidden === s.hidden ? {} : { hidden }) }
 }
 
-export const useEditor = createStore<EditorState>((set) => ({
+export const useEditor = createStore<EditorState>((set, get) => ({
   tabs: [],
   activeId: null,
   backStack: [],
   forwardStack: [],
+  hidden: [],
 
   openTerminal: (termId, title, background) =>
     set((s) => {
@@ -344,7 +353,7 @@ export const useEditor = createStore<EditorState>((set) => ({
 
   back: () =>
     set((s) => {
-      const stack = s.backStack.filter((id) => id !== s.activeId && s.tabs.some((t) => t.id === id))
+      const stack = s.backStack.filter((id) => id !== s.activeId && !s.hidden.includes(id) && s.tabs.some((t) => t.id === id))
       const target = stack.pop()
       if (!target) return {}
       return { activeId: target, backStack: stack, forwardStack: s.activeId ? [...s.forwardStack, s.activeId] : s.forwardStack }
@@ -352,7 +361,7 @@ export const useEditor = createStore<EditorState>((set) => ({
 
   forward: () =>
     set((s) => {
-      const stack = s.forwardStack.filter((id) => id !== s.activeId && s.tabs.some((t) => t.id === id))
+      const stack = s.forwardStack.filter((id) => id !== s.activeId && !s.hidden.includes(id) && s.tabs.some((t) => t.id === id))
       const target = stack.pop()
       if (!target) return {}
       return { activeId: target, forwardStack: stack, backStack: s.activeId ? [...s.backStack, s.activeId] : s.backStack }
@@ -521,6 +530,17 @@ export const useEditor = createStore<EditorState>((set) => ({
 
   setActive: (id) => set((s) => activate(s, id)),
 
+  hideTab: (id) => {
+    const s = get()
+    if (!s.tabs.some((t) => t.id === id) || s.hidden.includes(id)) return false
+    const next = s.activeId === id ? neighbourTab(s.tabs.map((t) => t.id), new Set(s.hidden), id) : s.activeId
+    if (!next) return false
+    set((cur) => ({ ...(next === cur.activeId ? {} : activate(cur, next)), hidden: [...cur.hidden.filter((x) => x !== next), id] }))
+    return true
+  },
+
+  showTab: (id) => set((s) => (s.hidden.includes(id) ? { hidden: s.hidden.filter((x) => x !== id) } : {})),
+
   setDirty: (id, dirty) =>
     set((s) => {
       const tab = s.tabs.find((t) => t.id === id)
@@ -559,10 +579,13 @@ function removeTab(s: EditorState, id: string): Partial<EditorState> {
   const tabs = s.tabs.filter((t) => t.id !== id)
   const backStack = s.backStack.filter((x) => x !== id)
   const forwardStack = s.forwardStack.filter((x) => x !== id)
-  if (s.activeId !== id) return { tabs, backStack, forwardStack }
-  const previous = [...backStack].reverse().find((x) => tabs.some((t) => t.id === x))
-  const activeId = previous ?? tabs[Math.min(idx, tabs.length - 1)]?.id ?? null
-  return { tabs, activeId, backStack: backStack.filter((x) => x !== activeId), forwardStack }
+  const hidden = s.hidden.filter((x) => x !== id)
+  if (s.activeId !== id) return { tabs, backStack, forwardStack, hidden }
+  // Closing a tab must not bring a settled one back by accident: prefer tabs that are drawn.
+  const drawn = (x: string) => !hidden.includes(x) && tabs.some((t) => t.id === x)
+  const previous = [...backStack].reverse().find(drawn)
+  const activeId = previous ?? neighbourTab(s.tabs.map((t) => t.id), new Set(hidden), id) ?? tabs[Math.min(idx, tabs.length - 1)]?.id ?? null
+  return { tabs, activeId, backStack: backStack.filter((x) => x !== activeId), forwardStack, hidden: hidden.filter((x) => x !== activeId) }
 }
 
 /** Save callbacks registered by mounted editors, keyed by tab id. */

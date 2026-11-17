@@ -1,8 +1,10 @@
 import { useEffect, useMemo } from 'react'
 import { agentRows, attentionCount, stateHint, stateLabel, type AgentRow } from '../../lib/agentList'
+import { modKey, modifierName } from '../../lib/platform'
 import { useAgentChat } from '../../store/agentChat'
 import { followTasks, useTasks } from '../../store/agentTasks'
-import { focusAgent, useAgents } from '../../store/agents'
+import { focusAgent, peekAgent, settleChat, settledChats, unsettleChat, useAgents } from '../../store/agents'
+import { useEditor } from '../../store/editor'
 
 /** Every agent of this window, the ones that need you first; a click shows its chat. */
 export function AgentsPanel() {
@@ -10,12 +12,13 @@ export function AgentsPanel() {
   const order = useAgentChat((s) => s.order)
   const tasks = useTasks((s) => s.tasks)
   const unseen = useAgents((s) => s.unseen)
+  const hidden = useEditor((s) => s.hidden)
   // Task states come from Go's events; following them is what keeps this list current.
   useEffect(() => followTasks(), [])
 
   const rows = useMemo(
-    () => agentRows({ sessions: order.flatMap((id) => (sessions[id] ? [sessions[id]] : [])), tasks, unseen }),
-    [sessions, order, tasks, unseen],
+    () => agentRows({ sessions: order.flatMap((id) => (sessions[id] ? [sessions[id]] : [])), tasks, unseen, settled: settledChats(hidden) }),
+    [sessions, order, tasks, unseen, hidden],
   )
   const attention = attentionCount(rows)
 
@@ -36,16 +39,31 @@ export function AgentsPanel() {
 function AgentRowView({ row }: { row: AgentRow }) {
   // finished-unseen shares the look of a finished task.
   const look = row.state === 'finished-unseen' ? 'finished' : row.state
+  const id = row.sessionId
   return (
     <div className="task">
-      <div className="tree-row static task-row" title={`${row.title}\n\n${row.root}`} onClick={() => focusAgent(row)}>
+      <div
+        className="tree-row static task-row"
+        title={`${row.title}\n\n${row.root}${id ? `\n\n${modifierName('Mod')}-click to peek without leaving your tab` : ''}`}
+        onClick={(e) => (id && modKey(e) ? peekAgent(id) : focusAgent(row))}
+      >
         <span className={`task-state ${look}`} title={stateHint(row.state)}>{stateLabel(row.state)}</span>
         <span className="file-name">{row.title}</span>
       </div>
       <div className="task-meta muted">
-        <span>{row.agent}{row.kind === 'task' ? ' · task' : ''}</span>
+        <span>{row.agent}{row.kind === 'task' ? ' · task' : ''}{row.hidden ? ' · hidden' : ''}</span>
         <span title={row.root}>{row.project}</span>
       </div>
+      {id && (
+        <div className="task-actions">
+          <button className="link" onClick={() => peekAgent(id)} title="Show the chat over your current tab: answer a request or send a prompt, then go back">Peek</button>
+          {row.hidden ? (
+            <button className="link" onClick={() => unsettleChat(id)} title="Draw the chat's tab again">Show tab</button>
+          ) : (
+            <button className="link" onClick={() => settleChat(id)} title="Hide the chat's tab until the agent needs you">Hide until needed</button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

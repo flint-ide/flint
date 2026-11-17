@@ -9,7 +9,8 @@ interface Props {
 
 export function Modal({ title, onClose, children, className = '' }: Props) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    // Esc that something inside already used (stopping an agent in a chat, closing a menu) does not also close the dialog.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !e.defaultPrevented && onClose()
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])

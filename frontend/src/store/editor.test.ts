@@ -4,7 +4,7 @@ import { useEditor } from './editor'
 
 const st = () => useEditor.getState()
 
-beforeEach(() => useEditor.setState({ tabs: [], activeId: null, backStack: [], forwardStack: [] }))
+beforeEach(() => useEditor.setState({ tabs: [], activeId: null, backStack: [], forwardStack: [], hidden: [] }))
 
 describe('editor tabs history', () => {
   it('goes back from a file opened in the terminal to the terminal', () => {
@@ -196,5 +196,64 @@ describe('settings tab', () => {
     const asked = settingsTab()?.page
     st().openSettings()
     assert.deepEqual(settingsTab()?.page, asked)
+  })
+})
+
+describe('hidden tabs', () => {
+  const open3 = () => {
+    st().openTerminal('t1', 'zsh')
+    st().openFile('/p/a.go')
+    st().openFile('/p/b.go')
+  }
+
+  it('hides the active tab and shows a neighbour that is drawn', () => {
+    open3()
+    st().setActive('file:/p/a.go')
+    assert.equal(st().hideTab('file:/p/a.go'), true)
+    assert.deepEqual(st().hidden, ['file:/p/a.go'])
+    assert.equal(st().activeId, 'file:/p/b.go')
+    assert.equal(st().tabs.length, 3) // still a tab: only not drawn
+  })
+
+  it('refuses to hide the only drawn tab', () => {
+    st().openTerminal('t1', 'zsh')
+    assert.equal(st().hideTab('term:t1'), false)
+    assert.deepEqual(st().hidden, [])
+  })
+
+  it('shows a tab again without switching to it', () => {
+    open3()
+    st().hideTab('term:t1')
+    st().showTab('term:t1')
+    assert.deepEqual(st().hidden, [])
+    assert.equal(st().activeId, 'file:/p/b.go')
+  })
+
+  it('activating a hidden tab shows it', () => {
+    open3()
+    st().hideTab('term:t1')
+    st().setActive('term:t1')
+    assert.deepEqual(st().hidden, [])
+  })
+
+  it('closing the active tab does not land on a hidden one', () => {
+    open3()
+    st().setActive('term:t1')
+    st().setActive('file:/p/a.go')
+    st().hideTab('term:t1')
+    st().setActive('file:/p/b.go')
+    st().closeTab('file:/p/b.go')
+    assert.equal(st().activeId, 'file:/p/a.go')
+  })
+
+  it('forgets a hidden tab that closes, and going back skips hidden tabs', () => {
+    open3()
+    st().setActive('term:t1')
+    st().setActive('file:/p/a.go')
+    st().hideTab('term:t1')
+    st().back()
+    assert.notEqual(st().activeId, 'term:t1')
+    st().closeTab('term:t1')
+    assert.deepEqual(st().hidden, [])
   })
 })

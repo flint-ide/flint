@@ -37,6 +37,7 @@ export const stateHint = (s: AgentRunState): string => HINTS[s]
 
 /** The states that ask something of the user. */
 const NEEDS_USER: readonly AgentRunState[] = ['waiting', 'failed', 'finished-unseen']
+export const needsUser = (s: AgentRunState): boolean => NEEDS_USER.includes(s)
 
 export type SettledChatState = 'idle' | 'working' | 'waiting' | 'finished' | 'failed'
 
@@ -90,6 +91,8 @@ export interface AgentRow {
   /** Last folder name of root. */
   project: string
   state: AgentRunState
+  /** The chat's tab is settled: not drawn in the tab strip until the agent needs the user. */
+  hidden: boolean
 }
 
 const trimSlash = (p: string) => p.replace(/\/+$/, '')
@@ -115,16 +118,19 @@ export interface AgentListInput {
   tasks: readonly TaskView[]
   /** Ids of chats from nextUnseen. */
   unseen: readonly string[]
+  /** Ids of chats whose tab is settled (store/agents.ts). */
+  settled?: readonly string[]
 }
 
 /** Every live agent of the window, most urgent first (stable within a state). */
-export function agentRows({ sessions, tasks, unseen }: AgentListInput): AgentRow[] {
+export function agentRows({ sessions, tasks, unseen, settled = [] }: AgentListInput): AgentRow[] {
   const unseenIds = new Set(unseen)
+  const settledIds = new Set(settled)
   const live = tasks.filter((t) => !t.stale)
   const rows: AgentRow[] = sessions.map((s): AgentRow => {
     const task = live.find((t) => trimSlash(t.worktree) === trimSlash(s.cwd))
     const mine = unseenIds.has(s.id)
-    const base = { key: `chat:${s.id}`, sessionId: s.id, agent: s.agent, root: s.cwd, project: folderName(s.cwd) }
+    const base = { key: `chat:${s.id}`, sessionId: s.id, agent: s.agent, root: s.cwd, project: folderName(s.cwd), hidden: settledIds.has(s.id) }
     if (task) return { ...base, kind: 'task', taskId: task.id, title: task.title, state: taskStateOf(task.state, mine) }
     const state = chatState(s.chat, !!s.dormant)
     return { ...base, kind: 'chat', title: chatTitle(s.chat), state: state === 'finished' ? (mine ? 'finished-unseen' : 'idle') : state }
@@ -132,10 +138,14 @@ export function agentRows({ sessions, tasks, unseen }: AgentListInput): AgentRow
   // A queued task has no chat yet but is an agent that will start; settled tasks without a chat are the Tasks panel's.
   for (const t of live) {
     if (t.state !== 'queued' || sessions.some((s) => trimSlash(s.cwd) === trimSlash(t.worktree))) continue
-    rows.push({ key: `task:${t.id}`, kind: 'task', taskId: t.id, agent: t.agent, title: t.title, root: t.worktree, project: folderName(t.worktree), state: 'queued' })
+    rows.push({ key: `task:${t.id}`, kind: 'task', taskId: t.id, agent: t.agent, title: t.title, root: t.worktree, project: folderName(t.worktree), state: 'queued', hidden: false })
   }
   return rows.map((row, i) => ({ row, i })).sort((a, b) => RANK[a.row.state] - RANK[b.row.state] || a.i - b.i).map((x) => x.row)
 }
 
 /** How many agents wait for the user: waiting, failed or finished unseen. */
-export const attentionCount = (rows: readonly AgentRow[]): number => rows.filter((r) => NEEDS_USER.includes(r.state)).length
+export const attentionCount = (rows: readonly AgentRow[]): number => rows.filter((r) => needsUser(r.state)).length
+
+/** The first agent in the panel's order that needs the user and has a chat to show (a queued task has none). */
+export const firstNeedingAttention = (rows: readonly AgentRow[]): AgentRow | undefined =>
+  rows.find((r) => r.sessionId && needsUser(r.state))

@@ -5,6 +5,7 @@ import {
   attentionCount,
   chatState,
   chatTitle,
+  firstNeedingAttention,
   nextUnseen,
   stateLabel,
   type AgentChatInput,
@@ -141,5 +142,31 @@ describe('attentionCount and labels', () => {
     assert.equal(stateLabel('waiting'), 'waiting for you')
     assert.equal(stateLabel('finished-unseen'), 'finished')
     assert.equal(stateLabel('queued'), 'queued')
+  })
+})
+
+describe('firstNeedingAttention', () => {
+  const rows = agentRows({
+    sessions: [
+      session('a', { chat: chat([user('x')], true) }),
+      session('b', { chat: chat([user('x'), end('end_turn')]) }),
+      session('c', { chat: chat([user('x'), ask(false)], true) }),
+    ],
+    tasks: [],
+    unseen: ['b'],
+  })
+  it('is the first row in the panel order that needs the user', () => assert.equal(firstNeedingAttention(rows)?.sessionId, 'c'))
+  it('is undefined when nobody needs the user', () =>
+    assert.equal(firstNeedingAttention(agentRows({ sessions: [session('a', { chat: chat([user('x')], true) })], tasks: [], unseen: [] })), undefined))
+  it('skips a row that has no chat to show', () => {
+    const failedTask = agentRows({ sessions: [], tasks: [task({ state: 'queued' })], unseen: [] })
+    assert.equal(firstNeedingAttention(failedTask), undefined)
+  })
+})
+
+describe('hidden rows', () => {
+  it('marks settled chats and keeps them listed', () => {
+    const rows = agentRows({ sessions: [session('a'), session('b')], tasks: [], unseen: [], settled: ['b'] })
+    assert.deepEqual(rows.map((r) => [r.sessionId, r.hidden]), [['a', false], ['b', true]])
   })
 })

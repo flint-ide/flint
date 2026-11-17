@@ -45,7 +45,8 @@ export type SavedTab =
       /** The agent CLI (claude, codex) that ran in it, started again when the terminal reopens. */
       resume?: TerminalResume
     }
-  | { kind: 'chat'; title: string; chat: SavedChat }
+  /** settled: the tab is hidden until the agent needs the user (absent: drawn). An optional field, so older snapshots stay valid. */
+  | { kind: 'chat'; title: string; chat: SavedChat; settled?: boolean }
   /** A tab of a kind that restores (an extension's tab view): reopened from its key and data. */
   | { kind: 'contrib'; view: string; key: string; title: string; data?: unknown }
 

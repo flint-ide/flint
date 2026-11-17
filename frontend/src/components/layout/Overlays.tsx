@@ -2,6 +2,7 @@ import { useDialog } from '../../store/dialog'
 import { useGit } from '../../store/git'
 import { PullProjectPopup } from '../git/PullProjectPopup'
 import { Modal } from './Modal'
+import { AgentPeek } from '../agents/AgentPeek'
 import { ContextMenu } from '../ui/ContextMenu'
 import { closeSignInDialog, useAccounts } from '../../store/accounts'
 import { SignInWithGitHub } from '../accounts/SignInWithGitHub'
@@ -37,6 +38,7 @@ export function Overlays() {
         </Modal>
       )}
       {pullPicker && <PullProjectPopup />}
+      <AgentPeek />
       <ContextMenu />
       {toast && <div className={`toast ${toast.kind}`} role="status">{toast.message}</div>}
     </>

@@ -92,7 +92,7 @@ The tools are `Acts: true` with a new `Tool.Granted func(ctx) bool`; `approveAct
 
 `Events` gains `AgentState(id, state string)`, emitted as `term:agent`.
 
-Flint never edits `~/.claude/settings.json`. It writes `<config>/agent-hooks/claude-status.json` with hooks that print the sequence to `/dev/tty`, and uses it only when Flint itself types `claude` into a terminal (`claude --settings '<path>'`). Settings offers "Copy hook snippet" for the user's own setup. **Unverified:** whether `--settings` merges hooks with the user's, and whether hook processes can open `/dev/tty`.
+Flint never edits `~/.claude/settings.json`. It writes `<config>/agent-hooks/claude-status.json` with hooks that print the sequence to `/dev/tty`, and uses it only when Flint itself types `claude` into a terminal (`claude --settings '<path>'`). Settings offers "Copy hook snippet" for the user's own setup. **Checked while building it:** a hook-like command (a child of the foreground program, output piped) can write the sequence to `/dev/tty` and the parser sees it (`internal/terminal/agentstate_test.go`); `claude --help` describes `--settings` as loading "more settings" and keeps it separate from `--setting-sources` (user, project, local). **Still unverified:** that `--settings` hooks are merged with the user's own rather than replacing them, and that Claude Code spawns hooks in the terminal's session so `/dev/tty` opens (both need a real Claude Code session). The number 6977 was checked against the private OSC numbers of iTerm2, kitty, VTE, WezTerm, Ghostty, foot, VS Code and FinalTerm from their documentation.
 
 ### Key types
 

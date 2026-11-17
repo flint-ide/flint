@@ -21,6 +21,10 @@ type Orchestration struct {
 	NotifyParent bool `json:"notifyParent"`
 	// OutputLines is the most lines read_agent_output returns.
 	OutputLines int `json:"outputLines"`
+	// MaxAutoTurns is how many turns agents may start in each other (send_prompt,
+	// a child's first prompt, a delivered notice) in one group of chats before
+	// the user writes in it again; the next ones are refused.
+	MaxAutoTurns int `json:"maxAutoTurns"`
 }
 
 // Bounds of the orchestration settings: every child is an agent process
@@ -30,10 +34,11 @@ const (
 	MaxOrchestrationDepth       = 4
 	MaxOrchestrationWait        = 600 // the MCP server's own cap on one call
 	MaxOrchestrationOutputLines = 2000
+	MaxOrchestrationAutoTurns   = 400
 )
 
 func defaultOrchestration() Orchestration {
-	return Orchestration{MaxChildren: 4, MaxDepth: 2, MaxWaitSeconds: 600, NotifyParent: true, OutputLines: 200}
+	return Orchestration{MaxChildren: 4, MaxDepth: 2, MaxWaitSeconds: 600, NotifyParent: true, OutputLines: 200, MaxAutoTurns: 40}
 }
 
 // CheckOrchestration reports the first value out of range.
@@ -46,6 +51,7 @@ func CheckOrchestration(o Orchestration) error {
 		{"maxDepth", o.MaxDepth, MaxOrchestrationDepth},
 		{"maxWaitSeconds", o.MaxWaitSeconds, MaxOrchestrationWait},
 		{"outputLines", o.OutputLines, MaxOrchestrationOutputLines},
+		{"maxAutoTurns", o.MaxAutoTurns, MaxOrchestrationAutoTurns},
 	} {
 		if f.v < 1 || f.v > f.hi {
 			return fmt.Errorf("orchestration.%s %d out of range 1–%d", f.key, f.v, f.hi)
@@ -68,5 +74,6 @@ func normalizeOrchestration(o Orchestration) Orchestration {
 	o.MaxDepth = clamp(o.MaxDepth, MaxOrchestrationDepth, def.MaxDepth)
 	o.MaxWaitSeconds = clamp(o.MaxWaitSeconds, MaxOrchestrationWait, def.MaxWaitSeconds)
 	o.OutputLines = clamp(o.OutputLines, MaxOrchestrationOutputLines, def.OutputLines)
+	o.MaxAutoTurns = clamp(o.MaxAutoTurns, MaxOrchestrationAutoTurns, def.MaxAutoTurns)
 	return o
 }

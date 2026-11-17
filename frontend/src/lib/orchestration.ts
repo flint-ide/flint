@@ -16,6 +16,8 @@ export interface OrchestrationSettings {
   notifyParent: boolean
   /** Most lines read_agent_output returns. */
   outputLines: number
+  /** Most turns agents may start in each other before the user writes in the group again. */
+  maxAutoTurns: number
 }
 
 /** Mirrors Go's defaultOrchestration. */
@@ -26,6 +28,7 @@ export const DEFAULT_ORCHESTRATION: OrchestrationSettings = Object.freeze({
   maxWaitSeconds: 600,
   notifyParent: true,
   outputLines: 200,
+  maxAutoTurns: 40,
 })
 
 /** Same bounds as Go (MaxOrchestration*). */
@@ -34,6 +37,7 @@ export const ORCHESTRATION_LIMITS = {
   maxDepth: { min: 1, max: 4 },
   maxWaitSeconds: { min: 1, max: 600 },
   outputLines: { min: 1, max: 2000 },
+  maxAutoTurns: { min: 1, max: 400 },
 } as const
 
 type NumberKey = keyof typeof ORCHESTRATION_LIMITS
@@ -55,5 +59,6 @@ export function coerceOrchestration(v: unknown): OrchestrationSettings {
     maxWaitSeconds: clamp('maxWaitSeconds', o.maxWaitSeconds),
     notifyParent: typeof o.notifyParent === 'boolean' ? o.notifyParent : d.notifyParent,
     outputLines: clamp('outputLines', o.outputLines),
+    maxAutoTurns: clamp('maxAutoTurns', o.maxAutoTurns),
   }
 }

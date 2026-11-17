@@ -85,6 +85,12 @@ func (a *App) flushNotices(parent string, attempt int) {
 		return
 	}
 	a.notices.EndTurn(parent) // no turn started
+	if errors.Is(err, errAutoTurns) {
+		// The budget is spent: these notices would only ask for the next turn.
+		// Dropped, not requeued; the user writing in the group starts it again.
+		a.logf("orchestrate: notice for %s dropped: %v", parent, err)
+		return
+	}
 	a.notices.Requeue(parent, taken)
 	if errors.Is(err, as.ErrBusy) && attempt < noticeRetries {
 		time.AfterFunc(noticeRetryIn, func() { a.flushNotices(parent, attempt+1) })

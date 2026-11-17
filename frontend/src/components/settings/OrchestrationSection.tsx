@@ -17,6 +17,12 @@ const NUMBERS: { key: keyof typeof ORCHESTRATION_LIMITS; label: string; hint: st
     suffix: 's',
   },
   { key: 'outputLines', label: 'Output lines', hint: 'Most lines read_agent_output returns, redacted.', suffix: 'lines' },
+  {
+    key: 'maxAutoTurns',
+    label: 'Turns without you',
+    hint: 'Most turns agents may start in each other (messages, first prompts, notices) before you write in one of their chats again. Past it they are told to stop and report to you.',
+    suffix: 'turns',
+  },
 ]
 
 /** Settings ▸ Agents ▸ Agent orchestration: agents that start and direct other agents. */

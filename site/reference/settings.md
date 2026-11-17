@@ -81,7 +81,7 @@ The file is readable only by your user. It never contains secrets: database pass
   },
   "inlineEdit": { "contextLines": 60 },
   "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/", "maxParallel": 3 },
-  "orchestration": { "enabled": false, "maxChildren": 4, "maxDepth": 2, "maxWaitSeconds": 600, "notifyParent": true, "outputLines": 200 },
+  "orchestration": { "enabled": false, "maxChildren": 4, "maxDepth": 2, "maxWaitSeconds": 600, "notifyParent": true, "outputLines": 200, "maxAutoTurns": 40 },
   "usage": {
     "retentionDays": 90,
     "dailyBudgetUsd": 20,
@@ -306,6 +306,7 @@ Lets an agent chat start other agents in the same project, send them messages, w
 | `maxWaitSeconds` | integer | 1–600 | `600` | The longest one `wait_for_agent` call. |
 | `notifyParent` | boolean | | `true` | When an agent a chat started waits for approval, fails or finishes, Flint sends that chat one short message (`[Flint] child … is …`) with the agent's last 20 lines, so it need not poll. |
 | `outputLines` | integer | 1–2000 | `200` | The most lines `read_agent_output` returns (redacted). |
+| `maxAutoTurns` | integer | 1–400 | `40` | The most turns agents may start in each other (a `send_prompt`, a started agent's first prompt, a delivered `[Flint]` notice) in one group of chats, counted from the last message you typed in any chat of that group. Past it, agents are told to stop and report to you, and no notices are delivered; typing a message in any of the chats starts the count again. |
 
 Out-of-range numbers are clamped; `0` or a missing number is the default. What is not a setting, on purpose: the grant covers one project only, never an untrusted folder (Restricted Mode), lives in memory and ends with the chat, and an agent that was refused is not asked about again. Messages an agent sends to another are redacted and appear in the target's chat, but are not previewed first. See [ARCHITECTURE.md](https://github.com/flint-ide/flint/blob/main/docs/ARCHITECTURE.md#security-model).
 

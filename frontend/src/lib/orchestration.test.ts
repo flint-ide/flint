@@ -10,13 +10,14 @@ describe('coerceOrchestration', () => {
   })
 
   it('clamps like Go', () => {
-    assert.deepEqual(coerceOrchestration({ maxChildren: 99, maxDepth: -1, maxWaitSeconds: 99999, outputLines: 0, notifyParent: false }), {
+    assert.deepEqual(coerceOrchestration({ maxChildren: 99, maxDepth: -1, maxWaitSeconds: 99999, outputLines: 0, maxAutoTurns: 9999, notifyParent: false }), {
       enabled: false,
       maxChildren: 16,
       maxDepth: 1,
       maxWaitSeconds: 600,
       notifyParent: false,
       outputLines: 200,
+      maxAutoTurns: 400,
     })
     assert.equal(coerceOrchestration({ maxChildren: 'x' }).maxChildren, 4)
     assert.equal(coerceOrchestration({ maxDepth: 2.6 }).maxDepth, 3)

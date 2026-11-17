@@ -73,6 +73,7 @@ Settings (`internal/settings/orchestration.go`):
 | `orchestration.maxWaitSeconds` | 600 | |
 | `orchestration.notifyParent` | `true` | |
 | `orchestration.outputLines` | 200 | |
+| `orchestration.maxAutoTurns` | 40 | Turns agents may start in each other between two user messages (max 400). |
 
 Fixed rules (constants, not settings): same project only; trusted folders only; the grant dies with the chat.
 

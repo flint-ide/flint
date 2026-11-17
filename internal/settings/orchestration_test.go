@@ -7,7 +7,7 @@ import (
 
 func TestOrchestrationDefaults(t *testing.T) {
 	d := Default().Orchestration
-	want := Orchestration{Enabled: false, MaxChildren: 4, MaxDepth: 2, MaxWaitSeconds: 600, NotifyParent: true, OutputLines: 200}
+	want := Orchestration{Enabled: false, MaxChildren: 4, MaxDepth: 2, MaxWaitSeconds: 600, NotifyParent: true, OutputLines: 200, MaxAutoTurns: 40}
 	if d != want {
 		t.Errorf("defaults = %+v, want %+v", d, want)
 	}
@@ -19,8 +19,8 @@ func TestOrchestrationDefaults(t *testing.T) {
 func TestCheckOrchestration(t *testing.T) {
 	for _, o := range []Orchestration{
 		defaultOrchestration(),
-		{MaxChildren: 1, MaxDepth: 1, MaxWaitSeconds: 1, OutputLines: 1},
-		{MaxChildren: MaxOrchestrationChildren, MaxDepth: MaxOrchestrationDepth, MaxWaitSeconds: MaxOrchestrationWait, OutputLines: MaxOrchestrationOutputLines},
+		{MaxChildren: 1, MaxDepth: 1, MaxWaitSeconds: 1, OutputLines: 1, MaxAutoTurns: 1},
+		{MaxChildren: MaxOrchestrationChildren, MaxDepth: MaxOrchestrationDepth, MaxWaitSeconds: MaxOrchestrationWait, OutputLines: MaxOrchestrationOutputLines, MaxAutoTurns: MaxOrchestrationAutoTurns},
 	} {
 		if err := CheckOrchestration(o); err != nil {
 			t.Errorf("%+v: %v", o, err)
@@ -36,6 +36,8 @@ func TestCheckOrchestration(t *testing.T) {
 		"wait long":     func(o *Orchestration) { o.MaxWaitSeconds = MaxOrchestrationWait + 1 },
 		"lines zero":    func(o *Orchestration) { o.OutputLines = 0 },
 		"lines many":    func(o *Orchestration) { o.OutputLines = MaxOrchestrationOutputLines + 1 },
+		"turns zero":    func(o *Orchestration) { o.MaxAutoTurns = 0 },
+		"turns many":    func(o *Orchestration) { o.MaxAutoTurns = MaxOrchestrationAutoTurns + 1 },
 	}
 	for name, mutate := range bad {
 		o := base
@@ -52,12 +54,12 @@ func TestCheckOrchestration(t *testing.T) {
 }
 
 func TestOrchestrationNormalize(t *testing.T) {
-	s, err := decode([]byte(`{"orchestration":{"enabled":true,"maxChildren":99,"maxDepth":-1,"maxWaitSeconds":99999,"outputLines":0}}`))
+	s, err := decode([]byte(`{"orchestration":{"enabled":true,"maxChildren":99,"maxDepth":-1,"maxWaitSeconds":99999,"outputLines":0,"maxAutoTurns":9999}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	o := s.Orchestration
-	if !o.Enabled || o.MaxChildren != MaxOrchestrationChildren || o.MaxDepth != 1 || o.MaxWaitSeconds != MaxOrchestrationWait || o.OutputLines != 200 {
+	if !o.Enabled || o.MaxChildren != MaxOrchestrationChildren || o.MaxDepth != 1 || o.MaxWaitSeconds != MaxOrchestrationWait || o.OutputLines != 200 || o.MaxAutoTurns != MaxOrchestrationAutoTurns {
 		t.Errorf("normalized = %+v", o)
 	}
 	empty, err := decode([]byte(`{}`))

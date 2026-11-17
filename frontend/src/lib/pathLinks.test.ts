@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { assertSubset } from '../testing/assertSubset'
-import { findPathLinks, resolvePath } from './pathLinks'
+import { findPathLinks, firstExisting, linkBases, linkCandidates, resolvePath } from './pathLinks'
 
 describe('findPathLinks', () => {
   it('finds paths with line and column', () => {
@@ -39,4 +39,38 @@ describe('resolvePath', () => {
   it('keeps absolute paths', () => {
     assert.equal(resolvePath('/p', '/etc/hosts'), '/etc/hosts')
   })
+})
+
+describe('linkBases', () => {
+  it('keeps the given order and drops empty entries', () =>
+    assert.deepEqual(linkBases(['/b', null, '', undefined, '/a']), ['/b', '/a']))
+  it('drops repeats, also with a trailing slash', () => assert.deepEqual(linkBases(['/a', '/b/', '/a/', '/b']), ['/a', '/b/']))
+  it('keeps the filesystem root', () => assert.deepEqual(linkBases(['/', '/']), ['/']))
+})
+
+describe('linkCandidates', () => {
+  it('resolves a relative path against every base, in order', () =>
+    assert.deepEqual(linkCandidates(['/b', '/a'], 'src/x.ts'), ['/b/src/x.ts', '/a/src/x.ts']))
+  it('drops candidates that resolve to the same file', () =>
+    assert.deepEqual(linkCandidates(['/a', '/a/b/..'], 'x.ts'), ['/a/x.ts']))
+  it('leaves an absolute path alone', () => assert.deepEqual(linkCandidates(['/a', '/b'], '/etc/x'), ['/etc/x']))
+  it('has none without a base', () => assert.deepEqual(linkCandidates([], 'x.ts'), []))
+})
+
+describe('firstExisting', () => {
+  it('returns the first candidate that exists, and stops there', async () => {
+    const asked: string[] = []
+    const got = await firstExisting(['/a/x', '/b/x', '/c/x'], async (p) => (asked.push(p), p !== '/a/x'))
+    assert.equal(got, '/b/x')
+    assert.deepEqual(asked, ['/a/x', '/b/x'])
+  })
+  it('is null when none exists', async () => assert.equal(await firstExisting(['/a'], async () => false), null))
+  it('treats a failing check as not found', async () =>
+    assert.equal(
+      await firstExisting(['/a', '/b'], async (p) => {
+        if (p === '/a') throw new Error('boom')
+        return true
+      }),
+      '/b',
+    ))
 })

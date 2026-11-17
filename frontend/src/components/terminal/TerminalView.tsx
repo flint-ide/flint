@@ -15,7 +15,8 @@ import {
 } from '../../store/terminal'
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
-import { findPathLinks, resolvePath } from '../../lib/pathLinks'
+import { fileExists } from '../../store/run'
+import { findPathLinks, firstExisting, linkBases, linkCandidates } from '../../lib/pathLinks'
 import { showToast } from '../../store/dialog'
 import { errorMessage } from '../../api/backend'
 import { focusSoon } from '../../lib/focusSoon'
@@ -98,9 +99,7 @@ export function TerminalView({ tab, active }: Props) {
           decorations: { underline: true, pointerCursor: true },
           activate: (e) => {
             if (!modKey(e)) return
-            // Relative paths in agent output are relative to the terminal's project.
-            const root = tab.project || useWorkspace.getState().root || tab.cwd
-            useEditor.getState().openFile(resolvePath(root, l.path), l.line ? { line: l.line, from: 0, to: 0 } : undefined)
+            void openLink(tab, l.path, l.line ? { line: l.line, from: 0, to: 0 } : undefined)
           },
         }))
         callback(links)
@@ -238,4 +237,19 @@ function readBuffer(xterm: XTerm, maxLines: number): string {
 /** Starts what the tab shows: a local shell. */
 function startSession(tab: TerminalTab, cols: number, rows: number): Promise<void> {
   return TerminalBackend.Start(tab.id, tab.cwd, cols, rows, tab.env ?? {})
+}
+
+/**
+ * Opens a path clicked in a terminal. A relative one is tried against, in turn, where
+ * the shell is now (it may have cd-ed out of the folder the terminal started in), the
+ * folder it started in, its project and the workspace folders; the first with the file
+ * wins. When none has it the first candidate is opened, so its error shows as before.
+ */
+async function openLink(tab: TerminalTab, path: string, reveal?: { line: number; from: number; to: number }): Promise<void> {
+  const workspace = useWorkspace.getState()
+  const live = await TerminalBackend.Cwd(tab.id).catch(() => '')
+  const candidates = linkCandidates(linkBases([live, tab.cwd, tab.project, workspace.root, ...workspace.roots]), path)
+  const found = candidates.length > 1 ? await firstExisting(candidates, fileExists) : null
+  const target = found ?? candidates[0]
+  if (target) useEditor.getState().openFile(target, reveal)
 }

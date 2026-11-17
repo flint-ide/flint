@@ -76,6 +76,8 @@ A file is at most 64 KB, and a folder is read up to 50 files.
 
 **New Agent…** in Settings ▸ Agents ▸ Defined agents, or "New Agent Definition…" in the command palette, asks for a name and a place and opens the new file from a template. It never overwrites a file, and refuses a project agent in a folder in Restricted Mode. **Open** in the list opens a file in the editor. Flint has no other editor for them: a definition is a file.
 
+![Settings ▸ Agents: the list of defined agents with their engine, model and source, and the New Agent… button](../images/defined-agents-settings.png)
+
 The list in Settings shows each agent's name, engine, model, where it comes from, its description and the files Flint couldn't use, each with the reason. A file that breaks a rule is skipped, never half-used. Pickers show a pinned agent as "reviewer · claude", and one without an engine as "reviewer · default (claude)", with the program it would use now. An agent is listed only when its program is installed.
 
 ### The engine
@@ -366,6 +368,8 @@ The actions:
 ### Compare agents
 
 To see how different agents, or several attempts of one agent, solve the same task, tick **Compare agents** in "New Agent Task…". The agent in the **Agent** box is always included; tick the others to add them, and set **Attempts per agent** to run each more than once. One description starts at most 6 tasks.
+
+![New Agent Task with Compare agents ticked: the native agents and the defined agents, each with its engine](../images/defined-agents-task.png)
 
 Flint creates one task per agent and attempt, all from the same commit of the base branch, each with its own branch and worktree. The branch names end in the agent's id: `agent/add-rate-limiting-claude`, `agent/add-rate-limiting-codex`, and `agent/add-rate-limiting-codex-2` for a second attempt. If one of them can't be created, none is kept. The same description goes to every agent. A [defined agent](#defined-agents) can be one of them, and its name ends the branch name; two defined agents with different instructions make a comparison of roles.
 

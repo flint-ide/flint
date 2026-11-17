@@ -1,10 +1,24 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, type MouseEvent } from 'react'
 import { useGit } from '../../store/git'
 import { useWorkspace } from '../../store/workspace'
 import { pullRequestTabId, useEditor } from '../../store/editor'
-import { loadPullRequests, openInBrowser, openPullRequest, setListFilter, setListQuery, usePullRequests, type ListState, type Who } from '../../store/pullRequests'
+import {
+  checkoutPullRequest,
+  loadPullRequests,
+  openInBrowser,
+  openPullRequest,
+  setListFilter,
+  setListQuery,
+  usePullRequests,
+  type ListState,
+  type Who,
+} from '../../store/pullRequests'
+import { addressReviewComments, requestCodeReview } from '../../store/prAgent'
+import { openContextMenu } from '../../store/contextMenu'
+import { showToast } from '../../store/dialog'
+import { pullRequestMenu } from '../../lib/prMenu'
 import { ROLLUP_GLYPH, checksSummary, rollup, searchPullRequests, stateBadge, timeAgo } from '../../lib/prReview'
-import type { PullRequest } from '../../api/backend'
+import { errorMessage, type PullRequest } from '../../api/backend'
 import { Select } from '../ui/Select'
 import { useWindowFocus } from './useWindowFocus'
 import { CIBanner } from './CIStatus'
@@ -123,12 +137,43 @@ function StatusMessage({ state, message, onRetry }: { state: string; message: st
   )
 }
 
+/** Copies text for a "Copy …" item of the row's menu and confirms it in a toast. */
+function copyText(text: string): void {
+  navigator.clipboard.writeText(text).then(
+    () => showToast(`Copied ${text}`),
+    (err: unknown) => showToast(`Copy failed: ${errorMessage(err)}`, 'error'),
+  )
+}
+
 function PullRequestRow({ root, pr }: { root: string; pr: PullRequest }) {
   const active = useEditor((s) => s.activeId === pullRequestTabId(root, pr.number))
   const ci = rollup(pr.checks)
   const badge = stateBadge(pr)
+  // The tab's header actions, without opening the tab first.
+  const onContextMenu = (e: MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const target = { root, number: pr.number }
+    openContextMenu(
+      e.clientX,
+      e.clientY,
+      pullRequestMenu(pr, {
+        open: () => openPullRequest(root, pr),
+        review: (send) => void requestCodeReview(target, { send }),
+        address: (send) => void addressReviewComments(target, { send }),
+        checkout: () => void checkoutPullRequest(root, pr.number, pr.headRef),
+        openOnGitHub: () => openInBrowser(pr.url),
+        copy: copyText,
+      }),
+    )
+  }
   return (
-    <div className={`pr-row${active ? ' active' : ''}`} onClick={() => openPullRequest(root, pr)} title={`${pr.title}\n${pr.headRef} → ${pr.baseRef}`}>
+    <div
+      className={`pr-row${active ? ' active' : ''}`}
+      onClick={() => openPullRequest(root, pr)}
+      onContextMenu={onContextMenu}
+      title={`${pr.title}\n${pr.headRef} → ${pr.baseRef}`}
+    >
       <div className="pr-row-title">
         {ci !== 'none' && (
           <span className={`pr-ci ${ci}`} title={checksSummary(pr.checks)}>

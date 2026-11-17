@@ -5,6 +5,7 @@ import (
 
 	"flint/internal/diag"
 	"flint/internal/mcptools"
+	"flint/internal/remote"
 	"flint/internal/sessions"
 	"flint/internal/terminal"
 )
@@ -29,6 +30,7 @@ func (a *App) wireTerminals(events terminal.Events, dial, spawn hostOpener) {
 	}
 	a.termRouter = newTerminalsRouter(main, terminal.NewManager(events))
 	a.terminals, a.termStreams = a.termRouter, a.termRouter
+	a.wireRemote(events)
 }
 
 // closeTerminals is what quitting does to terminals. In process they end; in
@@ -40,6 +42,7 @@ func (a *App) closeTerminals() {
 		return
 	}
 	a.termRouter.CloseStreams()
+	a.termRouter.DetachRemote() // remote sessions keep running on their machines
 	a.background.detach(a.stopSessionsOnQuit.Load())
 }
 
@@ -110,6 +113,9 @@ func (s *SessionAPI) Live() LiveTerminals {
 // on term:data as for any terminal. id must be one Live lists and no tab of
 // this window shows yet.
 func (t *TerminalAPI) Attach(id string) error {
+	if remote.IsRemoteID(id) {
+		return t.attachRemote(id) // a restored remote tab: the machine's own host kept the shell
+	}
 	if t.app.background == nil {
 		return errors.New("background terminals are off")
 	}

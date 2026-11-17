@@ -47,6 +47,11 @@ var (
 	machineCommandPattern = regexp.MustCompile(`^[A-Za-z0-9_./~-]{1,256}$`)
 )
 
+// ValidMachineID reports whether id is a possible machine id. The pattern has
+// no ':' and cannot start with '-', which is what keeps "<machine>:<session>"
+// terminal ids unambiguous.
+func ValidMachineID(id string) bool { return machineIDPattern.MatchString(id) }
+
 // MachineIssue says why an entry of "machines" was dropped when settings.json
 // was read, so the Settings UI can show it instead of the entry vanishing
 // silently.
@@ -63,7 +68,7 @@ type MachineIssue struct {
 // ssh argument list.
 func CheckMachine(m Machine) error {
 	switch {
-	case !machineIDPattern.MatchString(m.ID):
+	case !ValidMachineID(m.ID):
 		return fmt.Errorf("id %q: use %s", clip(m.ID), machineIDHint)
 	case !machineTargetPattern.MatchString(m.Target):
 		return fmt.Errorf("target %q: use %s", clip(m.Target), machineTargetHint)

@@ -12,6 +12,8 @@ import { setAllBreakpoints, useDebug } from './debug'
 import { breakpointsUnder } from '../lib/breakpoints'
 import { coerceResume, resumeCommand, type TerminalResume } from '../lib/terminalResume'
 import { restoreMode } from '../lib/backgroundTerminals'
+import { isRemoteTermId, restoreRemoteTab } from '../lib/machines'
+import { configuredMachineIds } from './machines'
 import { liveTerminalIds, noteUnclaimedTerminals } from './backgroundTerminals'
 
 // What was open in a project (tabs, terminals, agent chats) is saved per project
@@ -20,7 +22,9 @@ import { liveTerminalIds, noteUnclaimedTerminals } from './backgroundTerminals'
 // in one (claude, codex) is started again on its conversation; chats keep their
 // transcript and reconnect to the agent's conversation on the next message.
 // With background terminals on, a terminal whose shell the background host still
-// runs attaches to it instead (lib/backgroundTerminals.ts, restoreMode).
+// runs attaches to it instead (lib/backgroundTerminals.ts, restoreMode). A terminal on a
+// machine (its id is "<machine>:<session>") only ever re-attaches: the saved id carries the
+// machine, so the snapshot format is unchanged (lib/machines.ts, restoreRemoteTab).
 
 const SAVE_DELAY_MS = 1500
 const SAVE_MAX_WAIT_MS = 10_000
@@ -143,9 +147,10 @@ async function apply(root: string, snap: Snapshot, roots: string[]): Promise<voi
     : new Set<string>()
   const dirs = new Map<string, boolean>()
   await Promise.all(
-    snap.tabs.flatMap((t) => (t.kind === 'terminal' ? [SessionAPI.Exists(t.cwd).then((ok) => void dirs.set(t.cwd, ok))] : [])),
+    snap.tabs.flatMap((t) => (t.kind === 'terminal' && !isRemoteTermId(t.id ?? '') ? [SessionAPI.Exists(t.cwd).then((ok) => void dirs.set(t.cwd, ok))] : [])),
   )
   const live = snap.tabs.some((t) => t.kind === 'terminal') ? await liveTerminalIds() : new Set<string>()
+  const machineIds = snap.tabs.some((t) => t.kind === 'terminal' && isRemoteTermId(t.id ?? '')) ? await configuredMachineIds() : new Set<string>()
   const claimed = new Set(useTerminal.getState().tabs.map((t) => t.id))
 
   const ids: (string | null)[] = []
@@ -184,6 +189,18 @@ async function apply(root: string, snap: Snapshot, roots: string[]): Promise<voi
         break
       case 'terminal': {
         const project = t.project && roots.includes(t.project) ? t.project : root
+        // A terminal on a machine never respawns, and never as a local shell: it re-attaches to the
+        // session the machine kept (the tab says so when it is gone) or opens ended.
+        const remote = restoreRemoteTab(t.id, machineIds)
+        if (remote) {
+          claimed.add(t.id!)
+          const id = useTerminal.getState().create('', {
+            title: t.pinned ? t.title : undefined, background: true, project, attachId: t.id,
+            ...(remote.mode === 'ended' ? { endedWith: `${t.output ? `${t.output}\n── restored ──\n` : ''}${remote.reason}` } : {}),
+          })
+          ids.push(terminalTabId(id))
+          break
+        }
         if (restoreMode(t.id, live, claimed) === 'attach') {
           // Still running in the background host: shown as it is, nothing typed into it.
           claimed.add(t.id!)

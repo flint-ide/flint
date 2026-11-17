@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -198,6 +199,11 @@ func (s *Server) termStart(_ context.Context, cl *client, raw json.RawMessage) (
 	}
 	if s.terms == nil {
 		return nil, unavailable("terminals")
+	}
+	if p.Cwd == "" { // a remote window sends none: the shell starts in the host user's home
+		if home, err := os.UserHomeDir(); err == nil {
+			p.Cwd = home
+		}
 	}
 	e := &termEntry{
 		id: p.ID, ring: newRing(int(s.replayKiB.Load())<<10, 0), subs: map[*client]struct{}{cl: {}},

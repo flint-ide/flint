@@ -1,11 +1,13 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"slices"
 	"sync"
 
 	"flint/internal/mcptools"
+	"flint/internal/remote"
 	"flint/internal/terminal"
 )
 
@@ -77,6 +79,9 @@ type TerminalAPI struct {
 // Start launches the user's login shell in cwd (home when empty) with extra
 // environment variables (e.g. AWS_PROFILE). The frontend picks the id.
 func (t *TerminalAPI) Start(id, cwd string, cols, rows int, env map[string]string) error {
+	if remote.IsRemoteID(id) {
+		return errors.New("a terminal on a machine starts with StartRemote: no local folder or environment applies there")
+	}
 	if cwd == "" {
 		cwd, _ = os.UserHomeDir()
 	}

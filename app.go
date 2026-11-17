@@ -30,6 +30,7 @@ import (
 	"flint/internal/mcpserver"
 	"flint/internal/mcptools"
 	"flint/internal/orchestrate"
+	"flint/internal/remote"
 	"flint/internal/restore"
 	"flint/internal/runner"
 	"flint/internal/scratch"
@@ -79,6 +80,9 @@ type App struct {
 	// termStreams starts Docker/extension stream sessions; same router as terminals.
 	termStreams streamStarter
 	termRouter  *terminalsRouter
+	// remote holds the connections to remote machines (api_machines.go); the
+	// router sends "<machineId>:<id>" terminal ids to it.
+	remote *remote.Hub
 	// background runs terminals in the background host (background_terminals.go);
 	// nil when sessions.background was off at start.
 	background *hostTerminals

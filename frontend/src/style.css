@@ -5949,3 +5949,34 @@ body.file-drop-target-active::after {
 .extension-decoration-set {
   display: block;
 }
+
+/* ---------- machines (remote terminals) ---------- */
+
+.tab-machine {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 15px;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.terminal-banner {
+  flex: none;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  background: var(--bg-elevated, var(--bg-editor));
+  border-bottom: 1px solid var(--border);
+  white-space: pre-wrap;
+}
+.terminal-banner.error {
+  color: var(--danger);
+}
+.status-machines {
+  color: var(--fg-muted);
+}
+.status-machines.error {
+  color: var(--danger);
+}

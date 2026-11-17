@@ -27,6 +27,9 @@ import { ErrorBoundary } from '../layout/ErrorBoundary'
 import { FileIcon, TabKindIcon } from '../icons/FileIcon'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 import { formatKeys } from '../../lib/commands'
+import { machineBadge, machineLabel, tabBanner } from '../../lib/machines'
+import { newTerminalOnMachine, useMachines } from '../../store/machines'
+import { useSettings } from '../../store/settings'
 
 // CodeMirror, the SQL console and the agent chat load on first use, keeping startup
 // to the layout plus the terminal.
@@ -147,6 +150,7 @@ export function EditorArea() {
           >
             <TabIcon tab={tab} debugActive={debugActive} />
             <span className="tab-title">{tab.title}</span>
+            {tab.kind === 'terminal' && <TerminalMachineBadge termId={tab.termId} />}
             {tab.kind === 'terminal' && <TerminalAgentBadge termId={tab.termId} />}
             <button
               className={`tab-close${tab.dirty ? ' dirty' : ''}`}
@@ -207,7 +211,15 @@ function FileOrImage({ tab, active }: { tab: FileTab; active: boolean }) {
 
 function TerminalTabView({ termId, active }: { termId: string; active: boolean }) {
   const tab = useTerminal((s) => s.tabs.find((t) => t.id === termId))
-  return tab ? <TerminalView tab={tab} active={active} /> : null
+  const status = useMachines((s) => s.statuses.find((x) => x.id === tab?.machine))
+  if (!tab) return null
+  const banner = tab.machine ? tabBanner(status) : null
+  return (
+    <>
+      {banner && <div className={`terminal-banner ${banner.tone}`} role="status">{banner.text}</div>}
+      <TerminalView tab={tab} active={active} />
+    </>
+  )
 }
 
 /** A tab of a kind a feature contributed; its view may be gone (an extension that stopped). */
@@ -254,6 +266,15 @@ function TabIcon({ tab, debugActive }: { tab: Tab; debugActive: boolean }) {
   }
 }
 
+/** The machine a terminal runs on, small, before its agent badge; nothing for a local shell. */
+function TerminalMachineBadge({ termId }: { termId: string }) {
+  const name = useTerminal((s) => {
+    const machine = s.tabs.find((t) => t.id === termId)?.machine
+    return machine ? (useSettings.getState().settings.machines.find((m) => m.id === machine)?.name || machine) : ''
+  })
+  return name ? <span className="tab-machine" title={`Runs on ${name}`}>{machineBadge(name)}</span> : null
+}
+
 /** What an agent CLI in a terminal reported: working, waiting for you, done. */
 function TerminalAgentBadge({ termId }: { termId: string }) {
   const badge = useTerminal((s) => terminalBadge(s.tabs.find((t) => t.id === termId)?.agentState))
@@ -286,6 +307,7 @@ function newFileDir(): string {
 /** "+" at the end of the tab bar: a new file or scratch, then terminals (agent chats live in the title bar). */
 function NewTabMenu() {
   const roots = useWorkspace((s) => s.roots)
+  const machines = useSettings((s) => s.settings.machines)
   const items = (): DropdownItem[] => {
     const here = activeRoot()
     const labels = rootLabels(roots)
@@ -314,6 +336,13 @@ function NewTabMenu() {
       { type: 'separator' },
       terminal(here, roots.length < 2 ? 'Terminal' : `Terminal in ${labelOf(roots, here)}`, formatKeys('Mod+Shift+T')),
       ...roots.flatMap((r, i) => (r === here ? [] : [terminal(r, `Terminal in ${labels[i]}`)])),
+      ...machines.map((m): DropdownItem => ({
+        key: `m:${m.id}`,
+        label: `Terminal on ${machineLabel(m)}`,
+        hint: m.target,
+        icon: <TabKindIcon kind="terminal" />,
+        onSelect: () => newTerminalOnMachine(m.id),
+      })),
     ]
   }
   return (

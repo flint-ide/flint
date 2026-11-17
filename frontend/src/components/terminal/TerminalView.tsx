@@ -7,6 +7,7 @@ import {
   TerminalBackend,
   attachSink,
   claimStart,
+  failRemoteTerminal,
   registerOutputReader,
   registerSelectionReader,
   sendInput,
@@ -122,7 +123,11 @@ export function TerminalView({ tab, active }: Props) {
     if (claimStart(tab.id)) {
       startSession(tab, xterm.cols, xterm.rows)
         .then(() => tab.initialInput && sendInput(tab.id, `${tab.initialInput}\r`))
-        .catch((err) => showToast(`Terminal failed: ${errorMessage(err)}`, 'error'))
+        .catch((err) => {
+          // A terminal on a machine is never replaced by a local shell: the tab says why and ends.
+          if (tab.machine) failRemoteTerminal(tab.id, errorMessage(err))
+          showToast(`Terminal failed: ${errorMessage(err)}`, 'error')
+        })
     } else {
       void TerminalBackend.Resize(tab.id, xterm.cols, xterm.rows)
     }
@@ -241,6 +246,12 @@ function readBuffer(xterm: XTerm, maxLines: number): string {
  * redraws). Should the shell be gone by now, a new one starts as without the host.
  */
 function startSession(tab: TerminalTab, cols: number, rows: number): Promise<void> {
+  if (tab.machine) {
+    // On a machine: the shell starts in the remote home (no cwd, no env), or a restored tab
+    // re-attaches to the session the machine kept. Attaching never falls back to a new shell.
+    if (!tab.attach) return TerminalBackend.StartRemote(tab.id, cols, rows)
+    return TerminalBackend.Attach(tab.id).then(() => TerminalBackend.Resize(tab.id, cols, rows))
+  }
   const start = () => TerminalBackend.Start(tab.id, tab.cwd, cols, rows, tab.env ?? {})
   if (!tab.attach) return start()
   return TerminalBackend.Attach(tab.id).then(() => TerminalBackend.Resize(tab.id, cols, rows), start)

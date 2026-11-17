@@ -217,6 +217,10 @@ Scope: remote terminals and remote agents in tabs. Files, editor, git, language 
 - **Addressing:** frontend ids are `<machineId>:<id>`; the routers strip the prefix. Tabs read `name ▸ title` with a machine badge.
 - **Remote agents** get only the remote host's own MCP tools. Attachments with local paths are refused.
 
+### Scope decision for steps 5 and 6: terminals only
+
+Remote **agent chats** are out of scope for now: the host's agent side has no approvals, no MCP tools and no per-agent settings (steps 3.8 and 3.9 of Phase 3), so there is no "agent on machine" UI and `remote.Conn`'s agent side stays unused. Steps 5 and 6 cover remote terminals: prefixed routing (`internal/remote` `Hub`, `terminals_router.go`), the machine badge, picker, banner and status item, the Machines settings page, the native first-use dialog, the Check, install instructions generated from constants (no release publishes the archives yet; the names are where releases will publish them), and `cmd/flint-host` without agent drivers. The remote shell starts in the remote user's home and nothing local (cwd, environment) is sent. A remote terminal may be opened from an untrusted folder (it runs nothing from the project). A restored remote tab re-attaches or shows that the session ended; it never starts a new shell.
+
 ### Out of scope
 
 Remote files, editor, git, language servers and search; task worktrees on a remote; port forwarding; uploading files; automatic install or update; password or 2FA prompts; Windows remotes; remote MCP tools that read local UI state; Docker streams on a remote.

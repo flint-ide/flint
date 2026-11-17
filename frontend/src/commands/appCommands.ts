@@ -16,6 +16,7 @@ import { panelCommands } from '../panels/registry'
 import { saveTab, useEditor, viewFor, type Tab } from '../store/editor'
 import { toggleTerminal, useTerminal } from '../store/terminal'
 import { openBackgroundTerminals, useBackgroundTerminals } from '../store/backgroundTerminals'
+import { openMachinePicker } from '../store/machines'
 import { newClaudeTerminal } from '../store/terminalAgent'
 import { activeRoot } from '../store/activeRoot'
 import { removeFromWorkspace } from '../store/fileOps'
@@ -232,6 +233,7 @@ function appCommands(): Command[] {
     // Claude with Flint's own hooks file, so the tab shows what Claude does (explicit: not what New Terminal does).
     { id: 'terminal.newClaude', title: 'New Claude Terminal', category: 'Terminal', keywords: 'claude agent hooks status', run: () => void newClaudeTerminal() },
     { id: 'terminal.new', title: 'New Terminal', category: 'Terminal', keys: 'Mod+Shift+T', keywords: 'shell', run: () => void useTerminal.getState().create(activeRoot()) },
+    { id: 'terminal.onMachine', title: 'New Terminal on Machine…', category: 'Terminal', keywords: 'ssh remote server host', run: openMachinePicker },
     {
       id: 'terminal.background', title: 'Show Background Terminals…', category: 'Terminal', keywords: 'attach detach sessions host',
       when: () => useBackgroundTerminals.getState().background, run: openBackgroundTerminals,

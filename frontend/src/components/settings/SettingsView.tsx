@@ -14,11 +14,12 @@ import { UsageSection } from './UsageSection'
 import { CISection } from './CISection'
 import { AccountsSection } from './AccountsSection'
 import { BackgroundTerminalsSection } from './BackgroundTerminalsSection'
+import { MachinesSection } from './MachinesSection'
 import { NumberField, Row, TextField } from './fields'
 import { openVSCodeImport } from '../../store/vscodeImport'
 import { isMac } from '../../lib/platform'
 
-type Section = 'appearance' | 'editor' | 'terminal' | 'accounts' | 'agents' | 'agentContext' | 'usage' | 'editorAi' | 'lsp' | 'watch' | 'ci' | 'keymap' | 'import'
+type Section = 'appearance' | 'editor' | 'terminal' | 'machines' | 'accounts' | 'agents' | 'agentContext' | 'usage' | 'editorAi' | 'lsp' | 'watch' | 'ci' | 'keymap' | 'import'
 
 // Flint's own pages. Feature modules add theirs between them by order (lib/features.ts:
 // TODO List 130, Updates 150), so keep the gaps.
@@ -26,6 +27,7 @@ const SECTIONS: { id: Section; label: string; order: number }[] = [
   { id: 'appearance', label: 'Appearance', order: 10 },
   { id: 'editor', label: 'Editor', order: 20 },
   { id: 'terminal', label: 'Terminal', order: 30 },
+  { id: 'machines', label: 'Machines', order: 35 },
   { id: 'accounts', label: 'Accounts', order: 40 },
   { id: 'agents', label: 'Agents', order: 50 },
   { id: 'agentContext', label: 'Agent Context', order: 60 },
@@ -65,6 +67,7 @@ export function SettingsView({ active, page: asked }: { active: boolean; page?: 
         {section === 'appearance' && <AppearanceSection />}
         {section === 'editor' && <EditorSection />}
         {section === 'terminal' && <TerminalSection />}
+        {section === 'machines' && <MachinesSection />}
         {section === 'accounts' && <AccountsSection />}
         {section === 'agents' && <AgentsSection />}
         {section === 'agentContext' && <McpServerSection />}

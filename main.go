@@ -64,6 +64,7 @@ func main() {
 			application.NewService(&SearchAPI{app: flint}),
 			application.NewService(&ScratchAPI{app: flint}),
 			application.NewService(&TerminalAPI{app: flint}),
+			application.NewService(&MachinesAPI{app: flint}),
 			application.NewService(&RunAPI{app: flint}),
 			application.NewService(&DebugAPI{app: flint}),
 			application.NewService(&ProfileAPI{app: flint}),

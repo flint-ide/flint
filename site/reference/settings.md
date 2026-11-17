@@ -129,7 +129,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `prReview` | object | see below | Handing a pull request's review comments to the agent: threads per draft, code lines around a comment. See [prReview](#prreview). |
 | `github` | object | see below | The GitHub host, the OAuth App Sign in with GitHub uses, scopes and the retry wait. See [github](#github). |
 | `sessions` | object | see below | Background terminals: shells that keep running when Flint closes (off by default). See [sessions](#sessions). |
-| `machines` | array | `[]` | Remote machines for terminals and agents over SSH. See [machines](#machines). |
+| `machines` | array | `[]` | Remote machines for terminals over SSH. See [machines](#machines). |
 <!-- include-rows _settings/*.md -->
 
 ### Font objects
@@ -394,7 +394,7 @@ Out-of-range numbers are clamped; `0` or a missing number is the default. **Quit
 
 ### machines
 
-Remote machines whose terminals and agents run over your own `ssh` (remote terminals and agents only: files, editor, git, language servers and search stay local). Flint starts `ssh` with `BatchMode`, so it never asks for a password: authenticate with a key or the SSH agent, and put hosts that need more (jump hosts, other keys) in `~/.ssh/config` under an alias used as the `target`. Flint stores no secret.
+Remote machines whose terminals run over your own `ssh` (terminals only: files, editor, git, language servers and search stay local, and agent chats on a machine are not available yet). Edited in **Settings ▸ Machines**, which also has a Check button per machine and shows entries that were left out with the reason. See [Remote terminals](https://github.com/flint-ide/flint/blob/main/docs/FEATURES.md#remote-terminals). Flint starts `ssh` with `BatchMode`, so it never asks for a password: authenticate with a key or the SSH agent, and put hosts that need more (jump hosts, other keys) in `~/.ssh/config` under an alias used as the `target`. Flint stores no secret.
 
 ```json
 "machines": [{ "id": "dev-box", "name": "Dev box", "target": "me@dev.example.com", "port": 22, "command": "flint" }]

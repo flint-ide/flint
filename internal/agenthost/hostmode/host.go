@@ -47,6 +47,9 @@ const (
 	// readyFDFlag names the descriptor on which to say "ready" (a pipe the
 	// starter passed in ExtraFiles).
 	readyFDFlag = "--ready-fd="
+	// versionFlag prints the version and the host protocol version and exits
+	// ("flint --version": the machine Check reads it over ssh).
+	versionFlag = "--version"
 	// stdioFlag selects the relay: connect this machine's host to stdin and
 	// stdout (what a remote Flint runs over ssh).
 	stdioFlag = "--stdio"
@@ -70,6 +73,10 @@ type Options struct {
 	// set it; the Flint binary does not, so its host offers no more than
 	// the web view's terminal calls do.
 	AllowShell bool
+	// NoAgents leaves the host without an agent manager: every agent.* call
+	// fails with "agents are not available on this host". The headless build
+	// (cmd/flint-host) sets it, since the drivers live in package main.
+	NoAgents bool
 }
 
 // Main runs the host when the process was started with --agent-host as its
@@ -78,6 +85,10 @@ type Options struct {
 // other process it returns immediately and startup goes on. Call it right
 // after sandbox.Main, before anything that touches Wails.
 func Main(o Options) {
+	if len(os.Args) == 2 && os.Args[1] == versionFlag {
+		fmt.Println(agenthost.VersionLine(o.Version)) // what the Check of a machine reads
+		os.Exit(0)
+	}
 	isHost, args, err := parseArgs(os.Args)
 	if !isHost {
 		return
@@ -149,7 +160,7 @@ func runProcess(o Options, ready io.WriteCloser) error {
 		closeQuietly(ready)
 		return err
 	}
-	return run(ctx, runConfig{ConfigDir: dir, Version: o.Version, Drivers: o.Drivers, AllowShell: o.AllowShell, Idle: DefaultIdle, Ready: ready})
+	return run(ctx, runConfig{ConfigDir: dir, Version: o.Version, Drivers: o.Drivers, AllowShell: o.AllowShell, NoAgents: o.NoAgents, Idle: DefaultIdle, Ready: ready})
 }
 
 func closeQuietly(c io.Closer) {
@@ -172,6 +183,8 @@ type runConfig struct {
 	HelloTimeout time.Duration
 	// AllowShell is Options.AllowShell.
 	AllowShell bool
+	// NoAgents is Options.NoAgents.
+	NoAgents bool
 	// Ready, when set, receives "ready\n" once the host listens and is then
 	// closed; it is closed without a message when the host fails first, so
 	// the starter wakes up either way.
@@ -223,6 +236,16 @@ func run(ctx context.Context, cfg runConfig) (err error) {
 		srv          *agenthost.Server
 		sessionsDone atomic.Bool // host.shutdown{stopSessions} already stopped them
 	)
+	agentsFactory := func(emit func(as.Event)) sessions.Agents {
+		agents = as.NewManager(emit)
+		if cfg.Drivers != nil {
+			cfg.Drivers(agents)
+		}
+		return agents
+	}
+	if cfg.NoAgents {
+		agentsFactory = nil
+	}
 	srv, err = agenthost.New(agenthost.Config{
 		Token: token, Version: cfg.Version, HelloTimeout: cfg.HelloTimeout, AllowShell: cfg.AllowShell,
 		ReplayKiB: hostReplayKiB(cfg.ConfigDir),
@@ -233,13 +256,7 @@ func run(ctx context.Context, cfg runConfig) (err error) {
 			terms = terminal.NewManager(ev)
 			return terms
 		},
-		Agents: func(emit func(as.Event)) sessions.Agents {
-			agents = as.NewManager(emit)
-			if cfg.Drivers != nil {
-				cfg.Drivers(agents)
-			}
-			return agents
-		},
+		Agents: agentsFactory,
 		// watch is assigned before the accept loop starts, which is the first
 		// moment this can be called.
 		OnChange: func() { watch.Poke() },

@@ -86,6 +86,15 @@ export function Start(id: string, cwd: string, cols: number, rows: number, env: 
 }
 
 /**
+ * StartRemote opens a shell on the machine the id names ("<machineId>:<id>").
+ * The id picks the machine; the shell starts in the remote user's home and no
+ * working directory, environment or shell is accepted from the web view.
+ */
+export function StartRemote(id: string, cols: number, rows: number): $CancellablePromise<void> {
+    return $Call.ByID(1802247386, id, cols, rows);
+}
+
+/**
  * Write sends keystrokes / pasted text to the terminal.
  */
 export function Write(id: string, data: string): $CancellablePromise<void> {

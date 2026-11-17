@@ -52,6 +52,9 @@ func (a *App) updateSettings(change func(settings.Settings) settings.Settings) (
 	a.startQueuedTasks() // a higher agentTasks.maxParallel or budget frees slots
 	a.mcpSettingsChanged(prev.MCPServer, saved.MCPServer)
 	a.hostSettingsChanged() // the background host reads settings.json itself
+	if a.remote != nil {
+		a.remote.SetMachines(saved.Machines) // a removed or changed machine loses its connection
+	}
 	a.features.SettingsChanged(prev, saved)
 	if prev.GitHub.Host != saved.GitHub.Host && a.github != nil {
 		a.github.Reset() // another host: other repositories, another account

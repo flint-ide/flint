@@ -22,6 +22,11 @@ import (
 // workspace roots (project ones only when trusted) and registers them with
 // the session manager. Running chats keep their driver.
 func (a *App) loadDefinedAgents() agentdefs.Set {
+	// One load at a time, from reading the files to registering them: two
+	// overlapping loads could otherwise finish out of order and register what
+	// the older one read, such as a definition of a folder untrusted since.
+	a.definedMu.Lock()
+	defer a.definedMu.Unlock()
 	var roots []agentdefs.Root
 	for _, r := range a.projectRoots() {
 		roots = append(roots, agentdefs.Root{Path: r, Trusted: a.isTrusted(r)})

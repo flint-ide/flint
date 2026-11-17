@@ -73,7 +73,8 @@ func (s *AgentDefsAPI) Create(root string, personal bool, name string) (string, 
 	if _, custom := s.app.currentSettings().CustomAgent(name); custom {
 		return "", fmt.Errorf("%s is a custom agent's id; choose another name", name)
 	}
-	if d, ok := s.app.loadDefinedAgents().Find(name); ok {
+	// A personal definition may take a project one's name: it wins (Load).
+	if d, ok := s.app.loadDefinedAgents().Find(name); ok && !(personal && d.Source == agentdefs.SourceProject) {
 		return "", fmt.Errorf("an agent named %s is already defined in %s", name, d.Path)
 	}
 	if personal {

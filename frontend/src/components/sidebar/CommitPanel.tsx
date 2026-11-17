@@ -8,7 +8,7 @@ import { showToast } from '../../store/dialog'
 import { resolveConflictsWithAgent, suggestCommitMessage, useAgent } from '../../store/agent'
 import { errorMessage } from '../../api/backend'
 import { conflictHint } from '../../lib/customAgents'
-import { agentOption } from '../../lib/agentDefs'
+import { agentOption, engineOf } from '../../lib/agentDefs'
 import { useAgentDefs } from '../../store/agentDefs'
 import { Select } from '../ui/Select'
 import { openStashDialog } from '../../store/stash'
@@ -149,7 +149,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
             <button
               className="link"
               onClick={() => void resolveConflictsWithAgent(root, status.operation, conflicted.map((f) => f.path))}
-              title={conflictHint(agents.preferred, agents.conflictAgent)}
+              title={conflictHint(agents.preferred, agents.conflictAgent, engineOf(agents.preferred, defined))}
             >
               Resolve with {agents.conflictAgent}
             </button>
@@ -311,6 +311,7 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
   const { root, status } = section
   const { isIncluded, setGroup, toggleFile } = useGit.getState()
   const busy = useGit((s) => s.busy)
+  const defined = useAgentDefs((s) => s.defined)
   const openDiff = useEditor((s) => s.openDiff)
   const openFile = useEditor((s) => s.openFile)
   const agents = useAgent()
@@ -344,7 +345,7 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
               {g.key === 'conflicts' && agents.conflictAgent && (
                 <button
                   className="link agent-action"
-                  title={conflictHint(agents.preferred, agents.conflictAgent)}
+                  title={conflictHint(agents.preferred, agents.conflictAgent, engineOf(agents.preferred, defined))}
                   onClick={(e) => (e.stopPropagation(), resolve(g.files.map((f) => f.path)))}
                 >
                   ✦ Resolve with {agents.conflictAgent}

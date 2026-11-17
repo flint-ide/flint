@@ -298,6 +298,13 @@ func (a *AgentAPI) reviewAgent() (string, error) {
 		return a.preferred()
 	}
 	if !slices.Contains(a.Info().Available, name) {
+		// A defined agent is a file that can go away (removed, its folder
+		// untrusted, its engine uninstalled): reviews then use the default
+		// agent, as they do for a name settings no longer know.
+		s := a.app.currentSettings()
+		if _, custom := s.CustomAgent(name); !custom && !isNative(name) {
+			return a.preferred()
+		}
 		return "", fmt.Errorf("%s, the agent set for reviews in Settings ▸ Agents, is not installed", name)
 	}
 	return name, nil

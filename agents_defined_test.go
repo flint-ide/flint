@@ -279,3 +279,43 @@ func TestAgentDefsAPI(t *testing.T) {
 		}
 	}
 }
+
+// A review agent that is a defined agent no longer there falls back to the
+// default agent; a native or custom agent that can't start is still an error.
+func TestReviewAgentFallsBack(t *testing.T) {
+	a, _, _ := definedApp(t)
+	api := &AgentAPI{app: a}
+	tests := []struct{ set, want, err string }{
+		{set: "", want: "claude"},
+		{set: "opus-reviewer", want: "opus-reviewer"},
+		{set: "removed-agent", want: "claude"},
+		{set: "backend", want: "claude"}, // pinned to codex, which is not installed
+		{set: "codex", err: "not installed"},
+	}
+	for _, tt := range tests {
+		a.settings.AgentReview.Agent = tt.set
+		got, err := api.reviewAgent()
+		if tt.err != "" {
+			if err == nil || !strings.Contains(err.Error(), tt.err) {
+				t.Errorf("%q: err = %v, want %q", tt.set, err, tt.err)
+			}
+			continue
+		}
+		if err != nil || got != tt.want {
+			t.Errorf("%q: got %q, %v; want %q", tt.set, got, err, tt.want)
+		}
+	}
+}
+
+// New Agent… may shadow a project definition with a personal one, not the
+// other way round.
+func TestCreatePersonalOverProject(t *testing.T) {
+	a, trusted, _ := definedApp(t)
+	api := &AgentDefsAPI{app: a}
+	if _, err := api.Create("", true, "proj"); err != nil {
+		t.Errorf("personal over project: %v", err)
+	}
+	if _, err := api.Create(trusted, false, "planner"); err == nil {
+		t.Error("a project definition under a personal one's name was created")
+	}
+}

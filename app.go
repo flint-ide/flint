@@ -125,7 +125,9 @@ type App struct {
 	state   appState
 
 	settingsMu sync.Mutex
-	settings   settings.Settings // settings.json, loaded once at startup
+	// definedMu serializes loadDefinedAgents; taken before settingsMu.
+	definedMu sync.Mutex
+	settings  settings.Settings // settings.json, loaded once at startup
 	// definedAgents are the agent definitions registered with agentMgr
 	// (agents_defined.go); guarded by settingsMu like the custom agents.
 	definedAgents []agentdefs.Definition

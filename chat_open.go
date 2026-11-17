@@ -115,6 +115,7 @@ func (a *App) forgetChat(id string) {
 	a.usageChats.unbind(id)
 	a.orch.Remove(id)
 	a.orchGrants.forget(id) // a grant dies with its chat
+	a.notices.Drop(id)      // and what its children had to tell it
 }
 
 // announcer is what a session manager offers to put a message in a chat's

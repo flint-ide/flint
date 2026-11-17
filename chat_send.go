@@ -27,5 +27,8 @@ func (c *AgentChatAPI) DraftChanged(sessionID string, open bool) error {
 		return fmt.Errorf("unknown chat %q", sessionID)
 	}
 	c.app.orch.SetDraft(sessionID, open)
+	if !open {
+		c.app.flushNotices(sessionID, 0) // notices held back by the draft
+	}
 	return nil
 }

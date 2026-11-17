@@ -25,7 +25,7 @@ func newAgentManager(a *App) *as.Manager {
 	m := as.NewManager(func(e as.Event) {
 		a.emit(eventAgentEvent, e)
 		a.tasks.Observe(e) // agent tasks follow their chats (tasks_state.go)
-		a.orch.Observe(e)  // states and output for orchestration (chat_open.go)
+		a.observeChat(e)   // states and output for orchestration, notices (chat_notify.go)
 		a.observeUsage(e)  // usage_state.go
 	})
 	m.SetActionGate(a.actionGate()) // Flint's tools that act always ask (api_mcp_actions.go)

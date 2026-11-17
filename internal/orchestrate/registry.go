@@ -204,18 +204,28 @@ func (r *Registry) Prompted(id string) {
 // registered are ignored, so the registry never grows from a stream it was not
 // told about.
 func (r *Registry) Observe(e as.Event) {
-	r.update(e.SessionID, func(l agenttask.Live) agenttask.Live { return agenttask.Next(l, e) }, e)
+	r.ObserveChange(e)
+}
+
+// ObserveChange is Observe that also returns the chat as it is now and the
+// state it was in before the event, so a caller can act on a change without
+// reading the registry twice (and racing another event). ok is false for a chat
+// that is not registered.
+func (r *Registry) ObserveChange(e as.Event) (n Node, prev string, ok bool) {
+	return r.update(e.SessionID, func(l agenttask.Live) agenttask.Live { return agenttask.Next(l, e) }, e)
 }
 
 // update applies f to a chat's state and wakes the waiters that now match.
-// events, if any, also feed the output ring.
-func (r *Registry) update(id string, f func(agenttask.Live) agenttask.Live, events ...as.Event) {
+// events, if any, also feed the output ring. It returns the node after the
+// change and the state before it.
+func (r *Registry) update(id string, f func(agenttask.Live) agenttask.Live, events ...as.Event) (Node, string, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	e := r.nodes[id]
 	if e == nil {
-		return
+		return Node{}, "", false
 	}
+	prev := e.node.Live.State
 	for _, ev := range events {
 		if e.node.Live.Turn { // like Next: replayed history is not output
 			e.record(ev)
@@ -228,6 +238,7 @@ func (r *Registry) update(id string, f func(agenttask.Live) agenttask.Live, even
 			delete(e.waiters, w)
 		}
 	}
+	return e.node, prev, true
 }
 
 // record puts what an event says into the output ring.

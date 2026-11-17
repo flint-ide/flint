@@ -101,7 +101,7 @@ func newChatApp(t *testing.T) *chatApp {
 		}
 	}
 	m := as.NewManager(func(e as.Event) {
-		a.orch.Observe(e)
+		a.observeChat(e)
 		c.mu.Lock()
 		c.events = append(c.events, e)
 		c.mu.Unlock()

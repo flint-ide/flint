@@ -95,6 +95,7 @@ type App struct {
 	actionGrants actionGrants
 	configRuns   configRuns
 	orchGrants   orchGrants            // what the user allowed each chat to orchestrate (orch_grant.go)
+	notices      orchestrate.Notices   // what a chat's children have to tell it (chat_notify.go)
 	tasks        *agenttask.Tracker    // state of agent tasks from their chats
 	orch         *orchestrate.Registry // every chat's place in the tree, state and output (chat_open.go)
 	sessions     *restore.Store

@@ -148,8 +148,8 @@ func (s *Sources) orchestrationTools(cfg Config) []mcpserver.Tool {
 	}
 	return []mcpserver.Tool{
 		tool(ToolListAgents, "List agents",
-			"Lists the agent chats of this project that Flint knows: id, agent, role, state (idle, working, waiting for the user's approval, finished, failed), who started it (parent), depth and kind. "+
-				"Kind \"chat\" is an agent chat Flint runs; kind \"terminal\" is an agent CLI running in a terminal tab, of which Flint only reports the state (the other agent tools refuse it). "+
+			"Lists yourself and the agents you started, and theirs: id, agent, role, state (idle, working, waiting for the user's approval, finished, failed), who started it (parent), depth and kind. "+
+				"Chats the user opened, your parent and its other children, and agents in terminal tabs are not listed, and the other agent tools refuse them. "+
 				"Use the ids of chats with the other agent tools. Only available when the user allowed this chat to direct agents.",
 			`{"type":"object","properties":{},"additionalProperties":false}`, 0,
 			func(_ context.Context, caller, root string, args json.RawMessage) (string, error) {
@@ -208,7 +208,7 @@ func (s *Sources) orchestrationTools(cfg Config) []mcpserver.Tool {
 				return "Sent. It appears in that agent's chat.", nil
 			}),
 		tool(ToolWaitAgent, "Wait for an agent",
-			fmt.Sprintf("Waits until an agent is in one of the given states, without polling, then returns {state, error, timedOut}. States: idle (no turn running), waiting (it waits for the user's approval), finished, failed. "+
+			fmt.Sprintf("Waits until you or an agent you started (or one of theirs) is in one of the given states, without polling, then returns {state, error, timedOut}. States: idle (no turn running), waiting (it waits for the user's approval), finished, failed. "+
 				"It returns at once when the agent already is in one, so a finished earlier turn counts: send a prompt first when you wait for its answer. It gives up after timeoutSeconds (at most %d) and then returns timedOut true with the current state.", int(maxWait/time.Second)),
 			fmt.Sprintf(`{"type":"object","properties":{`+
 				`"id":{"type":"string","maxLength":%d,"description":"Id of the agent."},`+
@@ -245,7 +245,7 @@ func (s *Sources) orchestrationTools(cfg Config) []mcpserver.Tool {
 				return jsonText(res)
 			}),
 		tool(ToolReadAgent, "Read an agent's output",
-			fmt.Sprintf("The last lines of what an agent of this project said and did (its text and the titles of its tool calls), redacted. At most %d lines.", outLines),
+			fmt.Sprintf("The last lines of what you or an agent you started (or one of theirs) said and did (its text and the titles of its tool calls), redacted. At most %d lines.", outLines),
 			fmt.Sprintf(`{"type":"object","properties":{`+
 				`"id":{"type":"string","maxLength":%d,"description":"Id of the agent."},`+
 				`"lines":{"type":"integer","minimum":1,"maximum":%d,"description":"Number of lines (default %d)."}`+

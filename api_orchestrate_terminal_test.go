@@ -20,7 +20,7 @@ func listAgents(t *testing.T, o *orchApp) []listedAgent {
 	return out.Agents
 }
 
-func TestListAgentsReportsTerminalAgentsReadOnly(t *testing.T) {
+func TestTerminalAgentsAreNotListedAndStayOutOfReach(t *testing.T) {
 	o := newOrchApp(t)
 	terms := o.mcpSources.Terminals
 	terms.Open("term-a", mcptools.KindTerminal, "claude --resume", o.project)
@@ -32,19 +32,11 @@ func TestListAgentsReportsTerminalAgentsReadOnly(t *testing.T) {
 	terms.Open("term-elsewhere", mcptools.KindTerminal, "claude", t.TempDir())
 	terms.SetAgentState("term-elsewhere", "working")
 
-	var terminals, chats []listedAgent
-	for _, a := range listAgents(t, o) {
-		if a.Kind == "terminal" {
-			terminals = append(terminals, a)
-		} else {
-			chats = append(chats, a)
-		}
-	}
-	if len(terminals) != 1 || terminals[0].ID != "term-a" || terminals[0].State != "waiting" || terminals[0].Agent != "claude" || terminals[0].Cwd != "." {
-		t.Fatalf("terminal agents = %+v, want only term-a, waiting", terminals)
-	}
-	if len(chats) != 1 {
-		t.Errorf("chats = %+v", chats)
+	// Terminal tabs carry no parent link, so they cannot be attributed to the
+	// caller's subtree: list_agents leaves them out (see orchestrator.List).
+	listed := listAgents(t, o)
+	if len(listed) != 1 || listed[0].Kind != "chat" {
+		t.Fatalf("listed = %+v, want only the caller's own chat", listed)
 	}
 
 	// The other tools say what a terminal agent is, and do nothing.

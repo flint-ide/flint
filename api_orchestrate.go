@@ -120,6 +120,23 @@ func (o *orchestrator) descendant(caller, root, id string) (orchestrate.Node, er
 	return node, nil
 }
 
+// selfOrDescendant is target for the tools that only read: the caller itself
+// or an agent below it. The user's own chats, the caller's parent and its
+// siblings are not reachable, whatever folder they are in.
+func (o *orchestrator) selfOrDescendant(caller, root, id string) (orchestrate.Node, error) {
+	node, err := o.target(caller, root, id)
+	if err != nil {
+		return node, err
+	}
+	if id != caller && !o.app.orch.Descendant(caller, id) {
+		return node, fmt.Errorf("agent %q is not you or your descendant: you can only read the agents you started, and theirs", id)
+	}
+	return node, nil
+}
+
+// List shows the caller and its descendants. Agents in terminal tabs are left
+// out: a tab has no parent link, so it cannot be attributed to the caller's
+// subtree, and listing it would show other people's terminals.
 func (o *orchestrator) List(caller, root string) ([]mcptools.AgentInfo, error) {
 	if _, _, err := o.authorize(caller, root); err != nil {
 		return nil, err
@@ -127,7 +144,7 @@ func (o *orchestrator) List(caller, root string) ([]mcptools.AgentInfo, error) {
 	out := []mcptools.AgentInfo{}
 	scope := o.scopeOf(root)
 	for _, n := range o.app.orch.All() {
-		if !scope.has(n.Cwd) {
+		if !scope.has(n.Cwd) || (n.ID != caller && !o.app.orch.Descendant(caller, n.ID)) {
 			continue
 		}
 		out = append(out, mcptools.AgentInfo{
@@ -135,7 +152,7 @@ func (o *orchestrator) List(caller, root string) ([]mcptools.AgentInfo, error) {
 			Cwd: relCwd(n.Cwd, root), Kind: "chat", Self: n.ID == caller,
 		})
 	}
-	return append(out, o.terminalAgents(root)...), nil
+	return out, nil
 }
 
 // terminal finds a terminal tab by id.
@@ -144,27 +161,6 @@ func (o *orchestrator) terminal(id string) (mcptools.TerminalInfo, bool) {
 		return mcptools.TerminalInfo{}, false
 	}
 	return o.app.mcpSources.Terminals.Get(id)
-}
-
-// terminalAgents lists the agent CLIs running in terminal tabs of the project:
-// the terminals whose program reported a state (see internal/terminal's
-// agentstate.go) and still run. They are read-only for the other tools.
-func (o *orchestrator) terminalAgents(root string) []mcptools.AgentInfo {
-	if o.app.mcpSources == nil || o.app.mcpSources.Terminals == nil {
-		return nil
-	}
-	var out []mcptools.AgentInfo
-	for _, t := range o.app.mcpSources.Terminals.List(root) {
-		if t.Kind != mcptools.KindTerminal || t.AgentState == "" || t.Exited {
-			continue
-		}
-		name, _, _ := strings.Cut(t.Title, " ")
-		if name == "" {
-			name = "agent"
-		}
-		out = append(out, mcptools.AgentInfo{ID: t.ID, Agent: name, State: t.AgentState, Cwd: relCwd(t.Cwd, root), Kind: "terminal"})
-	}
-	return out
 }
 
 func (o *orchestrator) Start(ctx context.Context, caller, root string, r mcptools.StartRequest) (string, error) {
@@ -266,7 +262,7 @@ func (o *orchestrator) Wait(ctx context.Context, caller, root, id string, until 
 	if _, _, err := o.authorize(caller, root); err != nil {
 		return mcptools.WaitResult{}, err
 	}
-	if _, err := o.target(caller, root, id); err != nil {
+	if _, err := o.selfOrDescendant(caller, root, id); err != nil {
 		return mcptools.WaitResult{}, err
 	}
 	// A deadline of our own, so that running out of time is an answer and the
@@ -290,7 +286,7 @@ func (o *orchestrator) Output(caller, root, id string, lines int) (string, error
 	if _, _, err := o.authorize(caller, root); err != nil {
 		return "", err
 	}
-	if _, err := o.target(caller, root, id); err != nil {
+	if _, err := o.selfOrDescendant(caller, root, id); err != nil {
 		return "", err
 	}
 	return o.app.orch.Output(id, lines), nil

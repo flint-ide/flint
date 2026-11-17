@@ -30,6 +30,8 @@ export const ICONS = {
   helm: [circle(8, 8, 4.5), circle(8, 8, 1.25), spokes], // ☸
   terminal: ['M3 4.5 6.5 8 3 11.5', 'M8 12.25h5'], // ❯_
   sum: ['M12 3.5H4L8.5 8 4 12.5h8'], // ∑
+  // A sparkle, like the ✦ of "Ask agent": the Agents panel.
+  agents: ['M8 2l1.5 4.5L14 8l-4.5 1.5L8 14l-1.5-4.5L2 8l4.5-1.5z'],
   // A puzzle piece: extensions, and their panels whose icon Flint doesn't know.
   puzzle: ['M2.5 5.5h3v-1a1.5 1.5 0 0 1 3 0v1h3v3h-1a1.5 1.5 0 0 0 0 3h1v2h-9z'],
 } as const satisfies Record<string, readonly string[]>

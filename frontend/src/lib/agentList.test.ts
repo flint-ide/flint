@@ -1,0 +1,145 @@
+import { describe, it } from 'node:test'
+import assert from 'node:assert/strict'
+import {
+  agentRows,
+  attentionCount,
+  chatState,
+  chatTitle,
+  nextUnseen,
+  stateLabel,
+  type AgentChatInput,
+} from './agentList'
+import type { ChatItem, ChatState } from './agentReducer'
+import type { TaskView } from './agentTasks'
+
+const chat = (items: ChatItem[], busy = false): ChatState => ({ items, plan: [], busy })
+const user = (text: string): ChatItem => ({ type: 'user', text, attachments: [] })
+const end = (stopReason: string): ChatItem => ({ type: 'end', stopReason })
+const ask = (settled: boolean): ChatItem => ({
+  type: 'permission',
+  request: { id: 'r1', toolCall: { id: 't1', title: 'Run ls' }, options: [] },
+  answer: null,
+  settled,
+})
+
+describe('chatState', () => {
+  const cases: [string, ChatState, boolean, string][] = [
+    ['nothing said yet', chat([]), false, 'idle'],
+    ['a turn running', chat([user('hi')], true), false, 'working'],
+    ['an unanswered request', chat([user('hi'), ask(false)], true), false, 'waiting'],
+    ['an answered request', chat([user('hi'), ask(true)], true), false, 'working'],
+    ['a finished turn', chat([user('hi'), end('end_turn')]), false, 'finished'],
+    ['a cancelled turn', chat([user('hi'), end('cancelled')]), false, 'idle'],
+    ['a failed turn', chat([user('hi'), end('error')]), false, 'failed'],
+    ['an unknown stop reason', chat([user('hi'), end('max_tokens')]), false, 'failed'],
+    ['a new turn after a finished one', chat([user('a'), end('end_turn'), user('b')], true), false, 'working'],
+    ['a restored chat', chat([user('hi'), end('end_turn')]), true, 'idle'],
+  ]
+  for (const [name, c, dormant, want] of cases) {
+    it(name, () => assert.equal(chatState(c, dormant), want))
+  }
+})
+
+describe('chatTitle', () => {
+  it('uses the first message, one line, shortened', () => {
+    assert.equal(chatTitle(chat([user('  Fix the\nbug  ')])), 'Fix the bug')
+    assert.equal(chatTitle(chat([user('x'.repeat(100))])), `${'x'.repeat(59)}…`)
+  })
+  it('names a chat without messages', () => assert.equal(chatTitle(chat([])), 'New chat'))
+})
+
+describe('nextUnseen', () => {
+  const cases: [string, string[], string[], string | null, string[], string[]][] = [
+    ['a turn ended in a background tab', [], ['a'], 'b', ['a', 'b'], ['a']],
+    ['a turn ended in the open tab', [], ['a'], 'a', ['a', 'b'], []],
+    ['viewing a tab clears it', ['a'], [], 'a', ['a'], []],
+    ['a closed chat is forgotten', ['a'], [], null, [], []],
+    ['no duplicates', ['a'], ['a'], null, ['a'], ['a']],
+  ]
+  for (const [name, unseen, ended, active, live, want] of cases) {
+    it(name, () => assert.deepEqual(nextUnseen(unseen, ended, active, live), want))
+  }
+})
+
+const session = (id: string, over: Partial<AgentChatInput> = {}): AgentChatInput => ({
+  id, agent: 'claude', cwd: '/src/p', chat: chat([]), dormant: false, ...over,
+})
+const task = (over: Partial<TaskView> = {}): TaskView => ({
+  id: 'k1', title: 'Add a button', prompt: 'Add a button', agent: 'codex', branch: 'agent/b', base: 'main',
+  worktree: '/src/p.wt/b', checkout: '/src/p', createdAt: 1, pullRequest: '', state: 'idle', error: '', stale: false,
+  ahead: 0, merged: false, group: '', tokens: 0, costUsd: 0, ...over,
+})
+
+describe('agentRows', () => {
+  it('orders what needs the user first, then by session order', () => {
+    const rows = agentRows({
+      sessions: [
+        session('idle'),
+        session('work', { chat: chat([user('go')], true) }),
+        session('done', { chat: chat([user('go'), end('end_turn')]) }),
+        session('seen', { chat: chat([user('go'), end('end_turn')]) }),
+        session('fail', { chat: chat([user('go'), end('error')]) }),
+        session('ask', { chat: chat([user('go'), ask(false)], true) }),
+      ],
+      tasks: [task({ id: 'q', state: 'queued', worktree: '/nowhere' })],
+      unseen: ['done'],
+    })
+    assert.deepEqual(rows.map((r) => `${r.key}:${r.state}`), [
+      'chat:ask:waiting', 'chat:fail:failed', 'chat:done:finished-unseen', 'chat:work:working', 'task:q:queued',
+      'chat:idle:idle', 'chat:seen:idle',
+    ])
+  })
+
+  it('takes the state of a chat in a task worktree from the task', () => {
+    const rows = agentRows({
+      sessions: [session('c', { cwd: '/src/p.wt/b', chat: chat([user('go')], true) })],
+      tasks: [task({ state: 'waiting' })],
+      unseen: [],
+    })
+    assert.equal(rows.length, 1)
+    assert.deepEqual([rows[0].kind, rows[0].state, rows[0].title, rows[0].taskId], ['task', 'waiting', 'Add a button', 'k1'])
+  })
+
+  it('lists a task without a chat only while it is queued', () => {
+    const rows = agentRows({
+      sessions: [],
+      tasks: [task({ state: 'queued' }), task({ id: 'k2', state: 'finished' }), task({ id: 'k3', state: 'queued', stale: true })],
+      unseen: [],
+    })
+    assert.deepEqual(rows.map((r) => r.key), ['task:k1'])
+  })
+
+  it('shows a task chat that finished unseen', () => {
+    const rows = agentRows({
+      sessions: [session('c', { cwd: '/src/p.wt/b', chat: chat([user('go'), end('end_turn')]) })],
+      tasks: [task({ state: 'finished' })],
+      unseen: ['c'],
+    })
+    assert.equal(rows[0].state, 'finished-unseen')
+  })
+
+  it('names the project folder and the agent', () => {
+    const [r] = agentRows({ sessions: [session('c', { agent: 'codex', cwd: '/src/my-app/' })], tasks: [], unseen: [] })
+    assert.deepEqual([r.agent, r.root, r.project], ['codex', '/src/my-app/', 'my-app'])
+  })
+})
+
+describe('attentionCount and labels', () => {
+  it('counts waiting, failed and finished-unseen', () => {
+    const rows = agentRows({
+      sessions: [
+        session('a', { chat: chat([user('x'), ask(false)], true) }),
+        session('b', { chat: chat([user('x')], true) }),
+        session('c', { chat: chat([user('x'), end('end_turn')]) }),
+      ],
+      tasks: [],
+      unseen: ['c'],
+    })
+    assert.equal(attentionCount(rows), 2)
+  })
+  it('labels every state', () => {
+    assert.equal(stateLabel('waiting'), 'waiting for you')
+    assert.equal(stateLabel('finished-unseen'), 'finished')
+    assert.equal(stateLabel('queued'), 'queued')
+  })
+})

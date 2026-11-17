@@ -27,6 +27,7 @@ import { refreshTrust, useTrust } from './store/trust'
 import { TrustBanner } from './components/layout/TrustBanner'
 import { copyDiagnostics, reportIssue, showLogs } from './store/diagnostics'
 import { subscribeAlerts } from './store/alerts'
+import { subscribeAgents } from './store/agents'
 import { openToolCheck, openToolCheckOnFirstRun, useToolCheck } from './store/toolCheck'
 import { useVSCodeImport } from './store/vscodeImport'
 import { usePrompts } from './store/prompts'
@@ -95,6 +96,7 @@ subscribeUsageEvents()
     subscribeAutoSave()
     subscribeScratchAutosave()
     subscribeAlerts()
+    subscribeAgents()
     subscribeEditorContext()
     // Native File menu: Open Folder… / Open Recent ▸ <folder>.
     EventsOn('menu:open-recent', () => useWorkspace.getState().setRecentOpen(true))

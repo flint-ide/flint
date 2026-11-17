@@ -15,6 +15,7 @@ import {
   type ChatState,
 } from '../lib/agentReducer'
 import { showToast } from './dialog'
+import { createDraftReporter, draftFlags } from '../lib/draftReport'
 import { createReorderer, type Reorderer } from '../lib/reorder'
 import type { SavedChat } from '../lib/sessionSnapshot'
 import { useEditor } from './editor'
@@ -304,5 +305,12 @@ export function subscribeAgentChatEvents(): void {
   deliverAgent = deliver
   EventsOn('agent:event', (e: AgentEvent) => deliver(e.sessionId, e))
   EventsOn('chat:opened', (e: ChatOpened) => useAgentChat.getState().adopt(e.info, { background: e.background }))
+  // Go refuses another agent's message to a chat while the user has a draft in it.
+  const drafts = createDraftReporter((id, open) => {
+    Chat.DraftChanged(remoteId(id), open).catch(() => undefined) // a chat Go does not know has nothing to guard
+  })
+  useAgentChat.subscribe((st, prev) => {
+    if (st.sessions !== prev.sessions) drafts.update(draftFlags(st.sessions))
+  })
   void useAgentChat.getState().load()
 }

@@ -33,6 +33,15 @@ export function Cancel(sessionID: string): $CancellablePromise<void> {
 }
 
 /**
+ * DraftChanged records whether the user has an unfinished message in a chat's
+ * input. It only flips a flag that makes Flint refuse messages other agents
+ * send to that chat; the id must name a chat Flint knows.
+ */
+export function DraftChanged(sessionID: string, open: boolean): $CancellablePromise<void> {
+    return $Call.ByID(1637335542, sessionID, open);
+}
+
+/**
  * Policy returns which permission requests are answered automatically.
  */
 export function Policy(): $CancellablePromise<agentsession$0.Policy> {

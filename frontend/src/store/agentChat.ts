@@ -16,6 +16,7 @@ import {
 } from '../lib/agentReducer'
 import { showToast } from './dialog'
 import { createDraftReporter, draftFlags } from '../lib/draftReport'
+import { createEventHold } from '../lib/eventHold'
 import { createReorderer, type Reorderer } from '../lib/reorder'
 import type { SavedChat } from '../lib/sessionSnapshot'
 import { useEditor } from './editor'
@@ -241,6 +242,7 @@ const queued = new Map<string, AgentEvent[]>()
 let pendingFlush: { frame: number; timer: ReturnType<typeof setTimeout> } | null = null
 
 function enqueue(id: string, e: AgentEvent): void {
+  if (adopting.offer(id, e)) return
   announceApproval(id, e)
   if (e.kind === 'turn_end' && e.stopReason !== 'cancelled') {
     const tab = `chat:${id}`
@@ -297,6 +299,38 @@ interface ChatOpened {
   background: boolean
 }
 
+/**
+ * Shows a task's folder in the window (store/agentTasks.ts sets it; that store
+ * imports this one, so it cannot be imported here).
+ */
+let showTaskFolder: ((path: string) => Promise<boolean>) | null = null
+export function setTaskFolderOpener(fn: (path: string) => Promise<boolean>): void {
+  showTaskFolder = fn
+}
+
+/** Events of chats whose folder is being opened before they are adopted; replayed after. */
+const adopting = createEventHold<AgentEvent>(2000)
+
+/**
+ * A chat Go opened. When it belongs to a task, its folder is shown first (as the
+ * Open action does), so the tab is not left without its project. Events that
+ * arrive meanwhile wait and are applied after the chat is adopted.
+ */
+async function chatOpened(e: ChatOpened): Promise<void> {
+  const open = showTaskFolder
+  if (!e.taskId || !open || useAgentChat.getState().sessions[chatLocalId(e.info.id)]) {
+    useAgentChat.getState().adopt(e.info, { background: e.background })
+    return
+  }
+  adopting.begin(e.info.id)
+  try {
+    await open(e.info.cwd).catch(() => false) // a folder that cannot be shown must not lose the chat
+  } finally {
+    useAgentChat.getState().adopt(e.info, { background: e.background })
+    for (const ev of adopting.end(e.info.id)) enqueue(chatLocalId(e.info.id), ev)
+  }
+}
+
 let subscribed = false
 export function subscribeAgentChatEvents(): void {
   if (subscribed) return
@@ -304,7 +338,7 @@ export function subscribeAgentChatEvents(): void {
   const deliver = createReorderer<AgentEvent>((id, e) => enqueue(localId(id), e))
   deliverAgent = deliver
   EventsOn('agent:event', (e: AgentEvent) => deliver(e.sessionId, e))
-  EventsOn('chat:opened', (e: ChatOpened) => useAgentChat.getState().adopt(e.info, { background: e.background }))
+  EventsOn('chat:opened', (e: ChatOpened) => void chatOpened(e))
   // Go refuses another agent's message to a chat while the user has a draft in it.
   const drafts = createDraftReporter((id, open) => {
     Chat.DraftChanged(remoteId(id), open).catch(() => undefined) // a chat Go does not know has nothing to guard

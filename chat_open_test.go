@@ -12,6 +12,7 @@ import (
 	"time"
 
 	as "flint/internal/agentsession"
+	"flint/internal/agenttask"
 	"flint/internal/orchestrate"
 	"flint/internal/settings"
 )
@@ -92,7 +93,8 @@ type chatApp struct {
 func newChatApp(t *testing.T) *chatApp {
 	t.Helper()
 	c := &chatApp{driver: newChatDriver()}
-	a := &App{configDir: t.TempDir(), settings: settings.Default(), orch: orchestrate.New()}
+	a := &App{configDir: t.TempDir(), settings: settings.Default(), orch: orchestrate.New(), ctx: context.Background()}
+	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
 	a.emitHook = func(name string, data ...any) {
 		if name == eventChatOpened {
 			c.mu.Lock()
@@ -101,6 +103,7 @@ func newChatApp(t *testing.T) *chatApp {
 		}
 	}
 	m := as.NewManager(func(e as.Event) {
+		a.tasks.Observe(e) // a chat in a task's worktree makes the task work, as newAgentManager does
 		a.observeChat(e)
 		c.mu.Lock()
 		c.events = append(c.events, e)

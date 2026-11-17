@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	as "flint/internal/agentsession"
 	"flint/internal/agenttask"
 	"flint/internal/git"
 )
@@ -17,14 +18,12 @@ import (
 // created beyond that is remembered as queued (state.json), with its branch
 // and worktree but no chat. Nothing polls: the queue moves when a task
 // settles (taskChanged), a task is removed, the limit or a budget changes,
-// or the workspace folders change (StartQueued). Go decides and announces
-// each start with "tasks:start"; the UI opens the folder, starts the chat
-// and sends the description, like for a new task.
+// or the workspace folders change (StartQueued). Go starts each one itself:
+// openChat opens the chat in the task's worktree and sends the description,
+// and the UI adopts the chat from "chat:opened" (store/agentTasks.ts). The
+// UI still starts the chats of tasks the user creates or starts by hand.
 
 const (
-	// eventTaskStart tells the UI to start the chat of a task (its id) that
-	// left the queue.
-	eventTaskStart = "tasks:start"
 	// startGrace is how long a task counts as starting without a turn: the
 	// agent's own start timeout and some room. A UI that never reports back
 	// (a reload) frees the slot after it.
@@ -38,6 +37,8 @@ type taskQueue struct {
 	// startMu guards starting: tasks given a slot whose turn has not begun.
 	startMu  sync.Mutex
 	starting map[string]time.Time
+	// starts counts the chats being started in the background (tests wait on it).
+	starts sync.WaitGroup
 }
 
 func (a *App) reserveStart(id string) {
@@ -128,11 +129,53 @@ func (a *App) startQueuedTasks() {
 			a.logf("start queued task: %v", err)
 			return
 		}
-		a.emit(eventTaskStart, task.ID)
+		a.queue.starts.Add(1)
+		go func() {
+			defer a.queue.starts.Done()
+			a.startTaskChat(task)
+		}()
 	}
 	if len(next) > 0 {
 		a.emit(eventTasksChanged)
 	}
+}
+
+// taskOrigin labels the first message of a task's chat: nobody typed it in
+// that chat, so the transcript shows where it came from.
+var taskOrigin = as.Origin{Agent: "Flint", Role: "task"}
+
+// startTaskChat opens the chat of a task that left the queue in its
+// worktree and sends the description, then lets go of the slot held for the
+// start (a running turn holds it from there on) and lets the queue move on. It
+// runs in its own goroutine: starting an agent can take a while and the
+// caller is the event pipeline. A chat that already works in the folder (the
+// user opened one by hand) is left alone: a task's chat is started once.
+func (a *App) startTaskChat(task agenttask.Task) {
+	defer func() {
+		a.releaseStart(task.ID)
+		a.startQueuedTasks()
+	}()
+	if a.chatIn(task.Worktree) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(a.ctx, agentStartTimeout)
+	defer cancel()
+	origin := taskOrigin
+	if _, err := a.openChat(ctx, ChatRequest{
+		Agent: task.Agent, Cwd: task.Worktree, Prompt: task.Prompt, TaskID: task.ID, Origin: &origin,
+	}); err != nil {
+		a.logf("start the chat of task %s: %v", task.ID, err)
+	}
+}
+
+// chatIn reports whether a chat is open in folder.
+func (a *App) chatIn(folder string) bool {
+	for _, n := range a.orch.All() {
+		if cleanFolder(n.Cwd) == cleanFolder(folder) {
+			return true
+		}
+	}
+	return false
 }
 
 // dequeue takes a task off the queue and holds a slot for it until its

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	as "flint/internal/agentsession"
+	"flint/internal/agenttask"
+	"flint/internal/git"
 	"flint/internal/mcptools"
 	"flint/internal/orchestrate"
 )
@@ -19,9 +21,9 @@ import (
 // is decided here, from the registry and the chat's grant, on every call.
 //
 // Scope: a target must be a chat whose folder is inside the root of the
-// caller's token. Chats in a task's worktree of the same repository are not in
-// scope yet (that needs the task state, which is a later step of the design),
-// so agents only direct agents working in the project folder itself.
+// caller's token, or inside the worktree of a task of the repository that root
+// belongs to (what start_agent with worktree makes). The worktrees are read
+// from the task state on every call, never guessed from a path.
 type orchestrator struct {
 	app *App
 	// startMu serialises start_agent so two parallel calls cannot both pass the
@@ -61,10 +63,46 @@ func (o *orchestrator) target(caller, root, id string) (orchestrate.Node, error)
 	if !ok {
 		return node, fmt.Errorf("unknown agent %q (list_agents shows the ids)", id)
 	}
-	if !insideRoot(node.Cwd, root) {
+	if !o.scopeOf(root).has(node.Cwd) {
 		return node, fmt.Errorf("agent %q is not in this project", id)
 	}
 	return node, nil
+}
+
+// orchScope is where a call from one project may reach: the project folder
+// and the worktrees of the tasks of its repository.
+type orchScope struct {
+	root      string
+	worktrees []string
+}
+
+// scopeOf reads the task state for root's repository. A root that is not in a
+// repository (or one git cannot open) reaches its own folder only.
+func (o *orchestrator) scopeOf(root string) orchScope {
+	s := orchScope{root: root}
+	ctx, cancel := context.WithTimeout(o.app.ctx, gitTimeout)
+	defer cancel()
+	r, err := git.Open(ctx, root)
+	if err != nil {
+		return s
+	}
+	for _, t := range o.app.taskStore().List(cleanFolder(r.CommonDir)) {
+		s.worktrees = append(s.worktrees, t.Worktree)
+	}
+	return s
+}
+
+// has reports whether cwd is in the project folder or in a task worktree.
+func (s orchScope) has(cwd string) bool {
+	if insideRoot(cwd, s.root) {
+		return true
+	}
+	for _, w := range s.worktrees {
+		if insideRoot(cwd, w) {
+			return true
+		}
+	}
+	return false
 }
 
 // descendant is target for the tools that act on what the caller started.
@@ -84,8 +122,9 @@ func (o *orchestrator) List(caller, root string) ([]mcptools.AgentInfo, error) {
 		return nil, err
 	}
 	out := []mcptools.AgentInfo{}
+	scope := o.scopeOf(root)
 	for _, n := range o.app.orch.All() {
-		if !insideRoot(n.Cwd, root) {
+		if !scope.has(n.Cwd) {
 			continue
 		}
 		out = append(out, mcptools.AgentInfo{
@@ -115,18 +154,51 @@ func (o *orchestrator) Start(ctx context.Context, caller, root string, r mcptool
 	if n := len(o.app.orch.Children(caller)); n >= maxChildren {
 		return "", fmt.Errorf("you already have %d agents (the limit is %d); wait for one and stop it with stop_agent first", n, maxChildren)
 	}
+	cwd, taskID := root, ""
+	if r.Worktree {
+		task, err := o.newWorktree(ctx, root, agent, r)
+		if err != nil {
+			return "", err
+		}
+		cwd, taskID = task.Worktree, task.ID
+		// The slot the task holds while its chat starts: given back when the
+		// chat's turn runs (taskChanged) or the start failed, either way here.
+		defer func() {
+			o.app.releaseStart(taskID)
+			o.app.startQueuedTasks()
+		}()
+	}
 	origin := as.Origin{SessionID: caller, Agent: node.Agent, Role: node.Role}
 	info, err := o.app.openChat(ctx, ChatRequest{
-		Agent: agent, Cwd: root, Prompt: r.Task, Role: r.Role, Parent: caller, Origin: &origin,
+		Agent: agent, Cwd: cwd, Prompt: r.Task, Role: r.Role, Parent: caller, Origin: &origin, TaskID: taskID,
 	})
 	if err != nil {
 		if info.ID != "" {
 			// Only the first prompt failed (the usage budget, say): the chat exists.
 			return "", fmt.Errorf("agent %s was started, but %v", info.ID, err)
 		}
+		if taskID != "" {
+			return "", fmt.Errorf("the worktree was made (task %s, see the Tasks panel) but the agent could not start: %w", taskID, err)
+		}
 		return "", err
 	}
 	return info.ID, nil
+}
+
+// newWorktree makes the branch and worktree a child works in: one task of the
+// caller's repository, from base (default: the branch the project is on).
+// Only a trusted project gets one (Restricted Mode starts nothing by itself),
+// and a task beyond the limit of tasks working at once is refused, not
+// queued: the caller asked for an agent now.
+func (o *orchestrator) newWorktree(ctx context.Context, root, agent string, r mcptools.StartRequest) (agenttask.Task, error) {
+	if !o.app.isTrusted(root) {
+		return agenttask.Task{}, errors.New("this project is not trusted, so Flint starts no worktree tasks in it")
+	}
+	made, _, err := o.app.createTasks(ctx, NewTaskGroup{Dir: root, Description: r.Task, Base: r.Base, Agents: []string{agent}}, false)
+	if err != nil {
+		return agenttask.Task{}, err
+	}
+	return made[0], nil
 }
 
 // agentFor picks the agent to start: the request's, else the role's, else the

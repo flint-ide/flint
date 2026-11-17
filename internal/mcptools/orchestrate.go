@@ -51,6 +51,9 @@ const (
 var (
 	idPattern   = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
 	namePattern = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
+	// basePattern is a branch name a tool argument may carry: git checks it
+	// again, this keeps option-like and odd strings out of its arguments.
+	basePattern = regexp.MustCompile(`^[A-Za-z0-9_./][A-Za-z0-9_./-]{0,199}$`)
 	// untilStates are the states wait_for_agent can wait for (agenttask's).
 	untilStates = []string{"idle", "waiting", "finished", "failed"}
 )
@@ -166,8 +169,8 @@ func (s *Sources) orchestrationTools(cfg Config) []mcpserver.Tool {
 				`"agent":{"type":"string","maxLength":%d,"description":"Which agent to start (claude, codex or a custom agent's id). Default: a role's agent, else yours."},`+
 				`"role":{"type":"string","maxLength":%d,"description":"Name of a role template (letters, digits, - and _)."},`+
 				`"task":{"type":"string","maxLength":%d,"description":"What the new agent should do; it knows nothing else about your work."},`+
-				`"worktree":{"type":"boolean","description":"Run it in its own git worktree. Not supported yet."},`+
-				`"base":{"type":"string","maxLength":%d,"description":"Base branch for the worktree. Only with worktree."}`+
+				`"worktree":{"type":"boolean","description":"Run it in its own git branch and worktree (a task in Flint's Tasks panel), so its changes do not touch yours. Refused while the limit of tasks working at once is reached."},`+
+				`"base":{"type":"string","maxLength":%d,"description":"Local branch the worktree starts from (default: the branch of this project's folder). Only with worktree."}`+
 				`},"required":["task"],"additionalProperties":false}`, maxAgentName, maxAgentName, maxTaskBytes, maxBaseLen), 2*time.Minute,
 			func(ctx context.Context, caller, root string, args json.RawMessage) (string, error) {
 				r, err := startRequest(args)
@@ -292,10 +295,6 @@ func (s *Sources) orchestrationTools(cfg Config) []mcpserver.Tool {
 	}
 }
 
-// ErrWorktreeUnsupported answers start_agent with worktree true: creating the
-// task's worktree from Go is a later step of the design.
-var ErrWorktreeUnsupported = errors.New("start_agent with worktree is not supported yet; start the agent without it (it works in this project's folder)")
-
 func startRequest(args json.RawMessage) (StartRequest, error) {
 	var in struct {
 		Agent    string `json:"agent"`
@@ -316,12 +315,12 @@ func startRequest(args json.RawMessage) (StartRequest, error) {
 		return StartRequest{}, err
 	}
 	switch {
-	case in.Worktree:
-		return StartRequest{}, ErrWorktreeUnsupported
-	case in.Base != "":
+	case in.Base != "" && !in.Worktree:
 		return StartRequest{}, errors.New("base is only used with worktree")
+	case in.Base != "" && !basePattern.MatchString(in.Base):
+		return StartRequest{}, fmt.Errorf("base must be a local branch name of 1–%d characters (letters, digits, '.', '_', '/' or '-', not starting with '-')", maxBaseLen)
 	}
-	return StartRequest{Agent: in.Agent, Role: in.Role, Task: in.Task}, nil
+	return StartRequest{Agent: in.Agent, Role: in.Role, Task: in.Task, Worktree: in.Worktree, Base: in.Base}, nil
 }
 
 // checkID bounds an agent id from the arguments.

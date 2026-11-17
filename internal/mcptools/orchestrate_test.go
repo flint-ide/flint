@@ -140,14 +140,25 @@ func TestWaitIsCappedBySettingAndServer(t *testing.T) {
 	}
 }
 
-func TestStartAgentWorktreeIsNotSupportedYet(t *testing.T) {
+func TestStartAgentPassesTheWorktreeRequestOn(t *testing.T) {
 	f := &fakeOrch{granted: true}
 	ctx := mcpserver.WithCaller(context.Background(), "c1")
 	tl := orchTools(f, orchOn)[ToolStartAgent]
-	_, err := tl.Call(ctx, "/p", json.RawMessage(`{"task":"x","worktree":true}`))
-	if !errors.Is(err, ErrWorktreeUnsupported) || len(f.started) != 0 {
-		t.Errorf("worktree: %v, started %v", err, f.started)
+	for _, args := range []string{
+		`{"task":"x","worktree":true,"base":"-x"}`,
+		`{"task":"x","worktree":true,"base":"a b"}`,
+		`{"task":"x","worktree":true,"base":"` + strings.Repeat("a", 201) + `"}`,
+		`{"task":"x","base":"main"}`,
+	} {
+		if _, err := tl.Call(ctx, "/p", json.RawMessage(args)); err == nil || len(f.started) != 0 {
+			t.Errorf("%.50s: %v, started %v", args, err, f.started)
+		}
 	}
+	if _, err := tl.Call(ctx, "/p", json.RawMessage(`{"task":"x","worktree":true,"base":"release/1.2"}`)); err != nil ||
+		f.started[0] != (StartRequest{Task: "x", Worktree: true, Base: "release/1.2"}) {
+		t.Errorf("worktree: %v, started %+v", err, f.started)
+	}
+	f.started = nil
 	if text, err := tl.Call(ctx, "/p", json.RawMessage(`{"task":"x","role":"r","agent":"codex"}`)); err != nil || !strings.Contains(text, "c9") || f.started[0] != (StartRequest{Agent: "codex", Role: "r", Task: "x"}) {
 		t.Errorf("start: %q %v %+v", text, err, f.started)
 	}

@@ -96,9 +96,9 @@ export const useAgentChat = createStore<AgentChatState>((set, get) => ({
 
   load: async () => {
     try {
-      // Definitions first: reading them registers them, so Agents() lists the defined ones.
-      await loadAgentDefs()
-      const [agents, policy] = await Promise.all([Chat.Agents(), Chat.Policy()])
+      // The definitions for labels and Settings, the agents that can start (Go reads the
+      // definition files once in each call).
+      const [, agents, policy] = await Promise.all([loadAgentDefs(), Chat.Agents(), Chat.Policy()])
       set({ agents: agents ?? [], policy })
     } catch (err) {
       showToast(errorMessage(err), 'error')

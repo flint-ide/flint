@@ -16,7 +16,6 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"flint/internal/accounts"
-	"flint/internal/agentdefs"
 	"flint/internal/agentsession"
 	"flint/internal/agenttask"
 	"flint/internal/config"
@@ -97,8 +96,8 @@ type App struct {
 	lsp                *lsp.Manager
 	agents             sessions.Agents
 	// agentMgr is the in-process manager behind agents, for what only it can
-	// do: registering custom and defined agents (syncCustomAgents,
-	// syncDefinedAgents).
+	// do: registering custom agents (syncCustomAgents) and starting a defined
+	// agent on the driver of the definitions just read (StartWith).
 	agentMgr   *agentsession.Manager
 	mcp        *mcpserver.Server // Flint's MCP server for its agents (api_mcp.go)
 	mcpSources *mcptools.Sources // what the MCP server's tools read
@@ -128,9 +127,9 @@ type App struct {
 	// definedMu serializes loadDefinedAgents; taken before settingsMu.
 	definedMu sync.Mutex
 	settings  settings.Settings // settings.json, loaded once at startup
-	// definedAgents are the agent definitions registered with agentMgr
+	// definedAgents are the drivers of the agent definitions last read
 	// (agents_defined.go); guarded by settingsMu like the custom agents.
-	definedAgents []agentdefs.Definition
+	definedAgents []*definedAgent
 
 	accounts *accounts.Store    // tokens of signed-in accounts (keyring)
 	registry *accounts.Registry // account providers (GitHub)

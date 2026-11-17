@@ -88,7 +88,11 @@ The program's own settings still apply: its path and extra arguments from Settin
 
 The instructions reach the program as standing instructions for the whole conversation, when it starts and when it resumes: Claude Code gets them with `--append-system-prompt`, Codex as its developer instructions. They are passed as one argument or field and never through a shell.
 
-Two places need only the program and leave the instructions out. **✦ Generate message**, the review and similar one-off runs use the engine and the model of the agent, because Flint's own prompt there asks for an answer in a fixed format. **Resolve with claude** (or codex) runs the plain engine in a terminal.
+A [review](#review-changes-with-agent) by a defined agent follows its instructions too: set a reviewer as the review agent in Settings ▸ Agents ▸ Review, and it reviews by its rules (Codex gets them as its developer instructions for that run). Reviews of pull requests and **✦ Fix it** go to the chat, so a chat with a defined agent has them as well.
+
+Two places need only the program and leave the instructions out. **✦ Generate message** and **Edit with Agent** use the engine and the model of the agent, because Flint's own prompt there asks for an answer in a fixed format. **Resolve with claude** (or codex) runs the plain engine in a terminal.
+
+When an agent [starts another one](#letting-agents-act-in-flint) with a role meant for `claude` (or `codex`), a defined agent that runs on that program fits the role too; a role meant for a defined agent fits only that one.
 
 ### Trust and names
 
@@ -306,7 +310,7 @@ You never have to accept diffs one by one. Edits are applied directly, show up i
 Before you commit, let an agent look over what you changed: **✦ Review** in the Commit panel, **✦ Review** in a diff tab, or "Review Changes with Agent" in the palette.
 
 - It reviews the changes ticked in the Commit panel, as the panel shows them (the last commit against your working tree, staged or not). Settings ▸ Agents ▸ Review can make it review every change instead, and a review started from a diff tab always includes that tab's file.
-- The reviewing agent (the default agent unless you pick another in Settings ▸ Agents ▸ Review) runs once, headless, like **Generate message**. It gets each file's diff with the line numbers of the new version and may read other files to check how the code is used. Only files `git status` reports as changed are reviewed.
+- The reviewing agent (the default agent unless you pick another in Settings ▸ Agents ▸ Review) runs once, headless, like **Generate message**. A [defined agent](#defined-agents) reviews by its own instructions, on its program and model. It gets each file's diff with the line numbers of the new version and may read other files to check how the code is used. Only files `git status` reports as changed are reviewed.
 - What the agent can read on its own depends on the agent:
   - **Claude Code** gets only Read, Grep and Glob, no MCP servers, and deny rules for credential files: the files Flint treats as credentials (`.env*`, `.envrc`, keys and certificates, `credentials`, kubeconfig, Terraform variables and state, `secrets.yaml` and the like) anywhere in the project, and `~/.ssh`, `~/.aws`, `~/.kube`, `~/.gnupg`, `~/.config/gcloud`, `~/.azure`, `~/.docker/config.json`, `~/.netrc`.
   - **Codex** runs in its read-only sandbox: it can't change files, but it can read any file you can, including credentials outside the project.

@@ -39,17 +39,19 @@ type AgentAPI struct {
 }
 
 // Info reports installed agents and the preferred one (first available by default).
-func (a *AgentAPI) Info() AgentInfo {
-	info := AgentInfo{Available: a.app.availableAgents()}
-	pref := a.app.preferredAgent()
-	if slices.Contains(info.Available, pref) {
-		info.Preferred = pref
+func (a *AgentAPI) Info() AgentInfo { return a.info(a.app.agentView()) }
+
+// info is Info from what v read.
+func (a *AgentAPI) info(v agentView) AgentInfo {
+	info := AgentInfo{Available: v.available()}
+	if slices.Contains(info.Available, v.preferred) {
+		info.Preferred = v.preferred
 	} else if len(info.Available) > 0 {
 		info.Preferred = info.Available[0]
 	}
 	info.ConflictAgent = conflictAgent(info.Preferred, info.Available, func(name string) string {
-		k, _, _, _ := a.app.agentEngine(name)
-		return string(k)
+		run, _, _ := v.native(name)
+		return string(run.kind)
 	})
 	return info
 }
@@ -74,7 +76,8 @@ func conflictAgent(preferred string, available []string, engine func(name string
 // A custom agent answers in a one-shot ACP session that may read the project
 // but not change it.
 func (a *AgentAPI) SuggestCommitMessage(dir string, tracked, untracked []string) (string, error) {
-	name, err := a.preferred()
+	v := a.app.agentView()
+	name, err := a.preferred(v)
 	if err != nil {
 		return "", err
 	}
@@ -87,7 +90,7 @@ func (a *AgentAPI) SuggestCommitMessage(dir string, tracked, untracked []string)
 			return "", errors.New("no changes to describe")
 		}
 		prompt := agent.CommitMessagePrompt(r.RecentSubjects(ctx, recentSubjects))
-		msg, err := a.headless(ctx, name, r.Root, prompt, diff)
+		msg, err := a.headless(ctx, v, name, r.Root, prompt, diff, false)
 		if err != nil {
 			return "", err
 		}
@@ -95,18 +98,24 @@ func (a *AgentAPI) SuggestCommitMessage(dir string, tracked, untracked []string)
 	})
 }
 
-// headless runs one prompt with agent name in dir and returns its answer. A
-// defined agent runs as its engine with its model; its standing instructions
-// are left out, as Flint's prompt here asks for an answer in a set format.
-func (a *AgentAPI) headless(ctx context.Context, name, dir, prompt, input string) (string, error) {
-	kind, cfg, native, err := a.app.agentEngine(name)
+// headless runs one prompt with agent name (as v knows it) in dir and returns
+// its answer. A defined agent runs as its engine with its model; its standing
+// instructions go along only when withInstructions is set: for a review,
+// whose answer Flint parses but whose judgement is the agent's. Runs whose
+// answer has a fixed mechanical form (a commit message, a replacement for a
+// selection) leave them out. A custom (ACP) agent gets the prompt alone.
+func (a *AgentAPI) headless(ctx context.Context, v agentView, name, dir, prompt, input string, withInstructions bool) (string, error) {
+	run, native, err := v.native(name)
 	if err != nil {
 		return "", err
 	}
 	if native {
-		return agent.Headless(ctx, kind, cfg, dir, prompt, input, !a.app.isTrusted(dir))
+		if !withInstructions {
+			run.instructions = ""
+		}
+		return agent.Headless(ctx, run.kind, run.cfg, dir, prompt, input, run.instructions, !a.app.isTrusted(dir))
 	}
-	c, ok := a.app.currentSettings().CustomAgent(name)
+	c, ok := v.settings.CustomAgent(name)
 	if !ok {
 		return "", fmt.Errorf("unknown agent %q", name)
 	}
@@ -127,8 +136,9 @@ func (a *AgentAPI) ResolveConflictsCommand(root, operation string, files []strin
 	return agent.InteractiveCommand(kind, a.app.agentConfig(kind), agent.ConflictPrompt(operation, files), !a.app.isTrusted(root))
 }
 
-func (a *AgentAPI) preferred() (string, error) {
-	info := a.Info()
+// preferred is the agent headless runs use, from what v read.
+func (a *AgentAPI) preferred(v agentView) (string, error) {
+	info := a.info(v)
 	if info.Preferred == "" {
 		return "", errors.New("no agent found: install Claude Code (claude) or Codex CLI (codex), or add an ACP agent in Settings ▸ Agents")
 	}

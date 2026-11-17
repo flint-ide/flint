@@ -235,6 +235,39 @@ func tomlKeyPath(kv string) string {
 	return strings.Join(append(parts, strings.TrimSpace(cur.String())), ".")
 }
 
+// tomlString quotes s as a TOML basic string, the value of a Codex -c
+// key=value override (Codex parses it as TOML). Everything TOML does not
+// allow raw in a basic string is escaped: the quote, the backslash and every
+// control character (tab included, for simplicity). Invalid UTF-8 becomes
+// U+FFFD (ranging over a string yields it for each bad byte).
+func tomlString(s string) string {
+	var b strings.Builder
+	b.Grow(len(s) + 2)
+	b.WriteByte('"')
+	for _, r := range s {
+		switch r {
+		case '"':
+			b.WriteString(`\"`)
+		case '\\':
+			b.WriteString(`\\`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		default:
+			if r < 0x20 || r == 0x7f {
+				fmt.Fprintf(&b, `\u%04X`, r)
+			} else {
+				b.WriteRune(r)
+			}
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
+}
+
 // ComposeArgs builds a command line from Flint's own arguments and the
 // user's extra ones. The extra arguments come first so that Flint's flags,
 // parsed later, win wherever a CLI lets a repeated flag override an earlier

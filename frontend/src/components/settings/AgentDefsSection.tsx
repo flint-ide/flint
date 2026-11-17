@@ -1,16 +1,13 @@
-import { useEffect, useState } from 'react'
 import { engineLabel, ignoredNote } from '../../lib/agentDefs'
-import { loadAgentDefs, openAgentDefDialog, openAgentDefFile, type AgentDefinitions } from '../../store/agentDefs'
-import { useAgentDefs } from '../../store/agentDefs'
+import { openAgentDefDialog, openAgentDefFile, useAgentDefs } from '../../store/agentDefs'
 
-/** Settings ▸ Agents ▸ Defined agents: Markdown files that define an agent (engine, model, instructions). */
+/**
+ * Settings ▸ Agents ▸ Defined agents: Markdown files that define an agent (engine, model, instructions).
+ * Shows the store's last read: the page reads the agents when it opens (AgentsSection) and
+ * New Agent… after it creates one, so this list makes no read of its own.
+ */
 export function AgentDefsSection() {
-  const [defs, setDefs] = useState<AgentDefinitions | null>(null)
-  // Re-read when the page opens and after the New Agent dialog closes: Go has no change event.
-  const dialog = useAgentDefs((s) => s.dialog)
-  useEffect(() => {
-    if (!dialog) void loadAgentDefs().then(setDefs)
-  }, [dialog])
+  const defs = useAgentDefs((s) => s.defs)
   const list = defs?.agents ?? []
   return (
     <>

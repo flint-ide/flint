@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"flint/internal/acp/acptest"
+	"flint/internal/agent"
 	"flint/internal/agenthost/hostmode"
 	as "flint/internal/agentsession"
 	"flint/internal/agentsession/acpdriver"
@@ -97,17 +98,17 @@ func TestHeadlessThroughCustomAgent(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	if _, err := api.headless(ctx, "fake", dir, "Write a message.", "diff"); !errors.Is(err, acpdriver.ErrRestricted) {
+	if _, err := api.headless(ctx, a.agentView(), "fake", dir, "Write a message.", "diff", false); !errors.Is(err, acpdriver.ErrRestricted) {
 		t.Fatalf("headless run in an untrusted folder = %v, want ErrRestricted", err)
 	}
 	if err := a.setTrust(dir, true); err != nil {
 		t.Fatal(err)
 	}
-	got, err := api.headless(ctx, "fake", dir, "Write a message.", "diff")
+	got, err := api.headless(ctx, a.agentView(), "fake", dir, "Write a message.", "diff", false)
 	if err != nil || got != "echo:Write a message.\n\ndiff" {
 		t.Fatalf("headless = %q, %v", got, err)
 	}
-	if _, err := api.headless(ctx, "gone", dir, "x", "y"); err == nil {
+	if _, err := api.headless(ctx, a.agentView(), "gone", dir, "x", "y", false); err == nil {
 		t.Error("an agent missing from settings ran")
 	}
 }
@@ -123,11 +124,11 @@ func TestInstalledAgentsAndConflictAgent(t *testing.T) {
 		}
 		return "", errors.New("not found")
 	}
-	if got := installedAgents(s, lookPath, nil); !slices.Equal(got, []string{"gemini"}) {
+	if got := installedAgents(s, agent.Available(s.AgentConfigs()), lookPath, nil); !slices.Equal(got, []string{"gemini"}) {
 		t.Errorf("installedAgents = %v, want [gemini]", got)
 	}
 
-	// engine is agentEngine's answer: native agents are their own engine,
+	// engine is agentView.native's answer: native agents are their own engine,
 	// reviewer is a defined agent on codex, gemini a custom agent.
 	engine := func(name string) string {
 		switch name {

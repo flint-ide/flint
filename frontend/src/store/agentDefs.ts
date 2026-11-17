@@ -1,6 +1,6 @@
 // Agent definitions (Go: AgentDefsAPI): Markdown files that define an agent. Go has no
 // change event, so the list is read again whenever the UI refreshes its agent list
-// (store/agentChat.ts load) and when Settings ▸ Agents or the New Agent dialog opens.
+// (store/agentChat.ts load): when Settings ▸ Agents opens and after New Agent… creates one.
 import { createStore } from '../lib/store'
 import * as AgentDefs from '../../bindings/flint/agentdefsapi'
 import type { AgentDefinitions, DefinedAgent } from '../../bindings/flint/models'
@@ -11,19 +11,21 @@ import { useEditor } from './editor'
 export type { AgentDefinitions, DefinedAgent }
 
 interface AgentDefsState {
+  /** The last read, for Settings ▸ Agents (null before the first). */
+  defs: AgentDefinitions | null
   /** The defined agents of the last read, for the pickers' labels. */
   defined: DefinedAgent[]
   /** The New Agent… dialog is open. */
   dialog: boolean
 }
 
-export const useAgentDefs = createStore<AgentDefsState>(() => ({ defined: [], dialog: false }))
+export const useAgentDefs = createStore<AgentDefsState>(() => ({ defs: null, defined: [], dialog: false }))
 
-/** Reads the definitions from disk (Go registers them for new chats); null after an error, which a picker can live without. */
+/** Reads the definitions from disk (Go keeps them for new chats); null after an error, which a picker can live without. */
 export async function loadAgentDefs(): Promise<AgentDefinitions | null> {
   try {
     const defs = await AgentDefs.List()
-    useAgentDefs.setState({ defined: defs.agents ?? [] })
+    useAgentDefs.setState({ defs, defined: defs.agents ?? [] })
     return defs
   } catch (err) {
     showToast(`Couldn't read the agent definitions: ${errorMessage(err)}`, 'error')

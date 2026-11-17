@@ -94,7 +94,7 @@ export class SessionInfo {
     /**
      * Engine is the program that runs it: the driver's own name ("claude",
      * "codex" or the custom agent's id). It equals Agent except for a defined
-     * agent, whose conversation resumes on this engine (Manager.Resume).
+     * agent, whose conversation resumes on this engine.
      */
     "engine": string;
     "model"?: string;

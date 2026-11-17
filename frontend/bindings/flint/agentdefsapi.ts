@@ -25,7 +25,7 @@ export function Create(root: string, personal: boolean, name: string): $Cancella
 }
 
 /**
- * List reads the definitions again (and registers them for new chats).
+ * List reads the definitions again (and keeps them for new chats).
  */
 export function List(): $CancellablePromise<$models.AgentDefinitions> {
     return $Call.ByID(2083149101).then(($result: any) => {

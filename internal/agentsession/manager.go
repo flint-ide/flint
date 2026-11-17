@@ -255,16 +255,29 @@ var ErrNoResume = errors.New("this agent cannot resume earlier conversations")
 
 // Start opens a session with the named agent.
 func (m *Manager) Start(ctx context.Context, agent, cwd string) (SessionInfo, error) {
-	return m.open(ctx, agent, "", cwd, func(ctx context.Context, d Driver, sink Sink) (SessionInfo, error) {
+	return m.StartWith(ctx, agent, cwd, nil)
+}
+
+// Resume reopens an earlier conversation of the named agent.
+func (m *Manager) Resume(ctx context.Context, agent, cwd, sessionID string) (SessionInfo, error) {
+	return m.ResumeWith(ctx, agent, cwd, sessionID, nil)
+}
+
+// StartWith is Start on driver d, which need not be registered: the session
+// is the agent's (SessionInfo.Agent), and d runs it. Flint starts a defined
+// agent this way, on the engine driver of the definitions it just read, so
+// that nothing registered in between can change what starts. A nil d is the
+// driver registered under agent.
+func (m *Manager) StartWith(ctx context.Context, agent, cwd string, d Driver) (SessionInfo, error) {
+	return m.open(ctx, agent, d, cwd, func(ctx context.Context, d Driver, sink Sink) (SessionInfo, error) {
 		return d.Start(ctx, cwd, sink)
 	})
 }
 
-// Resume reopens an earlier conversation of the named agent. A Router (a
-// defined agent) resumes it on the engine WithEngine put in ctx: the
-// SessionInfo.Engine it started on.
-func (m *Manager) Resume(ctx context.Context, agent, cwd, sessionID string) (SessionInfo, error) {
-	return m.open(ctx, agent, EngineFrom(ctx), cwd, func(ctx context.Context, d Driver, sink Sink) (SessionInfo, error) {
+// ResumeWith is Resume on driver d (nil: the one registered under agent), as
+// StartWith.
+func (m *Manager) ResumeWith(ctx context.Context, agent, cwd, sessionID string, d Driver) (SessionInfo, error) {
+	return m.open(ctx, agent, d, cwd, func(ctx context.Context, d Driver, sink Sink) (SessionInfo, error) {
 		r, ok := d.(Resumer)
 		if !ok {
 			return SessionInfo{}, ErrNoResume
@@ -273,24 +286,22 @@ func (m *Manager) Resume(ctx context.Context, agent, cwd, sessionID string) (Ses
 	})
 }
 
-// open starts or resumes a session through fn and registers it. fn gets a
-// context carrying a CallerSlot that is filled with the session id as soon as
-// the driver returns it, so MCP tokens issued during the start resolve to it.
-func (m *Manager) open(ctx context.Context, agent, engine, cwd string, fn func(context.Context, Driver, Sink) (SessionInfo, error)) (SessionInfo, error) {
+// open starts or resumes a session on d (nil: the driver registered under
+// agent) through fn and registers it. fn gets a context carrying a
+// CallerSlot that is filled with the session id as soon as the driver
+// returns it, so MCP tokens issued during the start resolve to it.
+func (m *Manager) open(ctx context.Context, agent string, d Driver, cwd string, fn func(context.Context, Driver, Sink) (SessionInfo, error)) (SessionInfo, error) {
 	m.mu.Lock()
-	d, closed := m.drivers[agent], m.closed
+	if d == nil {
+		d = m.drivers[agent]
+	}
+	closed := m.closed
 	m.mu.Unlock()
 	if closed {
 		return SessionInfo{}, ErrClosed
 	}
 	if d == nil {
 		return SessionInfo{}, fmt.Errorf("unknown agent %q", agent)
-	}
-	if r, ok := d.(Router); ok {
-		var err error
-		if d, err = r.Route(engine); err != nil {
-			return SessionInfo{}, err
-		}
 	}
 	s := &managed{agent: agent, cwd: cwd, driver: d}
 	var sessionID string
@@ -311,8 +322,8 @@ func (m *Manager) open(ctx context.Context, agent, engine, cwd string, fn func(c
 	sessionID = info.ID
 	idMu.Unlock()
 	slot.Set(info.ID)
-	// The driver reports its own name; the session is the registered one's
-	// (a defined agent runs on the claude or codex driver).
+	// The driver reports its own name; the session is the agent's (a defined
+	// agent runs on the claude or codex driver).
 	if info.Engine == "" {
 		info.Engine = cmp.Or(info.Agent, agent)
 	}
@@ -334,8 +345,9 @@ func (m *Manager) open(ctx context.Context, agent, engine, cwd string, fn func(c
 		return SessionInfo{}, fmt.Errorf("%s reused the id of an open chat (%s)", agent, info.ID)
 	}
 	m.sessions[info.ID] = s
-	// The driver may have been replaced while the session started; keep it
-	// for Close, or its process would outlive Flint.
+	// The driver may have been replaced while the session started, or was
+	// never registered (StartWith); keep it for Close, or its process would
+	// outlive Flint.
 	if !slices.Contains(m.retired, d) && !slices.Contains(slices.Collect(maps.Values(m.drivers)), d) {
 		m.retired = append(m.retired, d)
 	}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"flint/internal/agent"
+	"flint/internal/agentdefs"
 	"flint/internal/settings"
 )
 
@@ -103,5 +104,22 @@ func TestInlineEditCancelStopsTheAgent(t *testing.T) {
 	}
 	if d := time.Since(start); d > 10*time.Second {
 		t.Errorf("cancelled run took %s", d)
+	}
+}
+
+// A defined agent as the default runs inline edits on its engine and model,
+// but without its instructions: the answer has a fixed form.
+func TestInlineEditLeavesOutADefinedAgentsInstructions(t *testing.T) {
+	claude, out := fakeClaude(t, "printf 'x\\n'")
+	api, root := inlineEditApp(t, claude, true)
+	writeFile(t, filepath.Join(agentdefs.PersonalDir(api.app.configDir), "terse.md"), "---\nengine: claude\nmodel: haiku\n---\nAlways answer in French.")
+	api.app.settings.DefaultAgent = "terse"
+	req := agent.EditRequest{Path: filepath.Join(root, "x.go"), Language: "go", Instruction: "fix", Selection: "y\n"}
+	if _, err := api.InlineEdit(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	args, _ := os.ReadFile(filepath.Join(out, "args"))
+	if !strings.Contains(string(args), "\n--model\nhaiku\n") || strings.Contains(string(args), "French") {
+		t.Errorf("args\n%s", args)
 	}
 }

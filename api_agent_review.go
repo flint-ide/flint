@@ -72,11 +72,12 @@ func (a *AgentAPI) review(ctx context.Context, req ReviewRequest) (ReviewResult,
 	if err := checkReviewFiles(req.Files); err != nil {
 		return ReviewResult{}, err
 	}
-	name, err := a.reviewAgent()
+	v := a.app.agentView()
+	name, err := a.reviewAgent(v)
 	if err != nil {
 		return ReviewResult{}, err
 	}
-	s := a.app.currentSettings()
+	s := v.settings
 	cfg := s.AgentReview
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(cfg.TimeoutSeconds)*time.Second)
 	defer cancel()
@@ -100,7 +101,8 @@ func (a *AgentAPI) review(ctx context.Context, req ReviewRequest) (ReviewResult,
 	if len(in.Files) == 0 {
 		return ReviewResult{}, errors.New("nothing to review: " + strings.Join(in.Notes, " "))
 	}
-	answer, err := a.headless(ctx, name, r.Root, review.Prompt(), in.Text)
+	// A defined agent set for reviews (a "reviewer") brings its instructions.
+	answer, err := a.headless(ctx, v, name, r.Root, review.Prompt(), in.Text, true)
 	if err != nil {
 		return ReviewResult{}, err
 	}
@@ -291,19 +293,19 @@ func readNewVersion(root, rel string, limit int) (content string, binary, ok boo
 	return string(data), bytes.IndexByte(head, 0) >= 0, true
 }
 
-// reviewAgent is the agent from settings, else the default one.
-func (a *AgentAPI) reviewAgent() (string, error) {
-	name := a.app.currentSettings().AgentReview.Agent
+// reviewAgent is the agent from settings, else the default one, from what v
+// read.
+func (a *AgentAPI) reviewAgent(v agentView) (string, error) {
+	name := v.settings.AgentReview.Agent
 	if name == "" {
-		return a.preferred()
+		return a.preferred(v)
 	}
-	if !slices.Contains(a.Info().Available, name) {
+	if !slices.Contains(v.available(), name) {
 		// A defined agent is a file that can go away (removed, its folder
 		// untrusted, its engine uninstalled): reviews then use the default
 		// agent, as they do for a name settings no longer know.
-		s := a.app.currentSettings()
-		if _, custom := s.CustomAgent(name); !custom && !isNative(name) {
-			return a.preferred()
+		if _, custom := v.settings.CustomAgent(name); !custom && !isNative(name) {
+			return a.preferred(v)
 		}
 		return "", fmt.Errorf("%s, the agent set for reviews in Settings ▸ Agents, is not installed", name)
 	}

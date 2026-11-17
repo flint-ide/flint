@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -15,6 +16,7 @@ import (
 	as "flint/internal/agentsession"
 	"flint/internal/agentsession/claude"
 	"flint/internal/agentsession/codex"
+	"flint/internal/orchestrate"
 	"flint/internal/settings"
 )
 
@@ -53,19 +55,16 @@ func (d *nameDriver) Stop(string) error                    { return nil }
 func (d *nameDriver) Close() error                         { return nil }
 
 func TestSyncDefinedAgents(t *testing.T) {
-	m := as.NewManager(func(as.Event) {})
 	reviewer := agentdefs.Definition{Name: "reviewer", Engine: "claude", Instructions: "Review."}
 	planner := agentdefs.Definition{Name: "planner", Instructions: "Plan."}
 	built := []string{}
-	newDriver := func(d agentdefs.Definition) as.Driver {
+	newDriver := func(d agentdefs.Definition) *definedAgent {
 		built = append(built, d.Name)
-		return &nameDriver{name: "claude"}
+		return &definedAgent{def: d}
 	}
-	none := func(string) bool { return false }
-
-	syncDefinedAgents(m, nil, []agentdefs.Definition{reviewer, planner}, none, newDriver)
-	if got := m.Agents(); !slices.Equal(got, []string{"planner", "reviewer"}) {
-		t.Fatalf("Agents() = %v", got)
+	first := syncDefinedAgents(nil, []agentdefs.Definition{reviewer, planner}, newDriver)
+	if len(first) != 2 || !slices.Equal(built, []string{"reviewer", "planner"}) {
+		t.Fatalf("built %v", built)
 	}
 	// Only a definition that runs differently gets a new driver.
 	changed := reviewer
@@ -73,19 +72,13 @@ func TestSyncDefinedAgents(t *testing.T) {
 	described := planner
 	described.Description, described.Path = "new words", "/elsewhere/planner.md"
 	built = nil
-	syncDefinedAgents(m, []agentdefs.Definition{reviewer, planner}, []agentdefs.Definition{changed, described}, none, newDriver)
-	if !slices.Equal(built, []string{"reviewer"}) {
+	second := syncDefinedAgents(first, []agentdefs.Definition{changed, described}, newDriver)
+	if !slices.Equal(built, []string{"reviewer"}) || second[1] != first[1] || second[0] == first[0] {
 		t.Fatalf("rebuilt %v, want only reviewer", built)
 	}
-	// Removed: planner goes; a name a custom agent took since stays its owner's.
-	custom := &nameDriver{name: "reviewer"}
-	m.Register("reviewer", custom) // syncCustomAgents registered a custom agent "reviewer"
-	syncDefinedAgents(m, []agentdefs.Definition{changed, described}, nil, func(n string) bool { return n == "reviewer" }, newDriver)
-	if got := m.Agents(); !slices.Equal(got, []string{"reviewer"}) {
-		t.Fatalf("after removal: Agents() = %v", got)
-	}
-	if info, err := m.Start(context.Background(), "reviewer", t.TempDir()); err != nil || info.Engine != "reviewer" {
-		t.Fatalf("the custom agent lost its name: %+v %v", info, err)
+	// Removed: gone from the next read.
+	if got := syncDefinedAgents(second, nil, newDriver); len(got) != 0 {
+		t.Fatalf("after removal: %v", got)
 	}
 }
 
@@ -98,7 +91,7 @@ func TestDefinedAgentRoute(t *testing.T) {
 		engine string
 		want   string
 	}{{"", "codex"}, {"claude", "claude"}, {"codex", "codex"}, {"gemini", ""}} {
-		drv, err := d.Route(tt.engine)
+		drv, k, err := d.route(tt.engine)
 		var got string
 		switch drv.(type) {
 		case *claude.Driver:
@@ -106,40 +99,99 @@ func TestDefinedAgentRoute(t *testing.T) {
 		case *codex.Driver:
 			got = "codex"
 		}
-		if got != tt.want || (tt.want == "") != (err != nil) {
-			t.Errorf("Route(%q) = %T, %v; want %s", tt.engine, drv, err, tt.want)
+		if got != tt.want || string(k) != tt.want || (tt.want == "") != (err != nil) {
+			t.Errorf("route(%q) = %T, %q, %v; want %s", tt.engine, drv, k, err, tt.want)
 		}
 	}
 	failure = agentdefs.ErrNoEngine
-	if _, err := d.Route(""); !errors.Is(err, agentdefs.ErrNoEngine) {
-		t.Errorf("Route with nothing installed = %v", err)
+	if _, _, err := d.route(""); !errors.Is(err, agentdefs.ErrNoEngine) {
+		t.Errorf("route with nothing installed = %v", err)
 	}
+}
+
+// fakeEngines replaces the engine drivers of defined agent name in loaded by
+// fakes that report their engine's name.
+func fakeEngines(t *testing.T, loaded loadedAgents, name string) (claudeFake, codexFake *nameDriver) {
+	t.Helper()
+	d := loaded.drivers[name]
+	if d == nil {
+		t.Fatalf("%s was not loaded", name)
+	}
+	claudeFake, codexFake = &nameDriver{name: "claude"}, &nameDriver{name: "codex"}
+	d.engines = map[agent.Kind]as.Driver{agent.Claude: claudeFake, agent.Codex: codexFake}
+	return claudeFake, codexFake
 }
 
 // A conversation resumes on the engine it started on, whatever the default
 // engine is by then; a new one starts on the default.
 func TestDefinedAgentResumesOnItsEngine(t *testing.T) {
-	m := as.NewManager(func(as.Event) {})
-	d := &definedAgent{
-		def:     agentdefs.Definition{Name: "reviewer", Instructions: "Review."},
-		engines: map[agent.Kind]as.Driver{agent.Claude: &nameDriver{name: "claude"}, agent.Codex: &nameDriver{name: "codex"}},
-		resolve: func(agentdefs.Definition) (agent.Kind, error) { return agent.Claude, nil },
+	a, _, _ := definedApp(t)
+	a.agents = a.agentMgr
+	loaded := a.loadDefinedAgents()
+	_, codexFake := fakeEngines(t, loaded, "planner")
+	drv, k, err := loaded.route("planner", "")
+	if err != nil || k != "claude" {
+		t.Fatalf("route = %q, %v", k, err)
 	}
-	m.Register("reviewer", d)
-	info, err := m.Start(context.Background(), "reviewer", t.TempDir())
-	if err != nil || info.Agent != "reviewer" || info.Engine != "claude" {
+	info, err := a.startChat(context.Background(), drv, "planner", t.TempDir())
+	if err != nil || info.Agent != "planner" || info.Engine != "claude" {
 		t.Fatalf("Start = %+v, %v", info, err)
 	}
-	info, err = m.Resume(as.WithEngine(context.Background(), "codex"), "reviewer", "/w", "thr-1")
-	if err != nil || info.Agent != "reviewer" || info.Engine != "codex" {
+	info, err = a.resumeChatWith(context.Background(), loaded, "planner", "/w", "thr-1", "codex")
+	if err != nil || info.Agent != "planner" || info.Engine != "codex" {
 		t.Fatalf("Resume = %+v, %v", info, err)
 	}
-	if got := d.engines[agent.Codex].(*nameDriver).resumed; !slices.Equal(got, []string{"thr-1"}) {
+	if got := codexFake.resumed; !slices.Equal(got, []string{"thr-1"}) {
 		t.Fatalf("codex resumed %v", got)
 	}
 	// Unknown engine (a chat saved before engines were recorded): the default.
-	if info, err = m.Resume(context.Background(), "reviewer", "/w", "old"); err != nil || info.Engine != "claude" {
+	if info, err = a.resumeChatWith(context.Background(), loaded, "planner", "/w", "old", ""); err != nil || info.Engine != "claude" {
 		t.Fatalf("Resume without engine = %+v, %v", info, err)
+	}
+	if _, err = a.resumeChatWith(context.Background(), loaded, "planner", "/w", "x", "gemini"); err == nil {
+		t.Fatal("resumed on an unknown engine")
+	}
+}
+
+// A chat starts on exactly the definition its own call read, whatever another
+// call read in between: openChatWith gets the read, and nothing looks the name
+// up again. The interleaving is spelled out (no goroutines): read, a second
+// read after the file changed (and after it is gone), then the start.
+func TestOpenChatStartsWhatItsCallRead(t *testing.T) {
+	c := newChatApp(t)
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.settings.Agents = map[string]settings.AgentSettings{"claude": {Path: exe}, "codex": {Path: "/nonexistent/codex"}}
+	file := filepath.Join(agentdefs.PersonalDir(c.configDir), "planner.md")
+	writeFile(t, file, "Plan v1.")
+
+	first := c.loadDefinedAgents()
+	fakeEngines(t, first, "planner")
+	writeFile(t, file, "Plan v2.")
+	second := c.loadDefinedAgents()
+	d := second.drivers["planner"]
+	if d == nil || d == first.drivers["planner"] || d.def.Instructions != "Plan v2." {
+		t.Fatalf("the second read did not replace the definition: %+v", d)
+	}
+	d.engines = map[agent.Kind]as.Driver{agent.Claude: &nameDriver{name: "v2"}, agent.Codex: &nameDriver{name: "v2"}}
+	if err := os.Remove(file); err != nil {
+		t.Fatal(err)
+	}
+	if third := c.loadDefinedAgents(); third.drivers["planner"] != nil {
+		t.Fatal("a removed definition is still loaded")
+	}
+
+	// Started on the first read's claude driver (the fake that names its
+	// sessions "claude-new"), not the second's ("v2-new").
+	info, err := c.openChatWith(context.Background(), ChatRequest{Agent: "planner", Cwd: t.TempDir()}, first)
+	if err != nil || info.ID != "claude-new" || info.Agent != "planner" || info.Engine != "claude" {
+		t.Fatalf("openChatWith = %+v, %v", info, err)
+	}
+	// The current read has no planner: by name, it is unknown.
+	if _, err := c.openChat(context.Background(), ChatRequest{Agent: "planner", Cwd: t.TempDir()}); err == nil || !strings.Contains(err.Error(), "planner") {
+		t.Fatalf("a removed definition started: %v", err)
 	}
 }
 
@@ -191,7 +243,8 @@ func TestAgentEngine(t *testing.T) {
 	}
 	for _, tt := range tests {
 		a.settings.DefaultAgent = tt.defaultAgent
-		k, cfg, ok, err := a.agentEngine(tt.name)
+		run, ok, err := a.agentView().native(tt.name)
+		k, cfg := run.kind, run.cfg
 		if tt.err != "" {
 			if err == nil || !strings.Contains(err.Error(), tt.err) {
 				t.Errorf("%s: err %v, want %q", tt.name, err, tt.err)
@@ -209,18 +262,18 @@ func TestAvailableAgentsAndRegistration(t *testing.T) {
 	if got := a.availableAgents(); !slices.Equal(got, []string{"claude", "gemini", "opus-reviewer", "planner", "proj"}) {
 		t.Fatalf("availableAgents = %v", got)
 	}
-	// Registered for chats, backend too (it fails to start with a clear
-	// message); gemini stays unregistered here (syncCustomAgents owns it).
-	if got := a.agentMgr.Agents(); !slices.Equal(got, []string{"backend", "opus-reviewer", "planner", "proj"}) {
-		t.Fatalf("registered %v", got)
+	// Kept for chats, backend too (it fails to start with a clear message);
+	// never registered with the manager by name.
+	got := slices.Sorted(maps.Keys(a.loadDefinedAgents().drivers))
+	if !slices.Equal(got, []string{"backend", "opus-reviewer", "planner", "proj"}) || len(a.agentMgr.Agents()) != 0 {
+		t.Fatalf("drivers %v, registered %v", got, a.agentMgr.Agents())
 	}
 	// A removed file is gone for the next conversation.
 	if err := os.Remove(filepath.Join(agentdefs.PersonalDir(a.configDir), "planner.md")); err != nil {
 		t.Fatal(err)
 	}
-	a.loadDefinedAgents()
-	if _, err := a.agentMgr.Start(context.Background(), "planner", t.TempDir()); err == nil || !strings.Contains(err.Error(), "planner") {
-		t.Fatalf("a removed definition started: %v", err)
+	if _, ok := a.loadDefinedAgents().drivers["planner"]; ok {
+		t.Fatal("a removed definition is still loaded")
 	}
 	// With no native agent installed, no definition can run.
 	a.settings.Agents = map[string]settings.AgentSettings{"claude": {Path: "/nonexistent/claude"}, "codex": {Path: "/nonexistent/codex"}}
@@ -294,7 +347,7 @@ func TestReviewAgentFallsBack(t *testing.T) {
 	}
 	for _, tt := range tests {
 		a.settings.AgentReview.Agent = tt.set
-		got, err := api.reviewAgent()
+		got, err := api.reviewAgent(a.agentView())
 		if tt.err != "" {
 			if err == nil || !strings.Contains(err.Error(), tt.err) {
 				t.Errorf("%q: err = %v, want %q", tt.set, err, tt.err)
@@ -317,5 +370,73 @@ func TestCreatePersonalOverProject(t *testing.T) {
 	}
 	if _, err := api.Create(trusted, false, "planner"); err == nil {
 		t.Error("a project definition under a personal one's name was created")
+	}
+}
+
+// A role for an engine fits a defined agent on that engine; a role naming a
+// defined (or custom) agent fits that agent only.
+func TestRolesAndDefinedAgents(t *testing.T) {
+	a, _, _ := definedApp(t) // claude installed, codex not: planner runs on claude
+	roles := orchestrate.PersonalRolesDir(a.configDir)
+	writeRoleFile(t, roles, "rv.md", "---\nagent: claude\n---\nReview for Claude.")
+	writeRoleFile(t, roles, "cx.md", "---\nagent: codex\n---\nCodex things.")
+	writeRoleFile(t, roles, "pl.md", "---\nagent: planner\n---\nPlan things.")
+	loaded := a.loadDefinedAgents()
+	cwd := t.TempDir()
+	for _, tt := range []struct {
+		agent, role string
+		want        string // the agent that starts; "" when refused
+		engine      bool   // started on a defined agent's driver
+	}{
+		{agent: "planner", role: "rv", want: "planner", engine: true},
+		{agent: "opus-reviewer", role: "rv", want: "opus-reviewer", engine: true},
+		{agent: "claude", role: "rv", want: "claude"},
+		{agent: "planner", role: "cx"},
+		{agent: "planner", role: "pl", want: "planner", engine: true},
+		{role: "pl", want: "planner", engine: true},
+		{agent: "opus-reviewer", role: "pl"},
+		{agent: "claude", role: "pl"},
+		{agent: "gemini", role: "rv"},
+	} {
+		r, drv, err := a.applyRole(ChatRequest{Agent: tt.agent, Cwd: cwd, Role: tt.role, Prompt: "go"}, loaded)
+		if tt.want == "" {
+			if err == nil {
+				t.Errorf("%s with role %s: allowed", tt.agent, tt.role)
+			}
+			continue
+		}
+		if err != nil || r.Agent != tt.want || (drv != nil) != tt.engine || !strings.HasSuffix(r.Prompt, "\n\ngo") {
+			t.Errorf("%s with role %s = %+v, %T, %v", tt.agent, tt.role, r, drv, err)
+		}
+	}
+	_, _, err := a.applyRole(ChatRequest{Agent: "planner", Cwd: cwd, Role: "cx"}, loaded)
+	if err == nil || err.Error() != "role cx is for codex, not planner (claude)" {
+		t.Errorf("refusal = %v", err)
+	}
+	if r, _, err := a.applyRole(ChatRequest{Agent: "planner", Cwd: cwd, Prompt: "go"}, loaded); err != nil || r.Prompt != "go" {
+		t.Errorf("no role = %+v, %v", r, err)
+	}
+}
+
+func TestRoleFits(t *testing.T) {
+	for _, tt := range []struct {
+		role, name, engine string
+		want               bool
+	}{
+		{"", "anything", "anything", true},
+		{"claude", "claude", "claude", true},
+		{"claude", "reviewer", "claude", true},
+		{"claude", "reviewer", "codex", false},
+		{"reviewer", "reviewer", "claude", true},
+		{"reviewer", "planner", "claude", false},
+		{"reviewer", "claude", "claude", false},
+		{"gemini", "gemini", "gemini", true},
+		// A role for a custom agent is not an engine: a defined agent never
+		// runs on one.
+		{"gemini", "planner", "gemini", false},
+	} {
+		if got := roleFits(tt.role, tt.name, tt.engine); got != tt.want {
+			t.Errorf("roleFits(%q, %q, %q) = %v", tt.role, tt.name, tt.engine, got)
+		}
 	}
 }

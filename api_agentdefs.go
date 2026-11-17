@@ -46,15 +46,16 @@ type AgentDefsAPI struct {
 	app *App
 }
 
-// List reads the definitions again (and registers them for new chats).
+// List reads the definitions again (and keeps them for new chats).
 func (s *AgentDefsAPI) List() AgentDefinitions {
-	set := s.app.loadDefinedAgents()
+	v := s.app.agentView()
+	set := v.defined.Set
 	out := AgentDefinitions{
 		Agents: []DefinedAgent{}, Problems: set.Problems, Ignored: set.Ignored,
 		PersonalDir: agentdefs.PersonalDir(s.app.configDir),
 	}
 	for _, d := range set.Agents {
-		engine, _ := s.app.resolveEngine(d)
+		engine, _ := v.resolveEngine(d)
 		out.Agents = append(out.Agents, DefinedAgent{
 			Name: d.Name, Description: d.Description, Engine: d.Engine, ResolvedEngine: string(engine),
 			Model: d.Model, Source: d.Source, Path: d.Path,

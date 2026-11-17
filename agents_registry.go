@@ -1,8 +1,6 @@
 package main
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"slices"
 
@@ -64,14 +62,13 @@ func customAgentOptions(c settings.CustomAgent, untrusted func(cwd string) bool)
 }
 
 // installedAgents lists the agents that can start: the native CLIs found
-// on the login PATH (or at their configured path) in preference order, then
-// the custom agents whose command resolves, in settings order, then the
-// defined agents whose engine is installed (any native agent for one without
-// a pinned engine), by name. lookPath is exec.LookPath once the login shell's
-// PATH was imported.
-func installedAgents(s settings.Settings, lookPath func(string) (string, error), defined []agentdefs.Definition) []string {
+// (natives, agent.Available: on the login PATH or at their configured path)
+// in preference order, then the custom agents whose command resolves, in
+// settings order, then the defined agents whose engine is installed (any
+// native agent for one without a pinned engine), by name. lookPath is
+// exec.LookPath once the login shell's PATH was imported.
+func installedAgents(s settings.Settings, natives []agent.Kind, lookPath func(string) (string, error), defined []agentdefs.Definition) []string {
 	out := []string{}
-	natives := agent.Available(s.AgentConfigs())
 	for _, k := range natives {
 		out = append(out, string(k))
 	}
@@ -88,37 +85,34 @@ func installedAgents(s settings.Settings, lookPath func(string) (string, error),
 	return out
 }
 
-// syncDefinedAgents registers a driver (newDriver) per definition in next and
-// removes the ones only prev had; an unchanged definition keeps its driver,
-// and sessions already running keep theirs (Manager). A name that is now
-// taken (a custom agent's id, reserved) is left to its owner.
-func syncDefinedAgents(m *as.Manager, prev, next []agentdefs.Definition, taken func(name string) bool, newDriver func(agentdefs.Definition) as.Driver) {
-	for _, p := range prev {
-		if !slices.ContainsFunc(next, func(d agentdefs.Definition) bool { return d.Name == p.Name }) && !taken(p.Name) {
-			m.Unregister(p.Name)
-		}
-	}
+// syncDefinedAgents builds the drivers of the definitions in next: an
+// unchanged definition keeps its driver from prev, so its chats share one
+// driver per engine. Nothing is registered with the session manager by name:
+// a chat starts on the driver of the load it comes from (Manager.StartWith),
+// and a driver that runs sessions is kept by the manager until they end.
+func syncDefinedAgents(prev []*definedAgent, next []agentdefs.Definition, newDriver func(agentdefs.Definition) *definedAgent) []*definedAgent {
+	out := make([]*definedAgent, 0, len(next))
 	for _, d := range next {
-		if slices.ContainsFunc(prev, d.Same) {
+		if i := slices.IndexFunc(prev, func(p *definedAgent) bool { return p.def.Same(d) }); i >= 0 {
+			out = append(out, prev[i])
 			continue
 		}
-		m.Register(d.Name, newDriver(d))
+		out = append(out, newDriver(d))
 	}
+	return out
 }
 
-// definedAgent is a defined agent's driver: a Router that hands each
-// conversation to a driver of its engine, carrying the definition's
-// instructions (and its model, on the pinned engine). A new conversation
-// runs on the engine resolve picks; a resumed one on the engine it started on.
+// definedAgent is a defined agent's drivers: one per engine, each carrying
+// the definition's instructions (and its model, on the pinned engine). A new
+// conversation runs on the engine resolve picks; a resumed one on the engine
+// it started on.
 type definedAgent struct {
 	def     agentdefs.Definition
 	engines map[agent.Kind]as.Driver
 	resolve func(agentdefs.Definition) (agent.Kind, error)
 }
 
-var _ as.Router = (*definedAgent)(nil)
-
-// newDefinedAgent builds d's driver: one driver per engine, created now but
+// newDefinedAgent builds d's drivers: one per engine, created now but
 // starting nothing until a session does. config is the engine's settings.
 func newDefinedAgent(d agentdefs.Definition, untrusted func(cwd string) bool, config func(agent.Kind) agent.Config, mcp as.MCPProvider, resolve func(agentdefs.Definition) (agent.Kind, error)) *definedAgent {
 	da := &definedAgent{def: d, engines: map[agent.Kind]as.Driver{}, resolve: resolve}
@@ -129,39 +123,22 @@ func newDefinedAgent(d agentdefs.Definition, untrusted func(cwd string) bool, co
 	return da
 }
 
-// Route picks the engine's driver: engine is the one a resumed conversation
-// started on, "" for a new conversation.
-func (d *definedAgent) Route(engine string) (as.Driver, error) {
+// route picks the engine's driver: engine is the one a resumed conversation
+// started on, "" for a new conversation (resolved now).
+func (d *definedAgent) route(engine string) (as.Driver, agent.Kind, error) {
 	k := agent.Kind(engine)
 	if engine == "" {
 		var err error
 		if k, err = d.resolve(d.def); err != nil {
-			return nil, err
+			return nil, "", err
 		}
 	}
 	drv := d.engines[k]
 	if drv == nil {
-		return nil, fmt.Errorf("%s: unknown engine %q", d.def.Name, engine)
+		return nil, "", fmt.Errorf("%s: unknown engine %q", d.def.Name, engine)
 	}
-	return drv, nil
+	return drv, k, nil
 }
-
-// errRouted: the manager hands a defined agent's sessions to its engines.
-var errRouted = errors.New("a defined agent's sessions run on its engine's driver")
-
-func (d *definedAgent) Start(context.Context, string, as.Sink) (as.SessionInfo, error) {
-	return as.SessionInfo{}, errRouted
-}
-func (d *definedAgent) Prompt(context.Context, string, string, []as.Attachment) (string, error) {
-	return "", errRouted
-}
-func (d *definedAgent) Cancel(string) error                  { return errRouted }
-func (d *definedAgent) Respond(string, string, string) error { return errRouted }
-func (d *definedAgent) Stop(string) error                    { return errRouted }
-
-// Close has nothing to stop: the manager keeps every engine driver that runs
-// a session and closes it itself.
-func (d *definedAgent) Close() error { return nil }
 
 // isNative reports one of the agent CLIs Flint drives directly.
 func isNative(name string) bool { return agent.Valid(agent.Kind(name)) }

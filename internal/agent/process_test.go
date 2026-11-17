@@ -27,7 +27,7 @@ func TestHeadlessCancelKillsTheAgentsChildren(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() {
-		_, err := Headless(ctx, Claude, Config{Path: script}, dir, "hi", "", false)
+		_, err := Headless(ctx, Claude, Config{Path: script}, dir, "hi", "", "", false)
 		done <- err
 	}()
 
@@ -73,7 +73,7 @@ func TestHeadlessSuccessKillsLeftoverChildren(t *testing.T) {
 	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	got, err := Headless(context.Background(), Claude, Config{Path: script}, dir, "hi", "", false)
+	got, err := Headless(context.Background(), Claude, Config{Path: script}, dir, "hi", "", "", false)
 	if err != nil || got != "the answer" {
 		t.Fatalf("Headless = %q, %v; want the answer", got, err)
 	}

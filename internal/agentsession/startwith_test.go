@@ -1,7 +1,6 @@
 package agentsession
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"testing"
@@ -31,65 +30,47 @@ func (e *engineFake) Resume(ctx context.Context, cwd, id string, sink Sink) (Ses
 	return info, err
 }
 
-// routerFake is a defined agent: new conversations go to def, resumed ones
-// to the engine they started on.
-type routerFake struct {
-	*closeCounting
-	def     string
-	engines map[string]Driver
-	asked   []string
-}
-
-func (r *routerFake) Route(engine string) (Driver, error) {
-	r.asked = append(r.asked, engine)
-	d := r.engines[cmp.Or(engine, r.def)]
-	if d == nil {
-		return nil, errors.New("no engine " + engine)
-	}
-	return d, nil
-}
-
-func TestRouterHandsSessionsToItsEngine(t *testing.T) {
+// StartWith and ResumeWith run a session on the driver handed over, under
+// the agent's name, even when nothing is registered under that name: a
+// defined agent's engine driver.
+func TestStartWithHandsSessionsToTheGivenDriver(t *testing.T) {
 	m := NewManager(func(Event) {})
 	claude := &engineFake{resumableFake: &resumableFake{fakeDriver: newFake("")}, name: "claude"}
 	codex := &engineFake{resumableFake: &resumableFake{fakeDriver: newFake("")}, name: "codex"}
 	close(claude.release)
-	r := &routerFake{closeCounting: &closeCounting{fakeDriver: newFake("")}, def: "claude", engines: map[string]Driver{"claude": claude, "codex": codex}}
-	m.Register("reviewer", r)
+	// A registration under the name is not what starts.
+	other := &engineFake{resumableFake: &resumableFake{fakeDriver: newFake("")}, name: "other"}
+	m.Register("reviewer", other)
 
-	info, err := m.Start(context.Background(), "reviewer", t.TempDir())
+	info, err := m.StartWith(context.Background(), "reviewer", t.TempDir(), claude)
 	if err != nil || info.Agent != "reviewer" || info.Engine != "claude" {
-		t.Fatalf("Start = %+v, %v", info, err)
+		t.Fatalf("StartWith = %+v, %v", info, err)
 	}
-	// The session talks to the engine's driver, not to the router.
+	// The session talks to that driver.
 	if err := m.Respond(info.ID, "p1", "yes"); err != nil {
 		t.Fatal(err)
 	}
 	if opt := <-claude.answered; opt != "yes" {
 		t.Fatalf("claude got %q", opt)
 	}
-
-	// Whatever the default is now, a conversation that started on codex
-	// resumes there.
-	info, err = m.Resume(WithEngine(context.Background(), "codex"), "reviewer", "/w", "thr-1")
+	info, err = m.ResumeWith(context.Background(), "reviewer", "/w", "thr-1", codex)
 	if err != nil || info.Agent != "reviewer" || info.Engine != "codex" || len(codex.resumed) != 1 {
-		t.Fatalf("Resume = %+v, %v (codex resumed %v)", info, err, codex.resumed)
+		t.Fatalf("ResumeWith = %+v, %v (codex resumed %v)", info, err, codex.resumed)
 	}
-	if _, err := m.Resume(WithEngine(context.Background(), "gemini"), "reviewer", "/w", "x"); err == nil {
-		t.Fatal("resumed on an unknown engine")
-	}
-	if got := r.asked; len(got) != 3 || got[0] != "" || got[1] != "codex" || got[2] != "gemini" {
-		t.Fatalf("Route asked for %q", got)
+	if _, err := m.ResumeWith(context.Background(), "reviewer", "/w", "x", newFake("")); !errors.Is(err, ErrNoResume) {
+		t.Fatalf("resumed on a driver that can't: %v", err)
 	}
 
-	// A removed definition's sessions keep their engine drivers, which
-	// Close still reaches.
+	// Drivers that were never registered still reach Close.
 	m.Unregister("reviewer")
 	if err := m.Close(); err != nil {
 		t.Fatal(err)
 	}
 	if claude.closes != 1 || codex.closes != 1 {
 		t.Fatalf("closed claude %d, codex %d times; want 1 each", claude.closes, codex.closes)
+	}
+	if _, err := m.StartWith(context.Background(), "reviewer", t.TempDir(), claude); !errors.Is(err, ErrClosed) {
+		t.Fatalf("StartWith after Close = %v", err)
 	}
 }
 

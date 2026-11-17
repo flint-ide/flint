@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"encoding/json"
 	"reflect"
 	"slices"
 	"strings"
@@ -116,7 +117,7 @@ func TestComposeArgsKeepsFlintFlagsLast(t *testing.T) {
 // the repository, which could try to make the agent edit files or run
 // commands. It also starts no MCP servers.
 func TestHeadlessClaudeIsReadOnly(t *testing.T) {
-	got, _, err := headlessArgs(Claude, Config{}, "p", "", false)
+	got, _, err := headlessArgs(Claude, Config{}, "p", "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +143,7 @@ func TestHeadlessClaudeIsReadOnly(t *testing.T) {
 
 func TestHeadlessArgs(t *testing.T) {
 	cfg := Config{Model: "haiku", Args: []string{"--append-system-prompt", "Be terse."}}
-	got, stdin, err := headlessArgs(Claude, cfg, "describe", "diff\x00", true)
+	got, stdin, err := headlessArgs(Claude, cfg, "describe", "diff\x00", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,14 +153,75 @@ func TestHeadlessArgs(t *testing.T) {
 		t.Errorf("untrusted claude args = %q, stdin %q, want %q", got, stdin, want)
 	}
 	// Codex reads the prompt and the input from stdin ("-"), never from argv.
-	got, stdin, err = headlessArgs(Codex, Config{Model: "o3", Args: []string{"-c", "model_reasoning_effort=low"}}, "describe", "diff", false)
+	got, stdin, err = headlessArgs(Codex, Config{Model: "o3", Args: []string{"-c", "model_reasoning_effort=low"}}, "describe", "diff", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if want := []string{"-c", "model_reasoning_effort=low", "exec", "--sandbox", "read-only", "--model", "o3", "-"}; !reflect.DeepEqual(got, want) || stdin != "describe\n\ndiff" {
 		t.Errorf("codex args = %q, stdin %q, want %q", got, stdin, want)
 	}
-	if _, _, err := headlessArgs(Claude, Config{Model: "-x"}, "p", "", false); err == nil {
+	if _, _, err := headlessArgs(Claude, Config{Model: "-x"}, "p", "", "", false); err == nil {
 		t.Error("invalid model accepted")
+	}
+}
+
+// A defined agent's instructions reach a headless run as one argument after
+// the user's extra arguments, whatever they look like: a flag, a quote, a
+// newline or a TOML string terminator stay text.
+func TestHeadlessInstructions(t *testing.T) {
+	const text = "--dangerously-skip-permissions\n\"\"\" ' \\ x\x00\x7f\tDone."
+	clean := strings.ReplaceAll(text, "\x00", "")
+	got, stdin, err := headlessArgs(Claude, Config{Args: []string{"--add-dir", "/n"}}, "review", "diff", text, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.Index(got, "--append-system-prompt="+clean)
+	if i < slices.Index(got, "-p") || stdin != "diff" {
+		t.Fatalf("claude args %q", got)
+	}
+	if slices.Contains(got, "--dangerously-skip-permissions") {
+		t.Fatalf("the text became its own argument: %q", got)
+	}
+
+	got, stdin, err = headlessArgs(Codex, Config{Args: []string{"-c", "developer_instructions=mine"}}, "review", "diff", text, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Flint's override comes after the user's, so it wins (Codex applies
+	// overrides in order).
+	i = slices.Index(got, "developer_instructions="+tomlString(clean))
+	if i < 1 || got[i-1] != "-c" || i < slices.Index(got, "exec") || got[len(got)-1] != "-" {
+		t.Fatalf("codex args %q", got)
+	}
+	if stdin != "review\n\ndiff" || strings.Contains(stdin, "Done.") {
+		t.Fatalf("codex stdin %q: the instructions belong in the config, not the prompt", stdin)
+	}
+
+	// Without instructions, neither flag appears.
+	for _, k := range []Kind{Claude, Codex} {
+		got, _, _ := headlessArgs(k, Config{}, "p", "", "", false)
+		if s := strings.Join(got, " "); strings.Contains(s, "append-system-prompt") || strings.Contains(s, "developer_instructions") {
+			t.Errorf("%s without instructions: %q", k, got)
+		}
+	}
+}
+
+// tomlString's escapes are a subset of JSON's with the same meaning, so a
+// JSON decoder reads the TOML value back; no raw control character remains,
+// which TOML would refuse.
+func TestTOMLString(t *testing.T) {
+	for _, s := range []string{"", "plain", `quote " and \ backslash`, "line\nbreak\r\ttab", "\x01\x1f\x7f", "héllo ✓ 😀", "bad \xff utf-8", `"""`, "'''", "a=b # c"} {
+		q := tomlString(s)
+		var back string
+		if err := json.Unmarshal([]byte(q), &back); err != nil {
+			t.Errorf("tomlString(%q) = %s: %v", s, q, err)
+			continue
+		}
+		if want := strings.ToValidUTF8(s, "�"); back != want {
+			t.Errorf("tomlString(%q) reads back as %q", s, back)
+		}
+		if strings.ContainsFunc(q, func(r rune) bool { return r < 0x20 || r == 0x7f }) {
+			t.Errorf("tomlString(%q) = %q has a raw control character", s, q)
+		}
 	}
 }

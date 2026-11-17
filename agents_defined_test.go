@@ -207,7 +207,7 @@ func definedApp(t *testing.T) (*App, string, string) {
 	a := &App{configDir: config, settings: settings.Default(), roots: []string{trusted, untrusted}}
 	a.settings.Agents = map[string]settings.AgentSettings{"claude": {Path: exe, Model: "sonnet"}, "codex": {Path: "/nonexistent/codex"}}
 	a.settings.CustomAgents = []settings.CustomAgent{{ID: "gemini", Command: exe}}
-	a.state.TrustedFolders = []string{trusted}
+	a.state.TrustedFolders = []string{cleanFolder(trusted)}
 	a.agentMgr = as.NewManager(func(as.Event) {})
 	t.Cleanup(func() { _ = a.agentMgr.Close() })
 	personal := agentdefs.PersonalDir(config)

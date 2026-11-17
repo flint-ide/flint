@@ -29,6 +29,7 @@ import (
 	"flint/internal/lsp"
 	"flint/internal/mcpserver"
 	"flint/internal/mcptools"
+	"flint/internal/orchestrate"
 	"flint/internal/restore"
 	"flint/internal/runner"
 	"flint/internal/scratch"
@@ -93,7 +94,8 @@ type App struct {
 	// actionGrants and configRuns serve the MCP tools that act (api_mcp_actions.go).
 	actionGrants actionGrants
 	configRuns   configRuns
-	tasks        *agenttask.Tracker // state of agent tasks from their chats
+	tasks        *agenttask.Tracker    // state of agent tasks from their chats
+	orch         *orchestrate.Registry // every chat's place in the tree, state and output (chat_open.go)
 	sessions     *restore.Store
 	usage        *usage.Store // agent usage per day (usage_state.go)
 	usageChats   usageChats
@@ -122,6 +124,8 @@ type App struct {
 
 	confirmMu sync.Mutex      // one confirmation dialog at a time
 	confirmed map[string]bool // custom agent command lines the user allowed a Check of, this session
+	// emitHook replaces the Wails event bus in tests.
+	emitHook func(name string, data ...any)
 	// ask replaces the native confirmation dialog (askNative) in tests.
 	ask func(title, message, ok string) bool
 }
@@ -176,6 +180,7 @@ func NewApp() (*App, error) {
 	a.mcp, a.mcpSources = newMCP(a)
 	a.features = feature.New(features, featureHost{a})
 	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
+	a.orch = orchestrate.New()
 	a.agentMgr = newAgentManager(a)
 	a.agents = a.agentMgr
 	return a, nil

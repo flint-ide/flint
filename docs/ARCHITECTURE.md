@@ -52,7 +52,7 @@ flowchart LR
   end
 
   UI -- "method calls (Wails bindings)" --> GO
-  GO -- "events: term:data · agent:event · run:event · debug:event · search:batch<br/>fs:changed · git:changed · lsp:diagnostics · tasks:changed" --> UI
+  GO -- "events: term:data · agent:event · run:event · debug:event · search:batch<br/>fs:changed · git:changed · lsp:diagnostics · tasks:changed · chat:opened" --> UI
   srch & git & lsp --> bins
   gh & acct --> ghapi
   ag --> agents
@@ -86,6 +86,8 @@ flowchart LR
 ### Agents
 
 - `AgentChatAPI` runs chats through `agentsession.Manager`, which routes each session to a registered driver and applies the approval policy to its permission requests (`agents_registry.go`).
+- One Go function opens a chat: `App.openChat` (`chat_open.go`). `AgentChatAPI.Start` is a thin call to it. It starts the agent, binds the chat to its task and usage record, registers it in `internal/orchestrate.Registry` (`App.orch`: tree, per-chat state folded from the same events as the task tracker, and a bounded redacted output ring; every event is fed to it, `Remove` runs when a chat stops) and emits `chat:opened` (`{info, parent, taskId, role, background}`). The frontend `adopt`s it: ids it already has are ignored (so the window that called `Start` gets one tab), and `background` opens the tab without taking focus.
+- Every prompt, from the UI or from Go, goes through `App.promptChat`: usage gate, then task tracking. A prompt that did not come from the web view is redacted and first announced as a `user_message` event with an `origin` (`{sessionId, agent, role}`); the chat shows it as "from <agent>". Origin-less `user_message` events are ignored by the reducer: the UI's own messages are already in the transcript.
 - Native drivers (`agentsession/claude`, `agentsession/codex`) are registered once and read their settings on every start.
 - Custom agents (`customAgents` in settings.json) are ACP agents: each gets one `acpdriver.Driver`, registered at startup and again whenever settings are saved (`syncCustomAgents`). A replaced or removed driver keeps the sessions it runs until they stop, and is still closed on quit. Adding an agent CLI with an ACP mode needs no code.
 - The agent lists (chat menus, default-agent pickers, `AgentAPI.Info`) are the native CLIs found on the login PATH, then the custom agents whose command resolves.

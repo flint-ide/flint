@@ -160,4 +160,13 @@ describe('agent reducer', () => {
     const items = run([{ kind: 'tool_call', toolCall: { id: '1', status: 'completed' } }, { kind: 'message_chunk', text: 'x' }]).items
     assert.equal(settleItems(items), items)
   })
+
+  it('shows a user_message only when another chat sent it, labelled with its origin', () => {
+    const own = run([{ kind: 'user_message', text: 'typed here' }])
+    assert.equal(own, emptyChat, 'the UI already has its own messages')
+    const peer = run([{ kind: 'user_message', text: 'review this', origin: { sessionId: 'p', agent: 'claude' } }])
+    assert.deepEqual(peer.items, [{ type: 'user', text: 'review this', attachments: [], from: 'claude' }])
+    const withRole = run([{ kind: 'user_message', text: 'x', origin: { sessionId: 'p', agent: 'codex', role: 'reviewer' } }])
+    assert.deepEqual(withRole.items[0], { type: 'user', text: 'x', attachments: [], from: 'codex (reviewer)' })
+  })
 })

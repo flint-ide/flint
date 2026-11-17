@@ -2725,6 +2725,10 @@ button.small {
   gap: 6px;
   padding-left: 4px;
 }
+.msg-from {
+  font-size: 11px;
+  margin-bottom: 2px;
+}
 .msg-attachments,
 .composer-attachments {
   display: flex;

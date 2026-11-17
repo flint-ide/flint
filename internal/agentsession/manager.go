@@ -171,6 +171,21 @@ func (m *Manager) emit(e Event) {
 	m.emitRaw(e)
 }
 
+// Announce emits e as an event of an open chat, stamped with that chat's next
+// sequence number, so a message Flint itself sends on someone's behalf stays in
+// order with the agent's own events. It fails for an unknown chat.
+func (m *Manager) Announce(sessionID string, e Event) error {
+	m.mu.Lock()
+	_, ok := m.sessions[sessionID]
+	m.mu.Unlock()
+	if !ok {
+		return fmt.Errorf("unknown session %q", sessionID)
+	}
+	e.SessionID = sessionID
+	m.emit(e)
+	return nil
+}
+
 // Register makes a driver available under name ("claude", "codex", ...). A
 // driver it replaces keeps the sessions it runs until they stop.
 func (m *Manager) Register(name string, d Driver) {

@@ -29,16 +29,26 @@ func (c *chat) unsubscribe(cl *client) {
 	c.mu.Unlock()
 }
 
-// chatFor returns the record of id, creating it when there is room: at the
-// limit a stopped chat nobody listens to makes way, and otherwise nil says no.
-func (s *Server) chatFor(id string, create bool) *chat {
+// chatFor returns the record of id, or nil when the host has none. A record
+// is made only by register, never by an event: an event of a session that
+// never registered, or one that was evicted, would otherwise count toward the
+// cap with nobody able to stop it.
+func (s *Server) chatFor(id string) *chat {
+	s.chatsMu.Lock()
+	defer s.chatsMu.Unlock()
+	return s.chatMap[id]
+}
+
+// openChat returns the record of a chat that registers: the existing one, or
+// a new one when there is room (at the limit a stopped chat nobody listens to
+// makes way; otherwise nil says no). A new record is returned locked, with
+// the events that were held for it while its start was in flight, so the
+// caller can add them before any live event does.
+func (s *Server) openChat(id string) (c *chat, held []as.Event, created bool) {
 	s.chatsMu.Lock()
 	defer s.chatsMu.Unlock()
 	if c := s.chatMap[id]; c != nil {
-		return c
-	}
-	if !create {
-		return nil
+		return c, nil, false
 	}
 	if len(s.chatMap) >= MaxSessions {
 		evicted := false
@@ -53,12 +63,65 @@ func (s *Server) chatFor(id string, create bool) *chat {
 			}
 		}
 		if !evicted {
-			return nil
+			return nil, nil, false
 		}
 	}
-	c := newChat()
+	c = newChat()
+	c.mu.Lock()
 	s.chatMap[id] = c
-	return c
+	held = s.pending[id]
+	s.dropPendingLocked(id)
+	return c, held, true
+}
+
+// beginStart and endStart bracket an agent.start or agent.resume. While one
+// is in flight, events of sessions that have no record yet are held rather
+// than dropped: a driver may report the new session's first events before
+// Start returns its id, and register adds them to the record it makes. When
+// the last start ends what is still held belonged to nobody and is dropped.
+func (s *Server) beginStart() {
+	s.chatsMu.Lock()
+	s.starting++
+	s.chatsMu.Unlock()
+}
+
+func (s *Server) endStart() {
+	s.chatsMu.Lock()
+	defer s.chatsMu.Unlock()
+	if s.starting--; s.starting == 0 {
+		s.pending = map[string][]as.Event{}
+		s.pendingEvents, s.pendingBytes = 0, 0
+	}
+}
+
+func (s *Server) dropPendingLocked(id string) {
+	for _, e := range s.pending[id] {
+		s.pendingEvents--
+		s.pendingBytes -= eventSize(e)
+	}
+	delete(s.pending, id)
+}
+
+// eventSize is what a held event counts for: the text it carries and a flat
+// allowance for the rest.
+func eventSize(e as.Event) int { return len(e.Text) + 512 }
+
+// route finds where an event goes: the record of its session, or nowhere. An
+// event of a session that has no record yet is held while a start is in
+// flight, within bounds, and dropped otherwise.
+func (s *Server) route(e as.Event) *chat {
+	s.chatsMu.Lock()
+	defer s.chatsMu.Unlock()
+	if c := s.chatMap[e.SessionID]; c != nil {
+		return c
+	}
+	size := eventSize(e)
+	if s.starting > 0 && s.pendingEvents < MaxPendingEvents && s.pendingBytes+size <= maxPendingBytes {
+		s.pending[e.SessionID] = append(s.pending[e.SessionID], e)
+		s.pendingEvents++
+		s.pendingBytes += size
+	}
+	return nil
 }
 
 // emitAgent receives the agent manager's events, already numbered per chat.
@@ -66,6 +129,18 @@ func (s *Server) emitAgent(e as.Event) {
 	if e.SessionID == "" {
 		return
 	}
+	c := s.route(e)
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	s.deliverLocked(c, e)
+	c.mu.Unlock()
+}
+
+// deliverLocked records an event in its chat and sends it to the chat's
+// listeners. c.mu is held, which keeps events in order per chat.
+func (s *Server) deliverLocked(c *chat, e as.Event) {
 	msg := EventMsg{Event: e}
 	if e.Kind == as.KindUsage {
 		msg.UsageSeq = s.usage.reserve()
@@ -83,27 +158,27 @@ func (s *Server) emitAgent(e as.Event) {
 	if msg.UsageSeq != 0 {
 		s.usage.put(msg.UsageSeq, data)
 	}
-	c := s.chatFor(e.SessionID, true)
-	if c == nil {
-		return
-	}
-	c.mu.Lock()
 	c.ring.add(e.Seq, data)
 	for cl := range c.subs {
 		if !cl.push(NotifyAgentEvent, data) {
 			delete(c.subs, cl)
 		}
 	}
-	c.mu.Unlock()
 }
 
-// register makes cl a listener of the chat that just started.
+// register makes cl a listener of the chat that just started, creating its
+// record: the only place one is made.
 func (s *Server) register(cl *client, id string) error {
-	c := s.chatFor(id, true)
+	c, held, created := s.openChat(id)
 	if c == nil {
 		return fmt.Errorf("the host keeps at most %d chats; stop some", MaxSessions)
 	}
-	c.mu.Lock()
+	if !created {
+		c.mu.Lock()
+	}
+	for _, e := range held {
+		s.deliverLocked(c, e)
+	}
 	c.stopped = false
 	c.subs[cl] = struct{}{}
 	c.mu.Unlock()
@@ -146,6 +221,8 @@ func (s *Server) agentStart(ctx context.Context, cl *client, raw json.RawMessage
 	if err := invalid(firstErr(checkText("agent", p.Agent, MaxID), checkText("cwd", p.Cwd, MaxPath))); err != nil {
 		return nil, err
 	}
+	s.beginStart()
+	defer s.endStart()
 	info, err := s.agents.Start(ctx, p.Agent, p.Cwd)
 	if err != nil {
 		return nil, err
@@ -161,6 +238,8 @@ func (s *Server) agentResume(ctx context.Context, cl *client, raw json.RawMessag
 	if err := invalid(firstErr(checkText("agent", p.Agent, MaxID), checkText("cwd", p.Cwd, MaxPath), checkText("session", p.Session, MaxID))); err != nil {
 		return nil, err
 	}
+	s.beginStart()
+	defer s.endStart()
 	info, err := s.agents.Resume(ctx, p.Agent, p.Cwd, p.Session)
 	if err != nil {
 		return nil, err
@@ -224,7 +303,7 @@ func (s *Server) agentStop(_ context.Context, _ *client, raw json.RawMessage) (a
 		return nil, err
 	}
 	err := s.agents.Stop(p.ID)
-	if c := s.chatFor(p.ID, false); c != nil {
+	if c := s.chatFor(p.ID); c != nil {
 		c.mu.Lock()
 		c.stopped = true
 		c.mu.Unlock()
@@ -257,7 +336,7 @@ func (s *Server) agentAttach(_ context.Context, cl *client, raw json.RawMessage)
 	if err := invalid(checkID(p.ID)); err != nil {
 		return nil, err
 	}
-	c := s.chatFor(p.ID, false)
+	c := s.chatFor(p.ID)
 	if c == nil {
 		return nil, jsonrpc.Errorf(jsonrpc.CodeInvalidParams, "unknown session %q", p.ID)
 	}
@@ -284,11 +363,18 @@ func firstErr(errs ...error) error {
 // usageStore keeps usage events until a client acknowledges them, so cost
 // accounting survives a window that was closed while agents kept working. It
 // is separate from the chat rings because those forget old events.
+//
+// It is the host's, not a window's: usage.ack from any window clears events
+// for all of them. Its size is bounded in events and in bytes; what the bounds
+// push out is counted in dropped, so the loss is visible and not silent.
 type usageStore struct {
-	mu    sync.Mutex
-	max   int
-	seq   uint64
-	items []item
+	mu       sync.Mutex
+	max      int
+	maxBytes int
+	seq      uint64
+	items    []item
+	bytes    int
+	dropped  uint64
 }
 
 // reserve numbers the next usage event.
@@ -299,14 +385,22 @@ func (u *usageStore) reserve() uint64 {
 	return u.seq
 }
 
-// put stores the event's JSON under its number, dropping the oldest events
-// over the cap.
+// put stores the event's JSON under its number, dropping (and counting) the
+// oldest events over either cap. The newest event is always kept.
 func (u *usageStore) put(seq uint64, data []byte) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	u.items = append(u.items, item{seq: seq, data: data})
-	if over := len(u.items) - u.max; over > 0 {
+	u.bytes += len(data)
+	over, freed := 0, 0
+	for len(u.items)-over > 1 && (len(u.items)-over > u.max || u.bytes-freed > u.maxBytes) {
+		freed += len(u.items[over].data)
+		over++
+	}
+	if over > 0 {
 		u.items = append(u.items[:0], u.items[over:]...)
+		u.bytes -= freed
+		u.dropped += uint64(over)
 	}
 }
 
@@ -316,9 +410,17 @@ func (u *usageStore) ack(upTo uint64) {
 	defer u.mu.Unlock()
 	keep := 0
 	for keep < len(u.items) && u.items[keep].seq <= upTo {
+		u.bytes -= len(u.items[keep].data)
 		keep++
 	}
 	u.items = append(u.items[:0], u.items[keep:]...)
+}
+
+// droppedCount is how many events the caps have pushed out so far.
+func (u *usageStore) droppedCount() uint64 {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.dropped
 }
 
 // after returns unacknowledged events newer than seq, up to the page budget.
@@ -354,7 +456,7 @@ func (s *Server) usageBacklog(_ context.Context, _ *client, raw json.RawMessage)
 		return nil, err
 	}
 	items, more := s.usage.after(p.After, pageBudget)
-	res := UsageBacklogResult{More: more, Events: make([]json.RawMessage, len(items))}
+	res := UsageBacklogResult{More: more, Events: make([]json.RawMessage, len(items)), Dropped: s.usage.droppedCount()}
 	for i, it := range items {
 		res.Events[i] = it.data
 	}

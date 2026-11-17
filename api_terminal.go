@@ -1,11 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"os"
-	"regexp"
 	"slices"
-	"strings"
 	"sync"
 
 	"flint/internal/mcptools"
@@ -98,15 +95,14 @@ func (t *TerminalAPI) Start(id, cwd string, cols, rows int, env map[string]strin
 	return nil
 }
 
-var envNameRe = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
-
 // terminalEnv turns the frontend's variables into NAME=value pairs, sorted;
-// names must be plain upper-case identifiers and values single-line.
+// names must be plain upper-case identifiers and values single-line
+// (terminal.CheckEnvVar, which the background host applies to its wire too).
 func terminalEnv(env map[string]string) ([]string, error) {
 	out := make([]string, 0, len(env))
 	for k, v := range env {
-		if !envNameRe.MatchString(k) || strings.ContainsAny(v, "\x00\n\r") || len(v) > 1024 {
-			return nil, fmt.Errorf("invalid terminal variable %q", k)
+		if err := terminal.CheckEnvVar(k, v); err != nil {
+			return nil, err
 		}
 		out = append(out, k+"="+v)
 	}

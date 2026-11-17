@@ -33,6 +33,8 @@ type fakeHost struct {
 	hello   agenthost.HelloResult
 	silent  atomic.Bool // answer nothing but hello
 	started chan struct{}
+	title   *agenthost.TermInfo // what term.attach reports as the latest title
+	backlog agenthost.UsageBacklogResult
 }
 
 func newFakeHost(t *testing.T) (net.Conn, *fakeHost) {
@@ -57,13 +59,15 @@ func (h *fakeHost) handle(ctx context.Context, method string, params json.RawMes
 	switch method {
 	case agenthost.MethodTermStart, agenthost.MethodTermWrite, agenthost.MethodHostShutdown:
 		return struct{}{}, nil
+	case agenthost.MethodUsageBacklog:
+		return h.backlog, nil
 	case agenthost.MethodTermAttach:
 		var p agenthost.AttachParams
 		_ = json.Unmarshal(params, &p)
 		h.attach <- p
 		h.mu.Lock()
 		defer h.mu.Unlock()
-		res := agenthost.TermAttachResult{Reset: h.reset}
+		res := agenthost.TermAttachResult{Reset: h.reset, Title: h.title}
 		h.reset = false
 		for _, c := range h.chunks {
 			if c.Seq > p.AfterSeq || res.Reset {
@@ -169,6 +173,47 @@ func TestResetClearsTheScreenFirst(t *testing.T) {
 	if resets.Load() != 1 {
 		t.Errorf("OnReset called %d times", resets.Load())
 	}
+}
+
+// Titles have no sequence number, so a client that attaches or resyncs takes
+// the latest one from the attach reply.
+func TestAttachDeliversTheLatestTitle(t *testing.T) {
+	rec := newTermRecorder()
+	c, host := connect(t, client.Handlers{Terminal: rec})
+	host.data(1, "a")
+	host.mu.Lock()
+	host.title = &agenthost.TermInfo{Command: "npm run dev", Cwd: "/w"}
+	host.mu.Unlock()
+	if err := c.AttachTerminal("t1", 0); err != nil {
+		t.Fatal(err)
+	}
+	want := terminal.Info{Command: "npm run dev", Cwd: "/w"}
+	rec.until(t, "the title", func() bool {
+		rec.mu.Lock()
+		defer rec.mu.Unlock()
+		return rec.titles["t1"] == want
+	})
+}
+
+func TestResyncDeliversTheTitleToo(t *testing.T) {
+	rec := newTermRecorder()
+	c, host := connect(t, client.Handlers{Terminal: rec})
+	if err := c.Terminals().Start("t1", terminal.Options{}); err != nil {
+		t.Fatal(err)
+	}
+	host.sendData(t, "t1", 1, "a")
+	host.mu.Lock()
+	host.title = &agenthost.TermInfo{Command: "vim", Cwd: "/x"} // its notification was lost
+	host.mu.Unlock()
+	host.data(2, "b")
+	host.sendData(t, "t1", 3, "c") // a gap: the client re-attaches
+	rec.waitOutput(t, "t1", "abc")
+	want := terminal.Info{Command: "vim", Cwd: "/x"}
+	rec.until(t, "the title", func() bool {
+		rec.mu.Lock()
+		defer rec.mu.Unlock()
+		return rec.titles["t1"] == want
+	})
 }
 
 func TestAttachingAfterReconnectReplaysFromTheGivenSeq(t *testing.T) {

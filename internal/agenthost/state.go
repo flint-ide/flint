@@ -13,14 +13,15 @@ type Load struct {
 // Idle reports a host with nothing to serve and nobody to serve it to.
 func (l Load) Idle() bool { return l.Terminals+l.Chats+l.Clients == 0 }
 
-// Load counts what the host is busy with. A terminal whose shell exited, or a
-// stopped chat, is kept only so a window can still read how it ended; it does
-// not keep the host running.
+// Load counts what the host is busy with. A terminal whose shell exited or
+// that was closed, or a stopped chat, is kept only so a window can still read
+// how it ended; it does not keep the host running. Neither does a connection
+// that has not said hello.
 func (s *Server) Load() Load {
 	l := Load{Clients: s.Clients()}
 	s.termsMu.Lock()
 	for _, e := range s.termMap {
-		if !e.isExited() {
+		if !e.closed.Load() && !e.isExited() {
 			l.Terminals++
 		}
 	}
@@ -42,8 +43,10 @@ func (s *Server) Load() Load {
 func (s *Server) held() (terminals, chats []string) {
 	terminals, chats = []string{}, []string{}
 	s.termsMu.Lock()
-	for id := range s.termMap {
-		terminals = append(terminals, id)
+	for id, e := range s.termMap {
+		if !e.closed.Load() {
+			terminals = append(terminals, id)
+		}
 	}
 	s.termsMu.Unlock()
 	s.chatsMu.Lock()

@@ -3,9 +3,11 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"flint/internal/agenthost"
 	as "flint/internal/agentsession"
+	"flint/internal/jsonrpc"
 )
 
 // agents implements sessions.Agents over the connection.
@@ -51,9 +53,26 @@ func (a agents) opened(info as.SessionInfo) error {
 	})
 }
 
+// ErrPromptTooLarge is returned by Prompt for a prompt (with its attachments)
+// whose encoding does not fit a message of the protocol: unlike terminal
+// input, a prompt cannot be sent in pieces. Ordinary text, markup included,
+// takes about its own size on the wire; only text full of control characters
+// (six bytes each) comes near the limit.
+var ErrPromptTooLarge = errors.New("the prompt is too large to send to the background host")
+
 func (a agents) Prompt(id, text string, attachments []as.Attachment) error {
-	return a.c.callT(agenthost.MethodAgentPrompt, agenthost.AgentPromptParams{ID: id, Text: text, Attachments: attachments}, nil)
+	params := agenthost.AgentPromptParams{ID: id, Text: text, Attachments: attachments}
+	// The same encoding the connection uses, checked before sending so the
+	// failure is this error and not a transport one.
+	if data, err := jsonrpc.Marshal(params); err == nil && len(data) >= agenthost.MaxMessage-promptEnvelope {
+		return fmt.Errorf("%w: %d bytes encoded, the limit is %d", ErrPromptTooLarge, len(data), agenthost.MaxMessage-promptEnvelope)
+	}
+	return a.c.callT(agenthost.MethodAgentPrompt, params, nil)
 }
+
+// promptEnvelope is what the request around a prompt's params takes (the
+// jsonrpc fields, the method, the id).
+const promptEnvelope = 1 << 10
 
 // Busy is false when the host cannot be asked.
 func (a agents) Busy(id string) bool {

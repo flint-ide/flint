@@ -3,6 +3,7 @@ package agenthost
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -12,6 +13,14 @@ import (
 
 // Protocol is the wire protocol version. Changes within a version are additive
 // only (new methods, new optional fields); anything else bumps it.
+//
+// The handshake: the first message on a connection is hello, and a client
+// must not send anything else until the hello reply has arrived. A request
+// that reaches the host before then (in the same write as hello, say) closes
+// the connection; so does a first message of more than 4 KiB, a hello that
+// takes longer than DefaultHelloTimeout, and a ninth unauthenticated
+// connection. After hello only host.shutdown is available when the host
+// answers with Compatible false.
 const Protocol = 1
 
 // Methods of protocol 1. Client to host requests:
@@ -71,8 +80,24 @@ const (
 	// MaxSize bounds terminal columns and rows.
 	MaxSize = 1000
 	// MaxSessions bounds terminals and chats the host keeps, running or not
-	// yet released (an exited terminal stays until its tab is closed).
+	// yet released (an exited terminal stays until its tab is closed). A
+	// terminal that was closed does not count (its id may be reused at
+	// once), but at most MaxSessions of them may still be waiting for their
+	// shell to leave.
 	MaxSessions = 256
+	// MaxUnauthenticated bounds the connections that have not completed
+	// hello; they are counted apart from the authenticated ones, so a flood
+	// of them cannot keep a window out.
+	MaxUnauthenticated = 8
+	// DefaultHelloTimeout is how long a connection has to complete hello.
+	DefaultHelloTimeout = 5 * time.Second
+	// maxFirstMessage bounds a line read before hello is complete: a hello
+	// is under 200 bytes.
+	maxFirstMessage = 4 << 10
+	// MaxPendingEvents and maxPendingBytes bound the events of sessions that
+	// are not registered yet and are held while a start is in flight.
+	MaxPendingEvents = 1024
+	maxPendingBytes  = 8 << 20
 
 	// maxChunk is the largest piece of terminal output with one seq.
 	maxChunk = 32 << 10
@@ -91,8 +116,10 @@ const (
 	// ChatReplayEvents and ChatReplayBytes bound a chat's ring: the smaller wins.
 	ChatReplayEvents = 2000
 	ChatReplayBytes  = 8 << 20
-	// MaxUsageBacklog bounds the usage events kept until acknowledged.
-	MaxUsageBacklog = 10000
+	// MaxUsageBacklog and MaxUsageBacklogBytes bound the usage events kept
+	// until acknowledged: the older ones go first, and are counted.
+	MaxUsageBacklog      = 10000
+	MaxUsageBacklogBytes = 8 << 20
 )
 
 // HelloParams is the first call on every connection.
@@ -117,7 +144,11 @@ type HelloResult struct {
 	Chats     []string `json:"chats"`
 }
 
-// TermStartParams is term.start: terminal.Options plus the id.
+// TermStartParams is term.start: terminal.Options plus the id. Over the wire
+// the host chooses the shell the way Flint's own terminals do (the login
+// shell), so Shell and Args are refused (invalid params) unless the host was
+// built to allow them (Config.AllowShell, for tests), and Env entries
+// follow the same rules as the web view's (terminal.CheckEnvVar).
 type TermStartParams struct {
 	ID    string   `json:"id"`
 	Cwd   string   `json:"cwd,omitempty"`
@@ -174,13 +205,24 @@ type Chunk struct {
 // message: ask again with the last seq received. Last is the newest seq the
 // host has; Exited and Code tell a terminal whose shell ended (sent with the
 // final page).
+//
+// Title is the latest term.title the host has for the terminal (nil when
+// there was none): those notifications have no sequence number, so a client
+// that re-attaches takes the title from here instead of losing it.
 type TermAttachResult struct {
-	Reset  bool    `json:"reset"`
-	Chunks []Chunk `json:"chunks"`
-	More   bool    `json:"more,omitempty"`
-	Last   uint64  `json:"last"`
-	Exited bool    `json:"exited,omitempty"`
-	Code   int     `json:"code,omitempty"`
+	Reset  bool      `json:"reset"`
+	Chunks []Chunk   `json:"chunks"`
+	More   bool      `json:"more,omitempty"`
+	Last   uint64    `json:"last"`
+	Exited bool      `json:"exited,omitempty"`
+	Code   int       `json:"code,omitempty"`
+	Title  *TermInfo `json:"title,omitempty"`
+}
+
+// TermInfo is what a terminal runs and where its shell is.
+type TermInfo struct {
+	Command string `json:"command"`
+	Cwd     string `json:"cwd"`
 }
 
 // TermDataParams is the term.data notification.
@@ -259,6 +301,9 @@ type AgentAttachResult struct {
 }
 
 // UsageAckParams is usage.ack: events up to and including UpTo may be dropped.
+// The backlog belongs to the host, not to a window: an ack from any window
+// removes the events for every window, so only the window that accounts for
+// usage (the one that records it) should send it.
 type UsageAckParams struct {
 	UpTo uint64 `json:"upTo"`
 }
@@ -268,10 +313,14 @@ type UsageBacklogParams struct {
 	After uint64 `json:"after"`
 }
 
-// UsageBacklogResult is the reply of usage.backlog; Events are EventMsg objects.
+// UsageBacklogResult is the reply of usage.backlog; Events are EventMsg
+// objects. Dropped is how many usage events the host has ever discarded
+// because the backlog was over its limits (MaxUsageBacklog events or
+// MaxUsageBacklogBytes bytes): the accounting is that much short.
 type UsageBacklogResult struct {
-	Events []json.RawMessage `json:"events"`
-	More   bool              `json:"more,omitempty"`
+	Events  []json.RawMessage `json:"events"`
+	More    bool              `json:"more,omitempty"`
+	Dropped uint64            `json:"dropped,omitempty"`
 }
 
 // ShutdownParams is host.shutdown.

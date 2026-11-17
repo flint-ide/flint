@@ -29,6 +29,26 @@ type fakeTerms struct {
 	sizes   map[string][][2]int
 	closed  []string
 	all     int
+	// holdExit makes Close leave the exit to the test, like a shell that
+	// ignores SIGHUP.
+	holdExit bool
+}
+
+// startedIDs are the keys the manager runs terminals under.
+func (f *fakeTerms) startedIDs() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var ids []string
+	for id := range f.started {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func (f *fakeTerms) setHoldExit(v bool) {
+	f.mu.Lock()
+	f.holdExit = v
+	f.mu.Unlock()
 }
 
 func newFakeTerms(ev terminal.Events) *fakeTerms {
@@ -70,8 +90,11 @@ func (f *fakeTerms) Close(id string) {
 	f.mu.Lock()
 	f.closed = append(f.closed, id)
 	delete(f.started, id)
+	hold := f.holdExit
 	f.mu.Unlock()
-	f.events.Exited(id, 129) // a hang-up, as the real manager reports it
+	if !hold {
+		f.events.Exited(id, 129) // a hang-up, as the real manager reports it
+	}
 }
 func (f *fakeTerms) CloseAll() {
 	f.mu.Lock()
@@ -86,14 +109,25 @@ type fakeAgents struct {
 	policy as.Policy
 	closed bool
 	stops  []string
+	// beforeStart runs inside Start and Resume before they return: a driver
+	// that reports events of the new session while it starts.
+	beforeStart func(info as.SessionInfo)
 }
 
 func (f *fakeAgents) Agents() []string { return []string{"fake"} }
 func (f *fakeAgents) Start(_ context.Context, agent, cwd string) (as.SessionInfo, error) {
-	return as.SessionInfo{ID: "chat-1", Agent: agent, Cwd: cwd}, nil
+	info := as.SessionInfo{ID: "chat-1", Agent: agent, Cwd: cwd}
+	if f.beforeStart != nil {
+		f.beforeStart(info)
+	}
+	return info, nil
 }
 func (f *fakeAgents) Resume(_ context.Context, agent, cwd, id string) (as.SessionInfo, error) {
-	return as.SessionInfo{ID: id, Agent: agent, Cwd: cwd}, nil
+	info := as.SessionInfo{ID: id, Agent: agent, Cwd: cwd}
+	if f.beforeStart != nil {
+		f.beforeStart(info)
+	}
+	return info, nil
 }
 func (f *fakeAgents) Prompt(string, string, []as.Attachment) error { return nil }
 func (f *fakeAgents) Busy(string) bool                             { return true }

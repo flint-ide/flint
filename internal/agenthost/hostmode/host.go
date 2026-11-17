@@ -62,6 +62,10 @@ type Options struct {
 	// is a parameter because the drivers are chosen in package main, which
 	// this package must not import. Nil registers none.
 	Drivers func(m *as.Manager)
+	// AllowShell lets clients choose the shell over the wire. Only tests
+	// set it; the Flint binary does not, so its host offers no more than
+	// the web view's terminal calls do.
+	AllowShell bool
 }
 
 // Main runs the host when the process was started with --agent-host as its
@@ -124,7 +128,7 @@ func runProcess(o Options, ready io.WriteCloser) error {
 		closeQuietly(ready)
 		return err
 	}
-	return run(ctx, runConfig{ConfigDir: dir, Version: o.Version, Drivers: o.Drivers, Idle: DefaultIdle, Ready: ready})
+	return run(ctx, runConfig{ConfigDir: dir, Version: o.Version, Drivers: o.Drivers, AllowShell: o.AllowShell, Idle: DefaultIdle, Ready: ready})
 }
 
 func closeQuietly(c io.Closer) {
@@ -142,6 +146,11 @@ type runConfig struct {
 	// Idle is how long the host waits with no sessions and no clients before
 	// it exits (DefaultIdle when zero).
 	Idle time.Duration
+	// HelloTimeout is how long a connection has to say hello
+	// (agenthost.DefaultHelloTimeout when zero).
+	HelloTimeout time.Duration
+	// AllowShell is Options.AllowShell.
+	AllowShell bool
 	// Ready, when set, receives "ready\n" once the host listens and is then
 	// closed; it is closed without a message when the host fails first, so
 	// the starter wakes up either way.
@@ -193,7 +202,7 @@ func run(ctx context.Context, cfg runConfig) (err error) {
 		sessionsDone atomic.Bool // host.shutdown{stopSessions} already stopped them
 	)
 	srv, err := agenthost.New(agenthost.Config{
-		Token: token, Version: cfg.Version,
+		Token: token, Version: cfg.Version, HelloTimeout: cfg.HelloTimeout, AllowShell: cfg.AllowShell,
 		Terminals: func(ev terminal.Events) sessions.Terminals {
 			terms = terminal.NewManager(ev)
 			return terms

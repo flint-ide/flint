@@ -2,7 +2,10 @@ package client_test
 
 import (
 	"context"
+	"fmt"
+	"hash/crc32"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -27,12 +30,18 @@ type env struct {
 
 type factory func(t *testing.T) *env
 
+// killGrace is how long a shell may ignore SIGHUP in these tests (5 s in
+// production).
+const killGrace = 300 * time.Millisecond
+
 // inProcess is today's setup: the managers called directly.
 func inProcess(t *testing.T) *env {
 	e := &env{rec: newTermRecorder(), events: make(chan as.Event, 1024), driver: newFakeDriver()}
 	m := as.NewManager(func(ev as.Event) { e.events <- ev })
 	m.Register("fake", e.driver)
-	e.terms, e.agents = terminal.NewManager(e.rec), m
+	tm := terminal.NewManager(e.rec)
+	tm.SetKillGrace(killGrace)
+	e.terms, e.agents = tm, m
 	t.Cleanup(func() { e.terms.CloseAll(); _ = e.agents.Close() })
 	return e
 }
@@ -44,7 +53,12 @@ func overThePipe(t *testing.T) *env {
 	const token = "0123456789abcdef0123456789abcdef"
 	srv, err := agenthost.New(agenthost.Config{
 		Token: token, Version: "test",
-		Terminals: func(ev terminal.Events) sessions.Terminals { return terminal.NewManager(ev) },
+		AllowShell: true, // the contract needs a deterministic shell
+		Terminals: func(ev terminal.Events) sessions.Terminals {
+			tm := terminal.NewManager(ev)
+			tm.SetKillGrace(killGrace)
+			return tm
+		},
 		Agents: func(emit func(as.Event)) sessions.Agents {
 			m := as.NewManager(emit)
 			m.Register("fake", e.driver)
@@ -183,6 +197,83 @@ func runContract(t *testing.T, mk factory) {
 		e.terms.CloseAll()
 		for _, id := range []string{"a", "b", "c"} {
 			e.rec.waitExit(t, id)
+		}
+	})
+
+	t.Run("input larger than one message arrives whole and in order", func(t *testing.T) {
+		e := mk(t)
+		dir := t.TempDir()
+		// More than the 1 MiB one term.write may carry, so the client has to
+		// split it. Raw mode, or the line discipline would cut it at 4 KiB.
+		data := make([]byte, 2*agenthost.MaxWrite+12345)
+		for i := range data {
+			data[i] = byte(i*31 + i>>8)
+		}
+		want := filepath.Join(dir, "want")
+		if err := os.WriteFile(want, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		got := filepath.Join(dir, "got")
+		script := fmt.Sprintf("stty raw -echo; echo READY; head -c %d > %q; cmp %q %q && echo SAME-%d", len(data), got, got, want, len(data))
+		if err := e.terms.Start("t1", sh(script)); err != nil {
+			t.Fatal(err)
+		}
+		e.rec.waitOutput(t, "t1", "READY")
+		if err := e.terms.Write("t1", data); err != nil {
+			t.Fatal(err)
+		}
+		e.rec.waitOutput(t, "t1", fmt.Sprintf("SAME-%d", len(data)))
+	})
+
+	t.Run("a shell that ignores SIGHUP is killed after the grace period", func(t *testing.T) {
+		e := mk(t)
+		if err := e.terms.Start("t1", sh("trap '' HUP; echo ready; while :; do sleep 1; done")); err != nil {
+			t.Fatal(err)
+		}
+		e.rec.waitOutput(t, "t1", "ready")
+		e.terms.Close("t1")
+		e.rec.waitExit(t, "t1")
+	})
+
+	t.Run("an id can be started again right after close", func(t *testing.T) {
+		e := mk(t)
+		// The first shell ignores SIGHUP, so it is still there when its id
+		// is used again: closing must not keep the id.
+		if err := e.terms.Start("t1", sh("trap '' HUP; echo first; while :; do sleep 1; done")); err != nil {
+			t.Fatal(err)
+		}
+		e.rec.waitOutput(t, "t1", "first")
+		e.terms.Close("t1")
+		if err := e.terms.Start("t1", sh("echo second; read x; exit 7")); err != nil {
+			t.Fatalf("start under the id of a closed terminal: %v", err)
+		}
+		e.rec.waitOutput(t, "t1", "second")
+		if err := e.terms.Write("t1", []byte("go\n")); err != nil {
+			t.Fatalf("the new terminal does not take input: %v", err)
+		}
+		// The old shell's own exit (a kill) may be reported or not; the new
+		// terminal's is code 7.
+		e.rec.until(t, "the new shell's exit", func() bool {
+			e.rec.mu.Lock()
+			defer e.rec.mu.Unlock()
+			return e.rec.exits["t1"] == 7
+		})
+	})
+
+	t.Run("a prompt of a megabyte of markup is delivered whole", func(t *testing.T) {
+		e := mk(t)
+		info := startChat(t, e)
+		// Almost all tags: encoding/json would make every < and > six bytes, about 4 MiB here.
+		text := "size\n" + strings.Repeat("<b><i></i></b>", 80000)
+		if len(text) < 1<<20 {
+			t.Fatalf("test prompt is only %d bytes", len(text))
+		}
+		if err := e.agents.Prompt(info.ID, text, nil); err != nil {
+			t.Fatalf("a prompt of %d bytes: %v", len(text), err)
+		}
+		got := e.collectUntilTurnEnd(t, info.ID)
+		if want := fmt.Sprintf("len:%d crc:%08x", len(text), crc32.ChecksumIEEE([]byte(text))); got[0].Text != want {
+			t.Errorf("the agent received %q, want %q", got[0].Text, want)
 		}
 	})
 

@@ -20,9 +20,10 @@ func (t terminals) Start(id string, o terminal.Options) error {
 	t.c.mu.Unlock()
 	return t.c.run(func() {
 		// Output may already have created the state; only a left-over of a
-		// finished shell under the same id is replaced (onTermData sees that
-		// too, when the new output comes first).
-		if st := t.c.tstate[id]; st == nil || st.exited {
+		// finished or closed shell under the same id is replaced (onTermData
+		// sees that too, when the new output comes first). A closed shell may
+		// not have exited yet: the host frees the id at once.
+		if st := t.c.tstate[id]; st == nil || st.exited || st.closing {
 			t.c.tstate[id] = &termState{}
 		}
 	})

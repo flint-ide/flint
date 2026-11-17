@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -135,6 +136,41 @@ func TestIdleHostExitsOnItsOwn(t *testing.T) {
 		if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
 			t.Errorf("%s is still there: %v", filepath.Base(path), err)
 		}
+	}
+}
+
+// A connection that never says hello is not a client: it must not hold the
+// host up (it is closed after the hello timeout anyway, which this test sets
+// far beyond the idle time so only the counting can end the host).
+func TestUnauthenticatedConnectionDoesNotDelayTheIdleExit(t *testing.T) {
+	cfg := shortDir(t)
+	t.Setenv("XDG_RUNTIME_DIR", cfg)
+	ready := newReadyBuf()
+	errc := make(chan error, 1)
+	go func() {
+		errc <- run(context.Background(), runConfig{
+			ConfigDir: cfg, Version: "test", Idle: 500 * time.Millisecond, HelloTimeout: time.Hour, Ready: ready,
+		})
+	}()
+	select {
+	case <-ready.closed:
+	case err := <-errc:
+		t.Fatalf("host ended before it was ready: %v", err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("host never became ready")
+	}
+	conn, err := net.Dial("unix", pathsIn(RunDir(cfg)).Sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	select {
+	case err := <-errc:
+		if err != nil {
+			t.Errorf("run = %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("a connection that never said hello kept the host from exiting")
 	}
 }
 

@@ -119,8 +119,8 @@ func (c *Client) output(id string, data []byte) {
 
 func (c *Client) onTermData(p agenthost.TermDataParams) {
 	st := c.tstate[p.ID]
-	if st != nil && st.exited && p.Seq == 1 {
-		st = nil // the id was reused for a new shell
+	if st != nil && (st.exited || st.closing && st.last >= 1) && p.Seq == 1 {
+		st = nil // the id was reused for a new shell (a closed one need not have exited)
 	}
 	if st == nil {
 		st = &termState{}
@@ -199,6 +199,10 @@ func (c *Client) syncTerm(id string) {
 		}
 		if res.More {
 			continue
+		}
+		// Titles carry no sequence number: this is how a lost one is recovered.
+		if res.Title != nil && c.h.Terminal != nil {
+			c.h.Terminal.Title(id, terminal.Info{Command: res.Title.Command, Cwd: res.Title.Cwd})
 		}
 		if res.Exited && !st.exited {
 			st.exited = true

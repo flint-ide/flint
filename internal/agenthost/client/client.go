@@ -190,26 +190,35 @@ type UsageEvent struct {
 // not delivered to Handlers.Agent: what to do with them (they may duplicate
 // events a chat replay brings) is up to the caller.
 func (c *Client) UsageBacklog(ctx context.Context) ([]UsageEvent, error) {
-	var out []UsageEvent
+	events, _, err := c.UsageBacklogDropped(ctx)
+	return events, err
+}
+
+// UsageBacklogDropped is UsageBacklog and also says how many usage events the
+// host ever had to discard because its backlog was full (events or bytes): the
+// accounting is that much short. Acknowledgements (AckUsage) are the host's,
+// not this window's: they clear the events for every window.
+func (c *Client) UsageBacklogDropped(ctx context.Context) (events []UsageEvent, dropped uint64, err error) {
 	var after uint64
 	for range maxPages {
 		var res agenthost.UsageBacklogResult
 		if err := c.call(ctx, agenthost.MethodUsageBacklog, agenthost.UsageBacklogParams{After: after}, &res); err != nil {
-			return out, err
+			return events, dropped, err
 		}
+		dropped = res.Dropped
 		for _, raw := range res.Events {
 			var msg agenthost.EventMsg
 			if err := json.Unmarshal(raw, &msg); err != nil {
-				return out, fmt.Errorf("usage backlog: %w", err)
+				return events, dropped, fmt.Errorf("usage backlog: %w", err)
 			}
-			out = append(out, UsageEvent{Seq: msg.UsageSeq, Event: msg.Event})
+			events = append(events, UsageEvent{Seq: msg.UsageSeq, Event: msg.Event})
 			after = msg.UsageSeq
 		}
 		if !res.More {
 			break
 		}
 	}
-	return out, nil
+	return events, dropped, nil
 }
 
 // AttachTerminal starts listening to a terminal that was started by an

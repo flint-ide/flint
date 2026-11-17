@@ -3,6 +3,7 @@ package client_test
 import (
 	"context"
 	"fmt"
+	"hash/crc32"
 	"strings"
 	"sync"
 	"testing"
@@ -155,6 +156,13 @@ func (d *fakeDriver) sink(id string) as.Sink {
 
 func (d *fakeDriver) Prompt(ctx context.Context, id, text string, _ []as.Attachment) (string, error) {
 	sink := d.sink(id)
+	if strings.HasPrefix(text, "size") {
+		// What arrived, in a form that survives the trip back: a big prompt
+		// cannot be echoed (an event has a size limit too).
+		sink(as.Event{SessionID: id, Kind: as.KindMessageChunk, Text: fmt.Sprintf("len:%d crc:%08x", len(text), crc32.ChecksumIEEE([]byte(text)))})
+		sink(as.Event{SessionID: id, Kind: as.KindTurnEnd, StopReason: as.StopEndTurn})
+		return as.StopEndTurn, nil
+	}
 	sink(as.Event{SessionID: id, Kind: as.KindMessageChunk, Text: "echo:" + text})
 	switch {
 	case strings.HasPrefix(text, "ask"):

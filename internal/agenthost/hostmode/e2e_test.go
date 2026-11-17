@@ -22,7 +22,7 @@ import (
 // and FLINT_TEST_AGENT_HOST=1 (inherited from the test) turns it into a host.
 func TestMain(m *testing.M) {
 	if os.Getenv("FLINT_TEST_AGENT_HOST") == "1" {
-		hostmode.Main(hostmode.Options{Version: "e2e"}) // never returns
+		hostmode.Main(hostmode.Options{Version: "e2e", AllowShell: true}) // never returns
 		os.Exit(99)
 	}
 	os.Exit(m.Run())

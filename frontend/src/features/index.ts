@@ -2,9 +2,10 @@
 // and one line in this list. Its Go half is listed in features.go at the
 // repository root.
 import type { FeatureModule } from '../lib/features'
+import backlog from './backlog'
 import database from './database'
 import extensions from './extensions'
 import todo from './todo'
 import update from './update'
 
-export const FEATURES: readonly FeatureModule[] = [database, todo, update, extensions]
+export const FEATURES: readonly FeatureModule[] = [database, todo, update, extensions, backlog]

@@ -233,6 +233,7 @@ func (l *termLog) Exited(id string, code int) {
 	l.mu.Unlock()
 }
 func (l *termLog) Title(string, terminal.Info) {}
+func (l *termLog) AgentState(string, string)   {}
 
 func (l *termLog) text(id string) string {
 	l.mu.Lock()

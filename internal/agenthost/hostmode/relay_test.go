@@ -104,6 +104,7 @@ func (l *termLog) Output(id string, b []byte) {
 }
 func (l *termLog) Exited(string, int)          {}
 func (l *termLog) Title(string, terminal.Info) {}
+func (l *termLog) AgentState(string, string)   {}
 
 func (l *termLog) waitFor(t *testing.T, id, want string) {
 	t.Helper()

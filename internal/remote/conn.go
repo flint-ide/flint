@@ -475,3 +475,9 @@ func (t trackedTerminal) Title(id string, info terminal.Info) {
 		t.h.Title(id, info)
 	}
 }
+
+func (t trackedTerminal) AgentState(id, state string) {
+	if t.h != nil {
+		t.h.AgentState(id, state)
+	}
+}

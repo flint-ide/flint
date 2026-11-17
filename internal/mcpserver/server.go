@@ -112,12 +112,21 @@ type Options struct {
 
 type tokenHash = [sha256.Size]byte
 
+// grant is what a live token stands for.
+type grant struct {
+	root string
+	// caller resolves the id of the chat the token was issued to; nil or ""
+	// when unknown. It is a function because the id is only known after the
+	// agent started, which is after the token was issued.
+	caller func() string
+}
+
 // Server is the MCP endpoint. It is safe for concurrent use.
 type Server struct {
 	opts Options
 
 	mu     sync.Mutex
-	tokens map[tokenHash]string     // hash of a live token → its project root
+	tokens map[tokenHash]grant      // hash of a live token → its project and chat
 	sems   map[string]chan struct{} // project root → its running tool calls
 	srv    *http.Server             // nil while not listening
 	served chan struct{}            // closed when Serve returned
@@ -128,13 +137,16 @@ type Server struct {
 
 // New returns a server; nothing listens until Endpoint is called.
 func New(opts Options) *Server {
-	return &Server{opts: opts, tokens: map[tokenHash]string{}, sems: map[string]chan struct{}{}}
+	return &Server{opts: opts, tokens: map[tokenHash]grant{}, sems: map[string]chan struct{}{}}
 }
 
 // Endpoint starts the listener if needed and issues a new token for one
-// agent session working in root. revoke ends the token (call it when the
-// session ends); it is safe to call more than once.
-func (s *Server) Endpoint(root string) (url, token string, revoke func(), err error) {
+// agent session working in root. caller, if not nil, resolves the id of the
+// chat that session belongs to (see CallerFrom); it is called on every
+// request, so it may start returning an id after the token was issued. revoke
+// ends the token (call it when the session ends); it is safe to call more
+// than once.
+func (s *Server) Endpoint(root string, caller func() string) (url, token string, revoke func(), err error) {
 	if !filepath.IsAbs(root) {
 		return "", "", nil, fmt.Errorf("mcpserver: root %q is not absolute", root)
 	}
@@ -154,7 +166,7 @@ func (s *Server) Endpoint(root string) (url, token string, revoke func(), err er
 		return "", "", nil, err
 	}
 	sum := sha256.Sum256([]byte(token))
-	s.tokens[sum] = root
+	s.tokens[sum] = grant{root: root, caller: caller}
 	var once sync.Once
 	revoke = func() {
 		once.Do(func() {
@@ -172,8 +184,8 @@ func (s *Server) RevokeRoot(root string) {
 	root = filepath.Clean(root)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for h, r := range s.tokens {
-		if r == root {
+	for h, g := range s.tokens {
+		if g.root == root {
 			delete(s.tokens, h)
 		}
 	}
@@ -181,8 +193,8 @@ func (s *Server) RevokeRoot(root string) {
 }
 
 func (s *Server) dropUnusedSemLocked(root string) {
-	for _, r := range s.tokens {
-		if r == root {
+	for _, g := range s.tokens {
+		if g.root == root {
 			return
 		}
 	}
@@ -230,7 +242,7 @@ func (s *Server) Stop() {
 	s.mu.Lock()
 	srv, served, cancel := s.srv, s.served, s.cancel
 	s.srv, s.served, s.cancel, s.port = nil, nil, nil, 0
-	s.tokens, s.sems = map[tokenHash]string{}, map[string]chan struct{}{}
+	s.tokens, s.sems = map[tokenHash]grant{}, map[string]chan struct{}{}
 	s.mu.Unlock()
 	if srv == nil {
 		return
@@ -260,16 +272,26 @@ func (s *Server) Close() error {
 	return nil
 }
 
-// rootFor returns the project of a bearer token.
-func (s *Server) rootFor(token string) (string, bool) {
+// grantFor returns what a bearer token stands for. Tokens are looked up by
+// their SHA-256, so the lookup never compares the secret itself.
+func (s *Server) grantFor(token string) (grant, bool) {
 	if token == "" {
-		return "", false
+		return grant{}, false
 	}
 	sum := sha256.Sum256([]byte(token))
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	root, ok := s.tokens[sum]
-	return root, ok
+	g, ok := s.tokens[sum]
+	return g, ok
+}
+
+type callerKey struct{}
+
+// CallerFrom returns the id of the chat session whose token made the request
+// a tool is answering, or "" when the token was issued without one.
+func CallerFrom(ctx context.Context) string {
+	id, _ := ctx.Value(callerKey{}).(string)
+	return id
 }
 
 // sem returns the semaphore of root's running tool calls.

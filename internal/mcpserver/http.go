@@ -1,6 +1,7 @@
 package mcpserver
 
 import (
+	"context"
 	"errors"
 	"io"
 	"mime"
@@ -29,12 +30,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	root, ok := s.rootFor(bearer(r.Header.Get("Authorization")))
+	g, ok := s.grantFor(bearer(r.Header.Get("Authorization")))
 	if !ok {
 		w.Header().Set("WWW-Authenticate", `Bearer realm="flint"`)
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	root := g.root
 	if s.opts.Allow != nil && !s.opts.Allow(root) {
 		http.Error(w, "Flint's MCP server is off for this project", http.StatusForbidden)
 		return
@@ -57,7 +59,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	reply, status := s.handle(r.Context(), root, body)
+	ctx := r.Context()
+	if g.caller != nil {
+		ctx = context.WithValue(ctx, callerKey{}, g.caller())
+	}
+	reply, status := s.handle(ctx, root, body)
 	if reply == nil {
 		w.WriteHeader(status) // a notification or a response: 202, no body
 		return

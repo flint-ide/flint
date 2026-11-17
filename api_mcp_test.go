@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -41,16 +42,16 @@ func TestMCPServerFollowsTrustAndSettings(t *testing.T) {
 	t.Cleanup(func() { _ = a.mcp.Close() })
 	project := t.TempDir()
 
-	if _, ok := a.offerMCP(project); ok {
+	if _, ok := a.offerMCP(context.Background(), project); ok {
 		t.Fatal("offered in Restricted Mode")
 	}
-	if _, ok := a.offerMCP("relative"); ok {
+	if _, ok := a.offerMCP(context.Background(), "relative"); ok {
 		t.Fatal("offered for a relative folder")
 	}
 	if err := a.setTrust(project, true); err != nil {
 		t.Fatal(err)
 	}
-	srv, ok := a.offerMCP(project)
+	srv, ok := a.offerMCP(context.Background(), project)
 	if !ok || !strings.HasPrefix(srv.URL, "http://127.0.0.1:") || srv.Token == "" {
 		t.Fatalf("offer = %+v, %v", srv, ok)
 	}
@@ -77,7 +78,7 @@ func TestMCPServerFollowsTrustAndSettings(t *testing.T) {
 	if status, _ := mcpPost(t, srv.URL, srv.Token, `{"jsonrpc":"2.0","id":3,"method":"ping"}`); status != http.StatusForbidden {
 		t.Fatalf("server off: %d", status)
 	}
-	if _, ok := a.offerMCP(project); ok {
+	if _, ok := a.offerMCP(context.Background(), project); ok {
 		t.Fatal("offered while off")
 	}
 	// Saving the setting closes the listener.
@@ -87,7 +88,7 @@ func TestMCPServerFollowsTrustAndSettings(t *testing.T) {
 	}
 
 	a.setSettingsForTest(settings.Default())
-	srv, ok = a.offerMCP(project)
+	srv, ok = a.offerMCP(context.Background(), project)
 	if !ok || !a.mcp.Listening() {
 		t.Fatal("not offered again after switching on")
 	}
@@ -109,8 +110,8 @@ func TestMCPTokensFollowSessionsAndProjects(t *testing.T) {
 	if err := a.setTrust(project, true); err != nil {
 		t.Fatal(err)
 	}
-	one, _ := a.offerMCP(project)
-	two, _ := a.offerMCP(project)
+	one, _ := a.offerMCP(context.Background(), project)
+	two, _ := a.offerMCP(context.Background(), project)
 	if one.Token == two.Token || a.mcp.Live() != 2 {
 		t.Fatal("sessions share a token")
 	}

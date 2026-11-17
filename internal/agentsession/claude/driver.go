@@ -164,7 +164,7 @@ func (d *Driver) start(ctx context.Context, cwd, id string, resume bool, sink ag
 		return agentsession.SessionInfo{}, fmt.Errorf("claude: session %s is already open", id)
 	}
 	var mcp *agentsession.MCPServer
-	if srv, ok := opts.MCP.Offer(cwd); ok {
+	if srv, ok := opts.MCP.Offer(ctx, cwd); ok {
 		mcp = &srv
 	}
 	args, err := buildArgs(id, resume, opts, opts.Untrusted != nil && opts.Untrusted(cwd), mcp)

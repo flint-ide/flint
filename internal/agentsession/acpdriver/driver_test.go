@@ -124,10 +124,10 @@ func TestChatTurnWithPermission(t *testing.T) {
 // the agent process ends.
 func TestMCPServersInNewSession(t *testing.T) {
 	var revoked atomic.Int32
-	offer := as.MCPProvider(func(cwd string) (as.MCPServer, bool) {
+	offer := as.MCPProvider(func(_ context.Context, cwd string) (as.MCPServer, bool) {
 		return as.MCPServer{URL: "http://127.0.0.1:9/mcp", Token: "tok", Release: func() { revoked.Add(1) }}, cwd == "/p"
 	})
-	got, revoke := mcpServers(acp.MCPCapabilities{HTTP: true}, offer, "/p")
+	got, revoke := mcpServers(context.Background(), acp.MCPCapabilities{HTTP: true}, offer, "/p")
 	want := `{"type":"http","name":"flint","url":"http://127.0.0.1:9/mcp","headers":[{"name":"Authorization","value":"Bearer tok"}]}`
 	if len(got) != 1 || string(got[0]) != want {
 		t.Fatalf("mcpServers = %s", got)
@@ -146,7 +146,7 @@ func TestMCPServersInNewSession(t *testing.T) {
 		{"not offered", acp.MCPCapabilities{HTTP: true}, offer, "/q"},
 		{"no provider", acp.MCPCapabilities{HTTP: true}, nil, "/p"},
 	} {
-		servers, revoke := mcpServers(tc.caps, tc.p, tc.cwd)
+		servers, revoke := mcpServers(context.Background(), tc.caps, tc.p, tc.cwd)
 		revoke()
 		if servers == nil || len(servers) != 0 {
 			t.Errorf("%s: %s (must be an empty list, never null)", tc.name, servers)
@@ -158,12 +158,16 @@ func TestMCPServersInNewSession(t *testing.T) {
 	// The fake agent advertises HTTP MCP and accepts the server.
 	revoked.Store(0)
 	opts := fakeOpts(t, "")
-	opts.MCP = func(string) (as.MCPServer, bool) {
+	slot := &as.CallerSlot{}
+	opts.MCP = func(ctx context.Context, _ string) (as.MCPServer, bool) {
+		if as.CallerSlotFrom(ctx) != slot {
+			t.Error("the driver did not pass its context to the provider")
+		}
 		return as.MCPServer{URL: "http://127.0.0.1:9/mcp", Token: "tok", Release: func() { revoked.Add(1) }}, true
 	}
 	d := New(opts)
 	t.Cleanup(func() { _ = d.Close() })
-	info, err := d.Start(testCtx(t), t.TempDir(), func(as.Event) {})
+	info, err := d.Start(as.WithCaller(testCtx(t), slot), t.TempDir(), func(as.Event) {})
 	if err != nil {
 		t.Fatal(err)
 	}

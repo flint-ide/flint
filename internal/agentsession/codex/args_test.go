@@ -98,7 +98,7 @@ func TestNoMCPOfferWithoutSupport(t *testing.T) {
 	supportsHTTPMCP = func(string, []string) bool { return false }
 	t.Cleanup(func() { supportsHTTPMCP = prev })
 	offered := false
-	d := New(Options{Binary: "/bin/sh", MCP: func(string) (agentsession.MCPServer, bool) {
+	d := New(Options{Binary: "/bin/sh", MCP: func(context.Context, string) (agentsession.MCPServer, bool) {
 		offered = true
 		return agentsession.MCPServer{URL: "u", Token: "t"}, true
 	}})
@@ -108,6 +108,27 @@ func TestNoMCPOfferWithoutSupport(t *testing.T) {
 	_, _ = d.Start(ctx, t.TempDir(), func(agentsession.Event) {}) // /bin/sh is no app-server
 	if offered {
 		t.Fatal("server offered to a codex without HTTP MCP support")
+	}
+}
+
+// The driver hands the context it was started with to the provider, so the
+// caller slot the Manager put there reaches the token.
+func TestMCPOfferGetsStartContext(t *testing.T) {
+	prev := supportsHTTPMCP
+	supportsHTTPMCP = func(string, []string) bool { return true }
+	t.Cleanup(func() { supportsHTTPMCP = prev })
+	slot := &agentsession.CallerSlot{}
+	var got *agentsession.CallerSlot
+	d := New(Options{Binary: "/bin/sh", MCP: func(ctx context.Context, _ string) (agentsession.MCPServer, bool) {
+		got = agentsession.CallerSlotFrom(ctx)
+		return agentsession.MCPServer{URL: "u", Token: "t"}, true
+	}})
+	defer d.Close()
+	ctx, cancel := context.WithTimeout(agentsession.WithCaller(context.Background(), slot), 10*time.Second)
+	defer cancel()
+	_, _ = d.Start(ctx, t.TempDir(), func(agentsession.Event) {}) // /bin/sh is no app-server
+	if got != slot {
+		t.Fatal("the driver did not pass its context to the provider")
 	}
 }
 

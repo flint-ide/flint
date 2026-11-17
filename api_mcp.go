@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"path/filepath"
 	"time"
 
@@ -53,11 +54,11 @@ func (a *App) allowMCP(root string) bool {
 
 // offerMCP is the agents' MCPProvider: the server's URL and a token for one
 // session, which the driver revokes when the session's process ends.
-func (a *App) offerMCP(cwd string) (as.MCPServer, bool) {
+func (a *App) offerMCP(ctx context.Context, cwd string) (as.MCPServer, bool) {
 	if !filepath.IsAbs(cwd) || !a.allowMCP(cwd) {
 		return as.MCPServer{}, false
 	}
-	url, token, revoke, err := a.mcp.Endpoint(filepath.Clean(cwd))
+	url, token, revoke, err := a.mcp.Endpoint(filepath.Clean(cwd), as.CallerSlotFrom(ctx).ID)
 	if err != nil {
 		a.logf("mcp server: %v", err)
 		return as.MCPServer{}, false

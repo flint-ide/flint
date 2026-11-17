@@ -26,9 +26,10 @@ import (
 func newMCP(a *App) (*mcpserver.Server, *mcptools.Sources) {
 	sources := mcptools.NewSources()
 	sources.Actor = mcpActor{a}
+	sources.Orchestrator = &orchestrator{app: a}
 	server := mcpserver.New(mcpserver.Options{
 		Tools: func() []mcpserver.Tool {
-			return append(sources.Tools(mcpToolConfig(a.currentSettings().MCPServer)), a.features.AgentTools()...)
+			return append(sources.Tools(mcpToolConfig(a.currentSettings())), a.features.AgentTools()...)
 		},
 		Allow:        a.allowMCP,
 		Approve:      a.approveAction,
@@ -38,8 +39,10 @@ func newMCP(a *App) (*mcpserver.Server, *mcptools.Sources) {
 	return server, sources
 }
 
-func mcpToolConfig(m settings.MCPServer) mcptools.Config {
+func mcpToolConfig(s settings.Settings) mcptools.Config {
+	m, o := s.MCPServer, s.Orchestration
 	return mcptools.Config{
+		Orchestration: o.Enabled, OrchMaxWait: time.Duration(o.MaxWaitSeconds) * time.Second, OrchOutputLines: o.OutputLines,
 		Diagnostics: m.Tools.Diagnostics, Editor: m.Tools.Editor, Terminals: m.Tools.Terminals,
 		Tests: m.Tools.Tests, TerminalLines: m.TerminalLines,
 		RunTests: m.Actions.Tests, RunConfigs: m.Actions.Run, HTTP: m.Actions.HTTP,

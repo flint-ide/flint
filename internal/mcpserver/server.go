@@ -47,6 +47,10 @@ const (
 	endpointPath    = "/mcp"
 )
 
+// MaxCallTimeout is the longest one tool call may run after its approval,
+// whatever a Tool asks for (tools that wait stay below it).
+const MaxCallTimeout = maxToolTimeout
+
 // ErrClosed is returned by Endpoint after Close.
 var ErrClosed = errors.New("mcpserver: closed")
 

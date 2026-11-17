@@ -150,6 +150,22 @@ func (r *Registry) Children(id string) []Node {
 	return out
 }
 
+// All returns a copy of every node, in registration order.
+func (r *Registry) All() []Node {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	found := make([]*entry, 0, len(r.nodes))
+	for _, e := range r.nodes {
+		found = append(found, e)
+	}
+	sort.Slice(found, func(i, j int) bool { return found[i].seq < found[j].seq })
+	out := make([]Node, len(found))
+	for i, e := range found {
+		out[i] = e.node
+	}
+	return out
+}
+
 // Descendant reports whether id is below ancestor in the tree (a chat is not
 // its own descendant).
 func (r *Registry) Descendant(ancestor, id string) bool {

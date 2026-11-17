@@ -30,7 +30,9 @@ const Instructions = "You are running inside Flint, the user's IDE. The get_ too
 	"language-server diagnostics, the files open in the editor and the user's selection, recent output of the user's terminals and run consoles, " +
 	"and the results of the last test run. Use them to find out what the user is looking at or what is failing before you ask. " +
 	"When the user switched them on, there are also tools that act in Flint (run_tests, run_configuration, send_http_request, run_sql_query): " +
-	"their results show in Flint's own tabs too, and the user is asked before each call, so call them only when the task needs it."
+	"their results show in Flint's own tabs too, and the user is asked before each call, so call them only when the task needs it. " +
+	"If the user allowed orchestration, list_agents, start_agent, send_prompt, wait_for_agent, read_agent_output and stop_agent let you start and direct other agents in this project; " +
+	"the first call asks the user once, and what you send appears in the other agents' chats."
 
 // Config selects the tools offered (settings.json "mcpServer").
 type Config struct {
@@ -43,6 +45,11 @@ type Config struct {
 	RunTests, RunConfigs, HTTP bool
 	// TestWait is how long run_tests waits for a run to finish.
 	TestWait time.Duration
+	// Orchestration offers the orchestration tools (orchestrate.go); they need
+	// Sources.Orchestrator. OrchMaxWait and OrchOutputLines are their limits.
+	Orchestration   bool
+	OrchMaxWait     time.Duration
+	OrchOutputLines int
 }
 
 // Sources is what the tools read.
@@ -53,6 +60,8 @@ type Sources struct {
 	Tests       *Tests
 	// Actor does what the acting tools ask; nil offers none of them.
 	Actor Actor
+	// Orchestrator carries out the orchestration tools; nil offers none.
+	Orchestrator Orchestrator
 	// Now is the clock (tests); nil is time.Now.
 	Now func() time.Time
 }
@@ -122,7 +131,8 @@ func (s *Sources) Tools(cfg Config) []mcpserver.Tool {
 			Call:        s.tests,
 		})
 	}
-	return append(out, s.actionTools(cfg)...)
+	out = append(out, s.actionTools(cfg)...)
+	return append(out, s.orchestrationTools(cfg)...)
 }
 
 // decode reads a tool's arguments; unknown fields are ignored.

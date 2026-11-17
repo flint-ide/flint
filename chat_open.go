@@ -48,6 +48,12 @@ type ChatOpened struct {
 // prompt fails (the usage budget is spent, say) the chat stays open and the
 // returned info is valid next to the error, so a caller can still address it.
 func (a *App) openChat(ctx context.Context, r ChatRequest) (as.SessionInfo, error) {
+	// Before anything starts: a role that cannot be used must not leave an
+	// agent process behind.
+	r, err := a.applyRole(r)
+	if err != nil {
+		return as.SessionInfo{}, err
+	}
 	info, err := a.agents.Start(ctx, r.Agent, r.Cwd)
 	if err != nil {
 		return info, err
@@ -71,6 +77,28 @@ func (a *App) openChat(ctx context.Context, r ChatRequest) (as.SessionInfo, erro
 		return info, fmt.Errorf("chat %s is open, but its first prompt failed: %w", info.ID, err)
 	}
 	return info, nil
+}
+
+// applyRole resolves r.Role (project roles only in a trusted folder: Restricted
+// Mode) and puts its body before the prompt. A role that names an agent fixes
+// it when the request has none and must match it when it has one.
+func (a *App) applyRole(r ChatRequest) (ChatRequest, error) {
+	if r.Role == "" {
+		return r, nil
+	}
+	role, err := orchestrate.ResolveRole(a.configDir, r.Cwd, a.isTrusted(r.Cwd), r.Role)
+	if err != nil {
+		return r, err
+	}
+	switch {
+	case role.Agent == "":
+	case r.Agent == "":
+		r.Agent = role.Agent
+	case r.Agent != role.Agent:
+		return r, fmt.Errorf("role %s is for %s, not %s", role.Name, role.Agent, r.Agent)
+	}
+	r.Prompt = role.Apply(r.Prompt)
+	return r, nil
 }
 
 // adoptChat registers a chat reopened by Resume: the UI already has its tab.

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -124,6 +126,7 @@ func (c *chatApp) userMessages() []as.Event {
 
 func TestOpenChatRegistersTellsTheUIAndPrompts(t *testing.T) {
 	c := newChatApp(t)
+	writeRoleFile(t, orchestrate.PersonalRolesDir(c.configDir), "fixer.md", "You fix bugs.")
 	parent := as.Origin{SessionID: "p0", Agent: "claude", Role: "lead"}
 	info, err := c.openChat(context.Background(), ChatRequest{
 		Agent: "fake", Cwd: "/work/repo", Prompt: "fix it, token ghp_0123456789abcdefghijklmnopqrstuvwxyzAB",
@@ -148,7 +151,7 @@ func TestOpenChatRegistersTellsTheUIAndPrompts(t *testing.T) {
 		t.Fatalf("user_message events = %+v", msgs)
 	}
 	got := c.driver.waitPrompts(t, info.ID, 1)
-	if len(got) != 1 || got[0] != msgs[0].Text {
+	if len(got) != 1 || got[0] != msgs[0].Text || !strings.HasPrefix(got[0], "You fix bugs.") {
 		t.Errorf("the agent got %q, the transcript shows %q: they must be the same redacted text", got, msgs[0].Text)
 	}
 	if n, _ = c.orch.Get(info.ID); n.Live.State == "idle" {
@@ -220,5 +223,71 @@ func TestStopForgetsTheChat(t *testing.T) {
 	}
 	if _, ok := c.usageChats.get(info.ID); ok {
 		t.Error("a stopped chat stays bound to usage")
+	}
+}
+
+func TestOpenChatPrependsTheRoleToThePrompt(t *testing.T) {
+	c := newChatApp(t)
+	roles := orchestrate.PersonalRolesDir(c.configDir)
+	writeRoleFile(t, roles, "reviewer.md", "---\nagent: fake\n---\nYou review code.")
+	writeRoleFile(t, roles, "codexonly.md", "---\nagent: codex\n---\nCodex things.")
+
+	info, err := c.openChat(context.Background(), ChatRequest{Agent: "fake", Cwd: "/x", Role: "reviewer", Prompt: "Look at main.go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.driver.waitPrompts(t, info.ID, 1); got[0] != "You review code.\n\nLook at main.go" {
+		t.Errorf("prompt = %q", got[0])
+	}
+	if n, _ := c.orch.Get(info.ID); n.Role != "reviewer" {
+		t.Errorf("node role = %q", n.Role)
+	}
+
+	// The role names the agent when the request does not.
+	if _, err := c.openChat(context.Background(), ChatRequest{Cwd: "/x", Role: "reviewer"}); err != nil {
+		t.Errorf("role should supply the agent: %v", err)
+	}
+	// A role for another agent is refused, and so is an unknown one: before
+	// any agent starts.
+	started := c.driver.next
+	for _, req := range []ChatRequest{
+		{Agent: "fake", Cwd: "/x", Role: "codexonly", Prompt: "hi"},
+		{Agent: "fake", Cwd: "/x", Role: "nope", Prompt: "hi"},
+		{Agent: "fake", Cwd: "/x", Role: "../reviewer", Prompt: "hi"},
+	} {
+		if _, err := c.openChat(context.Background(), req); err == nil {
+			t.Errorf("openChat(%+v) must fail", req)
+		}
+	}
+	if c.driver.next != started {
+		t.Error("a refused role must not start an agent")
+	}
+}
+
+func TestOpenChatIgnoresProjectRolesInRestrictedMode(t *testing.T) {
+	c := newChatApp(t)
+	project := t.TempDir()
+	writeRoleFile(t, orchestrate.ProjectRolesDir(project), "theirs.md", "From the repository.")
+
+	if _, err := c.openChat(context.Background(), ChatRequest{Agent: "fake", Cwd: project, Role: "theirs", Prompt: "hi"}); !errors.Is(err, orchestrate.ErrUnknownRole) {
+		t.Fatalf("untrusted project role = %v, want ErrUnknownRole", err)
+	}
+	c.state.TrustedFolders = []string{cleanFolder(project)}
+	info, err := c.openChat(context.Background(), ChatRequest{Agent: "fake", Cwd: project, Role: "theirs", Prompt: "hi"})
+	if err != nil {
+		t.Fatalf("trusted project role: %v", err)
+	}
+	if got := c.driver.waitPrompts(t, info.ID, 1); got[0] != "From the repository.\n\nhi" {
+		t.Errorf("prompt = %q", got[0])
+	}
+}
+
+func writeRoleFile(t *testing.T, dir, file, content string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, file), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

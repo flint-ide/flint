@@ -32,6 +32,7 @@ import (
 	"flint/internal/restore"
 	"flint/internal/runner"
 	"flint/internal/scratch"
+	"flint/internal/sessions"
 	"flint/internal/settings"
 	"flint/internal/terminal"
 	"flint/internal/usage"
@@ -73,17 +74,22 @@ type App struct {
 	configDir  string
 	argFolder  string
 
-	scratch     *scratch.Store
-	terminals   *terminal.Manager
+	scratch   *scratch.Store
+	terminals sessions.Terminals // the router (terminals_router.go)
+	// termStreams starts Docker/extension stream sessions; same router as terminals.
+	termStreams streamStarter
 	runs        *runner.Manager // run configurations and test runs
 	runEvents   *runEvents
 	debugs      *dap.Manager // debug sessions (dlv dap)
 	debugEvents *debugEvents
 	profiles    *profiles // temporary profiles and recordings in progress
 	lsp         *lsp.Manager
-	agents      *agentsession.Manager
-	mcp         *mcpserver.Server // Flint's MCP server for its agents (api_mcp.go)
-	mcpSources  *mcptools.Sources // what the MCP server's tools read
+	agents      sessions.Agents
+	// agentMgr is the in-process manager behind agents, for what only it can
+	// do: registering custom agents (syncCustomAgents).
+	agentMgr   *agentsession.Manager
+	mcp        *mcpserver.Server // Flint's MCP server for its agents (api_mcp.go)
+	mcpSources *mcptools.Sources // what the MCP server's tools read
 	// actionGrants and configRuns serve the MCP tools that act (api_mcp_actions.go).
 	actionGrants actionGrants
 	configRuns   configRuns
@@ -140,7 +146,9 @@ func NewApp() (*App, error) {
 		sessions:  restore.New(filepath.Join(dir, "sessions")),
 		http:      httpfile.NewClient(),
 	}
-	a.terminals = terminal.NewManager(newTerminalEvents(a))
+	events := newTerminalEvents(a)
+	router := newTerminalsRouter(terminal.NewManager(events), terminal.NewManager(events))
+	a.terminals, a.termStreams = router, router
 	a.runEvents = newRunEvents(a)
 	a.runs = runner.NewManager(a.runEvents)
 	a.debugEvents = newDebugEvents(a)
@@ -168,7 +176,8 @@ func NewApp() (*App, error) {
 	a.mcp, a.mcpSources = newMCP(a)
 	a.features = feature.New(features, featureHost{a})
 	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
-	a.agents = newAgentManager(a)
+	a.agentMgr = newAgentManager(a)
+	a.agents = a.agentMgr
 	return a, nil
 }
 

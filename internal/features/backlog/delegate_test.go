@@ -239,13 +239,181 @@ func TestStatusFollowsTasks(t *testing.T) {
 	if got := status(); got != StatusTodo {
 		t.Errorf("after the user's change: %s", got)
 	}
-	// An item whose file is gone loses its links.
-	if err := os.Remove(ItemFile(f.plan, "x")); err != nil {
+}
+
+// An item the user moved stays where they put it until its tasks change: a
+// manual move is not undone by the next read (reviewer's reproduction).
+func TestManualMoveStaysUntilTasksChange(t *testing.T) {
+	f := newFixture(t, map[string]string{"rl": "---\ntitle: Rate limit\nrepos: api\n---\nLimit it.\n"})
+	f.open()
+	id := f.delegate("rl").Tasks[0].ID
+	f.h.UpdateAgentTask(id, func(t *feature.AgentTask) { t.State = "finished"; t.Merged = true })
+	if got := f.item(f.load(), "rl").Status; got != StatusDone {
+		t.Fatalf("after the merge: %s", got)
+	}
+	// Rework: the user moves it back to doing; reads and the watcher leave it.
+	if _, err := f.api.SetStatus(f.plan, "rl", StatusDoing); err != nil {
 		t.Fatal(err)
 	}
-	f.load()
-	if raw := f.h.State(stateTasks); strings.Contains(string(raw), a) {
-		t.Errorf("links kept: %s", raw)
+	for range 2 {
+		if got := f.item(f.load(), "rl").Status; got != StatusDoing {
+			t.Fatalf("the manual move was undone: %s", got)
+		}
+		f.api.reconcileAll(t.Context())
+	}
+	// Its task changes (removed after the merge): the automatic move applies.
+	f.h.RemoveAgentTask(id)
+	if got := f.item(f.load(), "rl").Status; got != StatusDone {
+		t.Errorf("after its task changed: %s", got)
+	}
+}
+
+// The links of an item whose file is missing for a moment (a branch switch in
+// the backlog's repository, a rename in progress) are kept, and a change of
+// its tasks meanwhile moves it once it is back (reviewer's reproduction).
+func TestLinksOfAMissingFileStay(t *testing.T) {
+	f := newFixture(t, map[string]string{"rl": "---\ntitle: Rate limit\nrepos: api\n---\nLimit it.\n"})
+	f.open()
+	id := f.delegate("rl").Tasks[0].ID
+	p := ItemFile(f.plan, "rl")
+	data, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(p); err != nil {
+		t.Fatal(err)
+	}
+	f.h.UpdateAgentTask(id, func(t *feature.AgentTask) { t.State = "finished" })
+	if b := f.load(); len(b.Items) != 0 {
+		t.Fatalf("items %+v", b.Items)
+	}
+	f.api.reconcileAll(t.Context())
+	if ls := f.links("rl"); len(ls) != 1 || ls[0].State != "working" {
+		t.Fatalf("links of the missing file: %+v", ls)
+	}
+	if err := os.WriteFile(p, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	v := f.item(f.load(), "rl")
+	if len(v.Tasks) != 1 || v.Tasks[0].ID != id || v.Status != StatusReview {
+		t.Errorf("after the file came back: %+v", v)
+	}
+}
+
+// Close forgets the links of the backlog's items; the tasks stay.
+func TestCloseForgetsLinks(t *testing.T) {
+	f := newFixture(t, map[string]string{"x": item("X", "todo", "repos: api")})
+	f.open()
+	id := f.delegate("x").Tasks[0].ID
+	if err := f.api.Close(f.plan); err != nil {
+		t.Fatal(err)
+	}
+	if raw := f.h.State(stateTasks); strings.Contains(string(raw), id) {
+		t.Errorf("links kept after Close: %s", raw)
+	}
+	if _, ok := f.h.AllAgentTasks()[id]; !ok {
+		t.Error("Close removed the agent task")
+	}
+	f.open()
+	if v := f.item(f.load(), "x"); len(v.Tasks) != 0 {
+		t.Errorf("tasks after opening it again: %+v", v.Tasks)
+	}
+}
+
+// Two workspace folders claim acme/api and the first is in Restricted Mode:
+// the trusted one is used, and the UI is never asked to trust the other
+// (reviewer's reproduction).
+func TestDelegatePrefersTheTrustedCheckout(t *testing.T) {
+	f := newFixture(t, map[string]string{"rl": "---\ntitle: Rate limit\nrepos: api\n---\nLimit it.\n"})
+	hostile := filepath.Join(f.base, "hostile")
+	if err := os.MkdirAll(hostile, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	f.h.SetRepository(hostile, "https://GitHub.com:443/acme/api/")
+	f.h.SetRoots(hostile, f.project)
+	f.open()
+	if r := f.load().Repositories[0]; r.Folder != f.project || !r.Trusted {
+		t.Errorf("repository view %+v", r)
+	}
+	f.delegate("rl")
+	if reqs := f.h.Requested(); len(reqs) != 1 || reqs[0][0].Dir != f.project {
+		t.Errorf("requests %+v", reqs)
+	}
+	// With no trusted one, the untrusted match is shown, to be trusted.
+	f.h.SetRoots(hostile)
+	if r := f.load().Repositories[0]; r.Folder != hostile || r.Trusted {
+		t.Errorf("only the untrusted one: %+v", r)
+	}
+}
+
+// A checkout on a detached HEAD can't be delegated to; the message says what
+// to do.
+func TestDelegateDetachedHead(t *testing.T) {
+	f := newFixture(t, map[string]string{"x": item("X", "todo", "repos: api")})
+	f.open()
+	f.h.SetCreateError(&feature.DetachedHeadError{Dir: f.project})
+	_, err := f.api.Delegate(f.plan, "x", f.project)
+	wantErr(t, err, f.project+" is on a detached HEAD: check out a branch there, then Delegate again")
+	if ls := f.links("x"); len(ls) != 0 {
+		t.Errorf("links %+v", ls)
+	}
+}
+
+// A backlog whose folder is not trusted is listed and marked; Delegate asks
+// first in a native dialog that shows what will be sent, and does nothing
+// when the user says no.
+func TestUntrustedBacklog(t *testing.T) {
+	long := strings.Repeat("word ", 400) // 2,000 characters
+	f := newFixture(t, map[string]string{"x": item("X", "todo", "repos: api") + long})
+	other := newBacklog(t, filepath.Join(f.base, "other"), map[string]string{"y": item("Y", "todo", "repos: api")})
+	f.open()
+	if _, err := f.api.Open(other); err != nil {
+		t.Fatal(err)
+	}
+	if infos := f.api.Backlogs(); len(infos) != 2 || infos[1].Path != f.plan || !infos[1].Trusted || infos[0].Trusted {
+		t.Fatalf("Backlogs = %+v", infos)
+	}
+	if b, err := f.api.Load(other); err != nil || b.Trusted {
+		t.Fatalf("Load = %+v, %v", b, err)
+	}
+	// get_backlog leaves it out and says so.
+	out := f.api.describe("", "")
+	if !strings.Contains(out, "Do X.") || strings.Contains(out, "Do Y.") || strings.Contains(out, other) ||
+		!strings.Contains(out, "1 backlog(s) left out: their folders are in Restricted Mode") {
+		t.Errorf("get_backlog:\n%s", out)
+	}
+
+	// The item of an untrusted backlog: Delegate asks, and No stops it.
+	write(t, ItemFile(other, "long"), item("Long", "todo", "repos: api")+long)
+	f.h.Answer = false
+	_, err := f.api.Delegate(other, "long", f.project)
+	wantErr(t, err, "Delegate was cancelled")
+	if n := len(f.h.Requested()); n != 0 {
+		t.Fatalf("%d CreateAgentTasks calls after No", n)
+	}
+	asked := f.h.Asked()
+	if len(asked) != 1 {
+		t.Fatalf("asked %q", asked)
+	}
+	for _, want := range []string{
+		"Delegate from an untrusted backlog?", other, "not trusted", "Agent: claude", "Works in: " + f.project,
+		"Description:\nLong\n\nDo Long.", "[… cut here: the description has 2014 characters]",
+	} {
+		if !strings.Contains(asked[0], want) {
+			t.Errorf("the question lacks %q:\n%s", want, asked[0])
+		}
+	}
+	if len(asked[0]) > 2000 {
+		t.Errorf("the question is %d bytes", len(asked[0]))
+	}
+	// Yes: it goes on. A trusted backlog never asks.
+	f.h.Answer = true
+	if _, err := f.api.Delegate(other, "y", f.project); err != nil {
+		t.Fatal(err)
+	}
+	f.delegate("x")
+	if n := len(f.h.Asked()); n != 2 {
+		t.Errorf("asked %d times, want 2", n)
 	}
 }
 

@@ -277,7 +277,7 @@ type NewTaskGroup struct {
 func (t *TaskAPI) CreateGroup(req NewTaskGroup) ([]TaskView, error) {
 	ctx, cancel := t.ctx(gitRemoteTimeout) // checkout hooks may run
 	defer cancel()
-	made, r, err := t.app.createTasks(ctx, req, true)
+	made, r, err := t.app.createTasks(ctx, req, true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -295,14 +295,16 @@ func (t *TaskAPI) CreateGroup(req NewTaskGroup) ([]TaskView, error) {
 // remembered as queued when queueOK, otherwise nothing is created and the
 // error says so. A task that is not queued holds a slot (reserveStart) until
 // its chat's start is reported done (releaseStart): whoever calls this starts
-// that chat, or releases the slot.
-func (a *App) createTasks(ctx context.Context, req NewTaskGroup, queueOK bool) ([]agenttask.Task, *git.Repo, error) {
+// that chat, or releases the slot. With hold, the tasks are held (hold) before
+// the queue can see them: the caller unholds them once it keeps or discards
+// them.
+func (a *App) createTasks(ctx context.Context, req NewTaskGroup, queueOK, hold bool) ([]agenttask.Task, *git.Repo, error) {
 	desc := strings.TrimSpace(req.Description)
 	switch {
 	case desc == "":
 		return nil, nil, errors.New("describe the task first")
 	case len(desc) > agenttask.MaxPrompt:
-		return nil, nil, fmt.Errorf("the description is longer than %d characters", agenttask.MaxPrompt)
+		return nil, nil, fmt.Errorf("the description is longer than %d bytes", agenttask.MaxPrompt)
 	case strings.ContainsRune(desc, 0):
 		return nil, nil, errors.New("the description contains a NUL character")
 	case len(req.Agents) == 0:
@@ -367,6 +369,9 @@ func (a *App) createTasks(ctx context.Context, req NewTaskGroup, queueOK bool) (
 		if !task.Queued {
 			a.reserveStart(task.ID) // its chat starts next
 		}
+	}
+	if hold {
+		a.hold(made) // under queue.mu: the queue never sees them unheld
 	}
 	a.tasksChanged()
 	return made, r, nil
@@ -437,6 +442,10 @@ func (a *App) checkTaskLocation(source, checkout, path string) error {
 }
 
 // taskBase checks the requested base branch, or picks the current one.
+// errDetachedHead: a task needs a base branch and the checkout has none
+// checked out (the feature host turns it into feature.DetachedHeadError).
+var errDetachedHead = errors.New("the checkout is on a detached HEAD: pick a base branch")
+
 func taskBase(ctx context.Context, r *git.Repo, base string) (string, error) {
 	if base == "" {
 		st, err := r.Status(ctx)
@@ -444,7 +453,7 @@ func taskBase(ctx context.Context, r *git.Repo, base string) (string, error) {
 			return "", err
 		}
 		if st.Branch == "" {
-			return "", errors.New("the checkout is on a detached HEAD: pick a base branch")
+			return "", errDetachedHead
 		}
 		return st.Branch, nil
 	}

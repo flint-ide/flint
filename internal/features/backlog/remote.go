@@ -97,14 +97,3 @@ func trimRepoPath(p string) string {
 	}
 	return p
 }
-
-// SameRepository reports whether two remote URLs name the same repository
-// (RepoKey); URLs that are not remote URLs never match.
-func SameRepository(a, b string) bool {
-	ka, ok := RepoKey(a)
-	if !ok {
-		return false
-	}
-	kb, ok := RepoKey(b)
-	return ok && ka == kb
-}

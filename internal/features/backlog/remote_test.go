@@ -45,7 +45,14 @@ func TestRepoKey(t *testing.T) {
 	}
 }
 
-func TestSameRepository(t *testing.T) {
+// Two URLs name the same repository when their RepoKeys are equal; a URL
+// that is not a remote URL has none, so it matches nothing.
+func TestRepoKeyIdentifiesTheRepository(t *testing.T) {
+	same := func(a, b string) bool {
+		ka, oka := RepoKey(a)
+		kb, okb := RepoKey(b)
+		return oka && okb && ka == kb
+	}
 	for _, tc := range []struct {
 		a, b string
 		same bool
@@ -61,11 +68,11 @@ func TestSameRepository(t *testing.T) {
 		{"not a url", "not a url", false},
 		{"", "", false},
 	} {
-		if got := SameRepository(tc.a, tc.b); got != tc.same {
-			t.Errorf("SameRepository(%q, %q) = %v", tc.a, tc.b, got)
+		if got := same(tc.a, tc.b); got != tc.same {
+			t.Errorf("same(%q, %q) = %v", tc.a, tc.b, got)
 		}
-		if got := SameRepository(tc.b, tc.a); got != tc.same {
-			t.Errorf("SameRepository(%q, %q) = %v (swapped)", tc.b, tc.a, got)
+		if got := same(tc.b, tc.a); got != tc.same {
+			t.Errorf("same(%q, %q) = %v (swapped)", tc.b, tc.a, got)
 		}
 	}
 }

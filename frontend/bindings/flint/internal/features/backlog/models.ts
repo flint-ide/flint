@@ -14,6 +14,11 @@ export class Backlog {
     "workspace": boolean;
 
     /**
+     * Trusted: as BacklogInfo.Trusted.
+     */
+    "trusted": boolean;
+
+    /**
      * Repositories are flint-backlog.json's, with the checkout of each.
      */
     "repositories": RepositoryView[];
@@ -41,6 +46,9 @@ export class Backlog {
         if (!("workspace" in $$source)) {
             this["workspace"] = false;
         }
+        if (!("trusted" in $$source)) {
+            this["trusted"] = false;
+        }
         if (!("repositories" in $$source)) {
             this["repositories"] = [];
         }
@@ -61,18 +69,18 @@ export class Backlog {
      * Creates a new Backlog instance from a string or object.
      */
     static createFrom($$source: any = {}): Backlog {
-        const $$createField3_0 = $$createType1;
-        const $$createField4_0 = $$createType3;
-        const $$createField5_0 = $$createType5;
+        const $$createField4_0 = $$createType1;
+        const $$createField5_0 = $$createType3;
+        const $$createField6_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("repositories" in $$parsedSource) {
-            $$parsedSource["repositories"] = $$createField3_0($$parsedSource["repositories"]);
+            $$parsedSource["repositories"] = $$createField4_0($$parsedSource["repositories"]);
         }
         if ("items" in $$parsedSource) {
-            $$parsedSource["items"] = $$createField4_0($$parsedSource["items"]);
+            $$parsedSource["items"] = $$createField5_0($$parsedSource["items"]);
         }
         if ("problems" in $$parsedSource) {
-            $$parsedSource["problems"] = $$createField5_0($$parsedSource["problems"]);
+            $$parsedSource["problems"] = $$createField6_0($$parsedSource["problems"]);
         }
         return new Backlog($$parsedSource as Partial<Backlog>);
     }
@@ -95,6 +103,12 @@ export class BacklogInfo {
     "workspace": boolean;
 
     /**
+     * Trusted: the backlog's folder is trusted. An untrusted backlog is left
+     * out of get_backlog, and Delegate asks first (in Go).
+     */
+    "trusted": boolean;
+
+    /**
      * Error says why the backlog can't be read now ("" when it can).
      */
     "error": string;
@@ -109,6 +123,9 @@ export class BacklogInfo {
         }
         if (!("workspace" in $$source)) {
             this["workspace"] = false;
+        }
+        if (!("trusted" in $$source)) {
+            this["trusted"] = false;
         }
         if (!("error" in $$source)) {
             this["error"] = "";

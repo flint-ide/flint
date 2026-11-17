@@ -14,7 +14,7 @@ import (
 const (
 	MaxPerRepo = 50
 	maxRepos   = 100
-	MaxPrompt  = 8000 // characters of a description that are kept
+	MaxPrompt  = 8000 // bytes of a description (UTF-8): longer ones are refused
 	// MaxGroup bounds the tasks one description starts at once (agents ×
 	// attempts): each is a worktree on disk and an agent that spends tokens.
 	MaxGroup     = 6
@@ -27,7 +27,7 @@ const (
 type Task struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`
-	// Prompt is the description the user wrote (redacted, cut to MaxPrompt):
+	// Prompt is the description the user wrote (redacted, at most MaxPrompt bytes):
 	// the first message of the chat and the body of the pull request.
 	Prompt string `json:"prompt"`
 	Agent  string `json:"agent"`

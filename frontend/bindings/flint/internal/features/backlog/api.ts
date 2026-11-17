@@ -53,7 +53,9 @@ export function Create(folder: string, name: string): $CancellablePromise<$model
  * (else the default agent), through the same path as New Agent Task. Before
  * anything is created it checks the agent can start and every repository
  * has a trusted checkout inside the workspace; when one task cannot be
- * created, none is kept. Then it remembers the tasks for the item and sets
+ * created, none is kept. An item of a backlog whose folder is not trusted is
+ * sent only after the user confirmed it in a native dialog (Host.Confirm),
+ * which the UI can't skip. Then it remembers the tasks for the item and sets
  * its status to doing. Flint starts the chats itself (or queues them).
  * 
  * project is used only for an item without repositories and must be one of

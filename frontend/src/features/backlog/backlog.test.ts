@@ -2,22 +2,28 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   agentText,
+  allReposResolve,
   boardProblem,
   canClose,
   canOpenTask,
   coerceBoardData,
   delegateIssues,
+  delegateStep,
   dragPayload,
   dropStatus,
   groupByStatus,
+  locateQuestion,
   otherStatuses,
   parseDrop,
   pickSelected,
   problemPrompt,
+  repoMarkers,
   reposText,
   statusLabel,
   taskPill,
   touchesBacklog,
+  trustBacklogQuestion,
+  trustQuestion,
   type ItemInfo,
   type RepoView,
   type TaskInfo,
@@ -96,6 +102,57 @@ describe('delegate preconditions', () => {
   })
 })
 
+describe('delegate walk-through', () => {
+  const ready = repo()
+  const missing = repo({ name: 'web', url: 'https://h/a/web', folder: '' })
+  const issuesFor = (repos: RepoView[]) => delegateIssues(item({ repos: repos.map((r) => r.name) }), repos, '/w')
+  it('delegates when nothing is in the way', () => {
+    assert.deepEqual(delegateStep(issuesFor([ready]), ''), { kind: 'delegate' })
+  })
+  it('fixes the first issue, carrying the URL to locate', () => {
+    const step = delegateStep(issuesFor([missing, repo({ name: 'db', trusted: false })]), '')
+    assert.equal(step.kind, 'fix')
+    if (step.kind !== 'fix') return
+    assert.deepEqual([step.issue.fix, step.issue.repo, step.issue.url], ['locate', 'web', 'https://h/a/web'])
+    // The fix worked: the next issue is a new one.
+    const next = delegateStep(issuesFor([ready, repo({ name: 'db', trusted: false })]), step.sig)
+    assert.equal(next.kind === 'fix' && next.issue.fix, 'trust')
+  })
+  it('stops with the reason when a step made no progress', () => {
+    const first = delegateStep(issuesFor([missing]), '')
+    assert.equal(first.kind, 'fix')
+    const again = delegateStep(issuesFor([missing]), first.kind === 'fix' ? first.sig : '')
+    assert.deepEqual(again, { kind: 'stuck', message: "Delegate can't go on: No checkout of web was found: locate it." })
+  })
+  it('stops with the reason for an issue it cannot fix', () => {
+    assert.deepEqual(delegateStep(delegateIssues(item({ agentProblem: 'no agent can start' }), [], '/w'), ''), {
+      kind: 'stuck', message: "Delegate can't go on: no agent can start",
+    })
+    assert.equal(delegateStep(delegateIssues(item(), [], ''), '').kind, 'stuck')
+  })
+  it('says which repository to locate, and that trust is for the whole folder from now on', () => {
+    assert.match(locateQuestion('web', 'https://h/a/web'), /"web"[\s\S]*https:\/\/h\/a\/web/)
+    const q = trustQuestion('api', '/w/api')
+    assert.match(q, /^Trust the folder \/w\/api\?/)
+    assert.match(q, /whole folder from now on, not just for this Delegate/)
+    assert.match(trustBacklogQuestion('Acme', '/plan'), /^Trust the folder \/plan\?[\s\S]*"Acme"/)
+  })
+})
+
+describe('repositories group', () => {
+  it('marks what keeps a repository from being used', () => {
+    assert.deepEqual(repoMarkers(repo()), [])
+    assert.deepEqual(repoMarkers(repo({ folder: '' })).map((m) => m.label), ['no checkout'])
+    assert.deepEqual(repoMarkers(repo({ located: true, problem: 'gone' })).map((m) => [m.label, m.hint]), [['problem', 'gone']])
+    assert.deepEqual(repoMarkers(repo({ located: true, inWorkspace: false, trusted: false })).map((m) => m.label), ['located', 'not in workspace', 'Restricted Mode'])
+  })
+  it('is collapsed when every repository resolves', () => {
+    assert.equal(allReposResolve([repo(), repo({ name: 'web', located: true })]), true)
+    assert.equal(allReposResolve([repo(), repo({ name: 'web', trusted: false })]), false)
+    assert.equal(allReposResolve([]), true)
+  })
+})
+
 describe('agent tasks', () => {
   it('shows the Agent Tasks states, merged and stale', () => {
     assert.deepEqual(taskPill(task({ state: 'waiting' })).label, 'waiting for you')
@@ -113,7 +170,7 @@ describe('agent tasks', () => {
 })
 
 describe('selection', () => {
-  const infos = [{ path: '/a', name: 'a', workspace: false, error: '' }, { path: '/b', name: 'b', workspace: true, error: '' }]
+  const infos = [{ path: '/a', name: 'a', workspace: false, trusted: true, error: '' }, { path: '/b', name: 'b', workspace: true, trusted: true, error: '' }]
   it('keeps a known backlog, else the first', () => {
     assert.equal(pickSelected(infos, '/b'), '/b')
     assert.equal(pickSelected(infos, '/gone'), '/a')
@@ -142,7 +199,7 @@ describe('board', () => {
     for (const bad of [null, undefined, 'x', 3, {}, { folder: 3 }, { folder: 'rel/b' }, { folder: '' }]) assert.equal(coerceBoardData(bad), null)
   })
   it('explains a backlog that is gone or unreadable', () => {
-    const infos = [{ path: '/a', name: 'a', workspace: false, error: '' }, { path: '/c', name: 'c', workspace: false, error: 'no such file' }]
+    const infos = [{ path: '/a', name: 'a', workspace: false, trusted: true, error: '' }, { path: '/c', name: 'c', workspace: false, trusted: true, error: 'no such file' }]
     assert.equal(boardProblem('/a', infos), null)
     assert.equal(boardProblem('/a', null), null)
     assert.match(boardProblem('/b', infos) ?? '', /not known any more/)

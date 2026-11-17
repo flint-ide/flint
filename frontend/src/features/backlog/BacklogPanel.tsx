@@ -1,9 +1,21 @@
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Dropdown } from '../../components/ui/Dropdown'
 import { Select } from '../../components/ui/Select'
 import { BacklogDialogs } from './Dialogs'
 import { ItemActions, ItemMeta, ItemTasks, ItemTitle } from './ItemParts'
-import { canClose, groupByStatus, PANEL_STATUSES, statusLabel, type BacklogData, type ProblemInfo } from './backlog'
+import {
+  allReposResolve,
+  canClose,
+  groupByStatus,
+  PANEL_STATUSES,
+  repoIssue,
+  repoMarkers,
+  statusLabel,
+  type BacklogData,
+  type BacklogInfo,
+  type ProblemInfo,
+  type RepoView,
+} from './backlog'
 import {
   askAboutProblem,
   closeBacklog,
@@ -13,8 +25,10 @@ import {
   openBacklog,
   openBoard,
   openNewItem,
+  repoActions,
   selectBacklog,
   toggleGroup,
+  trustBacklog,
   useBacklog,
 } from './store'
 
@@ -54,7 +68,11 @@ export function BacklogPanel() {
             size="sm"
             value={selected}
             title={selected}
-            options={infos.map((i) => ({ value: i.path, label: i.name, hint: i.error || (i.workspace ? 'workspace folder' : i.path) }))}
+            options={infos.map((i) => ({
+              value: i.path,
+              label: i.name,
+              hint: i.error || [i.trusted ? '' : 'Restricted Mode', i.workspace ? 'workspace folder' : i.path].filter(Boolean).join(' · '),
+            }))}
             onChange={selectBacklog}
           />
         </div>
@@ -62,6 +80,8 @@ export function BacklogPanel() {
       <div className="tree scroll">
         {info?.error && <div className="placeholder error">{info.error}</div>}
         {loaded?.error && !info?.error && <div className="placeholder error">{loaded.error}</div>}
+        {info && !(backlog?.trusted ?? info.trusted) && <Untrusted info={info} />}
+        {backlog && backlog.repositories.length > 0 && <Repositories backlog={backlog} collapsed={collapsed} />}
         {backlog && <Groups backlog={backlog} collapsed={collapsed} />}
         {infos?.length === 0 && (
           <div className="placeholder muted">
@@ -87,6 +107,88 @@ export function BacklogPanel() {
   )
 }
 
+/** A collapsible group header, operable with the mouse and with Enter or Space. */
+function GroupHeader({ open, onToggle, children }: { open: boolean; onToggle: () => void; children: ReactNode }) {
+  return (
+    <div
+      className="tree-row static root-row backlog-group-head"
+      role="button"
+      tabIndex={0}
+      aria-expanded={open}
+      onClick={onToggle}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onToggle()
+        }
+      }}
+    >
+      <span className="twisty">{open ? '▾' : '▸'}</span>
+      {children}
+    </div>
+  )
+}
+
+/** The note on a backlog whose folder is not trusted: agents don't read it, and Delegate asks first. */
+function Untrusted({ info }: { info: BacklogInfo }) {
+  return (
+    <div className="backlog-untrusted" role="status">
+      <span className="backlog-marker warn">Restricted Mode</span>
+      <span className="muted">
+        This backlog&apos;s folder is not trusted: agents can&apos;t read it with get_backlog, and Delegate shows you each item before it sends it.
+      </span>
+      <button className="link" onClick={() => void trustBacklog(info)} title={info.path}>Trust Folder…</button>
+    </div>
+  )
+}
+
+/** The repositories of flint-backlog.json with their checkouts here; open while one can't be used by Delegate. */
+function Repositories({ backlog, collapsed }: { backlog: BacklogData; collapsed: Record<string, boolean> }) {
+  const repos = backlog.repositories
+  const open = collapsed.repositories === undefined ? !allReposResolve(repos) : !collapsed.repositories
+  const waiting = repos.filter((r) => repoIssue(r) !== null).length
+  return (
+    <div className="backlog-group backlog-repos">
+      <GroupHeader open={open} onToggle={() => toggleGroup('repositories', !open)}>
+        <span className="dir-name">Repositories</span>
+        <span className="badge" title={waiting ? `${waiting} can't be used by Delegate yet` : 'Every repository has a checkout here'}>
+          {waiting ? `${waiting}/${repos.length}` : repos.length}
+        </span>
+      </GroupHeader>
+      {open && repos.map((r) => <RepoRow key={r.name} folder={backlog.path} repo={r} />)}
+    </div>
+  )
+}
+
+function RepoRow({ folder, repo }: { folder: string; repo: RepoView }) {
+  const issue = repoIssue(repo)
+  return (
+    <div className="task backlog-item backlog-repo">
+      <div className="tree-row static task-row" title={repo.url}>
+        <span className="file-name">{repo.name}</span>
+        {repoMarkers(repo).map((m) => (
+          <span key={m.label} className={`backlog-marker ${m.cls}`} title={m.hint}>{m.label}</span>
+        ))}
+      </div>
+      <div className="backlog-meta muted">
+        <span title={repo.url}>{repo.url}</span>
+      </div>
+      <div className="backlog-meta muted">
+        <span title={repo.folder || undefined} className={repo.folder ? '' : 'error'}>{repo.folder || 'no checkout on this computer'}</span>
+      </div>
+      <div className="task-actions backlog-actions">
+        <button className="link" onClick={() => repoActions.locate(folder, repo)} title="Choose the folder of your checkout of this repository">Locate…</button>
+        {issue?.fix === 'attach' && (
+          <button className="link" onClick={() => repoActions.attach(folder, repo)} title={`Add ${repo.folder} to the workspace`}>Add to Workspace</button>
+        )}
+        {issue?.fix === 'trust' && (
+          <button className="link" onClick={() => repoActions.trust(folder, repo)} title={`Trust ${repo.folder}`}>Trust Folder…</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function Groups({ backlog, collapsed }: { backlog: BacklogData; collapsed: Record<string, boolean> }) {
   const groups = groupByStatus(backlog.items)
   return (
@@ -97,11 +199,10 @@ function Groups({ backlog, collapsed }: { backlog: BacklogData; collapsed: Recor
         const open = !collapsed[status]
         return (
           <div key={status} className="backlog-group">
-            <div className="tree-row static root-row" onClick={() => toggleGroup(status, !open)} role="button" aria-expanded={open}>
-              <span className="twisty">{open ? '▾' : '▸'}</span>
+            <GroupHeader open={open} onToggle={() => toggleGroup(status, !open)}>
               <span className="dir-name">{statusLabel(status)}</span>
               <span className="badge">{items.length}</span>
-            </div>
+            </GroupHeader>
             {open &&
               items.map((item) => (
                 <div key={item.id} className="task backlog-item">

@@ -1,6 +1,7 @@
 package backlog
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"flint/internal/config"
 	"flint/internal/feature"
 	"flint/internal/prompts"
 )
@@ -37,6 +37,9 @@ type API struct {
 	mu sync.Mutex
 	// kick asks the watcher to look at the items' tasks (TasksChanged).
 	kick chan struct{}
+	// beforeCompare runs in writeStatus once the new file is written, just
+	// before the old one is compared (tests: an editor saving meanwhile).
+	beforeCompare func()
 }
 
 func newAPI(h feature.Host) *API {
@@ -51,6 +54,9 @@ type BacklogInfo struct {
 	// Workspace: listed because it is a workspace folder (not remembered,
 	// so Close does not apply).
 	Workspace bool `json:"workspace"`
+	// Trusted: the backlog's folder is trusted. An untrusted backlog is left
+	// out of get_backlog, and Delegate asks first (in Go).
+	Trusted bool `json:"trusted"`
 	// Error says why the backlog can't be read now ("" when it can).
 	Error string `json:"error"`
 }
@@ -60,6 +66,8 @@ type Backlog struct {
 	Path      string `json:"path"`
 	Name      string `json:"name"`
 	Workspace bool   `json:"workspace"`
+	// Trusted: as BacklogInfo.Trusted.
+	Trusted bool `json:"trusted"`
 	// Repositories are flint-backlog.json's, with the checkout of each.
 	Repositories []RepositoryView `json:"repositories"`
 	// Items in the panel's order: doing, review, todo, done, then priority
@@ -213,7 +221,7 @@ func (a *API) Backlogs() []BacklogInfo {
 	ws := a.workspaceBacklogs()
 	remembered := a.remembered()
 	add := func(folder string, workspace bool) {
-		info := BacklogInfo{Path: folder, Name: filepath.Base(folder), Workspace: workspace}
+		info := BacklogInfo{Path: folder, Name: filepath.Base(folder), Workspace: workspace, Trusted: a.host.Trusted(folder)}
 		if c, err := LoadConfig(folder); err != nil {
 			info.Error = err.Error()
 		} else {
@@ -265,7 +273,7 @@ func (a *API) Open(folder string) (BacklogInfo, error) {
 	if err := a.rememberFolder(real); err != nil {
 		return BacklogInfo{}, err
 	}
-	return BacklogInfo{Path: real, Name: c.Name, Workspace: slices.Contains(a.workspaceBacklogs(), real)}, nil
+	return BacklogInfo{Path: real, Name: c.Name, Workspace: slices.Contains(a.workspaceBacklogs(), real), Trusted: a.host.Trusted(real)}, nil
 }
 
 // Create makes folder a backlog (flint-backlog.json named name, default the
@@ -304,7 +312,7 @@ func (a *API) Create(folder, name string) (BacklogInfo, error) {
 	if err := a.rememberFolder(real); err != nil {
 		return BacklogInfo{}, err
 	}
-	return BacklogInfo{Path: real, Name: c.Name, Workspace: slices.Contains(a.workspaceBacklogs(), real)}, nil
+	return BacklogInfo{Path: real, Name: c.Name, Workspace: slices.Contains(a.workspaceBacklogs(), real), Trusted: a.host.Trusted(real)}, nil
 }
 
 func (a *API) rememberFolder(real string) error {
@@ -375,7 +383,7 @@ func (a *API) Load(folder string) (Backlog, error) {
 	}
 	agents := a.host.Agents()
 	b := Backlog{
-		Path: real, Name: l.Config.Name, Workspace: workspace,
+		Path: real, Name: l.Config.Name, Workspace: workspace, Trusted: a.host.Trusted(real),
 		Repositories: a.resolveRepos(ctx, l.Config), Items: []ItemView{}, Problems: l.Problems,
 		DefaultAgent: agents.Default,
 	}
@@ -485,31 +493,44 @@ func (a *API) resolveRepos(ctx context.Context, c Config) []RepositoryView {
 	return out
 }
 
-// resolveRepo finds the checkout of r: the first workspace folder whose
-// repository has a remote with r's URL, else the folder chosen with
-// Locate… (still a checkout of r).
+// resolveRepo finds the checkout of r: a trusted workspace folder whose
+// repository has a remote with r's URL, else the folder chosen with Locate…
+// when it is still a checkout of r and trusted, else a workspace folder in
+// Restricted Mode with that remote, else the located folder as it is. Any
+// folder can claim any URL, so one in Restricted Mode never hides a trusted
+// checkout (and the UI never offers to trust it in that one's place).
 func (a *API) resolveRepo(ctx context.Context, r RepositoryDecl, roots []rootInfo, checkouts []Checkout) RepositoryView {
 	v := RepositoryView{Name: r.Name, URL: r.URL}
 	key, _ := RepoKey(r.URL)
+	untrusted := ""
 	for _, root := range roots {
-		if slices.Contains(root.keys, key) {
-			v.Folder, v.InWorkspace, v.Trusted = root.path, true, a.host.Trusted(root.path)
+		if !slices.Contains(root.keys, key) {
+			continue
+		}
+		if a.host.Trusted(root.path) {
+			v.Folder, v.InWorkspace, v.Trusted = root.path, true, true
 			return v
 		}
+		if untrusted == "" {
+			untrusted = root.path
+		}
 	}
-	folder := checkoutOf(checkouts, key)
-	if folder == "" {
-		return v
+	located := v
+	if folder := checkoutOf(checkouts, key); folder != "" {
+		located.Folder, located.Located = folder, true
+		if err := a.checkCheckout(ctx, folder, key); err != nil {
+			located.Problem = err.Error()
+		} else {
+			if p := inWorkspace(folder, roots); p != "" {
+				located.Folder, located.InWorkspace = p, true
+			}
+			located.Trusted = a.host.Trusted(located.Folder)
+		}
 	}
-	v.Folder, v.Located = folder, true
-	if err := a.checkCheckout(ctx, folder, key); err != nil {
-		v.Problem = err.Error()
-		return v
+	if located.Trusted || untrusted == "" {
+		return located
 	}
-	if p := inWorkspace(folder, roots); p != "" {
-		v.Folder, v.InWorkspace = p, true
-	}
-	v.Trusted = a.host.Trusted(v.Folder)
+	v.Folder, v.InWorkspace = untrusted, true
 	return v
 }
 
@@ -648,7 +669,9 @@ func (a *API) SetStatus(folder, id, status string) (ItemView, error) {
 }
 
 // writeStatus reads item id, checks it, and writes it back with status. The
-// file must still be what was read when it is replaced. Callers hold mu.
+// new file is written next to it first, and the file must still be what was
+// read just before it is replaced, which leaves the smallest window for an
+// editor's save to be lost. Callers hold mu.
 func (a *API) writeStatus(folder, id string, c Config, status string) (Item, error) {
 	data, real, err := ReadItemFile(folder, id)
 	if err != nil {
@@ -669,14 +692,53 @@ func (a *API) writeStatus(folder, id string, c Config, status string) (Item, err
 	if err != nil {
 		return Item{}, err
 	}
-	if now, err := readRegular(real); err != nil || string(now) != string(data) {
-		return Item{}, fmt.Errorf("%s changed while Flint was writing it: try again", itemPath(id))
+	changed := func() bool {
+		if a.beforeCompare != nil {
+			a.beforeCompare()
+		}
+		now, err := readRegular(real)
+		return err != nil || !bytes.Equal(now, data)
 	}
-	if err := config.WriteFileAtomic(real, out, info.Mode().Perm()); err != nil {
+	if err := replaceFile(real, out, info.Mode().Perm(), changed); err != nil {
+		if errors.Is(err, errChanged) {
+			return Item{}, fmt.Errorf("%s changed while Flint was writing it: try again", itemPath(id))
+		}
 		return Item{}, err
 	}
 	it.Status = status
 	return it, nil
+}
+
+// errChanged: replaceFile found the file changed.
+var errChanged = errors.New("the file changed")
+
+// replaceFile writes data to a temporary file next to path, then replaces
+// path with it unless changed reports, at the last moment, that path is not
+// what the caller read any more (errChanged).
+func replaceFile(path string, data []byte, perm fs.FileMode, changed func() bool) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".flint-*.tmp")
+	if err != nil {
+		return err
+	}
+	name := tmp.Name()
+	defer os.Remove(name) // no-op after the rename
+	_, err = tmp.Write(data)
+	if err == nil {
+		err = tmp.Chmod(perm)
+	}
+	if err == nil {
+		err = tmp.Sync()
+	}
+	if cerr := tmp.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return err
+	}
+	if changed() {
+		return errChanged
+	}
+	return os.Rename(name, path)
 }
 
 // ---- links and automatic status changes
@@ -691,8 +753,13 @@ func (a *API) links() links {
 }
 
 // reconcile refreshes the links of folder's items from their agent tasks and
-// moves the items whose tasks moved on (NextStatus). Links of items whose
-// file is gone are dropped. It reports whether a status changed, and the
+// moves an item (NextStatus) only when something about its tasks changed
+// since the last look: an item the user moved stays where they put it until
+// its tasks change. The links of an item whose file can't be read now (gone
+// for a moment during a branch switch or a rename, or not parsable) are left
+// as they are and looked at when it is back; they go only with Close or
+// pruning. A move that can't be written keeps the links as they were, so
+// the next look tries again. It reports whether a status changed, and the
 // tasks it read (nil when the backlog has none). Callers hold mu.
 func (a *API) reconcile(ctx context.Context, folder string, c Config) (moved bool, tasks map[string]feature.AgentTask) {
 	ls := a.links()
@@ -708,14 +775,9 @@ func (a *API) reconcile(ctx context.Context, folder string, c Config) (moved boo
 			dirty = true
 			continue
 		}
-		if _, err := os.Lstat(ItemFile(folder, id)); errors.Is(err, fs.ErrNotExist) {
-			delete(items, id)
-			dirty = true
-			continue
-		}
 		next, changed := Refresh(list, tasks)
-		if changed {
-			items[id], dirty = next, true
+		if !changed {
+			continue
 		}
 		data, _, err := ReadItemFile(folder, id)
 		if err != nil {
@@ -726,10 +788,12 @@ func (a *API) reconcile(ctx context.Context, folder string, c Config) (moved boo
 			continue
 		}
 		if status := NextStatus(it.Status, next); status != it.Status {
-			if _, err := a.writeStatus(folder, id, c, status); err == nil {
-				moved = true
+			if _, err := a.writeStatus(folder, id, c, status); err != nil {
+				continue
 			}
+			moved = true
 		}
+		items[id], dirty = next, true
 	}
 	if dirty {
 		if len(items) == 0 {

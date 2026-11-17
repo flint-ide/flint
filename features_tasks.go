@@ -26,7 +26,10 @@ const (
 // and when all of them exist starts the chats of those that got a slot, the
 // way the queue starts a task (startTaskChat: the slot is released when the
 // start is over, whatever the UI does). When one cannot be created, the
-// tasks this call already made are removed again.
+// tasks this call already made are removed again. Until then they are held
+// (taskQueue.held): the queue starts none of them, so a rollback never
+// removes a task whose chat is running, and the slots they hold do not run
+// out while the other requests are created.
 func (h featureHost) CreateAgentTasks(ctx context.Context, reqs []feature.NewAgentTask) ([]feature.AgentTask, error) {
 	a := h.a
 	if len(reqs) == 0 {
@@ -40,9 +43,10 @@ func (h featureHost) CreateAgentTasks(ctx context.Context, reqs []feature.NewAge
 		tasks []agenttask.Task
 	}
 	var groups []group
-	for _, req := range reqs {
+	var all []agenttask.Task
+	for i, req := range reqs {
 		gctx, cancel := context.WithTimeout(ctx, gitRemoteTimeout) // checkout hooks may run
-		made, r, err := a.createTasks(gctx, NewTaskGroup{Dir: req.Dir, Description: req.Description, Agents: []string{req.Agent}}, true)
+		made, r, err := a.createTasks(gctx, NewTaskGroup{Dir: req.Dir, Description: req.Description, Agents: []string{req.Agent}}, true, true)
 		cancel()
 		if err != nil {
 			uctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), gitTimeout)
@@ -50,13 +54,27 @@ func (h featureHost) CreateAgentTasks(ctx context.Context, reqs []feature.NewAge
 				a.discardTasks(uctx, g.r, g.tasks)
 			}
 			cancel()
+			a.unhold(all)
 			if len(groups) > 0 {
 				a.tasksChanged()
+			}
+			if errors.Is(err, errDetachedHead) {
+				return nil, &feature.DetachedHeadError{Dir: req.Dir}
 			}
 			return nil, fmt.Errorf("%s: %w", req.Dir, err)
 		}
 		groups = append(groups, group{r, made})
+		all = append(all, made...)
+		if a.queue.afterRequest != nil {
+			a.queue.afterRequest(i + 1)
+		}
 	}
+	for _, task := range all {
+		if !task.Queued {
+			a.reserveStart(task.ID) // their starts begin now: startGrace counts from here
+		}
+	}
+	a.unhold(all)
 	vctx, cancel := context.WithTimeout(ctx, gitTimeout)
 	defer cancel()
 	api := &TaskAPI{app: a}
@@ -74,6 +92,7 @@ func (h featureHost) CreateAgentTasks(ctx context.Context, reqs []feature.NewAge
 			}()
 		}
 	}
+	a.startQueuedTasks() // queued ones it held back while slots came free
 	return out, nil
 }
 

@@ -4402,6 +4402,51 @@ button.keymap-chord:hover {
 .backlog-group .tree-row.root-row {
   height: 24px;
 }
+.backlog-group-head:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.backlog-marker {
+  flex: none;
+  font-size: 10px;
+  line-height: 15px;
+  padding: 0 6px;
+  border-radius: 8px;
+  color: var(--fg-faint);
+  background: color-mix(in srgb, var(--fg-faint) 12%, transparent);
+}
+.backlog-marker.warn {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+}
+.backlog-marker.error {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+.backlog-untrusted {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0 10px 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  border-radius: 4px;
+}
+.backlog-untrusted .link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+}
+.backlog-repos {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+  margin-bottom: 2px;
+}
 .backlog-item .tree-row {
   gap: 6px;
 }

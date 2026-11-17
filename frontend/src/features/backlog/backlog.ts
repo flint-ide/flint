@@ -52,6 +52,8 @@ export interface BacklogInfo {
   path: string
   name: string
   workspace: boolean
+  /** The backlog's folder is trusted; otherwise get_backlog leaves it out and Go asks before Delegate. */
+  trusted: boolean
   error: string
 }
 
@@ -59,6 +61,7 @@ export interface BacklogData {
   path: string
   name: string
   workspace: boolean
+  trusted: boolean
   repositories: RepoView[]
   items: ItemInfo[]
   problems: ProblemInfo[]
@@ -106,6 +109,8 @@ export type DelegateFix = 'locate' | 'attach' | 'trust' | 'project' | 'none'
 export interface DelegateIssue {
   fix: DelegateFix
   repo: string
+  /** The repository's URL (locate). */
+  url: string
   /** The checkout the fix is about (attach, trust). */
   folder: string
   message: string
@@ -117,21 +122,99 @@ export interface DelegateIssue {
  * window's active project, used by an item without repositories.
  */
 export function delegateIssues(item: ItemInfo, repos: readonly RepoView[], project: string): DelegateIssue[] {
-  if (item.agentProblem) return [{ fix: 'none', repo: '', folder: '', message: item.agentProblem }]
+  if (item.agentProblem) return [{ fix: 'none', repo: '', url: '', folder: '', message: item.agentProblem }]
   if (item.repos.length === 0) {
-    return project ? [] : [{ fix: 'project', repo: '', folder: '', message: 'The item names no repository, so it runs in the active project: open that project first.' }]
+    return project ? [] : [{ fix: 'project', repo: '', url: '', folder: '', message: 'The item names no repository, so it runs in the active project: open that project first.' }]
   }
   const out: DelegateIssue[] = []
   for (const name of item.repos) {
     const r = repos.find((x) => x.name === name)
-    if (!r) out.push({ fix: 'none', repo: name, folder: '', message: `The item names the repository "${name}", which flint-backlog.json does not list.` })
-    else if (r.problem) out.push({ fix: 'locate', repo: name, folder: r.folder, message: `${name}: ${r.problem}` })
-    else if (!r.folder) out.push({ fix: 'locate', repo: name, folder: '', message: `No checkout of ${name} was found: locate it.` })
-    else if (!r.inWorkspace) out.push({ fix: 'attach', repo: name, folder: r.folder, message: `${name} (${r.folder}) is not in the workspace yet.` })
-    else if (!r.trusted) out.push({ fix: 'trust', repo: name, folder: r.folder, message: `${name} (${r.folder}) is in Restricted Mode: trust the folder first.` })
+    if (!r) out.push({ fix: 'none', repo: name, url: '', folder: '', message: `The item names the repository "${name}", which flint-backlog.json does not list.` })
+    else {
+      const issue = repoIssue(r)
+      if (issue) out.push(issue)
+    }
   }
   return out
 }
+
+/** What keeps a repository of the backlog from being used by Delegate, with its fix; null when it can be used. */
+export function repoIssue(r: RepoView): DelegateIssue | null {
+  const base = { repo: r.name, url: r.url, folder: r.folder }
+  if (r.problem) return { ...base, fix: 'locate', message: `${r.name}: ${r.problem}` }
+  if (!r.folder) return { ...base, fix: 'locate', message: `No checkout of ${r.name} was found: locate it.` }
+  if (!r.inWorkspace) return { ...base, fix: 'attach', message: `${r.name} (${r.folder}) is not in the workspace yet.` }
+  if (!r.trusted) return { ...base, fix: 'trust', message: `${r.name} (${r.folder}) is in Restricted Mode: trust the folder first.` }
+  return null
+}
+
+/** The next step of Delegate's walk-through: delegate, fix an issue, or stop with the reason. */
+export type DelegateStep = { kind: 'delegate' } | { kind: 'fix'; issue: DelegateIssue; sig: string } | { kind: 'stuck'; message: string }
+
+/**
+ * Decides the walk-through's next step from the issues left (delegateIssues) and
+ * the signature of the issue the previous step fixed ('' before the first): an
+ * issue with no fix here, or the same issue again (the fix made no progress),
+ * stops it with the issue's message.
+ */
+export function delegateStep(issues: readonly DelegateIssue[], last: string): DelegateStep {
+  const [issue] = issues
+  if (!issue) return { kind: 'delegate' }
+  const sig = `${issue.fix}:${issue.repo}:${issue.folder}`
+  if (issue.fix === 'none' || issue.fix === 'project' || sig === last) return { kind: 'stuck', message: `Delegate can't go on: ${issue.message}` }
+  return { kind: 'fix', issue, sig }
+}
+
+/** The question before the folder picker of Locate…: which repository the user is asked to find. */
+export function locateQuestion(repo: string, url: string): string {
+  return [
+    `Locate your checkout of "${repo}"`,
+    '',
+    `Flint needs a folder on this computer that is a git checkout of ${url} (a remote with that URL).`,
+    'It is remembered on this computer only, not in the backlog.',
+  ].join('\n')
+}
+
+/** The question before trusting a repository's folder: trust is for the whole folder, from now on. */
+export function trustQuestion(repo: string, folder: string): string {
+  return [
+    `Trust the folder ${folder}?`,
+    '',
+    `${repo} is checked out there, and it is in Restricted Mode, so no agent can start in it.`,
+    'Trusting it turns Restricted Mode off for the whole folder from now on, not just for this Delegate: its hooks, settings and language servers run, and agents use its project settings. Trust it only if you trust its authors. Revoke Folder Trust turns it back on.',
+  ].join('\n')
+}
+
+/** The question before trusting a backlog's own folder. */
+export function trustBacklogQuestion(name: string, folder: string): string {
+  return [
+    `Trust the folder ${folder}?`,
+    '',
+    `It holds the backlog "${name}". Trusted, agents can read its items with get_backlog, and Delegate stops asking before it sends an item.`,
+    'Trust is for the whole folder from now on: its hooks, settings and language servers run too. Trust it only if you trust its authors.',
+  ].join('\n')
+}
+
+/** A marker of a repository row: what keeps it from being used, or where its checkout is. */
+export interface RepoMarker {
+  label: string
+  cls: 'error' | 'warn' | 'muted'
+  hint: string
+}
+
+/** The markers of a repository in the Repositories group. */
+export function repoMarkers(r: RepoView): RepoMarker[] {
+  if (r.problem) return [{ label: 'problem', cls: 'error', hint: r.problem }]
+  if (!r.folder) return [{ label: 'no checkout', cls: 'error', hint: 'No open project and no located folder has a remote with this URL: Locate… it' }]
+  const out: RepoMarker[] = []
+  if (r.located) out.push({ label: 'located', cls: 'muted', hint: 'Chosen with Locate… (remembered on this computer)' })
+  if (!r.inWorkspace) out.push({ label: 'not in workspace', cls: 'warn', hint: 'Delegate adds the folder to the workspace first' })
+  if (!r.trusted) out.push({ label: 'Restricted Mode', cls: 'warn', hint: 'No agent can start here until you trust the folder' })
+  return out
+}
+
+/** Whether every repository of the backlog can be used by Delegate now (the Repositories group starts collapsed then). */
+export const allReposResolve = (repos: readonly RepoView[]): boolean => repos.every((r) => repoIssue(r) === null)
 
 // ---- Agent tasks of an item
 

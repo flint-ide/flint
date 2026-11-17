@@ -26,7 +26,8 @@ func (a *API) agentTools() []mcpserver.Tool {
 		Title: "Read the backlog",
 		Description: "Returns the backlogs open in Flint (folders of planned work items for one or more repositories) with their items: " +
 			"id, title, status (doing, review, todo, done), priority, agent, repositories and text. " +
-			"Use it to answer what is planned or what to work on next. Read-only: statuses change in Flint.",
+			"Use it to answer what is planned or what to work on next. Read-only: statuses change in Flint. " +
+			"Backlogs whose folder is in Restricted Mode in Flint are left out.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{` +
 			`"status":{"type":"string","enum":["todo","doing","review","done"],"description":"Only items with this status."},` +
 			`"backlog":{"type":"string","description":"Only the backlog with this name."}` +
@@ -53,17 +54,29 @@ func (a *API) callTool(_ context.Context, _ string, args json.RawMessage) (strin
 	return a.describe(in.Status, in.Backlog), nil
 }
 
-// describe renders the known backlogs as text for an agent, bounded.
+// noteRoom is kept free of describe's budget for its closing notes, so they
+// are never cut by the MCP server's own limit.
+const noteRoom = 512
+
+// describe renders the known backlogs as text for an agent, bounded:
+// everything it writes (headers, repositories, items, notes) counts against
+// maxToolOutput. Backlogs whose folder is not trusted are left out (their
+// text could steer the agent), and it says how many.
 func (a *API) describe(status, name string) string {
 	var b strings.Builder
 	folders := a.knownSet()
-	shown := 0
-	cut := 0
+	budget := maxToolOutput - noteRoom
+	fits := func(s string) bool { return b.Len()+len(s) <= budget }
+	shown, cut, untrusted := 0, 0, 0
 	for _, folder := range folders {
+		if !a.host.Trusted(folder) {
+			untrusted++
+			continue
+		}
 		l, err := Load(folder)
 		if err != nil {
-			if name == "" {
-				fmt.Fprintf(&b, "# Backlog at %s\n\nCannot be read: %v\n\n", folder, err)
+			if s := fmt.Sprintf("# Backlog at %s\n\nCannot be read: %v\n\n", folder, err); name == "" && fits(s) {
+				b.WriteString(s)
 			}
 			continue
 		}
@@ -71,39 +84,56 @@ func (a *API) describe(status, name string) string {
 			continue
 		}
 		shown++
-		fmt.Fprintf(&b, "# Backlog %q (%s)\n\n", l.Config.Name, folder)
-		if len(l.Config.Repositories) > 0 {
-			b.WriteString("Repositories:\n")
-			for _, r := range l.Config.Repositories {
-				fmt.Fprintf(&b, "- %s: %s\n", r.Name, r.URL)
-			}
-			b.WriteString("\n")
-		}
+		var items []Item
 		for _, it := range l.Items {
-			if status != "" && it.Status != status {
-				continue
+			if status == "" || it.Status == status {
+				items = append(items, it)
 			}
-			entry := itemText(it)
-			if b.Len()+len(entry) > maxToolOutput {
-				cut++
-				continue
-			}
-			b.WriteString(entry)
 		}
-		if len(l.Problems) > 0 && b.Len() < maxToolOutput-200 {
-			fmt.Fprintf(&b, "%d file(s) of this backlog could not be read.\n\n", len(l.Problems))
+		if head := backlogHeader(l.Config, folder); fits(head) {
+			b.WriteString(head)
+		} else {
+			cut += len(items)
+			continue
+		}
+		for _, it := range items {
+			if entry := itemText(it); fits(entry) {
+				b.WriteString(entry)
+			} else {
+				cut++
+			}
+		}
+		if s := fmt.Sprintf("%d file(s) of this backlog could not be read.\n\n", len(l.Problems)); len(l.Problems) > 0 && fits(s) {
+			b.WriteString(s)
 		}
 	}
 	switch {
 	case len(folders) == 0:
 		return "No backlog is open in Flint."
 	case shown == 0 && name != "":
-		return fmt.Sprintf("No open backlog is named %q.", name)
+		fmt.Fprintf(&b, "No open backlog is named %q.\n", name)
 	}
 	if cut > 0 {
 		fmt.Fprintf(&b, "(%d more item(s) not shown: the answer is limited to %d KB; ask for one status or one backlog.)\n", cut, maxToolOutput>>10)
 	}
+	if untrusted > 0 {
+		fmt.Fprintf(&b, "(%d backlog(s) left out: their folders are in Restricted Mode in Flint. The user can trust a backlog's folder in Flint to let agents read it.)\n", untrusted)
+	}
 	return strings.TrimSpace(b.String())
+}
+
+// backlogHeader is a backlog's heading and its repositories.
+func backlogHeader(c Config, folder string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Backlog %q (%s)\n\n", c.Name, folder)
+	if len(c.Repositories) > 0 {
+		b.WriteString("Repositories:\n")
+		for _, r := range c.Repositories {
+			fmt.Fprintf(&b, "- %s: %s\n", r.Name, r.URL)
+		}
+		b.WriteString("\n")
+	}
+	return b.String()
 }
 
 func itemText(it Item) string {

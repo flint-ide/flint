@@ -19,13 +19,19 @@ import {
   BOARD_VIEW,
   boardTitle,
   delegateIssues,
+  delegateStep,
+  locateQuestion,
   pickSelected,
   problemPrompt,
   touchesBacklog,
+  trustBacklogQuestion,
+  trustQuestion,
   type BacklogData,
   type BacklogInfo,
+  type DelegateIssue,
   type ItemInfo,
   type ProblemInfo,
+  type RepoView,
   type Status,
   type TaskInfo,
 } from './backlog'
@@ -49,7 +55,7 @@ interface BacklogState {
   data: Record<string, Loaded>
   /** Items with an action running, by folder and id. */
   busy: Record<string, boolean>
-  /** Status groups the user collapsed or opened; done is collapsed until then. */
+  /** Groups the user collapsed or opened (statuses, "repositories"); done is collapsed until then. */
   collapsed: Record<string, boolean>
   dialog: BacklogDialog | null
 }
@@ -119,8 +125,8 @@ export function selectBacklog(folder: string): void {
   void loadBacklog(folder)
 }
 
-export function toggleGroup(status: string, open: boolean): void {
-  useBacklog.setState((s) => ({ collapsed: { ...s.collapsed, [status]: !open } }))
+export function toggleGroup(group: string, open: boolean): void {
+  useBacklog.setState((s) => ({ collapsed: { ...s.collapsed, [group]: !open } }))
 }
 
 // ---- following events
@@ -305,45 +311,74 @@ export function setStatus(folder: string, id: string, status: Status): Promise<v
   })
 }
 
-// ---- Delegate
+// ---- Repositories and Delegate
 
-/** Fixes the first thing in the way of Delegate with the user's help; false when it cannot go on. */
-async function resolve(folder: string, backlog: BacklogData, item: ItemInfo, issue: ReturnType<typeof delegateIssues>[number]): Promise<boolean> {
+/** Locate…: says which repository to find, then asks for the folder. False when the user stopped or it was refused. */
+export async function locateRepo(folder: string, repo: string, url: string): Promise<boolean> {
+  if (!(await confirmAction(locateQuestion(repo, url), 'Choose Folder…'))) return false
+  const dir = await pickFolder()
+  if (!dir) return false
+  try {
+    await API.Locate(folder, repo, dir)
+  } catch (err) {
+    showToast(errorMessage(err), 'error')
+    return false
+  }
+  void loadBacklog(folder)
+  return true
+}
+
+/** Adds a located checkout outside the workspace to it. */
+export async function attachRepo(folder: string, repo: string, dir: string): Promise<boolean> {
+  if (!(await showFolder(dir))) return false
+  showToast(`Added ${dir} to the workspace`)
+  void loadBacklog(folder)
+  return true
+}
+
+/** Trusts a repository's checkout after saying that it is for the whole folder, from now on. */
+export async function trustRepo(folder: string, repo: string, dir: string): Promise<boolean> {
+  if (!(await confirmAction(trustQuestion(repo, dir), 'Trust Folder'))) return false
+  await trustFolder(dir)
+  void loadBacklog(folder)
+  return true
+}
+
+/** Trusts the backlog's own folder (get_backlog shows it then, and Delegate stops asking). */
+export async function trustBacklog(info: Pick<BacklogInfo, 'path' | 'name'>): Promise<void> {
+  if (!(await confirmAction(trustBacklogQuestion(info.name, info.path), 'Trust Folder'))) return
+  await trustFolder(info.path)
+  await refreshBacklogs()
+  void loadBacklog(info.path)
+}
+
+/** The actions of the Repositories group: Locate…, Add to Workspace, Trust. */
+export const repoActions = {
+  locate: (folder: string, r: RepoView) => void locateRepo(folder, r.name, r.url),
+  attach: (folder: string, r: RepoView) => void attachRepo(folder, r.name, r.folder),
+  trust: (folder: string, r: RepoView) => void trustRepo(folder, r.name, r.folder),
+}
+
+/** Fixes one thing in the way of Delegate with the user's help; false when the user stopped. */
+async function resolve(folder: string, issue: DelegateIssue): Promise<boolean> {
   switch (issue.fix) {
-    case 'locate': {
-      const dir = await pickFolder()
-      if (!dir) return false
-      try {
-        await API.Locate(folder, issue.repo, dir)
-      } catch (err) {
-        showToast(errorMessage(err), 'error')
-        return false
-      }
-      return true
-    }
+    case 'locate':
+      return locateRepo(folder, issue.repo, issue.url)
     case 'attach':
-      if (!(await showFolder(issue.folder))) return false
-      showToast(`Added ${issue.folder} to the workspace`)
-      return true
-    case 'trust': {
-      const ok = await confirmAction(
-        `${issue.repo} (${issue.folder}) is in Restricted Mode, so an agent cannot start there.\n\nTrust the folder to delegate "${item.title}"?`,
-        'Trust Folder',
-      )
-      if (!ok) return false
-      await trustFolder(issue.folder)
-      return true
-    }
+      return attachRepo(folder, issue.repo, issue.folder)
+    case 'trust':
+      return trustRepo(folder, issue.repo, issue.folder)
     default:
-      showToast(issue.message, 'error')
       return false
   }
 }
 
 /**
  * Delegate: starts the item's agent tasks. Before asking Go it walks the user
- * through what is missing (Locate…, attaching the folder, trusting it). Go starts
- * the chats itself; the window adopts them from "chat:opened", so none is started here.
+ * through what is missing (Locate…, attaching the folder, trusting it), one step
+ * at a time (delegateStep); a step that made no progress stops it with the reason.
+ * Go starts the chats itself; the window adopts them from "chat:opened", so none
+ * is started here. Go asks first, natively, for an item of an untrusted backlog.
  */
 export function delegateItem(folder: string, id: string): Promise<void> {
   return withBusy(folder, id, async () => {
@@ -353,11 +388,11 @@ export function delegateItem(folder: string, id: string): Promise<void> {
       const backlog = useBacklog.getState().data[folder]?.backlog
       const item = backlog?.items.find((i) => i.id === id)
       if (!backlog || !item) return showToast('The item is not in the backlog any more', 'error')
-      const [issue] = delegateIssues(item, backlog.repositories, activeRoot())
-      if (!issue) break
-      const sig = `${issue.fix}:${issue.repo}:${issue.folder}`
-      if (sig === last || !(await resolve(folder, backlog, item, issue))) return // no progress, or the user stopped
-      last = sig
+      const next = delegateStep(delegateIssues(item, backlog.repositories, activeRoot()), last)
+      if (next.kind === 'delegate') break
+      if (next.kind === 'stuck') return showToast(next.message, 'error')
+      if (!(await resolve(folder, next.issue))) return // the user stopped
+      last = next.sig
     }
     try {
       const res = await API.Delegate(folder, id, activeRoot())

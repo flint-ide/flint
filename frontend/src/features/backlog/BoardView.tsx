@@ -50,6 +50,11 @@ export function BoardView({ tab, active }: { tab: ContributedTab; active: boolea
     <div className="backlog-board">
       <div className="backlog-board-head">
         <span className="backlog-board-title">{backlog.name}</span>
+        {!backlog.trusted && (
+          <span className="backlog-marker warn" title="The backlog's folder is not trusted: agents can't read it with get_backlog, and Delegate shows you each item before it sends it">
+            Restricted Mode
+          </span>
+        )}
         <span className="muted truncate" title={backlog.path}>{backlog.path}</span>
         <span className="spacer" />
         <button className="icon" title="New Item…" onClick={() => openNewItem(folder, 'board')}>＋ New Item…</button>

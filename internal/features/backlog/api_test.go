@@ -13,7 +13,7 @@ import (
 )
 
 // fixture is the API over a fake host with one open, trusted project (a
-// checkout of acme/api) and a backlog folder that is not opened yet.
+// checkout of acme/api) and a trusted backlog folder that is not opened yet.
 type fixture struct {
 	t       *testing.T
 	h       *featuretest.Host
@@ -37,6 +37,7 @@ func newFixture(t *testing.T, items map[string]string) *fixture {
 	h.SetTrusted(project)
 	h.SetAgents("claude", "claude", "backend")
 	plan := newBacklog(t, filepath.Join(base, "plan"), items)
+	h.SetTrusted(plan) // a backlog in Restricted Mode: TestUntrustedBacklog
 	return &fixture{t: t, h: h, api: newAPI(h), base: base, project: project, plan: plan}
 }
 
@@ -352,13 +353,19 @@ func TestRepositoryResolution(t *testing.T) {
 	if web.Folder != web1 || !web.InWorkspace || !web.Trusted || !web.Located {
 		t.Errorf("attached: %+v", web)
 	}
-	// Opening the checkout itself in the workspace wins over the located one.
+	// A checkout in Restricted Mode opened in the workspace does not hide the
+	// trusted located one: any folder can claim any URL.
 	web2 := filepath.Join(f.base, "web2")
 	if err := os.Mkdir(web2, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	f.h.SetRepository(web2, "https://github.com/acme/web.git")
 	f.h.SetRoots(f.project, web2)
+	if web = f.load().Repositories[1]; web.Folder != web1 || !web.Located || !web.Trusted {
+		t.Errorf("untrusted workspace checkout: %+v", web)
+	}
+	// Trusted, the checkout opened in the workspace wins over the located one.
+	f.h.SetTrusted(web2)
 	if web = f.load().Repositories[1]; web.Folder != web2 || web.Located {
 		t.Errorf("workspace checkout: %+v", web)
 	}
@@ -390,5 +397,29 @@ func TestLoadReportsAgents(t *testing.T) {
 	f.h.SetAgents("")
 	if b := f.load(); !strings.Contains(f.item(b, "c").AgentProblem, "no agent can start") {
 		t.Errorf("no agent: %+v", f.item(b, "c"))
+	}
+}
+
+// An editor that saves the item while Flint writes its status wins: Flint
+// compares the file just before it replaces it, refuses, and leaves no
+// temporary file behind.
+func TestSetStatusRefusesAFileChangedWhileWriting(t *testing.T) {
+	f := newFixture(t, map[string]string{"x": item("X", "todo")})
+	f.open()
+	saved := item("X", "todo", "priority: high")
+	f.api.beforeCompare = func() { write(t, ItemFile(f.plan, "x"), saved) }
+	_, err := f.api.SetStatus(f.plan, "x", StatusDoing)
+	wantErr(t, err, "items/x.md changed while Flint was writing it: try again")
+	if got := f.read("x"); got != saved {
+		t.Errorf("file %q, want the editor's", got)
+	}
+	entries, err := os.ReadDir(filepath.Join(f.plan, ItemsDir))
+	if err != nil || len(entries) != 1 {
+		t.Errorf("items folder %v, %v", entries, err)
+	}
+	// Unchanged, the write goes through.
+	f.api.beforeCompare = nil
+	if v, err := f.api.SetStatus(f.plan, "x", StatusDoing); err != nil || v.Status != StatusDoing || !strings.Contains(f.read("x"), "status: doing") {
+		t.Errorf("SetStatus = %+v, %v", v, err)
 	}
 }

@@ -20,8 +20,6 @@ type Problem struct {
 
 // Loaded is a backlog as read from disk.
 type Loaded struct {
-	// Folder is the backlog folder (resolved).
-	Folder   string
 	Config   Config
 	Items    []Item
 	Problems []Problem
@@ -63,7 +61,7 @@ func Load(folder string) (Loaded, error) {
 	if err != nil {
 		return Loaded{}, err
 	}
-	l := Loaded{Folder: folder, Config: c, Items: []Item{}, Problems: []Problem{}}
+	l := Loaded{Config: c, Items: []Item{}, Problems: []Problem{}}
 	files, problems := prompts.ReadDir(filepath.Join(folder, ItemsDir), folder, MaxItems)
 	for _, p := range problems {
 		l.Problems = append(l.Problems, Problem{File: ItemsDir, Reason: strings.TrimPrefix(p, filepath.Join(folder, ItemsDir)+": ")})

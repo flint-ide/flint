@@ -30,6 +30,7 @@ func TestParseConfig(t *testing.T) {
 		{"name too long", `{"name":"` + strings.Repeat("n", 81) + `"}`, Config{}, "longer than 80"},
 		{"name of 80", `{"name":"` + strings.Repeat("ü", 80) + `"}`, Config{Name: strings.Repeat("ü", 80), Repositories: []RepositoryDecl{}}, ""},
 		{"control in name", `{"name":"a\u0007b"}`, Config{}, "control"},
+		{"invisible in name", `{"name":"a\u202eb"}`, Config{}, "invisible characters (U+202E)"},
 		{"upper-case repo", `{"repositories":[{"name":"API","url":"git@h:a/b"}]}`, Config{}, "lowercase"},
 		{"repo name too long", `{"repositories":[{"name":"` + strings.Repeat("a", 41) + `","url":"git@h:a/b"}]}`, Config{}, "at most 40"},
 		{"empty repo name", `{"repositories":[{"name":"","url":"git@h:a/b"}]}`, Config{}, "lowercase"},
@@ -84,8 +85,24 @@ func TestParseItem(t *testing.T) {
 		{"repo twice", "n", "---\ntitle: T\nrepos: api,api\n---\n", Item{}, "twice"},
 		{"no closing", "n", "---\ntitle: T\n", Item{}, "no closing"},
 		{"bad id", "../x", "---\ntitle: T\n---\n", Item{}, "file name"},
-		{"too long text", "n", "---\ntitle: T\n---\n" + long, Item{}, "longer than 8000"},
-		{"nul", "n", "---\ntitle: T\n---\na\x00b", Item{}, "NUL"},
+		{"too long text", "n", "---\ntitle: T\n---\n" + long, Item{}, "longer than 8000 bytes"},
+		// The limit is in bytes, as for New Agent Task: 4,100 characters of
+		// two bytes each are too many (reviewer's reproduction).
+		{"too many bytes", "n", "---\ntitle: T\n---\n" + strings.Repeat("ж", 4100), Item{}, "longer than 8000 bytes"},
+		{"nul", "n", "---\ntitle: T\n---\na\x00b", Item{}, "the text contains a control character (U+0000)"},
+		{"bell", "n", "---\ntitle: T\n---\na\ab", Item{}, "control character (U+0007)"},
+		{"lone carriage return", "n", "---\ntitle: T\n---\na\rb", Item{}, "control character (U+000D)"},
+		{"escape", "n", "---\ntitle: T\n---\n\x1b[2Jb", Item{}, "control character (U+001B)"},
+		// Characters the user does not see and the agent reads.
+		{"tag characters", "n", "---\ntitle: T\n---\nFix it.\U000E0049\U000E0067\U000E006E", Item{}, "the text contains invisible characters (U+E0049)"},
+		{"bidi override", "n", "---\ntitle: T\n---\nab\u202Ecd", Item{}, "invisible characters (U+202E)"},
+		{"bidi isolate", "n", "---\ntitle: T\n---\nab\u2066cd", Item{}, "invisible characters (U+2066)"},
+		{"zero-width space in the title", "n", "---\ntitle: T\u200Bx\n---\n", Item{}, "title contains invisible characters (U+200B)"},
+		{"word joiner", "n", "---\ntitle: T\n---\na\u2060b", Item{}, "invisible characters (U+2060)"},
+		{"BOM inside", "n", "---\ntitle: T\n---\na\uFEFFb", Item{}, "invisible characters (U+FEFF)"},
+		{"BOM at the start", "n", "\uFEFF---\ntitle: T\n---\nb", Item{}, "title is missing"},
+		{"joiners and tabs are fine", "j", "---\ntitle: Team 👩\u200D💻\n---\nक्\u200Cष\tindented",
+			Item{ID: "j", Title: "Team 👩\u200D💻", Status: "todo", Priority: "normal", Repos: []string{}, Body: "क्\u200Cष\tindented"}, ""},
 		{"not utf-8", "n", "---\ntitle: \xff\n---\n", Item{}, "UTF-8"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -177,7 +194,7 @@ func TestNewItemFileAndID(t *testing.T) {
 			t.Errorf("NewItemFile(%q) parses as %+v, %v", title, it, err)
 		}
 	}
-	for _, bad := range []string{"", "  ", "a\nb", strings.Repeat("t", MaxTitle+1)} {
+	for _, bad := range []string{"", "  ", "a\nb", strings.Repeat("t", MaxTitle+1), "a\u202eb"} {
 		if _, err := NewItemFile(bad); err == nil {
 			t.Errorf("NewItemFile(%q) accepted", bad)
 		}

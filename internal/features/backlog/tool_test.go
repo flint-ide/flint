@@ -80,3 +80,31 @@ func TestGetBacklogToolIsBounded(t *testing.T) {
 		t.Error("the first item is missing")
 	}
 }
+
+// Headers and repository lists count against the budget too: with many large
+// backlogs the answer stays under the MCP server's limit and ends with the
+// note about what was left out.
+func TestGetBacklogToolBoundsHeaders(t *testing.T) {
+	f := newFixture(t, nil)
+	f.h.SetTrusted(f.base)
+	var repos []string
+	for i := range MaxRepositories {
+		repos = append(repos, fmt.Sprintf(`{"name":"r%d","url":"https://github.com/acme/%s%d"}`, i, strings.Repeat("a", 900), i))
+	}
+	config := `{"name":"Big","repositories":[` + strings.Join(repos, ",") + `]}`
+	for i := range 4 {
+		dir := filepath.Join(f.base, fmt.Sprintf("big%d", i))
+		write(t, filepath.Join(dir, ConfigFile), config)
+		write(t, filepath.Join(dir, ItemsDir, "a.md"), item("A", "todo"))
+		if _, err := f.api.Open(dir); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out := f.api.describe("", "")
+	if len(out) > maxToolOutput || !strings.HasSuffix(out, "(3 more item(s) not shown: the answer is limited to 60 KB; ask for one status or one backlog.)") {
+		t.Errorf("%d bytes, tail %q", len(out), out[max(0, len(out)-200):])
+	}
+	if strings.Count(out, "# Backlog ") != 1 {
+		t.Errorf("%d backlogs shown", strings.Count(out, "# Backlog "))
+	}
+}

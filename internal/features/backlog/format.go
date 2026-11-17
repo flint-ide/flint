@@ -28,8 +28,8 @@ const (
 	maxRepoName     = 40
 	MaxTitle        = 120
 	maxAgentName    = 64
-	// MaxDescription bounds title and body together: they become an agent
-	// task's description.
+	// MaxDescription bounds title and body together, in bytes (UTF-8), as
+	// New Agent Task bounds a description: they become an agent task's.
 	MaxDescription = agenttask.MaxPrompt
 )
 
@@ -97,6 +97,9 @@ func ParseConfig(data []byte, folderName string) (Config, error) {
 		return Config{}, fmt.Errorf("name is longer than %d characters", maxBacklogName)
 	case strings.ContainsFunc(c.Name, unicode.IsControl):
 		return Config{}, errors.New("name contains control characters")
+	}
+	if r, ok := hiddenRune(c.Name); ok {
+		return Config{}, fmt.Errorf("name contains invisible characters (U+%04X)", r)
 	}
 	if len(c.Repositories) > MaxRepositories {
 		return Config{}, fmt.Errorf("more than %d repositories", MaxRepositories)
@@ -190,13 +193,41 @@ func ParseItem(id string, data []byte, c Config) (Item, error) {
 		return Item{}, fmt.Errorf("title is longer than %d characters", MaxTitle)
 	}
 	it.Body = strings.TrimSpace(strings.ReplaceAll(body, "\r\n", "\n"))
-	if strings.ContainsRune(it.Body, 0) {
-		return Item{}, errors.New("the text contains a NUL character")
+	for _, part := range []struct{ name, text string }{{"title", it.Title}, {"the text", it.Body}} {
+		if r, ok := hiddenRune(part.text); ok {
+			if unicode.IsControl(r) {
+				return Item{}, fmt.Errorf("%s contains a control character (U+%04X)", part.name, r)
+			}
+			return Item{}, fmt.Errorf("%s contains invisible characters (U+%04X)", part.name, r)
+		}
 	}
 	if len(it.Description()) > MaxDescription {
-		return Item{}, fmt.Errorf("title and text are longer than %d characters", MaxDescription)
+		return Item{}, fmt.Errorf("title and text are longer than %d bytes", MaxDescription)
 	}
 	return it, nil
+}
+
+// hiddenRune finds a character an item must not contain because the user
+// reading it does not see it, while the agent it is sent to does: a control
+// character other than tab and newline, a Unicode tag (U+E0000–U+E007F), a
+// bidirectional control (U+202A–U+202E, U+2066–U+2069), a zero-width space
+// (U+200B), a word joiner (U+2060) or a zero-width no-break space (U+FEFF; a
+// file that starts with one has no front matter, so no title). Zero-width
+// joiner and non-joiner (U+200D, U+200C) are allowed: emoji and several
+// scripts need them.
+func hiddenRune(s string) (rune, bool) {
+	for _, r := range s {
+		switch {
+		case r == '\t' || r == '\n':
+		case unicode.IsControl(r),
+			r >= 0xE0000 && r <= 0xE007F,
+			r >= 0x202A && r <= 0x202E,
+			r >= 0x2066 && r <= 0x2069,
+			r == 0x200B, r == 0x2060, r == 0xFEFF:
+			return r, true
+		}
+	}
+	return 0, false
 }
 
 func parseRepos(v string, c Config) ([]string, error) {
@@ -291,6 +322,9 @@ func NewItemFile(title string) ([]byte, error) {
 		return nil, fmt.Errorf("the title is longer than %d characters", MaxTitle)
 	case strings.ContainsFunc(title, unicode.IsControl):
 		return nil, errors.New("the title must be one line")
+	}
+	if r, ok := hiddenRune(title); ok {
+		return nil, fmt.Errorf("the title contains invisible characters (U+%04X)", r)
 	}
 	if len(title) >= 2 && (title[0] == '"' || title[0] == '\'') && title[len(title)-1] == title[0] {
 		title = `"` + title + `"` // FrontMatter takes one pair of quotes off

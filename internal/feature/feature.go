@@ -122,7 +122,9 @@ type Host interface {
 	// worktree from Dir's current branch, the queue and its limits, the trust
 	// of the worktree) and starts the chats of those that got a slot; the
 	// others are queued. Dir must be a folder inside an open project folder.
-	// All or nothing: when one cannot be created, none is kept.
+	// All or nothing: when one cannot be created, none is kept, and a
+	// queued task is not started before the call returns. A checkout on a
+	// detached HEAD fails with *DetachedHeadError.
 	CreateAgentTasks(ctx context.Context, reqs []NewAgentTask) ([]AgentTask, error)
 	// AgentTasks returns the tasks with these ids that still exist, by id.
 	AgentTasks(ctx context.Context, ids []string) map[string]AgentTask
@@ -138,6 +140,16 @@ type Host interface {
 type NewAgentTask struct {
 	Dir, Description, Agent string
 }
+
+// DetachedHeadError is CreateAgentTasks' error for a request whose Dir is a
+// checkout on a detached HEAD: a task starts from the checkout's current
+// branch and merges back into it, so there must be one.
+type DetachedHeadError struct {
+	// Dir is the request's folder.
+	Dir string
+}
+
+func (e *DetachedHeadError) Error() string { return e.Dir + " is on a detached HEAD" }
 
 // AgentTask is an agent task as the Agent Tasks panel shows it.
 type AgentTask struct {

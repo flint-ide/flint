@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -9,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"flint/internal/agenttask"
 	"flint/internal/feature"
@@ -167,5 +169,118 @@ func TestFeatureHostCreateAgentTasksIsAllOrNothing(t *testing.T) {
 	defer f.app.queue.startMu.Unlock()
 	if len(f.app.queue.starting) != 0 {
 		t.Errorf("start slots held: %v", f.app.queue.starting)
+	}
+}
+
+// A queued task of a CreateAgentTasks call is not started while the call is
+// still creating the next request, so a rollback never removes a task whose
+// chat runs: the first request's task waits in the queue, its slot comes free
+// meanwhile, and the second request fails (deterministic: afterRequest runs
+// between the two requests).
+func TestFeatureHostCreateHoldsTasksFromTheQueue(t *testing.T) {
+	f := queueFixture(t, 1)
+	first := f.create("first") // holds the only slot (the UI starts its chat)
+	outside := t.TempDir()
+	var held []string
+	f.app.queue.afterRequest = func(done int) {
+		for _, q := range f.app.taskStore().QueuedTasks() {
+			held = append(held, q.Task.ID)
+		}
+		// The slot comes free: the queue looks, and must leave the task alone.
+		if err := f.api.StartDone(first.ID); err != nil {
+			t.Error(err)
+		}
+		f.waitStarts()
+	}
+	_, err := featureHost{f.app}.CreateAgentTasks(context.Background(), []feature.NewAgentTask{
+		{Dir: f.repo, Description: "second", Agent: "fake"},
+		{Dir: outside, Description: "third", Agent: "fake"},
+	})
+	if err == nil {
+		t.Fatal("CreateAgentTasks succeeded with a request outside the workspace")
+	}
+	f.waitStarts()
+	if len(held) != 1 {
+		t.Fatalf("queued during the call: %v", held)
+	}
+	if n := len(f.app.orch.All()); n != 0 {
+		t.Errorf("%d chats started for tasks that were rolled back", n)
+	}
+	tasks := f.app.taskStore().List(cleanFolder(filepath.Join(f.repo, ".git")))
+	if len(tasks) != 1 || tasks[0].ID != first.ID {
+		t.Errorf("tasks kept: %+v", tasks)
+	}
+	if f.app.isHeld(held[0]) {
+		t.Error("the rolled-back task is still held")
+	}
+}
+
+// When the call succeeds, its queued tasks are released to the queue at once:
+// the slot that came free meanwhile starts one.
+func TestFeatureHostCreateReleasesHeldTasks(t *testing.T) {
+	f := queueFixture(t, 1)
+	first := f.create("first")
+	f.app.queue.afterRequest = func(int) {
+		if err := f.api.StartDone(first.ID); err != nil {
+			t.Error(err)
+		}
+		f.waitStarts()
+		if n := len(f.app.orch.All()); n != 0 {
+			t.Errorf("%d chats started while the call runs", n)
+		}
+	}
+	made, err := featureHost{f.app}.CreateAgentTasks(context.Background(), []feature.NewAgentTask{{Dir: f.repo, Description: "second", Agent: "fake"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(made) != 1 || made[0].State != agenttask.Queued {
+		t.Fatalf("made %+v", made)
+	}
+	f.waitStarts()
+	if all := f.app.orch.All(); len(all) != 1 || cleanFolder(all[0].Cwd) != made[0].Worktree {
+		t.Errorf("chats %+v, want one in %s", all, made[0].Worktree)
+	}
+}
+
+// The slots the tasks of one call hold are kept while its other requests are
+// created, however long that takes (startGrace does not free them).
+func TestFeatureHostCreateKeepsSlotsPastTheGrace(t *testing.T) {
+	f := queueFixture(t, 2)
+	web := f.addRepoT("web", "git@github.com:acme/web.git")
+	f.app.queue.afterRequest = func(done int) {
+		if done != 1 {
+			return
+		}
+		f.app.queue.startMu.Lock()
+		for id := range f.app.queue.starting {
+			f.app.queue.starting[id] = time.Now().Add(-2 * startGrace)
+		}
+		f.app.queue.startMu.Unlock()
+		if n := f.app.activeTasks(); n != 1 {
+			t.Errorf("active tasks after the grace = %d, want 1", n)
+		}
+	}
+	made, err := featureHost{f.app}.CreateAgentTasks(context.Background(), []feature.NewAgentTask{
+		{Dir: f.repo, Description: "api", Agent: "fake"},
+		{Dir: web, Description: "web", Agent: "fake"},
+	})
+	if err != nil || len(made) != 2 || made[0].State == agenttask.Queued || made[1].State == agenttask.Queued {
+		t.Fatalf("made %+v, %v", made, err)
+	}
+	f.waitStarts()
+}
+
+// A checkout on a detached HEAD fails with feature.DetachedHeadError naming
+// it, and nothing is kept.
+func TestFeatureHostCreateDetachedHead(t *testing.T) {
+	f := queueFixture(t, 0)
+	gitT(t, f.repo, "checkout", "-q", "--detach")
+	_, err := featureHost{f.app}.CreateAgentTasks(context.Background(), []feature.NewAgentTask{{Dir: f.repo, Description: "x", Agent: "fake"}})
+	var dh *feature.DetachedHeadError
+	if !errors.As(err, &dh) || dh.Dir != f.repo {
+		t.Fatalf("err = %v", err)
+	}
+	if n := len(f.app.taskStore().List(cleanFolder(filepath.Join(f.repo, ".git")))); n != 0 {
+		t.Errorf("%d tasks kept", n)
 	}
 }

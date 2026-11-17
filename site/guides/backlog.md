@@ -16,15 +16,20 @@ Nothing in a backlog runs by itself. Opening a backlog only reads its files. Age
 
 ## Create and open a backlog
 
-- **New Backlog…** (command palette, `⇧⌘P`, or **New** in the **Backlog** panel) makes a folder you pick into a backlog: it writes `flint-backlog.json` and an empty `items/` folder. It never overwrites a `flint-backlog.json` that is already there.
-- **Open Backlog…** (or **Open** in the panel) picks a folder that already has a `flint-backlog.json`, for example one you cloned from your team.
-- **Close** in the panel's backlog picker removes a backlog from Flint's list. The files stay where they are.
+Open the **Backlog** panel from the activity bar or with "Show Backlog" in the command palette (`⇧⌘P`). The `⋯` menu in its header holds:
+
+- **Open Backlog…** picks a folder that already has a `flint-backlog.json`, for example one you cloned from your team.
+- **New Backlog…** makes a folder you pick into a backlog: it asks for a name, then writes `flint-backlog.json` and an empty `items/` folder. It never overwrites a `flint-backlog.json` that is already there.
+- **Show Board** opens the backlog's [board](#the-board).
+- **Close Backlog** removes the backlog from Flint's list. The files stay where they are. It is disabled, and marked "workspace folder", for a backlog listed because it is a project open in the window.
+
+The same commands are in the command palette, listed under **Backlog**: Open Backlog…, New Backlog…, New Backlog Item… and Show Backlog Board.
 
 Flint remembers the backlogs you opened or created, most recent first, up to 20. A project open in the window whose top folder holds `flint-backlog.json` is listed without being opened. It can't be closed there; remove the folder from the window instead.
 
 The backlog folder can be its own git repository, a folder inside one of your repositories, or a plain folder. A backlog is known by its real path, with symbolic links resolved.
 
-The **Backlog** panel lists the items of the backlog you picked. **Show Backlog Board** in the command palette opens the same items as a [board](#the-board).
+The picker under the panel's header chooses the backlog the panel shows. Below it come the [Repositories](#the-repositories-group) group and the items, grouped by status: **Doing**, **Review**, **To do** and **Done** (Done starts collapsed). Each group header opens and closes with a click, or with Enter or Space when it has the keyboard focus. Problem files are listed at the end.
 
 ## The folder
 
@@ -86,11 +91,13 @@ Done when:
 | `repos` | Optional, comma-separated names from `flint-backlog.json`, each at most once. Empty means the project that is active in the window. |
 | Text after the front matter | What to do and how to tell it is done. |
 
-The title and the text together become the agent task's description, the first message the agent gets. They may be at most 8,000 bytes. With several repositories, Delegate adds a note naming them, and the note counts too.
+The title and the text together become the agent task's description, the first message the agent gets. They may be at most 8,000 bytes, as for New Agent Task (a letter outside ASCII takes two to four bytes). With several repositories, Delegate adds a note naming them, and the note counts too.
+
+The title and the text can't contain characters you don't see but the agent reads: control characters other than tab and line breaks, Unicode tag characters, bidirectional controls, zero-width spaces, word joiners and byte order marks. Such a file is listed as a problem. Zero-width joiners, which emoji and several scripts need, are fine.
 
 Unknown keys are kept when Flint rewrites the file and are otherwise ignored.
 
-**New Item…** (in the panel, or "New Backlog Item…" in the command palette) asks for a title, makes the id from it (lowercase letters, digits and `-`, at most 40 characters; `-2`, `-3`… when the name is taken), writes the file from this template and opens it:
+**New Item…** (the **＋** button in the panel's header or the board's, or "New Backlog Item…" in the command palette) asks for a title, makes the id from it (lowercase letters, digits and `-`, at most 40 characters; `-2`, `-3`… when the name is taken), writes the file from this template and opens it:
 
 ```markdown
 ---
@@ -114,7 +121,8 @@ A file that breaks a rule is not shown as an item. It is listed under the items 
 |---|---|
 | `title is missing`, or a `status` or `priority` that isn't one of the values above | Correct the front matter. |
 | `repository "x" is not in flint-backlog.json` | Add the repository to the file or fix the name in `repos`. |
-| `title and text are longer than 8000 characters` | Shorten the text. |
+| `title and text are longer than 8000 bytes` | Shorten the text. |
+| `the text contains invisible characters (U+200B)`, or `a control character` | Remove the character it names. It is often pasted in from a web page or a chat; an agent can find it for you with **Ask the agent**. |
 | `larger than 64 KB` | Items are plain files of at most 64 KB. Split the work into several items. |
 | `front matter has no closing ---`, or a line that is not `key: value` | Fix the line. A comment starts with `#`. |
 | `the agent "x" is not available here` | The item stays listed. Define or install the agent, or change `agent`. Delegate says the same. |
@@ -125,10 +133,24 @@ A file that breaks a rule is not shown as an item. It is listed under the items 
 
 An item names repositories, not folders, so the same backlog works on every machine. For each repository, Flint looks for your checkout:
 
-1. A project open in the window whose repository has a remote with the same URL. Any remote counts, not only `origin`.
-2. Otherwise the folder you chose with **Locate…** for that URL.
+1. A project open in the window, and trusted, whose repository has a remote with the same URL. Any remote counts, not only `origin`. It is the repository the project folder is in: a repository nested inside an open folder (a folder of several repositories, a submodule) is not found this way, so **Locate…** it.
+2. Otherwise the folder you chose with **Locate…** for that URL, if it is trusted.
+3. Otherwise a project open in the window that is in [Restricted Mode](#backlogs-and-restricted-mode). Any folder can claim any URL, so a folder in Restricted Mode is used only when no trusted checkout is found, and Delegate asks you to trust it first.
+4. Otherwise the folder you chose with **Locate…**, in Restricted Mode too.
 
-A repository with neither shows **Locate…**. It asks for a folder and accepts only a checkout that has a remote with that URL. A folder that is an agent task's worktree is refused: choose the repository's own checkout. The choice is kept in Flint's `state.json` per URL, never in the backlog, so every teammate has their own. If the located folder is moved or deleted, the repository is listed with the reason and you locate it again. A located folder that isn't open in the window is added to it before Delegate uses it.
+### The Repositories group
+
+The **Repositories** group at the top of the panel lists each repository of `flint-backlog.json` with its URL and the checkout Flint found, or "no checkout on this computer". It starts collapsed when every repository can be used, and open otherwise. A repository is marked:
+
+| Marker | Meaning |
+|---|---|
+| no checkout | No project and no located folder has a remote with its URL. |
+| problem | The located folder can't be used; the tooltip says why. |
+| located | The folder was chosen with **Locate…**. |
+| not in workspace | The located folder isn't open in the window. Delegate adds it; **Add to Workspace** does it now. |
+| Restricted Mode | The checkout isn't trusted. **Trust Folder…** trusts it, after saying that this is for the whole folder from now on. |
+
+**Locate…** first says which repository to find, with its name and URL, then asks for a folder. It accepts only a checkout that has a remote with that URL. A folder that is an agent task's worktree is refused: choose the repository's own checkout. The choice is kept in Flint's `state.json` per URL, never in the backlog, so every teammate has their own. If the located folder is moved or deleted, the repository is listed with the reason and you locate it again. A located folder that isn't open in the window is added to it before Delegate uses it.
 
 Flint does not clone a repository that has no checkout.
 
@@ -149,12 +171,14 @@ The path keeps its case. Local paths (`/srv/git/api.git`, `file:///srv/git/api.g
 **Delegate** is on every item in the panel and on the board. It does this, in order:
 
 1. **Checks the agent.** The item's `agent`, else the default agent. It must be available now.
-2. **Finds a checkout for every repository** the item names, as described above. An item without `repos` uses the project that is active in the window, which must be a project folder open in it.
+2. **Finds a checkout for every repository** the item names, as described above. An item without `repos` uses the project that is active in the window, which must be a project folder open in it. If something is missing, Delegate walks you through it one step at a time before it starts anything: **Locate…** for a repository without a checkout, adding a located folder to the window, trusting a checkout in Restricted Mode. A step you cancel stops Delegate; a step that doesn't help shows why Delegate can't go on.
 3. **Creates one agent task per repository**, the way New Agent Task does: a branch from the checkout's current branch, a worktree, the [queue](ai-agents.md#the-queue) and its limit, and the trust of the worktree. The description is the item's title and text. When the item names several repositories, each task also gets a note naming the item's other repositories and saying which one this task works in.
 4. **Starts the agents.** A task that gets a slot starts its chat at once, with the description as its first message. The others wait in the queue, like any queued task.
 5. **Remembers the tasks for the item and sets its status to `doing`.**
 
-Delegate is all or nothing. If one task can't be created, Flint removes the ones it already created for this Delegate and shows the error.
+Delegate is all or nothing. If one task can't be created, Flint removes the ones it already created for this Delegate and shows the error. None of its tasks leaves the queue before all of them exist, so a task that is removed again never had an agent working in it.
+
+For an item of a backlog whose folder isn't trusted, Flint asks first in a dialog of its own: see [Backlogs and Restricted Mode](#backlogs-and-restricted-mode).
 
 The item row lists its agent tasks with their states (queued, working, waiting for you, finished, failed, as in the [Agent Tasks panel](ai-agents.md#agent-tasks-agents-in-parallel)), and **Open** on a task shows its folder and chat, as in that panel. Review, merge or create a pull request there.
 
@@ -173,7 +197,9 @@ Delegate checks everything before it creates anything, and lists every repositor
 | The item names no repository and no project is open, or the project is not an open folder | An item without `repos` runs in the active project | Open the project the item is for. |
 | The title and text with the note about its repositories are too long | Together they may be at most 8,000 bytes | Shorten the text. |
 | The item has 100 agent tasks | An item remembers at most 100 | Remove some in the Agent Tasks panel. |
-| A task could not be created | For example the checkout is on a detached HEAD (Delegate starts from the current branch, so check one out), or the branch or the worktree failed. The message names the folder. | Fix what it names, then Delegate again. |
+| A folder is on a detached HEAD | Delegate starts each task from the checkout's current branch, and there is none | Check out a branch in that folder, then Delegate again. |
+| A task could not be created | For example the branch or the worktree failed. The message names the folder. | Fix what it names, then Delegate again. |
+| Delegate was cancelled | You answered Cancel when Flint showed the item of an untrusted backlog | Read the item; Delegate again if it is what you want, or trust the backlog's folder. |
 
 An item that is listed as a problem can't be delegated, because it isn't an item yet. If the tasks start but Flint can't write the status, it tells you; the tasks keep running.
 
@@ -183,18 +209,20 @@ An item has one status: `todo`, `doing`, `review` or `done`. It is stored in the
 
 | Change | When |
 |---|---|
-| any → any | You pick a status: the menu on the item, or dragging a card on the board. |
+| any → any | You pick a status: **Status ⌄** on the item (To do, Doing, Review, Done), or dragging a card on the board. |
 | any → `doing` | **Delegate** started the item's agent tasks. |
 | `doing` → `review` | Every agent task of the item finished (the agent's turn ended). A task that failed keeps the item in `doing`, marked failed. |
 | `review` → `done` | Every agent task of the item is merged into its base branch, or its pull request was created and the task removed. |
 
-The automatic changes start only from `doing` or `review`: an item you moved somewhere else stays there. Both can happen in one step: an item goes from `doing` to `done` when every task is already merged.
+The automatic changes start only from `doing` or `review`, and only when something about the item's agent tasks changed since Flint last looked: a state, a merge, a pull request or a removal. An item you moved stays where you put it until its tasks change, so you can move a delivered item back to `doing` for rework. Both changes can happen in one step: an item goes from `doing` to `done` when every task is already merged.
 
 - A task you remove without merging it and without a pull request, such as a failed attempt you discard, no longer counts. With no task left, the status doesn't move.
 - A task whose pull request was created but that still exists doesn't count as delivered yet. Remove it after creating the pull request, or merge it.
 - A failed task is marked on the item. Open it and ask the agent to fix it, or remove it and Delegate again.
 
-Flint makes these changes when agent tasks change, when Flint starts, and whenever the panel reads the backlog (when it is shown and on refresh), which also notices a merge you made outside Flint. Nothing polls. A task that was merged outside Flint and removed before Flint looked counts as discarded.
+Flint makes these changes when agent tasks change, when Flint starts, and whenever the panel reads the backlog (when it is shown and on refresh), which also notices a merge you made outside Flint. Nothing polls. A task that was merged outside Flint and removed before Flint looked counts as discarded. A change Flint can't write (the file changed meanwhile) is tried again the next time it looks.
+
+Flint remembers an item's agent tasks by the item's file name. While the file is missing for a moment, for example during a branch switch in the backlog's repository, the item isn't listed but its tasks are kept, and they are back with the file. Renaming the file loses them: the renamed item starts without tasks (the tasks stay in the Agent Tasks panel). Close Backlog forgets them too.
 
 ### Moving it by hand
 
@@ -204,7 +232,7 @@ Flint refuses to write a file it can't change safely and says why. Set the statu
 
 ## The board
 
-**Show Backlog Board** opens the **Board** tab: one column per status (`todo`, `doing`, `review`, `done`), with the items as cards. A card shows what an item row shows and has the same actions: **Delegate**, **Open**, set status, and **Open** on an agent task. Drag a card to another column to set its status.
+**Show Board** in the panel's `⋯` menu, or "Show Backlog Board" in the command palette, opens the board in a tab titled "Backlog: <name>": one column per status, **To do**, **Doing**, **Review** and **Done**, with the items as cards. A card shows what an item row shows and has the same actions: **Delegate**, **Open**, **Status ⌄**, and **Open** on an agent task. Drag a card to another column to set its status. **＋ New Item…** in the board's header adds an item. An open board comes back with the session when Flint restarts.
 
 ## Share a backlog with a team
 
@@ -234,13 +262,20 @@ An agent chat can read the backlog through Flint's [MCP server](ai-agents.md#wha
 | `status` | Optional. Only items with this status (`todo`, `doing`, `review` or `done`). |
 | `backlog` | Optional. Only the backlog with this name. |
 
-The answer lists each open backlog with its repositories and its items: id, title, status, priority, agent, repositories and text. It does not include agent tasks. The text of one item is cut at 2,000 bytes, and the whole answer at 60 KB, with a line saying how many items were left out; ask for one status or one backlog to see them.
+The answer lists each backlog Flint knows whose folder is trusted, with its repositories and its items: id, title, status, priority, agent, repositories and text. It does not include agent tasks. Backlogs whose folder is in Restricted Mode are left out, and the answer says how many and why. The text of one item is cut at 2,000 bytes, and the whole answer, headings and repository lists included, at 60 KB, with a line saying how many items were left out; ask for one status or one backlog to see them.
 
-It shows every backlog Flint has open, not only the one in the chat's project. In Claude Code it is not one of the tools that run without asking: you are asked before each call, as for terminal output, unless you chose "Do everything". It is offered while the Backlog feature is on and, like all of Flint's tools, not in a folder in Restricted Mode.
+It shows every trusted backlog Flint knows to any chat, not only the backlog of the chat's project. So in Claude Code it is not one of the read tools that run without asking: like Flint's other tools outside that list, such as terminal output, you are asked before each call, unless you chose "Do everything". It is offered while the Backlog feature is on and, like all of Flint's tools, not to a chat in a folder in Restricted Mode.
 
 ## Backlogs and Restricted Mode
 
-A backlog is read in any folder: reading files runs nothing. Delegate is what starts an agent, so it is refused for a repository checkout in [Restricted Mode](restricted-mode.md) until you trust the folder. The item's text is a message to an agent, so read an item from a backlog you didn't write before you delegate it.
+A backlog is read in any folder: reading files runs nothing. What Restricted Mode changes is what reaches an agent.
+
+- **Checkouts.** Delegate starts an agent in each checkout, so it is refused for a checkout in [Restricted Mode](restricted-mode.md) until you trust the folder. Delegate offers to trust it. The question names the folder and says that trust is for the whole folder from now on, not just for this Delegate.
+- **The backlog's own folder.** An item's text becomes an agent's instructions, and a backlog may come from someone else's repository. A backlog whose folder isn't trusted is marked **Restricted Mode** in the panel (with **Trust Folder…**) and on its board, and:
+  - `get_backlog` leaves it out, so no chat reads its items;
+  - Delegate on one of its items asks first, in a dialog of Flint's own that the page can't skip. It says the backlog's folder isn't trusted and shows the agent, the folders the tasks will work in and the description that will be sent (the first 1,000 characters, saying when it is cut). Cancel stops Delegate before anything is created.
+
+Read an item from a backlog you didn't write before you delegate it.
 
 ## Limits
 
@@ -252,13 +287,14 @@ Flint fixes these because a backlog may come from someone else's repository.
 | Size of an item file or of `flint-backlog.json` | 64 KB |
 | Title | 120 characters |
 | Title and text together | 8,000 bytes, with Delegate's note about the repositories |
+| Item text shown before Delegate from an untrusted backlog | 1,000 characters |
 | Backlog name | 80 characters |
 | Repositories per backlog | 50; a name is at most 40 characters, a URL at most 1,000 |
 | Item id and agent name | 64 characters |
 | Backlogs Flint remembers | 20 |
 | Located folders it remembers | 200 |
 | Agent tasks remembered per item | 100 |
-| `get_backlog` answer | 60 KB, and 2,000 bytes of text per item |
+| `get_backlog` answer | 60 KB, headings included, and 2,000 bytes of text per item |
 
 A symbolic link that leaves the backlog folder is refused.
 

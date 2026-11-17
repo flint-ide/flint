@@ -177,10 +177,14 @@ func TestToolSettingsTiers(t *testing.T) {
 	if err := Validate(got); err != nil {
 		t.Fatalf("normalized settings fail Validate: %v", err)
 	}
-	// Tiers of the wrong type lose only themselves.
-	if bad, err := Load(write(t, `{"agents": {"claude": {"model": "opus", "tiers": "strong"}}, "theme": "light"}`)); err != nil ||
-		bad.Theme != "light" || bad.Agents["claude"].Model != "opus" || len(bad.Agents["claude"].Tiers) != 0 {
-		t.Errorf("tiers of the wrong type: %+v, %v", bad.Agents, err)
+	// Tiers of the wrong type lose only themselves (the rest of the agent
+	// and of the file loads).
+	for _, tiers := range []string{`"strong"`, `[1]`, `3`, `{"fast": 3}`} {
+		bad, err := Load(write(t, `{"agents": {"claude": {"model": "opus", "tiers": `+tiers+`}}, "theme": "light", "watchExclude": ["zzz"]}`))
+		if err != nil || bad.Theme != "light" || bad.Agents["claude"].Model != "opus" || len(bad.Agents["claude"].Tiers) != 0 ||
+			!slices.Equal(bad.WatchExclude, []string{"zzz"}) {
+			t.Errorf("tiers %s: %+v, %v", tiers, bad.Agents, err)
+		}
 	}
 	path := filepath.Join(t.TempDir(), FileName)
 	if _, err := Save(path, got); err != nil {

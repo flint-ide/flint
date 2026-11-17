@@ -11,12 +11,16 @@ import { restoreRunSelections, useRun } from './run'
 import { setAllBreakpoints, useDebug } from './debug'
 import { breakpointsUnder } from '../lib/breakpoints'
 import { coerceResume, resumeCommand, type TerminalResume } from '../lib/terminalResume'
+import { restoreMode } from '../lib/backgroundTerminals'
+import { liveTerminalIds, noteUnclaimedTerminals } from './backgroundTerminals'
 
 // What was open in a project (tabs, terminals, agent chats) is saved per project
 // so a restart comes back as it was left. Terminals reopen as new shells in their
 // last directory with the earlier output dimmed above, and an agent CLI that ran
 // in one (claude, codex) is started again on its conversation; chats keep their
 // transcript and reconnect to the agent's conversation on the next message.
+// With background terminals on, a terminal whose shell the background host still
+// runs attaches to it instead (lib/backgroundTerminals.ts, restoreMode).
 
 const SAVE_DELAY_MS = 1500
 const SAVE_MAX_WAIT_MS = 10_000
@@ -83,7 +87,7 @@ async function captureTab(t: Tab, roots: string[]): Promise<SavedTab | null> {
       if (live) agentIn.set(t.termId, term.command ? coerceResume(await TerminalBackend.Resume(t.termId).catch(() => null)) : null)
       const resume = agentIn.get(t.termId) ?? null
       return {
-        kind: 'terminal', title: t.title, pinned: term.pinned, env: term.env, tag: term.tag, cwd: cwd || term.cwd,
+        kind: 'terminal', id: t.termId, title: t.title, pinned: term.pinned, env: term.env, tag: term.tag, cwd: cwd || term.cwd,
         output: recentOutput(t.termId, SCROLLBACK_LINES), project: term.project, ...(resume ? { resume } : {}),
       }
     }
@@ -141,6 +145,8 @@ async function apply(root: string, snap: Snapshot, roots: string[]): Promise<voi
   await Promise.all(
     snap.tabs.flatMap((t) => (t.kind === 'terminal' ? [SessionAPI.Exists(t.cwd).then((ok) => void dirs.set(t.cwd, ok))] : [])),
   )
+  const live = snap.tabs.some((t) => t.kind === 'terminal') ? await liveTerminalIds() : new Set<string>()
+  const claimed = new Set(useTerminal.getState().tabs.map((t) => t.id))
 
   const ids: (string | null)[] = []
   const settled: string[] = []
@@ -178,6 +184,15 @@ async function apply(root: string, snap: Snapshot, roots: string[]): Promise<voi
         break
       case 'terminal': {
         const project = t.project && roots.includes(t.project) ? t.project : root
+        if (restoreMode(t.id, live, claimed) === 'attach') {
+          // Still running in the background host: shown as it is, nothing typed into it.
+          claimed.add(t.id!)
+          const id = useTerminal.getState().create(t.cwd, {
+            title: t.pinned ? t.title : undefined, background: true, project, env: t.env, tag: t.tag, attachId: t.id,
+          })
+          ids.push(terminalTabId(id))
+          break
+        }
         const cwd = dirs.get(t.cwd) ? t.cwd : project
         // The agent's conversation belongs to the folder it ran in: elsewhere it would resume another one.
         const input = cwd === t.cwd ? resumeCommand(t.resume) : ''
@@ -255,6 +270,8 @@ export function restoreSession(root: string, attach?: (roots: string[]) => Promi
     } finally {
       restoring = false
     }
+    // After the tabs claimed theirs: what the host still runs without a tab.
+    void noteUnclaimedTerminals()
   })()
   return restored
 }

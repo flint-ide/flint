@@ -88,6 +88,7 @@ func (c *Client) run(f func()) error {
 
 // deliver is the one goroutine that calls the handlers and owns the state.
 func (c *Client) deliver() {
+	defer close(c.delivered)
 	for {
 		select {
 		case f := <-c.jobs:

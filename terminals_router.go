@@ -91,6 +91,16 @@ func (r *terminalsRouter) CloseAll() {
 	r.streams.CloseAll()
 }
 
+// CloseStreams closes the stream sessions only. Detaching from the
+// background host leaves main's terminals running, but Docker and extension
+// streams live in this process and end with it.
+func (r *terminalsRouter) CloseStreams() {
+	r.mu.Lock()
+	r.streamIDs = map[string]struct{}{}
+	r.mu.Unlock()
+	r.streams.CloseAll()
+}
+
 // streamStarter starts stream sessions; featureHost.StartStream needs it
 // where the rest of the app only needs sessions.Terminals.
 type streamStarter interface {

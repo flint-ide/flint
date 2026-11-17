@@ -13,6 +13,7 @@ import { EditorAiSection } from './EditorAiSection'
 import { UsageSection } from './UsageSection'
 import { CISection } from './CISection'
 import { AccountsSection } from './AccountsSection'
+import { BackgroundTerminalsSection } from './BackgroundTerminalsSection'
 import { NumberField, Row, TextField } from './fields'
 import { openVSCodeImport } from '../../store/vscodeImport'
 import { isMac } from '../../lib/platform'
@@ -199,6 +200,7 @@ function TerminalSection() {
       <h2>Terminal</h2>
       <FontRows font={terminal} defaults={DEFAULT_SETTINGS.terminal} onChange={(f) => update({ terminal: f })} />
       <p className="muted settings-note">Applies to terminals and run consoles (one point smaller there).</p>
+      <BackgroundTerminalsSection />
     </section>
   )
 }

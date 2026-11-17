@@ -15,6 +15,16 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as terminal$0 from "./internal/terminal/models.js";
 
 /**
+ * Attach shows a terminal the background host kept running in a new tab of
+ * this window: what the host buffered is replayed, then live output follows
+ * on term:data as for any terminal. id must be one Live lists and no tab of
+ * this window shows yet.
+ */
+export function Attach(id: string): $CancellablePromise<void> {
+    return $Call.ByID(3380260757, id);
+}
+
+/**
  * Close terminates the terminal's shell.
  */
 export function Close(id: string): $CancellablePromise<void> {

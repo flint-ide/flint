@@ -61,6 +61,7 @@ func (a *App) buildMenu() *application.Menu {
 		appMenu.AddRole(application.ShowAll)
 		appMenu.AddSeparator()
 		appMenu.AddRole(application.Quit)
+		a.addStopSessionsItem(appMenu)
 	}
 
 	file := m.AddSubmenu("File")
@@ -74,6 +75,7 @@ func (a *App) buildMenu() *application.Menu {
 		// Not the Quit role: on Linux it registers Ctrl+Q app-wide. App.Quit
 		// still asks ShouldQuit (unsaved files) first.
 		file.Add("Quit").OnClick(func(*application.Context) { a.quitApp() })
+		a.addStopSessionsItem(file)
 	}
 
 	if isMac {
@@ -94,6 +96,19 @@ func (a *App) buildMenu() *application.Menu {
 		help.Add("About Flint").OnClick(func(*application.Context) { a.showAbout() })
 	}
 	return m
+}
+
+// stopSessionsLabel names the menu item that quits and ends the background
+// terminals; plain Quit leaves them running.
+const stopSessionsLabel = "Quit and Stop Background Sessions"
+
+// addStopSessionsItem adds Quit and Stop Background Sessions after Quit:
+// hidden while background terminals are off, disabled while the host is not
+// connected. The menu is rebuilt when the connection changes.
+func (a *App) addStopSessionsItem(m *application.Menu) {
+	item := m.Add(stopSessionsLabel).OnClick(func(*application.Context) { a.quitAndStopSessions() })
+	item.SetHidden(a.background == nil)
+	item.SetEnabled(a.backgroundConnected())
 }
 
 // quitApp quits through Wails, which asks ShouldQuit first.

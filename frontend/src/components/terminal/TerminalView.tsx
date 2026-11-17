@@ -234,9 +234,16 @@ function readBuffer(xterm: XTerm, maxLines: number): string {
   return lines.slice(-maxLines).join('\n')
 }
 
-/** Starts what the tab shows: a local shell. */
+/**
+ * Starts what the tab shows: a local shell, or, for a tab restored onto a shell
+ * the background host kept running, that shell. Attaching replays what the host
+ * kept; the resize then fits the program to this window (a full-screen one
+ * redraws). Should the shell be gone by now, a new one starts as without the host.
+ */
 function startSession(tab: TerminalTab, cols: number, rows: number): Promise<void> {
-  return TerminalBackend.Start(tab.id, tab.cwd, cols, rows, tab.env ?? {})
+  const start = () => TerminalBackend.Start(tab.id, tab.cwd, cols, rows, tab.env ?? {})
+  if (!tab.attach) return start()
+  return TerminalBackend.Attach(tab.id).then(() => TerminalBackend.Resize(tab.id, cols, rows), start)
 }
 
 /**

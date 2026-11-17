@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -188,7 +190,7 @@ func (s *Server) termStart(_ context.Context, cl *client, raw json.RawMessage) (
 		return nil, unavailable("terminals")
 	}
 	e := &termEntry{
-		id: p.ID, ring: newRing(s.cfg.ReplayKiB<<10, 0), subs: map[*client]struct{}{cl: {}},
+		id: p.ID, ring: newRing(int(s.replayKiB.Load())<<10, 0), subs: map[*client]struct{}{cl: {}},
 		cols: orDefault(p.Cols, 80), rows: orDefault(p.Rows, 24),
 	}
 	// The entry exists before the shell does: its first output may arrive
@@ -365,6 +367,29 @@ func (s *Server) termClose(_ context.Context, _ *client, raw json.RawMessage) (a
 	s.terms.Close(e.key)
 	s.changed() // a closed terminal no longer keeps the host running
 	return struct{}{}, nil
+}
+
+// termList answers what hello listed, as it is now: a window that restores its
+// tabs asks after it connected, and an exited shell is worth telling apart
+// from a running one.
+func (s *Server) termList(context.Context, *client, json.RawMessage) (any, error) {
+	if s.terms == nil {
+		return nil, unavailable("terminals")
+	}
+	s.termsMu.Lock()
+	entries := make([]*termEntry, 0, len(s.termMap))
+	for _, e := range s.termMap {
+		if !e.closed.Load() {
+			entries = append(entries, e)
+		}
+	}
+	s.termsMu.Unlock()
+	out := make([]TermStatus, len(entries))
+	for i, e := range entries {
+		out[i] = TermStatus{ID: e.id, Exited: e.isExited()}
+	}
+	slices.SortFunc(out, func(a, b TermStatus) int { return strings.Compare(a.ID, b.ID) })
+	return TermListResult{Terminals: out}, nil
 }
 
 func (s *Server) termAttach(_ context.Context, cl *client, raw json.RawMessage) (any, error) {

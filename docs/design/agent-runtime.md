@@ -187,8 +187,8 @@ type Agents interface {
 3. `internal/agenthost` server over `net.Pipe`, with rings.
 4. Client implementation; one contract test suite runs against the in-process managers and against client plus server.
 5. `hostmode.Main`: lock, socket, peer credentials, token, idle exit.
-6. GUI connect/spawn, `sessions.background`, close and quit semantics, menu item.
-7. Frontend attach on startup (`SessionAPI.Live()`).
+6. GUI connect/spawn, `sessions.background`, close and quit semantics, menu item. **Done for terminals only.** The host's agent side is not at parity yet (no MCP server, approval gate, custom agents or per-agent settings until steps 8 and 9), so agent chats stay in the window's process whatever the setting says; `App.agents` in `NewApp` is the one place that switches them later. The host reads `settings.json` at start and on `host.settingsChanged`; the only value its terminals take from it is `sessions.replayKiB`. Additions to protocol 1: `term.list` (ids and exited) and `host.settingsChanged`. Restart after a version skew stops the old host and spawns a new one, waiting up to 15 s for the lock.
+7. Frontend attach on startup (`SessionAPI.Live()`). **Done for terminals.** Snapshots keep terminal ids; a live, unclaimed id attaches (`TerminalAPI.Attach(id)`, always from seq 0: the frontend's sequence numbers are the window's own, and a reconnect inside one run re-attaches from the client's host seqs instead). Unclaimed host terminals are listed by Show Background Terminals, never opened or ended on their own.
 8. MCP listener into the host, plus the `mcp.call` proxy.
 9. `ui.confirm` proxy, detached behaviour, usage backlog.
 10. Version-skew dialog; docs.

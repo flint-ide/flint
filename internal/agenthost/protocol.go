@@ -34,6 +34,7 @@ const (
 	MethodTermResume = "term.resume"
 	MethodTermClose  = "term.close"
 	MethodTermAttach = "term.attach"
+	MethodTermList   = "term.list"
 
 	MethodAgentAgents    = "agent.agents"
 	MethodAgentStart     = "agent.start"
@@ -47,9 +48,10 @@ const (
 	MethodAgentSetPolicy = "agent.setPolicy"
 	MethodAgentAttach    = "agent.attach"
 
-	MethodHostShutdown = "host.shutdown"
-	MethodUsageAck     = "usage.ack"
-	MethodUsageBacklog = "usage.backlog"
+	MethodHostShutdown        = "host.shutdown"
+	MethodHostSettingsChanged = "host.settingsChanged"
+	MethodUsageAck            = "usage.ack"
+	MethodUsageBacklog        = "usage.backlog"
 )
 
 // Host to client notifications.
@@ -217,6 +219,19 @@ type TermAttachResult struct {
 	Exited bool      `json:"exited,omitempty"`
 	Code   int       `json:"code,omitempty"`
 	Title  *TermInfo `json:"title,omitempty"`
+}
+
+// TermListResult is the reply of term.list: the terminals the host holds now
+// (the same ids hello lists, which may have changed since), sorted by id.
+type TermListResult struct {
+	Terminals []TermStatus `json:"terminals"`
+}
+
+// TermStatus is one terminal of term.list. Exited: its shell ended, and the
+// host keeps the entry until a window closes the tab.
+type TermStatus struct {
+	ID     string `json:"id"`
+	Exited bool   `json:"exited,omitempty"`
 }
 
 // TermInfo is what a terminal runs and where its shell is.

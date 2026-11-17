@@ -26,6 +26,8 @@ export interface TerminalTab {
   env?: Record<string, string>
   /** Shown first in the tab name ("aws:prod"). */
   tag?: string
+  /** Shows a shell the background host kept running instead of starting one. */
+  attach?: boolean
 }
 
 export interface CreateOptions {
@@ -38,6 +40,8 @@ export interface CreateOptions {
   project?: string
   env?: Record<string, string>
   tag?: string
+  /** Attach to the background host's terminal of this id (store/backgroundTerminals.ts). */
+  attachId?: string
 }
 
 interface TerminalState {
@@ -53,11 +57,11 @@ export const useTerminal = createStore<TerminalState>((set, get) => ({
   tabs: [],
 
   create: (cwd, opts = {}) => {
-    const id = crypto.randomUUID()
+    const id = opts.attachId ?? crypto.randomUUID()
     const title = opts.title ?? terminalTitle({ command: '', cwd, tag: opts.tag })
     const tab: TerminalTab = {
       id, title, pinned: opts.title !== undefined, command: '', cwd, exitCode: null, initialInput: opts.input, restored: opts.restored, project: opts.project ?? cwd,
-      env: opts.env, tag: opts.tag,
+      env: opts.env, tag: opts.tag, ...(opts.attachId ? { attach: true } : {}),
     }
     set((s) => ({ tabs: [...s.tabs, tab] }))
     useEditor.getState().openTerminal(id, title, opts.background)

@@ -85,9 +85,10 @@ type Client struct {
 	h     Handlers
 	hello agenthost.HelloResult // what the host said at the handshake; set before New returns
 
-	jobs   chan func()
-	wake   chan struct{}
-	resync atomic.Bool
+	jobs      chan func()
+	wake      chan struct{}
+	resync    atomic.Bool
+	delivered chan struct{} // closed when the delivery goroutine has ended
 
 	mu     sync.Mutex
 	terms  map[string]struct{} // terminals to close on CloseAll
@@ -104,7 +105,7 @@ type Client struct {
 // returned client is still usable for Shutdown and Close.
 func New(rwc io.ReadWriteCloser, cfg Config) (*Client, error) {
 	c := &Client{
-		h: cfg.Handlers, jobs: make(chan func(), jobQueue), wake: make(chan struct{}, 1),
+		h: cfg.Handlers, jobs: make(chan func(), jobQueue), wake: make(chan struct{}, 1), delivered: make(chan struct{}),
 		terms: map[string]struct{}{}, chats: map[string]struct{}{}, policy: as.DefaultPolicy(),
 		tstate: map[string]*termState{}, cstate: map[string]*chatState{},
 	}
@@ -232,6 +233,44 @@ func (c *Client) AttachTerminal(id string, afterSeq uint64) error {
 		c.tstate[id] = &termState{last: afterSeq}
 		c.syncTerm(id)
 	})
+}
+
+// Positions waits until the connection has closed and delivery stopped, then
+// reports the terminals this client started or attached (and did not close)
+// with the seq of the last output it delivered for each: what a new
+// connection passes to AttachTerminal so the window misses nothing and sees
+// nothing twice. It blocks while the connection is open; call it once Done
+// is closed (Handlers.OnDisconnect is a good place).
+func (c *Client) Positions() map[string]uint64 {
+	<-c.conn.Done()
+	<-c.delivered // after this, the delivery goroutine's state is ours to read
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make(map[string]uint64, len(c.terms))
+	for id := range c.terms {
+		var last uint64
+		if st := c.tstate[id]; st != nil {
+			last = st.last
+		}
+		out[id] = last
+	}
+	return out
+}
+
+// ListTerminals asks the host which terminals it holds now (Hello lists them
+// as they were at the handshake).
+func (c *Client) ListTerminals(ctx context.Context) ([]agenthost.TermStatus, error) {
+	var res agenthost.TermListResult
+	if err := c.call(ctx, agenthost.MethodTermList, struct{}{}, &res); err != nil {
+		return nil, err
+	}
+	return res.Terminals, nil
+}
+
+// SettingsChanged tells the host that settings.json changed; it reads the
+// file again itself.
+func (c *Client) SettingsChanged(ctx context.Context) error {
+	return c.call(ctx, agenthost.MethodHostSettingsChanged, struct{}{}, nil)
 }
 
 // AttachChat is AttachTerminal for a chat.

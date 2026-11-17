@@ -10,7 +10,7 @@ Flint stores your preferences in `settings.json`. The [Settings tab](../guides/s
 
 The file is readable only by your user. It never contains secrets: database passwords and the completion endpoint's API key live in the macOS Keychain, and other credentials stay with the tools that own them.
 
-> **Note:** Flint reads `settings.json` when it starts. If you edit the file by hand, restart Flint to apply your changes. Changes made in the Settings tab apply immediately; agent settings apply to agent sessions started afterwards.
+> **Note:** Flint reads `settings.json` when it starts. If you edit the file by hand, restart Flint to apply your changes. Changes made in the Settings tab apply immediately; agent settings apply to agent sessions started afterwards, and `sessions.background` at the next start.
 
 ## How the file is read
 
@@ -92,7 +92,8 @@ The file is readable only by your user. It never contains secrets: database pass
   "agentReview": { "scope": "selected", "maxDiffKB": 128, "agent": "", "timeoutSeconds": 300 },
   "ci": { "pollSeconds": 60, "logTailLines": 80, "logErrorLines": 40, "notify": true },
   "prReview": { "maxThreads": 20, "contextLines": 8 },
-  "github": { "host": "github.com", "clientId": "", "scopes": ["repo", "read:org", "workflow"], "maxRetryWaitSeconds": 60 }
+  "github": { "host": "github.com", "clientId": "", "scopes": ["repo", "read:org", "workflow"], "maxRetryWaitSeconds": 60 },
+  "sessions": { "background": false, "replayKiB": 1024 }
 }
 ```
 
@@ -124,6 +125,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `ci` | object | see below | Following your pull requests' CI: poll interval, Fix with agent's log excerpt, notifications. See [ci](#ci). |
 | `prReview` | object | see below | Handing a pull request's review comments to the agent: threads per draft, code lines around a comment. See [prReview](#prreview). |
 | `github` | object | see below | The GitHub host, the OAuth App Sign in with GitHub uses, scopes and the retry wait. See [github](#github). |
+| `sessions` | object | see below | Background terminals: shells that keep running when Flint closes (off by default). See [sessions](#sessions). |
 <!-- include-rows _settings/*.md -->
 
 ### Font objects
@@ -373,6 +375,17 @@ Used by [Pull requests](../guides/git-and-github.md#pull-requests) and [When CI 
 | `maxRetryWaitSeconds` | integer (s) | 0–300 | `60` | When GitHub answers "retry after" (a secondary rate limit), a read waits that long and tries once more if the wait is at most this; otherwise, and for writes, the limit is reported. |
 
 Flint caps a GitHub answer at 32 MB, a file side of a diff at 4 MB and the pages one listing follows at 30; these limits are not settings.
+
+### sessions
+
+Background terminals: terminals run in a separate Flint process, so closing the window or quitting leaves them running and the next start reattaches their tabs. **Off by default.** Edited in **Settings ▸ Terminal ▸ Background terminals**. Agent chats are not covered yet: they end when Flint quits, whatever `background` says.
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `background` | boolean | | `false` | Run terminals in the background host. Read when Flint starts: a change applies at the next start, also from the Settings tab. Off, terminals run inside Flint and end when it quits. |
+| `replayKiB` | integer (KiB) | 64–8192 | `1024` | How much recent output the host keeps per terminal for the window that reattaches. Applies to terminals started afterwards. |
+
+Out-of-range numbers are clamped; `0` or a missing number is the default. **Quit and Stop Background Sessions** (next to Quit in the menu) ends the background shells and the host. See [Background terminals](https://github.com/flint-ide/flint/blob/main/docs/FEATURES.md#background-terminals).
 
 <!-- Keys of feature modules: one file per key in _settings/ (first line: the table row; the rest: its section), pulled in by cmd/docsite. -->
 <!-- include-sections _settings/*.md -->

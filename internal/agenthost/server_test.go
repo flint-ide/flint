@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,12 +29,64 @@ func TestNewValidatesTheConfig(t *testing.T) {
 		t.Error("a short token was accepted")
 	}
 	s, err := New(Config{Token: testToken, ReplayKiB: 1 << 20})
-	if err != nil || s.cfg.ReplayKiB != MaxReplayKiB {
-		t.Errorf("replay = %d, %v; want it capped at %d", s.cfg.ReplayKiB, err, MaxReplayKiB)
+	if err != nil || s.replayKiB.Load() != MaxReplayKiB {
+		t.Errorf("replay = %d, %v; want it capped at %d", s.replayKiB.Load(), err, MaxReplayKiB)
 	}
 	s, _ = New(Config{Token: testToken})
-	if s.cfg.ReplayKiB != DefaultReplayKiB {
-		t.Errorf("default replay = %d", s.cfg.ReplayKiB)
+	if s.replayKiB.Load() != DefaultReplayKiB {
+		t.Errorf("default replay = %d", s.replayKiB.Load())
+	}
+}
+
+// host.settingsChanged reaches the host mode's hook; a changed replay size
+// applies to terminals started afterwards only.
+func TestSettingsChangedAndReplaySize(t *testing.T) {
+	var calls atomic.Int32
+	r := newRig(t, func(c *Config) { c.OnSettingsChanged = func() { calls.Add(1) } })
+	p := r.connect(t)
+	if err := p.call(t, MethodHostSettingsChanged, struct{}{}, nil); err != nil || calls.Load() != 1 {
+		t.Fatalf("settingsChanged = %v, hook calls %d", err, calls.Load())
+	}
+	if err := p.call(t, MethodTermStart, TermStartParams{ID: "old"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	r.srv.SetReplayKiB(1)
+	if err := p.call(t, MethodTermStart, TermStartParams{ID: "new"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.srv.term("old").ring.maxBytes; got != DefaultReplayKiB<<10 {
+		t.Errorf("old ring = %d bytes", got)
+	}
+	if got := r.srv.term("new").ring.maxBytes; got != 1<<10 {
+		t.Errorf("new ring = %d bytes", got)
+	}
+	r.srv.SetReplayKiB(0)
+	if r.srv.replayKiB.Load() != DefaultReplayKiB {
+		t.Errorf("SetReplayKiB(0) = %d", r.srv.replayKiB.Load())
+	}
+}
+
+// term.list reports what the host holds now, exited shells included and
+// closed terminals left out.
+func TestTermList(t *testing.T) {
+	r := newRig(t, nil)
+	p := r.connect(t)
+	for _, id := range []string{"b", "a", "c"} {
+		if err := p.call(t, MethodTermStart, TermStartParams{ID: id}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r.terms.events.Exited("b", 0)
+	if err := p.call(t, MethodTermClose, IDParams{ID: "c"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	var res TermListResult
+	if err := p.call(t, MethodTermList, struct{}{}, &res); err != nil {
+		t.Fatal(err)
+	}
+	want := []TermStatus{{ID: "a"}, {ID: "b", Exited: true}}
+	if !slices.Equal(res.Terminals, want) {
+		t.Errorf("term.list = %+v, want %+v", res.Terminals, want)
 	}
 }
 

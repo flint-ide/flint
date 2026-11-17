@@ -125,6 +125,8 @@ type Settings struct {
 	PRReview PRReview `json:"prReview"`
 	// GitHub configures the GitHub host, sign-in and API limits (github.go).
 	GitHub GitHub `json:"github"`
+	// Sessions configures background terminals (sessions.go).
+	Sessions Sessions `json:"sessions"`
 
 	// sections are the values of the keys features own (section.go), by key.
 	sections map[string]any
@@ -163,6 +165,7 @@ func Default() Settings {
 		Orchestration:      defaultOrchestration(),
 		PRReview:           defaultPRReview(),
 		GitHub:             defaultGitHub(),
+		Sessions:           defaultSessions(),
 		CustomTheme:        defaultCustomTheme(),
 		sections:           sectionDefaults(),
 	}
@@ -237,6 +240,7 @@ func Normalize(s Settings) Settings {
 	out.Orchestration = normalizeOrchestration(s.Orchestration)
 	out.PRReview = normalizePRReview(s.PRReview)
 	out.GitHub = normalizeGitHub(s.GitHub)
+	out.Sessions = normalizeSessions(s.Sessions)
 	out.sections = normalizeSections(s)
 	return out
 }
@@ -336,6 +340,9 @@ func Validate(s Settings) error {
 		return err
 	}
 	if err := CheckGitHub(s.GitHub); err != nil {
+		return err
+	}
+	if err := CheckSessions(s.Sessions); err != nil {
 		return err
 	}
 	return checkSections(s)

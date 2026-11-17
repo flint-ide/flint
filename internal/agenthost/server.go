@@ -47,8 +47,12 @@ type Config struct {
 	Terminals func(terminal.Events) sessions.Terminals
 	Agents    func(emit func(as.Event)) sessions.Agents
 	// ReplayKiB is the byte ring per terminal (DefaultReplayKiB; at most
-	// MaxReplayKiB).
+	// MaxReplayKiB). SetReplayKiB changes it for terminals started later.
 	ReplayKiB int
+	// OnSettingsChanged is called for host.settingsChanged, which a window
+	// sends after it saved settings.json; the host mode reads the file again.
+	// Nil makes the call a no-op that still succeeds.
+	OnSettingsChanged func()
 	// OnShutdown is called once, after host.shutdown stopped what it was
 	// asked to and its reply was written; the host mode exits the process
 	// from there. Several shutdown requests call it once.
@@ -84,6 +88,7 @@ type Server struct {
 	termMap                     map[string]*termEntry // by the id on the wire: the current entry of each
 	termByKey                   map[string]*termEntry // by the manager's key: every entry whose shell may still report
 	termGen                     uint64
+	replayKiB                   atomic.Int64 // ring size of terminals started from now on
 	chatsMu                     sync.Mutex
 	chatMap                     map[string]*chat
 	starting                    int                   // agent.start and agent.resume calls in flight
@@ -98,10 +103,6 @@ func New(cfg Config) (*Server, error) {
 	if len(cfg.Token) < 16 {
 		return nil, errors.New("agenthost: token must be at least 16 bytes")
 	}
-	if cfg.ReplayKiB <= 0 {
-		cfg.ReplayKiB = DefaultReplayKiB
-	}
-	cfg.ReplayKiB = min(cfg.ReplayKiB, MaxReplayKiB)
 	if cfg.HelloTimeout <= 0 {
 		cfg.HelloTimeout = DefaultHelloTimeout
 	}
@@ -111,6 +112,7 @@ func New(cfg Config) (*Server, error) {
 		chatMap: map[string]*chat{}, pending: map[string][]as.Event{},
 		usage: usageStore{max: MaxUsageBacklog, maxBytes: MaxUsageBacklogBytes},
 	}
+	s.SetReplayKiB(cfg.ReplayKiB)
 	if cfg.Terminals != nil {
 		s.terms = cfg.Terminals(termEvents{s})
 	}
@@ -118,6 +120,16 @@ func New(cfg Config) (*Server, error) {
 		s.agents = cfg.Agents(s.emitAgent)
 	}
 	return s, nil
+}
+
+// SetReplayKiB sets the replay ring of terminals started from now on (0 or
+// less is DefaultReplayKiB; more than MaxReplayKiB is MaxReplayKiB). Running
+// terminals keep the ring they have: resizing one would drop or fake history.
+func (s *Server) SetReplayKiB(kib int) {
+	if kib <= 0 {
+		kib = DefaultReplayKiB
+	}
+	s.replayKiB.Store(int64(min(kib, MaxReplayKiB)))
 }
 
 // errClosedByHost closes connections that broke a rule.
@@ -143,6 +155,7 @@ var methods = map[string]handler{
 	MethodTermResume: (*Server).termResume,
 	MethodTermClose:  (*Server).termClose,
 	MethodTermAttach: (*Server).termAttach,
+	MethodTermList:   (*Server).termList,
 
 	MethodAgentAgents:    (*Server).agentAgents,
 	MethodAgentStart:     (*Server).agentStart,
@@ -156,8 +169,20 @@ var methods = map[string]handler{
 	MethodAgentSetPolicy: (*Server).agentSetPolicy,
 	MethodAgentAttach:    (*Server).agentAttach,
 
+	MethodHostSettingsChanged: (*Server).settingsChanged,
+
 	MethodUsageAck:     (*Server).usageAck,
 	MethodUsageBacklog: (*Server).usageBacklog,
+}
+
+// settingsChanged lets the host mode re-read settings.json. The window only
+// says that the file changed, never what is in it: the host reads the file
+// itself, so a client cannot hand it values the window would refuse to save.
+func (s *Server) settingsChanged(context.Context, *client, json.RawMessage) (any, error) {
+	if s.cfg.OnSettingsChanged != nil {
+		s.cfg.OnSettingsChanged()
+	}
+	return struct{}{}, nil
 }
 
 // afterIncompatibleHello lists what a client of another protocol may still do.

@@ -35,6 +35,8 @@ export type SavedTab =
   | { kind: 'history'; path: string }
   | {
       kind: 'terminal'
+      /** The terminal's id: a background host may still run it (absent in older snapshots). */
+      id?: string
       title: string
       cwd: string
       output: string

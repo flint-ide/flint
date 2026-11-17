@@ -32,6 +32,7 @@ import (
 	as "flint/internal/agentsession"
 	"flint/internal/config"
 	"flint/internal/sessions"
+	"flint/internal/settings"
 	"flint/internal/terminal"
 )
 
@@ -199,10 +200,15 @@ func run(ctx context.Context, cfg runConfig) (err error) {
 		terms        *terminal.Manager
 		agents       *as.Manager
 		watch        *idleWatch
+		srv          *agenthost.Server
 		sessionsDone atomic.Bool // host.shutdown{stopSessions} already stopped them
 	)
-	srv, err := agenthost.New(agenthost.Config{
+	srv, err = agenthost.New(agenthost.Config{
 		Token: token, Version: cfg.Version, HelloTimeout: cfg.HelloTimeout, AllowShell: cfg.AllowShell,
+		ReplayKiB: hostReplayKiB(cfg.ConfigDir),
+		// srv is assigned before the accept loop starts, the first moment a
+		// client can ask.
+		OnSettingsChanged: func() { srv.SetReplayKiB(hostReplayKiB(cfg.ConfigDir)) },
 		Terminals: func(ev terminal.Events) sessions.Terminals {
 			terms = terminal.NewManager(ev)
 			return terms
@@ -256,6 +262,18 @@ func run(ctx context.Context, cfg runConfig) (err error) {
 		closeSessions(terms, agents)
 	}
 	return nil
+}
+
+// hostReplayKiB reads sessions.replayKiB from settings.json, the one setting
+// the host's terminals take from it today: the shell is the login shell and
+// its environment comes with each term.start, as in the window. A file that
+// cannot be read gives the default, as it does in the window.
+func hostReplayKiB(configDir string) int {
+	s, err := settings.Load(settings.Path(configDir))
+	if err != nil {
+		slog.Warn("agent host: settings", "error", err)
+	}
+	return s.Sessions.ReplayKiB
 }
 
 // closeSessions hangs up the terminals and stops the chats, for at most

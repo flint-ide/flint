@@ -15,6 +15,7 @@ import { PANELS } from '../panels'
 import { panelCommands } from '../panels/registry'
 import { saveTab, useEditor, viewFor, type Tab } from '../store/editor'
 import { toggleTerminal, useTerminal } from '../store/terminal'
+import { openBackgroundTerminals, useBackgroundTerminals } from '../store/backgroundTerminals'
 import { activeRoot } from '../store/activeRoot'
 import { removeFromWorkspace } from '../store/fileOps'
 import { rootLabels } from '../lib/workspaceRoots'
@@ -228,6 +229,10 @@ function appCommands(): Command[] {
     // In the active tab's workspace folder (the primary one when it has none).
     { id: 'terminal.toggle', title: 'Toggle Terminal', category: 'Terminal', keys: 'Mod+J', run: () => toggleTerminal(activeRoot()) },
     { id: 'terminal.new', title: 'New Terminal', category: 'Terminal', keys: 'Mod+Shift+T', keywords: 'shell', run: () => void useTerminal.getState().create(activeRoot()) },
+    {
+      id: 'terminal.background', title: 'Show Background Terminals…', category: 'Terminal', keywords: 'attach detach sessions host',
+      when: () => useBackgroundTerminals.getState().background, run: openBackgroundTerminals,
+    },
 
     // View
     { id: 'view.toggleSidebar', title: 'Toggle Sidebar', category: 'View', keys: 'Mod+B', keysIgnoredIn: IN_EDITOR, keywords: 'panel hide show', run: () => ws().toggleSidebar() },

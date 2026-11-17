@@ -35,7 +35,6 @@ import (
 	"flint/internal/scratch"
 	"flint/internal/sessions"
 	"flint/internal/settings"
-	"flint/internal/terminal"
 	"flint/internal/usage"
 	"flint/internal/watcher"
 )
@@ -79,13 +78,19 @@ type App struct {
 	terminals sessions.Terminals // the router (terminals_router.go)
 	// termStreams starts Docker/extension stream sessions; same router as terminals.
 	termStreams streamStarter
-	runs        *runner.Manager // run configurations and test runs
-	runEvents   *runEvents
-	debugs      *dap.Manager // debug sessions (dlv dap)
-	debugEvents *debugEvents
-	profiles    *profiles // temporary profiles and recordings in progress
-	lsp         *lsp.Manager
-	agents      sessions.Agents
+	termRouter  *terminalsRouter
+	// background runs terminals in the background host (background_terminals.go);
+	// nil when sessions.background was off at start.
+	background *hostTerminals
+	// stopSessionsOnQuit: Quit and Stop Background Sessions was chosen.
+	stopSessionsOnQuit atomic.Bool
+	runs               *runner.Manager // run configurations and test runs
+	runEvents          *runEvents
+	debugs             *dap.Manager // debug sessions (dlv dap)
+	debugEvents        *debugEvents
+	profiles           *profiles // temporary profiles and recordings in progress
+	lsp                *lsp.Manager
+	agents             sessions.Agents
 	// agentMgr is the in-process manager behind agents, for what only it can
 	// do: registering custom agents (syncCustomAgents).
 	agentMgr   *agentsession.Manager
@@ -152,9 +157,6 @@ func NewApp() (*App, error) {
 		sessions:  restore.New(filepath.Join(dir, "sessions")),
 		http:      httpfile.NewClient(),
 	}
-	events := newTerminalEvents(a)
-	router := newTerminalsRouter(terminal.NewManager(events), terminal.NewManager(events))
-	a.terminals, a.termStreams = router, router
 	a.runEvents = newRunEvents(a)
 	a.runs = runner.NewManager(a.runEvents)
 	a.debugEvents = newDebugEvents(a)
@@ -177,6 +179,7 @@ func NewApp() (*App, error) {
 	if err != nil {
 		log.Printf("flint: %v (using default settings)", err)
 	}
+	a.wireTerminals(newTerminalEvents(a), dialHost, spawnHost) // after settings: sessions.background picks
 	a.openUsage()
 	a.wireAccounts()
 	a.mcp, a.mcpSources = newMCP(a)
@@ -184,12 +187,18 @@ func NewApp() (*App, error) {
 	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
 	a.orch = orchestrate.New()
 	a.agentMgr = newAgentManager(a)
+	// Agent chats stay in this process even with sessions.background on: the
+	// host has no MCP server, approval gate, custom agents or per-agent
+	// settings yet (steps 3.8, 3.9). Moving them to the host is this switch.
 	a.agents = a.agentMgr
 	return a, nil
 }
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	if a.background != nil {
+		go a.background.connect() // terminal calls wait for it, startup does not
+	}
 	a.features.Start(ctx)
 }
 
@@ -198,7 +207,7 @@ func (a *App) shutdown() {
 	// so quitting stays fast.
 	var wg sync.WaitGroup
 	for _, stop := range append([]func(){
-		a.terminals.CloseAll,
+		a.closeTerminals, // detaches from background terminals instead of ending them
 		a.runs.CloseAll,
 		a.debugs.CloseAll,
 		a.http.CancelAll,

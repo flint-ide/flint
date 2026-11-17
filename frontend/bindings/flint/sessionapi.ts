@@ -11,6 +11,10 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 /**
  * Exists reports whether path is an existing directory (used to skip restoring
  * terminals whose folder is gone).
@@ -24,6 +28,17 @@ export function Exists(path: string): $CancellablePromise<boolean> {
  */
 export function Forget(root: string): $CancellablePromise<void> {
     return $Call.ByID(3806077685, root);
+}
+
+/**
+ * Live returns the terminals the background host holds, so a restored tab
+ * whose id is among them attaches instead of starting a new shell. It waits
+ * for the startup connection (a few seconds at most).
+ */
+export function Live(): $CancellablePromise<$models.LiveTerminals> {
+    return $Call.ByID(4201513790).then(($result: any) => {
+        return $$createType0($result);
+    });
 }
 
 /**
@@ -42,3 +57,6 @@ export function Load(root: string): $CancellablePromise<string> {
 export function Save(root: string, data: string): $CancellablePromise<void> {
     return $Call.ByID(1046005473, root, data);
 }
+
+// Private type creation functions
+const $$createType0 = $models.LiveTerminals.createFrom;

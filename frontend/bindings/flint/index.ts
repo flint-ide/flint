@@ -70,6 +70,8 @@ export {
     ComparedTask,
     FileComparison,
     FileHistory,
+    LiveTerminal,
+    LiveTerminals,
     MergeResult,
     NewTask,
     NewTaskGroup,

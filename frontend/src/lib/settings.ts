@@ -18,6 +18,7 @@ import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
 import { coerceOrchestration, DEFAULT_ORCHESTRATION, type OrchestrationSettings } from './orchestration'
 import { coercePRReview, DEFAULT_PR_REVIEW, type PRReviewSettings } from './prAgent'
 import { coerceGitHub, DEFAULT_GITHUB, type GitHubSettings } from './githubSettings'
+import { coerceSessions, DEFAULT_SESSIONS, type SessionsSettings } from './sessionsSettings'
 import { coerceSections, type FeatureSettings } from './settingsSections'
 import { TERMINAL_COLOR_NAMES } from './terminalTheme'
 
@@ -98,6 +99,8 @@ export interface CoreSettings {
   prReview: PRReviewSettings
   /** GitHub host, the OAuth App Flint signs in with, scopes and the retry wait (lib/githubSettings.ts). */
   github: GitHubSettings
+  /** Background terminals: kept running when Flint closes (lib/sessionsSettings.ts). */
+  sessions: SessionsSettings
 }
 
 /** The whole settings.json: Flint's keys plus the sections features registered. */
@@ -132,6 +135,7 @@ export const DEFAULT_SETTINGS: CoreSettings = Object.freeze({
   ci: DEFAULT_CI,
   prReview: DEFAULT_PR_REVIEW,
   github: DEFAULT_GITHUB,
+  sessions: DEFAULT_SESSIONS,
 }) as CoreSettings
 
 /** Flint's own keys; a feature's section may not use one. */
@@ -273,5 +277,6 @@ function coerceCore(v: Record<string, unknown>): CoreSettings {
     ci: coerceCI(v.ci),
     prReview: coercePRReview(v.prReview),
     github: coerceGitHub(v.github),
+    sessions: coerceSessions(v.sessions),
   }
 }

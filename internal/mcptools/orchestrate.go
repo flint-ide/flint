@@ -149,7 +149,8 @@ func (s *Sources) orchestrationTools(cfg Config) []mcpserver.Tool {
 	return []mcpserver.Tool{
 		tool(ToolListAgents, "List agents",
 			"Lists the agent chats of this project that Flint knows: id, agent, role, state (idle, working, waiting for the user's approval, finished, failed), who started it (parent), depth and kind. "+
-				"Use the ids with the other agent tools. Only available when the user allowed this chat to direct agents.",
+				"Kind \"chat\" is an agent chat Flint runs; kind \"terminal\" is an agent CLI running in a terminal tab, of which Flint only reports the state (the other agent tools refuse it). "+
+				"Use the ids of chats with the other agent tools. Only available when the user allowed this chat to direct agents.",
 			`{"type":"object","properties":{},"additionalProperties":false}`, 0,
 			func(_ context.Context, caller, root string, args json.RawMessage) (string, error) {
 				if err := decodeStrict(args, &struct{}{}); err != nil {

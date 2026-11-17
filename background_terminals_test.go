@@ -162,10 +162,11 @@ type termRecorder struct {
 	mu    sync.Mutex
 	out   map[string]string
 	exits map[string]int
+	agent map[string]string
 }
 
 func newTermEventsRecorder() *termRecorder {
-	return &termRecorder{out: map[string]string{}, exits: map[string]int{}}
+	return &termRecorder{out: map[string]string{}, exits: map[string]int{}, agent: map[string]string{}}
 }
 func (e *termRecorder) Output(id string, b []byte) {
 	e.mu.Lock()
@@ -174,6 +175,16 @@ func (e *termRecorder) Output(id string, b []byte) {
 }
 func (e *termRecorder) Exited(id string, code int)  { e.mu.Lock(); e.exits[id] = code; e.mu.Unlock() }
 func (e *termRecorder) Title(string, terminal.Info) {}
+func (e *termRecorder) AgentState(id, state string) {
+	e.mu.Lock()
+	e.agent[id] = state
+	e.mu.Unlock()
+}
+func (e *termRecorder) agentState(id string) string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.agent[id]
+}
 func (e *termRecorder) output(id string) string {
 	e.mu.Lock()
 	defer e.mu.Unlock()

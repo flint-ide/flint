@@ -9,6 +9,7 @@ import { CheckedField, Row } from './fields'
 import { CustomAgentsSection, reloadAgents } from './CustomAgentsSection'
 import { AgentTasksSection } from './AgentTasksSection'
 import { OrchestrationSection } from './OrchestrationSection'
+import { TerminalAgentSection } from './TerminalAgentSection'
 import { PromptsSection } from './PromptsSection'
 import { AgentReviewSection } from './AgentReviewSection'
 import { isMac } from '../../lib/platform'
@@ -58,6 +59,7 @@ export function AgentsSection() {
       <CustomAgentsSection />
       <AgentTasksSection />
       <OrchestrationSection />
+      <TerminalAgentSection />
       <PromptsSection />
       <AgentReviewSection />
       <h3>Notifications</h3>

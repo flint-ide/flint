@@ -25,6 +25,9 @@ type Events interface {
 	Exited(id string, code int)
 	// Title reports a change of what the terminal runs or where its shell is.
 	Title(id string, info Info)
+	// AgentState reports a change of the state an agent CLI in the terminal
+	// reports (the Agent* constants), see agentstate.go.
+	AgentState(id, state string)
 }
 
 // Options configure a new terminal session.
@@ -49,6 +52,7 @@ type session struct {
 	fgGroup    int  // foreground process group of info.Command, 0 at the prompt
 	done       bool
 	gone       chan struct{} // closed once the shell has been waited for
+	agent      agentTracker
 }
 
 // DefaultKillGrace is how long a shell has to leave after SIGHUP before its
@@ -223,6 +227,7 @@ func (m *Manager) pump(id string, s *session) {
 
 	Coalesce(chunks, func(data []byte) {
 		m.events.Output(id, data)
+		m.scanAgent(id, s, data) // after the bytes went on: reading them never delays the screen
 		m.noteActivity(id, s)
 	})
 	s.stopTitle()

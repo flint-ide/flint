@@ -61,6 +61,9 @@ func (o *orchestrator) authorize(caller, root string) (orchestrate.Node, orchGra
 func (o *orchestrator) target(caller, root, id string) (orchestrate.Node, error) {
 	node, ok := o.app.orch.Get(id)
 	if !ok {
+		if _, isTerminal := o.terminal(id); isTerminal {
+			return node, fmt.Errorf("%q is an agent running in a terminal tab: Flint only reports its state (list_agents); it cannot send it prompts, wait for it, read its output or stop it", id)
+		}
 		return node, fmt.Errorf("unknown agent %q (list_agents shows the ids)", id)
 	}
 	if !o.scopeOf(root).has(node.Cwd) {
@@ -132,7 +135,36 @@ func (o *orchestrator) List(caller, root string) ([]mcptools.AgentInfo, error) {
 			Cwd: relCwd(n.Cwd, root), Kind: "chat", Self: n.ID == caller,
 		})
 	}
-	return out, nil
+	return append(out, o.terminalAgents(root)...), nil
+}
+
+// terminal finds a terminal tab by id.
+func (o *orchestrator) terminal(id string) (mcptools.TerminalInfo, bool) {
+	if o.app.mcpSources == nil || o.app.mcpSources.Terminals == nil {
+		return mcptools.TerminalInfo{}, false
+	}
+	return o.app.mcpSources.Terminals.Get(id)
+}
+
+// terminalAgents lists the agent CLIs running in terminal tabs of the project:
+// the terminals whose program reported a state (see internal/terminal's
+// agentstate.go) and still run. They are read-only for the other tools.
+func (o *orchestrator) terminalAgents(root string) []mcptools.AgentInfo {
+	if o.app.mcpSources == nil || o.app.mcpSources.Terminals == nil {
+		return nil
+	}
+	var out []mcptools.AgentInfo
+	for _, t := range o.app.mcpSources.Terminals.List(root) {
+		if t.Kind != mcptools.KindTerminal || t.AgentState == "" || t.Exited {
+			continue
+		}
+		name, _, _ := strings.Cut(t.Title, " ")
+		if name == "" {
+			name = "agent"
+		}
+		out = append(out, mcptools.AgentInfo{ID: t.ID, Agent: name, State: t.AgentState, Cwd: relCwd(t.Cwd, root), Kind: "terminal"})
+	}
+	return out
 }
 
 func (o *orchestrator) Start(ctx context.Context, caller, root string, r mcptools.StartRequest) (string, error) {

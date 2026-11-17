@@ -3,8 +3,9 @@ import { agentRows, attentionCount, stateHint, stateLabel, type AgentRow } from 
 import { modKey, modifierName } from '../../lib/platform'
 import { useAgentChat } from '../../store/agentChat'
 import { followTasks, useTasks } from '../../store/agentTasks'
-import { focusAgent, peekAgent, settleChat, settledChats, unsettleChat, useAgents } from '../../store/agents'
+import { focusAgent, peekAgent, settleChat, settledChats, terminalInput, unsettleChat, useAgents } from '../../store/agents'
 import { useEditor } from '../../store/editor'
+import { useTerminal } from '../../store/terminal'
 
 /** Every agent of this window, the ones that need you first; a click shows its chat. */
 export function AgentsPanel() {
@@ -13,12 +14,16 @@ export function AgentsPanel() {
   const tasks = useTasks((s) => s.tasks)
   const unseen = useAgents((s) => s.unseen)
   const hidden = useEditor((s) => s.hidden)
+  const terminalTabs = useTerminal((s) => s.tabs)
   // Task states come from Go's events; following them is what keeps this list current.
   useEffect(() => followTasks(), [])
 
   const rows = useMemo(
-    () => agentRows({ sessions: order.flatMap((id) => (sessions[id] ? [sessions[id]] : [])), tasks, unseen, settled: settledChats(hidden) }),
-    [sessions, order, tasks, unseen, hidden],
+    () => agentRows({
+        sessions: order.flatMap((id) => (sessions[id] ? [sessions[id]] : [])), tasks, unseen, settled: settledChats(hidden),
+        terminals: terminalTabs.map(terminalInput),
+      }),
+    [sessions, order, tasks, unseen, hidden, terminalTabs],
   )
   const attention = attentionCount(rows)
 
@@ -47,11 +52,11 @@ function AgentRowView({ row }: { row: AgentRow }) {
         title={`${row.title}\n\n${row.root}${id ? `\n\n${modifierName('Mod')}-click to peek without leaving your tab` : ''}`}
         onClick={(e) => (id && modKey(e) ? peekAgent(id) : focusAgent(row))}
       >
-        <span className={`task-state ${look}`} title={stateHint(row.state)}>{stateLabel(row.state)}</span>
+        <span className={`task-state ${look}`} title={stateHint(row.state, row.kind)}>{stateLabel(row.state)}</span>
         <span className="file-name">{row.title}</span>
       </div>
       <div className="task-meta muted">
-        <span>{row.agent}{row.kind === 'task' ? ' · task' : ''}{row.hidden ? ' · hidden' : ''}</span>
+        <span>{row.agent}{row.kind === 'task' ? ' · task' : ''}{row.kind === 'terminal' ? ' · terminal' : ''}{row.hidden ? ' · hidden' : ''}</span>
         <span title={row.root}>{row.project}</span>
       </div>
       {id && (

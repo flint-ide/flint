@@ -178,6 +178,16 @@ func (s *Server) checkStart(p TermStartParams) error {
 	return nil
 }
 
+func (ev termEvents) AgentState(id, state string) {
+	e := ev.s.term(id)
+	if e == nil {
+		return
+	}
+	e.mu.Lock()
+	e.broadcast(NotifyTermAgent, notification(TermAgentParams{ID: id, State: state}))
+	e.mu.Unlock()
+}
+
 func (s *Server) termStart(_ context.Context, cl *client, raw json.RawMessage) (any, error) {
 	var p TermStartParams
 	if err := decode(raw, &p); err != nil {

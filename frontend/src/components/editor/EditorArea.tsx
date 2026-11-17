@@ -10,6 +10,7 @@ import { useTerminal } from '../../store/terminal'
 import { requestNewEntry } from '../../store/fileOps'
 import { useAgentChat } from '../../store/agentChat'
 import { settleChat } from '../../store/agents'
+import { terminalBadge } from '../../lib/agentList'
 import { openContextMenu } from '../../store/contextMenu'
 import { createScratchFile, openScratchFilePicker, useScratch } from '../../store/scratch'
 import { isFeatureActive } from '../../lib/activeFeatures'
@@ -146,6 +147,7 @@ export function EditorArea() {
           >
             <TabIcon tab={tab} debugActive={debugActive} />
             <span className="tab-title">{tab.title}</span>
+            {tab.kind === 'terminal' && <TerminalAgentBadge termId={tab.termId} />}
             <button
               className={`tab-close${tab.dirty ? ' dirty' : ''}`}
               onClick={(e) => {
@@ -250,6 +252,12 @@ function TabIcon({ tab, debugActive }: { tab: Tab; debugActive: boolean }) {
     default:
       return <TabKindIcon kind={tab.kind} busy={false} />
   }
+}
+
+/** What an agent CLI in a terminal reported: working, waiting for you, done. */
+function TerminalAgentBadge({ termId }: { termId: string }) {
+  const badge = useTerminal((s) => terminalBadge(s.tabs.find((t) => t.id === termId)?.agentState))
+  return badge ? <span className={`task-state tab-agent ${badge.look}`} title={badge.hint}>{badge.label}</span> : null
 }
 
 function ChatTabIcon({ sessionId }: { sessionId: string }) {

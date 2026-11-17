@@ -4,6 +4,7 @@ import { EventsOn } from '../wails/runtime'
 import { createReorderer } from '../lib/reorder'
 import { useEditor } from './editor'
 import { terminalTitle } from '../lib/terminalTitle'
+import type { TerminalAgentState } from '../lib/agentList'
 
 export interface TerminalTab {
   id: string
@@ -28,6 +29,8 @@ export interface TerminalTab {
   tag?: string
   /** Shows a shell the background host kept running instead of starting one. */
   attach?: boolean
+  /** What an agent CLI in the terminal reported (term:agent); never saved with the session. */
+  agentState?: TerminalAgentState
 }
 
 export interface CreateOptions {
@@ -275,10 +278,17 @@ export function subscribeTerminalEvents(): void {
       programTitle: msg.command === t.command ? t.programTitle : undefined,
     }))
   })
+  EventsOn('term:agent', (msg: { id: string; state: TerminalAgentState }) => {
+    if (closed.has(msg.id)) return
+    useTerminal.setState((s) => {
+      const tab = s.tabs.find((t) => t.id === msg.id)
+      return !tab || tab.agentState === msg.state ? {} : { tabs: s.tabs.map((t) => (t.id === msg.id ? { ...t, agentState: msg.state } : t)) }
+    })
+  })
   EventsOn('term:exit', (msg: { id: string; code: number }) => {
     if (closed.has(msg.id)) return forgetClosedLater(msg.id)
     useTerminal.setState((s) => ({
-      tabs: s.tabs.map((t) => (t.id === msg.id ? { ...t, exitCode: msg.code } : t)),
+      tabs: s.tabs.map((t) => (t.id === msg.id ? { ...t, exitCode: msg.code, agentState: undefined } : t)),
     }))
   })
 }

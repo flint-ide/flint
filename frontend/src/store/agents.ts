@@ -3,10 +3,11 @@
 // row does. Chat and task state stay where they are (store/agentChat.ts,
 // store/agentTasks.ts); a settled tab is the editor's hidden tab (store/editor.ts).
 import { createStore } from '../lib/store'
-import { agentRows, firstNeedingAttention, needsUser, nextUnseen, type AgentRow } from '../lib/agentList'
+import { agentRows, firstNeedingAttention, needsUser, nextUnseen, terminalAgentKey, type AgentRow, type TerminalAgentInput } from '../lib/agentList'
 import { settledToReveal } from '../lib/settledTabs'
 import { chatTabId, useAgentChat } from './agentChat'
 import { useTasks } from './agentTasks'
+import { terminalTabId, useTerminal, type TerminalTab } from './terminal'
 import { showToast } from './dialog'
 import { useEditor } from './editor'
 import { useWorkspace } from './workspace'
@@ -23,6 +24,11 @@ export const useAgents = createStore<AgentsState>(() => ({ unseen: [], peek: nul
 /** The chat of a dock tab id ("chat:<id>"), or null for any other tab. */
 const chatOfTab = (tab: string | null): string | null => (tab?.startsWith('chat:') ? tab.slice('chat:'.length) : null)
 
+/** What the panel needs of a terminal tab. */
+export const terminalInput = (t: TerminalTab): TerminalAgentInput => ({
+  id: t.id, title: t.title, cwd: t.cwd, command: t.command, state: t.agentState, exited: t.exitCode !== null,
+})
+
 /** Chats whose tab is settled. */
 export const settledChats = (hidden: readonly string[] = useEditor.getState().hidden): string[] =>
   hidden.flatMap((t) => chatOfTab(t) ?? [])
@@ -35,14 +41,19 @@ export function currentRows(): AgentRow[] {
     tasks: useTasks.getState().tasks,
     unseen: useAgents.getState().unseen,
     settled: settledChats(),
+    terminals: useTerminal.getState().tabs.map(terminalInput),
   })
 }
 
 function refresh(ended: string[]): void {
   const { sessions } = useAgentChat.getState()
   const { unseen, peek } = useAgents.getState()
+  const activeId = useEditor.getState().activeId
+  // A terminal agent is kept under its tab id ("term:<id>"), a chat under its session id.
+  const active = chatOfTab(activeId) ?? (activeId?.startsWith('term:') ? activeId : null)
+  const live = [...Object.keys(sessions), ...useTerminal.getState().tabs.map((t) => terminalAgentKey(t.id))]
   // What is read in the peek is seen, as in its own tab.
-  const next = nextUnseen(unseen, ended, chatOfTab(useEditor.getState().activeId), Object.keys(sessions)).filter((id) => id !== peek)
+  const next = nextUnseen(unseen, ended, active, live).filter((id) => id !== peek)
   useAgents.setState({ unseen: next, ...(peek && !sessions[peek] ? { peek: null } : {}) })
 }
 
@@ -64,6 +75,12 @@ export function subscribeAgents(): void {
     refresh(ended)
     revealSettled()
   })
+  useTerminal.subscribe((s, prev) => {
+    if (s.tabs === prev.tabs) return
+    // An agent CLI in a terminal finished its turn (the Stop hook) while its tab was not the open one.
+    const ended = s.tabs.filter((t) => t.agentState === 'done' && prev.tabs.find((p) => p.id === t.id)?.agentState !== 'done').map((t) => terminalAgentKey(t.id))
+    refresh(ended)
+  })
   useEditor.subscribe((s, prev) => {
     if (s.activeId !== prev.activeId) refresh([])
   })
@@ -75,9 +92,10 @@ export function subscribeAgents(): void {
   })
 }
 
-/** Shows an agent: its chat tab (drawn again if it was settled), or the Tasks panel for a queued task that has no chat yet. */
+/** Shows an agent: its chat or terminal tab (a chat's is drawn again if it was settled), or the Tasks panel for a queued task that has no chat yet. */
 export function focusAgent(row: AgentRow): void {
   if (row.sessionId) useEditor.getState().setActive(chatTabId(row.sessionId))
+  else if (row.terminalId) useEditor.getState().setActive(terminalTabId(row.terminalId))
   else useWorkspace.getState().setSidebar('tasks')
 }
 
@@ -119,7 +137,8 @@ export function keepPeekAsTab(): void {
 export function peekAttention(): boolean {
   // The chat in front is not "elsewhere": look past it.
   const here = chatOfTab(useEditor.getState().activeId)
-  const row = firstNeedingAttention(currentRows().filter((r) => r.sessionId !== here))
+  // Only a chat can be peeked at: a terminal agent has no chat to show over the tab.
+  const row = firstNeedingAttention(currentRows().filter((r) => r.sessionId && r.sessionId !== here))
   if (!row?.sessionId) return false
   peekAgent(row.sessionId)
   return true

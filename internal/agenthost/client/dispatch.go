@@ -59,6 +59,11 @@ func (c *Client) notifyJob(method string, params json.RawMessage) func() {
 		if json.Unmarshal(params, &p) == nil && c.h.Terminal != nil {
 			return func() { c.h.Terminal.Title(p.ID, terminal.Info{Command: p.Command, Cwd: p.Cwd}) }
 		}
+	case agenthost.NotifyTermAgent:
+		var p agenthost.TermAgentParams
+		if json.Unmarshal(params, &p) == nil && c.h.Terminal != nil {
+			return func() { c.h.Terminal.AgentState(p.ID, p.State) }
+		}
 	case agenthost.NotifyAgentEvent:
 		var e as.Event
 		if json.Unmarshal(params, &e) == nil {

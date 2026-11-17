@@ -16,6 +16,7 @@ import { panelCommands } from '../panels/registry'
 import { saveTab, useEditor, viewFor, type Tab } from '../store/editor'
 import { toggleTerminal, useTerminal } from '../store/terminal'
 import { openBackgroundTerminals, useBackgroundTerminals } from '../store/backgroundTerminals'
+import { newClaudeTerminal } from '../store/terminalAgent'
 import { activeRoot } from '../store/activeRoot'
 import { removeFromWorkspace } from '../store/fileOps'
 import { rootLabels } from '../lib/workspaceRoots'
@@ -228,6 +229,8 @@ function appCommands(): Command[] {
     // Terminal
     // In the active tab's workspace folder (the primary one when it has none).
     { id: 'terminal.toggle', title: 'Toggle Terminal', category: 'Terminal', keys: 'Mod+J', run: () => toggleTerminal(activeRoot()) },
+    // Claude with Flint's own hooks file, so the tab shows what Claude does (explicit: not what New Terminal does).
+    { id: 'terminal.newClaude', title: 'New Claude Terminal', category: 'Terminal', keywords: 'claude agent hooks status', run: () => void newClaudeTerminal() },
     { id: 'terminal.new', title: 'New Terminal', category: 'Terminal', keys: 'Mod+Shift+T', keywords: 'shell', run: () => void useTerminal.getState().create(activeRoot()) },
     {
       id: 'terminal.background', title: 'Show Background Terminals…', category: 'Terminal', keywords: 'attach detach sessions host',

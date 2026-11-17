@@ -59,6 +59,7 @@ const (
 	NotifyTermData   = "term.data"
 	NotifyTermExit   = "term.exit"
 	NotifyTermTitle  = "term.title"
+	NotifyTermAgent  = "term.agent"
 	NotifyAgentEvent = "agent.event"
 )
 
@@ -260,6 +261,13 @@ type TermTitleParams struct {
 	ID      string `json:"id"`
 	Command string `json:"command"`
 	Cwd     string `json:"cwd"`
+}
+
+// TermAgentParams is the term.agent notification: the state an agent CLI in
+// the terminal reports (terminal.Agent* constants).
+type TermAgentParams struct {
+	ID    string `json:"id"`
+	State string `json:"state"`
 }
 
 // AgentStartParams is agent.start.

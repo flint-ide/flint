@@ -7,8 +7,12 @@ import {
   chatTitle,
   firstNeedingAttention,
   nextUnseen,
+  stateHint,
   stateLabel,
+  terminalAgentKey,
+  terminalBadge,
   type AgentChatInput,
+  type TerminalAgentInput,
 } from './agentList'
 import type { ChatItem, ChatState } from './agentReducer'
 import type { TaskView } from './agentTasks'
@@ -161,6 +165,58 @@ describe('firstNeedingAttention', () => {
   it('skips a row that has no chat to show', () => {
     const failedTask = agentRows({ sessions: [], tasks: [task({ state: 'queued' })], unseen: [] })
     assert.equal(firstNeedingAttention(failedTask), undefined)
+  })
+})
+
+const term = (id: string, over: Partial<TerminalAgentInput> = {}): TerminalAgentInput => ({
+  id, title: 'claude', cwd: '/src/p', command: 'claude --resume', state: 'working', ...over,
+})
+
+describe('terminal agents', () => {
+  it('lists a terminal that reports a state, with the panel rules', () => {
+    const rows = agentRows({
+      sessions: [session('idle'), session('work', { chat: chat([user('go')], true) })],
+      tasks: [],
+      unseen: [terminalAgentKey('d')],
+      terminals: [term('w', { state: 'waiting' }), term('d', { state: 'done' }), term('d2', { state: 'done' }), term('x', { state: 'working' })],
+    })
+    assert.deepEqual(rows.map((r) => `${r.key}:${r.state}`), [
+      'term:w:waiting', 'term:d:finished-unseen', 'chat:work:working', 'term:x:working', 'chat:idle:idle', 'term:d2:idle',
+    ])
+    const w = rows[0]
+    assert.deepEqual([w.kind, w.terminalId, w.agent, w.title, w.root, w.project, w.sessionId], ['terminal', 'w', 'claude', 'claude', '/src/p', 'p', undefined])
+  })
+
+  it('ignores terminals with no agent: no state, idle, exited', () => {
+    const rows = agentRows({
+      sessions: [],
+      tasks: [],
+      unseen: [],
+      terminals: [term('none', { state: undefined }), term('left', { state: 'idle' }), term('dead', { state: 'working', exited: true })],
+    })
+    assert.deepEqual(rows, [])
+  })
+
+  it('names an agent without a command after the terminal', () => {
+    const [r] = agentRows({ sessions: [], tasks: [], unseen: [], terminals: [term('a', { command: '' })] })
+    assert.equal(r.agent, 'terminal')
+  })
+
+  it('counts a waiting terminal as needing the user, and can be the first to look at', () => {
+    const rows = agentRows({ sessions: [session('a', { chat: chat([user('x')], true) })], tasks: [], unseen: [], terminals: [term('w', { state: 'waiting' })] })
+    assert.equal(attentionCount(rows), 1)
+    assert.equal(firstNeedingAttention(rows)?.terminalId, 'w')
+  })
+
+  it('badges a tab for working, waiting and done only', () => {
+    assert.deepEqual(['working', 'waiting', 'done'].map((s) => terminalBadge(s as TerminalAgentInput['state'])?.look), ['working', 'waiting', 'finished'])
+    assert.equal(terminalBadge('idle'), null)
+    assert.equal(terminalBadge(undefined), null)
+  })
+
+  it('explains waiting differently for a terminal', () => {
+    assert.match(stateHint('waiting', 'terminal'), /terminal/)
+    assert.equal(stateHint('waiting', 'chat'), stateHint('waiting'))
   })
 })
 

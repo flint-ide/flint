@@ -32,8 +32,12 @@ const HINTS: Record<AgentRunState, string> = {
   idle: 'No turn is running',
 }
 
+/** What the "waiting" state means for an agent CLI in a terminal tab: it signalled that it needs you. */
+const TERMINAL_WAITING_HINT = 'The agent in this terminal asked for your attention (an approval or a question)'
+
 export const stateLabel = (s: AgentRunState): string => LABELS[s]
-export const stateHint = (s: AgentRunState): string => HINTS[s]
+export const stateHint = (s: AgentRunState, kind?: AgentRow['kind']): string =>
+  kind === 'terminal' && s === 'waiting' ? TERMINAL_WAITING_HINT : HINTS[s]
 
 /** The states that ask something of the user. */
 const NEEDS_USER: readonly AgentRunState[] = ['waiting', 'failed', 'finished-unseen']
@@ -81,10 +85,12 @@ export interface AgentChatInput {
 export interface AgentRow {
   /** Stable list key. */
   key: string
-  /** A chat of a worktree task is a 'task' row (named after the task). */
-  kind: 'chat' | 'task'
+  /** A chat of a worktree task is a 'task' row (named after the task); an agent CLI in a terminal tab is a 'terminal' row. */
+  kind: 'chat' | 'task' | 'terminal'
   sessionId?: string
   taskId?: string
+  /** The terminal of a 'terminal' row. */
+  terminalId?: string
   agent: string
   title: string
   root: string
@@ -112,6 +118,55 @@ const taskStateOf = (task: string, unseen: boolean): AgentRunState => {
   }
 }
 
+/** The state an agent CLI in a terminal reports (Go: terminal.Agent* constants, event "term:agent"). */
+export type TerminalAgentState = 'working' | 'waiting' | 'done' | 'idle'
+
+export interface TerminalAgentInput {
+  id: string
+  title: string
+  cwd: string
+  /** The running command ("claude --resume"), '' at the prompt. */
+  command: string
+  /** Absent until the program reports one. */
+  state?: TerminalAgentState
+  exited?: boolean
+}
+
+export interface TerminalBadge {
+  label: string
+  /** The `task-state` look it borrows from the Agents panel. */
+  look: 'working' | 'waiting' | 'finished'
+  hint: string
+}
+
+/** The badge on a terminal's tab for what its agent reported; none for no agent or one that left (idle). */
+export function terminalBadge(state: TerminalAgentState | undefined): TerminalBadge | null {
+  switch (state) {
+    case 'working':
+      return { label: 'working', look: 'working', hint: 'The agent in this terminal is working' }
+    case 'waiting':
+      return { label: 'waiting', look: 'waiting', hint: TERMINAL_WAITING_HINT }
+    case 'done':
+      return { label: 'done', look: 'finished', hint: 'The agent in this terminal finished its turn' }
+    default:
+      return null
+  }
+}
+
+/** The key under which a terminal agent is kept in the "unseen" list (a chat's is its session id). */
+export const terminalAgentKey = (id: string): string => `term:${id}`
+
+/** A terminal that runs an agent: it reported working, waiting or done, and its shell still lives. `idle` means the agent left. */
+const isTerminalAgent = (t: TerminalAgentInput): boolean => !t.exited && (t.state === 'working' || t.state === 'waiting' || t.state === 'done')
+
+function terminalRow(t: TerminalAgentInput, unseen: boolean): AgentRow {
+  const state: AgentRunState = t.state === 'done' ? (unseen ? 'finished-unseen' : 'idle') : t.state === 'waiting' ? 'waiting' : 'working'
+  return {
+    key: terminalAgentKey(t.id), kind: 'terminal', terminalId: t.id, agent: t.command.split(' ')[0] || 'terminal', title: t.title,
+    root: t.cwd, project: folderName(t.cwd), state, hidden: false,
+  }
+}
+
 export interface AgentListInput {
   /** Chats in the order they were opened. */
   sessions: readonly AgentChatInput[]
@@ -120,10 +175,12 @@ export interface AgentListInput {
   unseen: readonly string[]
   /** Ids of chats whose tab is settled (store/agents.ts). */
   settled?: readonly string[]
+  /** Terminal tabs (store/terminal.ts); the ones running an agent get a row. */
+  terminals?: readonly TerminalAgentInput[]
 }
 
 /** Every live agent of the window, most urgent first (stable within a state). */
-export function agentRows({ sessions, tasks, unseen, settled = [] }: AgentListInput): AgentRow[] {
+export function agentRows({ sessions, tasks, unseen, settled = [], terminals = [] }: AgentListInput): AgentRow[] {
   const unseenIds = new Set(unseen)
   const settledIds = new Set(settled)
   const live = tasks.filter((t) => !t.stale)
@@ -140,12 +197,13 @@ export function agentRows({ sessions, tasks, unseen, settled = [] }: AgentListIn
     if (t.state !== 'queued' || sessions.some((s) => trimSlash(s.cwd) === trimSlash(t.worktree))) continue
     rows.push({ key: `task:${t.id}`, kind: 'task', taskId: t.id, agent: t.agent, title: t.title, root: t.worktree, project: folderName(t.worktree), state: 'queued', hidden: false })
   }
+  for (const t of terminals) if (isTerminalAgent(t)) rows.push(terminalRow(t, unseenIds.has(terminalAgentKey(t.id))))
   return rows.map((row, i) => ({ row, i })).sort((a, b) => RANK[a.row.state] - RANK[b.row.state] || a.i - b.i).map((x) => x.row)
 }
 
 /** How many agents wait for the user: waiting, failed or finished unseen. */
 export const attentionCount = (rows: readonly AgentRow[]): number => rows.filter((r) => needsUser(r.state)).length
 
-/** The first agent in the panel's order that needs the user and has a chat to show (a queued task has none). */
+/** The first agent in the panel's order that needs the user and has a tab to show (a queued task has none). */
 export const firstNeedingAttention = (rows: readonly AgentRow[]): AgentRow | undefined =>
-  rows.find((r) => r.sessionId && needsUser(r.state))
+  rows.find((r) => (r.sessionId || r.terminalId) && needsUser(r.state))

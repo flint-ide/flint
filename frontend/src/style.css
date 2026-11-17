@@ -904,6 +904,9 @@ kbd {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.tab-agent {
+  margin-left: 6px;
+}
 .tab-icon {
   width: 7px;
   height: 7px;

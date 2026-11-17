@@ -77,6 +77,13 @@ func TestBackgroundTerminalsEndToEnd(t *testing.T) {
 	}
 	waitUntil(t, "live output after the replay", func() bool { return strings.Contains(second.output("t1"), "still-2") })
 
+	// An agent's state reported in a shell the host runs reaches the window's
+	// term:agent path (terminal.Events.AgentState) through term.agent.
+	if err := w2.Write("t1", []byte(`printf '\033]6977;state=waiting\007'`+"\n")); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, "the agent state from the host", func() bool { return second.agentState("t1") == "waiting" })
+
 	w2.detach(true) // Quit and Stop Background Sessions
 	deadline := time.Now().Add(15 * time.Second)
 	for syscall.Kill(pid, 0) == nil && time.Now().Before(deadline) {

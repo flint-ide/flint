@@ -276,6 +276,7 @@ type funcEvents struct{ output func(string, []byte) }
 func (f *funcEvents) Output(id string, data []byte) { f.output(id, data) }
 func (f *funcEvents) Exited(string, int)            {}
 func (f *funcEvents) Title(string, terminal.Info)   {}
+func (f *funcEvents) AgentState(string, string)     {}
 
 func TestCallbacksMayCallTheClient(t *testing.T) {
 	var c *client.Client
@@ -429,6 +430,17 @@ func TestTitleIsForwarded(t *testing.T) {
 		rec.mu.Lock()
 		defer rec.mu.Unlock()
 		return rec.titles["t1"] == terminal.Info{Command: "npm test", Cwd: "/w"}
+	})
+}
+
+func TestAgentStateIsForwarded(t *testing.T) {
+	rec := newTermRecorder()
+	_, host := connect(t, client.Handlers{Terminal: rec})
+	host.send(t, agenthost.NotifyTermAgent, agenthost.TermAgentParams{ID: "t1", State: "waiting"})
+	rec.until(t, "the agent state", func() bool {
+		rec.mu.Lock()
+		defer rec.mu.Unlock()
+		return rec.agents["t1"] == "waiting"
 	})
 }
 

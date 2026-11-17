@@ -21,12 +21,13 @@ type termRecorder struct {
 	out     map[string]*strings.Builder
 	exits   map[string]int
 	titles  map[string]terminal.Info
+	agents  map[string]string
 	changed chan struct{}
 }
 
 func newTermRecorder() *termRecorder {
 	return &termRecorder{
-		out: map[string]*strings.Builder{}, exits: map[string]int{}, titles: map[string]terminal.Info{},
+		out: map[string]*strings.Builder{}, exits: map[string]int{}, titles: map[string]terminal.Info{}, agents: map[string]string{},
 		changed: make(chan struct{}, 1),
 	}
 }
@@ -58,6 +59,13 @@ func (r *termRecorder) Exited(id string, code int) {
 func (r *termRecorder) Title(id string, info terminal.Info) {
 	r.mu.Lock()
 	r.titles[id] = info
+	r.mu.Unlock()
+	r.poke()
+}
+
+func (r *termRecorder) AgentState(id, state string) {
+	r.mu.Lock()
+	r.agents[id] = state
 	r.mu.Unlock()
 	r.poke()
 }

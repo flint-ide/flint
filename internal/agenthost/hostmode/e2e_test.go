@@ -48,6 +48,7 @@ func (o *output) Output(id string, b []byte) {
 }
 func (o *output) Exited(string, int)          {}
 func (o *output) Title(string, terminal.Info) {}
+func (o *output) AgentState(string, string)   {}
 
 func (o *output) waitFor(t *testing.T, id, want string) {
 	t.Helper()

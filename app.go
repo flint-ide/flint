@@ -94,6 +94,7 @@ type App struct {
 	// actionGrants and configRuns serve the MCP tools that act (api_mcp_actions.go).
 	actionGrants actionGrants
 	configRuns   configRuns
+	orchGrants   orchGrants            // what the user allowed each chat to orchestrate (orch_grant.go)
 	tasks        *agenttask.Tracker    // state of agent tasks from their chats
 	orch         *orchestrate.Registry // every chat's place in the tree, state and output (chat_open.go)
 	sessions     *restore.Store

@@ -81,6 +81,7 @@ The file is readable only by your user. It never contains secrets: database pass
   },
   "inlineEdit": { "contextLines": 60 },
   "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/", "maxParallel": 3 },
+  "orchestration": { "enabled": false, "maxChildren": 4, "maxDepth": 2, "maxWaitSeconds": 600, "notifyParent": true, "outputLines": 200 },
   "usage": {
     "retentionDays": 90,
     "dailyBudgetUsd": 20,
@@ -116,6 +117,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `completions` | object | see below | Inline suggestions from a code model (off by default). See [completions](#completions). |
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
 | `agentTasks` | object | see below | Where agent task worktrees go, how their branches are named and how many tasks work at the same time. See [agentTasks](#agenttasks). |
+| `orchestration` | object | see below | Agents that start and direct other agents (off by default). See [orchestration](#orchestration). |
 | `usage` | object | see below | How long agent usage is kept, budgets, and prices for estimates. See [usage](#usage). |
 | `prompts` | object | see below | The prompt library of the agent chat (`/`). See [prompts](#prompts). |
 | `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
@@ -285,6 +287,21 @@ Used by [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel).
 | `maxParallel` | integer | `3` | How many agent tasks may work at the same time, from 0 to 32. A task started beyond it waits in [the queue](../guides/ai-agents.md#the-queue) until a working task settles. `0` means no limit. |
 
 Slashes in a branch name become dashes in the folder name. The tasks themselves are kept in `state.json`.
+
+### orchestration
+
+Lets an agent chat start other agents in the same project, send them messages, wait for them and read their output, through Flint's MCP server (which must be on, see [mcpServer](#mcpserver)). **Off by default**: while `enabled` is `false` the tools are not even listed.
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `enabled` | boolean | | `false` | Offer the tools `list_agents`, `start_agent`, `send_prompt`, `wait_for_agent`, `read_agent_output` and `stop_agent` to agents. Even then, each chat needs your yes once (a native dialog) before its first call. |
+| `maxChildren` | integer | 1–16 | `4` | Agents one chat may have started at a time. |
+| `maxDepth` | integer | 1–4 | `2` | Levels of agents that may start agents. `1`: your chat can start agents, which cannot start any. |
+| `maxWaitSeconds` | integer | 1–600 | `600` | The longest one `wait_for_agent` call. |
+| `notifyParent` | boolean | | `true` | When an agent a chat started waits for approval, fails or finishes, Flint sends that chat one short message (`[Flint] child … is …`) with the agent's last 20 lines, so it need not poll. |
+| `outputLines` | integer | 1–2000 | `200` | The most lines `read_agent_output` returns (redacted). |
+
+Out-of-range numbers are clamped; `0` or a missing number is the default. What is not a setting, on purpose: the grant covers one project only, never an untrusted folder (Restricted Mode), lives in memory and ends with the chat, and an agent that was refused is not asked about again. Messages an agent sends to another are redacted and appear in the target's chat, but are not previewed first. See [ARCHITECTURE.md](https://github.com/flint-ide/flint/blob/main/docs/ARCHITECTURE.md#security-model).
 
 ### usage
 

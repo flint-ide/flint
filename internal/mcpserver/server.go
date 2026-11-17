@@ -70,6 +70,11 @@ type Tool struct {
 	Plan func(ctx context.Context, root string, args json.RawMessage) (Planned, error)
 	// Timeout bounds one call (after the approval); 0 is the default of 30 s.
 	Timeout time.Duration
+	// Granted marks a tool that a standing, per-chat grant covers (the
+	// orchestration tools) and reports whether ctx's caller holds it. It is
+	// handed to Options.Approve, which asks for the grant when it does not
+	// and lets the call through when it does. Only meaningful with Acts.
+	Granted func(ctx context.Context) bool
 }
 
 // Planned is one checked call of an acting tool.
@@ -87,6 +92,8 @@ type Approval struct {
 	Title   string
 	Args    json.RawMessage // the call's arguments (an object)
 	Summary string          // Planned.Summary, bounded; "" without a Plan
+	// Granted is Tool.Granted: non-nil for a tool covered by a per-chat grant.
+	Granted func(ctx context.Context) bool
 }
 
 // ErrNotApproved is the answer to an acting call the user didn't allow.
@@ -292,6 +299,12 @@ type callerKey struct{}
 func CallerFrom(ctx context.Context) string {
 	id, _ := ctx.Value(callerKey{}).(string)
 	return id
+}
+
+// WithCaller returns ctx carrying the id of the calling chat, as the server
+// does for a request (tests of code that reads CallerFrom use it).
+func WithCaller(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, callerKey{}, id)
 }
 
 // sem returns the semaphore of root's running tool calls.

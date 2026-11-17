@@ -15,6 +15,7 @@ import { coerceUsage, DEFAULT_USAGE, type UsageSettings } from './usageSettings'
 import { coercePromptSettings, DEFAULT_PROMPT_SETTINGS, type PromptSettings } from './prompts'
 import { coerceAgentReview, DEFAULT_AGENT_REVIEW, type AgentReviewSettings } from './reviewSettings'
 import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
+import { coerceOrchestration, DEFAULT_ORCHESTRATION, type OrchestrationSettings } from './orchestration'
 import { coercePRReview, DEFAULT_PR_REVIEW, type PRReviewSettings } from './prAgent'
 import { coerceGitHub, DEFAULT_GITHUB, type GitHubSettings } from './githubSettings'
 import { coerceSections, type FeatureSettings } from './settingsSections'
@@ -91,6 +92,7 @@ export interface CoreSettings {
   /** Review Changes with Agent (lib/reviewSettings.ts). */
   agentReview: AgentReviewSettings
   /** Following your pull requests' CI: poll interval, log excerpt size, notifications. */
+  orchestration: OrchestrationSettings
   ci: CISettings
   /** Handing review comments to the agent: threads per draft, context lines (lib/prAgent.ts). */
   prReview: PRReviewSettings
@@ -126,6 +128,7 @@ export const DEFAULT_SETTINGS: CoreSettings = Object.freeze({
   usage: DEFAULT_USAGE,
   prompts: DEFAULT_PROMPT_SETTINGS,
   agentReview: DEFAULT_AGENT_REVIEW,
+  orchestration: DEFAULT_ORCHESTRATION,
   ci: DEFAULT_CI,
   prReview: DEFAULT_PR_REVIEW,
   github: DEFAULT_GITHUB,
@@ -266,6 +269,7 @@ function coerceCore(v: Record<string, unknown>): CoreSettings {
     usage: coerceUsage(v.usage),
     prompts: coercePromptSettings(v.prompts),
     agentReview: coerceAgentReview(v.agentReview),
+    orchestration: coerceOrchestration(v.orchestration),
     ci: coerceCI(v.ci),
     prReview: coercePRReview(v.prReview),
     github: coerceGitHub(v.github),

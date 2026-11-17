@@ -66,6 +66,7 @@ func (a *App) openChat(ctx context.Context, r ChatRequest) (as.SessionInfo, erro
 		_ = a.agents.Stop(info.ID)
 		return as.SessionInfo{}, err
 	}
+	a.orchGrants.inherit(r.Parent, info.ID) // the parent's grant, one level deeper
 	a.emit(eventChatOpened, ChatOpened{
 		Info: info, Parent: r.Parent, TaskID: r.TaskID, Role: r.Role,
 		Background: r.Origin != nil || r.Parent != "",
@@ -113,6 +114,7 @@ func (a *App) forgetChat(id string) {
 	a.tasks.Unbind(id)
 	a.usageChats.unbind(id)
 	a.orch.Remove(id)
+	a.orchGrants.forget(id) // a grant dies with its chat
 }
 
 // announcer is what a session manager offers to put a message in a chat's

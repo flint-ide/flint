@@ -8,6 +8,7 @@ import { Select } from '../ui/Select'
 import { CheckedField, Row } from './fields'
 import { CustomAgentsSection, reloadAgents } from './CustomAgentsSection'
 import { AgentTasksSection } from './AgentTasksSection'
+import { OrchestrationSection } from './OrchestrationSection'
 import { PromptsSection } from './PromptsSection'
 import { AgentReviewSection } from './AgentReviewSection'
 import { isMac } from '../../lib/platform'
@@ -56,6 +57,7 @@ export function AgentsSection() {
       </p>
       <CustomAgentsSection />
       <AgentTasksSection />
+      <OrchestrationSection />
       <PromptsSection />
       <AgentReviewSection />
       <h3>Notifications</h3>

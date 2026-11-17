@@ -346,6 +346,15 @@ func (m *Manager) route(s *managed, e Event) {
 		m.settleAction(e.SessionID, e.RequestID, "")
 	}
 	if e.Kind == KindPermission && e.Permission != nil {
+		if opt, ok := m.grantedOption(e.SessionID, *e.Permission); ok {
+			// Covered by the chat's orchestration grant (actions.go).
+			go func() {
+				if err := s.driver.Respond(e.SessionID, e.Permission.ID, opt); err != nil {
+					m.emit(Event{SessionID: e.SessionID, Kind: KindError, Text: "auto-approve failed: " + err.Error()})
+				}
+			}()
+			return
+		}
 		if req, acts := m.gateAction(e.SessionID, s.cwd, *e.Permission); acts {
 			// A tool of Flint that acts: the user answers, whatever the policy.
 			e.Permission = &req

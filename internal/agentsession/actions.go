@@ -22,6 +22,33 @@ type ActionGate struct {
 	// Approved is called when the user allowed one call of an acting tool in
 	// the chat of a session in cwd, before the agent is told.
 	Approved func(cwd, tool string, args json.RawMessage)
+	// Granted reports whether the user gave the chat sessionID a standing
+	// grant that covers tool (the orchestration tools), so the agent's own
+	// permission request for it is allowed without another question. It must
+	// say yes for those tools only: nothing else may ride on a grant.
+	Granted func(sessionID, tool string) bool
+}
+
+// grantedOption is the answer to the permission request of a Flint tool that
+// a standing grant covers: allow this one call, never "always allow" (the
+// grant is what lasts, and it dies with the chat). ok is false for every
+// other request, which then goes on to the user or the policy.
+func (m *Manager) grantedOption(sessionID string, req PermissionRequest) (string, bool) {
+	if req.FlintTool == "" {
+		return "", false
+	}
+	m.mu.Lock()
+	acts, granted := m.gate.Acts, m.gate.Granted
+	m.mu.Unlock()
+	// Asked without the lock: both read Flint's settings and grants.
+	if acts == nil || granted == nil || !acts(req.FlintTool) || !granted(sessionID, req.FlintTool) {
+		return "", false
+	}
+	i := slices.IndexFunc(req.Options, func(o PermissionOption) bool { return o.Kind == AllowOnce })
+	if i < 0 {
+		return "", false
+	}
+	return req.Options[i].ID, true
 }
 
 // maxPendingActions bounds the remembered requests (unanswered ones of

@@ -265,7 +265,7 @@ func (s *Server) approve(ctx context.Context, root string, tool Tool, args json.
 	} else if tool.Call == nil {
 		return nil, errors.New("nothing to do")
 	}
-	if err := s.opts.Approve(ctx, Approval{Root: root, Tool: tool.Name, Title: tool.Title, Args: args, Summary: summary}); err != nil {
+	if err := s.opts.Approve(ctx, Approval{Root: root, Tool: tool.Name, Title: tool.Title, Args: args, Summary: summary, Granted: tool.Granted}); err != nil {
 		return nil, err
 	}
 	return run, nil

@@ -117,6 +117,8 @@ type Settings struct {
 	Prompts Prompts `json:"prompts"`
 	// AgentReview configures Review Changes with Agent (review.go).
 	AgentReview AgentReview `json:"agentReview"`
+	// Orchestration configures agents that start and direct agents (orchestration.go).
+	Orchestration Orchestration `json:"orchestration"`
 	// CI configures following your pull requests' checks (ci.go).
 	CI CI `json:"ci"`
 	// PRReview configures handing review comments to the agent (prreview.go).
@@ -158,6 +160,7 @@ func Default() Settings {
 		Prompts:            defaultPrompts(),
 		AgentReview:        defaultAgentReview(),
 		CI:                 defaultCI(),
+		Orchestration:      defaultOrchestration(),
 		PRReview:           defaultPRReview(),
 		GitHub:             defaultGitHub(),
 		CustomTheme:        defaultCustomTheme(),
@@ -231,6 +234,7 @@ func Normalize(s Settings) Settings {
 	out.Usage = normalizeUsage(s.Usage)
 	out.AgentReview = normalizeAgentReview(s.AgentReview, out.CustomAgents)
 	out.CI = normalizeCI(s.CI)
+	out.Orchestration = normalizeOrchestration(s.Orchestration)
 	out.PRReview = normalizePRReview(s.PRReview)
 	out.GitHub = normalizeGitHub(s.GitHub)
 	out.sections = normalizeSections(s)
@@ -320,6 +324,9 @@ func Validate(s Settings) error {
 		return err
 	}
 	if err := validateAgentReview(s.AgentReview, s.CustomAgents); err != nil {
+		return err
+	}
+	if err := CheckOrchestration(s.Orchestration); err != nil {
 		return err
 	}
 	if err := CheckCI(s.CI); err != nil {

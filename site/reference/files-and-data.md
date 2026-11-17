@@ -12,7 +12,7 @@ Most of Flint's data lives in:
 
 | File or folder | What it holds |
 |---|---|
-| `state.json` | Recent folders, the agent approval policy, trusted folders, [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel) per repository (description with credentials removed, agent, branch, base, worktree folder, last state, pull request link), whether the tool check has been shown, and the [update check](privacy-and-security.md#update-check)'s last time, the release it found and a version you skipped. |
+| `state.json` | Recent folders, the agent approval policy, trusted folders, [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel) per repository (description with credentials removed, agent, branch, base, worktree folder, last state, pull request link), the [backlogs](../guides/backlog.md) you opened (folders), the folder you chose with **Locate…** for each repository URL, and which agent tasks belong to each backlog item (task id, repository name, last state, pull request link, merged or removed), whether the tool check has been shown, and the [update check](privacy-and-security.md#update-check)'s last time, the release it found and a version you skipped. |
 | `settings.json` | Your preferences: theme (and an imported custom theme), fonts, Vim mode, default agent, auto-save, notifications, update check, shortcut overrides, TODO excludes, agent CLIs, language servers, agent context, inline completions, agent tasks, usage budgets and model prices. No secrets. See [Settings file](settings.md). |
 | `connections.json` | Database connection profiles: host, port, user, default database, TLS and read-only options. No passwords. A one-time `connections.json.native-backup` appears next to it when Flint moves old native ClickHouse connections to HTTP. |
 | `sessions/` | One file per project: open tabs, terminals, agent conversations, attached projects, the selected run configuration and breakpoints. |
@@ -60,6 +60,7 @@ The log rotates at 5 MB, keeping one old file (`flint.log.1`). Secrets and your 
 | `.flint/run.json` | [Run configurations](../guides/run-debug-test.md#run-configurations) | Yes, it is meant to be shared |
 | `http-client.env.json` | Public [HTTP client environments](../guides/http-client.md#environments), next to the `.http` file | Yes |
 | `http-client.private.env.json` | Secret HTTP client variables (tokens, passwords) | No, add it to `.gitignore` |
+| `flint-backlog.json` and `items/*.md` | A [backlog](../guides/backlog.md): its repositories, and one Markdown file per work item with its status. The folder can be anywhere, inside a repository or not. Flint writes an item's `status:` line | Yes, if your team shares the backlog. Which agent tasks belong to an item stays in `state.json` |
 | `.claude/settings.local.json` | "Always allow" choices for Claude commands, written by Claude Code itself | Usually not |
 
 ## Kept by other tools

@@ -263,6 +263,8 @@ Flint's own MCP server for agent chats: read-only tools, and tools that act when
 | `testWaitSeconds` | integer | 10–540 | `120` | How long `run_tests` waits for a test run before it answers with the results so far (clamped into the range). |
 
 Tool switches apply right away, also to running chats.
+
+`get_backlog` (the [backlog](../guides/backlog.md#what-agents-can-see)) has no key here: it is offered while the Backlog feature is on (see [features](#features)).
 ### completions
 
 Ghost-text suggestions in file editors from a fill-in-the-middle code model. See [AI in the editor](../guides/editor-and-navigation.md#ai-in-the-editor).

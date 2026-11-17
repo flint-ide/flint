@@ -43,7 +43,7 @@ Editing or removing an agent in Settings affects new chats; open chats keep runn
 
 A defined agent is an agent you describe in a Markdown file: who it is (standing instructions), and optionally which program and model it runs on. It is an agent wherever Flint asks for an agent name: the chat's agent picker, "New Agent Task…" and Compare agents, the default agent, the review agent, the `start_agent` tool of [orchestration](#letting-agents-act-in-flint) and the [usage](#usage-and-budgets) breakdown.
 
-Use one when you want a lasting role, such as a reviewer that never edits files or a backend developer on a stronger model, that you can pick, hand tasks to or let other agents start. A [prompt](#prompt-library) is different: it fills the chat box once, with text you can edit before you send it. A defined agent's instructions apply to the whole conversation, and you don't see them in the chat.
+Use one when you want a lasting role, such as a reviewer that never edits files or a backend developer on a stronger model, that you can pick, hand tasks to (also from a [backlog](backlog.md), where an item's `agent` can name it) or let other agents start. A [prompt](#prompt-library) is different: it fills the chat box once, with text you can edit before you send it. A defined agent's instructions apply to the whole conversation, and you don't see them in the chat.
 
 An example, saved as `reviewer.md`:
 
@@ -245,11 +245,13 @@ An agent chat in Flint can also look things up by itself. Flint runs a small [MC
 | `get_diagnostics` | The errors and warnings the language servers report, for the project, a folder or a file. Only files a language server has checked are included: usually the open files and, for Go, their packages. | On |
 | `get_editor_state` | The files open in the editor (and which have unsaved changes), the active file, and your selection with its text, or the cursor position. Ask about "this function" and the agent can see which one. | On |
 | `get_test_results` | The last test run in Flint: totals, and each failed test with its location and output. | On |
+| `get_backlog` | The [backlogs](backlog.md) open in Flint and their items: id, title, status, priority, agent, repositories and text. | On with the Backlog feature |
 | `get_terminal_output` | The recent output your terminals and run consoles printed while they were in the project (dev servers, builds), as plain text without colors. | Off |
 
 These tools only read. Claude Code shows them as `mcp__flint__…`.
 
 - Diagnostics, editor state and test results show only the project's own state. With the default approval policy ("Read and search the project" on) Claude Code runs them without asking, so the agent can look at what you are looking at without a prompt each time.
+- `get_backlog` shows backlogs from any folder you opened, not only the chat's project, so it isn't one of the tools that run without asking: Claude Code asks before each call, unless you chose "Do everything". It has no switch under Agent Context; it goes with the Backlog feature (Settings ▸ Extensions ▸ **Built-in**). See [What agents can see](backlog.md#what-agents-can-see).
 - Terminal output can show anything you saw, such as a token printed in a terminal. It is off until you turn it on, and then the agent asks before each call, even with "Read and search" on. This keeps Flint's rule that nothing goes to an AI provider without you seeing it.
 - Codex and custom agents decide about all of them with their own rules.
 
@@ -362,6 +364,8 @@ An agent task gives an agent its own branch in its own [git worktree](git-and-gi
 
 Flint creates the branch and the worktree (by default in `<repository>.worktrees/` next to your checkout, like **New Worktree…** in the branch widget), attaches the folder to the window as another project, opens a chat there and sends your description as the first message. Nothing else is added to it.
 
+Work that isn't started yet can wait in a [backlog](backlog.md): its **Delegate** action creates these tasks for an item, one per repository the item names, and moves the item's status as they finish and merge.
+
 The panel lists the tasks of every repository open in the window, newest first. Each row shows:
 
 | What | Meaning |
@@ -448,6 +452,7 @@ In a folder you haven't trusted, agents run without the project's own agent sett
 
 ## Related
 
+- [Backlog](backlog.md)
 - [Restricted Mode](restricted-mode.md)
 - [Work with agents](../how-to/work-with-agents.md)
 - [Build a feature with an agent](../use-cases/build-a-feature-with-an-agent.md)

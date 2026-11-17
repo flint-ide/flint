@@ -27,6 +27,7 @@
 ## Guides
 - [Editor and navigation](guides/editor-and-navigation.md)
 - [AI agents](guides/ai-agents.md)
+- [Backlog](guides/backlog.md)
 - [Git and GitHub](guides/git-and-github.md)
 - [Run, debug and test](guides/run-debug-test.md)
 - [Databases](guides/databases.md)

@@ -2,14 +2,17 @@ package main
 
 import (
 	"context"
-	"os/exec"
+	"errors"
+	"strings"
 	"time"
+	"unicode"
 
 	as "flint/internal/agentsession"
 	"flint/internal/config"
 )
 
 const (
+	maxEngineName     = 64 // an agent name (SessionInfo.Engine)
 	eventAgentEvent   = "agent:event"
 	agentStartTimeout = 90 * time.Second // first start may authenticate / warm caches
 )
@@ -38,9 +41,10 @@ func newAgentManager(a *App) *as.Manager {
 }
 
 // Agents lists the agents available for chat sessions: the native CLIs found,
-// then the custom ACP agents whose command resolves.
+// then the custom ACP agents whose command resolves, then the defined agents
+// whose engine is installed.
 func (c *AgentChatAPI) Agents() []string {
-	return installedAgents(c.app.currentSettings(), exec.LookPath)
+	return c.app.availableAgents()
 }
 
 // Start opens a conversation with agent in cwd.
@@ -53,11 +57,17 @@ func (c *AgentChatAPI) Start(agent, cwd string) (as.SessionInfo, error) {
 }
 
 // Resume reopens a conversation from an earlier run (after a restart). The
-// returned ID may differ from sessionID if the agent forked it.
-func (c *AgentChatAPI) Resume(agent, cwd, sessionID string) (as.SessionInfo, error) {
+// returned ID may differ from sessionID if the agent forked it. engine is the
+// SessionInfo.Engine the conversation started on ("" when not known): a
+// defined agent resumes on it, whatever its default engine is now.
+func (c *AgentChatAPI) Resume(agent, cwd, sessionID, engine string) (as.SessionInfo, error) {
+	if len(engine) > maxEngineName || strings.ContainsFunc(engine, unicode.IsControl) {
+		return as.SessionInfo{}, errors.New("invalid engine")
+	}
 	ctx, cancel := context.WithTimeout(c.app.ctx, agentStartTimeout)
 	defer cancel()
-	info, err := c.app.agents.Resume(ctx, agent, cwd, sessionID)
+	c.app.loadDefinedAgents() // a definition added, changed or removed since
+	info, err := c.app.agents.Resume(as.WithEngine(ctx, engine), agent, cwd, sessionID)
 	if err == nil {
 		c.app.tasks.Bind(info.ID, cwd)
 		c.app.usageChats.bind(info.ID, usageChat{chat: sessionID, agent: info.Agent, cwd: cwd, model: info.Model})

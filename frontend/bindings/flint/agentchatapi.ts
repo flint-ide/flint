@@ -17,7 +17,8 @@ import * as agentsession$0 from "./internal/agentsession/models.js";
 
 /**
  * Agents lists the agents available for chat sessions: the native CLIs found,
- * then the custom ACP agents whose command resolves.
+ * then the custom ACP agents whose command resolves, then the defined agents
+ * whose engine is installed.
  */
 export function Agents(): $CancellablePromise<string[]> {
     return $Call.ByID(2156074381).then(($result: any) => {
@@ -66,10 +67,12 @@ export function Respond(sessionID: string, requestID: string, optionID: string):
 
 /**
  * Resume reopens a conversation from an earlier run (after a restart). The
- * returned ID may differ from sessionID if the agent forked it.
+ * returned ID may differ from sessionID if the agent forked it. engine is the
+ * SessionInfo.Engine the conversation started on ("" when not known): a
+ * defined agent resumes on it, whatever its default engine is now.
  */
-export function Resume(agent: string, cwd: string, sessionID: string): $CancellablePromise<agentsession$0.SessionInfo> {
-    return $Call.ByID(2087199420, agent, cwd, sessionID).then(($result: any) => {
+export function Resume(agent: string, cwd: string, sessionID: string, engine: string): $CancellablePromise<agentsession$0.SessionInfo> {
+    return $Call.ByID(2087199420, agent, cwd, sessionID, engine).then(($result: any) => {
         return $$createType2($result);
     });
 }

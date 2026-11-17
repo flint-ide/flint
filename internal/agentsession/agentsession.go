@@ -181,10 +181,16 @@ type Attachment struct {
 
 // SessionInfo is returned when a session starts.
 type SessionInfo struct {
-	ID    string `json:"id"`
-	Agent string `json:"agent"` // e.g. "claude", "codex"
-	Model string `json:"model,omitempty"`
-	Cwd   string `json:"cwd"`
+	ID string `json:"id"`
+	// Agent is the name the session was started under: "claude", "codex", a
+	// custom agent's id or a defined agent's name.
+	Agent string `json:"agent"`
+	// Engine is the program that runs it: the driver's own name ("claude",
+	// "codex" or the custom agent's id). It equals Agent except for a defined
+	// agent, whose conversation resumes on this engine (Manager.Resume).
+	Engine string `json:"engine"`
+	Model  string `json:"model,omitempty"`
+	Cwd    string `json:"cwd"`
 }
 
 // Sink receives events; drivers must call it sequentially per session (in order).
@@ -205,6 +211,32 @@ type Driver interface {
 	Stop(sessionID string) error
 	// Close stops every session.
 	Close() error
+}
+
+// Router is implemented by a driver that hands each session to one of several
+// drivers when it starts or resumes: a defined agent whose engine is chosen
+// per conversation. The session then belongs to the returned driver (its
+// Prompt, Stop, ... are called directly); the Router's own methods other
+// than Close are never called for it.
+type Router interface {
+	// Route returns the driver for a new conversation (engine "") or for one
+	// that started on engine.
+	Route(engine string) (Driver, error)
+}
+
+type engineKey struct{}
+
+// WithEngine returns ctx carrying the engine a conversation started on
+// (SessionInfo.Engine), for Manager.Resume to hand to a Router. It travels in
+// the context so that every implementation of Resume keeps one signature.
+func WithEngine(ctx context.Context, engine string) context.Context {
+	return context.WithValue(ctx, engineKey{}, engine)
+}
+
+// EngineFrom returns the engine WithEngine stored in ctx, or "".
+func EngineFrom(ctx context.Context) string {
+	e, _ := ctx.Value(engineKey{}).(string)
+	return e
 }
 
 // Resumer is implemented by drivers that can reopen a conversation from an

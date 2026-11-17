@@ -26,7 +26,7 @@ func TestValidateCustomAgents(t *testing.T) {
 			s.CustomAgents = []CustomAgent{{ID: "opencode", Command: "/Users/me/.opencode/bin/opencode", Args: []string{"acp"}}}
 		}, ""},
 		{"default is custom", func(s *Settings) { s.CustomAgents = []CustomAgent{gemini()}; s.DefaultAgent = "gemini" }, ""},
-		{"default is unknown", func(s *Settings) { s.DefaultAgent = "gemini" }, "unsupported agent"},
+		{"default is no agent name", func(s *Settings) { s.DefaultAgent = "Gemini 2" }, "unsupported agent"},
 		{"empty id", func(s *Settings) { s.CustomAgents = []CustomAgent{{Command: "x"}} }, "id is empty"},
 		{"uppercase id", func(s *Settings) { s.CustomAgents = []CustomAgent{{ID: "Gemini", Command: "x"}} }, "lowercase"},
 		{"id with space", func(s *Settings) { s.CustomAgents = []CustomAgent{{ID: "my agent", Command: "x"}} }, "lowercase"},
@@ -92,8 +92,10 @@ func TestLoadCustomAgentsForgiving(t *testing.T) {
 	if got, _ := s.CustomAgent("gemini"); !got.Equal(gemini()) {
 		t.Errorf("gemini = %+v", got)
 	}
-	if s.DefaultAgent != "" {
-		t.Errorf("default agent %q points at a dropped agent; want empty", s.DefaultAgent)
+	// The name of a dropped custom agent may still name a defined agent
+	// (files Flint does not read here); Flint falls back when it is missing.
+	if s.DefaultAgent != "broken" {
+		t.Errorf("default agent %q, want the name kept", s.DefaultAgent)
 	}
 	if err := Validate(s); err != nil {
 		t.Errorf("normalized settings fail Validate: %v", err)
@@ -118,5 +120,20 @@ func TestCustomAgentsCloned(t *testing.T) {
 	}
 	if _, ok := s.CustomAgent("nope"); ok {
 		t.Error("CustomAgent(nope) found")
+	}
+}
+
+// defaultAgent and agentReview.agent may name a defined agent: a file Flint
+// reads when it needs it, so any name of the custom agent id form is kept.
+func TestDefinedAgentNames(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		ok   bool
+	}{{"reviewer", true}, {"backend-2", true}, {"Reviewer", false}, {"2nd", false}, {"a b", false}, {"x_y", false}} {
+		s := Default()
+		s.DefaultAgent, s.AgentReview.Agent = tt.name, tt.name
+		if err := Validate(s); (err == nil) != tt.ok {
+			t.Errorf("%q: %v", tt.name, err)
+		}
 	}
 }

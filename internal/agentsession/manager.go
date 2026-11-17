@@ -1,6 +1,7 @@
 package agentsession
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -254,14 +255,16 @@ var ErrNoResume = errors.New("this agent cannot resume earlier conversations")
 
 // Start opens a session with the named agent.
 func (m *Manager) Start(ctx context.Context, agent, cwd string) (SessionInfo, error) {
-	return m.open(ctx, agent, cwd, func(ctx context.Context, d Driver, sink Sink) (SessionInfo, error) {
+	return m.open(ctx, agent, "", cwd, func(ctx context.Context, d Driver, sink Sink) (SessionInfo, error) {
 		return d.Start(ctx, cwd, sink)
 	})
 }
 
-// Resume reopens an earlier conversation of the named agent.
+// Resume reopens an earlier conversation of the named agent. A Router (a
+// defined agent) resumes it on the engine WithEngine put in ctx: the
+// SessionInfo.Engine it started on.
 func (m *Manager) Resume(ctx context.Context, agent, cwd, sessionID string) (SessionInfo, error) {
-	return m.open(ctx, agent, cwd, func(ctx context.Context, d Driver, sink Sink) (SessionInfo, error) {
+	return m.open(ctx, agent, EngineFrom(ctx), cwd, func(ctx context.Context, d Driver, sink Sink) (SessionInfo, error) {
 		r, ok := d.(Resumer)
 		if !ok {
 			return SessionInfo{}, ErrNoResume
@@ -273,7 +276,7 @@ func (m *Manager) Resume(ctx context.Context, agent, cwd, sessionID string) (Ses
 // open starts or resumes a session through fn and registers it. fn gets a
 // context carrying a CallerSlot that is filled with the session id as soon as
 // the driver returns it, so MCP tokens issued during the start resolve to it.
-func (m *Manager) open(ctx context.Context, agent, cwd string, fn func(context.Context, Driver, Sink) (SessionInfo, error)) (SessionInfo, error) {
+func (m *Manager) open(ctx context.Context, agent, engine, cwd string, fn func(context.Context, Driver, Sink) (SessionInfo, error)) (SessionInfo, error) {
 	m.mu.Lock()
 	d, closed := m.drivers[agent], m.closed
 	m.mu.Unlock()
@@ -282,6 +285,12 @@ func (m *Manager) open(ctx context.Context, agent, cwd string, fn func(context.C
 	}
 	if d == nil {
 		return SessionInfo{}, fmt.Errorf("unknown agent %q", agent)
+	}
+	if r, ok := d.(Router); ok {
+		var err error
+		if d, err = r.Route(engine); err != nil {
+			return SessionInfo{}, err
+		}
 	}
 	s := &managed{agent: agent, cwd: cwd, driver: d}
 	var sessionID string
@@ -302,9 +311,12 @@ func (m *Manager) open(ctx context.Context, agent, cwd string, fn func(context.C
 	sessionID = info.ID
 	idMu.Unlock()
 	slot.Set(info.ID)
-	if info.Agent == "" {
-		info.Agent = agent
+	// The driver reports its own name; the session is the registered one's
+	// (a defined agent runs on the claude or codex driver).
+	if info.Engine == "" {
+		info.Engine = cmp.Or(info.Agent, agent)
 	}
+	info.Agent = agent
 	m.mu.Lock()
 	switch {
 	case m.closed:

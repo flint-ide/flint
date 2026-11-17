@@ -79,6 +79,9 @@ type threadStartParams struct {
 	Model          string `json:"model,omitempty"`
 	ApprovalPolicy string `json:"approvalPolicy,omitempty"`
 	Sandbox        string `json:"sandbox,omitempty"`
+	// DeveloperInstructions are added to Codex's own instructions as a
+	// developer message for the whole thread.
+	DeveloperInstructions string `json:"developerInstructions,omitempty"`
 }
 
 // threadResumeParams reopens a stored thread; the policy fields mirror
@@ -89,6 +92,9 @@ type threadResumeParams struct {
 	Model          string `json:"model,omitempty"`
 	ApprovalPolicy string `json:"approvalPolicy,omitempty"`
 	Sandbox        string `json:"sandbox,omitempty"`
+	// DeveloperInstructions as in thread/start: a resumed thread is given
+	// them again.
+	DeveloperInstructions string `json:"developerInstructions,omitempty"`
 	// ExcludeTurns skips sending the stored history back: Flint keeps its own transcript.
 	ExcludeTurns bool `json:"excludeTurns,omitempty"`
 }

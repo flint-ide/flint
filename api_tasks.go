@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -315,7 +314,7 @@ func (a *App) createTasks(ctx context.Context, req NewTaskGroup, queueOK bool) (
 		return nil, nil, err
 	}
 	s := a.currentSettings()
-	installed := installedAgents(s, exec.LookPath)
+	installed := a.availableAgents()
 	for _, agent := range req.Agents {
 		if !slices.Contains(installed, agent) {
 			return nil, nil, fmt.Errorf("the agent %q is not installed", agent)

@@ -59,6 +59,7 @@ func (a *App) openChat(ctx context.Context, r ChatRequest) (as.SessionInfo, erro
 	if err != nil {
 		return as.SessionInfo{}, err
 	}
+	a.loadDefinedAgents() // a definition added, changed or removed since
 	info, err := a.agents.Start(ctx, r.Agent, r.Cwd)
 	if err != nil {
 		return info, err

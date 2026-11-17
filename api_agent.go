@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
 	"slices"
 	"time"
 
@@ -26,8 +25,10 @@ type AgentInfo struct {
 	Available []string `json:"available"`
 	Preferred string   `json:"preferred"`
 	// ConflictAgent resolves merge conflicts in a terminal: the preferred
-	// agent when it is a native CLI, else the first installed native one
-	// (custom ACP agents have no interactive terminal mode); "" when none.
+	// agent when it is a native CLI, the engine of the preferred agent when
+	// that is a defined agent, else the first installed native one (custom
+	// ACP agents have no interactive terminal mode); "" when none. It is
+	// always "claude", "codex" or "".
 	ConflictAgent string `json:"conflictAgent"`
 }
 
@@ -39,21 +40,28 @@ type AgentAPI struct {
 
 // Info reports installed agents and the preferred one (first available by default).
 func (a *AgentAPI) Info() AgentInfo {
-	info := AgentInfo{Available: installedAgents(a.app.currentSettings(), exec.LookPath)}
+	info := AgentInfo{Available: a.app.availableAgents()}
 	pref := a.app.preferredAgent()
 	if slices.Contains(info.Available, pref) {
 		info.Preferred = pref
 	} else if len(info.Available) > 0 {
 		info.Preferred = info.Available[0]
 	}
-	info.ConflictAgent = conflictAgent(info.Preferred, info.Available)
+	info.ConflictAgent = conflictAgent(info.Preferred, info.Available, func(name string) string {
+		k, _, _, _ := a.app.agentEngine(name)
+		return string(k)
+	})
 	return info
 }
 
-// conflictAgent is the agent that resolves conflicts in a terminal.
-func conflictAgent(preferred string, available []string) string {
-	if isNative(preferred) {
-		return preferred
+// conflictAgent is the native agent that resolves conflicts in a terminal:
+// the engine of preferred (engine returns "" for an agent without one, a
+// custom ACP agent), else the first native agent available.
+func conflictAgent(preferred string, available []string, engine func(name string) string) string {
+	if preferred != "" {
+		if k := engine(preferred); k != "" {
+			return k
+		}
 	}
 	if i := slices.IndexFunc(available, isNative); i >= 0 {
 		return available[i]
@@ -87,11 +95,16 @@ func (a *AgentAPI) SuggestCommitMessage(dir string, tracked, untracked []string)
 	})
 }
 
-// headless runs one prompt with agent name in dir and returns its answer.
+// headless runs one prompt with agent name in dir and returns its answer. A
+// defined agent runs as its engine with its model; its standing instructions
+// are left out, as Flint's prompt here asks for an answer in a set format.
 func (a *AgentAPI) headless(ctx context.Context, name, dir, prompt, input string) (string, error) {
-	if isNative(name) {
-		kind := agent.Kind(name)
-		return agent.Headless(ctx, kind, a.app.agentConfig(kind), dir, prompt, input, !a.app.isTrusted(dir))
+	kind, cfg, native, err := a.app.agentEngine(name)
+	if err != nil {
+		return "", err
+	}
+	if native {
+		return agent.Headless(ctx, kind, cfg, dir, prompt, input, !a.app.isTrusted(dir))
 	}
 	c, ok := a.app.currentSettings().CustomAgent(name)
 	if !ok {
@@ -110,7 +123,7 @@ func (a *AgentAPI) ResolveConflictsCommand(root, operation string, files []strin
 	if name == "" {
 		return "", errors.New("resolving conflicts runs Claude Code (claude) or Codex CLI (codex) in a terminal; install one of them")
 	}
-	kind := agent.Kind(name)
+	kind := agent.Kind(name) // Info.ConflictAgent is always a native agent
 	return agent.InteractiveCommand(kind, a.app.agentConfig(kind), agent.ConflictPrompt(operation, files), !a.app.isTrusted(root))
 }
 

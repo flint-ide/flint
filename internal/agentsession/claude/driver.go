@@ -92,6 +92,11 @@ type Options struct {
 	// Model and ExtraArgs, so settings changes apply to new sessions without
 	// re-creating the driver.
 	Settings func() agent.Config
+	// Instructions, when set, are standing instructions for every
+	// conversation (a defined agent's, internal/agentdefs), passed on start
+	// and resume as one --append-system-prompt=… argument, so the text is
+	// never parsed as flags.
+	Instructions string
 }
 
 // current returns the options for a new session.
@@ -382,6 +387,9 @@ func buildArgs(sessionID string, resume bool, opts Options, untrusted bool, mcp 
 	}
 	if opts.Model != "" {
 		args = append(args, "--model", opts.Model)
+	}
+	if opts.Instructions != "" {
+		args = append(args, "--append-system-prompt="+opts.Instructions)
 	}
 	if untrusted {
 		args = append(args, "--setting-sources", "user")

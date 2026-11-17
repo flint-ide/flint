@@ -86,9 +86,17 @@ export class SessionInfo {
     "id": string;
 
     /**
-     * e.g. "claude", "codex"
+     * Agent is the name the session was started under: "claude", "codex", a
+     * custom agent's id or a defined agent's name.
      */
     "agent": string;
+
+    /**
+     * Engine is the program that runs it: the driver's own name ("claude",
+     * "codex" or the custom agent's id). It equals Agent except for a defined
+     * agent, whose conversation resumes on this engine (Manager.Resume).
+     */
+    "engine": string;
     "model"?: string;
     "cwd": string;
 
@@ -99,6 +107,9 @@ export class SessionInfo {
         }
         if (!("agent" in $$source)) {
             this["agent"] = "";
+        }
+        if (!("engine" in $$source)) {
+            this["engine"] = "";
         }
         if (!("cwd" in $$source)) {
             this["cwd"] = "";

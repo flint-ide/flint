@@ -60,7 +60,7 @@ func TestLoadReplacesInvalidValues(t *testing.T) {
 		"theme": "neon",
 		"editor": {"fontFamily": "x; } body { display:none", "fontSize": 99, "lineHeight": 0.2},
 		"terminal": {"fontSize": "big", "lineHeight": 1.4},
-		"defaultAgent": "gpt",
+		"defaultAgent": "GPT 5",
 		"keymap": {"a.ok": "Mod+K", "a.removed": "", "a.bad": "Mod+", "": "Mod+J", "a.spaces": "Mod+Shift+ X"}
 	}`)
 	got, err := Load(path)
@@ -112,7 +112,8 @@ func TestValidate(t *testing.T) {
 		{"line height", func(s *Settings) { s.Terminal.LineHeight = 3 }, "terminal: line height"},
 		{"empty family", func(s *Settings) { s.Editor.FontFamily = "  " }, "empty"},
 		{"family injection", func(s *Settings) { s.Terminal.FontFamily = "Menlo; color: red" }, "invalid characters"},
-		{"agent", func(s *Settings) { s.DefaultAgent = "gpt" }, "agent"},
+		{"agent", func(s *Settings) { s.DefaultAgent = "GPT 5" }, "agent"},
+		{"agent name too long", func(s *Settings) { s.DefaultAgent = strings.Repeat("a", 33) }, "agent"},
 		{"plus key", func(s *Settings) { s.Keymap = map[string]string{"zoom.in": "Mod++"} }, ""},
 		{"bare key", func(s *Settings) { s.Keymap = map[string]string{"debug.step": "F8"} }, ""},
 		{"unknown modifier", func(s *Settings) { s.Keymap = map[string]string{"x.y": "Hyper+K"} }, "invalid shortcut"},

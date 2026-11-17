@@ -63,11 +63,11 @@ Everything else is the engine's: permissions and the approval policy, Flint's MC
 Rules that follow:
 
 - A defined agent is listed (and can start) only when its engine is installed: the pinned one, or any native agent when none is pinned.
-- An agent without a pinned engine resolves its engine when a conversation starts, so changing `defaultAgent` applies to the next conversation. A conversation remembers the engine it started on and resumes on it, whatever the default is by then.
+- An agent without a pinned engine resolves its engine when a conversation starts, so changing `defaultAgent` applies to the next conversation. A conversation remembers the engine it started on and resumes on it, whatever the default is by then. The engine is `SessionInfo.engine`; the UI saves it with the chat and hands it back to `AgentChatAPI.Resume` (a chat saved without it resumes on the engine resolved now).
 - Changing or adding a file applies to the next conversation that starts, without a restart. Conversations that are running keep what they started with (the manager already keeps a retired driver for its sessions).
 - A conversation reopened after a restart finds its agent by name. When the definition is gone, resuming fails with a message that names it, as for a removed custom agent.
-- Wherever Flint needs the *program* behind an agent name (a headless run for a commit message, a terminal command to resolve conflicts, per-engine settings, engine-specific UI such as slash commands), it uses the definition's engine. No code may cast a defined agent's name to `agent.Kind`.
-- `defaultAgent` may name a defined agent. When that agent is not available (file removed, folder untrusted, engine missing), Flint falls back as it does for a missing custom agent.
+- Wherever Flint needs the *program* behind an agent name (a headless run for a commit message, a terminal command to resolve conflicts, per-engine settings, engine-specific UI such as slash commands), it uses the definition's engine (resolved as for a new conversation). No code may cast a defined agent's name to `agent.Kind`. A headless run uses the engine with the definition's model but not its instructions, since Flint's prompt there asks for an answer in a fixed format; the conflict terminal runs the plain engine (its command line goes through a shell, where the instructions must not).
+- `defaultAgent` (and `agentReview.agent`) may name a defined agent; settings accept any name of the custom-agent-id form there, since definitions are files that come and go. When that agent is not available (file removed, folder untrusted, engine missing), Flint falls back as it does for a missing custom agent.
 
 ## API and UI
 

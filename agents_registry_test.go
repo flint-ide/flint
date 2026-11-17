@@ -123,10 +123,21 @@ func TestInstalledAgentsAndConflictAgent(t *testing.T) {
 		}
 		return "", errors.New("not found")
 	}
-	if got := installedAgents(s, lookPath); !slices.Equal(got, []string{"gemini"}) {
+	if got := installedAgents(s, lookPath, nil); !slices.Equal(got, []string{"gemini"}) {
 		t.Errorf("installedAgents = %v, want [gemini]", got)
 	}
 
+	// engine is agentEngine's answer: native agents are their own engine,
+	// reviewer is a defined agent on codex, gemini a custom agent.
+	engine := func(name string) string {
+		switch name {
+		case "claude", "codex":
+			return name
+		case "reviewer":
+			return "codex"
+		}
+		return ""
+	}
 	tests := []struct {
 		preferred string
 		available []string
@@ -136,10 +147,11 @@ func TestInstalledAgentsAndConflictAgent(t *testing.T) {
 		{"codex", []string{"claude", "codex"}, "codex"},
 		{"gemini", []string{"codex", "gemini"}, "codex"},
 		{"gemini", []string{"gemini"}, ""},
+		{"reviewer", []string{"claude", "codex", "reviewer"}, "codex"},
 		{"", nil, ""},
 	}
 	for _, tt := range tests {
-		if got := conflictAgent(tt.preferred, tt.available); got != tt.want {
+		if got := conflictAgent(tt.preferred, tt.available, engine); got != tt.want {
 			t.Errorf("conflictAgent(%q, %v) = %q, want %q", tt.preferred, tt.available, got, tt.want)
 		}
 	}

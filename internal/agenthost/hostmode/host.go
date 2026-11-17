@@ -47,6 +47,9 @@ const (
 	// readyFDFlag names the descriptor on which to say "ready" (a pipe the
 	// starter passed in ExtraFiles).
 	readyFDFlag = "--ready-fd="
+	// stdioFlag selects the relay: connect this machine's host to stdin and
+	// stdout (what a remote Flint runs over ssh).
+	stdioFlag = "--stdio"
 	// DefaultIdle is how long the host stays with no sessions and no clients.
 	DefaultIdle = 60 * time.Second
 	// maxConns bounds simultaneous connections (windows are a handful).
@@ -75,13 +78,16 @@ type Options struct {
 // other process it returns immediately and startup goes on. Call it right
 // after sandbox.Main, before anything that touches Wails.
 func Main(o Options) {
-	isHost, readyFD, err := parseArgs(os.Args)
+	isHost, args, err := parseArgs(os.Args)
 	if !isHost {
 		return
 	}
+	if err == nil && args.stdio {
+		os.Exit(runRelay()) // stdout is the stream: nothing else may print to it
+	}
 	var ready io.WriteCloser
-	if err == nil && readyFD > 0 {
-		ready = os.NewFile(uintptr(readyFD), "ready")
+	if err == nil && args.readyFD > 0 {
+		ready = os.NewFile(uintptr(args.readyFD), "ready")
 	}
 	if err == nil {
 		err = runProcess(o, ready)
@@ -98,25 +104,39 @@ func Main(o Options) {
 	}
 }
 
-// parseArgs recognises host mode and its readiness descriptor. Only the first
-// argument can select host mode, so a file named "--agent-host" given to the
-// editor later on the command line cannot.
-func parseArgs(args []string) (isHost bool, readyFD int, err error) {
+// hostArgs are the flags after --agent-host.
+type hostArgs struct {
+	readyFD int  // descriptor for the readiness message; 0 for none
+	stdio   bool // run the relay instead of the host
+}
+
+// parseArgs recognises host mode and its flags. Only the first argument can
+// select host mode, so a file named "--agent-host" given to the editor later
+// on the command line cannot. --stdio stands alone: the relay is not a host
+// and has no readiness pipe.
+func parseArgs(args []string) (isHost bool, a hostArgs, err error) {
 	if len(args) < 2 || args[1] != agentHostFlag {
-		return false, 0, nil
+		return false, hostArgs{}, nil
 	}
-	for _, a := range args[2:] {
-		v, ok := strings.CutPrefix(a, readyFDFlag)
+	for _, arg := range args[2:] {
+		if arg == stdioFlag {
+			a.stdio = true
+			continue
+		}
+		v, ok := strings.CutPrefix(arg, readyFDFlag)
 		if !ok {
-			return true, 0, fmt.Errorf("unknown argument %q", a)
+			return true, hostArgs{}, fmt.Errorf("unknown argument %q", arg)
 		}
 		fd, convErr := strconv.Atoi(v)
 		if convErr != nil || fd < 3 || fd > 1<<16 { // 0-2 are stdio
-			return true, 0, fmt.Errorf("bad %s%q", readyFDFlag, v)
+			return true, hostArgs{}, fmt.Errorf("bad %s%q", readyFDFlag, v)
 		}
-		readyFD = fd
+		a.readyFD = fd
 	}
-	return true, readyFD, nil
+	if a.stdio && a.readyFD != 0 {
+		return true, hostArgs{}, fmt.Errorf("%s and %s cannot be combined", stdioFlag, readyFDFlag)
+	}
+	return true, a, nil
 }
 
 func runProcess(o Options, ready io.WriteCloser) error {

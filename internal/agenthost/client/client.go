@@ -65,6 +65,10 @@ type Config struct {
 	Token    string
 	Version  string
 	Handlers Handlers
+	// HelloTimeout bounds the handshake (helloWait when zero). A connection
+	// that has to be set up first, such as ssh logging in, needs longer than
+	// a Unix socket does.
+	HelloTimeout time.Duration
 }
 
 const (
@@ -120,7 +124,11 @@ func New(rwc io.ReadWriteCloser, cfg Config) (*Client, error) {
 	}()
 	go c.deliver()
 
-	ctx, cancel := context.WithTimeout(context.Background(), helloWait)
+	wait := cfg.HelloTimeout
+	if wait <= 0 {
+		wait = helloWait
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
 	defer cancel()
 	var res agenthost.HelloResult
 	err := c.call(ctx, agenthost.MethodHello, agenthost.HelloParams{

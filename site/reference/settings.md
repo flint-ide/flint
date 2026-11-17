@@ -93,7 +93,10 @@ The file is readable only by your user. It never contains secrets: database pass
   "ci": { "pollSeconds": 60, "logTailLines": 80, "logErrorLines": 40, "notify": true },
   "prReview": { "maxThreads": 20, "contextLines": 8 },
   "github": { "host": "github.com", "clientId": "", "scopes": ["repo", "read:org", "workflow"], "maxRetryWaitSeconds": 60 },
-  "sessions": { "background": false, "replayKiB": 1024 }
+  "sessions": { "background": false, "replayKiB": 1024 },
+  "machines": [
+    { "id": "dev-box", "name": "Dev box", "target": "me@dev.example.com", "port": 22, "command": "flint" }
+  ]
 }
 ```
 
@@ -126,6 +129,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `prReview` | object | see below | Handing a pull request's review comments to the agent: threads per draft, code lines around a comment. See [prReview](#prreview). |
 | `github` | object | see below | The GitHub host, the OAuth App Sign in with GitHub uses, scopes and the retry wait. See [github](#github). |
 | `sessions` | object | see below | Background terminals: shells that keep running when Flint closes (off by default). See [sessions](#sessions). |
+| `machines` | array | `[]` | Remote machines for terminals and agents over SSH. See [machines](#machines). |
 <!-- include-rows _settings/*.md -->
 
 ### Font objects
@@ -386,6 +390,24 @@ Background terminals: terminals run in a separate Flint process, so closing the 
 | `replayKiB` | integer (KiB) | 64–8192 | `1024` | How much recent output the host keeps per terminal for the window that reattaches. Applies to terminals started afterwards. |
 
 Out-of-range numbers are clamped; `0` or a missing number is the default. **Quit and Stop Background Sessions** (next to Quit in the menu) ends the background shells and the host. See [Background terminals](https://github.com/flint-ide/flint/blob/main/docs/FEATURES.md#background-terminals).
+
+### machines
+
+Remote machines whose terminals and agents run over your own `ssh` (remote terminals and agents only: files, editor, git, language servers and search stay local). Flint starts `ssh` with `BatchMode`, so it never asks for a password: authenticate with a key or the SSH agent, and put hosts that need more (jump hosts, other keys) in `~/.ssh/config` under an alias used as the `target`. Flint stores no secret.
+
+```json
+"machines": [{ "id": "dev-box", "name": "Dev box", "target": "me@dev.example.com", "port": 22, "command": "flint" }]
+```
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `id` | string | `^[a-z0-9][a-z0-9-]{0,31}$`, unique | required | Names the machine in tabs. |
+| `name` | string | up to 64 characters, no control characters | `""` | Shown in the UI; empty shows the `id`. |
+| `target` | string | `host` or `user@host`: letters, digits, `.`, `_`, `-`; may not start with `-` | required | What `ssh` connects to: a host name, an address or an alias from `~/.ssh/config`. |
+| `port` | integer | 0 or 1–65535 | `0` | SSH port; `0` leaves it to `ssh`. |
+| `command` | string | `^[A-Za-z0-9_./~-]{1,256}$`, may not start with `-` | `"flint"` | The Flint executable on the remote machine. It is a name or a path, never a command line. |
+
+At most 32 machines. An entry that breaks a rule is dropped whole (Flint never connects with half of one) and the reason is kept for the Settings tab; the rest of the file is read as usual. Saving refuses invalid entries.
 
 <!-- Keys of feature modules: one file per key in _settings/ (first line: the table row; the rest: its section), pulled in by cmd/docsite. -->
 <!-- include-sections _settings/*.md -->

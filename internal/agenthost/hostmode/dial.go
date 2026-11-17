@@ -30,29 +30,46 @@ const (
 // protocol mismatch returns the client with a *client.ProtocolError, as
 // client.New does.
 func Dial(ctx context.Context, configDir string, cfg client.Config) (*client.Client, error) {
+	s, err := dialSocket(ctx, configDir)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Token = s.token
+	return client.New(s.conn, cfg)
+}
+
+// hostSocket is a connection to the host's socket that has not said hello,
+// with the token that hello needs.
+type hostSocket struct {
+	conn  net.Conn
+	token string
+}
+
+// dialSocket connects to the host's socket without saying hello. The token is
+// read after the run directory was checked.
+func dialSocket(ctx context.Context, configDir string) (hostSocket, error) {
 	paths := pathsIn(RunDir(configDir))
 	fi, err := checkRunDir(paths.Dir)
 	if err != nil {
-		return nil, err
+		return hostSocket{}, err
 	}
 	if fi.Mode().Perm()&0o077 != 0 {
-		return nil, fmt.Errorf("%s is accessible to others (mode %v)", paths.Dir, fi.Mode().Perm())
+		return hostSocket{}, fmt.Errorf("%s is accessible to others (mode %v)", paths.Dir, fi.Mode().Perm())
 	}
 	token, err := readToken(paths.Token)
 	if err != nil {
-		return nil, err
+		return hostSocket{}, err
 	}
 	d := net.Dialer{Timeout: dialTimeout}
 	conn, err := d.DialContext(ctx, "unix", paths.Sock)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ECONNREFUSED) {
 			// A socket nobody listens on: a host that died, or one still starting.
-			return nil, fmt.Errorf("%w (%v)", ErrNotRunning, err)
+			return hostSocket{}, fmt.Errorf("%w (%v)", ErrNotRunning, err)
 		}
-		return nil, fmt.Errorf("connect to the host: %w", err)
+		return hostSocket{}, fmt.Errorf("connect to the host: %w", err)
 	}
-	cfg.Token = token
-	return client.New(conn, cfg)
+	return hostSocket{conn, token}, nil
 }
 
 // Spawn starts a host for configDir as a detached process of its own (a new
@@ -62,19 +79,36 @@ func Dial(ctx context.Context, configDir string, cfg client.Config) (*client.Cli
 // spawnTimeout and ctx. When another host won the race for the lock, Spawn
 // connects to that one.
 func Spawn(ctx context.Context, configDir string, cfg client.Config) (*client.Client, error) {
+	return spawnThen(ctx, configDir, func(ctx context.Context) (*client.Client, error) {
+		return Dial(ctx, configDir, cfg)
+	})
+}
+
+// spawnSocket is Spawn for a caller that wants the raw connection (the
+// --stdio relay) instead of a client.
+func spawnSocket(ctx context.Context, configDir string) (hostSocket, error) {
+	return spawnThen(ctx, configDir, func(ctx context.Context) (hostSocket, error) {
+		return dialSocket(ctx, configDir)
+	})
+}
+
+// spawnThen starts a host and, once it listens (or another host won the
+// lock), calls connect.
+func spawnThen[T any](ctx context.Context, configDir string, connect func(context.Context) (T, error)) (T, error) {
+	var zero T
 	exe, err := os.Executable()
 	if err != nil {
-		return nil, fmt.Errorf("find the Flint executable: %w", err)
+		return zero, fmt.Errorf("find the Flint executable: %w", err)
 	}
 	r, w, err := os.Pipe()
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 	defer r.Close()
 	null, err := os.OpenFile(os.DevNull, os.O_RDWR, 0)
 	if err != nil {
 		_ = w.Close()
-		return nil, err
+		return zero, err
 	}
 	defer null.Close()
 
@@ -87,7 +121,7 @@ func Spawn(ctx context.Context, configDir string, cfg client.Config) (*client.Cl
 	err = cmd.Start()
 	_ = w.Close() // the child's copy is the only writer now: EOF means it ended
 	if err != nil {
-		return nil, fmt.Errorf("start the host: %w", err)
+		return zero, fmt.Errorf("start the host: %w", err)
 	}
 	exited := make(chan error, 1)
 	go func() { exited <- cmd.Wait() }() // reaps it, whenever it ends
@@ -107,33 +141,34 @@ func Spawn(ctx context.Context, configDir string, cfg client.Config) (*client.Cl
 	select {
 	case err := <-said:
 		if err == nil {
-			return Dial(ctx, configDir, cfg)
+			return connect(ctx)
 		}
-		return afterNoReady(ctx, configDir, cfg, exited)
+		return afterNoReady(ctx, connect, exited)
 	case <-ctx.Done():
 		_ = cmd.Process.Kill() // a host that never got ready is of no use
-		return nil, fmt.Errorf("the host did not become ready: %w", ctx.Err())
+		return zero, fmt.Errorf("the host did not become ready: %w", ctx.Err())
 	}
 }
 
 // afterNoReady explains a host that ended without saying ready. Losing the
 // lock means another host serves the directory: connect to it.
-func afterNoReady(ctx context.Context, configDir string, cfg client.Config, exited <-chan error) (*client.Client, error) {
+func afterNoReady[T any](ctx context.Context, connect func(context.Context) (T, error), exited <-chan error) (T, error) {
+	var zero T
 	var werr error
 	select {
 	case werr = <-exited:
 	case <-time.After(exitWait):
-		return nil, errors.New("the host closed its readiness pipe but did not exit")
+		return zero, errors.New("the host closed its readiness pipe but did not exit")
 	}
 	var ee *exec.ExitError
 	if errors.As(werr, &ee) && ee.ExitCode() == ExitAlreadyRunning {
-		c, err := Dial(ctx, configDir, cfg)
+		c, err := connect(ctx)
 		if err != nil {
 			// The winner took the lock but does not listen yet; waiting for it
 			// would mean polling, so the caller is told to try again.
-			return nil, fmt.Errorf("%w: another host holds the lock but is not listening yet (%v)", ErrNotRunning, err)
+			return zero, fmt.Errorf("%w: another host holds the lock but is not listening yet (%v)", ErrNotRunning, err)
 		}
 		return c, nil
 	}
-	return nil, fmt.Errorf("the host exited before it was ready: %v", werr)
+	return zero, fmt.Errorf("the host exited before it was ready: %v", werr)
 }

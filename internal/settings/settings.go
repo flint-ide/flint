@@ -127,9 +127,14 @@ type Settings struct {
 	GitHub GitHub `json:"github"`
 	// Sessions configures background terminals (sessions.go).
 	Sessions Sessions `json:"sessions"`
+	// Machines are the remote machines terminals and agents can run on over
+	// ssh (machines.go).
+	Machines []Machine `json:"machines"`
 
 	// sections are the values of the keys features own (section.go), by key.
 	sections map[string]any
+	// machineIssues are the entries of Machines that Normalize dropped.
+	machineIssues []MachineIssue
 }
 
 // Default returns the settings Flint uses when nothing is configured.
@@ -166,6 +171,7 @@ func Default() Settings {
 		PRReview:           defaultPRReview(),
 		GitHub:             defaultGitHub(),
 		Sessions:           defaultSessions(),
+		Machines:           []Machine{},
 		CustomTheme:        defaultCustomTheme(),
 		sections:           sectionDefaults(),
 	}
@@ -241,6 +247,7 @@ func Normalize(s Settings) Settings {
 	out.PRReview = normalizePRReview(s.PRReview)
 	out.GitHub = normalizeGitHub(s.GitHub)
 	out.Sessions = normalizeSessions(s.Sessions)
+	out.Machines, out.machineIssues = NormalizeMachines(s.Machines)
 	out.sections = normalizeSections(s)
 	return out
 }
@@ -343,6 +350,9 @@ func Validate(s Settings) error {
 		return err
 	}
 	if err := CheckSessions(s.Sessions); err != nil {
+		return err
+	}
+	if err := CheckMachines(s.Machines); err != nil {
 		return err
 	}
 	return checkSections(s)

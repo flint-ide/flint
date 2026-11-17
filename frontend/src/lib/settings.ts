@@ -15,8 +15,11 @@ import { coerceUsage, DEFAULT_USAGE, type UsageSettings } from './usageSettings'
 import { coercePromptSettings, DEFAULT_PROMPT_SETTINGS, type PromptSettings } from './prompts'
 import { coerceAgentReview, DEFAULT_AGENT_REVIEW, type AgentReviewSettings } from './reviewSettings'
 import { coerceCI, DEFAULT_CI, type CISettings } from './ci'
+import { coerceOrchestration, DEFAULT_ORCHESTRATION, type OrchestrationSettings } from './orchestration'
 import { coercePRReview, DEFAULT_PR_REVIEW, type PRReviewSettings } from './prAgent'
 import { coerceGitHub, DEFAULT_GITHUB, type GitHubSettings } from './githubSettings'
+import { coerceSessions, DEFAULT_SESSIONS, type SessionsSettings } from './sessionsSettings'
+import { coerceMachines, type Machine } from './machines'
 import { coerceSections, type FeatureSettings } from './settingsSections'
 import { TERMINAL_COLOR_NAMES } from './terminalTheme'
 
@@ -64,6 +67,8 @@ export interface CoreSettings {
   autoSave: boolean
   /** Notification and Dock badge when work finishes while Flint is in the background. */
   notifyInBackground: boolean
+  /** Also tell when an agent waits for approval (needs notifyInBackground). */
+  notifyOnApproval: boolean
   /** Shortcut overrides: command id → keys ('' = none). */
   keymap: Record<string, string>
   /** Folder names (or globs over one) the Linux file watcher skips, on top of dependency folders. */
@@ -89,11 +94,16 @@ export interface CoreSettings {
   /** Review Changes with Agent (lib/reviewSettings.ts). */
   agentReview: AgentReviewSettings
   /** Following your pull requests' CI: poll interval, log excerpt size, notifications. */
+  orchestration: OrchestrationSettings
   ci: CISettings
   /** Handing review comments to the agent: threads per draft, context lines (lib/prAgent.ts). */
   prReview: PRReviewSettings
   /** GitHub host, the OAuth App Flint signs in with, scopes and the retry wait (lib/githubSettings.ts). */
   github: GitHubSettings
+  /** Background terminals: kept running when Flint closes (lib/sessionsSettings.ts). */
+  sessions: SessionsSettings
+  /** Remote machines whose terminals run over ssh (lib/machines.ts). */
+  machines: Machine[]
 }
 
 /** The whole settings.json: Flint's keys plus the sections features registered. */
@@ -111,6 +121,7 @@ export const DEFAULT_SETTINGS: CoreSettings = Object.freeze({
   defaultAgent: '',
   autoSave: false,
   notifyInBackground: true,
+  notifyOnApproval: true,
   keymap: Object.freeze({}) as Record<string, string>,
   watchExclude: Object.freeze(['dist', '.cache']) as unknown as string[],
   agents: Object.freeze({}) as Record<string, AgentSettings>,
@@ -123,9 +134,12 @@ export const DEFAULT_SETTINGS: CoreSettings = Object.freeze({
   usage: DEFAULT_USAGE,
   prompts: DEFAULT_PROMPT_SETTINGS,
   agentReview: DEFAULT_AGENT_REVIEW,
+  orchestration: DEFAULT_ORCHESTRATION,
   ci: DEFAULT_CI,
   prReview: DEFAULT_PR_REVIEW,
   github: DEFAULT_GITHUB,
+  sessions: DEFAULT_SESSIONS,
+  machines: Object.freeze([]) as unknown as Machine[],
 }) as CoreSettings
 
 /** Flint's own keys; a feature's section may not use one. */
@@ -250,6 +264,7 @@ function coerceCore(v: Record<string, unknown>): CoreSettings {
     defaultAgent: typeof v.defaultAgent === 'string' ? v.defaultAgent : d.defaultAgent,
     autoSave: typeof v.autoSave === 'boolean' ? v.autoSave : d.autoSave,
     notifyInBackground: typeof v.notifyInBackground === 'boolean' ? v.notifyInBackground : d.notifyInBackground,
+    notifyOnApproval: typeof v.notifyOnApproval === 'boolean' ? v.notifyOnApproval : d.notifyOnApproval,
     keymap,
     watchExclude: Array.isArray(v.watchExclude) ? v.watchExclude.filter((p): p is string => typeof p === 'string' && validWatchExclude(p)) : d.watchExclude,
     agents: coerceAgents(v.agents),
@@ -262,8 +277,11 @@ function coerceCore(v: Record<string, unknown>): CoreSettings {
     usage: coerceUsage(v.usage),
     prompts: coercePromptSettings(v.prompts),
     agentReview: coerceAgentReview(v.agentReview),
+    orchestration: coerceOrchestration(v.orchestration),
     ci: coerceCI(v.ci),
     prReview: coercePRReview(v.prReview),
     github: coerceGitHub(v.github),
+    sessions: coerceSessions(v.sessions),
+    machines: coerceMachines(v.machines),
   }
 }

@@ -13,10 +13,18 @@ type recorder struct {
 	out    bytes.Buffer
 	exited chan int
 	titles chan Info
+	states chan string
 }
 
 func newRecorder() *recorder {
-	return &recorder{exited: make(chan int, 1), titles: make(chan Info, 32)}
+	return &recorder{exited: make(chan int, 1), titles: make(chan Info, 32), states: make(chan string, 32)}
+}
+
+func (r *recorder) AgentState(_, state string) {
+	select {
+	case r.states <- state:
+	default:
+	}
 }
 
 func (r *recorder) Output(_ string, data []byte) {

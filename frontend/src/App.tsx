@@ -27,7 +27,10 @@ import { refreshTrust, useTrust } from './store/trust'
 import { TrustBanner } from './components/layout/TrustBanner'
 import { copyDiagnostics, reportIssue, showLogs } from './store/diagnostics'
 import { subscribeAlerts } from './store/alerts'
+import { subscribeAgents } from './store/agents'
 import { openToolCheck, openToolCheckOnFirstRun, useToolCheck } from './store/toolCheck'
+import { refreshBackgroundTerminals, useBackgroundTerminals } from './store/backgroundTerminals'
+import { subscribeMachineEvents, useMachines } from './store/machines'
 import { useVSCodeImport } from './store/vscodeImport'
 import { usePrompts } from './store/prompts'
 import type { DroppedPath } from './lib/drop'
@@ -56,6 +59,8 @@ const QuickOpen = lazyPreload(() => import('./components/QuickOpen').then((m) =>
 const RunConfigDialog = lazyPreload(() => import('./components/run/RunConfigDialog').then((m) => ({ default: m.RunConfigDialog })))
 const CommandPalette = lazyPreload(() => import('./components/CommandPalette').then((m) => ({ default: m.CommandPalette })), { early: true })
 const ToolCheck = lazyPreload(() => import('./components/layout/ToolCheck').then((m) => ({ default: m.ToolCheck })))
+const BackgroundTerminals = lazyPreload(() => import('./components/layout/BackgroundTerminals').then((m) => ({ default: m.BackgroundTerminals })))
+const MachinePicker = lazyPreload(() => import('./components/layout/MachinePicker').then((m) => ({ default: m.MachinePicker })))
 const PromptDialog = lazyPreload(() => import('./components/agent/PromptDialog').then((m) => ({ default: m.PromptDialog })))
 const ImportVSCodeDialog = lazyPreload(() => import('./components/settings/ImportVSCodeDialog').then((m) => ({ default: m.ImportVSCodeDialog })))
 
@@ -69,6 +74,8 @@ export default function App() {
   const recentOpen = useWorkspace((s) => s.recentOpen)
   const paletteOpen = useWorkspace((s) => s.paletteOpen)
   const toolCheckOpen = useToolCheck((s) => s.open)
+  const backgroundTerminalsOpen = useBackgroundTerminals((s) => s.open)
+  const machinePickerOpen = useMachines((s) => s.pickerOpen)
   const importOpen = useVSCodeImport((s) => s.open)
   const promptDialog = usePrompts((s) => s.dialog)
   const root = useWorkspace((s) => s.root)
@@ -80,6 +87,7 @@ export default function App() {
   useEffect(() => {
     subscribeSearchEvents()
     subscribeTerminalEvents()
+    subscribeMachineEvents()
     subscribeFsEvents()
     subscribeQuit()
     subscribeGitEvents()
@@ -95,6 +103,7 @@ subscribeUsageEvents()
     subscribeAutoSave()
     subscribeScratchAutosave()
     subscribeAlerts()
+    subscribeAgents()
     subscribeEditorContext()
     // Native File menu: Open Folder… / Open Recent ▸ <folder>.
     EventsOn('menu:open-recent', () => useWorkspace.getState().setRecentOpen(true))
@@ -109,6 +118,7 @@ subscribeUsageEvents()
     void useScratch.getState().load()
     void useWorkspace.getState().init()
     void openToolCheckOnFirstRun()
+    void refreshBackgroundTerminals()
     // Panels, dialogs and views load on first use; fetch them once startup settled
     // so that first use is instant too.
     preloadInBackground()
@@ -187,6 +197,16 @@ subscribeUsageEvents()
       {toolCheckOpen && (
         <Suspense fallback={null}>
           <ToolCheck />
+        </Suspense>
+      )}
+      {backgroundTerminalsOpen && (
+        <Suspense fallback={null}>
+          <BackgroundTerminals />
+        </Suspense>
+      )}
+      {machinePickerOpen && (
+        <Suspense fallback={null}>
+          <MachinePicker />
         </Suspense>
       )}
       {importOpen && (

@@ -52,12 +52,12 @@ type Options struct {
 // when the agent can connect to one, else none. The token travels over the
 // agent's stdin, never its command line. revoke ends the token (a no-op when
 // none was issued).
-func mcpServers(caps acp.MCPCapabilities, provider as.MCPProvider, cwd string) (servers []json.RawMessage, revoke func()) {
+func mcpServers(ctx context.Context, caps acp.MCPCapabilities, provider as.MCPProvider, cwd string) (servers []json.RawMessage, revoke func()) {
 	none := func() {}
 	if !caps.HTTP {
 		return []json.RawMessage{}, none
 	}
-	srv, ok := provider.Offer(cwd)
+	srv, ok := provider.Offer(ctx, cwd)
 	if !ok {
 		return []json.RawMessage{}, none
 	}
@@ -129,7 +129,7 @@ func (d *Driver) Start(ctx context.Context, cwd string, sink as.Sink) (as.Sessio
 	if err != nil {
 		return as.SessionInfo{}, err
 	}
-	servers, revoke := mcpServers(client.Info().AgentCapabilities.MCPCapabilities, d.opts.MCP, cwd)
+	servers, revoke := mcpServers(ctx, client.Info().AgentCapabilities.MCPCapabilities, d.opts.MCP, cwd)
 	go func() {
 		<-client.Done() // the session's token dies with the agent process
 		revoke()

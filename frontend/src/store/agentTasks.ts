@@ -1,8 +1,9 @@
 // Agent tasks (TaskAPI in Go): the Tasks panel's list, the New Agent Task dialog
 // and the row actions. State changes come as "tasks:changed" events (derived in
 // Go from the chats' agent events); changed-file counts follow git and file events.
-// Go also keeps the queue: it says which new tasks start now and announces each
-// queued one with "tasks:start" when a slot is free; this store starts the chats.
+// Go also keeps the queue: it says which new tasks start now (this store starts
+// those chats) and starts each queued one itself when a slot is free, telling
+// the window with "chat:opened" (adopted in store/agentChat.ts).
 import { createStore } from '../lib/store'
 import * as TaskAPI from '../../bindings/flint/taskapi'
 import { EventsOn } from '../wails/runtime'
@@ -25,7 +26,7 @@ import { requestGitHubSignIn } from './accounts'
 import { isSignInError } from '../lib/githubSettings'
 import { useWorkspace } from './workspace'
 import { useEditor } from './editor'
-import { chatTabId, useAgentChat } from './agentChat'
+import { chatTabId, setTaskFolderOpener, useAgentChat } from './agentChat'
 import { resolveConflictsWithAgent } from './agent'
 import { activeRoot } from './activeRoot'
 
@@ -164,6 +165,8 @@ export async function showFolder(path: string): Promise<boolean> {
   return (await addRoot(path)) !== null
 }
 
+setTaskFolderOpener(showFolder)
+
 /** The open chat working in a task's folder, most recently opened first. */
 function chatOf(t: TaskView): string | null {
   const { sessions, order } = useAgentChat.getState()
@@ -217,22 +220,6 @@ async function beginTask(t: TaskView, text: string): Promise<void> {
   }
 }
 
-/** A task Go took off the queue: started with the description as it was saved (secrets redacted). */
-async function beginQueuedTask(id: string): Promise<void> {
-  let task: TaskView | undefined
-  try {
-    const tasks = ((await TaskAPI.ListAll(useWorkspace.getState().roots)) ?? []) as TaskView[]
-    task = tasks.find((t) => t.id === id)
-  } catch {
-    // Listed below as not found.
-  }
-  if (!task || task.stale) {
-    await TaskAPI.StartDone(id).catch(() => undefined)
-    return
-  }
-  await beginTask(task, task.prompt)
-}
-
 /** Starts a queued task now, although the limit of working tasks is reached. */
 export async function startQueuedNow(t: TaskView): Promise<void> {
   const started = await withBusy(t, () => TaskAPI.StartNow(t.id))
@@ -251,11 +238,11 @@ let subscribed = false
 export function subscribeTaskQueue(): void {
   if (subscribed) return
   subscribed = true
-  // One at a time: starting a chat opens a folder and a tab.
-  let chain: Promise<void> = Promise.resolve()
-  EventsOn('tasks:start', (id: string) => {
-    chain = chain.then(() => beginQueuedTask(id)).catch(() => undefined)
-  })
+  // Go starts a queued task's chat itself now and announces it with
+  // "chat:opened" (store/agentChat.ts). This listener stays, doing nothing, for
+  // one release: a Go that still emitted "tasks:start" must not make this
+  // window start a second chat for a task whose chat Go starts.
+  EventsOn('tasks:start', () => undefined)
   const pump = () => void TaskAPI.StartQueued().catch(() => undefined)
   useWorkspace.subscribe((s, prev) => {
     if (s.roots !== prev.roots && s.roots.length > 0) pump()

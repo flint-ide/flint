@@ -14,6 +14,7 @@ import { useContributions, type Contributions } from '../lib/contributions'
 const CommitPanel = lazyPreload(() => import('../components/sidebar/CommitPanel').then((m) => ({ default: m.CommitPanel })))
 const PullRequestsPanel = lazyPreload(() => import('../components/github/PullRequestsPanel').then((m) => ({ default: m.PullRequestsPanel })))
 const TasksPanel = lazyPreload(() => import('../components/tasks/TasksPanel').then((m) => ({ default: m.TasksPanel })))
+const AgentsPanel = lazyPreload(() => import('../components/agents/AgentsPanel').then((m) => ({ default: m.AgentsPanel })))
 const UsagePanel = lazyPreload(() => import('../components/usage/UsagePanel').then((m) => ({ default: m.UsagePanel })))
 
 // Command ids and titles predating the registry are kept: keymap overrides are stored by id.
@@ -30,6 +31,10 @@ export const PANELS = definePanels([
   {
     id: 'tasks', title: 'Agent Tasks', icon: 'fork', order: 35, component: TasksPanel,
     command: { id: 'view.agentTasks', category: 'Agent', keywords: 'worktree parallel agents branch claude codex' },
+  },
+  {
+    id: 'agents', title: 'Agents', icon: 'agents', order: 36, component: AgentsPanel,
+    command: { id: 'view.agents', title: 'Show Agents', category: 'Agent', keywords: 'chats status waiting working running overview approval claude codex' },
   },
   {
     id: 'usage', title: 'Usage', icon: 'sum', order: 37, component: UsagePanel,

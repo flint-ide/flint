@@ -189,7 +189,11 @@ func (h *harness) fakeLog(t *testing.T) []map[string]json.RawMessage {
 func TestMCPTokenIsRevokedWithTheSession(t *testing.T) {
 	var issued, revoked atomic.Int32
 	opts, _ := fakeOptions(t, "text")
-	opts.MCP = func(string) (agentsession.MCPServer, bool) {
+	slot := &agentsession.CallerSlot{}
+	opts.MCP = func(ctx context.Context, _ string) (agentsession.MCPServer, bool) {
+		if agentsession.CallerSlotFrom(ctx) != slot {
+			t.Error("the driver did not pass its context to the provider")
+		}
 		issued.Add(1)
 		return agentsession.MCPServer{URL: "http://127.0.0.1:1/mcp", Token: "t", Release: func() { revoked.Add(1) }}, true
 	}
@@ -197,7 +201,7 @@ func TestMCPTokenIsRevokedWithTheSession(t *testing.T) {
 	t.Cleanup(func() { _ = d.Close() })
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	info, err := d.Start(ctx, newWorkspace(t), (&recorder{}).sink)
+	info, err := d.Start(agentsession.WithCaller(ctx, slot), newWorkspace(t), (&recorder{}).sink)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +221,7 @@ func TestMCPTokenIsRevokedWithTheSession(t *testing.T) {
 
 	bad := opts
 	bad.ExtraArgs = []string{"--permission-mode", "bypassPermissions"}
-	if _, err := New(bad).Start(ctx, newWorkspace(t), (&recorder{}).sink); err == nil {
+	if _, err := New(bad).Start(agentsession.WithCaller(ctx, slot), newWorkspace(t), (&recorder{}).sink); err == nil {
 		t.Fatal("reserved argument accepted")
 	}
 	if issued.Load() != revoked.Load() {

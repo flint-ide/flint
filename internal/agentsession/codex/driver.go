@@ -132,7 +132,7 @@ func (d *Driver) start(ctx context.Context, cwd, resumeID string, sink agentsess
 	}
 	var mcp *agentsession.MCPServer
 	if opts.MCP != nil && supportsHTTPMCP(path, buildEnv(opts.Env, nil)) {
-		if srv, ok := opts.MCP.Offer(cwd); ok {
+		if srv, ok := opts.MCP.Offer(ctx, cwd); ok {
 			mcp = &srv
 		}
 	}

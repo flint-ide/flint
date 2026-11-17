@@ -76,6 +76,17 @@ type Event struct {
 	RequestID  string `json:"requestId,omitempty"`
 	StopReason string `json:"stopReason,omitempty"`
 	Usage      *Usage `json:"usage,omitempty"`
+	// Origin is set on a KindUserMessage that did not come from the person
+	// at the keyboard but from another chat (orchestration): the UI shows it
+	// as "from <agent>". Messages typed in the chat itself carry none.
+	Origin *Origin `json:"origin,omitempty"`
+}
+
+// Origin says which chat sent a message that did not come from the web view.
+type Origin struct {
+	SessionID string `json:"sessionId"`
+	Agent     string `json:"agent"`
+	Role      string `json:"role,omitempty"`
 }
 
 // ToolCall describes something the agent does. Updates carry the ID plus changed fields.

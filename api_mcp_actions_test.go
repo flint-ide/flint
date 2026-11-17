@@ -58,7 +58,7 @@ func newActingApp(t *testing.T, actions settings.MCPActions) *actingApp {
 	if err := a.setTrust(project, true); err != nil {
 		t.Fatal(err)
 	}
-	srv, ok := a.offerMCP(project)
+	srv, ok := a.offerMCP(context.Background(), project)
 	if !ok {
 		t.Fatal("no MCP server offered")
 	}

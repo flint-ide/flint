@@ -50,6 +50,9 @@ func TestLoadFillsMissingKeysAndIgnoresUnknown(t *testing.T) {
 	if got.Version != Version {
 		t.Errorf("Version = %d, want %d", got.Version, Version)
 	}
+	if !got.NotifyOnApproval {
+		t.Error("NotifyOnApproval is off, want the default (on) for a file without the key")
+	}
 }
 
 func TestLoadReplacesInvalidValues(t *testing.T) {

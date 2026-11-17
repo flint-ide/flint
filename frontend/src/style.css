@@ -904,6 +904,9 @@ kbd {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.tab-agent {
+  margin-left: 6px;
+}
 .tab-icon {
   width: 7px;
   height: 7px;
@@ -1776,6 +1779,38 @@ button.small {
 .modal.confirm p {
   margin: 0 0 16px;
   white-space: pre-line;
+}
+.modal.peek {
+  width: min(860px, 94vw);
+  height: min(78vh, 860px);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0 0;
+  overflow: hidden;
+}
+.modal.peek .modal-title {
+  margin: 0 16px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.peek-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 8px 16px;
+}
+.peek-actions .link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+.peek-chat {
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--border);
 }
 .modal.quick-open {
   width: min(640px, 92vw);
@@ -2692,6 +2727,10 @@ button.small {
   display: flex;
   gap: 6px;
   padding-left: 4px;
+}
+.msg-from {
+  font-size: 11px;
+  margin-bottom: 2px;
 }
 .msg-attachments,
 .composer-attachments {
@@ -5909,4 +5948,35 @@ body.file-drop-target-active::after {
 }
 .extension-decoration-set {
   display: block;
+}
+
+/* ---------- machines (remote terminals) ---------- */
+
+.tab-machine {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 15px;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.terminal-banner {
+  flex: none;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  background: var(--bg-elevated, var(--bg-editor));
+  border-bottom: 1px solid var(--border);
+  white-space: pre-wrap;
+}
+.terminal-banner.error {
+  color: var(--danger);
+}
+.status-machines {
+  color: var(--fg-muted);
+}
+.status-machines.error {
+  color: var(--danger);
 }

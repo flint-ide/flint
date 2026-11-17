@@ -15,6 +15,28 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as terminal$0 from "./internal/terminal/models.js";
 
 /**
+ * Attach shows a terminal the background host kept running in a new tab of
+ * this window: what the host buffered is replayed, then live output follows
+ * on term:data as for any terminal. id must be one Live lists and no tab of
+ * this window shows yet.
+ */
+export function Attach(id: string): $CancellablePromise<void> {
+    return $Call.ByID(3380260757, id);
+}
+
+/**
+ * ClaudeCommand makes sure Flint's Claude Code hooks file exists and returns
+ * the command line that starts Claude with it, for the "New Claude Terminal"
+ * command to type into a terminal opened in folder. The file is written only
+ * for a folder of the window that is trusted: Restricted Mode starts nothing
+ * on its own, and a hooks file is code that runs when the agent does. It is
+ * the only file written: the user's own agent settings are never touched.
+ */
+export function ClaudeCommand(folder: string): $CancellablePromise<string> {
+    return $Call.ByID(226595739, folder);
+}
+
+/**
  * Close terminates the terminal's shell.
  */
 export function Close(id: string): $CancellablePromise<void> {
@@ -26,6 +48,15 @@ export function Close(id: string): $CancellablePromise<void> {
  */
 export function Cwd(id: string): $CancellablePromise<string> {
     return $Call.ByID(981383818, id);
+}
+
+/**
+ * HookSnippet is the Claude Code settings fragment that reports an agent's
+ * state to Flint's terminal tabs, for a user who wants it in their own
+ * configuration. Flint only offers it; nothing is written for it.
+ */
+export function HookSnippet(): $CancellablePromise<string> {
+    return $Call.ByID(2646336884);
 }
 
 /**
@@ -52,6 +83,15 @@ export function Resume(id: string): $CancellablePromise<terminal$0.Resume> {
  */
 export function Start(id: string, cwd: string, cols: number, rows: number, env: { [_ in string]?: string }): $CancellablePromise<void> {
     return $Call.ByID(1351803004, id, cwd, cols, rows, env);
+}
+
+/**
+ * StartRemote opens a shell on the machine the id names ("<machineId>:<id>").
+ * The id picks the machine; the shell starts in the remote user's home and no
+ * working directory, environment or shell is accepted from the web view.
+ */
+export function StartRemote(id: string, cols: number, rows: number): $CancellablePromise<void> {
+    return $Call.ByID(1802247386, id, cols, rows);
 }
 
 /**

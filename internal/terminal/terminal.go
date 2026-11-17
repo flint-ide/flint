@@ -25,6 +25,9 @@ type Events interface {
 	Exited(id string, code int)
 	// Title reports a change of what the terminal runs or where its shell is.
 	Title(id string, info Info)
+	// AgentState reports a change of the state an agent CLI in the terminal
+	// reports (the Agent* constants), see agentstate.go.
+	AgentState(id, state string)
 }
 
 // Options configure a new terminal session.
@@ -48,20 +51,35 @@ type session struct {
 	info       Info // last reported
 	fgGroup    int  // foreground process group of info.Command, 0 at the prompt
 	done       bool
+	gone       chan struct{} // closed once the shell has been waited for
+	agent      agentTracker
 }
+
+// DefaultKillGrace is how long a shell has to leave after SIGHUP before its
+// process group is killed.
+const DefaultKillGrace = 5 * time.Second
 
 // Manager owns all running terminal sessions.
 type Manager struct {
 	events Events
 
-	mu       sync.Mutex
-	sessions map[string]*session
-	streams  map[string]*streamSession
+	mu        sync.Mutex
+	sessions  map[string]*session
+	streams   map[string]*streamSession
+	killGrace time.Duration
 }
 
 // NewManager creates a manager that reports output through events.
 func NewManager(events Events) *Manager {
-	return &Manager{events: events, sessions: map[string]*session{}, streams: map[string]*streamSession{}}
+	return &Manager{events: events, sessions: map[string]*session{}, streams: map[string]*streamSession{}, killGrace: DefaultKillGrace}
+}
+
+// SetKillGrace changes how long a shell may outlive Close and CloseAll
+// (DefaultKillGrace); tests shorten it.
+func (m *Manager) SetKillGrace(d time.Duration) {
+	m.mu.Lock()
+	m.killGrace = d
+	m.mu.Unlock()
 }
 
 // Start launches a shell in a new PTY under the given id.
@@ -85,7 +103,7 @@ func (m *Manager) Start(id string, opts Options) error {
 	if err != nil {
 		return fmt.Errorf("start shell %s: %w", shell, err)
 	}
-	s := &session{cmd: cmd, pty: ptmx}
+	s := &session{cmd: cmd, pty: ptmx, gone: make(chan struct{})}
 
 	m.mu.Lock()
 	m.sessions[id] = s
@@ -152,9 +170,10 @@ func (m *Manager) Close(id string) {
 	m.mu.Lock()
 	s := m.sessions[id]
 	delete(m.sessions, id)
+	grace := m.killGrace
 	m.mu.Unlock()
 	if s != nil {
-		hangUp(s)
+		hangUp(s, grace)
 	}
 }
 
@@ -165,9 +184,10 @@ func (m *Manager) CloseAll() {
 	m.sessions = map[string]*session{}
 	streams := m.streams
 	m.streams = map[string]*streamSession{}
+	grace := m.killGrace
 	m.mu.Unlock()
 	for _, s := range all {
-		hangUp(s)
+		hangUp(s, grace)
 	}
 	for _, st := range streams {
 		if st.Close != nil {
@@ -207,6 +227,7 @@ func (m *Manager) pump(id string, s *session) {
 
 	Coalesce(chunks, func(data []byte) {
 		m.events.Output(id, data)
+		m.scanAgent(id, s, data) // after the bytes went on: reading them never delays the screen
 		m.noteActivity(id, s)
 	})
 	s.stopTitle()
@@ -221,6 +242,7 @@ func (m *Manager) pump(id string, s *session) {
 		}
 	}
 	_ = s.pty.Close()
+	close(s.gone)
 
 	m.mu.Lock()
 	if m.sessions[id] == s {
@@ -253,10 +275,22 @@ func Coalesce(chunks <-chan []byte, emit func([]byte)) {
 }
 
 // hangUp sends SIGHUP to the shell's process group (pty.Start makes it a session leader),
-// which is what closing a terminal window does.
-func hangUp(s *session) {
+// which is what closing a terminal window does. A shell that ignores SIGHUP
+// would live on (and, in the background host, hold its id), so after grace
+// the group is killed unless the shell has been waited for by then.
+func hangUp(s *session, grace time.Duration) {
 	if s.cmd.Process != nil {
-		_ = syscall.Kill(-s.cmd.Process.Pid, syscall.SIGHUP)
+		pid := s.cmd.Process.Pid
+		_ = syscall.Kill(-pid, syscall.SIGHUP)
+		go func() {
+			timer := time.NewTimer(grace)
+			defer timer.Stop()
+			select {
+			case <-s.gone:
+			case <-timer.C:
+				_ = syscall.Kill(-pid, syscall.SIGKILL)
+			}
+		}()
 	}
 	_ = s.pty.Close()
 }

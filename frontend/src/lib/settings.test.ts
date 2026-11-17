@@ -61,6 +61,12 @@ describe('coerceSettings', () => {
     assert.deepEqual(s.keymap, { 'git.push': 'Mod+K' })
   })
 
+  it('notifies about approvals by default and keeps an explicit off', () => {
+    assert.equal(coerceSettings({}).notifyOnApproval, true)
+    assert.equal(coerceSettings({ notifyOnApproval: false }).notifyOnApproval, false)
+    assert.equal(coerceSettings({ notifyOnApproval: 'no' }).notifyOnApproval, true)
+  })
+
   it('falls back to the defaults for garbage', () => {
     // No feature registered a section here (lib/settingsSections.test.ts has them).
     assert.deepEqual(coerceSettings(null), DEFAULT_SETTINGS)

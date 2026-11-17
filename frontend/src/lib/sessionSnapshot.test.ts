@@ -19,6 +19,12 @@ describe('parseSnapshot', () => {
     assert.deepEqual(snap, { version: 1, active: 1, tabs: [{ kind: 'file', path: '/p/a' }] })
   })
 
+  it('keeps the settled flag of a chat tab, and reads a snapshot without it', () => {
+    const chat = { id: 'c', agent: 'claude', cwd: '/p', draft: '', chat: { items: [], plan: [], busy: false } }
+    const snap = parseSnapshot(JSON.stringify({ version: 1, active: 0, tabs: [{ kind: 'chat', title: 'a', chat, settled: true }, { kind: 'chat', title: 'b', chat }] }))
+    assert.deepEqual(snap?.tabs.map((t) => (t.kind === 'chat' ? t.settled : null)), [true, undefined])
+  })
+
   it('rejects empty, broken and foreign documents', () => {
     assert.equal(parseSnapshot(''), null)
     assert.equal(parseSnapshot('{'), null)

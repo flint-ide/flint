@@ -4,6 +4,9 @@ import { EventsOn } from '../wails/runtime'
 import { createReorderer } from '../lib/reorder'
 import { useEditor } from './editor'
 import { terminalTitle } from '../lib/terminalTitle'
+import { machineLabel, remoteTabTitle, remoteTermId, splitRemoteTermId } from '../lib/machines'
+import { useSettings } from './settings'
+import type { TerminalAgentState } from '../lib/agentList'
 
 export interface TerminalTab {
   id: string
@@ -26,6 +29,12 @@ export interface TerminalTab {
   env?: Record<string, string>
   /** Shown first in the tab name ("aws:prod"). */
   tag?: string
+  /** Shows a shell the background host kept running instead of starting one. */
+  attach?: boolean
+  /** What an agent CLI in the terminal reported (term:agent); never saved with the session. */
+  agentState?: TerminalAgentState
+  /** The machine this terminal runs on (its id is "<machine>:<session>"); absent for a local shell. */
+  machine?: string
 }
 
 export interface CreateOptions {
@@ -38,12 +47,29 @@ export interface CreateOptions {
   project?: string
   env?: Record<string, string>
   tag?: string
+  /**
+   * Attach to the terminal of this id: the background host's (store/backgroundTerminals.ts) or,
+   * for "<machine>:<session>", the one the machine kept (a restored remote tab).
+   */
+  attachId?: string
+  /** Open a new shell on this machine (its home folder; the cwd and env are not sent). */
+  machine?: string
+  /** Open the tab already ended, showing this text: a remote session that cannot be reached again. */
+  endedWith?: string
 }
 
 interface TerminalState {
   tabs: TerminalTab[]
   create: (cwd: string, opts?: CreateOptions) => string
   close: (id: string) => void
+}
+
+/** The tab name: what the terminal runs, behind "<machine> ▸" for a terminal on a machine. */
+function tabTitle(t: { command: string; cwd: string; programTitle?: string; tag?: string; machine?: string }): string {
+  const base = terminalTitle(t)
+  if (!t.machine) return base
+  const known = useSettings.getState().settings.machines.find((m) => m.id === t.machine)
+  return remoteTabTitle(known ? machineLabel(known) : t.machine, base)
 }
 
 /** Editor tab id of a terminal (terminals live among the editor tabs). */
@@ -53,12 +79,14 @@ export const useTerminal = createStore<TerminalState>((set, get) => ({
   tabs: [],
 
   create: (cwd, opts = {}) => {
-    const id = crypto.randomUUID()
-    const title = opts.title ?? terminalTitle({ command: '', cwd, tag: opts.tag })
+    const id = opts.attachId ?? (opts.machine ? remoteTermId(opts.machine, crypto.randomUUID()) : crypto.randomUUID())
+    const machine = opts.machine ?? (opts.attachId ? splitRemoteTermId(opts.attachId)?.machine : undefined)
+    const title = opts.title ?? tabTitle({ command: '', cwd, tag: opts.tag, machine })
     const tab: TerminalTab = {
-      id, title, pinned: opts.title !== undefined, command: '', cwd, exitCode: null, initialInput: opts.input, restored: opts.restored, project: opts.project ?? cwd,
-      env: opts.env, tag: opts.tag,
+      id, title, pinned: opts.title !== undefined, command: '', cwd, exitCode: opts.endedWith === undefined ? null : -1, initialInput: opts.input, restored: opts.endedWith ?? opts.restored, project: opts.project ?? cwd,
+      env: opts.env, tag: opts.tag, ...(opts.attachId ? { attach: true } : {}), ...(machine ? { machine } : {}),
     }
+    if (opts.endedWith !== undefined) started.add(id) // nothing to start: the session is gone
     set((s) => ({ tabs: [...s.tabs, tab] }))
     useEditor.getState().openTerminal(id, title, opts.background)
     return id
@@ -104,7 +132,7 @@ function updateTab(id: string, change: (t: TerminalTab) => Partial<TerminalTab>)
   const tab = useTerminal.getState().tabs.find((t) => t.id === id)
   if (!tab) return
   const next = { ...tab, ...change(tab) }
-  if (!next.pinned) next.title = terminalTitle(next)
+  if (!next.pinned) next.title = tabTitle(next)
   // Programs repeat their title (shells at every prompt, agents while they work):
   // a new tabs array would re-render the tab bar and save the session for nothing.
   if (unchanged(tab, next)) return
@@ -115,6 +143,25 @@ function updateTab(id: string, change: (t: TerminalTab) => Partial<TerminalTab>)
 /** A title set by the program in the terminal (OSC 0/2); shells setting one at the prompt are ignored. */
 export function setProgramTitle(id: string, title: string): void {
   updateTab(id, (t) => (t.command ? { programTitle: title } : {}))
+}
+
+/** Shows a dimmed line in a terminal (its sink, or its backlog until a view mounts) without involving the backend. */
+function showNotice(id: string, text: string): void {
+  const bytes = new TextEncoder().encode(`\r\n\x1b[2m[${text}]\x1b[0m\r\n`)
+  const sink = sinks.get(id)
+  if (sink) sink(bytes)
+  else buffer(id, bytes)
+}
+
+/**
+ * A terminal on a machine that could not be started or re-attached (the user declined the ssh
+ * command, ssh failed, the session is gone): the tab says why and shows as ended. Nothing starts
+ * a new shell in its place.
+ */
+export function failRemoteTerminal(id: string, why: string): void {
+  if (closed.has(id)) return
+  showNotice(id, why)
+  useTerminal.setState((s) => ({ tabs: s.tabs.map((t) => (t.id === id && t.exitCode === null ? { ...t, exitCode: -1, agentState: undefined } : t)) }))
 }
 
 /** Recent plain-text output of each mounted terminal, for session snapshots. */
@@ -271,10 +318,17 @@ export function subscribeTerminalEvents(): void {
       programTitle: msg.command === t.command ? t.programTitle : undefined,
     }))
   })
+  EventsOn('term:agent', (msg: { id: string; state: TerminalAgentState }) => {
+    if (closed.has(msg.id)) return
+    useTerminal.setState((s) => {
+      const tab = s.tabs.find((t) => t.id === msg.id)
+      return !tab || tab.agentState === msg.state ? {} : { tabs: s.tabs.map((t) => (t.id === msg.id ? { ...t, agentState: msg.state } : t)) }
+    })
+  })
   EventsOn('term:exit', (msg: { id: string; code: number }) => {
     if (closed.has(msg.id)) return forgetClosedLater(msg.id)
     useTerminal.setState((s) => ({
-      tabs: s.tabs.map((t) => (t.id === msg.id ? { ...t, exitCode: msg.code } : t)),
+      tabs: s.tabs.map((t) => (t.id === msg.id ? { ...t, exitCode: msg.code, agentState: undefined } : t)),
     }))
   })
 }

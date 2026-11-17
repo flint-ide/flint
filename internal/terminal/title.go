@@ -48,12 +48,14 @@ func (m *Manager) checkTitle(id string, s *session) {
 	}
 	info, ok := s.inspect()
 	changed := ok && info != s.info
+	was := s.info
 	if changed {
 		s.info = info
 	}
 	s.titleMu.Unlock()
 	if changed {
 		m.events.Title(id, info)
+		m.agentLeft(id, s, was, info)
 	}
 }
 

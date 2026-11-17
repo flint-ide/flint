@@ -4,7 +4,9 @@
 export {
     AgentSettings,
     CustomAgent,
-    LanguageServerSettings
+    LanguageServerSettings,
+    Machine,
+    MachineIssue
 } from "./models.js";
 
 export type {

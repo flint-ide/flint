@@ -80,6 +80,15 @@ export interface AgentEvent {
   requestId?: string
   stopReason?: string
   usage?: Usage
+  /** On a `user_message`: the chat that sent it, when it was not typed here. */
+  origin?: Origin
+}
+
+/** Mirrors Go's agentsession.Origin. */
+export interface Origin {
+  sessionId: string
+  agent: string
+  role?: string
 }
 
 export interface Attachment {
@@ -90,7 +99,7 @@ export interface Attachment {
 }
 
 export type ChatItem =
-  | { type: 'user'; text: string; attachments: Attachment[] }
+  | { type: 'user'; text: string; attachments: Attachment[]; /** Who sent it, when another agent did. */ from?: string }
   | { type: 'assistant'; text: string }
   | { type: 'thought'; text: string }
   | { type: 'tool'; call: ToolCall }
@@ -118,6 +127,11 @@ export function addUserMessage(state: ChatState, text: string, attachments: Atta
   return { ...state, busy: true, items: [...state.items, { type: 'user', text, attachments }] }
 }
 
+/** How a message's sender is named: the agent, and its role when it has one. */
+export function originLabel(o: Origin): string {
+  return o.role ? `${o.agent} (${o.role})` : o.agent
+}
+
 /** Applies one event; returns the same object when nothing changed. */
 export function applyEvent(state: ChatState, e: AgentEvent): ChatState {
   switch (e.kind) {
@@ -126,7 +140,11 @@ export function applyEvent(state: ChatState, e: AgentEvent): ChatState {
     case 'thought_chunk':
       return appendText(state, 'thought', e.text ?? '')
     case 'user_message':
-      return state // our own messages are already in the transcript
+      // Our own messages are already in the transcript; only another chat's
+      // message (it has an origin) is news.
+      return e.origin
+        ? { ...state, items: [...state.items, { type: 'user', text: e.text ?? '', attachments: [], from: originLabel(e.origin) }] }
+        : state
     case 'tool_call':
       return e.toolCall ? upsertTool(state, e.toolCall) : state
     case 'tool_call_update':

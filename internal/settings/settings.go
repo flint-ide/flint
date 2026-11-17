@@ -88,6 +88,9 @@ type Settings struct {
 	// NotifyInBackground shows a notification and a Dock badge when a run, a
 	// test run or an agent finishes while Flint is in the background.
 	NotifyInBackground bool `json:"notifyInBackground"`
+	// NotifyOnApproval also notifies when an agent chat waits for the user's
+	// approval; it needs NotifyInBackground.
+	NotifyOnApproval bool `json:"notifyOnApproval"`
 	// Keymap overrides command shortcuts: command id → "Mod+Shift+X", or "" to
 	// remove the shortcut. Commands not listed keep their default keys.
 	Keymap map[string]string `json:"keymap"`
@@ -114,15 +117,24 @@ type Settings struct {
 	Prompts Prompts `json:"prompts"`
 	// AgentReview configures Review Changes with Agent (review.go).
 	AgentReview AgentReview `json:"agentReview"`
+	// Orchestration configures agents that start and direct agents (orchestration.go).
+	Orchestration Orchestration `json:"orchestration"`
 	// CI configures following your pull requests' checks (ci.go).
 	CI CI `json:"ci"`
 	// PRReview configures handing review comments to the agent (prreview.go).
 	PRReview PRReview `json:"prReview"`
 	// GitHub configures the GitHub host, sign-in and API limits (github.go).
 	GitHub GitHub `json:"github"`
+	// Sessions configures background terminals (sessions.go).
+	Sessions Sessions `json:"sessions"`
+	// Machines are the remote machines terminals and agents can run on over
+	// ssh (machines.go).
+	Machines []Machine `json:"machines"`
 
 	// sections are the values of the keys features own (section.go), by key.
 	sections map[string]any
+	// machineIssues are the entries of Machines that Normalize dropped.
+	machineIssues []MachineIssue
 }
 
 // Default returns the settings Flint uses when nothing is configured.
@@ -141,6 +153,7 @@ func Default() Settings {
 			LineHeight: 1.2,
 		},
 		NotifyInBackground: true,
+		NotifyOnApproval:   true,
 		Keymap:             map[string]string{},
 		WatchExclude:       defaultWatchExclude(),
 		Agents:             map[string]AgentSettings{},
@@ -154,8 +167,11 @@ func Default() Settings {
 		Prompts:            defaultPrompts(),
 		AgentReview:        defaultAgentReview(),
 		CI:                 defaultCI(),
+		Orchestration:      defaultOrchestration(),
 		PRReview:           defaultPRReview(),
 		GitHub:             defaultGitHub(),
+		Sessions:           defaultSessions(),
+		Machines:           []Machine{},
 		CustomTheme:        defaultCustomTheme(),
 		sections:           sectionDefaults(),
 	}
@@ -227,8 +243,11 @@ func Normalize(s Settings) Settings {
 	out.Usage = normalizeUsage(s.Usage)
 	out.AgentReview = normalizeAgentReview(s.AgentReview, out.CustomAgents)
 	out.CI = normalizeCI(s.CI)
+	out.Orchestration = normalizeOrchestration(s.Orchestration)
 	out.PRReview = normalizePRReview(s.PRReview)
 	out.GitHub = normalizeGitHub(s.GitHub)
+	out.Sessions = normalizeSessions(s.Sessions)
+	out.Machines, out.machineIssues = NormalizeMachines(s.Machines)
 	out.sections = normalizeSections(s)
 	return out
 }
@@ -318,6 +337,9 @@ func Validate(s Settings) error {
 	if err := validateAgentReview(s.AgentReview, s.CustomAgents); err != nil {
 		return err
 	}
+	if err := CheckOrchestration(s.Orchestration); err != nil {
+		return err
+	}
 	if err := CheckCI(s.CI); err != nil {
 		return err
 	}
@@ -325,6 +347,12 @@ func Validate(s Settings) error {
 		return err
 	}
 	if err := CheckGitHub(s.GitHub); err != nil {
+		return err
+	}
+	if err := CheckSessions(s.Sessions); err != nil {
+		return err
+	}
+	if err := CheckMachines(s.Machines); err != nil {
 		return err
 	}
 	return checkSections(s)

@@ -16,6 +16,7 @@ import * as GitHubAPI from "./githubapi.js";
 import * as HTTPAPI from "./httpapi.js";
 import * as ImportAPI from "./importapi.js";
 import * as LSPAPI from "./lspapi.js";
+import * as MachinesAPI from "./machinesapi.js";
 import * as PreviewAPI from "./previewapi.js";
 import * as ProfileAPI from "./profileapi.js";
 import * as PromptsAPI from "./promptsapi.js";
@@ -44,6 +45,7 @@ export {
     HTTPAPI,
     ImportAPI,
     LSPAPI,
+    MachinesAPI,
     PreviewAPI,
     ProfileAPI,
     PromptsAPI,
@@ -70,6 +72,8 @@ export {
     ComparedTask,
     FileComparison,
     FileHistory,
+    LiveTerminal,
+    LiveTerminals,
     MergeResult,
     NewTask,
     NewTaskGroup,

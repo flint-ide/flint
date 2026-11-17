@@ -1,4 +1,4 @@
-// Package rpc is JSON-RPC 2.0 over a pair of byte streams, one message per
+// Package jsonrpc is JSON-RPC 2.0 over a pair of byte streams, one message per
 // line (UTF-8 JSON without raw newlines), as MCP's stdio transport: how Flint
 // talks to an external extension's process (docs/design/extensions.md). Both
 // sides send requests, responses and notifications.
@@ -7,7 +7,7 @@
 // isn't JSON-RPC or a flood of output closes it (the owner then stops the
 // process), requests from the other side run with bounded concurrency, and a
 // request that times out is cancelled with $/cancelRequest, as in LSP.
-package rpc
+package jsonrpc
 
 import (
 	"bufio"
@@ -68,6 +68,12 @@ type Options struct {
 	// closes. Return an *Error to pick the error code. Nil answers
 	// "method not found".
 	OnRequest func(ctx context.Context, method string, params json.RawMessage) (any, error)
+	// AfterReply, when set, is called with the method of each request of the
+	// other side once its reply has been written (or, if the writer is stuck
+	// or the connection closed, after a short wait), in the request's own
+	// goroutine. It is how a handler can act only after its answer left, e.g.
+	// a request to shut the process down.
+	AfterReply func(method string)
 	// OnNotify handles a notification on the reading goroutine, in order:
 	// it must not block.
 	OnNotify func(method string, params json.RawMessage)
@@ -85,7 +91,7 @@ type Options struct {
 // Conn is one connection. Create it with New, then run Serve with the input.
 type Conn struct {
 	o    Options
-	out  chan []byte
+	out  chan frame
 	done chan struct{}
 	err  error // set before done is closed
 	once sync.Once
@@ -137,7 +143,7 @@ func New(w io.Writer, o Options) *Conn {
 		o.RateWindow = 5
 	}
 	c := &Conn{
-		o: o, out: make(chan []byte, outQueue), done: make(chan struct{}),
+		o: o, out: make(chan frame, outQueue), done: make(chan struct{}),
 		pending: map[int64]chan *message{}, incoming: map[string]context.CancelFunc{},
 		sem: make(chan struct{}, o.MaxConcurrent),
 	}
@@ -148,8 +154,12 @@ func New(w io.Writer, o Options) *Conn {
 func (c *Conn) write(w io.Writer) {
 	for {
 		select {
-		case data := <-c.out:
-			if _, err := w.Write(data); err != nil {
+		case f := <-c.out:
+			if f.data == nil { // a flush marker: everything before it was written
+				close(f.written)
+				continue
+			}
+			if _, err := w.Write(f.data); err != nil {
 				c.Close(fmt.Errorf("write: %w", err))
 				return
 			}
@@ -233,8 +243,22 @@ func (c *Conn) Notify(method string, params any) error {
 	return c.send(ctx, request{JSONRPC: "2.0", Method: method, Params: params})
 }
 
+// Marshal encodes v the way messages are put on the wire: JSON without the
+// HTML escaping of encoding/json, which would turn < > & into six-byte escapes
+// (markup-heavy text would grow sixfold and no longer fit MaxMessage). The
+// output has no raw line ends: U+2028 and U+2029 stay escaped.
+func Marshal(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
+}
+
 func (c *Conn) send(ctx context.Context, v any) error {
-	data, err := json.Marshal(v)
+	data, err := Marshal(v)
 	if err != nil {
 		return err
 	}
@@ -248,12 +272,36 @@ func (c *Conn) send(ctx context.Context, v any) error {
 	default:
 	}
 	select {
-	case c.out <- data:
+	case c.out <- frame{data: data}:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-c.done:
 		return c.err
+	}
+}
+
+// frame is one queued write; a frame without data is a flush marker.
+type frame struct {
+	data    []byte
+	written chan struct{}
+}
+
+// flush waits until everything queued before it has been handed to the
+// writer, or ctx ends or the connection closes.
+func (c *Conn) flush(ctx context.Context) {
+	marker := frame{written: make(chan struct{})}
+	select {
+	case c.out <- marker:
+	case <-ctx.Done():
+		return
+	case <-c.done:
+		return
+	}
+	select {
+	case <-marker.written:
+	case <-ctx.Done():
+	case <-c.done:
 	}
 }
 
@@ -398,6 +446,9 @@ func (c *Conn) request(msg *message) {
 		}()
 		result, err := c.handle(ctx, msg)
 		c.reply(msg.ID, result, err)
+		if c.o.AfterReply != nil {
+			c.afterReply(msg.Method)
+		}
 	}()
 }
 
@@ -431,6 +482,16 @@ func (c *Conn) reply(id json.RawMessage, result any, err error) {
 		// The result itself could not be sent (too large): say so instead.
 		_ = c.send(ctx, errorReply{JSONRPC: "2.0", ID: id, Error: Errorf(CodeInternal, "%v", sendErr)})
 	}
+}
+
+// afterReply waits (a bounded time) for the reply to be written, then calls
+// the hook; a hook that panics does not take the process down.
+func (c *Conn) afterReply(method string) {
+	defer func() { _ = recover() }()
+	ctx, cancel := context.WithTimeout(context.Background(), notifyWait)
+	defer cancel()
+	c.flush(ctx)
+	c.o.AfterReply(method)
 }
 
 func validID(id json.RawMessage) bool {

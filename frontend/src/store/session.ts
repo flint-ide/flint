@@ -11,12 +11,20 @@ import { restoreRunSelections, useRun } from './run'
 import { setAllBreakpoints, useDebug } from './debug'
 import { breakpointsUnder } from '../lib/breakpoints'
 import { coerceResume, resumeCommand, type TerminalResume } from '../lib/terminalResume'
+import { restoreMode } from '../lib/backgroundTerminals'
+import { isRemoteTermId, restoreRemoteTab } from '../lib/machines'
+import { configuredMachineIds } from './machines'
+import { liveTerminalIds, noteUnclaimedTerminals } from './backgroundTerminals'
 
 // What was open in a project (tabs, terminals, agent chats) is saved per project
 // so a restart comes back as it was left. Terminals reopen as new shells in their
 // last directory with the earlier output dimmed above, and an agent CLI that ran
 // in one (claude, codex) is started again on its conversation; chats keep their
 // transcript and reconnect to the agent's conversation on the next message.
+// With background terminals on, a terminal whose shell the background host still
+// runs attaches to it instead (lib/backgroundTerminals.ts, restoreMode). A terminal on a
+// machine (its id is "<machine>:<session>") only ever re-attaches: the saved id carries the
+// machine, so the snapshot format is unchanged (lib/machines.ts, restoreRemoteTab).
 
 const SAVE_DELAY_MS = 1500
 const SAVE_MAX_WAIT_MS = 10_000
@@ -83,7 +91,7 @@ async function captureTab(t: Tab, roots: string[]): Promise<SavedTab | null> {
       if (live) agentIn.set(t.termId, term.command ? coerceResume(await TerminalBackend.Resume(t.termId).catch(() => null)) : null)
       const resume = agentIn.get(t.termId) ?? null
       return {
-        kind: 'terminal', title: t.title, pinned: term.pinned, env: term.env, tag: term.tag, cwd: cwd || term.cwd,
+        kind: 'terminal', id: t.termId, title: t.title, pinned: term.pinned, env: term.env, tag: term.tag, cwd: cwd || term.cwd,
         output: recentOutput(t.termId, SCROLLBACK_LINES), project: term.project, ...(resume ? { resume } : {}),
       }
     }
@@ -94,6 +102,7 @@ async function captureTab(t: Tab, roots: string[]): Promise<SavedTab | null> {
         kind: 'chat',
         title: t.title,
         chat: { id: s.id, agent: s.agent, cwd: s.cwd, model: s.model, draft: s.draft, chat: trimChat(s.chat) },
+        ...(useEditor.getState().hidden.includes(t.id) ? { settled: true } : {}),
       }
     }
     case 'run':
@@ -138,10 +147,14 @@ async function apply(root: string, snap: Snapshot, roots: string[]): Promise<voi
     : new Set<string>()
   const dirs = new Map<string, boolean>()
   await Promise.all(
-    snap.tabs.flatMap((t) => (t.kind === 'terminal' ? [SessionAPI.Exists(t.cwd).then((ok) => void dirs.set(t.cwd, ok))] : [])),
+    snap.tabs.flatMap((t) => (t.kind === 'terminal' && !isRemoteTermId(t.id ?? '') ? [SessionAPI.Exists(t.cwd).then((ok) => void dirs.set(t.cwd, ok))] : [])),
   )
+  const live = snap.tabs.some((t) => t.kind === 'terminal') ? await liveTerminalIds() : new Set<string>()
+  const machineIds = snap.tabs.some((t) => t.kind === 'terminal' && isRemoteTermId(t.id ?? '')) ? await configuredMachineIds() : new Set<string>()
+  const claimed = new Set(useTerminal.getState().tabs.map((t) => t.id))
 
   const ids: (string | null)[] = []
+  const settled: string[] = []
   for (const t of snap.tabs) {
     switch (t.kind) {
       case 'file':
@@ -176,6 +189,27 @@ async function apply(root: string, snap: Snapshot, roots: string[]): Promise<voi
         break
       case 'terminal': {
         const project = t.project && roots.includes(t.project) ? t.project : root
+        // A terminal on a machine never respawns, and never as a local shell: it re-attaches to the
+        // session the machine kept (the tab says so when it is gone) or opens ended.
+        const remote = restoreRemoteTab(t.id, machineIds)
+        if (remote) {
+          claimed.add(t.id!)
+          const id = useTerminal.getState().create('', {
+            title: t.pinned ? t.title : undefined, background: true, project, attachId: t.id,
+            ...(remote.mode === 'ended' ? { endedWith: `${t.output ? `${t.output}\n── restored ──\n` : ''}${remote.reason}` } : {}),
+          })
+          ids.push(terminalTabId(id))
+          break
+        }
+        if (restoreMode(t.id, live, claimed) === 'attach') {
+          // Still running in the background host: shown as it is, nothing typed into it.
+          claimed.add(t.id!)
+          const id = useTerminal.getState().create(t.cwd, {
+            title: t.pinned ? t.title : undefined, background: true, project, env: t.env, tag: t.tag, attachId: t.id,
+          })
+          ids.push(terminalTabId(id))
+          break
+        }
         const cwd = dirs.get(t.cwd) ? t.cwd : project
         // The agent's conversation belongs to the folder it ran in: elsewhere it would resume another one.
         const input = cwd === t.cwd ? resumeCommand(t.resume) : ''
@@ -188,6 +222,7 @@ async function apply(root: string, snap: Snapshot, roots: string[]): Promise<voi
       case 'chat':
         useAgentChat.getState().restore(t.chat)
         ids.push(chatTabId(t.chat.id))
+        if (t.settled) settled.push(chatTabId(t.chat.id))
         break
       case 'contrib': {
         // Shown as soon as its extension's tab kind is contributed (after the extensions load).
@@ -200,6 +235,8 @@ async function apply(root: string, snap: Snapshot, roots: string[]): Promise<voi
   }
   const active = ids[snap.active]
   if (active && useEditor.getState().tabs.some((t) => t.id === active)) useEditor.getState().setActive(active)
+  // After the active tab is chosen: a settled tab is never the one shown (hideTab refuses when it would be the last drawn).
+  for (const id of settled) if (id !== active) useEditor.getState().hideTab(id)
 }
 
 let restoring = false
@@ -250,6 +287,8 @@ export function restoreSession(root: string, attach?: (roots: string[]) => Promi
     } finally {
       restoring = false
     }
+    // After the tabs claimed theirs: what the host still runs without a tab.
+    void noteUnclaimedTerminals()
   })()
   return restored
 }
@@ -269,7 +308,7 @@ export function subscribeSessionAutosave(): void {
   if (subscribed) return
   subscribed = true
   useEditor.subscribe((s, prev) => {
-    if (s.tabs !== prev.tabs || s.activeId !== prev.activeId) scheduleSave()
+    if (s.tabs !== prev.tabs || s.activeId !== prev.activeId || s.hidden !== prev.hidden) scheduleSave()
   })
   useTerminal.subscribe((s, prev) => {
     if (s.tabs !== prev.tabs) scheduleSave()

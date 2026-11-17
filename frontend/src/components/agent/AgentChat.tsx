@@ -89,6 +89,7 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
             case 'user':
               return (
                 <div key={i} className="msg user">
+                  {it.from && <div className="msg-from muted">from {it.from}</div>}
                   <MessageText text={it.text} />
                   {it.attachments.length > 0 && (
                     <div className="msg-attachments">{it.attachments.map((a, j) => <span key={j} className="chip">{label(a, root)}</span>)}</div>

@@ -35,6 +35,7 @@ type Terminals struct {
 
 type console struct {
 	kind, title, cwd string
+	agent            string // the state an agent CLI reported
 	exited           bool
 	code             int
 	segs             []segment // oldest first; the last one is being written
@@ -56,6 +57,9 @@ type TerminalInfo struct {
 	Cwd    string
 	Exited bool
 	Code   int
+	// AgentState is what an agent CLI running in the terminal reported
+	// (working, waiting, done, idle); "" when none did.
+	AgentState string
 }
 
 // NewTerminals returns an empty store.
@@ -159,6 +163,28 @@ func (t *Terminals) SetInfo(id, command, cwd string) {
 	}
 }
 
+// SetAgentState records the state an agent CLI in the terminal reports
+// (working, waiting, done, idle), "" for none.
+func (t *Terminals) SetAgentState(id, state string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if c := t.byID[id]; c != nil {
+		c.agent = state
+	}
+}
+
+// Get returns one console's description (any project), for telling a terminal
+// id from an unknown one.
+func (t *Terminals) Get(id string) (TerminalInfo, bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	c := t.byID[id]
+	if c == nil {
+		return TerminalInfo{}, false
+	}
+	return TerminalInfo{ID: id, Kind: c.kind, Title: c.title, Cwd: c.cwd, Exited: c.exited, Code: c.code, AgentState: c.agent}, true
+}
+
 // Exit records that id's process ended; its output stays readable.
 func (t *Terminals) Exit(id string, code int) {
 	t.mu.Lock()
@@ -193,7 +219,7 @@ func (t *Terminals) List(root string) []TerminalInfo {
 		c := t.byID[id]
 		in := within(c.cwd, root) || slices.ContainsFunc(c.segs, func(s segment) bool { return len(s.data) > 0 && within(s.cwd, root) })
 		if in {
-			out = append(out, TerminalInfo{ID: id, Kind: c.kind, Title: c.title, Cwd: c.cwd, Exited: c.exited, Code: c.code})
+			out = append(out, TerminalInfo{ID: id, Kind: c.kind, Title: c.title, Cwd: c.cwd, Exited: c.exited, Code: c.code, AgentState: c.agent})
 		}
 	}
 	return out

@@ -10,15 +10,20 @@ import (
 	"time"
 
 	"flint/internal/acp/acptest"
+	"flint/internal/agenthost/hostmode"
 	as "flint/internal/agentsession"
 	"flint/internal/agentsession/acpdriver"
 	"flint/internal/settings"
 )
 
 // TestMain lets the test binary double as a fake ACP agent (custom agents
-// in these tests run os.Executable()).
+// in these tests run os.Executable()) and as the background host
+// (background_e2e_test.go spawns os.Executable() --agent-host).
 func TestMain(m *testing.M) {
 	acptest.RunIfAgent()
+	if os.Getenv("FLINT_TEST_AGENT_HOST") == "1" {
+		hostmode.Main(hostmode.Options{Version: "e2e", AllowShell: true}) // returns unless started with --agent-host
+	}
 	os.Exit(m.Run())
 }
 

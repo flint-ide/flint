@@ -167,6 +167,113 @@ export class LanguageServerSettings {
 }
 
 /**
+ * Machine is a remote machine whose terminals and agents Flint runs over the
+ * user's own ssh (docs/design/agent-runtime.md, "Phase 4"). Every field ends
+ * up in the argument list of an ssh process, so each is checked against a
+ * strict pattern here and again by internal/remote before it builds a command
+ * line. Nothing secret is stored: ssh authenticates with the user's keys and
+ * agent, and BatchMode means it never asks for a password.
+ */
+export class Machine {
+    /**
+     * ID names the machine in tabs and routing ("<id>:<session>").
+     */
+    "id": string;
+
+    /**
+     * Name is shown in the UI; empty shows the ID.
+     */
+    "name": string;
+
+    /**
+     * Target is what ssh connects to: "host", "user@host" or an alias from
+     * ~/.ssh/config.
+     */
+    "target": string;
+
+    /**
+     * Port is the ssh port; 0 leaves it to ssh (its config or 22).
+     */
+    "port": number;
+
+    /**
+     * Command is the Flint executable on the remote machine (default
+     * "flint"): a name or a path, never with arguments.
+     */
+    "command": string;
+
+    /** Creates a new Machine instance. */
+    constructor($$source: Partial<Machine> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("target" in $$source)) {
+            this["target"] = "";
+        }
+        if (!("port" in $$source)) {
+            this["port"] = 0;
+        }
+        if (!("command" in $$source)) {
+            this["command"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Machine instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Machine {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Machine($$parsedSource as Partial<Machine>);
+    }
+}
+
+/**
+ * MachineIssue says why an entry of "machines" was dropped when settings.json
+ * was read, so the Settings UI can show it instead of the entry vanishing
+ * silently.
+ */
+export class MachineIssue {
+    /**
+     * Index is the entry's position in the file's list.
+     */
+    "index": number;
+
+    /**
+     * ID is the entry's id as written (it may be the invalid part).
+     */
+    "id": string;
+    "reason": string;
+
+    /** Creates a new MachineIssue instance. */
+    constructor($$source: Partial<MachineIssue> = {}) {
+        if (!("index" in $$source)) {
+            this["index"] = 0;
+        }
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("reason" in $$source)) {
+            this["reason"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MachineIssue instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MachineIssue {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MachineIssue($$parsedSource as Partial<MachineIssue>);
+    }
+}
+
+/**
  * Settings is the whole settings.json document.
  */
 export type Settings = any;

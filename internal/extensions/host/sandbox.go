@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"flint/internal/agenthost/hostmode"
 	"flint/internal/extensions/manifest"
 	"flint/internal/extensions/sandbox"
 )
@@ -162,6 +163,9 @@ func (e *ext) sandboxRequest(tmp string, env []string) (sandbox.Request, error) 
 		return sandbox.Request{}, err
 	}
 	config := filepath.Dir(e.h.o.Dir)
+	// The background host's run directory is derived from the configuration
+	// folder as the host sees it, links not resolved.
+	runDir := hostmode.RunDir(config)
 	if real, err := resolve(config); err == nil {
 		config = real
 	}
@@ -185,7 +189,7 @@ func (e *ext) sandboxRequest(tmp string, env []string) (sandbox.Request, error) 
 	}
 	sb := e.m.Run.Sandbox
 	req := sandbox.Request{
-		GOOS: runtime.GOOS, Home: home, ConfigDir: config,
+		GOOS: runtime.GOOS, Home: home, ConfigDir: config, RunDir: runDir,
 		ExtensionDir: dir, DataDir: data, TempDir: tmp,
 		Read: sb.Read, Write: sb.Write, Network: sandboxNetwork(e.m), LocalSockets: sb.LocalSockets, Exec: sb.Exec,
 		Env: lookup, Resolve: resolve,

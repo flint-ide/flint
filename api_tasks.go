@@ -276,47 +276,66 @@ type NewTaskGroup struct {
 // of the others only, and the queue starts that one later (tasks_queue.go).
 // When one cannot be created, none is kept.
 func (t *TaskAPI) CreateGroup(req NewTaskGroup) ([]TaskView, error) {
-	a := t.app
+	ctx, cancel := t.ctx(gitRemoteTimeout) // checkout hooks may run
+	defer cancel()
+	made, r, err := t.app.createTasks(ctx, req, true)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]TaskView, len(made))
+	for i, task := range made {
+		views[i] = t.view(ctx, r, task)
+	}
+	return views, nil
+}
+
+// createTasks is the core of CreateGroup, for Go code that makes tasks
+// without the UI (an agent's start_agent with a worktree). It validates req,
+// makes the branches and worktrees and remembers the tasks; when one cannot
+// be created none is kept. A task that would exceed agentTasks.maxParallel is
+// remembered as queued when queueOK, otherwise nothing is created and the
+// error says so. A task that is not queued holds a slot (reserveStart) until
+// its chat's start is reported done (releaseStart): whoever calls this starts
+// that chat, or releases the slot.
+func (a *App) createTasks(ctx context.Context, req NewTaskGroup, queueOK bool) ([]agenttask.Task, *git.Repo, error) {
 	desc := strings.TrimSpace(req.Description)
 	switch {
 	case desc == "":
-		return nil, errors.New("describe the task first")
+		return nil, nil, errors.New("describe the task first")
 	case len(desc) > agenttask.MaxPrompt:
-		return nil, fmt.Errorf("the description is longer than %d characters", agenttask.MaxPrompt)
+		return nil, nil, fmt.Errorf("the description is longer than %d characters", agenttask.MaxPrompt)
 	case strings.ContainsRune(desc, 0):
-		return nil, errors.New("the description contains a NUL character")
+		return nil, nil, errors.New("the description contains a NUL character")
 	case len(req.Agents) == 0:
-		return nil, errors.New("choose an agent first")
+		return nil, nil, errors.New("choose an agent first")
 	case len(req.Agents) > agenttask.MaxGroup:
-		return nil, fmt.Errorf("one description starts at most %d tasks: choose fewer agents or attempts", agenttask.MaxGroup)
+		return nil, nil, fmt.Errorf("one description starts at most %d tasks: choose fewer agents or attempts", agenttask.MaxGroup)
 	}
 	if _, err := a.rootOf(req.Dir); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	s := a.currentSettings()
 	installed := installedAgents(s, exec.LookPath)
 	for _, agent := range req.Agents {
 		if !slices.Contains(installed, agent) {
-			return nil, fmt.Errorf("the agent %q is not installed", agent)
+			return nil, nil, fmt.Errorf("the agent %q is not installed", agent)
 		}
 	}
-	ctx, cancel := t.ctx(gitRemoteTimeout) // checkout hooks may run
-	defer cancel()
-	r, err := t.git.repo(ctx, req.Dir)
+	r, err := git.Open(ctx, req.Dir)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	base, err := taskBase(ctx, r, req.Base)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	baseCommit, err := r.Resolve(ctx, git.HeadRef(base))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	wts, err := r.Worktrees(ctx)
 	if err != nil || len(wts) == 0 {
-		return nil, fmt.Errorf("list worktrees: %v", err)
+		return nil, nil, fmt.Errorf("list worktrees: %v", err)
 	}
 	checkout := wts[0].Path
 	home, _ := os.UserHomeDir()
@@ -330,6 +349,9 @@ func (t *TaskAPI) CreateGroup(req NewTaskGroup) ([]TaskView, error) {
 	// One decision at a time about who gets a free slot (tasks_queue.go).
 	a.queue.mu.Lock()
 	defer a.queue.mu.Unlock()
+	if !queueOK && agenttask.Slots(s.AgentTasks.MaxParallel, a.activeTasks()) < len(req.Agents) {
+		return nil, nil, fmt.Errorf("the limit of %d tasks working at once is reached: wait for one to finish", s.AgentTasks.MaxParallel)
+	}
 	var made []agenttask.Task
 	undo := func() {
 		for _, task := range made {
@@ -341,7 +363,7 @@ func (t *TaskAPI) CreateGroup(req NewTaskGroup) ([]TaskView, error) {
 		}
 	}
 	for _, agent := range req.Agents {
-		task, err := t.createOne(ctx, r, agenttask.Task{
+		task, err := a.createOne(ctx, r, agenttask.Task{
 			ID: agenttask.NewID(), Title: agenttask.Title(desc), Prompt: redact.Secrets(desc), Agent: agent,
 			Branch: agenttask.BranchName(s.AgentTasks.BranchPrefix, desc, agent, group != ""),
 			Base:   base, BaseCommit: baseCommit, Checkout: cleanFolder(checkout),
@@ -350,26 +372,21 @@ func (t *TaskAPI) CreateGroup(req NewTaskGroup) ([]TaskView, error) {
 		}, pathOf, &made)
 		if err != nil {
 			undo()
-			return nil, err
+			return nil, nil, err
 		}
 		if !task.Queued {
-			a.reserveStart(task.ID) // the UI starts its chat next
+			a.reserveStart(task.ID) // its chat starts next
 		}
 	}
 	a.emit(eventTasksChanged)
-	views := make([]TaskView, len(made))
-	for i, task := range made {
-		views[i] = t.view(ctx, r, task)
-	}
-	return views, nil
+	return made, r, nil
 }
 
 // createOne gives task (whose Branch is the wanted name) a free branch and a
 // worktree at its base commit, remembers it and trusts its folder when the
 // repository is trusted. What it made is appended to made as soon as it
 // exists, for the caller to undo.
-func (t *TaskAPI) createOne(ctx context.Context, r *git.Repo, task agenttask.Task, pathOf func(string) string, made *[]agenttask.Task) (agenttask.Task, error) {
-	a := t.app
+func (a *App) createOne(ctx context.Context, r *git.Repo, task agenttask.Task, pathOf func(string) string, made *[]agenttask.Task) (agenttask.Task, error) {
 	branch, err := agenttask.Unique(task.Branch, func(b string) bool {
 		_, statErr := os.Lstat(pathOf(b))
 		return r.BranchExists(ctx, b) || statErr == nil

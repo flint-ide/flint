@@ -536,7 +536,8 @@ export async function openRunLink(key: string, path: string, line?: number, colu
   showToast(`${path} not found`, 'error')
 }
 
-async function fileExists(path: string): Promise<boolean> {
+/** Whether path is an existing file (a listing of its folder: no binding for a single stat). */
+export async function fileExists(path: string): Promise<boolean> {
   const entries = await Workspace.ListDir(dirname(path)).catch(() => null)
   const name = path.slice(path.lastIndexOf('/') + 1)
   return !!entries?.some((e) => e.name === name && !e.isDir)

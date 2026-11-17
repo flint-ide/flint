@@ -16,6 +16,10 @@ type Request struct {
 	// Home is the user's home folder; ConfigDir Flint's own.
 	Home      string
 	ConfigDir string
+	// RunDir is the background session host's run directory (its socket and
+	// token), "" when there is none to protect. Nothing in it, and nothing
+	// that holds it, is ever granted.
+	RunDir string
 	// ExtensionDir is the installed folder (read and run), DataDir the
 	// extension's data folder and TempDir its private temporary folder (both
 	// written). All three are absolute, with symbolic links resolved.
@@ -90,6 +94,14 @@ func Build(r Request) Policy {
 	}
 	protected := ProtectedPaths(r.GOOS, r.Home, r.ConfigDir)
 	own := []string{r.ExtensionDir, r.DataDir, r.TempDir}
+	runDirs := r.runDirs()
+	p.Protected = append(p.Protected, runDirs...)
+	check := func(real string, explicit bool) string {
+		if why := refuseRunDir(real, runDirs); why != "" {
+			return why
+		}
+		return refuse(real, r.Home, r.ConfigDir, own, protected, explicit)
+	}
 	grant := func(list *[]string, shown, target string, explicit bool) {
 		real, err := r.Resolve(target)
 		if err != nil {
@@ -99,7 +111,7 @@ func Build(r Request) Policy {
 		if real != target {
 			explicit = false // a link: judged by where it leads
 		}
-		switch reason := refuse(real, r.Home, r.ConfigDir, own, protected, explicit); {
+		switch reason := check(real, explicit); {
 		case reason != "":
 			p.Notes = append(p.Notes, fmt.Sprintf("%s is not granted: %s", shown, reason))
 		case !containsPath(*list, real):
@@ -129,7 +141,7 @@ func Build(r Request) Policy {
 			if err != nil || linuxSystem(real) && r.GOOS == "linux" {
 				continue
 			}
-			if refuse(real, r.Home, r.ConfigDir, own, protected, false) == "" && !containsPath(p.Read, real) {
+			if check(real, false) == "" && !containsPath(p.Read, real) {
 				p.Read = append(p.Read, real)
 			}
 		}
@@ -137,6 +149,36 @@ func Build(r Request) Policy {
 	// A path both read and written is written.
 	p.Read = slices.DeleteFunc(p.Read, func(s string) bool { return containsPath(p.Write, s) })
 	return p
+}
+
+// runDirs are the run directory as given and where its links lead; empty
+// without one.
+func (r Request) runDirs() []string {
+	if r.RunDir == "" {
+		return nil
+	}
+	dirs := []string{path.Clean(r.RunDir)}
+	if real, err := r.Resolve(dirs[0]); err == nil && !slices.Contains(dirs, real) {
+		dirs = append(dirs, real)
+	}
+	return dirs
+}
+
+// refuseRunDir says why real may not be granted for the background host's run
+// directory (its socket, its token): neither the directory, nor anything in
+// it, nor a folder that holds it may be granted, even by name in a manifest.
+// Without this a manifest granting $XDG_RUNTIME_DIR (or /tmp, where the run
+// directory may fall back to) would hand the token to the extension.
+func refuseRunDir(real string, runDirs []string) string {
+	for _, dir := range runDirs {
+		switch {
+		case within(dir, real):
+			return "it is inside the background host's run directory"
+		case within(real, dir):
+			return "it contains the background host's run directory; name the folders the program needs"
+		}
+	}
+	return ""
 }
 
 // refuse says why real may not be granted; "" when it may.

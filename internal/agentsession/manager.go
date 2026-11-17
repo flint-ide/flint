@@ -171,6 +171,21 @@ func (m *Manager) emit(e Event) {
 	m.emitRaw(e)
 }
 
+// Announce emits e as an event of an open chat, stamped with that chat's next
+// sequence number, so a message Flint itself sends on someone's behalf stays in
+// order with the agent's own events. It fails for an unknown chat.
+func (m *Manager) Announce(sessionID string, e Event) error {
+	m.mu.Lock()
+	_, ok := m.sessions[sessionID]
+	m.mu.Unlock()
+	if !ok {
+		return fmt.Errorf("unknown session %q", sessionID)
+	}
+	e.SessionID = sessionID
+	m.emit(e)
+	return nil
+}
+
 // Register makes a driver available under name ("claude", "codex", ...). A
 // driver it replaces keeps the sessions it runs until they stop.
 func (m *Manager) Register(name string, d Driver) {
@@ -239,14 +254,14 @@ var ErrNoResume = errors.New("this agent cannot resume earlier conversations")
 
 // Start opens a session with the named agent.
 func (m *Manager) Start(ctx context.Context, agent, cwd string) (SessionInfo, error) {
-	return m.open(agent, cwd, func(d Driver, sink Sink) (SessionInfo, error) {
+	return m.open(ctx, agent, cwd, func(ctx context.Context, d Driver, sink Sink) (SessionInfo, error) {
 		return d.Start(ctx, cwd, sink)
 	})
 }
 
 // Resume reopens an earlier conversation of the named agent.
 func (m *Manager) Resume(ctx context.Context, agent, cwd, sessionID string) (SessionInfo, error) {
-	return m.open(agent, cwd, func(d Driver, sink Sink) (SessionInfo, error) {
+	return m.open(ctx, agent, cwd, func(ctx context.Context, d Driver, sink Sink) (SessionInfo, error) {
 		r, ok := d.(Resumer)
 		if !ok {
 			return SessionInfo{}, ErrNoResume
@@ -255,8 +270,10 @@ func (m *Manager) Resume(ctx context.Context, agent, cwd, sessionID string) (Ses
 	})
 }
 
-// open starts or resumes a session through fn and registers it.
-func (m *Manager) open(agent, cwd string, fn func(Driver, Sink) (SessionInfo, error)) (SessionInfo, error) {
+// open starts or resumes a session through fn and registers it. fn gets a
+// context carrying a CallerSlot that is filled with the session id as soon as
+// the driver returns it, so MCP tokens issued during the start resolve to it.
+func (m *Manager) open(ctx context.Context, agent, cwd string, fn func(context.Context, Driver, Sink) (SessionInfo, error)) (SessionInfo, error) {
 	m.mu.Lock()
 	d, closed := m.drivers[agent], m.closed
 	m.mu.Unlock()
@@ -269,7 +286,8 @@ func (m *Manager) open(agent, cwd string, fn func(Driver, Sink) (SessionInfo, er
 	s := &managed{agent: agent, cwd: cwd, driver: d}
 	var sessionID string
 	var idMu sync.Mutex
-	info, err := fn(d, func(e Event) {
+	slot := &CallerSlot{}
+	info, err := fn(WithCaller(ctx, slot), d, func(e Event) {
 		idMu.Lock()
 		if e.SessionID == "" {
 			e.SessionID = sessionID
@@ -283,6 +301,7 @@ func (m *Manager) open(agent, cwd string, fn func(Driver, Sink) (SessionInfo, er
 	idMu.Lock()
 	sessionID = info.ID
 	idMu.Unlock()
+	slot.Set(info.ID)
 	if info.Agent == "" {
 		info.Agent = agent
 	}
@@ -327,6 +346,15 @@ func (m *Manager) route(s *managed, e Event) {
 		m.settleAction(e.SessionID, e.RequestID, "")
 	}
 	if e.Kind == KindPermission && e.Permission != nil {
+		if opt, ok := m.grantedOption(e.SessionID, *e.Permission); ok {
+			// Covered by the chat's orchestration grant (actions.go).
+			go func() {
+				if err := s.driver.Respond(e.SessionID, e.Permission.ID, opt); err != nil {
+					m.emit(Event{SessionID: e.SessionID, Kind: KindError, Text: "auto-approve failed: " + err.Error()})
+				}
+			}()
+			return
+		}
 		if req, acts := m.gateAction(e.SessionID, s.cwd, *e.Permission); acts {
 			// A tool of Flint that acts: the user answers, whatever the policy.
 			e.Permission = &req

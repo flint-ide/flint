@@ -12,7 +12,7 @@ import (
 	"unicode/utf8"
 
 	"flint/internal/extensions/manifest"
-	"flint/internal/extensions/rpc"
+	"flint/internal/jsonrpc"
 )
 
 // maxReadFile bounds workspace/readFile.
@@ -38,7 +38,7 @@ func (e *ext) workspaceFile(path string) (string, error) {
 			return real, nil
 		}
 	}
-	return "", rpc.Errorf(rpc.CodePermission, "%s is not inside an open, trusted project folder", path)
+	return "", jsonrpc.Errorf(jsonrpc.CodePermission, "%s is not inside an open, trusted project folder", path)
 }
 
 func (e *ext) readFile(params json.RawMessage) (any, error) {
@@ -83,11 +83,11 @@ func (e *ext) readFile(params json.RawMessage) (any, error) {
 func readable(path string) error {
 	for _, part := range strings.Split(filepath.ToSlash(path), "/") {
 		if part == ".git" {
-			return rpc.Errorf(rpc.CodePermission, "files inside .git are not readable by extensions")
+			return jsonrpc.Errorf(jsonrpc.CodePermission, "files inside .git are not readable by extensions")
 		}
 	}
 	if secretFiles.MatchString(filepath.Base(path)) {
-		return rpc.Errorf(rpc.CodePermission, "%s may hold credentials and is not readable by extensions", filepath.Base(path))
+		return jsonrpc.Errorf(jsonrpc.CodePermission, "%s may hold credentials and is not readable by extensions", filepath.Base(path))
 	}
 	return nil
 }
@@ -115,7 +115,7 @@ func (e *ext) secret(op string, params json.RawMessage) (any, error) {
 		return nil, err
 	}
 	if e.h.o.Secrets == nil {
-		return nil, rpc.Errorf(rpc.CodeInternal, "no keyring")
+		return nil, jsonrpc.Errorf(jsonrpc.CodeInternal, "no keyring")
 	}
 	var p struct {
 		Key   string  `json:"key"`

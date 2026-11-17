@@ -154,11 +154,17 @@ func (a *App) actionGate() as.ActionGate {
 				a.actionGrants.add(cwd, tool, args)
 			}
 		},
+		Granted: a.orchGate,
 	}
 }
 
 // approveAction is the MCP server's question before an acting tool runs.
 func (a *App) approveAction(ctx context.Context, call mcpserver.Approval) error {
+	if call.Granted != nil {
+		// The orchestration tools: one grant per chat, not one dialog per call
+		// (orch_grant.go). The agent's own permission card does not count here.
+		return a.approveOrchestration(ctx, call)
+	}
 	if a.actionGrants.take(call.Root, call.Tool, call.Args) {
 		return nil
 	}

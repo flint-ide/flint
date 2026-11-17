@@ -10,7 +10,7 @@ Flint stores your preferences in `settings.json`. The [Settings tab](../guides/s
 
 The file is readable only by your user. It never contains secrets: database passwords and the completion endpoint's API key live in the macOS Keychain, and other credentials stay with the tools that own them.
 
-> **Note:** Flint reads `settings.json` when it starts. If you edit the file by hand, restart Flint to apply your changes. Changes made in the Settings tab apply immediately; agent settings apply to agent sessions started afterwards.
+> **Note:** Flint reads `settings.json` when it starts. If you edit the file by hand, restart Flint to apply your changes. Changes made in the Settings tab apply immediately; agent settings apply to agent sessions started afterwards, and `sessions.background` at the next start.
 
 ## How the file is read
 
@@ -41,6 +41,7 @@ The file is readable only by your user. It never contains secrets: database pass
   "defaultAgent": "claude",
   "autoSave": true,
   "notifyInBackground": true,
+  "notifyOnApproval": true,
   "checkForUpdates": true,
   "keymap": {
     "terminal.new": "Mod+Alt+T",
@@ -80,6 +81,7 @@ The file is readable only by your user. It never contains secrets: database pass
   },
   "inlineEdit": { "contextLines": 60 },
   "agentTasks": { "worktreeDir": "~/worktrees", "branchPrefix": "agent/", "maxParallel": 3 },
+  "orchestration": { "enabled": false, "maxChildren": 4, "maxDepth": 2, "maxWaitSeconds": 600, "notifyParent": true, "outputLines": 200, "maxAutoTurns": 40 },
   "usage": {
     "retentionDays": 90,
     "dailyBudgetUsd": 20,
@@ -90,7 +92,11 @@ The file is readable only by your user. It never contains secrets: database pass
   "agentReview": { "scope": "selected", "maxDiffKB": 128, "agent": "", "timeoutSeconds": 300 },
   "ci": { "pollSeconds": 60, "logTailLines": 80, "logErrorLines": 40, "notify": true },
   "prReview": { "maxThreads": 20, "contextLines": 8 },
-  "github": { "host": "github.com", "clientId": "", "scopes": ["repo", "read:org", "workflow"], "maxRetryWaitSeconds": 60 }
+  "github": { "host": "github.com", "clientId": "", "scopes": ["repo", "read:org", "workflow"], "maxRetryWaitSeconds": 60 },
+  "sessions": { "background": false, "replayKiB": 1024 },
+  "machines": [
+    { "id": "dev-box", "name": "Dev box", "target": "me@dev.example.com", "port": 22, "command": "flint" }
+  ]
 }
 ```
 
@@ -106,6 +112,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `defaultAgent` | string | `""` | Agent for new chats, commit messages and conflict resolution: `"claude"`, `"codex"` or the `id` of a custom agent. Empty means the first installed agent. Conflict resolution always uses Claude Code or Codex. |
 | `autoSave` | boolean | `false` | Save modified files when the Flint window loses focus. |
 | `notifyInBackground` | boolean | `true` | Show a macOS notification and a Dock badge when a run, a test run or an agent finishes while Flint is in the background. |
+| `notifyOnApproval` | boolean | `true` | Also show a notification, and count it on the Dock badge, when an agent chat waits for your approval while Flint is in the background. Also needs `notifyInBackground`. |
 | `keymap` | object | `{}` | Shortcut overrides: command id → shortcut. See [keymap](#keymap). |
 | `agents` | object | `{}` | Agent CLIs by name (`"claude"`, `"codex"`). See [agents](#agents). |
 | `customAgents` | array | `[]` | Other agents, spoken to over the Agent Client Protocol. See [customAgents](#customagents). |
@@ -114,12 +121,15 @@ The file is readable only by your user. It never contains secrets: database pass
 | `completions` | object | see below | Inline suggestions from a code model (off by default). See [completions](#completions). |
 | `inlineEdit` | object | see below | Edit with Agent (`⌘I`). See [inlineEdit](#inlineedit). |
 | `agentTasks` | object | see below | Where agent task worktrees go, how their branches are named and how many tasks work at the same time. See [agentTasks](#agenttasks). |
+| `orchestration` | object | see below | Agents that start and direct other agents (off by default). See [orchestration](#orchestration). |
 | `usage` | object | see below | How long agent usage is kept, budgets, and prices for estimates. See [usage](#usage). |
 | `prompts` | object | see below | The prompt library of the agent chat (`/`). See [prompts](#prompts). |
 | `agentReview` | object | see below | Review Changes with Agent. See [agentReview](#agentreview). |
 | `ci` | object | see below | Following your pull requests' CI: poll interval, Fix with agent's log excerpt, notifications. See [ci](#ci). |
 | `prReview` | object | see below | Handing a pull request's review comments to the agent: threads per draft, code lines around a comment. See [prReview](#prreview). |
 | `github` | object | see below | The GitHub host, the OAuth App Sign in with GitHub uses, scopes and the retry wait. See [github](#github). |
+| `sessions` | object | see below | Background terminals: shells that keep running when Flint closes (off by default). See [sessions](#sessions). |
+| `machines` | array | `[]` | Remote machines for terminals over SSH. See [machines](#machines). |
 <!-- include-rows _settings/*.md -->
 
 ### Font objects
@@ -284,6 +294,22 @@ Used by [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel).
 
 Slashes in a branch name become dashes in the folder name. The tasks themselves are kept in `state.json`.
 
+### orchestration
+
+Lets an agent chat start other agents in the same project, send them messages, wait for them and read their output, through Flint's MCP server (which must be on, see [mcpServer](#mcpserver)). **Off by default**: while `enabled` is `false` the tools are not even listed.
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `enabled` | boolean | | `false` | Offer the tools `list_agents`, `start_agent`, `send_prompt`, `wait_for_agent`, `read_agent_output` and `stop_agent` to agents. Even then, each chat needs your yes once (a native dialog) before its first call. |
+| `maxChildren` | integer | 1–16 | `4` | Agents one chat may have started at a time. |
+| `maxDepth` | integer | 1–4 | `2` | Levels of agents that may start agents. `1`: your chat can start agents, which cannot start any. |
+| `maxWaitSeconds` | integer | 1–600 | `600` | The longest one `wait_for_agent` call. |
+| `notifyParent` | boolean | | `true` | When an agent a chat started waits for approval, fails or finishes, Flint sends that chat one short message (`[Flint] child … is …`) with the agent's last 20 lines, so it need not poll. |
+| `outputLines` | integer | 1–2000 | `200` | The most lines `read_agent_output` returns (redacted). |
+| `maxAutoTurns` | integer | 1–400 | `40` | The most turns agents may start in each other (a `send_prompt`, a started agent's first prompt, a delivered `[Flint]` notice) in one group of chats, counted from the last message you typed in any chat of that group. Past it, agents are told to stop and report to you, and no notices are delivered; typing a message in any of the chats starts the count again. |
+
+Out-of-range numbers are clamped; `0` or a missing number is the default. What is not a setting, on purpose: the grant covers one project only, never an untrusted folder (Restricted Mode), lives in memory and ends with the chat, and an agent that was refused is not asked about again. Messages an agent sends to another are redacted and appear in the target's chat, but are not previewed first. See [ARCHITECTURE.md](https://github.com/flint-ide/flint/blob/main/docs/ARCHITECTURE.md#security-model).
+
 ### usage
 
 Used by the [Usage panel and budgets](../guides/ai-agents.md#usage-and-budgets). A budget of `0` is off.
@@ -354,6 +380,35 @@ Used by [Pull requests](../guides/git-and-github.md#pull-requests) and [When CI 
 | `maxRetryWaitSeconds` | integer (s) | 0–300 | `60` | When GitHub answers "retry after" (a secondary rate limit), a read waits that long and tries once more if the wait is at most this; otherwise, and for writes, the limit is reported. |
 
 Flint caps a GitHub answer at 32 MB, a file side of a diff at 4 MB and the pages one listing follows at 30; these limits are not settings.
+
+### sessions
+
+Background terminals: terminals run in a separate Flint process, so closing the window or quitting leaves them running and the next start reattaches their tabs. **Off by default.** Edited in **Settings ▸ Terminal ▸ Background terminals**. Agent chats are not covered yet: they end when Flint quits, whatever `background` says.
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `background` | boolean | | `false` | Run terminals in the background host. Read when Flint starts: a change applies at the next start, also from the Settings tab. Off, terminals run inside Flint and end when it quits. |
+| `replayKiB` | integer (KiB) | 64–8192 | `1024` | How much recent output the host keeps per terminal for the window that reattaches. Applies to terminals started afterwards. |
+
+Out-of-range numbers are clamped; `0` or a missing number is the default. **Quit and Stop Background Sessions** (next to Quit in the menu) ends the background shells and the host. See [Background terminals](https://github.com/flint-ide/flint/blob/main/docs/FEATURES.md#background-terminals).
+
+### machines
+
+Remote machines whose terminals run over your own `ssh` (terminals only: files, editor, git, language servers and search stay local, and agent chats on a machine are not available yet). Edited in **Settings ▸ Machines**, which also has a Check button per machine and shows entries that were left out with the reason. See [Remote terminals](https://github.com/flint-ide/flint/blob/main/docs/FEATURES.md#remote-terminals). Flint starts `ssh` with `BatchMode`, so it never asks for a password: authenticate with a key or the SSH agent, and put hosts that need more (jump hosts, other keys) in `~/.ssh/config` under an alias used as the `target`. Flint stores no secret.
+
+```json
+"machines": [{ "id": "dev-box", "name": "Dev box", "target": "me@dev.example.com", "port": 22, "command": "flint" }]
+```
+
+| Key | Type | Range | Default | Meaning |
+|---|---|---|---|---|
+| `id` | string | `^[a-z0-9][a-z0-9-]{0,31}$`, unique | required | Names the machine in tabs. |
+| `name` | string | up to 64 characters, no control characters | `""` | Shown in the UI; empty shows the `id`. |
+| `target` | string | `host` or `user@host`: letters, digits, `.`, `_`, `-`; may not start with `-` | required | What `ssh` connects to: a host name, an address or an alias from `~/.ssh/config`. |
+| `port` | integer | 0 or 1–65535 | `0` | SSH port; `0` leaves it to `ssh`. |
+| `command` | string | `^[A-Za-z0-9_./~-]{1,256}$`, may not start with `-` | `"flint"` | The Flint executable on the remote machine. It is a name or a path, never a command line. |
+
+At most 32 machines. An entry that breaks a rule is dropped whole (Flint never connects with half of one) and the reason is kept for the Settings tab; the rest of the file is read as usual. Saving refuses invalid entries.
 
 <!-- Keys of feature modules: one file per key in _settings/ (first line: the table row; the rest: its section), pulled in by cmd/docsite. -->
 <!-- include-sections _settings/*.md -->

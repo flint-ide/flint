@@ -54,4 +54,5 @@ func (q *AppAPI) CancelQuit() {
 	q.app.closeMu.Lock()
 	q.app.closeAskedAt = time.Time{}
 	q.app.closeMu.Unlock()
+	q.app.stopSessionsOnQuit.Store(false) // background terminals keep running after all
 }

@@ -29,11 +29,13 @@ import (
 	"flint/internal/lsp"
 	"flint/internal/mcpserver"
 	"flint/internal/mcptools"
+	"flint/internal/orchestrate"
+	"flint/internal/remote"
 	"flint/internal/restore"
 	"flint/internal/runner"
 	"flint/internal/scratch"
+	"flint/internal/sessions"
 	"flint/internal/settings"
-	"flint/internal/terminal"
 	"flint/internal/usage"
 	"flint/internal/watcher"
 )
@@ -73,21 +75,38 @@ type App struct {
 	configDir  string
 	argFolder  string
 
-	scratch     *scratch.Store
-	terminals   *terminal.Manager
-	runs        *runner.Manager // run configurations and test runs
-	runEvents   *runEvents
-	debugs      *dap.Manager // debug sessions (dlv dap)
-	debugEvents *debugEvents
-	profiles    *profiles // temporary profiles and recordings in progress
-	lsp         *lsp.Manager
-	agents      *agentsession.Manager
-	mcp         *mcpserver.Server // Flint's MCP server for its agents (api_mcp.go)
-	mcpSources  *mcptools.Sources // what the MCP server's tools read
+	scratch   *scratch.Store
+	terminals sessions.Terminals // the router (terminals_router.go)
+	// termStreams starts Docker/extension stream sessions; same router as terminals.
+	termStreams streamStarter
+	termRouter  *terminalsRouter
+	// remote holds the connections to remote machines (api_machines.go); the
+	// router sends "<machineId>:<id>" terminal ids to it.
+	remote *remote.Hub
+	// background runs terminals in the background host (background_terminals.go);
+	// nil when sessions.background was off at start.
+	background *hostTerminals
+	// stopSessionsOnQuit: Quit and Stop Background Sessions was chosen.
+	stopSessionsOnQuit atomic.Bool
+	runs               *runner.Manager // run configurations and test runs
+	runEvents          *runEvents
+	debugs             *dap.Manager // debug sessions (dlv dap)
+	debugEvents        *debugEvents
+	profiles           *profiles // temporary profiles and recordings in progress
+	lsp                *lsp.Manager
+	agents             sessions.Agents
+	// agentMgr is the in-process manager behind agents, for what only it can
+	// do: registering custom agents (syncCustomAgents).
+	agentMgr   *agentsession.Manager
+	mcp        *mcpserver.Server // Flint's MCP server for its agents (api_mcp.go)
+	mcpSources *mcptools.Sources // what the MCP server's tools read
 	// actionGrants and configRuns serve the MCP tools that act (api_mcp_actions.go).
 	actionGrants actionGrants
 	configRuns   configRuns
-	tasks        *agenttask.Tracker // state of agent tasks from their chats
+	orchGrants   orchGrants            // what the user allowed each chat to orchestrate (orch_grant.go)
+	notices      orchestrate.Notices   // what a chat's children have to tell it (chat_notify.go)
+	tasks        *agenttask.Tracker    // state of agent tasks from their chats
+	orch         *orchestrate.Registry // every chat's place in the tree, state and output (chat_open.go)
 	sessions     *restore.Store
 	usage        *usage.Store // agent usage per day (usage_state.go)
 	usageChats   usageChats
@@ -116,6 +135,8 @@ type App struct {
 
 	confirmMu sync.Mutex      // one confirmation dialog at a time
 	confirmed map[string]bool // custom agent command lines the user allowed a Check of, this session
+	// emitHook replaces the Wails event bus in tests.
+	emitHook func(name string, data ...any)
 	// ask replaces the native confirmation dialog (askNative) in tests.
 	ask func(title, message, ok string) bool
 }
@@ -140,7 +161,6 @@ func NewApp() (*App, error) {
 		sessions:  restore.New(filepath.Join(dir, "sessions")),
 		http:      httpfile.NewClient(),
 	}
-	a.terminals = terminal.NewManager(newTerminalEvents(a))
 	a.runEvents = newRunEvents(a)
 	a.runs = runner.NewManager(a.runEvents)
 	a.debugEvents = newDebugEvents(a)
@@ -163,17 +183,26 @@ func NewApp() (*App, error) {
 	if err != nil {
 		log.Printf("flint: %v (using default settings)", err)
 	}
+	a.wireTerminals(newTerminalEvents(a), dialHost, spawnHost) // after settings: sessions.background picks
 	a.openUsage()
 	a.wireAccounts()
 	a.mcp, a.mcpSources = newMCP(a)
 	a.features = feature.New(features, featureHost{a})
 	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
-	a.agents = newAgentManager(a)
+	a.orch = orchestrate.New()
+	a.agentMgr = newAgentManager(a)
+	// Agent chats stay in this process even with sessions.background on: the
+	// host has no MCP server, approval gate, custom agents or per-agent
+	// settings yet (steps 3.8, 3.9). Moving them to the host is this switch.
+	a.agents = a.agentMgr
 	return a, nil
 }
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	if a.background != nil {
+		go a.background.connect() // terminal calls wait for it, startup does not
+	}
 	a.features.Start(ctx)
 }
 
@@ -182,7 +211,7 @@ func (a *App) shutdown() {
 	// so quitting stays fast.
 	var wg sync.WaitGroup
 	for _, stop := range append([]func(){
-		a.terminals.CloseAll,
+		a.closeTerminals, // detaches from background terminals instead of ending them
 		a.runs.CloseAll,
 		a.debugs.CloseAll,
 		a.http.CancelAll,

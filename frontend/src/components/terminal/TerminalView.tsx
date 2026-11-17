@@ -7,6 +7,7 @@ import {
   TerminalBackend,
   attachSink,
   claimStart,
+  failRemoteTerminal,
   registerOutputReader,
   registerSelectionReader,
   sendInput,
@@ -15,7 +16,8 @@ import {
 } from '../../store/terminal'
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
-import { findPathLinks, resolvePath } from '../../lib/pathLinks'
+import { fileExists } from '../../store/run'
+import { findPathLinks, firstExisting, linkBases, linkCandidates } from '../../lib/pathLinks'
 import { showToast } from '../../store/dialog'
 import { errorMessage } from '../../api/backend'
 import { focusSoon } from '../../lib/focusSoon'
@@ -98,9 +100,7 @@ export function TerminalView({ tab, active }: Props) {
           decorations: { underline: true, pointerCursor: true },
           activate: (e) => {
             if (!modKey(e)) return
-            // Relative paths in agent output are relative to the terminal's project.
-            const root = tab.project || useWorkspace.getState().root || tab.cwd
-            useEditor.getState().openFile(resolvePath(root, l.path), l.line ? { line: l.line, from: 0, to: 0 } : undefined)
+            void openLink(tab, l.path, l.line ? { line: l.line, from: 0, to: 0 } : undefined)
           },
         }))
         callback(links)
@@ -123,7 +123,11 @@ export function TerminalView({ tab, active }: Props) {
     if (claimStart(tab.id)) {
       startSession(tab, xterm.cols, xterm.rows)
         .then(() => tab.initialInput && sendInput(tab.id, `${tab.initialInput}\r`))
-        .catch((err) => showToast(`Terminal failed: ${errorMessage(err)}`, 'error'))
+        .catch((err) => {
+          // A terminal on a machine is never replaced by a local shell: the tab says why and ends.
+          if (tab.machine) failRemoteTerminal(tab.id, errorMessage(err))
+          showToast(`Terminal failed: ${errorMessage(err)}`, 'error')
+        })
     } else {
       void TerminalBackend.Resize(tab.id, xterm.cols, xterm.rows)
     }
@@ -235,7 +239,35 @@ function readBuffer(xterm: XTerm, maxLines: number): string {
   return lines.slice(-maxLines).join('\n')
 }
 
-/** Starts what the tab shows: a local shell. */
+/**
+ * Starts what the tab shows: a local shell, or, for a tab restored onto a shell
+ * the background host kept running, that shell. Attaching replays what the host
+ * kept; the resize then fits the program to this window (a full-screen one
+ * redraws). Should the shell be gone by now, a new one starts as without the host.
+ */
 function startSession(tab: TerminalTab, cols: number, rows: number): Promise<void> {
-  return TerminalBackend.Start(tab.id, tab.cwd, cols, rows, tab.env ?? {})
+  if (tab.machine) {
+    // On a machine: the shell starts in the remote home (no cwd, no env), or a restored tab
+    // re-attaches to the session the machine kept. Attaching never falls back to a new shell.
+    if (!tab.attach) return TerminalBackend.StartRemote(tab.id, cols, rows)
+    return TerminalBackend.Attach(tab.id).then(() => TerminalBackend.Resize(tab.id, cols, rows))
+  }
+  const start = () => TerminalBackend.Start(tab.id, tab.cwd, cols, rows, tab.env ?? {})
+  if (!tab.attach) return start()
+  return TerminalBackend.Attach(tab.id).then(() => TerminalBackend.Resize(tab.id, cols, rows), start)
+}
+
+/**
+ * Opens a path clicked in a terminal. A relative one is tried against, in turn, where
+ * the shell is now (it may have cd-ed out of the folder the terminal started in), the
+ * folder it started in, its project and the workspace folders; the first with the file
+ * wins. When none has it the first candidate is opened, so its error shows as before.
+ */
+async function openLink(tab: TerminalTab, path: string, reveal?: { line: number; from: number; to: number }): Promise<void> {
+  const workspace = useWorkspace.getState()
+  const live = await TerminalBackend.Cwd(tab.id).catch(() => '')
+  const candidates = linkCandidates(linkBases([live, tab.cwd, tab.project, workspace.root, ...workspace.roots]), path)
+  const found = candidates.length > 1 ? await firstExisting(candidates, fileExists) : null
+  const target = found ?? candidates[0]
+  if (target) useEditor.getState().openFile(target, reveal)
 }

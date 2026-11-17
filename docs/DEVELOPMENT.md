@@ -128,6 +128,20 @@ The build targets macOS 12 (`MACOSX_DEPLOYMENT_TARGET=12.0`) with cgo enabled.
 
 `make install` copies the app to `/Applications` and installs `scripts/flint` as `~/.local/bin/flint`. `flint [folder]` opens a folder (default: the current one); a running Flint takes it over and comes to the front. `flint --install-extension <folder>` asks Flint to install an extension from a folder (same confirmation as in the app).
 
+### The headless host (remote machines)
+
+`cmd/flint-host` is Flint without a window, Wails or cgo: the background session host and its ssh relay, for machines you open terminals on over ssh ([Remote terminals](FEATURES.md#remote-terminals)). It builds anywhere for linux and darwin on amd64 and arm64:
+
+```bash
+wails3 task host:package                                  # this machine's OS and architecture
+wails3 task host:package HOST_OS=linux HOST_ARCH=arm64    # any of linux/darwin x amd64/arm64
+wails3 task host:package:all VERSION=vX.Y.Z               # all four
+```
+
+Each produces `build/bin/flint-host-<os>-<arch>.tar.gz` (one file, the binary, named `flint`) and a `.sha256` file next to it. `flint --version` prints `flint <version> host-protocol <n>`, which the machine Check in Settings reads. The binary hosts terminals only: agent calls fail with "agents are not available on this host" (the agent drivers live in package main). On macOS the no-cgo build cannot read a shell's live working directory, so the remote tab's folder follows only what the shell last reported. `go test ./cmd/flint-host` cross-compiles the four targets with `CGO_ENABLED=0`, checks that the import graph has no Wails and runs the built binary as a relay.
+
+No release publishes these archives yet; the install instructions in Settings ▸ Machines say so. See "Release process" below for what a release would add.
+
 ## Building on Linux
 
 Flint builds against GTK 4 and WebKitGTK 6.0 (Wails v3's default on Linux), so it needs a distribution that ships them: Ubuntu 24.04+, Debian 13+, Fedora 39+ or Arch. On Debian and Ubuntu:
@@ -232,6 +246,8 @@ The `homebrew` job does nothing (it logs a notice) until this is done. It also n
 5. Publish a release (or re-run the `homebrew` job of the last release's workflow run) and check that `Casks/flint.rb` appears in the tap, then remove the "not published yet" note from `site/installation.md`.
 
 To check the cask locally after a release: `brew install --cask flint-ide/tap/flint`, `brew audit --cask --online flint-ide/tap/flint` and `brew uninstall --zap --cask flint`.
+
+A release that also ships the headless host would add to the workflow: `wails3 task host:package:all VERSION=vX.Y.Z` on any runner (no cgo, no GTK), the four `flint-host-<os>-<arch>.tar.gz` files and their `.sha256` lines in `SHA256SUMS.txt`, attestation for them, and the same files uploaded to the release. The install steps in Settings ▸ Machines already name those files.
 
 The version is embedded with `-ldflags -X main.version=…` and written into `Info.plist`; local builds report `dev`. To build a universal app locally, run `wails3 task package:universal`.
 

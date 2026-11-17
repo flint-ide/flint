@@ -553,6 +553,84 @@ export class FileHistory {
 }
 
 /**
+ * LiveTerminal is a terminal the host holds: its id and whether its shell
+ * still runs. Nothing else: the tab that attaches learns the rest from the
+ * terminal itself.
+ */
+export class LiveTerminal {
+    "id": string;
+    "running": boolean;
+
+    /** Creates a new LiveTerminal instance. */
+    constructor($$source: Partial<LiveTerminal> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("running" in $$source)) {
+            this["running"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LiveTerminal instance from a string or object.
+     */
+    static createFrom($$source: any = {}): LiveTerminal {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new LiveTerminal($$parsedSource as Partial<LiveTerminal>);
+    }
+}
+
+/**
+ * LiveTerminals is what SessionAPI.Live reports.
+ */
+export class LiveTerminals {
+    /**
+     * Background: this run's terminals are in the background host.
+     */
+    "background": boolean;
+
+    /**
+     * Terminals the host holds now; empty when Background is false.
+     */
+    "terminals": LiveTerminal[];
+
+    /**
+     * Notice says, once, why background terminals are not in use although
+     * they are switched on; "" otherwise.
+     */
+    "notice": string;
+
+    /** Creates a new LiveTerminals instance. */
+    constructor($$source: Partial<LiveTerminals> = {}) {
+        if (!("background" in $$source)) {
+            this["background"] = false;
+        }
+        if (!("terminals" in $$source)) {
+            this["terminals"] = [];
+        }
+        if (!("notice" in $$source)) {
+            this["notice"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LiveTerminals instance from a string or object.
+     */
+    static createFrom($$source: any = {}): LiveTerminals {
+        const $$createField1_0 = $$createType14;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("terminals" in $$parsedSource) {
+            $$parsedSource["terminals"] = $$createField1_0($$parsedSource["terminals"]);
+        }
+        return new LiveTerminals($$parsedSource as Partial<LiveTerminals>);
+    }
+}
+
+/**
  * MergeResult tells whether a task was merged or which files conflict.
  */
 export class MergeResult {
@@ -793,7 +871,7 @@ export class ProfiledTests {
      * Creates a new ProfiledTests instance from a string or object.
      */
     static createFrom($$source: any = {}): ProfiledTests {
-        const $$createField2_0 = $$createType13;
+        const $$createField2_0 = $$createType15;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField2_0($$parsedSource["files"]);
@@ -912,7 +990,7 @@ export class PromptLibrary {
      * Creates a new PromptLibrary instance from a string or object.
      */
     static createFrom($$source: any = {}): PromptLibrary {
-        const $$createField0_0 = $$createType15;
+        const $$createField0_0 = $$createType17;
         const $$createField1_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("prompts" in $$parsedSource) {
@@ -977,7 +1055,7 @@ export class ProviderInfo {
      * Creates a new ProviderInfo instance from a string or object.
      */
     static createFrom($$source: any = {}): ProviderInfo {
-        const $$createField3_0 = $$createType17;
+        const $$createField3_0 = $$createType19;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("account" in $$parsedSource) {
             $$parsedSource["account"] = $$createField3_0($$parsedSource["account"]);
@@ -1197,7 +1275,7 @@ export class ReviewRequest {
      * Creates a new ReviewRequest instance from a string or object.
      */
     static createFrom($$source: any = {}): ReviewRequest {
-        const $$createField1_0 = $$createType19;
+        const $$createField1_0 = $$createType21;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
@@ -1239,7 +1317,7 @@ export class ReviewResult {
      */
     static createFrom($$source: any = {}): ReviewResult {
         const $$createField1_0 = $$createType0;
-        const $$createField2_0 = $$createType21;
+        const $$createField2_0 = $$createType23;
         const $$createField3_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
@@ -1305,9 +1383,9 @@ export class RunConfigs {
      * Creates a new RunConfigs instance from a string or object.
      */
     static createFrom($$source: any = {}): RunConfigs {
-        const $$createField0_0 = $$createType23;
-        const $$createField1_0 = $$createType23;
-        const $$createField2_0 = $$createType25;
+        const $$createField0_0 = $$createType25;
+        const $$createField1_0 = $$createType25;
+        const $$createField2_0 = $$createType27;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("saved" in $$parsedSource) {
             $$parsedSource["saved"] = $$createField0_0($$parsedSource["saved"]);
@@ -1434,8 +1512,8 @@ export class TaskComparison {
      * Creates a new TaskComparison instance from a string or object.
      */
     static createFrom($$source: any = {}): TaskComparison {
-        const $$createField1_0 = $$createType27;
-        const $$createField2_0 = $$createType29;
+        const $$createField1_0 = $$createType29;
+        const $$createField2_0 = $$createType31;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("tasks" in $$parsedSource) {
             $$parsedSource["tasks"] = $$createField1_0($$parsedSource["tasks"]);
@@ -1506,7 +1584,7 @@ export class TaskFileDiff {
      * Creates a new TaskFileDiff instance from a string or object.
      */
     static createFrom($$source: any = {}): TaskFileDiff {
-        const $$createField4_0 = $$createType31;
+        const $$createField4_0 = $$createType33;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("lines" in $$parsedSource) {
             $$parsedSource["lines"] = $$createField4_0($$parsedSource["lines"]);
@@ -1749,7 +1827,7 @@ export class UsageView {
      * Creates a new UsageView instance from a string or object.
      */
     static createFrom($$source: any = {}): UsageView {
-        const $$createField0_0 = $$createType32;
+        const $$createField0_0 = $$createType34;
         const $$createField1_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("summary" in $$parsedSource) {
@@ -1776,23 +1854,25 @@ const $$createType9 = TaskFileDiff.createFrom;
 const $$createType10 = $Create.Array($$createType9);
 const $$createType11 = git$0.FileCommit.createFrom;
 const $$createType12 = $Create.Array($$createType11);
-const $$createType13 = testrun$0.Profiles.createFrom;
-const $$createType14 = prompts$0.Prompt.createFrom;
-const $$createType15 = $Create.Array($$createType14);
-const $$createType16 = accounts$0.Account.createFrom;
-const $$createType17 = $Create.Nullable($$createType16);
-const $$createType18 = ReviewFile.createFrom;
-const $$createType19 = $Create.Array($$createType18);
-const $$createType20 = review$0.Finding.createFrom;
+const $$createType13 = LiveTerminal.createFrom;
+const $$createType14 = $Create.Array($$createType13);
+const $$createType15 = testrun$0.Profiles.createFrom;
+const $$createType16 = prompts$0.Prompt.createFrom;
+const $$createType17 = $Create.Array($$createType16);
+const $$createType18 = accounts$0.Account.createFrom;
+const $$createType19 = $Create.Nullable($$createType18);
+const $$createType20 = ReviewFile.createFrom;
 const $$createType21 = $Create.Array($$createType20);
-const $$createType22 = runconfig$0.Config.createFrom;
+const $$createType22 = review$0.Finding.createFrom;
 const $$createType23 = $Create.Array($$createType22);
-const $$createType24 = runconfig$0.Capabilities.createFrom;
-const $$createType25 = $Create.Map($Create.Any, $$createType24);
-const $$createType26 = ComparedTask.createFrom;
-const $$createType27 = $Create.Array($$createType26);
-const $$createType28 = agenttask$0.FileRow.createFrom;
+const $$createType24 = runconfig$0.Config.createFrom;
+const $$createType25 = $Create.Array($$createType24);
+const $$createType26 = runconfig$0.Capabilities.createFrom;
+const $$createType27 = $Create.Map($Create.Any, $$createType26);
+const $$createType28 = ComparedTask.createFrom;
 const $$createType29 = $Create.Array($$createType28);
-const $$createType30 = agenttask$0.DiffLine.createFrom;
+const $$createType30 = agenttask$0.FileRow.createFrom;
 const $$createType31 = $Create.Array($$createType30);
-const $$createType32 = usage$0.Summary.createFrom;
+const $$createType32 = agenttask$0.DiffLine.createFrom;
+const $$createType33 = $Create.Array($$createType32);
+const $$createType34 = usage$0.Summary.createFrom;

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"flint/internal/extensions/manifest"
-	"flint/internal/extensions/rpc"
+	"flint/internal/jsonrpc"
 )
 
 // What an extension may ask of Flint (docs/design/extensions.md, "Extension →
@@ -74,7 +74,7 @@ type AskEvent struct {
 }
 
 func invalid(format string, args ...any) error {
-	return rpc.Errorf(rpc.CodeInvalidParams, format, args...)
+	return jsonrpc.Errorf(jsonrpc.CodeInvalidParams, format, args...)
 }
 
 func decode(params json.RawMessage, v any) error {
@@ -90,7 +90,7 @@ func decode(params json.RawMessage, v any) error {
 // need fails unless the manifest declares perm.
 func (e *ext) need(perm string) error {
 	if !e.m.HasPermission(perm) {
-		return rpc.Errorf(rpc.CodePermission, "%s needs the %q permission in its manifest", e.id, perm)
+		return jsonrpc.Errorf(jsonrpc.CodePermission, "%s needs the %q permission in its manifest", e.id, perm)
 	}
 	return nil
 }
@@ -149,7 +149,7 @@ func (e *ext) handle(ctx context.Context, method string, params json.RawMessage)
 	case "agent/ask":
 		return nil, e.askAgent(params)
 	}
-	return nil, rpc.Errorf(rpc.CodeMethodNotFound, "method not found: %s", method)
+	return nil, jsonrpc.Errorf(jsonrpc.CodeMethodNotFound, "method not found: %s", method)
 }
 
 func (e *ext) statusUpdate(params json.RawMessage) error {
@@ -292,7 +292,7 @@ func (e *ext) openURL(params json.RawMessage) error {
 	if !allowed {
 		msg := fmt.Sprintf("%s wants to open %s in your browser.\n\nLinks to %s from this extension open without asking again until Flint quits.", e.m.Name, cleanText(p.URL, 300), origin)
 		if !e.h.o.App.Confirm("Open link?", msg, "Open") {
-			return rpc.Errorf(rpc.CodeCancelled, "the user did not open the link")
+			return jsonrpc.Errorf(jsonrpc.CodeCancelled, "the user did not open the link")
 		}
 		e.mu.Lock()
 		e.origins[origin] = true

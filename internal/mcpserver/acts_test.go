@@ -40,7 +40,7 @@ const callAct = `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":
 func TestActingToolsAreAnnounced(t *testing.T) {
 	var ran atomic.Int32
 	s := newTestServer(t, Options{Tools: func() []Tool { return []Tool{echoTool(), actTool(&ran, false)} }})
-	url, token, _, _ := s.Endpoint("/p")
+	url, token, _, _ := s.Endpoint("/p", nil)
 	r := call(t, url, token, `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
 	var list struct {
 		Tools []struct {
@@ -73,7 +73,7 @@ func TestActingToolNeedsApproval(t *testing.T) {
 	tools := func() []Tool { return []Tool{actTool(&ran, false)} }
 
 	s := newTestServer(t, Options{Tools: tools})
-	url, token, _, _ := s.Endpoint("/p")
+	url, token, _, _ := s.Endpoint("/p", nil)
 	if text, isErr := toolText(t, call(t, url, token, callAct)); !isErr || !strings.Contains(text, "no way to ask") {
 		t.Fatalf("no approver: %q %v", text, isErr)
 	}
@@ -87,7 +87,7 @@ func TestActingToolNeedsApproval(t *testing.T) {
 		asked = append(asked, a)
 		return answer
 	}})
-	url, token, _, _ = s.Endpoint("/p")
+	url, token, _, _ = s.Endpoint("/p", nil)
 	if text, isErr := toolText(t, call(t, url, token, callAct)); !isErr || text != ErrNotApproved.Error() {
 		t.Fatalf("denied: %q %v", text, isErr)
 	}
@@ -121,7 +121,7 @@ func TestActingToolPlan(t *testing.T) {
 			return nil
 		},
 	})
-	url, token, _, _ := s.Endpoint("/p")
+	url, token, _, _ := s.Endpoint("/p", nil)
 	bad := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"act","arguments":{}}}`
 	if text, isErr := toolText(t, call(t, url, token, bad)); !isErr || text != "what is required" {
 		t.Fatalf("bad arguments: %q %v", text, isErr)
@@ -147,7 +147,7 @@ func TestReadToolsAreNotAskedAbout(t *testing.T) {
 		asked++
 		return ErrNotApproved
 	}})
-	url, token, _, _ := s.Endpoint("/p")
+	url, token, _, _ := s.Endpoint("/p", nil)
 	r := call(t, url, token, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"echo","arguments":{"text":"hi"}}}`)
 	if text, isErr := toolText(t, r); isErr || text != "/p:hi" || asked != 0 {
 		t.Fatalf("read call: %q %v, asked %d", text, isErr, asked)

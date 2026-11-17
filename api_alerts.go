@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"sync/atomic"
 
+	"flint/internal/redact"
+
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/services/dock"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
@@ -70,11 +72,16 @@ func (s *AlertsAPI) Notify(title, body, tab string) error {
 	}
 	return s.notifier.SendNotification(notifications.NotificationOptions{
 		ID:    "flint-" + strconv.FormatUint(s.seq.Add(1), 10),
-		Title: title,
-		Body:  body,
+		Title: notificationText(title),
+		Body:  notificationText(body),
 		Data:  map[string]any{"tab": tab},
 	})
 }
+
+// notificationText is what reaches the OS: notifications show on the lock
+// screen and in other apps' history, and some carry text an agent wrote (what
+// it asks to run), so secrets are masked here whatever the caller did.
+func notificationText(s string) string { return redact.Secrets(s) }
 
 // SetBadge shows count on the Dock icon (0 removes it).
 func (s *AlertsAPI) SetBadge(count int) error {

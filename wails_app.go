@@ -29,6 +29,10 @@ func (l *lifecycle) ServiceShutdown() error {
 
 // emit sends an event to the frontend; a no-op before the application runs.
 func (a *App) emit(name string, data ...any) {
+	if a.emitHook != nil {
+		a.emitHook(name, data...)
+		return
+	}
 	if a.wails == nil || a.ctx == nil {
 		return
 	}

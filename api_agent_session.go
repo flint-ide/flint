@@ -25,6 +25,7 @@ func newAgentManager(a *App) *as.Manager {
 	m := as.NewManager(func(e as.Event) {
 		a.emit(eventAgentEvent, e)
 		a.tasks.Observe(e) // agent tasks follow their chats (tasks_state.go)
+		a.observeChat(e)   // states and output for orchestration, notices (chat_notify.go)
 		a.observeUsage(e)  // usage_state.go
 	})
 	m.SetActionGate(a.actionGate()) // Flint's tools that act always ask (api_mcp_actions.go)
@@ -46,12 +47,9 @@ func (c *AgentChatAPI) Agents() []string {
 func (c *AgentChatAPI) Start(agent, cwd string) (as.SessionInfo, error) {
 	ctx, cancel := context.WithTimeout(c.app.ctx, agentStartTimeout)
 	defer cancel()
-	info, err := c.app.agents.Start(ctx, agent, cwd)
-	if err == nil {
-		c.app.tasks.Bind(info.ID, cwd)
-		c.app.usageChats.bind(info.ID, usageChat{chat: info.ID, agent: info.Agent, cwd: cwd, model: info.Model})
-	}
-	return info, err
+	// The UI adds the tab itself when this returns; the "chat:opened" event
+	// openChat emits is then a no-op for it (store/agentChat.ts adopt).
+	return c.app.openChat(ctx, ChatRequest{Agent: agent, Cwd: cwd})
 }
 
 // Resume reopens a conversation from an earlier run (after a restart). The
@@ -63,21 +61,14 @@ func (c *AgentChatAPI) Resume(agent, cwd, sessionID string) (as.SessionInfo, err
 	if err == nil {
 		c.app.tasks.Bind(info.ID, cwd)
 		c.app.usageChats.bind(info.ID, usageChat{chat: sessionID, agent: info.Agent, cwd: cwd, model: info.Model})
+		c.app.adoptChat(info, cwd)
 	}
 	return info, err
 }
 
 // Prompt sends a message; the reply streams as "agent:event" events.
 func (c *AgentChatAPI) Prompt(sessionID, text string, attachments []as.Attachment) error {
-	if err := c.app.usageGate(sessionID); err != nil {
-		return err
-	}
-	c.app.usageChats.prompted(sessionID, text)
-	// Before the turn starts: an early failure's events must come after it.
-	if !c.app.agents.Busy(sessionID) {
-		c.app.tasks.Prompted(sessionID)
-	}
-	return c.app.agents.Prompt(sessionID, text, attachments)
+	return c.app.promptChat(sessionID, text, attachments, true, nil)
 }
 
 // Cancel interrupts the running turn.
@@ -88,11 +79,10 @@ func (c *AgentChatAPI) Respond(sessionID, requestID, optionID string) error {
 	return c.app.agents.Respond(sessionID, requestID, optionID)
 }
 
-// Stop ends a conversation and its agent process.
+// Stop ends a conversation and its agent process, and the agents it started:
+// they ran under its grant, which ends with it.
 func (c *AgentChatAPI) Stop(sessionID string) error {
-	c.app.tasks.Unbind(sessionID)
-	c.app.usageChats.unbind(sessionID)
-	return c.app.agents.Stop(sessionID)
+	return c.app.stopChatTree(sessionID)
 }
 
 // Policy returns which permission requests are answered automatically.

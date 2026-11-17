@@ -1,14 +1,13 @@
 package main
 
 import (
-	"fmt"
+	"errors"
 	"os"
-	"regexp"
 	"slices"
-	"strings"
 	"sync"
 
 	"flint/internal/mcptools"
+	"flint/internal/remote"
 	"flint/internal/terminal"
 )
 
@@ -80,6 +79,9 @@ type TerminalAPI struct {
 // Start launches the user's login shell in cwd (home when empty) with extra
 // environment variables (e.g. AWS_PROFILE). The frontend picks the id.
 func (t *TerminalAPI) Start(id, cwd string, cols, rows int, env map[string]string) error {
+	if remote.IsRemoteID(id) {
+		return errors.New("a terminal on a machine starts with StartRemote: no local folder or environment applies there")
+	}
 	if cwd == "" {
 		cwd, _ = os.UserHomeDir()
 	}
@@ -98,15 +100,14 @@ func (t *TerminalAPI) Start(id, cwd string, cols, rows int, env map[string]strin
 	return nil
 }
 
-var envNameRe = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
-
 // terminalEnv turns the frontend's variables into NAME=value pairs, sorted;
-// names must be plain upper-case identifiers and values single-line.
+// names must be plain upper-case identifiers and values single-line
+// (terminal.CheckEnvVar, which the background host applies to its wire too).
 func terminalEnv(env map[string]string) ([]string, error) {
 	out := make([]string, 0, len(env))
 	for k, v := range env {
-		if !envNameRe.MatchString(k) || strings.ContainsAny(v, "\x00\n\r") || len(v) > 1024 {
-			return nil, fmt.Errorf("invalid terminal variable %q", k)
+		if err := terminal.CheckEnvVar(k, v); err != nil {
+			return nil, err
 		}
 		out = append(out, k+"="+v)
 	}

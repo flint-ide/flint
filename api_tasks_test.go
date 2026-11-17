@@ -14,6 +14,7 @@ import (
 	"flint/internal/agenttask"
 	"flint/internal/config"
 	"flint/internal/github"
+	"flint/internal/orchestrate"
 	"flint/internal/settings"
 )
 
@@ -24,6 +25,8 @@ type taskFixture struct {
 	app  *App
 	api  *TaskAPI
 	repo string
+	// driver is the fake agent behind app's session manager.
+	driver *chatDriver
 }
 
 func gitT(t *testing.T, dir string, args ...string) string {
@@ -76,9 +79,35 @@ func newTaskFixture(t *testing.T) *taskFixture {
 	a := &App{configDir: t.TempDir(), settings: settings.Default(), ctx: context.Background()}
 	a.settings.CustomAgents = []settings.CustomAgent{{ID: "fake", Command: "sh"}}
 	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
+	driver := installChats(t, a)
 	a.openProject(repo, nil)
 	api := &TaskAPI{app: a, git: &GitAPI{app: a}}
-	return &taskFixture{t: t, app: a, api: api, repo: repo}
+	return &taskFixture{t: t, app: a, api: api, repo: repo, driver: driver}
+}
+
+// installChats gives a an orchestration registry and a session manager over a
+// fake agent "fake" whose turns stay running until the test ends, so a task
+// whose chat Go starts keeps working (and holding its slot) like a real one.
+// The manager feeds the task tracker like newAgentManager does.
+func installChats(t *testing.T, a *App) *chatDriver {
+	t.Helper()
+	d := newChatDriver()
+	d.hold = make(chan struct{})
+	t.Cleanup(func() { close(d.hold) })
+	a.orch = orchestrate.New()
+	m := as.NewManager(func(e as.Event) {
+		a.tasks.Observe(e)
+		a.observeChat(e)
+	})
+	m.Register("fake", d)
+	a.agentMgr, a.agents = m, m
+	return d
+}
+
+// waitStarts waits for the chats Go is starting for tasks that left the queue.
+func (f *taskFixture) waitStarts() {
+	f.t.Helper()
+	f.app.queue.starts.Wait()
 }
 
 func (f *taskFixture) create(desc string) TaskView {

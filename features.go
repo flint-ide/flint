@@ -70,7 +70,7 @@ func (h featureHost) SaveState(key string, v any) error { return h.a.saveFeature
 func (h featureHost) StartStream(termID, title string, st terminal.Stream) error {
 	a := h.a
 	opened := a.mcpSources.Terminals.OpenNew(termID, mcptools.KindTerminal, title, "")
-	if err := a.terminals.StartStream(termID, st); err != nil {
+	if err := a.termStreams.StartStream(termID, st); err != nil {
 		if opened {
 			a.mcpSources.Terminals.Close(termID)
 		}

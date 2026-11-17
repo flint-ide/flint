@@ -40,6 +40,7 @@ func (f *taskFixture) settle(session string) {
 // states maps the given tasks to their states in the panel, in order.
 func (f *taskFixture) states(tasks ...TaskView) string {
 	f.t.Helper()
+	f.waitStarts()
 	list, err := f.api.List(f.repo)
 	if err != nil {
 		f.t.Fatal(err)
@@ -108,18 +109,18 @@ func TestTaskQueueStartsOldestWhenATaskSettles(t *testing.T) {
 		t.Fatalf("a waiting task freed its slot: %s", got)
 	}
 	f.settle("sa")
-	if got := f.states(a, b, c, d); got != "finished working idle queued" {
+	// Go starts the third one's chat itself and it works at once.
+	if got := f.states(a, b, c, d); got != "finished working working queued" {
 		t.Fatalf("after the first settled: %s", got)
 	}
-	// The third holds the slot while its chat starts, then by its turn.
+	// The third holds the slot by its turn.
 	f.settle("sa") // no change of state: nothing more starts
 	if got := f.states(d); got != "queued" {
 		t.Fatalf("the starting task did not hold its slot: %s", got)
 	}
-	f.work(c, "sc")
 	// A failed turn and a closed chat free a slot like a finished one.
 	f.app.tasks.Observe(as.Event{SessionID: "sb", Kind: as.KindTurnEnd, StopReason: as.StopError})
-	if got := f.states(a, b, c, d); got != "finished failed working idle" {
+	if got := f.states(a, b, c, d); got != "finished failed working working" {
 		t.Fatalf("after the second failed: %s", got)
 	}
 }
@@ -136,7 +137,7 @@ func TestTaskQueueStartThatFailsFreesTheSlot(t *testing.T) {
 	if err := f.api.StartDone(a.ID); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.states(a, b, c); got != "idle idle queued" {
+	if got := f.states(a, b, c); got != "idle working queued" {
 		t.Fatalf("after a failed start: %s", got)
 	}
 	if err := f.api.StartDone("nope"); err == nil {
@@ -169,7 +170,7 @@ func TestTaskQueueStartNow(t *testing.T) {
 		t.Errorf("the limit was exceeded by the queue itself: %s", got)
 	}
 	f.settle("sc")
-	if got := f.states(b); got != "idle" {
+	if got := f.states(b); got != "working" {
 		t.Errorf("after both settled: %s", got)
 	}
 }
@@ -193,7 +194,7 @@ func TestTaskQueueRemoval(t *testing.T) {
 	if _, err := f.api.Remove(a.ID, RemoveOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.states(a, c); got != "gone idle" {
+	if got := f.states(a, c); got != "gone working" {
 		t.Fatalf("after removing the working task: %s", got)
 	}
 }
@@ -205,7 +206,7 @@ func TestTaskQueueRaisedLimitStartsQueued(t *testing.T) {
 	b, c := f.create("second"), f.create("third")
 	f.app.settings.AgentTasks.MaxParallel = 2
 	f.api.StartQueued()
-	if got := f.states(a, b, c); got != "working idle queued" {
+	if got := f.states(a, b, c); got != "working working queued" {
 		t.Fatalf("states = %s", got)
 	}
 }
@@ -222,6 +223,7 @@ func TestTaskQueueAfterRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	next.tasks = agenttask.NewTracker(next.taskByFolder, next.taskChanged)
+	installChats(t, next)
 	api := &TaskAPI{app: next, git: &GitAPI{app: next}}
 	queued := func() bool {
 		_, task, ok := next.taskStore().Find(b.ID)
@@ -243,6 +245,7 @@ func TestTaskQueueAfterRestart(t *testing.T) {
 	}
 	next.openProject(f.repo, nil)
 	api.StartQueued()
+	next.queue.starts.Wait()
 	if queued() {
 		t.Fatal("the queued task did not start once its repository was open and a slot free")
 	}
@@ -281,7 +284,7 @@ func TestTaskQueueNeverStartsInAnUntrustedFolder(t *testing.T) {
 	if err := f.api.StartDone(b.ID); err != nil { // its chat did not start
 		t.Fatal(err)
 	}
-	if got := f.states(c); got != "idle" {
+	if got := f.states(c); got != "working" {
 		t.Fatalf("after trusting its folder: %s", got)
 	}
 }
@@ -319,17 +322,17 @@ func TestTaskQueueRespectsBudgetPause(t *testing.T) {
 	if err := usageAPI.Override("sa"); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.states(b); got != "idle" {
+	if got := f.states(b); got != "working" {
 		t.Fatalf("after Continue anyway: %s", got)
 	}
 
-	// Without the pause setting a spent budget only warns.
-	f.work(b, "sb")
+	// Without the pause setting a spent budget only warns. Go started b's
+	// chat, the first one its fake agent opened: "c1".
 	f.app.settings.Usage.PauseOverBudget = false
 	c := f.create("third")
 	f.app.recordUsage("sa", mustChat(t, f.app, "sa"), &as.Usage{InputTokens: 500})
-	f.settle("sb")
-	if got := f.states(c); got != "idle" {
+	f.settle("c1")
+	if got := f.states(c); got != "working" {
 		t.Fatalf("without pauseOverBudget: %s", got)
 	}
 }

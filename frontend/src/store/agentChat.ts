@@ -18,7 +18,7 @@ import { showToast } from './dialog'
 import { createReorderer, type Reorderer } from '../lib/reorder'
 import type { SavedChat } from '../lib/sessionSnapshot'
 import { useEditor } from './editor'
-import { alertDone } from './alerts'
+import { alertApproval, alertDone, approvalSettled, approvalsEnded } from './alerts'
 
 export interface ChatSession {
   id: string
@@ -227,6 +227,7 @@ const queued = new Map<string, AgentEvent[]>()
 let pendingFlush: { frame: number; timer: ReturnType<typeof setTimeout> } | null = null
 
 function enqueue(id: string, e: AgentEvent): void {
+  announceApproval(id, e)
   if (e.kind === 'turn_end' && e.stopReason !== 'cancelled') {
     const tab = `chat:${id}`
     const title = useEditor.getState().tabs.find((t) => t.id === tab)?.title ?? 'Agent'
@@ -236,6 +237,16 @@ function enqueue(id: string, e: AgentEvent): void {
   if (q) q.push(e)
   else queued.set(id, [e])
   pendingFlush ??= { frame: requestAnimationFrame(flushEvents), timer: setTimeout(flushEvents, FLUSH_FALLBACK_MS) }
+}
+
+/** Keeps the background alerts for permission requests in step with the agent's events. */
+function announceApproval(id: string, e: AgentEvent): void {
+  const session = useAgentChat.getState().sessions[id]
+  if (e.kind === 'permission_request' && e.permission) {
+    // Only a turn the user started asks: a resumed chat replaying its history does not.
+    if (session?.chat.busy) alertApproval(id, session.agent, session.cwd, e.permission)
+  } else if (e.kind === 'permission_settled' && e.requestId) approvalSettled(id, e.requestId)
+  else if (e.kind === 'turn_end') approvalsEnded(id)
 }
 
 /** Applies every queued event in one store update. */

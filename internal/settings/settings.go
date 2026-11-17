@@ -88,6 +88,9 @@ type Settings struct {
 	// NotifyInBackground shows a notification and a Dock badge when a run, a
 	// test run or an agent finishes while Flint is in the background.
 	NotifyInBackground bool `json:"notifyInBackground"`
+	// NotifyOnApproval also notifies when an agent chat waits for the user's
+	// approval; it needs NotifyInBackground.
+	NotifyOnApproval bool `json:"notifyOnApproval"`
 	// Keymap overrides command shortcuts: command id → "Mod+Shift+X", or "" to
 	// remove the shortcut. Commands not listed keep their default keys.
 	Keymap map[string]string `json:"keymap"`
@@ -141,6 +144,7 @@ func Default() Settings {
 			LineHeight: 1.2,
 		},
 		NotifyInBackground: true,
+		NotifyOnApproval:   true,
 		Keymap:             map[string]string{},
 		WatchExclude:       defaultWatchExclude(),
 		Agents:             map[string]AgentSettings{},

@@ -41,6 +41,7 @@ The file is readable only by your user. It never contains secrets: database pass
   "defaultAgent": "claude",
   "autoSave": true,
   "notifyInBackground": true,
+  "notifyOnApproval": true,
   "checkForUpdates": true,
   "keymap": {
     "terminal.new": "Mod+Alt+T",
@@ -106,6 +107,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `defaultAgent` | string | `""` | Agent for new chats, commit messages and conflict resolution: `"claude"`, `"codex"` or the `id` of a custom agent. Empty means the first installed agent. Conflict resolution always uses Claude Code or Codex. |
 | `autoSave` | boolean | `false` | Save modified files when the Flint window loses focus. |
 | `notifyInBackground` | boolean | `true` | Show a macOS notification and a Dock badge when a run, a test run or an agent finishes while Flint is in the background. |
+| `notifyOnApproval` | boolean | `true` | Also show a notification, and count it on the Dock badge, when an agent chat waits for your approval while Flint is in the background. Also needs `notifyInBackground`. |
 | `keymap` | object | `{}` | Shortcut overrides: command id → shortcut. See [keymap](#keymap). |
 | `agents` | object | `{}` | Agent CLIs by name (`"claude"`, `"codex"`). See [agents](#agents). |
 | `customAgents` | array | `[]` | Other agents, spoken to over the Agent Client Protocol. See [customAgents](#customagents). |

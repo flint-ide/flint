@@ -64,6 +64,8 @@ export interface CoreSettings {
   autoSave: boolean
   /** Notification and Dock badge when work finishes while Flint is in the background. */
   notifyInBackground: boolean
+  /** Also tell when an agent waits for approval (needs notifyInBackground). */
+  notifyOnApproval: boolean
   /** Shortcut overrides: command id → keys ('' = none). */
   keymap: Record<string, string>
   /** Folder names (or globs over one) the Linux file watcher skips, on top of dependency folders. */
@@ -111,6 +113,7 @@ export const DEFAULT_SETTINGS: CoreSettings = Object.freeze({
   defaultAgent: '',
   autoSave: false,
   notifyInBackground: true,
+  notifyOnApproval: true,
   keymap: Object.freeze({}) as Record<string, string>,
   watchExclude: Object.freeze(['dist', '.cache']) as unknown as string[],
   agents: Object.freeze({}) as Record<string, AgentSettings>,
@@ -250,6 +253,7 @@ function coerceCore(v: Record<string, unknown>): CoreSettings {
     defaultAgent: typeof v.defaultAgent === 'string' ? v.defaultAgent : d.defaultAgent,
     autoSave: typeof v.autoSave === 'boolean' ? v.autoSave : d.autoSave,
     notifyInBackground: typeof v.notifyInBackground === 'boolean' ? v.notifyInBackground : d.notifyInBackground,
+    notifyOnApproval: typeof v.notifyOnApproval === 'boolean' ? v.notifyOnApproval : d.notifyOnApproval,
     keymap,
     watchExclude: Array.isArray(v.watchExclude) ? v.watchExclude.filter((p): p is string => typeof p === 'string' && validWatchExclude(p)) : d.watchExclude,
     agents: coerceAgents(v.agents),

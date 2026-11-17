@@ -109,7 +109,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `editor` | object | see below | Font for all editors (files, diffs and scratchpads), `vimMode`: Vim key bindings in every editor (default `false`), and `formatOnSave` / `organizeImportsOnSave` (default `false`). |
 | `terminal` | object | see below | Font for terminals and run consoles. |
 | `customTheme` | object | see below | The palette of the `"custom"` theme, usually imported from VS Code. See [customTheme](#customtheme). |
-| `defaultAgent` | string | `""` | Agent for new chats, commit messages and conflict resolution: `"claude"`, `"codex"` or the `id` of a custom agent. Empty means the first installed agent. Conflict resolution always uses Claude Code or Codex. |
+| `defaultAgent` | string | `""` | Agent for new chats, commit messages and conflict resolution: `"claude"`, `"codex"`, the `id` of a custom agent or the name of a [defined agent](../guides/ai-agents.md#defined-agents). Empty means the first installed agent. A name that isn't available (no such file, an untrusted folder, a program that isn't installed) falls back to the first installed agent. Conflict resolution always uses Claude Code or Codex: for a defined agent, the one it runs on. |
 | `autoSave` | boolean | `false` | Save modified files when the Flint window loses focus. |
 | `notifyInBackground` | boolean | `true` | Show a macOS notification and a Dock badge when a run, a test run or an agent finishes while Flint is in the background. |
 | `notifyOnApproval` | boolean | `true` | Also show a notification, and count it on the Dock badge, when an agent chat waits for your approval while Flint is in the background. Also needs `notifyInBackground`. |
@@ -342,7 +342,7 @@ Used by [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-a
 |---|---|---|---|---|
 | `scope` | string | `"selected"`, `"all"` | `"selected"` | What a review covers: the changes ticked in the Commit panel, or every change. A review started from a diff tab always includes that tab's file. |
 | `maxDiffKB` | integer | 8–512 | `128` | Largest diff sent to the agent, in KB; never exceeded. Above it, small files still go in whole and the larger ones share the rest: each keeps its first hunks, or is summarized in one line, with a note that tells the agent to read the file. Files with no room left at all are left out and listed in a note. Untracked files are read only as far as their share. |
-| `agent` | string | | `""` | The reviewing agent: `"claude"`, `"codex"` or the `id` of a custom agent. Empty uses `defaultAgent`. An agent that isn't configured falls back to empty. What each agent can read on its own is described in [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-agent): Codex can read any file you can, and a custom agent started with an auto-approve flag is not read-only. |
+| `agent` | string | | `""` | The reviewing agent: `"claude"`, `"codex"`, the `id` of a custom agent or the name of a [defined agent](../guides/ai-agents.md#defined-agents). Empty uses `defaultAgent`. An agent that isn't configured falls back to empty. What each agent can read on its own is described in [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-agent): Codex can read any file you can, and a custom agent started with an auto-approve flag is not read-only. |
 | `timeoutSeconds` | integer | 30–1800 | `300` | A review that takes longer is stopped, with the agent and everything it started. |
 ### ci
 

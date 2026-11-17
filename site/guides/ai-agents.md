@@ -11,10 +11,11 @@ Flint talks to the agent CLIs you have installed:
 | Claude Code | `claude` | Reports token usage and cost |
 | Codex | `codex` | Usually reports tokens but not cost |
 | Any agent with an ACP mode | your choice | Added in Settings; see [Other agents (ACP)](#other-agents-acp) |
+| Your own agents | Claude Code or Codex | A Markdown file with instructions; see [Defined agents](#defined-agents) |
 
 Flint uses the CLIs directly, with your own sign-in and configuration; it has no account or API key of its own. You can also run either agent's interactive interface in a regular [terminal](terminals.md) tab.
 
-The **default agent** (Settings ▸ Agents) is used for new chats, commit messages and conflict resolution. If you don't pick one, Flint uses the first installed agent.
+The **default agent** (Settings ▸ Agents) is used for new chats, commit messages and conflict resolution. If you don't pick one, Flint uses the first installed agent. It can also be a [defined agent](#defined-agents).
 
 ## Other agents (ACP)
 
@@ -38,9 +39,84 @@ What a custom agent can and can't do:
 
 Editing or removing an agent in Settings affects new chats; open chats keep running until you close them.
 
+## Defined agents
+
+A defined agent is an agent you describe in a Markdown file: who it is (standing instructions), and optionally which program and model it runs on. It is an agent wherever Flint asks for an agent name: the chat's agent picker, "New Agent Task…" and Compare agents, the default agent, the review agent, the `start_agent` tool of [orchestration](#letting-agents-act-in-flint) and the [usage](#usage-and-budgets) breakdown.
+
+Use one when you want a lasting role, such as a reviewer that never edits files or a backend developer on a stronger model, that you can pick, hand tasks to or let other agents start. A [prompt](#prompt-library) is different: it fills the chat box once, with text you can edit before you send it. A defined agent's instructions apply to the whole conversation, and you don't see them in the chat.
+
+An example, saved as `reviewer.md`:
+
+```markdown
+---
+description: Reviews a change for bugs; reports, never edits
+engine: claude
+model: opus
+---
+You are the reviewer of this project. Read the diff and the code around it.
+Report bugs with file and line. Do not change files.
+```
+
+The front matter between the `---` lines is optional, one `key: value` per line (`#` starts a comment), as for prompts. Unknown keys are ignored.
+
+| Part | Rule |
+|---|---|
+| Name | The file name without `.md`: lowercase letters, digits and `-`, starting with a letter, at most 32 characters. `claude` and `codex`, and the id of a custom agent, can't be used. |
+| `description` | Optional. One line for the pickers, at most 200 characters. |
+| `engine` | Optional. `claude` or `codex`. Pins the agent to that program. |
+| `model` | Optional, and only with `engine`, because model names belong to one program. Replaces the model from Settings ▸ Agents for this agent. |
+| Text after the front matter | Required: the standing instructions, at most 16,000 characters. |
+
+A file is at most 64 KB, and a folder is read up to 50 files.
+
+### Where the files live
+
+- **Personal**: `agents/<name>.md` in Flint's configuration folder (`~/Library/Application Support/flint/agents`); yours only, in every project.
+- **Project**: `.flint/agents/<name>.md` in a workspace folder, shared with your team when you commit it.
+
+**New Agent…** in Settings ▸ Agents ▸ Defined agents, or "New Agent Definition…" in the command palette, asks for a name and a place and opens the new file from a template. It never overwrites a file, and refuses a project agent in a folder in Restricted Mode. **Open** in the list opens a file in the editor. Flint has no other editor for them: a definition is a file.
+
+The list in Settings shows each agent's name, engine, model, where it comes from, its description and the files Flint couldn't use, each with the reason. A file that breaks a rule is skipped, never half-used. Pickers show a pinned agent as "reviewer · claude", and one without an engine as "reviewer · default (claude)", with the program it would use now. An agent is listed only when its program is installed.
+
+### The engine
+
+With `engine`, the agent always runs on that program. Without it, the agent is a role that works whichever CLI each person has: it runs on your default agent when that is Claude Code or Codex, otherwise on the first of them that is installed. A defined or custom agent set as the default is not followed. Without either installed, the agent isn't listed.
+
+The engine is chosen when a conversation starts, so changing the default agent applies to the next conversation. A conversation keeps the engine it started on, also after a restart, whatever the default is by then.
+
+The program's own settings still apply: its path and extra arguments from Settings ▸ Agents, the approval policy, [Flint's MCP server](#what-agents-can-see-in-flint) and its tools, and usage and cost.
+
+The instructions reach the program as standing instructions for the whole conversation, when it starts and when it resumes: Claude Code gets them with `--append-system-prompt`, Codex as its developer instructions. They are passed as one argument or field and never through a shell.
+
+Two places need only the program and leave the instructions out. **✦ Generate message**, the review and similar one-off runs use the engine and the model of the agent, because Flint's own prompt there asks for an answer in a fixed format. **Resolve with claude** (or codex) runs the plain engine in a terminal.
+
+### Trust and names
+
+- Project definitions are not loaded at all in a folder in [Restricted Mode](restricted-mode.md): their text would steer an agent with words from a repository you haven't trusted. Settings ▸ Agents says how many files were ignored and where. They load once you trust the folder.
+- A personal definition wins over a project one with the same name, and the project file is reported as not used. A repository can't replace an agent you rely on. With several project folders open, the first one wins.
+- Names that are taken (`claude`, `codex`, a custom agent's id) are reported as problems, and so is a symbolic link that leaves its folder.
+
+### When a change applies
+
+Flint reads the files again whenever it lists agents or starts or resumes a chat. A new, changed or removed file applies to the next conversation; there is nothing to restart. Conversations that are running keep what they started with. If you reopen a chat after its definition is gone, Flint can't resume it and says which agent is missing.
+
+When the default agent or the review agent names a defined agent that isn't available (the file is gone, the folder isn't trusted, the program isn't installed), Flint falls back as it does for a custom agent that is missing.
+
+### What a definition can't do
+
+It chooses a program, a model and text, nothing else. It has no arguments (a prompt's `args` are not supported here), and it can't add tools, change permissions or set environment variables, so it can't widen what an agent may do. The program's settings and your approval policy stay yours.
+
+Not supported yet:
+
+- A custom ACP agent as the engine, pinned or as the default.
+- A model that isn't tied to a program (such as "strong"), and running one role on a program you choose in the picker.
+- Per-agent permissions or tools, limits on turns or budgets, and a scope of repositories or paths.
+- Defined agents in the background session host.
+- Workflows between agents, such as running the reviewer when a task finishes.
+
 ## The chat
 
-Open a chat from the `+` button in the tab bar (**claude chat** / **codex chat**, or a custom agent) or with "New Chat with claude" / "New Chat with codex" in the command palette. A chat starts in the active tab's project.
+Open a chat from the `+` button in the tab bar (**claude chat** / **codex chat**, a custom agent or a defined agent) or with "New Chat with claude" / "New Chat with codex" in the command palette. A chat starts in the active tab's project.
 
 A chat shows:
 
@@ -116,7 +192,7 @@ Check them against docs/api-guidelines.md.
 The front matter between the `---` lines is optional, one `key: value` per line (`#` starts a comment):
 
 - `description`: the line shown in the list.
-- `agent`: only offer the prompt in chats with this agent (`claude`, `codex` or a custom agent's id). "Run Prompt…" opens a chat with that agent if needed.
+- `agent`: only offer the prompt in chats with this agent (`claude`, `codex`, a custom agent's id or the name of a [defined agent](#defined-agents)). "Run Prompt…" opens a chat with that agent if needed.
 - `args`: names you are asked for when you choose the prompt (comma-separated, up to 8), used as `{{name}}` in the text.
 
 Flint fills these placeholders:
@@ -261,7 +337,7 @@ An agent task gives an agent its own branch in its own [git worktree](git-and-gi
 
 1. Run "New Agent Task…" from the command palette (`⇧⌘P`), or click `＋` in the **Agent Tasks** panel (`⑂` on the activity bar).
 2. Describe the task. Its first line names the branch: "Add rate limiting" becomes `agent/add-rate-limiting` (`-2`, `-3`… when the name is taken).
-3. Pick the agent (the default agent is preselected; Claude Code, Codex or a custom agent) and the branch to start from (the current one by default), then click **Start** (`⌘↵`).
+3. Pick the agent (the default agent is preselected; Claude Code, Codex, a custom agent or a [defined agent](#defined-agents)) and the branch to start from (the current one by default), then click **Start** (`⌘↵`).
 
 Flint creates the branch and the worktree (by default in `<repository>.worktrees/` next to your checkout, like **New Worktree…** in the branch widget), attaches the folder to the window as another project, opens a chat there and sends your description as the first message. Nothing else is added to it.
 
@@ -287,7 +363,7 @@ The actions:
 
 To see how different agents, or several attempts of one agent, solve the same task, tick **Compare agents** in "New Agent Task…". The agent in the **Agent** box is always included; tick the others to add them, and set **Attempts per agent** to run each more than once. One description starts at most 6 tasks.
 
-Flint creates one task per agent and attempt, all from the same commit of the base branch, each with its own branch and worktree. The branch names end in the agent's id: `agent/add-rate-limiting-claude`, `agent/add-rate-limiting-codex`, and `agent/add-rate-limiting-codex-2` for a second attempt. If one of them can't be created, none is kept. The same description goes to every agent.
+Flint creates one task per agent and attempt, all from the same commit of the base branch, each with its own branch and worktree. The branch names end in the agent's id: `agent/add-rate-limiting-claude`, `agent/add-rate-limiting-codex`, and `agent/add-rate-limiting-codex-2` for a second attempt. If one of them can't be created, none is kept. The same description goes to every agent. A [defined agent](#defined-agents) can be one of them, and its name ends the branch name; two defined agents with different instructions make a comparison of roles.
 
 The panel shows these tasks together under the task's title, each with its agent, state, changes, commits ahead and usage. A group has three more actions:
 
@@ -345,9 +421,10 @@ When an agent turn finishes while Flint isn't the active app, you get a macOS no
 
 ## Agents in Restricted Mode
 
-In a folder you haven't trusted, agents run without the project's own agent settings and hooks (Claude Code is started with `--setting-sources user`). Trust the folder to let them apply. Custom ACP agents don't start there at all, and chats there don't get [Flint's MCP server](#what-agents-can-see-in-flint): a hostile repository could otherwise steer the agent into reading your terminals or cluster without a prompt. The repository's [prompts](#prompts-in-restricted-mode) are marked and can't replace yours. See [Restricted Mode](restricted-mode.md).
+In a folder you haven't trusted, agents run without the project's own agent settings and hooks (Claude Code is started with `--setting-sources user`). Trust the folder to let them apply. Project [defined agents](#trust-and-names) are not loaded there. Custom ACP agents don't start there at all, and chats there don't get [Flint's MCP server](#what-agents-can-see-in-flint): a hostile repository could otherwise steer the agent into reading your terminals or cluster without a prompt. The repository's [prompts](#prompts-in-restricted-mode) are marked and can't replace yours. See [Restricted Mode](restricted-mode.md).
 
 ## Related
 
+- [Restricted Mode](restricted-mode.md)
 - [Work with agents](../how-to/work-with-agents.md)
 - [Build a feature with an agent](../use-cases/build-a-feature-with-an-agent.md)

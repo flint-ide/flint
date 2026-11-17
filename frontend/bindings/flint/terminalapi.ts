@@ -15,6 +15,16 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as terminal$0 from "./internal/terminal/models.js";
 
 /**
+ * Attach shows a terminal the background host kept running in a new tab of
+ * this window: what the host buffered is replayed, then live output follows
+ * on term:data as for any terminal. id must be one Live lists and no tab of
+ * this window shows yet.
+ */
+export function Attach(id: string): $CancellablePromise<void> {
+    return $Call.ByID(3380260757, id);
+}
+
+/**
  * ClaudeCommand makes sure Flint's Claude Code hooks file exists and returns
  * the command line that starts Claude with it, for the "New Claude Terminal"
  * command to type into a terminal opened in folder. The file is written only

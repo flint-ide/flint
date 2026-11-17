@@ -178,13 +178,13 @@ func (s *Server) checkStart(p TermStartParams) error {
 	return nil
 }
 
-func (ev termEvents) AgentState(id, state string) {
-	e := ev.s.term(id)
-	if e == nil {
+func (ev termEvents) AgentState(key, state string) {
+	e := ev.s.byKey(key)
+	if e == nil || e.superseded.Load() {
 		return
 	}
 	e.mu.Lock()
-	e.broadcast(NotifyTermAgent, notification(TermAgentParams{ID: id, State: state}))
+	e.broadcast(NotifyTermAgent, notification(TermAgentParams{ID: e.id, State: state}))
 	e.mu.Unlock()
 }
 

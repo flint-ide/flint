@@ -424,6 +424,20 @@ func TestTerminalTitleIsForwarded(t *testing.T) {
 	}
 }
 
+func TestAgentStateIsForwarded(t *testing.T) {
+	r := newRig(t, nil)
+	p := r.connect(t)
+	if err := p.call(t, MethodTermStart, TermStartParams{ID: "t1"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	r.terms.events.AgentState("t1", "waiting")
+	n := p.next(t)
+	var st TermAgentParams
+	if n.method != NotifyTermAgent || json.Unmarshal(n.params, &st) != nil || st.ID != "t1" || st.State != "waiting" {
+		t.Errorf("notification = %s %s", n.method, n.params)
+	}
+}
+
 func TestEveryClientGetsTheOutputOfItsTerminals(t *testing.T) {
 	r := newRig(t, nil)
 	a, b := r.connect(t), r.connect(t)

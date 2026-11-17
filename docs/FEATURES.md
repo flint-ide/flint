@@ -50,7 +50,6 @@ Files, terminals, agent chats, SQL consoles and diffs share one tab area, with f
 - **Unverified:** whether `claude --settings <file>` *merges* its hooks with the hooks in your own settings (the CLI's help says the flag loads "more settings"; the behaviour was not exercised, because it would need a Claude Code session). If it replaced them, your own hooks would not run in terminals started with *New Claude Terminal*; use the copied snippet instead. A terminal restored after a restart resumes Claude without `--settings`. What was verified: a hook-like command (a child of the foreground program with its output piped) can write the sequence to `/dev/tty` and Flint reads it (a test); that Claude Code starts hooks that way was not.
 
 ### File tree
-### File tree
 
 - Virtualized tree with selection (click, `⌘`+click, `⇧`+click, arrow keys).
 - Right-click opens a context menu: New File / New Folder and Rename, edited in place (`F2` / `↵`); Move to Trash (`⌘⌫` / Delete, with confirmation, also for multiple selected items); Copy Path / Copy Relative Path; Reveal in Finder; Open in Terminal; Find in Folder; Add to Agent Chat. On test files it adds Run Tests (and Debug Tests for Go); inside a repository, Show History; on changed files, Show Diff and Rollback.

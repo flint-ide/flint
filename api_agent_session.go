@@ -79,10 +79,10 @@ func (c *AgentChatAPI) Respond(sessionID, requestID, optionID string) error {
 	return c.app.agents.Respond(sessionID, requestID, optionID)
 }
 
-// Stop ends a conversation and its agent process.
+// Stop ends a conversation and its agent process, and the agents it started:
+// they ran under its grant, which ends with it.
 func (c *AgentChatAPI) Stop(sessionID string) error {
-	c.app.forgetChat(sessionID)
-	return c.app.agents.Stop(sessionID)
+	return c.app.stopChatTree(sessionID)
 }
 
 // Policy returns which permission requests are answered automatically.

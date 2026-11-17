@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	as "flint/internal/agentsession"
@@ -30,6 +31,10 @@ type ChatRequest struct {
 	// Origin says who is sending Prompt when it is not the person at the
 	// keyboard; the transcript shows the message as "from <agent>".
 	Origin *as.Origin
+	// wrapRegister, when set, runs the chat's registration (do) for the
+	// caller, which may hold a lock around it: start_agent turns its reserved
+	// slot into the registered child atomically.
+	wrapRegister func(do func() error) error
 }
 
 // ChatOpened is the payload of "chat:opened". Background asks the UI not to
@@ -61,7 +66,13 @@ func (a *App) openChat(ctx context.Context, r ChatRequest) (as.SessionInfo, erro
 	a.tasks.Bind(info.ID, r.Cwd)
 	a.usageChats.bind(info.ID, usageChat{chat: info.ID, agent: info.Agent, cwd: r.Cwd, model: info.Model})
 	node := orchestrate.Node{ID: info.ID, Agent: info.Agent, Role: r.Role, Parent: r.Parent, Cwd: r.Cwd}
-	if err := a.orch.Register(node); err != nil {
+	register := func() error { return a.orch.Register(node) }
+	if r.wrapRegister != nil {
+		err = r.wrapRegister(register)
+	} else {
+		err = register()
+	}
+	if err != nil {
 		a.forgetChat(info.ID)
 		_ = a.agents.Stop(info.ID)
 		return as.SessionInfo{}, err
@@ -113,9 +124,53 @@ func (a *App) adoptChat(info as.SessionInfo, cwd string) {
 func (a *App) forgetChat(id string) {
 	a.tasks.Unbind(id)
 	a.usageChats.unbind(id)
-	a.orch.Remove(id)
+	// The grant goes before the registry entry: a child registered in between
+	// finds its parent still there but inherits nothing, never a grant at a
+	// depth the registry no longer knows.
 	a.orchGrants.forget(id) // a grant dies with its chat
-	a.notices.Drop(id)      // and what its children had to tell it
+	a.orch.Remove(id)
+	a.notices.Drop(id) // and what its children had to tell it
+}
+
+// stopChatTree ends a chat and every agent it started, deepest first, so
+// closing a chat that holds a grant really ends the run: an agent left behind
+// would spend the user's budget unseen, and its grant died with the chat. A
+// second pass takes a child that was registered while the first one ran.
+func (a *App) stopChatTree(id string) error {
+	var errs []error
+	done := map[string]bool{}
+	for pass := 0; pass < 2; pass++ {
+		for _, victim := range a.chatSubtree(id) {
+			if done[victim] {
+				continue
+			}
+			done[victim] = true
+			a.forgetChat(victim)
+			if err := a.agents.Stop(victim); err != nil {
+				errs = append(errs, fmt.Errorf("stop %s: %w", victim, err))
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// chatSubtree lists id and its descendants, children before their parents.
+// The links are read from the children's Parent field, so it still finds the
+// children of a chat already removed from the registry.
+func (a *App) chatSubtree(id string) []string {
+	var out []string
+	var walk func(string, int)
+	walk = func(n string, depth int) {
+		if depth > 16 { // the registry bounds depth far lower; this ends a corrupt cycle
+			return
+		}
+		for _, c := range a.orch.Children(n) {
+			walk(c.ID, depth+1)
+		}
+		out = append(out, n)
+	}
+	walk(id, 0)
+	return out
 }
 
 // announcer is what a session manager offers to put a message in a chat's
@@ -129,19 +184,31 @@ type announcer interface {
 // did not come from the web view (fromWeb false) is redacted, because it may
 // carry what an agent read, and is announced as a "user_message" event so the
 // target's transcript shows it, with its origin; the web view already shows
-// what the user typed. Nothing is announced when the chat is busy.
+// what the user typed. Nothing is announced when the chat is busy. A prompt
+// the user typed resets, and one an agent sent counts against, the budget of
+// turns agents may start in each other (orchGrants.chargeTurn).
 func (a *App) promptChat(id, text string, attachments []as.Attachment, fromWeb bool, origin *as.Origin) error {
 	if err := a.usageGate(id); err != nil {
 		return err
 	}
 	busy := a.agents.Busy(id)
-	if !fromWeb {
+	charged := false
+	if fromWeb {
+		a.orchGrants.resetTurns(id) // the user wrote: agents get their turns back
+	} else {
 		if busy {
 			return as.ErrBusy // before announcing: a refused message must not appear
 		}
+		// A turn an agent (or Flint's notice) starts counts against the budget
+		// of the group of chats the target belongs to; past it, nothing starts.
+		if err := a.orchGrants.chargeTurn(id, a.currentSettings().Orchestration.MaxAutoTurns); err != nil {
+			return err
+		}
+		charged = true
 		text = redact.Secrets(text)
 		if an, ok := a.agents.(announcer); ok {
 			if err := an.Announce(id, as.Event{Kind: as.KindUserMessage, Text: text, Origin: origin}); err != nil {
+				a.orchGrants.refundTurn(id)
 				return err
 			}
 		}
@@ -152,5 +219,9 @@ func (a *App) promptChat(id, text string, attachments []as.Attachment, fromWeb b
 		a.tasks.Prompted(id)
 		a.orch.Prompted(id)
 	}
-	return a.agents.Prompt(id, text, attachments)
+	err := a.agents.Prompt(id, text, attachments)
+	if err != nil && charged {
+		a.orchGrants.refundTurn(id)
+	}
+	return err
 }

@@ -26,9 +26,62 @@ import (
 // from the task state on every call, never guessed from a path.
 type orchestrator struct {
 	app *App
-	// startMu serialises start_agent so two parallel calls cannot both pass the
-	// child limit.
+	// startMu guards reserved, and nothing else: it is held for the count of a
+	// caller's children and never while an agent starts.
 	startMu sync.Mutex
+	// reserved counts, per caller, the children whose start is under way and
+	// not yet in the registry, so parallel start_agent calls cannot together
+	// pass the child limit.
+	reserved map[string]int
+}
+
+// childSlot is one reserved child slot of a caller.
+type childSlot struct {
+	o      *orchestrator
+	caller string
+	done   bool
+}
+
+// reserveChild takes one of caller's child slots, or says why there is none.
+// The slot is held until the child is registered (see register) or release.
+func (o *orchestrator) reserveChild(caller string, limit int) (*childSlot, error) {
+	o.startMu.Lock()
+	defer o.startMu.Unlock()
+	if n := len(o.app.orch.Children(caller)) + o.reserved[caller]; n >= limit {
+		return nil, fmt.Errorf("you already have %d agents (the limit is %d); wait for one and stop it with stop_agent first", n, limit)
+	}
+	if o.reserved == nil {
+		o.reserved = map[string]int{}
+	}
+	o.reserved[caller]++
+	return &childSlot{o: o, caller: caller}, nil
+}
+
+func (s *childSlot) releaseLocked() {
+	if s.done {
+		return
+	}
+	s.done = true
+	if s.o.reserved[s.caller]--; s.o.reserved[s.caller] <= 0 {
+		delete(s.o.reserved, s.caller)
+	}
+}
+
+// release gives the slot back (a start that failed before its child existed).
+func (s *childSlot) release() {
+	s.o.startMu.Lock()
+	defer s.o.startMu.Unlock()
+	s.releaseLocked()
+}
+
+// register runs the child's registration and gives the slot up in the same
+// critical section, so the child is never counted twice nor not at all.
+func (s *childSlot) register(do func() error) error {
+	s.o.startMu.Lock()
+	defer s.o.startMu.Unlock()
+	err := do()
+	s.releaseLocked()
+	return err
 }
 
 var _ mcptools.Orchestrator = (*orchestrator)(nil)
@@ -177,11 +230,14 @@ func (o *orchestrator) Start(ctx context.Context, caller, root string, r mcptool
 	if err != nil {
 		return "", err
 	}
-	o.startMu.Lock()
-	defer o.startMu.Unlock()
-	if n := len(o.app.orch.Children(caller)); n >= maxChildren {
-		return "", fmt.Errorf("you already have %d agents (the limit is %d); wait for one and stop it with stop_agent first", n, maxChildren)
+	if !o.app.orchGrants.turnsLeft(caller, cfg.MaxAutoTurns) {
+		return "", autoTurnsError(cfg.MaxAutoTurns) // before anything is started: the first prompt would be refused
 	}
+	slot, err := o.reserveChild(caller, maxChildren)
+	if err != nil {
+		return "", err
+	}
+	defer slot.release()
 	cwd, taskID := root, ""
 	if r.Worktree {
 		task, err := o.newWorktree(ctx, root, agent, r)
@@ -198,7 +254,7 @@ func (o *orchestrator) Start(ctx context.Context, caller, root string, r mcptool
 	}
 	origin := as.Origin{SessionID: caller, Agent: node.Agent, Role: node.Role}
 	info, err := o.app.openChat(ctx, ChatRequest{
-		Agent: agent, Cwd: cwd, Prompt: r.Task, Role: r.Role, Parent: caller, Origin: &origin, TaskID: taskID,
+		Agent: agent, Cwd: cwd, Prompt: r.Task, Role: r.Role, Parent: caller, Origin: &origin, TaskID: taskID, wrapRegister: slot.register,
 	})
 	if err != nil {
 		if info.ID != "" {
@@ -210,7 +266,21 @@ func (o *orchestrator) Start(ctx context.Context, caller, root string, r mcptool
 		}
 		return "", err
 	}
+	if err := o.keepOrStop(caller, info.ID); err != nil {
+		return "", err
+	}
 	return info.ID, nil
+}
+
+// keepOrStop ends a child that was started while its parent was being closed:
+// the parent's grant (or its registry entry) went away between the checks of
+// Start and the child's registration, and nothing would stop the child later.
+func (o *orchestrator) keepOrStop(caller, child string) error {
+	if _, known := o.app.orch.Get(caller); known && o.app.orchGranted(caller) {
+		return nil
+	}
+	_ = o.app.stopChatTree(child)
+	return fmt.Errorf("the chat that started agent %s was closed meanwhile, so the agent was stopped", child)
 }
 
 // newWorktree makes the branch and worktree a child works in: one task of the
@@ -292,8 +362,7 @@ func (o *orchestrator) Output(caller, root, id string, lines int) (string, error
 	return o.app.orch.Output(id, lines), nil
 }
 
-// Stop ends the chat and everything below it, deepest first: a chat left
-// running without its parent would keep spending the user's budget unseen.
+// Stop ends the chat and everything below it, deepest first (stopChatTree).
 func (o *orchestrator) Stop(caller, root, id string) error {
 	if _, _, err := o.authorize(caller, root); err != nil {
 		return err
@@ -301,31 +370,7 @@ func (o *orchestrator) Stop(caller, root, id string) error {
 	if _, err := o.descendant(caller, root, id); err != nil {
 		return err
 	}
-	var errs []error
-	for _, victim := range o.subtree(id) {
-		o.app.forgetChat(victim)
-		if err := o.app.agents.Stop(victim); err != nil {
-			errs = append(errs, fmt.Errorf("stop %s: %w", victim, err))
-		}
-	}
-	return errors.Join(errs...)
-}
-
-// subtree lists id and its descendants, children before their parents.
-func (o *orchestrator) subtree(id string) []string {
-	var out []string
-	var walk func(string, int)
-	walk = func(n string, depth int) {
-		if depth > 16 { // the registry bounds depth far lower; this ends a corrupt cycle
-			return
-		}
-		for _, c := range o.app.orch.Children(n) {
-			walk(c.ID, depth+1)
-		}
-		out = append(out, n)
-	}
-	walk(id, 0)
-	return out
+	return o.app.stopChatTree(id)
 }
 
 // insideRoot reports whether a chat's folder is root or below it, with

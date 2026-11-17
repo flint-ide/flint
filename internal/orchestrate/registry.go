@@ -29,6 +29,9 @@ var (
 	ErrRemoved = errors.New("orchestrate: agent was removed")
 	// ErrTooManyWaiters is returned when a chat already has maxWaiters waiters.
 	ErrTooManyWaiters = errors.New("orchestrate: too many waiters on one agent")
+	// ErrParentGone is returned by Register for a node whose Parent is not
+	// registered (it was closed meanwhile).
+	ErrParentGone = errors.New("orchestrate: the parent chat is gone")
 	// ErrFull is returned by Register when maxNodes chats are registered.
 	ErrFull = errors.New("orchestrate: too many agents")
 )
@@ -80,8 +83,9 @@ type Registry struct {
 // New returns an empty registry.
 func New() *Registry { return &Registry{nodes: map[string]*entry{}} }
 
-// Register adds a chat. Its state starts as idle. When n.Parent is registered
-// the depth is the parent's plus one, otherwise n.Depth is kept.
+// Register adds a chat. Its state starts as idle. A chat with a Parent needs
+// that parent registered (ErrParentGone otherwise) and gets its depth plus one;
+// a chat without one keeps n.Depth.
 func (r *Registry) Register(n Node) error {
 	if n.ID == "" {
 		return errors.New("orchestrate: empty id")
@@ -97,7 +101,13 @@ func (r *Registry) Register(n Node) error {
 	if len(r.nodes) >= maxNodes {
 		return ErrFull
 	}
-	if p := r.nodes[n.Parent]; p != nil {
+	if n.Parent != "" {
+		// A child of a chat that is gone must not become a top-level chat
+		// (depth 0, with a depth budget of its own): refuse it.
+		p := r.nodes[n.Parent]
+		if p == nil {
+			return fmt.Errorf("%w: %s", ErrParentGone, n.Parent)
+		}
 		n.Depth = p.node.Depth + 1
 	}
 	n.Live = agenttask.Live{State: agenttask.Idle}

@@ -25,12 +25,36 @@ type chatDriver struct {
 	prompts map[string][]string
 	hold    chan struct{}
 	stopped []string
+	// startGate, when set, makes the next Start wait for it (see holdNextStart).
+	startGate chan struct{}
+	startHeld bool
+}
+
+// holdNextStart makes the next Start block until gate is closed.
+func (d *chatDriver) holdNextStart(gate chan struct{}) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.startGate = gate
+}
+
+// isStartHeld reports whether a Start is blocked on the gate.
+func (d *chatDriver) isStartHeld() bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.startHeld
 }
 
 func newChatDriver() *chatDriver { return &chatDriver{prompts: map[string][]string{}} }
 
 func (d *chatDriver) Start(_ context.Context, cwd string, _ as.Sink) (as.SessionInfo, error) {
 	d.mu.Lock()
+	if gate := d.startGate; gate != nil {
+		d.startGate, d.startHeld = nil, true
+		d.mu.Unlock()
+		<-gate
+		d.mu.Lock()
+		d.startHeld = false
+	}
 	defer d.mu.Unlock()
 	d.next++
 	return as.SessionInfo{ID: fmt.Sprintf("c%d", d.next), Cwd: cwd, Model: "m"}, nil
@@ -131,6 +155,9 @@ func TestOpenChatRegistersTellsTheUIAndPrompts(t *testing.T) {
 	c := newChatApp(t)
 	writeRoleFile(t, orchestrate.PersonalRolesDir(c.configDir), "fixer.md", "You fix bugs.")
 	parent := as.Origin{SessionID: "p0", Agent: "claude", Role: "lead"}
+	if err := c.orch.Register(orchestrate.Node{ID: "p0", Agent: "claude", Cwd: "/work/repo"}); err != nil {
+		t.Fatal(err)
+	}
 	info, err := c.openChat(context.Background(), ChatRequest{
 		Agent: "fake", Cwd: "/work/repo", Prompt: "fix it, token ghp_0123456789abcdefghijklmnopqrstuvwxyzAB",
 		Role: "fixer", TaskID: "t1", Parent: "p0", Origin: &parent,

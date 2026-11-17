@@ -122,7 +122,7 @@ func TestTreeDepthAndDescendants(t *testing.T) {
 func TestRegisterErrors(t *testing.T) {
 	r := newWith(t, Node{ID: "a"})
 	for name, n := range map[string]Node{
-		"empty id": {}, "duplicate": {ID: "a"}, "own parent": {ID: "b", Parent: "b"},
+		"empty id": {}, "duplicate": {ID: "a"}, "own parent": {ID: "b", Parent: "b"}, "parent gone": {ID: "b", Parent: "ghost"},
 	} {
 		if err := r.Register(n); err == nil {
 			t.Errorf("%s accepted", name)

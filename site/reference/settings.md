@@ -52,9 +52,10 @@ The file is readable only by your user. It never contains secrets: database pass
     "claude": {
       "path": "/opt/homebrew/bin/claude",
       "model": "opus",
-      "args": ["--add-dir", "/Users/me/notes"]
+      "args": ["--add-dir", "/Users/me/notes"],
+      "tiers": { "strong": "claude-opus-4-1", "fast": "" }
     },
-    "codex": { "path": "", "model": "", "args": ["-c", "model_reasoning_effort=high"] }
+    "codex": { "path": "", "model": "", "args": ["-c", "model_reasoning_effort=high"], "tiers": { "strong": "gpt-5-codex" } }
   },
   "customAgents": [
     { "id": "gemini", "name": "Gemini CLI", "command": "gemini", "args": ["--experimental-acp"] }
@@ -204,6 +205,7 @@ Each entry configures one agent CLI. A missing entry or key uses the default.
 | `path` | string | `""` | The executable. Empty looks up `claude` or `codex` on your login shell's `PATH`. Otherwise a command name (looked up on the `PATH`) or an absolute path; a path relative to the project is refused. |
 | `model` | string | `""` | The model, passed as `--model` (Claude Code, Codex commit messages) or as the chat thread's model (Codex). Empty uses the CLI's default. Letters, digits and `. _ : / @ [ ] -`, up to 128 characters, not starting with `-`. |
 | `args` | array of strings | `[]` | Extra command-line arguments for chats, commit messages and conflict resolution. |
+| `tiers` | object | see below | The model each [model tier](../guides/ai-agents.md#model-tiers) means on this agent CLI, for defined agents whose `model` is `fast`, `balanced` or `strong`: `{ "fast": "…", "balanced": "…", "strong": "…" }`. A missing tier uses the default: `haiku`, `sonnet` and `opus` for Claude Code, none for Codex. `""` means none, not even the default. A tier without a model runs on `model` above. Each value follows the rules of `model`. |
 
 Extra arguments are placed before Flint's own flags, so where a CLI lets a repeated flag override an earlier one, Flint's flag wins. They also may not:
 
@@ -212,6 +214,8 @@ Extra arguments are placed before Flint's own flags, so where a CLI lets a repea
 - be more than 32 arguments or longer than 512 characters each.
 
 In [Restricted Mode](../guides/restricted-mode.md) the extra arguments are left out, because a flag such as `--mcp-config` or `--add-dir` with a relative path would load the project's files.
+
+In `tiers`, other keys than `fast`, `balanced` and `strong` are refused, and so is a value that isn't a valid model. When the file is loaded, such a tier is dropped and uses its default again. To clear one of Claude Code's defaults, set the tier to `""` here: Settings ▸ Agents can set a tier's model or return it to the default (an empty field), but not clear it.
 
 ### customAgents
 

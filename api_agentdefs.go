@@ -19,9 +19,15 @@ type DefinedAgent struct {
 	// ResolvedEngine is the engine a new conversation would run on now; ""
 	// when none is installed (the agent is then not listed in pickers).
 	ResolvedEngine string `json:"resolvedEngine"`
-	// Model replaces the pinned engine's model ("" keeps the settings').
-	Model  string           `json:"model"`
-	Source agentdefs.Source `json:"source"`
+	// Model is the model as the file names it: a tier ("fast", "balanced",
+	// "strong") or a model name of the pinned engine; "" keeps the settings'.
+	Model string `json:"model"`
+	// ResolvedModel is the model a new conversation would use on
+	// ResolvedEngine because of Model: a tier's mapped model, or Model
+	// itself. "" when Model is empty, the tier is unmapped on that engine
+	// (the engine's own model applies) or no engine is installed.
+	ResolvedModel string           `json:"resolvedModel"`
+	Source        agentdefs.Source `json:"source"`
 	// Path is the Markdown file, for Open.
 	Path string `json:"path"`
 }
@@ -55,10 +61,14 @@ func (s *AgentDefsAPI) List() AgentDefinitions {
 		PersonalDir: agentdefs.PersonalDir(s.app.configDir),
 	}
 	for _, d := range set.Agents {
-		engine, _ := v.resolveEngine(d)
+		engine, err := v.resolveEngine(d)
+		var model string
+		if err == nil {
+			model = definedModel(d, engine, v.settings.AgentConfig(string(engine)))
+		}
 		out.Agents = append(out.Agents, DefinedAgent{
 			Name: d.Name, Description: d.Description, Engine: d.Engine, ResolvedEngine: string(engine),
-			Model: d.Model, Source: d.Source, Path: d.Path,
+			Model: d.Model, ResolvedModel: model, Source: d.Source, Path: d.Path,
 		})
 	}
 	return out

@@ -147,13 +147,28 @@ func (a *App) resolveEngine(d agentdefs.Definition) (agent.Kind, error) {
 	return agentdefs.ResolveEngine(d, a.preferredAgent(), agent.Available(a.currentSettings().AgentConfigs()))
 }
 
-// definedConfig is engine k's settings for d: d's model replaces the engine's
-// on the engine d pins (model names belong to one engine).
+// definedConfig is engine k's settings for d: d's model replaces the
+// engine's (definedModel). c is read from settings when a conversation starts
+// or resumes, so a tier resolves then, on the engine the conversation runs on.
 func definedConfig(d agentdefs.Definition, k agent.Kind, c agent.Config) agent.Config {
-	if d.Model != "" && agent.Kind(d.Engine) == k {
-		c.Model = d.Model
+	if m := definedModel(d, k, c); m != "" {
+		c.Model = m
 	}
 	return c
+}
+
+// definedModel is the model d sets on engine k with settings c: a tier's
+// model from c.Tiers (settings over the defaults), or d's model name on the
+// engine d pins (model names belong to one engine). "" when d sets none
+// there (no model, an unmapped tier): the engine's own model applies.
+func definedModel(d agentdefs.Definition, k agent.Kind, c agent.Config) string {
+	switch {
+	case agent.IsTier(d.Model):
+		return c.Tiers[d.Model]
+	case d.Model != "" && agent.Kind(d.Engine) == k:
+		return d.Model
+	}
+	return ""
 }
 
 // nativeRun is the native program behind an agent name: the engine, its

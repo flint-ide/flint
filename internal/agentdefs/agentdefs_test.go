@@ -32,7 +32,12 @@ func TestParse(t *testing.T) {
 		{name: "underscore", file: "a_b", data: "x", err: "name"},
 		{name: "name too long", file: strings.Repeat("a", 33), data: "x", err: "name"},
 		{name: "unknown engine", file: "a", data: "---\nengine: gemini\n---\nx", err: "engine"},
+		{name: "tier without engine", file: "rev", data: "---\nmodel: strong\n---\nReview.",
+			want: Definition{Name: "rev", Model: "strong", Instructions: "Review."}},
+		{name: "tier with engine", file: "rev", data: "---\nengine: codex\nmodel: fast\n---\nReview.",
+			want: Definition{Name: "rev", Engine: "codex", Model: "fast", Instructions: "Review."}},
 		{name: "model without engine", file: "a", data: "---\nmodel: opus\n---\nx", err: "needs an engine"},
+		{name: "tier is case-sensitive", file: "a", data: "---\nmodel: Strong\n---\nx", err: "needs an engine"},
 		{name: "bad model", file: "a", data: "---\nengine: claude\nmodel: --yolo\n---\nx", err: "model"},
 		{name: "empty body", file: "a", data: "---\nengine: claude\n---\n  \n", err: "empty"},
 		{name: "body too long", file: "a", data: long, err: "longer than"},
@@ -223,6 +228,9 @@ func TestCreate(t *testing.T) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "strong") {
+		t.Error("the template does not mention model tiers")
 	}
 	if d, err := Parse("reviewer", data); err != nil || d.Engine != "" || d.Description == "" {
 		t.Fatalf("template: %+v, %v", d, err)

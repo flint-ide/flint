@@ -50,8 +50,7 @@ An example, saved as `reviewer.md`:
 ```markdown
 ---
 description: Reviews a change for bugs; reports, never edits
-engine: claude
-model: opus
+model: strong
 ---
 You are the reviewer of this project. Read the diff and the code around it.
 Report bugs with file and line. Do not change files.
@@ -64,7 +63,7 @@ The front matter between the `---` lines is optional, one `key: value` per line 
 | Name | The file name without `.md`: lowercase letters, digits and `-`, starting with a letter, at most 32 characters. `claude` and `codex`, and the id of a custom agent, can't be used. |
 | `description` | Optional. One line for the pickers, at most 200 characters. |
 | `engine` | Optional. `claude` or `codex`. Pins the agent to that program. |
-| `model` | Optional, and only with `engine`, because model names belong to one program. Replaces the model from Settings ▸ Agents for this agent. |
+| `model` | Optional. A [model tier](#model-tiers), `fast`, `balanced` or `strong`, works with or without `engine`. Any other value is a model name, which needs `engine`, because model names belong to one program. Replaces the model from Settings ▸ Agents for this agent. |
 | Text after the front matter | Required: the standing instructions, at most 16,000 characters. |
 
 A file is at most 64 KB, and a folder is read up to 50 files.
@@ -78,7 +77,7 @@ A file is at most 64 KB, and a folder is read up to 50 files.
 
 ![Settings ▸ Agents: the list of defined agents with their engine, model and source, and the New Agent… button](../images/defined-agents-settings.png)
 
-The list in Settings shows each agent's name, engine, model, where it comes from, its description and the files Flint couldn't use, each with the reason. A file that breaks a rule is skipped, never half-used. Pickers show a pinned agent as "reviewer · claude", and one without an engine as "reviewer · default (claude)", with the program it would use now. An agent is listed only when its program is installed.
+The list in Settings shows each agent's name, engine, model, where it comes from, its description and the files Flint couldn't use, each with the reason. A file that breaks a rule is skipped, never half-used. Pickers show a pinned agent as "reviewer · claude", and one without an engine as "reviewer · default (claude)", with the program it would use now, followed by its model if it sets one: a tier with the model it means on that program now, "strong (opus)", or just "strong" when the program has no model for it. An agent is listed only when its program is installed.
 
 ### The engine
 
@@ -95,6 +94,22 @@ A [review](#review-changes-with-agent) by a defined agent follows its instructio
 Two places need only the program and leave the instructions out. **✦ Generate message** and **Edit with Agent** use the engine and the model of the agent, because Flint's own prompt there asks for an answer in a fixed format. **Resolve with claude** (or codex) runs the plain engine in a terminal.
 
 When an agent [starts another one](#letting-agents-act-in-flint) with a role meant for `claude` (or `codex`), a defined agent that runs on that program fits the role too; a role meant for a defined agent fits only that one.
+
+### Model tiers
+
+Model names belong to one program: `opus` means nothing to Codex. A tier asks for a kind of model instead, so a role shared with a team can say "use a strong model" and work on whichever program each person runs it on:
+
+| Tier | Claude Code | Codex |
+|---|---|---|
+| `fast` | `haiku` | the model from Settings ▸ Agents |
+| `balanced` | `sonnet` | the model from Settings ▸ Agents |
+| `strong` | `opus` | the model from Settings ▸ Agents |
+
+Each program's block in Settings ▸ Agents has a field per tier (**Fast model**, **Balanced model**, **Strong model**) that says which of its models the tier means for you. For Claude Code, an empty field uses the default above (Claude Code's own aliases); for Codex, whose model names change, there is no default, and a tier without a model runs on Codex's model from Settings, as if the definition named none. To make a Claude Code tier do the same, set it to `""` in `settings.json` (see [agents](../reference/settings.md#agents)).
+
+The tier is resolved when a conversation starts, on the program it starts on, from your settings at that moment: an agent without `engine` and with `model: strong` runs on `opus` with Claude Code and on your mapped model with Codex. A resumed conversation resolves it again on the program it started on. A review, a commit message and Edit with Agent resolve it the same way.
+
+A tier can only become a model from your own settings or the defaults above, so a project's file can name a tier but can't choose what it means.
 
 ### Trust and names
 
@@ -115,7 +130,7 @@ It chooses a program, a model and text, nothing else. It has no arguments (a pro
 Not supported yet:
 
 - A custom ACP agent as the engine, pinned or as the default.
-- A model that isn't tied to a program (such as "strong"), and running one role on a program you choose in the picker.
+- Running one role on a program you choose in the picker.
 - Per-agent permissions or tools, limits on turns or budgets, and a scope of repositories or paths.
 - Defined agents in the background session host.
 - Workflows between agents, such as running the reviewer when a task finishes.

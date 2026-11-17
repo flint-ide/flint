@@ -1,6 +1,7 @@
 // Package agentdefs reads agent definitions: Markdown files that make a named
 // agent out of an engine (Claude Code or Codex), an optional model and
-// standing instructions (docs/design/agent-definitions.md). The file format is
+// standing instructions (docs/design/agent-definitions.md). The model may be
+// a tier (agent.Tiers), which each engine maps to a model in settings. The file format is
 // the prompt library's (prompts.FrontMatter).
 //
 // A definition only chooses an engine, a model and text: it cannot add
@@ -36,7 +37,9 @@ type Definition struct {
 	// Engine is the pinned engine ("claude" or "codex"); "" runs on the
 	// user's default engine (ResolveEngine).
 	Engine string `json:"engine"`
-	// Model replaces the engine's model from settings; only with Engine.
+	// Model replaces the engine's model from settings: a model tier
+	// (agent.Tiers: "fast", "balanced", "strong"), resolved per engine from
+	// settings, or a model name, which needs Engine.
 	Model string `json:"model"`
 	// Instructions are the standing instructions (the file's body).
 	Instructions string `json:"instructions"`
@@ -94,8 +97,8 @@ func Parse(name string, data []byte) (Definition, error) {
 			d.Model = f.Value
 		}
 	}
-	if d.Model != "" && d.Engine == "" {
-		return Definition{}, errors.New("a model needs an engine: model names belong to one engine")
+	if d.Model != "" && d.Engine == "" && !agent.IsTier(d.Model) {
+		return Definition{}, errors.New("a model needs an engine: model names belong to one engine (or use a tier: fast, balanced or strong)")
 	}
 	d.Instructions = strings.TrimSpace(body)
 	switch {

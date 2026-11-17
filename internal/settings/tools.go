@@ -1,7 +1,9 @@
 package settings
 
 import (
+	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 
 	"flint/internal/agent"
@@ -19,6 +21,32 @@ type AgentSettings struct {
 	// name the flags Flint sets (agent.CheckArgs) and are ignored in
 	// Restricted Mode.
 	Args []string `json:"args"`
+	// Tiers maps a model tier ("fast", "balanced", "strong") to the model a
+	// defined agent asking for it runs on with this CLI. A missing tier uses
+	// the built-in default (agent.DefaultTiers: Claude Code's haiku, sonnet,
+	// opus; none for Codex); "" has none, so the agent runs on Model.
+	Tiers ModelTiers `json:"tiers,omitempty"`
+}
+
+// ModelTiers maps a model tier to a model (AgentSettings.Tiers).
+type ModelTiers map[string]string
+
+// UnmarshalJSON keeps the string values only: a value of the wrong type
+// ("fast": 3) is left out, so the tier keeps its default, where encoding/json
+// would store "" and clear it.
+func (t *ModelTiers) UnmarshalJSON(data []byte) error {
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	out := ModelTiers{}
+	for tier, v := range raw {
+		if model, ok := v.(string); ok {
+			out[tier] = model
+		}
+	}
+	*t = out
+	return nil
 }
 
 // LanguageServerSettings configures one language's server ("languageServers"
@@ -37,7 +65,7 @@ type LanguageServerSettings struct {
 // AgentConfig is the agent package's view of name's settings.
 func (s Settings) AgentConfig(name string) agent.Config {
 	a := s.Agents[name]
-	return agent.Config{Path: a.Path, Model: a.Model, Args: slices.Clone(a.Args)}
+	return agent.Config{Path: a.Path, Model: a.Model, Args: slices.Clone(a.Args), Tiers: agent.TierModels(agent.Kind(name), a.Tiers)}
 }
 
 // AgentConfigs maps every configured agent to its agent.Config.
@@ -76,6 +104,9 @@ func CheckAgent(name string, a AgentSettings) error {
 	if err := agent.CheckModel(a.Model); err != nil {
 		return err
 	}
+	if err := agent.CheckTiers(a.Tiers); err != nil {
+		return err
+	}
 	return agent.CheckArgs(k, a.Args)
 }
 
@@ -103,7 +134,8 @@ func CheckLanguageServer(language string, l LanguageServerSettings) error {
 
 // normalizeAgents keeps the known agents, each value valid or empty: a bad
 // path or model falls back to the default, bad arguments are all dropped
-// (dropping one could leave its value behind as a stray argument).
+// (dropping one could leave its value behind as a stray argument), and an
+// unknown tier or a tier with a bad model is dropped (back to its default).
 func normalizeAgents(agents map[string]AgentSettings) map[string]AgentSettings {
 	out := map[string]AgentSettings{}
 	for name, a := range agents {
@@ -111,7 +143,7 @@ func normalizeAgents(agents map[string]AgentSettings) map[string]AgentSettings {
 		if !agent.Valid(k) {
 			continue
 		}
-		n := AgentSettings{Path: a.Path, Model: a.Model, Args: cloneArgs(a.Args)}
+		n := AgentSettings{Path: a.Path, Model: a.Model, Args: cloneArgs(a.Args), Tiers: normalizeTiers(a.Tiers)}
 		if agent.CheckPath(n.Path) != nil {
 			n.Path = ""
 		}
@@ -122,6 +154,22 @@ func normalizeAgents(agents map[string]AgentSettings) map[string]AgentSettings {
 			n.Args = []string{}
 		}
 		out[name] = n
+	}
+	return out
+}
+
+// normalizeTiers keeps the known tiers with a valid model ("" included);
+// nil when none is left.
+func normalizeTiers(tiers ModelTiers) ModelTiers {
+	var out ModelTiers
+	for tier, model := range tiers {
+		if !agent.IsTier(tier) || agent.CheckModel(model) != nil {
+			continue
+		}
+		if out == nil {
+			out = ModelTiers{}
+		}
+		out[tier] = model
 	}
 	return out
 }
@@ -155,6 +203,7 @@ func cloneAgents(m map[string]AgentSettings) map[string]AgentSettings {
 	out := make(map[string]AgentSettings, len(m))
 	for k, v := range m {
 		v.Args = cloneArgs(v.Args)
+		v.Tiers = maps.Clone(v.Tiers)
 		out[k] = v
 	}
 	return out

@@ -1,12 +1,30 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { agentDescription, agentOption, agentLabel, engineLabel, engineOf, ignoredNote, savedEngine, trustedRoots, validAgentName, type AgentDefInfo } from './agentDefs'
+import {
+  agentDescription,
+  agentOption,
+  agentLabel,
+  DEFAULT_TIERS,
+  engineLabel,
+  engineOf,
+  ignoredNote,
+  isTier,
+  MODEL_TIERS,
+  modelLabel,
+  savedEngine,
+  trustedRoots,
+  validAgentName,
+  type AgentDefInfo,
+} from './agentDefs'
 import { forAgent, matchPrompts, type PromptInfo } from './prompts'
 
 const defs: AgentDefInfo[] = [
-  { name: 'reviewer', description: 'Reviews diffs', engine: 'claude', resolvedEngine: 'claude' },
-  { name: 'helper', description: '', engine: '', resolvedEngine: 'codex' },
-  { name: 'ghost', description: 'Nothing installed', engine: '', resolvedEngine: '' },
+  { name: 'reviewer', description: 'Reviews diffs', engine: 'claude', resolvedEngine: 'claude', model: '', resolvedModel: '' },
+  { name: 'helper', description: '', engine: '', resolvedEngine: 'codex', model: '', resolvedModel: '' },
+  { name: 'ghost', description: 'Nothing installed', engine: '', resolvedEngine: '', model: '', resolvedModel: '' },
+  { name: 'strong', description: '', engine: '', resolvedEngine: 'claude', model: 'strong', resolvedModel: 'opus' },
+  { name: 'cx-strong', description: '', engine: 'codex', resolvedEngine: 'codex', model: 'strong', resolvedModel: '' },
+  { name: 'named', description: '', engine: 'claude', resolvedEngine: 'claude', model: 'claude-opus-4-1', resolvedModel: 'claude-opus-4-1' },
 ]
 
 describe('agent definitions', () => {
@@ -15,6 +33,26 @@ describe('agent definitions', () => {
     assert.equal(agentLabel('helper', defs), 'helper · default (codex)')
     assert.equal(agentLabel('ghost', defs), 'ghost · default')
     assert.equal(engineLabel(defs[0]), 'claude')
+  })
+
+  it('shows a tier with the model it means now', () => {
+    assert.equal(modelLabel(defs[3]), 'strong (opus)')
+    assert.equal(modelLabel(defs[4]), 'strong', 'an unmapped tier runs on the engine model')
+    assert.equal(modelLabel(defs[5]), 'claude-opus-4-1', 'a model name is shown once')
+    assert.equal(modelLabel(defs[0]), '')
+    assert.equal(modelLabel({ model: 'opus', resolvedModel: '' }), 'opus')
+    assert.equal(agentLabel('strong', defs), 'strong · default (claude) · strong (opus)')
+    assert.equal(agentLabel('cx-strong', defs), 'cx-strong · codex · strong')
+    assert.equal(agentLabel('named', defs), 'named · claude · claude-opus-4-1')
+  })
+
+  it('knows the tier names like Go', () => {
+    assert.deepEqual([...MODEL_TIERS], ['fast', 'balanced', 'strong'])
+    assert.ok(isTier('strong'))
+    assert.ok(!isTier('Strong'))
+    assert.ok(!isTier('opus'))
+    assert.deepEqual(DEFAULT_TIERS.claude, { fast: 'haiku', balanced: 'sonnet', strong: 'opus' })
+    assert.equal(DEFAULT_TIERS.codex, undefined)
   })
 
   it('leaves native and custom agents as they are', () => {

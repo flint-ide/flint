@@ -22,6 +22,10 @@ type Config struct {
 	Model string
 	// Args are added to every command line Flint starts for the agent.
 	Args []string
+	// Tiers maps a model tier to this engine's model (TierModels: settings
+	// over the defaults; a tier without a model is missing). Only a defined
+	// agent whose model is a tier uses it.
+	Tiers map[string]string
 }
 
 // Limits for Config values.

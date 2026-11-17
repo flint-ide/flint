@@ -126,7 +126,8 @@ func (s Set) Find(name string) (Definition, bool) {
 const template = `---
 description: Reviews a change for bugs; reports, never edits
 # engine: claude     pin a program (claude or codex); without it, your default agent runs it
-# model: opus        a model of the pinned engine; needs engine
+# model: strong      a tier (fast, balanced or strong) works on any engine: Settings ▸ Agents maps
+#                    it to each engine's model; a model name (opus) needs engine
 ---
 You are the reviewer of this project. Read the diff and the code around it.
 Report bugs with file and line. Do not change files.

@@ -581,9 +581,18 @@ export class DefinedAgent {
     "resolvedEngine": string;
 
     /**
-     * Model replaces the pinned engine's model ("" keeps the settings').
+     * Model is the model as the file names it: a tier ("fast", "balanced",
+     * "strong") or a model name of the pinned engine; "" keeps the settings'.
      */
     "model": string;
+
+    /**
+     * ResolvedModel is the model a new conversation would use on
+     * ResolvedEngine because of Model: a tier's mapped model, or Model
+     * itself. "" when Model is empty, the tier is unmapped on that engine
+     * (the engine's own model applies) or no engine is installed.
+     */
+    "resolvedModel": string;
     "source": agentdefs$0.Source;
 
     /**
@@ -607,6 +616,9 @@ export class DefinedAgent {
         }
         if (!("model" in $$source)) {
             this["model"] = "";
+        }
+        if (!("resolvedModel" in $$source)) {
+            this["resolvedModel"] = "";
         }
         if (!("source" in $$source)) {
             this["source"] = agentdefs$0.Source.$zero;

@@ -1,4 +1,4 @@
-import { engineLabel, ignoredNote } from '../../lib/agentDefs'
+import { engineLabel, ignoredNote, modelLabel } from '../../lib/agentDefs'
 import { openAgentDefDialog, openAgentDefFile, useAgentDefs } from '../../store/agentDefs'
 
 /**
@@ -15,14 +15,15 @@ export function AgentDefsSection() {
       <p className="muted settings-note">
         A Markdown file with an optional engine (claude or codex), an optional model and standing instructions defines an agent you can pick
         wherever an agent is chosen. Personal ones live in {defs?.personalDir || '…'}; project ones in .flint/agents of a trusted folder.
-        Without an engine, an agent runs on the default agent. It cannot change permissions or tools.
+        Without an engine, an agent runs on the default agent. A model tier (fast, balanced or strong) works on either engine: each engine's
+        tier models above say what it means. A defined agent cannot change permissions or tools.
       </p>
       {defs && list.length === 0 && <p className="muted settings-note">No defined agents yet.</p>}
       {list.map((a) => (
         <div key={a.path} className="settings-actions">
           <span title={a.description || undefined}>
             <strong>{a.name}</strong> · {engineLabel(a)}
-            {a.model && <> · {a.model}</>} · {a.source}
+            {a.model && <> · {modelLabel(a)}</>} · {a.source}
             {a.description && <span className="muted"> · {a.description}</span>}
             {!a.resolvedEngine && <span className="muted"> · no engine installed</span>}
           </span>

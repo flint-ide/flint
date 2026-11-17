@@ -2,6 +2,8 @@
 
 A backlog holds work that is planned but not started: a folder of items, for one or more repositories, that Flint shows as a list and as a board. **Delegate** turns an item into [agent tasks](ai-agents.md#agent-tasks-agents-in-parallel), one per repository the item names, run by the agent the item names, and the item's status follows them. This guide explains the folder and its files, how repositories are matched to your checkouts, what Delegate does and refuses, how the status moves, and what is shared with a team.
 
+![The Backlog panel with the repositories and the items by status, next to the board of the same backlog](../images/backlog.png)
+
 ## When to use it
 
 Use a backlog when you:

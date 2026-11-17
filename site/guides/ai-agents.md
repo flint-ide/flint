@@ -111,6 +111,8 @@ The tier is resolved when a conversation starts, on the program it starts on, fr
 
 A tier can only become a model from your own settings or the defaults above, so a project's file can name a tier but can't choose what it means.
 
+![Settings ▸ Agents: the Fast, Balanced and Strong model fields of Claude Code with their defaults](../images/agents-tiers.png)
+
 ### Trust and names
 
 - Project definitions are not loaded at all in a folder in [Restricted Mode](restricted-mode.md): their text would steer an agent with words from a repository you haven't trusted. Settings ▸ Agents says how many files were ignored and where. They load once you trust the folder.

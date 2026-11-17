@@ -73,3 +73,17 @@ func TestSetRunsModulesInListOrder(t *testing.T) {
 		t.Error("a nil Set contributes something")
 	}
 }
+
+func TestSetTasksChanged(t *testing.T) {
+	calls := 0
+	s := New([]Module{
+		{ID: "a", New: func(Host) Instance { return Instance{TasksChanged: func() { calls++ }} }},
+		{ID: "b", New: func(Host) Instance { return Instance{} }},
+	}, nil)
+	s.TasksChanged()
+	if calls != 1 {
+		t.Errorf("TasksChanged ran %d times", calls)
+	}
+	var none *Set
+	none.TasksChanged()
+}

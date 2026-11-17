@@ -71,9 +71,9 @@ Done when:
 | `title` | Required, at most 120 characters. |
 | `status` | `todo` (default), `doing`, `review` or `done`. |
 | `priority` | `low`, `normal` (default) or `high`. Orders items inside a status; then by title. |
-| `agent` | Optional. Any agent name (defined, native or custom). Empty: the default agent. |
+| `agent` | Optional. Any agent name (defined, native or custom). Empty: the default agent. An agent that is not available on this machine does not hide the item: it is listed as a problem and Delegate says so. |
 | `repos` | Optional, comma-separated names from `flint-backlog.json`. Empty: the window's active project. |
-| Body | What to do and how to tell it is done. It becomes the agent task's description, so title and body together are at most 8,000 characters (`agenttask.MaxPrompt`). |
+| Body | What to do and how to tell it is done. It becomes the agent task's description, so title and body together are at most 8,000 bytes (`agenttask.MaxPrompt`). With several repositories, Delegate adds a sentence naming them, which counts too. |
 
 Unknown keys are kept when Flint rewrites a file and otherwise ignored. A file that breaks a rule is listed as a problem (file and reason) and not shown as an item.
 
@@ -82,11 +82,12 @@ Limits, fixed because a backlog may come from someone else's repository: 64 KiB 
 ## Which backlogs Flint knows
 
 - **Open Backlog…** picks a folder with `flint-backlog.json`; **New Backlog…** creates one in a folder the user picks. Flint remembers the folders (a state key), most recent first, at most 20, and forgets one on **Close Backlog**.
-- A workspace root that holds `flint-backlog.json` at its top is listed without being added.
+- A workspace root that holds `flint-backlog.json` at its top is listed without being added (and cannot be closed; it goes when the folder leaves the workspace).
+- A backlog is known by its real path (symlinks resolved). Closing one also forgets the links of its items to agent tasks (the tasks stay).
 
 ## Status and delegation
 
-Statuses are stored in the item's file, so a team that keeps the backlog in git shares them. Flint rewrites only the `status` line (adding front matter when the file has none) and keeps the rest of the file byte for byte.
+Statuses are stored in the item's file, so a team that keeps the backlog in git shares them. Flint rewrites only the value of the `status` line (adding the line before the closing `---` when there is none, or front matter when the file has none, with the file's line endings) and keeps the rest of the file byte for byte. A file it cannot change safely (two `status` lines, no closing `---`, a line that is not `key: value`, a file that changed between reading and writing) is refused with the reason.
 
 | Change | When |
 |---|---|
@@ -95,11 +96,13 @@ Statuses are stored in the item's file, so a team that keeps the backlog in git 
 | `doing` → `review` | Every agent task of the item finished. A failed task keeps the item in `doing`, marked failed. |
 | `review` → `done` | Every agent task of the item is merged into its base, or its pull request was created and the task removed. |
 
+Automatic changes only start from `doing` or `review`: an item the user moved elsewhere stays there. A task removed without being merged and without a pull request (a discarded attempt) no longer counts; with no task left, nothing moves. Both changes can happen in one step (`doing` → `done` when every task is already merged). Flint remembers in the link what the item needs after a task is removed: the last state, the pull request and whether it was merged. The changes are made when Flint hears that agent tasks changed (`feature.Instance.TasksChanged`, run with every `tasks:changed`; a watcher goroutine reconciles, then emits `backlog:changed`) and whenever the panel reads the backlog (the UI re-reads on `tasks:changed` and `git:changed`, which also catches a merge made outside Flint). Nothing polls. A task merged outside Flint and removed before Flint looked counts as discarded.
+
 **Delegate** on an item:
 
 1. Resolves the agent: the item's `agent`, else the default agent. It must be available now, or Delegate fails and says which agent is missing.
-2. Resolves each repository in `repos` to a checkout: a workspace root (or a folder in one) whose repository has a remote with the same URL (compared after normalizing scheme, user, `.git` and case of the host), else the folder the user chose for that URL with **Locate…** (remembered per URL in Flint's state, never in the backlog). A repository with no checkout stops the whole Delegate before anything is created; the UI offers **Locate…**. A located folder that is not in the workspace is attached to it first, by the UI, like a task's worktree. Flint does not clone in version 1.
-3. Creates one agent task per repository through the same path as New Agent Task (branch, worktree, queue, limits, trust of the worktree). The description is the item's title and body; with several repositories it also names the item's other repositories and says which one this task works in. All or nothing: when one cannot be created, the ones already created for this Delegate are removed.
+2. Resolves each repository in `repos` to a checkout: a workspace root (or a folder in one) whose repository has a remote with the same URL, else the folder the user chose for that URL with **Locate…** (remembered per URL in Flint's state, never in the backlog). URLs are compared after normalizing: scheme, user, port, trailing `.git` and slashes are dropped and the host is lower-cased (`git@github.com:acme/api.git`, `ssh://git@github.com:22/acme/api` and `https://github.com/acme/api/` are one repository); the path keeps its case, and local paths (`/srv/git/api.git`, `file://…`) compare as paths. An agent task's worktree is never used as a checkout. **Locate…** accepts only a folder whose repository has a remote with that URL. A repository with no checkout stops the whole Delegate before anything is created; the UI offers **Locate…**. A located folder that is not in the workspace is attached to it first, by the UI, like a task's worktree. Flint does not clone in version 1. An item without `repos` runs in the window's active project, which the UI passes and which must be an open workspace folder.
+3. Creates one agent task per repository through the same path as New Agent Task (branch, worktree, queue, limits, trust of the worktree), from the checkout's current branch. The description is the item's title and body; with several repositories it also names the item's other repositories and says which one this task works in. All or nothing: when one cannot be created, the ones already created for this Delegate are removed. Flint starts the chats of the tasks that got a slot itself, as it does for a queued task that leaves the queue (the UI adopts them from `chat:opened`); the others are queued.
 4. Remembers which agent tasks belong to the item, and sets `status: doing`.
 
 The link between an item and its agent tasks is local state, not part of the backlog: agent tasks, worktrees and chats exist on one machine. A teammate sees the item's status, not the other machine's tasks.
@@ -125,8 +128,9 @@ A read-only agent tool, `get_backlog`, returns the open backlogs with their item
 
 - A feature module, switched on by default and optional: `internal/features/backlog` (the file format, loading, status rewriting and URL matching are pure and tested without Flint) and `frontend/src/features/backlog`.
 - The module needs agent tasks and repositories, which a feature's `Host` does not offer. The contract is widened on purpose with the narrowest methods that do the job (create agent tasks for a description in a folder with an agent; the states of given agent tasks; the remotes of a folder's repository; the default and available agents), implemented by the app with the code New Agent Task already uses.
-- State keys: the remembered backlog folders, the checkout chosen per repository URL, and the agent tasks of each item.
-- Every service method takes a backlog folder that must be one Flint knows (above) and an item id that is validated; paths are never taken from the UI.
+- State keys: `backlogs` (the remembered backlog folders, at most 20), `backlogCheckouts` (the checkout chosen per repository URL, at most 200) and `backlogTasks` (the agent tasks of each item, at most 100 per item; delegating again drops the oldest removed ones first).
+- The `Host` methods: `CreateAgentTasks` (requests of folder, description and agent; all or nothing), `AgentTasks` (the states of given task ids, merged and pull request included), `Repository` (a folder's checkout, its remote URLs and whether it is a task's worktree) and `Agents` (the available agents and the default one). `featuretest.Host` fakes them.
+- Every service method takes a backlog folder that must be one Flint knows (above) and an item id that is validated; paths are taken from the UI only for Open, New Backlog and Locate (existing folders the user picked with the native folder picker, `WorkspaceAPI.PickFolder`) and as Delegate's active project (which must be an open workspace folder).
 
 ## Not in version 1
 

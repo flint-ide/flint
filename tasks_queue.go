@@ -136,7 +136,7 @@ func (a *App) startQueuedTasks() {
 		}()
 	}
 	if len(next) > 0 {
-		a.emit(eventTasksChanged)
+		a.tasksChanged()
 	}
 }
 
@@ -216,7 +216,7 @@ func (t *TaskAPI) StartNow(id string) (TaskView, error) {
 		return TaskView{}, err
 	}
 	task.Queued = false
-	a.emit(eventTasksChanged)
+	a.tasksChanged()
 	ctx, cancel := t.ctx(gitTimeout)
 	defer cancel()
 	r, err := t.git.repo(ctx, task.Worktree)

@@ -352,15 +352,6 @@ func (a *App) createTasks(ctx context.Context, req NewTaskGroup, queueOK bool) (
 		return nil, nil, fmt.Errorf("the limit of %d tasks working at once is reached: wait for one to finish", s.AgentTasks.MaxParallel)
 	}
 	var made []agenttask.Task
-	undo := func() {
-		for _, task := range made {
-			a.releaseStart(task.ID)
-			_ = r.RemoveWorktree(ctx, task.Worktree, true)
-			_ = r.DeleteBranch(ctx, task.Branch, true)
-			_ = a.untrustTask(task)
-			_ = a.saveTasks(func(st agenttask.Store) (agenttask.Store, error) { return st.Remove(task.ID), nil })
-		}
-	}
 	for _, agent := range req.Agents {
 		task, err := a.createOne(ctx, r, agenttask.Task{
 			ID: agenttask.NewID(), Title: agenttask.Title(desc), Prompt: redact.Secrets(desc), Agent: agent,
@@ -370,15 +361,27 @@ func (a *App) createTasks(ctx context.Context, req NewTaskGroup, queueOK bool) (
 			Queued: agenttask.Slots(s.AgentTasks.MaxParallel, a.activeTasks()) == 0,
 		}, pathOf, &made)
 		if err != nil {
-			undo()
+			a.discardTasks(ctx, r, made)
 			return nil, nil, err
 		}
 		if !task.Queued {
 			a.reserveStart(task.ID) // its chat starts next
 		}
 	}
-	a.emit(eventTasksChanged)
+	a.tasksChanged()
 	return made, r, nil
+}
+
+// discardTasks undoes tasks of r that were just created and whose chats have
+// not started: their slots, worktrees, branches, trust and entries go.
+func (a *App) discardTasks(ctx context.Context, r *git.Repo, made []agenttask.Task) {
+	for _, task := range made {
+		a.releaseStart(task.ID)
+		_ = r.RemoveWorktree(ctx, task.Worktree, true)
+		_ = r.DeleteBranch(ctx, task.Branch, true)
+		_ = a.untrustTask(task)
+		_ = a.saveTasks(func(st agenttask.Store) (agenttask.Store, error) { return st.Remove(task.ID), nil })
+	}
 }
 
 // createOne gives task (whose Branch is the wanted name) a free branch and a
@@ -496,7 +499,7 @@ func (t *TaskAPI) Merge(id string) (MergeResult, error) {
 		return MergeResult{}, err
 	}
 	res.Merged = true
-	t.app.emit(eventTasksChanged)
+	t.app.tasksChanged()
 	return res, nil
 }
 
@@ -545,7 +548,7 @@ func (t *TaskAPI) UpdateFromBase(id string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	t.app.emit(eventTasksChanged)
+	t.app.tasksChanged()
 	return append([]string{}, files...), nil
 }
 
@@ -598,7 +601,7 @@ func (t *TaskAPI) CreatePullRequest(id string) (string, error) {
 	if err != nil {
 		t.app.logf("save pull request of task: %v", err)
 	}
-	t.app.emit(eventTasksChanged)
+	t.app.tasksChanged()
 	return url, nil
 }
 
@@ -716,7 +719,7 @@ func (t *TaskAPI) Remove(id string, opts RemoveOptions) (RemoveResult, error) {
 		return RemoveResult{}, err
 	}
 	err = a.saveTasks(func(s agenttask.Store) (agenttask.Store, error) { return s.Remove(id), nil })
-	a.emit(eventTasksChanged)
+	a.tasksChanged()
 	a.startQueuedTasks() // a working task that was removed frees its slot
 	return res, err
 }

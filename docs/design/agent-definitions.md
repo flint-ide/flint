@@ -28,8 +28,8 @@ Report bugs with file and line. Do not change files.
 |---|---|
 | Name | The file name without `.md`. Lowercase letters, digits and dashes, starting with a letter, at most 32 characters (the rule for a custom agent's id), because the name is used as an agent name and in task branch names. |
 | `description` | One line for pickers; at most 200 characters; optional. |
-| `engine` | Required. `claude` or `codex` in version 1. |
-| `model` | Optional. Replaces the engine's model from settings for this agent; checked with `agent.CheckModel`. |
+| `engine` | Optional. Without it the agent runs on the user's default engine: `defaultAgent` when that is a native agent that is installed, otherwise the first native agent installed. A definition is then a role that works for everyone on a team, whichever CLI each has. Set it (`claude` or `codex` in version 1) only to pin the role to one program. |
+| `model` | Optional, and only with `engine`: model names belong to an engine, so a model without an engine is a problem. Replaces the engine's model from settings for this agent; checked with `agent.CheckModel`. |
 | Body | The instructions. Required, at most 16,000 characters. |
 
 Unknown keys are ignored, so newer files still load. A file that breaks a rule is skipped and reported as a problem (file and reason), like a prompt file.
@@ -62,7 +62,8 @@ Everything else is the engine's: permissions and the approval policy, Flint's MC
 
 Rules that follow:
 
-- A defined agent is listed (and can start) only when its engine is installed.
+- A defined agent is listed (and can start) only when its engine is installed: the pinned one, or any native agent when none is pinned.
+- An agent without a pinned engine resolves its engine when a conversation starts, so changing `defaultAgent` applies to the next conversation. A conversation remembers the engine it started on and resumes on it, whatever the default is by then.
 - Changing or adding a file applies to the next conversation that starts, without a restart. Conversations that are running keep what they started with (the manager already keeps a retired driver for its sessions).
 - A conversation reopened after a restart finds its agent by name. When the definition is gone, resuming fails with a message that names it, as for a removed custom agent.
 - Wherever Flint needs the *program* behind an agent name (a headless run for a commit message, a terminal command to resolve conflicts, per-engine settings, engine-specific UI such as slash commands), it uses the definition's engine. No code may cast a defined agent's name to `agent.Kind`.
@@ -83,7 +84,8 @@ Rules that follow:
 
 ## Not in version 1
 
-- Custom ACP agents as engines.
+- Custom ACP agents as engines (pinned or as the default engine).
+- Model tiers that are not tied to an engine (`model: strong`, mapped to each engine's model in settings), and running one role on a chosen engine from a picker (for Compare agents across engines).
 - Per-agent permissions and tool sets, a scope (repositories or paths), budgets and turn limits, and the machine an agent runs on.
 - The background session host (`hostmode`) registers native drivers only, as it does for custom agents; defined agents come with its settings sync.
 - Workflows between agents (run the reviewer when a task finishes).

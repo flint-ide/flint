@@ -4586,6 +4586,18 @@ button.keymap-chord:hover {
 .pr-loading {
   font-size: 11px;
 }
+.pr-search {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 6px;
+}
+.pr-search-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+}
 .pr-row {
   padding: 5px 10px 6px;
   cursor: pointer;

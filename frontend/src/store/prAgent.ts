@@ -7,7 +7,8 @@
 import { createStore } from '../lib/store'
 import { GitHub, errorMessage } from '../api/backend'
 import { askAgent } from '../lib/askAgent'
-import { draftNotice, isNothingToAddress, maySend, pickReviewTarget, type ReviewTarget } from '../lib/prAgent'
+import { codeReviewPrompt, draftNotice, isNothingToAddress, maySend, pickReviewTarget, type CodeReviewSubject, type ReviewTarget } from '../lib/prAgent'
+import { detailsKey, usePullRequests } from './pullRequests'
 import { isSignInError } from '../lib/githubSettings'
 import type { TaskView } from '../lib/agentTasks'
 import { requestGitHubSignIn } from './accounts'
@@ -58,6 +59,23 @@ export async function addressReviewComments(target: ReviewAgentTarget, opts: { t
       const { [key]: _done, ...busy } = s.busy
       return { busy }
     })
+  }
+}
+
+/**
+ * Puts a request for a code review of a pull request in the agent chat of its
+ * project, for the user to review and send (send: right away). What is already
+ * loaded about it (its tab's details, else its row in the list) goes in; the
+ * agent reads the change itself. Nothing is fetched here.
+ */
+export async function requestCodeReview(target: ReviewTarget, opts: { send?: boolean } = {}): Promise<void> {
+  const { details, items, root } = usePullRequests.getState()
+  const known: CodeReviewSubject | undefined =
+    details[detailsKey(target.root, target.number)]?.data ?? (root === target.root ? items.find((i) => i.number === target.number) : undefined)
+  try {
+    await askAgent({ prompt: codeReviewPrompt({ ...known, number: target.number }), root: target.root, send: !!opts.send })
+  } catch (err) {
+    showToast(`Couldn't hand #${target.number} to the agent: ${errorMessage(err)}`, 'error')
   }
 }
 

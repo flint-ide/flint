@@ -1,9 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useGit } from '../../store/git'
 import { useWorkspace } from '../../store/workspace'
 import { pullRequestTabId, useEditor } from '../../store/editor'
-import { loadPullRequests, openInBrowser, openPullRequest, setListFilter, usePullRequests, type ListState, type Who } from '../../store/pullRequests'
-import { ROLLUP_GLYPH, checksSummary, rollup, stateBadge, timeAgo } from '../../lib/prReview'
+import { loadPullRequests, openInBrowser, openPullRequest, setListFilter, setListQuery, usePullRequests, type ListState, type Who } from '../../store/pullRequests'
+import { ROLLUP_GLYPH, checksSummary, rollup, searchPullRequests, stateBadge, timeAgo } from '../../lib/prReview'
 import type { PullRequest } from '../../api/backend'
 import { Select } from '../ui/Select'
 import { useWindowFocus } from './useWindowFocus'
@@ -36,6 +36,8 @@ export function PullRequestsPanel() {
   const error = usePullRequests((s) => s.error)
   const who = usePullRequests((s) => s.who)
   const state = usePullRequests((s) => s.state)
+  const query = usePullRequests((s) => s.query)
+  const shown = useMemo(() => searchPullRequests(items, query), [items, query])
   const ci = useCurrentCI()
 
   // Loaded when shown and on window focus; the panel unmounts when hidden, so nothing polls.
@@ -63,13 +65,42 @@ export function PullRequestsPanel() {
           {loading && <span className="muted pr-loading">Loading…</span>}
         </div>
       )}
+      {repo && (
+        <div className="pr-search">
+          <input
+            type="search"
+            className="pr-search-input"
+            placeholder="Search by title or #number"
+            aria-label="Search pull requests by title or number"
+            value={query}
+            spellCheck={false}
+            onChange={(e) => setListQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && query) {
+                e.stopPropagation()
+                setListQuery('')
+              }
+            }}
+          />
+          {query.trim() !== '' && (
+            <span className="muted pr-loading">
+              {shown.length} of {items.length}
+            </span>
+          )}
+        </div>
+      )}
       {repo && <CIBanner entry={ci} />}
       <div className="tree scroll">
         {!root && <div className="placeholder muted">Open a folder to see its pull requests.</div>}
         {status && status.state !== 'ok' && <StatusMessage state={status.state} message={status.message} onRetry={() => void loadPullRequests(root, true)} />}
         {error && <div className="placeholder error selectable">{error}</div>}
         {repo && !error && !loading && items.length === 0 && <div className="placeholder muted">No pull requests.</div>}
-        {repo && root && items.map((pr) => <PullRequestRow key={pr.number} root={root} pr={pr} />)}
+        {repo && !error && items.length > 0 && shown.length === 0 && (
+          <div className="placeholder muted">
+            No pull request in this list matches “{query.trim()}”. The search covers the pull requests loaded here: change the filters above to look in others.
+          </div>
+        )}
+        {repo && root && shown.map((pr) => <PullRequestRow key={pr.number} root={root} pr={pr} />)}
       </div>
     </div>
   )

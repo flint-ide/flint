@@ -8,6 +8,8 @@ import { showToast } from '../../store/dialog'
 import { resolveConflictsWithAgent, suggestCommitMessage, useAgent } from '../../store/agent'
 import { errorMessage } from '../../api/backend'
 import { conflictHint } from '../../lib/customAgents'
+import { agentOption } from '../../lib/agentDefs'
+import { useAgentDefs } from '../../store/agentDefs'
 import { Select } from '../ui/Select'
 import { openStashDialog } from '../../store/stash'
 import { StashSection } from './StashSection'
@@ -65,6 +67,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
   const [generating, setGenerating] = useState(false)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const agents = useAgent()
+  const defined = useAgentDefs((s) => s.defined)
   const reviewing = useAgentReview((s) => !!s.running)
   useFocus(textarea, focusToken)
   useEffect(() => {
@@ -178,7 +181,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
             <Select
               size="sm"
               value={agents.preferred}
-              options={agents.available.map((a) => ({ value: a, label: a }))}
+              options={agents.available.map((a) => agentOption(a, defined))}
               onChange={(a) => agents.setPreferred(a)}
               title="Agent used for generating messages and resolving conflicts"
             />

@@ -20,11 +20,16 @@ import { createEventHold } from '../lib/eventHold'
 import { createReorderer, type Reorderer } from '../lib/reorder'
 import type { SavedChat } from '../lib/sessionSnapshot'
 import { useEditor } from './editor'
+import { loadAgentDefs } from './agentDefs'
+import { savedEngine } from '../lib/agentDefs'
 import { alertApproval, alertDone, approvalSettled, approvalsEnded } from './alerts'
 
 export interface ChatSession {
   id: string
+  /** The name the user picked (a native, custom or defined agent). */
   agent: string
+  /** The program behind it ("claude", "codex", a custom agent's id); '' for a chat saved before definitions: resolved from the name. */
+  engine: string
   cwd: string
   model?: string
   chat: ChatState
@@ -91,6 +96,8 @@ export const useAgentChat = createStore<AgentChatState>((set, get) => ({
 
   load: async () => {
     try {
+      // Definitions first: reading them registers them, so Agents() lists the defined ones.
+      await loadAgentDefs()
       const [agents, policy] = await Promise.all([Chat.Agents(), Chat.Policy()])
       set({ agents: agents ?? [], policy })
     } catch (err) {
@@ -117,7 +124,7 @@ export const useAgentChat = createStore<AgentChatState>((set, get) => ({
   adopt: (info, opts) => {
     if (get().sessions[chatLocalId(info.id)]) return
     const session: ChatSession = {
-      id: info.id, agent: info.agent, cwd: info.cwd, model: info.model, chat: emptyChat, draft: '', attachments: [],
+      id: info.id, agent: info.agent, engine: info.engine, cwd: info.cwd, model: info.model, chat: emptyChat, draft: '', attachments: [],
     }
     set((s) => ({ sessions: { ...s.sessions, [info.id]: session }, order: [...s.order, info.id] }))
     useEditor.getState().openChat(info.id, session.agent, opts?.background)
@@ -178,7 +185,7 @@ export const useAgentChat = createStore<AgentChatState>((set, get) => ({
 
   restore: (saved) => {
     if (get().sessions[saved.id]) return
-    const session: ChatSession = { ...saved, chat: settle(saved.chat), attachments: [], dormant: true }
+    const session: ChatSession = { ...saved, engine: savedEngine(saved), chat: settle(saved.chat), attachments: [], dormant: true }
     set((s) => ({ sessions: { ...s.sessions, [saved.id]: session }, order: [...s.order, saved.id] }))
     useEditor.getState().openChat(saved.id, saved.agent, true)
   },
@@ -200,7 +207,7 @@ export const useAgentChat = createStore<AgentChatState>((set, get) => ({
 async function wake(s: ChatSession): Promise<void> {
   let info: agentsession.SessionInfo
   try {
-    info = await Chat.Resume(s.agent, s.cwd, s.id)
+    info = await Chat.Resume(s.agent, s.cwd, s.id, s.engine)
   } catch (err) {
     info = await Chat.Start(s.agent, s.cwd)
     update(s.id, (cs) => ({
@@ -213,7 +220,7 @@ async function wake(s: ChatSession): Promise<void> {
     }))
   }
   link(s.id, info.id)
-  update(s.id, (cs) => ({ ...cs, dormant: false, model: info.model || cs.model }))
+  update(s.id, (cs) => ({ ...cs, dormant: false, engine: info.engine || cs.engine, model: info.model || cs.model }))
 }
 
 /** A restored transcript is idle: nothing runs and unanswered questions expired. */

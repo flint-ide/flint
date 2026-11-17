@@ -1,6 +1,8 @@
 import { useSettings } from '../../store/settings'
 import { useAgent } from '../../store/agent'
 import { AGENT_REVIEW_LIMITS, DEFAULT_AGENT_REVIEW, autoApproveArgs, type AgentReviewSettings, type ReviewScope } from '../../lib/reviewSettings'
+import { useAgentDefs } from '../../store/agentDefs'
+import { agentOption } from '../../lib/agentDefs'
 import { Select } from '../ui/Select'
 import { NumberField, Row } from './fields'
 
@@ -16,6 +18,7 @@ export function AgentReviewSection() {
   const update = useSettings((s) => s.update)
   const available = useAgent((s) => s.available)
   const preferred = useAgent((s) => s.preferred)
+  const defined = useAgentDefs((s) => s.defined)
   const set = (change: Partial<AgentReviewSettings>) => update((s) => ({ agentReview: { ...s.agentReview, ...change } }))
   // An agent that is no longer installed still shows, so it can be changed back.
   const names = review.agent && !available.includes(review.agent) ? [...available, review.agent] : available
@@ -33,7 +36,7 @@ export function AgentReviewSection() {
         <Select
           value={review.agent}
           allowEmpty="Default agent"
-          options={names.map((a) => ({ value: a, label: a, hint: available.includes(a) ? undefined : 'not installed' }))}
+          options={names.map((a) => agentOption(a, defined, available.includes(a) ? undefined : 'not installed'))}
           onChange={(agent) => set({ agent })}
         />
       </Row>

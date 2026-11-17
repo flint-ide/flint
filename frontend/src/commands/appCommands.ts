@@ -27,6 +27,8 @@ import { useSearch } from '../store/search'
 import { useAgentChat } from '../store/agentChat'
 import { showToast } from '../store/dialog'
 import { trustFolder, untrustFolder } from '../store/trust'
+import { useAgentDefs } from '../store/agentDefs'
+import { agentLabel } from '../lib/agentDefs'
 import { copyDiagnostics, reportIssue, showLogs } from '../store/diagnostics'
 import { openToolCheck } from '../store/toolCheck'
 import { openInlineEditInActiveEditor } from '../store/editorAi'
@@ -307,7 +309,7 @@ function registerAgentChatCommands(): () => void {
     off = registerCommands(
       next.map((agent) => ({
         id: `agent.newChat.${agent}`,
-        title: `New Chat with ${agent}`,
+        title: `New Chat with ${agentLabel(agent, useAgentDefs.getState().defined)}`,
         category: 'Agent',
         keywords: 'conversation',
         when: () => !useAgentChat.getState().starting,

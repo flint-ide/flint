@@ -12,6 +12,8 @@ const DIFF_LIMIT = 40_000
 export interface SavedChat {
   id: string
   agent: string
+  /** The program behind the agent; absent in chats saved before agent definitions (resumes on the engine resolved now). */
+  engine?: string
   cwd: string
   model?: string
   chat: ChatState

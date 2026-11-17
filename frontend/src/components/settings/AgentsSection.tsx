@@ -12,6 +12,10 @@ import { OrchestrationSection } from './OrchestrationSection'
 import { TerminalAgentSection } from './TerminalAgentSection'
 import { PromptsSection } from './PromptsSection'
 import { AgentReviewSection } from './AgentReviewSection'
+import { useAgentChat } from '../../store/agentChat'
+import { useAgentDefs } from '../../store/agentDefs'
+import { agentOption } from '../../lib/agentDefs'
+import { AgentDefsSection } from './AgentDefsSection'
 import { isMac } from '../../lib/platform'
 
 // The agent CLIs Flint drives (Go: agent.known).
@@ -27,9 +31,14 @@ export function AgentsSection() {
   const notify = useSettings((s) => s.settings.notifyInBackground)
   const notifyApproval = useSettings((s) => s.settings.notifyOnApproval)
   const update = useSettings((s) => s.update)
+  const defined = useAgentDefs((s) => s.defined)
   useEffect(() => {
     if (!loaded) void useAgent.getState().load()
   }, [loaded])
+  // Definitions are files: read them again when the page opens.
+  useEffect(() => {
+    void useAgentChat.getState().load()
+  }, [])
   const first = available[0]
   // A default that is no longer installed still shows, so it can be changed back.
   const names = defaultAgent && !available.includes(defaultAgent) ? [...available, defaultAgent] : available
@@ -43,7 +52,7 @@ export function AgentsSection() {
           <Select
             value={defaultAgent}
             allowEmpty={first ? `First installed (${first})` : 'First installed'}
-            options={names.map((a) => ({ value: a, label: a, hint: available.includes(a) ? undefined : 'not installed' }))}
+            options={names.map((a) => agentOption(a, defined, available.includes(a) ? undefined : 'not installed'))}
             onChange={(a) => useAgent.getState().setPreferred(a)}
           />
         )}
@@ -57,6 +66,7 @@ export function AgentsSection() {
         are ignored in Restricted Mode.
       </p>
       <CustomAgentsSection />
+      <AgentDefsSection />
       <AgentTasksSection />
       <OrchestrationSection />
       <TerminalAgentSection />

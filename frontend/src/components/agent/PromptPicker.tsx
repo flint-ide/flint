@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import { matchPrompts, slashQuery } from '../../lib/prompts'
 import { rootOf } from '../../lib/workspaceRoots'
+import { engineOf } from '../../lib/agentDefs'
+import { useAgentDefs } from '../../store/agentDefs'
 import { useAgentChat, type ChatSession } from '../../store/agentChat'
 import { expandPrompt, loadPrompts, type Prompt, type PromptLibrary } from '../../store/prompts'
 import { useWorkspace } from '../../store/workspace'
@@ -39,9 +41,12 @@ export function usePromptPicker(session: ChatSession, input: RefObject<HTMLTextA
       live = false
     }
   }, [open, root])
+  // A prompt limited to claude also applies to a defined agent running on Claude Code.
+  const defined = useAgentDefs((s) => s.defined)
+  const engine = engineOf(session.agent, defined, session.engine)
   const matches = useMemo(
-    () => (library && query !== null ? matchPrompts(library.prompts, query, session.agent) : []),
-    [library, query, session.agent],
+    () => (library && query !== null ? matchPrompts(library.prompts, query, session.agent, engine) : []),
+    [library, query, session.agent, engine],
   )
   useEffect(() => setCursor(0), [query, setCursor])
 

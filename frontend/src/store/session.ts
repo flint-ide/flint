@@ -101,7 +101,7 @@ async function captureTab(t: Tab, roots: string[]): Promise<SavedTab | null> {
       return {
         kind: 'chat',
         title: t.title,
-        chat: { id: s.id, agent: s.agent, cwd: s.cwd, model: s.model, draft: s.draft, chat: trimChat(s.chat) },
+        chat: { id: s.id, agent: s.agent, engine: s.engine, cwd: s.cwd, model: s.model, draft: s.draft, chat: trimChat(s.chat) },
         ...(useEditor.getState().hidden.includes(t.id) ? { settled: true } : {}),
       }
     }

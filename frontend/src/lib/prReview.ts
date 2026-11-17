@@ -227,3 +227,18 @@ export function threadCounts(threads: readonly { path: string; resolved: boolean
   }
   return out
 }
+
+/**
+ * The pull requests the list's search box keeps. Every word of query must
+ * match: in the title (any case) or in the number; "#12" means only a number
+ * that starts with 12. An empty query keeps everything.
+ */
+export function searchPullRequests<P extends { number: number; title: string }>(items: readonly P[], query: string): P[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return [...items]
+  return items.filter((pr) => {
+    const title = pr.title.toLowerCase()
+    const number = String(pr.number)
+    return words.every((w) => (w.startsWith('#') ? number.startsWith(w.slice(1)) : title.includes(w) || number.includes(w)))
+  })
+}

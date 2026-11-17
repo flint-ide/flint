@@ -32,6 +32,8 @@ interface PullRequestsState {
   root: string | null
   who: Who
   state: ListState
+  /** What the list's search box holds: it narrows the loaded list by title or number. */
+  query: string
   status: GitHubStatus | null
   items: PullRequest[]
   loading: boolean
@@ -48,6 +50,7 @@ export const usePullRequests = createStore<PullRequestsState>(() => ({
   root: null,
   who: 'all',
   state: 'open',
+  query: '',
   status: null,
   items: [],
   loading: false,
@@ -86,6 +89,11 @@ export async function loadPullRequests(root: string | null, force = false): Prom
 export function setListFilter(filter: { who?: Who; state?: ListState }): void {
   set(filter)
   void loadPullRequests(get().root)
+}
+
+/** Narrows the loaded list in place; nothing is fetched for it. */
+export function setListQuery(query: string): void {
+  set({ query })
 }
 
 const inflight = new Map<string, Promise<void>>()

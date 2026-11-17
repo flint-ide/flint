@@ -17,7 +17,7 @@ import { useWindowFocus } from './useWindowFocus'
 import { FailedCheckActions, FixWithAgentButton } from './CIStatus'
 import type { FixTarget } from '../../store/ci'
 import { reviewWork, workSummary } from '../../lib/prAgent'
-import { AddressReviewButton } from './ReviewAgent'
+import { AddressReviewButton, RequestCodeReviewButton } from './ReviewAgent'
 
 const STATUS_LETTER: Record<string, string> = { added: 'A', removed: 'D', modified: 'M', renamed: 'R', copied: 'C', changed: 'T' }
 const STATUS_KIND: Record<string, string> = { added: 'added', removed: 'deleted', modified: 'modified', renamed: 'renamed', copied: 'copied' }
@@ -53,6 +53,7 @@ export function PullRequestView({ tab, active }: { tab: PullRequestTab; active: 
             </h2>
             <span className="spacer" />
             <button className="icon" title="Refresh" disabled={entry.loading} onClick={() => void loadDetails(tab.root, tab.number, true)}>↻</button>
+            <RequestCodeReviewButton root={tab.root} number={d.number} />
             {feedback && <AddressReviewButton target={{ root: tab.root, number: d.number }} className="" />}
             {d.state === 'OPEN' && (
               <button disabled={!!busy} onClick={() => void checkoutPullRequest(tab.root, d.number, d.headRef)} title="git fetch pull/N/head and switch to its branch (refused while files have local changes)">

@@ -1,6 +1,6 @@
 // Commands of the pull request → agent hand-off (store/prAgent.ts).
 import { registerCommands } from '../lib/commands'
-import { addressReviewComments, commandReviewTarget } from '../store/prAgent'
+import { addressReviewComments, commandReviewTarget, requestCodeReview } from '../store/prAgent'
 
 export function registerPullRequestCommands(): () => void {
   return registerCommands([
@@ -14,6 +14,17 @@ export function registerPullRequestCommands(): () => void {
       run: () => {
         const target = commandReviewTarget()
         if (target) return addressReviewComments(target)
+      },
+    },
+    {
+      id: 'pr.reviewWithAgent',
+      title: 'Review Pull Request with Agent',
+      category: 'Agent',
+      keywords: 'pull request pr github code review findings claude codex',
+      when: () => commandReviewTarget() !== null,
+      run: () => {
+        const target = commandReviewTarget()
+        if (target) return requestCodeReview(target)
       },
     },
   ])

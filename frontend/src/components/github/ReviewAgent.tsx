@@ -1,4 +1,4 @@
-import { addressReviewComments, busyKey, useReviewAgent, type ReviewAgentTarget } from '../../store/prAgent'
+import { addressReviewComments, busyKey, requestCodeReview, useReviewAgent, type ReviewAgentTarget } from '../../store/prAgent'
 import { detailsKey, usePullRequests } from '../../store/pullRequests'
 import { reviewHint } from '../../lib/prAgent'
 import { modifierName } from '../../lib/platform'
@@ -19,6 +19,18 @@ export function AddressReviewButton({ target, label = '✦ Address review commen
       }}
     >
       {busy ? 'Reading comments…' : label}
+    </button>
+  )
+}
+
+/** "✦ Review with agent": asks the agent for a code review of the pull request, as an agent chat draft. */
+export function RequestCodeReviewButton({ root, number }: { root: string; number: number }) {
+  return (
+    <button
+      title={`Ask the agent for a code review of this pull request: the request goes to the agent chat for you to review and send (${sendHint()}). The agent reads the change and reports findings; it changes no files and posts nothing to GitHub.`}
+      onClick={(e) => void requestCodeReview({ root, number }, { send: e.altKey })}
+    >
+      ✦ Review with agent
     </button>
   )
 }

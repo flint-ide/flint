@@ -8,6 +8,7 @@ import {
   lineOnOtherSide,
   placeThreads,
   rollup,
+  searchPullRequests,
   stateBadge,
   threadCounts,
   timeAgo,
@@ -166,5 +167,34 @@ describe('timeAgo', () => {
     assert.equal(timeAgo('2026-10-28T12:00:00Z', now), '2d ago')
     assert.equal(timeAgo('2026-01-02T12:00:00Z', now), '2026-01-02')
     assert.equal(timeAgo('nope', now), '')
+  })
+})
+
+describe('searchPullRequests', () => {
+  const list = [
+    { number: 12, title: 'Fix the login redirect' },
+    { number: 123, title: 'Add search to the pull request list' },
+    { number: 7, title: 'Bump deps to 12.1' },
+  ]
+  const numbers = (q: string) => searchPullRequests(list, q).map((p) => p.number)
+
+  it('keeps everything for an empty query', () => {
+    assert.deepEqual(numbers(''), [12, 123, 7])
+    assert.deepEqual(numbers('   '), [12, 123, 7])
+  })
+  it('matches the title in any case, every word', () => {
+    assert.deepEqual(numbers('LOGIN'), [12])
+    assert.deepEqual(numbers('search list'), [123])
+    assert.deepEqual(numbers('search login'), [])
+  })
+  it('matches a number, and digits in a title', () => {
+    assert.deepEqual(numbers('12'), [12, 123, 7])
+    assert.deepEqual(numbers('123'), [123])
+  })
+  it('takes #N for the number only, from its start', () => {
+    assert.deepEqual(numbers('#12'), [12, 123])
+    assert.deepEqual(numbers('#7'), [7])
+    assert.deepEqual(numbers('#23'), [])
+    assert.deepEqual(numbers('#'), [12, 123, 7])
   })
 })

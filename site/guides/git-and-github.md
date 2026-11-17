@@ -98,6 +98,9 @@ Set **Settings ▸ Accounts ▸ Host** to your server (`ghe.example.com`): Flint
 Open it with the `⇅` icon on the activity bar or "Pull Requests…" in the palette. It lists the pull requests of the active tab's project repository: the remote marked with `gh repo set-default` if there is one, else `upstream`, `github`, `origin`, then the others.
 
 - Filter by **All / Created by me / Review requested** and by **Open / Closed / Merged / All states**.
+- Type in the search box to narrow the list by title or number. `#12` finds pull requests whose number starts with 12. The search looks only at the pull requests the filters loaded, so change the filters to look in others. Esc clears it.
+- Right-click a pull request in the list to act on it without opening it: review it with the agent, address its review comments, check it out, open it on GitHub, or copy its link or number.
+- **✦ Review with agent** in a pull request's tab asks the agent for a code review: the request goes to the agent chat as a draft for you to send (⌥-click sends it right away). The agent reads the change with the `gh` command, reports what it finds in the chat, changes no files and posts nothing to GitHub.
 - Each entry shows the CI state (✓ passed, ✗ failed, ● running; hover for the counts), the review decision (Approved, Changes requested, Review required, Draft, Merged) and when it was last updated.
 
 If you are not signed in, the view offers **Sign in with GitHub**; if the repository has no remote on the configured GitHub host, it says so.

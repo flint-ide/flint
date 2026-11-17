@@ -1,10 +1,24 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, type MouseEvent } from 'react'
 import { useGit } from '../../store/git'
 import { useWorkspace } from '../../store/workspace'
 import { pullRequestTabId, useEditor } from '../../store/editor'
-import { loadPullRequests, openInBrowser, openPullRequest, setListFilter, usePullRequests, type ListState, type Who } from '../../store/pullRequests'
-import { ROLLUP_GLYPH, checksSummary, rollup, stateBadge, timeAgo } from '../../lib/prReview'
-import type { PullRequest } from '../../api/backend'
+import {
+  checkoutPullRequest,
+  loadPullRequests,
+  openInBrowser,
+  openPullRequest,
+  setListFilter,
+  setListQuery,
+  usePullRequests,
+  type ListState,
+  type Who,
+} from '../../store/pullRequests'
+import { addressReviewComments, requestCodeReview } from '../../store/prAgent'
+import { openContextMenu } from '../../store/contextMenu'
+import { showToast } from '../../store/dialog'
+import { pullRequestMenu } from '../../lib/prMenu'
+import { ROLLUP_GLYPH, checksSummary, rollup, searchPullRequests, stateBadge, timeAgo } from '../../lib/prReview'
+import { errorMessage, type PullRequest } from '../../api/backend'
 import { Select } from '../ui/Select'
 import { useWindowFocus } from './useWindowFocus'
 import { CIBanner } from './CIStatus'
@@ -36,6 +50,8 @@ export function PullRequestsPanel() {
   const error = usePullRequests((s) => s.error)
   const who = usePullRequests((s) => s.who)
   const state = usePullRequests((s) => s.state)
+  const query = usePullRequests((s) => s.query)
+  const shown = useMemo(() => searchPullRequests(items, query), [items, query])
   const ci = useCurrentCI()
 
   // Loaded when shown and on window focus; the panel unmounts when hidden, so nothing polls.
@@ -63,13 +79,42 @@ export function PullRequestsPanel() {
           {loading && <span className="muted pr-loading">Loading…</span>}
         </div>
       )}
+      {repo && (
+        <div className="pr-search">
+          <input
+            type="search"
+            className="pr-search-input"
+            placeholder="Search by title or #number"
+            aria-label="Search pull requests by title or number"
+            value={query}
+            spellCheck={false}
+            onChange={(e) => setListQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && query) {
+                e.stopPropagation()
+                setListQuery('')
+              }
+            }}
+          />
+          {query.trim() !== '' && (
+            <span className="muted pr-loading">
+              {shown.length} of {items.length}
+            </span>
+          )}
+        </div>
+      )}
       {repo && <CIBanner entry={ci} />}
       <div className="tree scroll">
         {!root && <div className="placeholder muted">Open a folder to see its pull requests.</div>}
         {status && status.state !== 'ok' && <StatusMessage state={status.state} message={status.message} onRetry={() => void loadPullRequests(root, true)} />}
         {error && <div className="placeholder error selectable">{error}</div>}
         {repo && !error && !loading && items.length === 0 && <div className="placeholder muted">No pull requests.</div>}
-        {repo && root && items.map((pr) => <PullRequestRow key={pr.number} root={root} pr={pr} />)}
+        {repo && !error && items.length > 0 && shown.length === 0 && (
+          <div className="placeholder muted">
+            No pull request in this list matches “{query.trim()}”. The search covers the pull requests loaded here: change the filters above to look in others.
+          </div>
+        )}
+        {repo && root && shown.map((pr) => <PullRequestRow key={pr.number} root={root} pr={pr} />)}
       </div>
     </div>
   )
@@ -92,12 +137,43 @@ function StatusMessage({ state, message, onRetry }: { state: string; message: st
   )
 }
 
+/** Copies text for a "Copy …" item of the row's menu and confirms it in a toast. */
+function copyText(text: string): void {
+  navigator.clipboard.writeText(text).then(
+    () => showToast(`Copied ${text}`),
+    (err: unknown) => showToast(`Copy failed: ${errorMessage(err)}`, 'error'),
+  )
+}
+
 function PullRequestRow({ root, pr }: { root: string; pr: PullRequest }) {
   const active = useEditor((s) => s.activeId === pullRequestTabId(root, pr.number))
   const ci = rollup(pr.checks)
   const badge = stateBadge(pr)
+  // The tab's header actions, without opening the tab first.
+  const onContextMenu = (e: MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const target = { root, number: pr.number }
+    openContextMenu(
+      e.clientX,
+      e.clientY,
+      pullRequestMenu(pr, {
+        open: () => openPullRequest(root, pr),
+        review: (send) => void requestCodeReview(target, { send }),
+        address: (send) => void addressReviewComments(target, { send }),
+        checkout: () => void checkoutPullRequest(root, pr.number, pr.headRef),
+        openOnGitHub: () => openInBrowser(pr.url),
+        copy: copyText,
+      }),
+    )
+  }
   return (
-    <div className={`pr-row${active ? ' active' : ''}`} onClick={() => openPullRequest(root, pr)} title={`${pr.title}\n${pr.headRef} → ${pr.baseRef}`}>
+    <div
+      className={`pr-row${active ? ' active' : ''}`}
+      onClick={() => openPullRequest(root, pr)}
+      onContextMenu={onContextMenu}
+      title={`${pr.title}\n${pr.headRef} → ${pr.baseRef}`}
+    >
       <div className="pr-row-title">
         {ci !== 'none' && (
           <span className={`pr-ci ${ci}`} title={checksSummary(pr.checks)}>

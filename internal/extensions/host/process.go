@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"flint/internal/extensions/manifest"
-	"flint/internal/extensions/rpc"
+	"flint/internal/jsonrpc"
 	"flint/internal/proctree"
 	"flint/internal/shellenv"
 )
@@ -29,7 +29,7 @@ const (
 // proc is a running extension process and its connection.
 type proc struct {
 	cmd      *exec.Cmd
-	conn     *rpc.Conn
+	conn     *jsonrpc.Conn
 	stdin    *os.File
 	exited   chan struct{}
 	stopping atomic.Bool
@@ -100,7 +100,7 @@ func (e *ext) start() (*proc, error) {
 		return nil, err
 	}
 	p := &proc{cmd: cmd, stdin: inW, exited: make(chan struct{}), confined: box}
-	p.conn = rpc.New(inW, rpc.Options{
+	p.conn = jsonrpc.New(inW, jsonrpc.Options{
 		OnRequest: e.handle,
 		OnNotify:  e.notified,
 		MaxRate:   maxOutputRate, RateWindow: rateWindow,
@@ -123,7 +123,7 @@ func (e *ext) start() (*proc, error) {
 		if werr != nil {
 			reason = werr.Error()
 		}
-		if cerr := p.conn.Err(); cerr != nil && !errors.Is(cerr, io.EOF) && !errors.Is(cerr, rpc.ErrClosed) {
+		if cerr := p.conn.Err(); cerr != nil && !errors.Is(cerr, io.EOF) && !errors.Is(cerr, jsonrpc.ErrClosed) {
 			reason = cerr.Error()
 		}
 		p.conn.Close(fmt.Errorf("%s stopped (%s)", e.name(), reason))

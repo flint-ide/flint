@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"flint/internal/extensions/rpc"
+	"flint/internal/jsonrpc"
 )
 
 // Webviews (docs/design/extensions.md, "Webviews"): Flint loads a view's HTML
@@ -128,7 +128,7 @@ func (e *ext) openTab(params json.RawMessage) error {
 		return err
 	}
 	if _, ok := e.m.TabView(p.View); !ok {
-		return rpc.Errorf(rpc.CodeInvalidParams, "no tab view %q in the manifest", p.View)
+		return jsonrpc.Errorf(jsonrpc.CodeInvalidParams, "no tab view %q in the manifest", p.View)
 	}
 	key := cleanText(p.Key, maxTabKey)
 	if key == "" {

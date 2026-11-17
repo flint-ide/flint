@@ -238,7 +238,7 @@ An **extension** is a directory with a manifest (`flint-extension.json`) and a p
 
 Inside Flint, level 2 is one level-1 feature, `extensions`:
 
-- Go: `internal/features/extensions`, with `internal/extensions/{manifest,host,rpc}`. It discovers manifests, owns the processes and exposes one service (`ExtensionsAPI`) to the frontend.
+- Go: `internal/features/extensions`, with `internal/extensions/{manifest,host}` and `internal/jsonrpc`. It discovers manifests, owns the processes and exposes one service (`ExtensionsAPI`) to the frontend.
 - Frontend: `features/extensions`. It installs each extension's contributions with `contribute('extension:<id>', …)` and renders declarative views.
 
 ### Installation and discovery
@@ -785,7 +785,7 @@ Each step is one pull request that leaves Flint shippable.
 
 ### Level 2: implemented (v1)
 
-Code: `internal/extensions/{manifest,rpc,host}`, the module `internal/features/extensions`, `frontend/src/features/extensions`, the example `examples/extensions/stats` (Go, standard library). Docs: [site/guides/extensions.md](../../site/guides/extensions.md) (users), [site/extensions/write-an-extension.md](../../site/extensions/write-an-extension.md) and [site/extensions/protocol.md](../../site/extensions/protocol.md) (authors; the reference is written by hand, not generated). Tests: manifest table tests, the RPC transport (with a fuzz target), the host against `host/testdata/testext` (lazy start, permissions, crashes, idle stop, timeouts, process-group kill, environment, tools, settings) and a conformance test that builds the example and drives every contribution point it uses; frontend tests for the translation into contributions, the settings section and the schema checks.
+Code: `internal/extensions/{manifest,host}`, `internal/jsonrpc`, the module `internal/features/extensions`, `frontend/src/features/extensions`, the example `examples/extensions/stats` (Go, standard library). Docs: [site/guides/extensions.md](../../site/guides/extensions.md) (users), [site/extensions/write-an-extension.md](../../site/extensions/write-an-extension.md) and [site/extensions/protocol.md](../../site/extensions/protocol.md) (authors; the reference is written by hand, not generated). Tests: manifest table tests, the RPC transport (with a fuzz target), the host against `host/testdata/testext` (lazy start, permissions, crashes, idle stop, timeouts, process-group kill, environment, tools, settings) and a conformance test that builds the example and drives every contribution point it uses; frontend tests for the translation into contributions, the settings section and the schema checks.
 
 **Implemented as designed:** the manifest and its rules (ids namespaced by `<id>.`, `run.command` inside the folder, no shell or `PATH`), the lifecycle (`initialize` with contract check, `initialized`, `shutdown`, then stdin closed and the process group killed after 2 s), lazy activation, idle stop after 5 minutes, the timeouts, the 4 MiB message cap and the 8 MiB/s × 5 s flood limit, 3 crashes in 10 minutes stop the extension, `$/cancelRequest`, the permissions and `-32001`, the keyring layout, the `extensions` settings section (objects of extensions that aren't installed are kept), agent tools named `<short>_<name>`, contributions under `extension:<id>` withdrawn when an extension is turned off or uninstalled.
 

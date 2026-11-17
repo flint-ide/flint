@@ -16,8 +16,8 @@ import (
 	"time"
 
 	"flint/internal/extensions/manifest"
-	"flint/internal/extensions/rpc"
 	"flint/internal/extensions/sandbox"
+	"flint/internal/jsonrpc"
 )
 
 // The host's tests drive testdata/testext, a Go program built once per run.
@@ -605,7 +605,7 @@ func TestInvalidFolders(t *testing.T) {
 	if len(list) != 1 || list[0].State != StateInvalid || !strings.Contains(list[0].Error, "no flint-extension.json") {
 		t.Errorf("List = %+v", list)
 	}
-	var rpcErr *rpc.Error
+	var rpcErr *jsonrpc.Error
 	if err := h.Execute(context.Background(), "broken.ext", "broken.ext.x", nil); err == nil || errors.As(err, &rpcErr) {
 		t.Errorf("a broken extension runs: %v", err)
 	}

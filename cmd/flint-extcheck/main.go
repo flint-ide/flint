@@ -25,8 +25,8 @@ import (
 
 	"flint/internal/extensions/host"
 	"flint/internal/extensions/manifest"
-	"flint/internal/extensions/rpc"
 	"flint/internal/extensions/sandbox"
+	"flint/internal/jsonrpc"
 )
 
 // checkApp is the Flint side of the run: one trusted project folder, every
@@ -328,7 +328,7 @@ func sandboxLine(in host.SandboxInfo) string {
 // answered tells an error the program sent (it is alive and speaks the
 // protocol) from one about the program itself (no answer, not started, crashed).
 func answered(err error) bool {
-	var rpcErr *rpc.Error
+	var rpcErr *jsonrpc.Error
 	return errors.As(err, &rpcErr)
 }
 

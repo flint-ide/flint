@@ -163,7 +163,7 @@ Level 2 of the same contract: programs the user installs, run as child processes
 
 ```text
 internal/extensions/manifest   flint-extension.json: parsing, id and path rules, the settings schema subset
-internal/extensions/rpc        newline-delimited JSON-RPC 2.0, both directions, size caps, $/cancelRequest
+internal/jsonrpc               newline-delimited JSON-RPC 2.0, both directions, size caps, $/cancelRequest
 internal/extensions/host       discovery, lazy start, initialize, idle stop, crash policy, host methods + permissions, install/uninstall, log;
                                view models checked and bounded before the web view sees them (views.go: tree, list; richviews.go: table, form, chart)
 internal/extensions/index      the signed extension index: format, Ed25519 signature, bounded https download, safe tar.gz unpacking, building (cmd/flint-extindex)
@@ -380,7 +380,7 @@ features.go                 the feature modules list and the Host they get from 
 menu.go, wails_app.go       application menu, window and event wiring
 internal/feature            the feature-module contract: Module, Instance, Host; featuretest: a fake Host
 internal/features/<id>      feature modules: database, todo, update, extensions (service, settings sections, tools, hooks)
-internal/extensions         external extensions: manifest (flint-extension.json, themes included), rpc, host
+internal/extensions         external extensions: manifest (flint-extension.json, themes included), host (over internal/jsonrpc)
 cmd/webbuild                frontend bundler (esbuild Go API), --watch, --test, CSP
 build/                      Wails config (config.yml), Info.plist, app icon
 scripts/flint               the `flint [folder]` / `flint --install-extension <folder>` command installed by `make install`

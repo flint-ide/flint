@@ -1,4 +1,4 @@
-// Package rpc is JSON-RPC 2.0 over a pair of byte streams, one message per
+// Package jsonrpc is JSON-RPC 2.0 over a pair of byte streams, one message per
 // line (UTF-8 JSON without raw newlines), as MCP's stdio transport: how Flint
 // talks to an external extension's process (docs/design/extensions.md). Both
 // sides send requests, responses and notifications.
@@ -7,7 +7,7 @@
 // isn't JSON-RPC or a flood of output closes it (the owner then stops the
 // process), requests from the other side run with bounded concurrency, and a
 // request that times out is cancelled with $/cancelRequest, as in LSP.
-package rpc
+package jsonrpc
 
 import (
 	"bufio"

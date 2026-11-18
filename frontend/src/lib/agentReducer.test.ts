@@ -170,3 +170,28 @@ describe('agent reducer', () => {
     assert.deepEqual(withRole.items[0], { type: 'user', text: 'x', attachments: [], from: 'codex (reviewer)' })
   })
 })
+
+describe('turns started elsewhere', () => {
+  it('a turn Go started (a queued task, another agent, a notice) makes the chat busy', () => {
+    let s = applyEvents(emptyChat, [
+      { sessionId: 's', kind: 'user_message', text: 'Fix it', origin: { sessionId: '', agent: 'Flint', role: 'task' } },
+      { sessionId: 's', kind: 'turn_start' },
+    ])
+    assert.equal(s.busy, true)
+    s = applyEvent(s, { sessionId: 's', kind: 'turn_end', stopReason: 'end_turn' })
+    assert.equal(s.busy, false)
+  })
+
+  it('history a resumed chat replays is not a turn', () => {
+    const s = applyEvents(emptyChat, [
+      { sessionId: 's', kind: 'user_message', text: 'old question' },
+      { sessionId: 's', kind: 'message_chunk', text: 'old answer' },
+    ])
+    assert.equal(s.busy, false)
+  })
+
+  it('a turn the user started stays one when Go confirms it', () => {
+    const typed = addUserMessage(emptyChat, 'hi', [])
+    assert.equal(applyEvent(typed, { sessionId: 's', kind: 'turn_start' }), typed)
+  })
+})

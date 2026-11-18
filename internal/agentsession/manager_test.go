@@ -616,3 +616,40 @@ func TestOtherFlintToolsFollowThePolicy(t *testing.T) {
 		t.Fatalf("a read tool was treated as acting (approved %d)", approved)
 	}
 }
+
+// Every turn begins with turn_start, before anything the agent does in it,
+// and a refused prompt (a turn already runs) starts none; what a resumed chat
+// replays before its first prompt has no turn_start in front of it.
+func TestTurnStartOpensEveryTurn(t *testing.T) {
+	rec := &recorder{}
+	m := NewManager(rec.emit)
+	f := &resumableFake{fakeDriver: newFake(ToolExecute)}
+	m.Register("fake", f)
+	info, err := m.Resume(context.Background(), "fake", "/w", "old-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	sink := f.sinks[info.ID]
+	f.mu.Unlock()
+	sink(Event{SessionID: info.ID, Kind: KindUserMessage, Text: "replayed"}) // history
+	if err := m.Prompt(info.ID, "go", nil); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool { return contains(rec.kinds(), KindPermission) })
+	if err := m.Prompt(info.ID, "again", nil); !errors.Is(err, ErrBusy) {
+		t.Fatalf("second prompt: %v", err)
+	}
+	close(f.release)
+	waitFor(t, func() bool { return contains(rec.kinds(), KindTurnEnd) })
+	got := rec.kinds()
+	want := []string{KindUserMessage, KindTurnStart, KindPermission, KindMessageChunk, KindTurnEnd}
+	if len(got) != len(want) {
+		t.Fatalf("events = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("events = %v, want %v", got, want)
+		}
+	}
+}

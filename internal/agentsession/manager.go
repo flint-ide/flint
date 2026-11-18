@@ -420,8 +420,8 @@ func autoOption(policy Policy, s *managed, req PermissionRequest) (string, bool)
 	return "", false
 }
 
-// Prompt starts a turn in the background; progress arrives as events, ending with
-// KindTurnEnd. It fails fast when a turn is already running.
+// Prompt starts a turn in the background; progress arrives as events, from
+// KindTurnStart to KindTurnEnd. It fails fast when a turn is already running.
 func (m *Manager) Prompt(sessionID, text string, attachments []Attachment) error {
 	m.mu.Lock()
 	s := m.sessions[sessionID]
@@ -436,6 +436,11 @@ func (m *Manager) Prompt(sessionID, text string, attachments []Attachment) error
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 	m.mu.Unlock()
+	// Every turn starts here, whoever sent the prompt (the web view, the task
+	// queue, another agent, Flint's notice), so this event is what tells the
+	// UI that a turn runs. A resumed chat's replayed history comes before any
+	// turn_start: it is history, not work waiting for the user.
+	m.emit(Event{SessionID: sessionID, Kind: KindTurnStart})
 
 	go func() {
 		defer cancel()

@@ -459,6 +459,8 @@ Usage is kept for 90 days by default (Settings ▸ Usage ▸ Keep daily totals f
 
 Flint tells you when an agent needs you, whoever started it: a chat you wrote in, an [agent task](#agent-tasks-agents-in-parallel) that left the queue, a [project](projects.md) item Flint delegated, an agent another agent started, or an agent CLI in a terminal tab.
 
+![An agent waits for approval while another tab is in front: a count on the Agents button, "waiting" on the chat's tab and a notice with Show](../images/agent-waiting.png)
+
 ### What notifies
 
 While Flint isn't the active app you get a desktop notification for:

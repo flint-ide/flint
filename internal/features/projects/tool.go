@@ -162,6 +162,13 @@ func (a *API) describeFor(who caller, status, name string) string {
 			continue
 		}
 		shown++
+		if l.Config.OldFormat {
+			s := projectHeader(l.Config, folder) + fmt.Sprintf("This project is in the old format (%s): Flint shows it read-only, and its items are not listed here until the user renames the file to %s in the Projects panel.\n\n", OldConfigFile, ConfigFile)
+			if fits(s) {
+				b.WriteString(s)
+			}
+			continue
+		}
 		var items []Item
 		for _, it := range l.Items {
 			if status == "" || it.Status == status || folder == focus && it.ID == who.Item {

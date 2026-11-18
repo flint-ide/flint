@@ -92,14 +92,14 @@ func (s *AgentDefsAPI) Create(root string, personal bool, name string) (string, 
 		return agentdefs.Create(agentdefs.PersonalDir(s.app.configDir), "", name)
 	}
 	if root == "" {
-		return "", errors.New("open a folder to add a project agent")
+		return "", errors.New("open a folder to add a repository agent")
 	}
 	root, err := s.app.rootOf(root)
 	if err != nil {
 		return "", err
 	}
 	if !s.app.isTrusted(root) {
-		return "", errors.New("this folder is in Restricted Mode, where Flint loads no project agents; trust it first")
+		return "", errors.New("this folder is in Restricted Mode, where Flint loads no repository agents; trust it first")
 	}
 	return agentdefs.Create(agentdefs.ProjectDir(root), root, name)
 }

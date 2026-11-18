@@ -86,7 +86,7 @@ func (s *Sources) diagnostics(_ context.Context, root string, args json.RawMessa
 			items = append(items, item{path, d})
 		}
 	}
-	where := "this project"
+	where := "this folder"
 	if scope != root {
 		where = rel(scope, root)
 	}
@@ -121,11 +121,11 @@ func (s *Sources) editor(_ context.Context, root string, args json.RawMessage) (
 	}
 	snap := s.Editor.In(root)
 	if len(snap.Files) == 0 && snap.Active == "" {
-		return "No files of this project are open in Flint's editor.", nil
+		return "No files of this folder are open in Flint's editor.", nil
 	}
 	var b strings.Builder
 	if snap.Active == "" {
-		b.WriteString("Active tab: not a file of this project.\n")
+		b.WriteString("Active tab: not a file of this folder.\n")
 	} else {
 		fmt.Fprintf(&b, "Active file: %s%s\n", rel(snap.Active, root), unsaved(snap.Files, snap.Active))
 		if sel := snap.Selection; sel != nil {
@@ -171,7 +171,7 @@ func (s *Sources) terminals(_ context.Context, root string, args json.RawMessage
 	}
 	list := s.Terminals.List(root)
 	if len(list) == 0 {
-		return "No terminals or run consoles of this project are open in Flint.", nil
+		return "No terminals or run consoles of this folder are open in Flint.", nil
 	}
 	return s.consoleTails(root, list, "console", in.Terminal, in.Lines, maxLines)
 }
@@ -188,7 +188,7 @@ func (s *Sources) consoleTails(root string, list []TerminalInfo, what, id string
 			for j, t := range list {
 				ids[j] = t.ID
 			}
-			return "", fmt.Errorf("no %s %q in this project (%ss: %s)", what, cut(id, maxNameLen), what, strings.Join(ids, ", "))
+			return "", fmt.Errorf("no %s %q in this folder (%ss: %s)", what, cut(id, maxNameLen), what, strings.Join(ids, ", "))
 		}
 		pick, lines = list[i:i+1], maxLines
 	}
@@ -229,7 +229,7 @@ func (s *Sources) tests(_ context.Context, root string, args json.RawMessage) (s
 	}
 	run, ok := s.Tests.Last(root)
 	if !ok {
-		return "No test run of this project in Flint yet.", nil
+		return "No test run for this folder in Flint yet.", nil
 	}
 	return s.describeRun("Last test run", run, root), nil
 }

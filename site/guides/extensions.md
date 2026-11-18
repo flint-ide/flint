@@ -90,7 +90,7 @@ An extension is a program on your machine. One that declares a [sandbox](#the-sa
 
 What it asks **Flint** for is checked:
 
-- It sees only [trusted](restricted-mode.md) project folders. Folders in Restricted Mode are never passed to it, and it can't read, open or attach files in them.
+- It sees only [trusted](restricted-mode.md) workspace folders. Folders in Restricted Mode are never passed to it, and it can't read, open or attach files in them.
 - Reading files through Flint (`workspace.read`), keeping secrets in the keychain (`secrets`) and writing an agent chat draft (`agent.ask`) need permissions declared in its manifest. Flint refuses the request otherwise.
 - Files inside `.git` and credential files such as `.env`, `.netrc` or private keys are never returned to it, and it is never told that one is open in an editor.
 - Links it opens are limited to `http` and `https`, and Flint asks you the first time it opens a link to a given site.
@@ -116,7 +116,7 @@ An extension's manifest can ask Flint to confine its program. Flint then starts 
 
 A sandboxed program, unless its manifest declares more:
 
-- **reads** only its own folder, the system's programs and libraries, and, with the `workspace.read` permission, your trusted project folders;
+- **reads** only its own folder, the system's programs and libraries, and, with the `workspace.read` permission, your trusted workspace folders;
 - **writes** only its own data folder and a private temporary folder;
 - has **no network**: it can't open a connection of any kind;
 - **starts no other program** than its own;
@@ -126,10 +126,10 @@ What a manifest adds is listed in the confirmation and on the card: more folders
 
 What the sandbox does not do:
 
-- It doesn't limit what the program does with what it may reach. An extension with `workspace.read` reads every file of a trusted project folder directly, `.env` files included; one with network access can send what it reads to any host.
+- It doesn't limit what the program does with what it may reach. An extension with `workspace.read` reads every file of a trusted workspace folder directly, `.env` files included; one with network access can send what it reads to any host.
 - With local sockets allowed, on Linux the program can reach every local service you can, including the desktop's message bus.
 - It doesn't limit memory or CPU. A sandboxed program can't write core dumps and has at most 4,096 open files.
 - On an older Linux kernel some protections are missing; the card lists them. On macOS, network access and local sockets can only be allowed together, and `sandbox-exec` is a tool Apple calls deprecated, though macOS still ships and uses it.
 - An extension that is not sandboxed is not limited at all.
 
-Project-local extensions (in a repository's own folder) are not supported: every extension is one you installed yourself.
+Repository-local extensions (in a repository's own folder) are not supported: every extension is one you installed yourself.

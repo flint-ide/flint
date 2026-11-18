@@ -193,10 +193,10 @@ func TestRunTestsArguments(t *testing.T) {
 	for _, tc := range []struct{ args, want string }{
 		{`{}`, "path is required"},
 		{`{"path":"pkg","run":"-exec=sh"}`, "invalid arguments"},
-		{`{"path":"../other"}`, "outside the project"},
-		{`{"path":"/etc"}`, "outside the project"},
-		{`{"path":"link"}`, "leads outside the project"},
-		{`{"path":"link/b_test.go"}`, "leads outside the project"},
+		{`{"path":"../other"}`, "outside the folder"},
+		{`{"path":"/etc"}`, "outside the folder"},
+		{`{"path":"link"}`, "leads outside the folder"},
+		{`{"path":"link/b_test.go"}`, "leads outside the folder"},
 		{`{"path":"missing"}`, "does not exist"},
 		{`{"path":"empty"}`, "has no Go tests"},
 		{`{"path":"pkg/a.go"}`, "is not a test file"},
@@ -286,7 +286,7 @@ func TestRunConfigurationTool(t *testing.T) {
 	for _, tc := range []struct{ args, want string }{
 		{`{}`, "name is required"},
 		{`{"name":"Dev server","command":"rm -rf /"}`, "invalid arguments"},
-		{`{"name":"npm run dev"}`, `no run configuration named "npm run dev" in this project (configurations: Dev server, Twin, Twin, Gone)`},
+		{`{"name":"npm run dev"}`, `no run configuration named "npm run dev" in this folder (configurations: Dev server, Twin, Twin, Gone)`},
 		{`{"name":"Twin"}`, "2 run configurations are named"},
 		{`{"name":"Gone"}`, "does not exist"},
 		{`{"name":"` + strings.Repeat("x", maxNameLen+1) + `"}`, "longer than"},
@@ -305,7 +305,7 @@ func TestRunOutputTool(t *testing.T) {
 	call := func(args string) (string, error) {
 		return toolNamed(t, s, actionsOn, ToolRunOutput).Call(context.Background(), root, json.RawMessage(args))
 	}
-	if text, err := call(`{}`); err != nil || text != "No runs of this project in Flint's run tabs." {
+	if text, err := call(`{}`); err != nil || text != "No runs for this folder in Flint's run tabs." {
 		t.Fatalf("empty: %q %v", text, err)
 	}
 	s.Terminals.Open("term-1", KindTerminal, "zsh", root)
@@ -432,8 +432,8 @@ func TestSendHTTPRequestTool(t *testing.T) {
 		{`{"file":"api/users.http","request":"list users","environment":"prod"}`, `no environment "prod" next to api/users.http (environments: dev)`},
 		{`{"file":"api/notes.txt","request":"list users"}`, "is not a .http or .rest file"},
 		{`{"file":"api/missing.http","request":"x"}`, "does not exist"},
-		{`{"file":"../outside.http","request":"x"}`, "outside the project"},
-		{`{"file":"top.http","request":"leak"}`, "is outside the project"},
+		{`{"file":"../outside.http","request":"x"}`, "outside the folder"},
+		{`{"file":"top.http","request":"leak"}`, "is outside the workspace"},
 	} {
 		if _, _, err := act(t, s, ToolHTTP, root, tc.args); err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%s: error %v, want %q", tc.args, err, tc.want)

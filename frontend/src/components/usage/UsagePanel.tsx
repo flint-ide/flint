@@ -101,7 +101,7 @@ export function UsagePanel() {
             {filter.project && (
               <span className="chip" title={filter.project}>
                 {projectName(filter.project)}
-                <button className="icon" aria-label="Clear project filter" onClick={() => setFilter({ ...filter, project: '' })}>✕</button>
+                <button className="icon" aria-label="Clear folder filter" onClick={() => setFilter({ ...filter, project: '' })}>✕</button>
               </span>
             )}
             {filter.task && (
@@ -130,7 +130,7 @@ export function UsagePanel() {
             {sum.month.turns === 0 && sum.days.every((d) => d.totals.turns === 0) && (
               <div className="placeholder muted">No agent usage recorded in this range. Turns of agent chats are counted here as they finish.</div>
             )}
-            <Breakdown title="Projects" groups={sum.projects} name={projectName} hint={(k) => k} onPick={(project) => setFilter({ ...filter, project })} />
+            <Breakdown title="Folders" groups={sum.projects} name={projectName} hint={(k) => k} onPick={(project) => setFilter({ ...filter, project })} />
             <Breakdown title="Agent tasks" groups={sum.tasks} name={taskName} hint={(k) => k} onPick={(task) => setFilter({ ...filter, task })} />
             <Breakdown title="Agents" groups={sum.agents} name={(k) => k} />
             <Breakdown title="Models" groups={sum.models} name={(k) => k || 'unknown'} />

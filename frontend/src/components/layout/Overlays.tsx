@@ -7,7 +7,7 @@ import { ContextMenu } from '../ui/ContextMenu'
 import { closeSignInDialog, useAccounts } from '../../store/accounts'
 import { SignInWithGitHub } from '../accounts/SignInWithGitHub'
 
-/** Global confirm dialog, Sign in with GitHub, the Update Project picker, context menu and toast notification. */
+/** Global confirm dialog, Sign in with GitHub, the Update Repository picker, context menu and toast notification. */
 export function Overlays() {
   const confirm = useDialog((s) => s.confirm)
   const toast = useDialog((s) => s.toast)

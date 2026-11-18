@@ -17,7 +17,7 @@ export function LanguageServersSection() {
     <section>
       <h2>Language Servers</h2>
       <p className="muted settings-note">
-        A change restarts that language's servers. Servers that run the project's code (rust-analyzer, the Python servers) and servers Flint
+        A change restarts that language's servers. Servers that run the folder's code (rust-analyzer, the Python servers) and servers Flint
         doesn't know start only in trusted folders; extra arguments are ignored in Restricted Mode.
       </p>
       {languages.map((l) => (
@@ -39,7 +39,7 @@ function ServerRows({ info }: { info: lsp.LanguageInfo }) {
   return (
     <>
       <h3>{LABELS[language] ?? language}</h3>
-      <Row label="Enabled" hint={needsTrust ? 'Runs the project\'s code: starts only in trusted folders.' : undefined}>
+      <Row label="Enabled" hint={needsTrust ? 'Runs the folder\'s code: starts only in trusted folders.' : undefined}>
         <input type="checkbox" checked={!server.disabled} onChange={(e) => commit({ disabled: !e.target.checked })} />
       </Row>
       <Row label="Server" hint={`Empty tries ${(servers ?? []).join(', ')} in this order. Install: ${install}`}>

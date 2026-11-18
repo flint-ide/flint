@@ -62,7 +62,7 @@ interface GitState {
   counts: Record<string, number>
   /** Every repository of the workspace, in folder order, one per work tree (several folders only). */
   repos: RepoView[]
-  /** The "Update Project" picker is open (several repositories: which one to pull). */
+  /** The "Update Repository" picker is open (several repositories: which one to pull). */
   pullPicker: boolean
 
   load: (folder: string | null) => Promise<void>
@@ -268,7 +268,7 @@ export const useGit = createStore<GitState>((set, get) => ({
 }))
 
 /**
- * "Update Project": with several repositories in the workspace asks which one to
+ * "Update Repository": with several repositories in the workspace asks which one to
  * pull (like IntelliJ), with one it pulls right away.
  */
 export function updateProject(): void {

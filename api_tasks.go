@@ -737,7 +737,7 @@ func (t *TaskAPI) Remove(id string, opts RemoveOptions) (RemoveResult, error) {
 	}
 	a := t.app
 	if roots := a.projectRoots(); len(roots) > 0 && roots[0] == task.Worktree {
-		return RemoveResult{}, errors.New("the task's folder is the main project of this window: open another folder first")
+		return RemoveResult{}, errors.New("the task's folder is the main folder of this window: open another folder first")
 	}
 	info, err := t.RemoveCheck(id)
 	if err != nil {

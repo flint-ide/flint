@@ -155,7 +155,7 @@ func TestWorktreeChildIsUnreachableFromAnotherProject(t *testing.T) {
 		{"read_agent_output", `{"id":"` + id + `"}`},
 		{"stop_agent", `{"id":"` + id + `"}`},
 	} {
-		o.fails(t, call.tool, call.args, "not in this project")
+		o.fails(t, call.tool, call.args, "not in this folder")
 	}
 	if _, ok := o.orch.Get(id); !ok {
 		t.Error("the child was stopped by a stranger")

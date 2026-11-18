@@ -83,6 +83,9 @@ func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, 
 	if err != nil {
 		return DelegateResult{}, err
 	}
+	if err := writable(c); err != nil {
+		return DelegateResult{}, err
+	}
 	data, _, err := ReadItemFile(real, id)
 	if auto != nil && (err != nil || itemHash(data) != auto.hash) {
 		// Only what the user asked for starts by itself; this data is what

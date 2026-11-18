@@ -7,7 +7,7 @@ An extension is a folder with two things:
 - `flint-extension.json`, the **manifest**: who the extension is, the program Flint runs, what it adds to Flint and which permissions it needs.
 - **A program** in any language. Flint starts it when it is first needed and talks to it with [JSON-RPC 2.0](https://www.jsonrpc.org/specification), one JSON message per line, over the program's standard input and output. Whatever the program writes to standard error goes to its log in **Settings ▸ Extensions**.
 
-A complete example in Go, using only the standard library, is in Flint's repository: [`examples/extensions/stats`](https://github.com/flint-ide/flint/tree/main/examples/extensions/stats). It counts the files of the open projects by type and shows them as a tree, a sortable table and a chart in a tab. [`examples/extensions/todos`](https://github.com/flint-ide/flint/tree/main/examples/extensions/todos) marks TODO lines in the editor, with a quick fix.
+A complete example in Go, using only the standard library, is in Flint's repository: [`examples/extensions/stats`](https://github.com/flint-ide/flint/tree/main/examples/extensions/stats). It counts the files of the open folders by type and shows them as a tree, a sortable table and a chart in a tab. [`examples/extensions/todos`](https://github.com/flint-ide/flint/tree/main/examples/extensions/todos) marks TODO lines in the editor, with a quick fix.
 
 ## 1. The manifest
 
@@ -144,7 +144,7 @@ Agents that Flint starts (Claude Code, Codex, custom ACP agents) can call your t
 }]
 ```
 
-The agent sees it as `hello_greeting` (your id's name part, then the tool's name). A call arrives as `agentTool/call` with the tool's `name`, the agent's project folder (`root`) and the `arguments`; answer with `{ "text": "…" }`. Tools are read-only by default: return information, don't change things. A tool that does change something declares `"acts": true`, and Flint asks the user before each call.
+The agent sees it as `hello_greeting` (your id's name part, then the tool's name). A call arrives as `agentTool/call` with the tool's `name`, the agent's workspace folder (`root`) and the `arguments`; answer with `{ "text": "…" }`. Tools are read-only by default: return information, don't change things. A tool that does change something declares `"acts": true`, and Flint asks the user before each call.
 
 ## 8. Ask Flint for more
 
@@ -152,12 +152,12 @@ Requests your program can send to Flint, each needing a permission declared in t
 
 | Request | Permission | What it does |
 |---|---|---|
-| `workspace/readFile` | `workspace.read` | Reads a file in a trusted project folder |
+| `workspace/readFile` | `workspace.read` | Reads a file in a trusted workspace folder |
 | `window/openFile` | `workspace.read` | Opens a file in Flint's editor |
 | `secrets/get`, `secrets/set`, `secrets/delete` | `secrets` | Keeps a token or password in the system keychain |
 | `agent/ask` | `agent.ask` | Writes a draft in the agent chat for the user to send |
 | `window/openUrl` | none | Opens an `http(s)` link in the browser (Flint asks the user the first time per site) |
-| `window/openTerminal` | `terminal` | Opens a terminal tab in a trusted project folder that runs a command you give |
+| `window/openTerminal` | `terminal` | Opens a terminal tab in a trusted workspace folder that runs a command you give |
 
 Your program also gets a private folder for its own data in `FLINT_EXTENSION_DATA`, and the variables of the user's environment it names in the manifest's `run.env` (for example `["KUBECONFIG"]`). For a panel or tab drawn by your own HTML, see [Webviews](protocol.md#webviews) and the [`notes`](https://github.com/flint-ide/flint/tree/main/examples/extensions/notes) example.
 
@@ -213,7 +213,7 @@ Then say what your program needs beyond that, and nothing more; the install dial
 
 | It… | Declare |
 |---|---|
-| reads the project's files itself | the `workspace.read` permission |
+| reads the workspace folders' files itself | the `workspace.read` permission |
 | calls a web API | `"network": true`, or the `network:<host>` permission |
 | reads a tool's configuration | `"read": ["~/.config/tool", "${env:TOOL_CONFIG}"]` (the variable must be in `run.env`) |
 | keeps a cache outside its data folder | `"write": ["~/.cache/tool"]` |
@@ -317,11 +317,11 @@ An extension can debug and test files of a language: yours from section 10, or a
 ```
 
 - **`debuggers`**: a debug adapter that speaks the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) on its standard input and output. Flint runs the first of the **`adapter.candidates`** it finds (a name on `PATH`, or a `./` path inside your extension's folder, as for language servers) and shows **`install`** when none is installed. It sends `initialize` with `type` as the adapter id, then `launch` with **`launch`** as its arguments, then the breakpoints and `configurationDone`. **`launch`** is a JSON object of at most 16 KiB. Flint's debugger works as it does for Go: breakpoints, stepping, the call stack, variables and the debug console.
-- **`testRunners`**: **`command`** is the program and its arguments. Flint runs it in the project folder, without a shell. **`format`** is `tap` (Flint reads the results of each test from [TAP](https://testanything.org/) on standard output) or `plain` (only the exit code counts: 0 passed).
-- **Variables** in launch strings and command arguments: `${file}` (the file's absolute path), `${fileBasename}`, `${fileDirname}` and `${workspaceFolder}` (the project folder). In a command, an argument that is exactly `${tests}` becomes the names of the tests to run, one argument each, or nothing when the whole file runs (a TAP runner's results can be run again one by one). Any other `${…}` refuses the manifest.
+- **`testRunners`**: **`command`** is the program and its arguments. Flint runs it in the workspace folder, without a shell. **`format`** is `tap` (Flint reads the results of each test from [TAP](https://testanything.org/) on standard output) or `plain` (only the exit code counts: 0 passed).
+- **Variables** in launch strings and command arguments: `${file}` (the file's absolute path), `${fileBasename}`, `${fileDirname}` and `${workspaceFolder}` (the workspace folder). In a command, an argument that is exactly `${tests}` becomes the names of the tests to run, one argument each, or nothing when the whole file runs (a TAP runner's results can be run again one by one). Any other `${…}` refuses the manifest.
 - **`languages`** are language ids, the `id` of a language from section 10 or one of Flint's own (`python`, `rust`). Flint debugs Go and runs Go and JavaScript/TypeScript tests itself, so a debugger for `go`, or a test runner for `go` or `typescript`, is ignored. When two extensions offer one for the same language, the first by extension id is used.
 
-The user runs them with **Debug File** and **Run Tests in File** in the command palette, the run configuration menu in the toolbar, or a file's context menu in the sidebar. Both run the project's code, so they start only in [trusted folders](../guides/restricted-mode.md), and the install confirmation lists the programs they start.
+The user runs them with **Debug File** and **Run Tests in File** in the command palette, the run configuration menu in the toolbar, or a file's context menu in the sidebar. Both run the folder's code, so they start only in [trusted folders](../guides/restricted-mode.md), and the install confirmation lists the programs they start.
 
 ## 13. Tables, forms and charts
 

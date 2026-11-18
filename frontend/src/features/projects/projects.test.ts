@@ -196,7 +196,7 @@ describe('agent tasks', () => {
 })
 
 describe('selection', () => {
-  const infos = [{ path: '/a', name: 'a', workspace: false, trusted: true, error: '' }, { path: '/b', name: 'b', workspace: true, trusted: true, error: '' }]
+  const infos = [{ path: '/a', name: 'a', workspace: false, trusted: true, error: '', oldFormat: false }, { path: '/b', name: 'b', workspace: true, trusted: true, error: '', oldFormat: false }]
   it('keeps a known project, else the first', () => {
     assert.equal(pickSelected(infos, '/b'), '/b')
     assert.equal(pickSelected(infos, '/gone'), '/a')
@@ -213,6 +213,7 @@ describe('file changes', () => {
   it('reacts to the config and the items only', () => {
     assert.equal(touchesProject('/b', ['/b/items/a.md']), true)
     assert.equal(touchesProject('/b', ['/b/flint-project.json']), true)
+    assert.equal(touchesProject('/b', ['/b/flint-backlog.json']), true)
     assert.equal(touchesProject('/b/', ['/b/items/x/y.md']), true)
     assert.equal(touchesProject('/b', ['/b/src/a.go', '/b/items2/a.md', '/other/items/a.md']), false)
     assert.equal(touchesProject('', ['/items/a.md']), false)
@@ -225,7 +226,7 @@ describe('board', () => {
     for (const bad of [null, undefined, 'x', 3, {}, { folder: 3 }, { folder: 'rel/b' }, { folder: '' }]) assert.equal(coerceBoardData(bad), null)
   })
   it('explains a project that is gone or unreadable', () => {
-    const infos = [{ path: '/a', name: 'a', workspace: false, trusted: true, error: '' }, { path: '/c', name: 'c', workspace: false, trusted: true, error: 'no such file' }]
+    const infos = [{ path: '/a', name: 'a', workspace: false, trusted: true, error: '', oldFormat: false }, { path: '/c', name: 'c', workspace: false, trusted: true, error: 'no such file', oldFormat: false }]
     assert.equal(boardProblem('/a', infos), null)
     assert.equal(boardProblem('/a', null), null)
     assert.match(boardProblem('/b', infos) ?? '', /not known any more/)
@@ -256,6 +257,13 @@ describe('problems', () => {
     const p = problemPrompt('Acme', '/b', { file: 'PROJECT.md', reason: 'contains invisible characters (U+200B)' })
     assert.match(p, /PROJECT\.md: contains invisible characters/)
     assert.match(p, /at most 16,000 characters/)
+    assert.ok(!p.includes('project item'))
+  })
+
+  it('asks about a flint-backlog.json left over next to flint-project.json without deleting it', () => {
+    const p = problemPrompt('Acme', '/b', { file: 'flint-backlog.json', reason: 'left over from the old format' })
+    assert.match(p, /Compare the two files/)
+    assert.match(p, /don't delete it yourself/)
     assert.ok(!p.includes('project item'))
   })
 })

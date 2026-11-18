@@ -14,7 +14,7 @@ The default agent is used for new chats, generated commit messages and conflict 
 1. Click `+` in the tab bar.
 2. Choose **claude chat** or **codex chat**.
 
-Or run "New Chat with claude" / "New Chat with codex" from the command palette. The chat starts in the active tab's project.
+Or run "New Chat with claude" / "New Chat with codex" from the command palette. The chat starts in the active tab's folder.
 
 ## Attach context
 
@@ -43,8 +43,8 @@ Attachments appear as chips above the message box. Click ✕ on a chip to remove
 
 1. In the chat header, click the policy link (for example **auto: edits**).
 2. Tick or untick:
-   - **Edit files in the project** (on by default);
-   - **Read and search the project** (on by default);
+   - **Edit files in the folder** (on by default);
+   - **Read and search the folder** (on by default);
    - **Do everything (commands too)** (off by default).
 
 The policy applies to all chats. When the agent needs permission, a card appears in the chat; choose one of its options to continue.
@@ -55,7 +55,7 @@ Press `Esc` in the message box, or click **■ Stop**.
 
 ## Resume a chat after a restart
 
-1. Open the project again. Its chats come back with their transcripts.
+1. Open the folder again. Its chats come back with their transcripts.
 2. Type your next message and press `↵`.
 
 The agent picks the conversation up where it left off. If it can't, Flint starts a new conversation and tells you.

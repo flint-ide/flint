@@ -75,6 +75,8 @@ export interface ProjectInfo {
   /** The project's folder is trusted; otherwise get_project leaves it out and Go asks before Delegate. */
   trusted: boolean
   error: string
+  /** Marked by flint-backlog.json (the Backlog preview's format): read-only until it is renamed. */
+  oldFormat: boolean
 }
 
 /** The project's context file, PROJECT.md (Go: projects.ContextView). */
@@ -92,6 +94,8 @@ export interface ProjectData {
   name: string
   workspace: boolean
   trusted: boolean
+  /** As ProjectInfo.oldFormat. */
+  oldFormat: boolean
   repositories: RepoView[]
   context: ContextInfo
   items: ItemInfo[]
@@ -343,9 +347,11 @@ export const canClose = (info: ProjectInfo | undefined): boolean => !!info && !i
 /** Whether a changed file is one the project reads: flint-project.json or a file in items/. */
 export function touchesProject(folder: string, paths: readonly string[]): boolean {
   if (!folder) return false
-  const config = `${folder.replace(/\/+$/, '')}/flint-project.json`
-  const items = `${folder.replace(/\/+$/, '')}/items`
-  return paths.some((p) => p === config || isWithin(items, p))
+  const base = folder.replace(/\/+$/, '')
+  // The old format's file too: renamed or removed by hand, the project changes format.
+  const configs = [`${base}/${CONFIG_FILE}`, `${base}/${OLD_CONFIG_FILE}`]
+  const items = `${base}/items`
+  return paths.some((p) => configs.includes(p) || isWithin(items, p))
 }
 
 // ---- Board
@@ -410,11 +416,28 @@ export function problemPrompt(projectName: string, projectPath: string, p: Probl
     '',
     `${p.file}: ${p.reason}`,
     '',
-    p.file === CONTEXT_FILE
+    p.file === OLD_CONFIG_FILE
+      ? `The file is left over from the format of the Backlog preview: Flint reads ${CONFIG_FILE} and ignores it. Compare the two files; if ${CONFIG_FILE} has everything ${OLD_CONFIG_FILE} says, tell me that ${OLD_CONFIG_FILE} can be deleted (don't delete it yourself).`
+      : p.file === CONTEXT_FILE
       ? `Fix the file so that Flint can give it to agents again: plain Markdown in UTF-8, at most ${MAX_CONTEXT_CHARS.toLocaleString('en-US')} characters, without control characters (other than tab and newline) or invisible ones, and not a link to a file outside the project's folder. Keep what it says.`
       : 'Fix the file so that it follows the format of a project item (front matter with title, status, priority, agent and repos, then the text), and keep what it says.',
   ].join('\n')
 }
+
+// ---- The old format
+// Migrates the pre-rename format of this feature (the Backlog preview on main, never released); remove it with
+// Go's internal/features/projects/oldformat.go.
+
+/** The file that marks a project (Go: projects.ConfigFile). */
+export const CONFIG_FILE = 'flint-project.json'
+/** The file that marked a project in the Backlog preview (Go: projects.OldConfigFile). */
+export const OLD_CONFIG_FILE = 'flint-backlog.json'
+/** The one action an old-format project offers. */
+export const RENAME_ACTION = `Rename ${OLD_CONFIG_FILE} to ${CONFIG_FILE}`
+/** The note on an old-format project, in the panel and on the board. */
+export const OLD_FORMAT_NOTE = `This project is in the format of the Backlog preview (${OLD_CONFIG_FILE}). Flint shows it read-only until the file is renamed: Delegate, New Item, status changes and the agent tools wait for that.`
+/** The hint on the actions an old-format project refuses. */
+export const OLD_FORMAT_HINT = `Read-only: rename ${OLD_CONFIG_FILE} to ${CONFIG_FILE} first`
 
 // ---- Project context
 

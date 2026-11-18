@@ -17,7 +17,7 @@ export function TrustBanner() {
       <span className="trust-icon">⚠</span>
       <span className="trust-text">
         <strong>Restricted Mode</strong> in {displayPath(roots, root)}: Flint doesn't run this folder's code on its own — no automatic terminal,
-        no Rust or Python language servers, and agents ignore the project's hooks and settings. Trust it only if you trust its authors.
+        no Rust or Python language servers, and agents ignore the folder's hooks and settings. Trust it only if you trust its authors.
       </span>
       <button className="primary" onClick={() => void trustFolder(root)}>Trust Folder</button>
       <button className="icon" title="Hide for now (the folder stays restricted)" onClick={() => dismissTrustBanner(root)}>✕</button>

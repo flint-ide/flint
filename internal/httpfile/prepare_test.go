@@ -224,7 +224,7 @@ func TestBodyFileMustBeInsideTheProject(t *testing.T) {
 		t.Fatalf("file inside the project refused: %v", err)
 	}
 	for _, body := range []string{filepath.Join(outside, "secret"), "../" + filepath.Base(outside) + "/secret", "./link"} {
-		if err := send(body); err == nil || !strings.Contains(err.Error(), "outside the project") {
+		if err := send(body); err == nil || !strings.Contains(err.Error(), "outside the workspace") {
 			t.Errorf("%s: err = %v", body, err)
 		}
 	}

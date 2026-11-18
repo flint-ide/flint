@@ -222,7 +222,7 @@ function appCommands(): Command[] {
       run: () => ws().focusPanel('git'),
     },
     { id: 'git.push', title: 'Push', category: 'Git', keys: 'Mod+Shift+K', keysIgnoredIn: IN_TERMINAL, run: () => useGit.getState().remote('push') },
-    { id: 'git.pull', title: 'Update Project (Pull)', category: 'Git', when: isRepo, run: updateProject },
+    { id: 'git.pull', title: 'Update Repository (Pull)', category: 'Git', when: isRepo, run: updateProject },
     { id: 'git.fetch', title: 'Fetch', category: 'Git', when: isRepo, run: () => useGit.getState().remote('fetch') },
     { id: 'git.refresh', title: 'Refresh Status', category: 'Git', keywords: 'reload changes', when: isRepo, run: () => useGit.getState().refresh() },
     { id: 'git.branches', title: 'Branches & Worktrees…', category: 'Git', keywords: 'checkout switch', when: hasBranchWidget, run: () => ws().setBranchesPopup('list') },
@@ -246,20 +246,20 @@ function appCommands(): Command[] {
     // One "Show <panel>" per built-in sidebar panel (panels/index.ts); features register their own.
     ...panelCommands(PANELS, (id) => ws().setSidebar(id)),
 
-    // Project
-    { id: 'project.recent', title: 'Recent Projects…', category: 'Project', keys: 'Mod+O', keywords: 'open folder', run: () => ws().setRecentOpen(true) },
+    // Workspace: the folders open in the window (command ids keep their old "project." prefix)
+    { id: 'project.recent', title: 'Recent Folders…', category: 'Workspace', keys: 'Mod+O', keywords: 'open folder', run: () => ws().setRecentOpen(true) },
     {
-      id: 'project.openFolder', title: 'Open Folder…', category: 'Project',
+      id: 'project.openFolder', title: 'Open Folder…', category: 'Workspace',
       run: async () => {
         const path = await Workspace.PickFolder()
         if (path) await ws().openFolder(path)
       },
     },
     {
-      id: 'project.addToWorkspace', title: 'Add Project to Workspace…', category: 'Project', keys: 'Mod+Shift+O',
+      id: 'project.addToWorkspace', title: 'Add Folder to Workspace…', category: 'Workspace', keys: 'Mod+Shift+O',
       keywords: 'attach folder multi root', when: () => !!ws().root, run: () => ws().pickRoot(),
     },
-    { id: 'project.reloadTree', title: 'Reload File Tree', category: 'Project', keywords: 'refresh', when: () => !!ws().root, run: () => ws().reloadTree() },
+    { id: 'project.reloadTree', title: 'Reload File Tree', category: 'Workspace', keywords: 'refresh', when: () => !!ws().root, run: () => ws().reloadTree() },
 
     // Scratchpads (SQL consoles and their commands come from the database feature)
     { id: 'scratch.newMarkdown', title: 'New Markdown Note', category: 'Scratchpads', keywords: 'md scratch', run: () => void useScratch.getState().create('markdown') },
@@ -325,7 +325,7 @@ function registerAgentChatCommands(): () => void {
   }
 }
 
-/** "Remove <project> from Workspace" per attached folder; follows the workspace. */
+/** "Remove <folder> from Workspace" per attached folder; follows the workspace. */
 function registerWorkspaceRootCommands(): () => void {
   let roots: string[] | null = null
   let off: () => void = () => undefined
@@ -339,7 +339,7 @@ function registerWorkspaceRootCommands(): () => void {
       next.slice(1).map((r, i) => ({
         id: `project.remove.${r}`,
         title: `Remove ${labels[i + 1]} from Workspace`,
-        category: 'Project',
+        category: 'Workspace',
         keywords: 'detach close folder multi root',
         run: () => removeFromWorkspace(r),
       })),

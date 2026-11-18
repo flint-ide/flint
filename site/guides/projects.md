@@ -2,7 +2,7 @@
 
 A project holds work that is planned but not started: a folder of work items, its **backlog**, for one or more repositories, that Flint shows as a list and as a board. **Delegate** turns an item into [agent tasks](ai-agents.md#agent-tasks-agents-in-parallel), one per repository the item names (or one agent for all of them), run by the agent the item names, and the item's status follows them. Every agent Delegate starts knows the project it works on: what it is for (from the project's `PROJECT.md`), where its item stands, what it depends on and what else is in progress. An item can wait for other items, an agent can plan the items for you, and a repository you don't have yet can be cloned. You can have several projects at once. This guide explains the folder and its files, how repositories are matched to your checkouts and cloned, what Delegate does and refuses, what every agent is told about the project, how items wait for each other, how one agent works across repositories, how an agent plans a project, how the status moves, and what is shared with a team.
 
-**Two meanings of "project".** Elsewhere in Flint, and in [Open projects](../how-to/open-projects.md), a project is a folder you open in the window ("Open Folder…", "Recent Projects…"). This guide says "project" only for the folder of work items described here, and calls the folders open in the window *folders*, *workspace folders* or *checkouts*; the one you are working in is the *active folder*. A project's folder may also be open in the window, but it doesn't have to be.
+In Flint a project is always this folder of work items. The folders you open in the window are *folders* (together, the window's *workspace*; see [Open folders](../how-to/open-projects.md)), and the one you are working in is the *active folder*. A project's folder may also be open in the window, but it doesn't have to be. Coming from the Backlog preview? See [below](#coming-from-the-backlog-preview).
 
 ![The Projects panel with the repositories and the items by status, next to the board of the same project](../images/projects.png)
 
@@ -29,7 +29,7 @@ Open the **Projects** panel from the activity bar or with "Show Projects" in the
 - **Show Board** opens the project's [board](#the-board).
 - **Close Project** removes the project from Flint's list of projects. The files stay where they are. It is disabled, and marked "workspace folder", for a project listed because it is a folder open in the window.
 
-The same commands are in the command palette, listed under **Projects** (not under **Project**, which holds the commands for the folders open in the window): Open Project…, New Project…, New Project Item…, Plan with Agent… and Show Project Board.
+The same commands are in the command palette, listed under **Projects**: Open Project…, New Project…, New Project Item…, Plan with Agent… and Show Project Board.
 
 Flint remembers the projects you opened or created, most recent first, up to 20. A folder open in the window whose top level holds `flint-project.json` is listed without being opened. It can't be closed there; remove the folder from the window instead.
 
@@ -680,6 +680,15 @@ A symbolic link that leaves the project folder is refused.
 - Milestones, budgets per item, and assignees who are people.
 - Watching a project folder outside the window, and live updates from a teammate's push.
 - Import from or synchronization with trackers.
+
+## Coming from the Backlog preview
+
+Before its first release this feature was called Backlog, and a project was marked by `flint-backlog.json`. Flint takes over what that preview kept:
+
+- the projects you opened, the checkouts you chose with **Locate…** and the links of items to agent tasks, from Flint's `state.json`; a feature switched off as `backlog` stays off; an open board tab reopens as the project's board.
+- A folder that has `flint-backlog.json` and no `flint-project.json` is still a project, in the old format: it is listed (also as a workspace folder, and **Open Project…** accepts it) and its items are shown, with the note "This project is in the format of the Backlog preview (flint-backlog.json)". It is read-only until you rename the file: Delegate, New Item…, status changes, Plan with Agent…, Add Project Context…, `get_project`'s items, `add_project_item` and starts that wait are refused with a message that points to the rename, so nothing new is written in the old format.
+- **Rename flint-backlog.json to flint-project.json…** in the note asks first, then renames the file without changing its content. It refuses when `flint-project.json` exists already. Flint never renames it on its own, because the folder may be a repository your team shares: commit the rename so they get it too.
+- When a folder has both files, `flint-project.json` is used and `flint-backlog.json` is listed as a problem (left over); delete it when nobody needs it.
 
 ## Turning it off
 

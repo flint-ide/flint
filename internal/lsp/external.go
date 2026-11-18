@@ -30,7 +30,7 @@ type ExtensionLanguage struct {
 
 // extensionTrustReason: an extension's server is a program Flint doesn't
 // know, so it starts only in trusted folders.
-const extensionTrustReason = "a language server from an extension may run the project's code"
+const extensionTrustReason = "a language server from an extension may run the folder's code"
 
 // registry holds the extensions' languages; reads are frequent (every file
 // opened), writes happen when the installed extensions change.

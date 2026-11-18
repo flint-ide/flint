@@ -38,7 +38,7 @@ func (e *ext) workspaceFile(path string) (string, error) {
 			return real, nil
 		}
 	}
-	return "", jsonrpc.Errorf(jsonrpc.CodePermission, "%s is not inside an open, trusted project folder", path)
+	return "", jsonrpc.Errorf(jsonrpc.CodePermission, "%s is not inside an open, trusted workspace folder", path)
 }
 
 func (e *ext) readFile(params json.RawMessage) (any, error) {

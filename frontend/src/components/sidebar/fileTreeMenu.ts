@@ -25,7 +25,7 @@ export interface MenuActions {
   startRename: (path: string) => void
 }
 
-const addProject: DropdownItem = { label: 'Add Project to Workspace…', kbd: formatKeys('Mod+Shift+O'), onSelect: () => void useWorkspace.getState().pickRoot() }
+const addProject: DropdownItem = { label: 'Add Folder to Workspace…', kbd: formatKeys('Mod+Shift+O'), onSelect: () => void useWorkspace.getState().pickRoot() }
 
 /**
  * Items of the file tree's context menu for the right-clicked targets (the selection

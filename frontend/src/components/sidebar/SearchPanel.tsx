@@ -95,7 +95,7 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
           <input
             ref={input}
             value={params.query}
-            placeholder={roots.length > 1 ? 'Search in workspace' : 'Search in project'}
+            placeholder={roots.length > 1 ? 'Search in workspace' : 'Search in folder'}
             spellCheck={false}
             onChange={(e) => setParams({ query: e.target.value })}
             onKeyDown={(e) => e.key === 'Enter' && roots.length > 0 && void run(roots)}

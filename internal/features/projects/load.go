@@ -42,16 +42,19 @@ func Resolve(folder string) (string, error) {
 	return filepath.Clean(real), nil
 }
 
-// LoadConfig reads folder's flint-project.json (folder resolved).
+// LoadConfig reads folder's flint-project.json (folder resolved), or the
+// old format's file when only that one is there (configFile).
 func LoadConfig(folder string) (Config, error) {
-	data, err := readInside(folder, ConfigFile)
+	file := configFile(folder)
+	data, err := readInside(folder, file)
 	if err != nil {
-		return Config{}, fmt.Errorf("%s: %w", ConfigFile, err)
+		return Config{}, fmt.Errorf("%s: %w", file, err)
 	}
 	c, err := ParseConfig(data, filepath.Base(folder))
 	if err != nil {
-		return Config{}, fmt.Errorf("%s: %w", ConfigFile, err)
+		return Config{}, fmt.Errorf("%s: %w", file, err)
 	}
+	c.OldFormat = file == OldConfigFile
 	return c, nil
 }
 
@@ -67,6 +70,9 @@ func Load(folder string) (Loaded, error) {
 	}
 	l := Loaded{Config: c, Items: []Item{}, Problems: []Problem{}, Context: ReadContext(folder)}
 	if p, ok := l.Context.problem(); ok {
+		l.Problems = append(l.Problems, p)
+	}
+	if p, ok := leftoverProblem(folder, c); ok {
 		l.Problems = append(l.Problems, p)
 	}
 	files, problems := prompts.ReadDir(filepath.Join(folder, ItemsDir), folder, MaxItems)

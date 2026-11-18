@@ -85,7 +85,7 @@ export function parseSnapshot(raw: string): Snapshot | null {
     return {
       version: snap.version,
       active: Number.isInteger(snap.active) ? snap.active : -1,
-      tabs: snap.tabs.filter(isTab),
+      tabs: snap.tabs.map(migrateRenamedView).filter(isTab),
       ...(roots.length ? { roots } : {}),
       ...(Object.keys(runConfigs).length ? { runConfigs } : {}),
       ...(typeof snap.runConfig === 'string' && snap.runConfig ? { runConfig: snap.runConfig } : {}),
@@ -94,6 +94,22 @@ export function parseSnapshot(raw: string): Snapshot | null {
   } catch {
     return null
   }
+}
+
+/**
+ * Migrates the pre-rename tab of the Projects feature (the Backlog preview on main, never released): a
+ * "backlog.board" tab reopens as "projects.board" when its data names a folder as the board's does
+ * (BoardData: an absolute path); otherwise it is dropped. It can be removed later. Other unknown kinds are
+ * kept for the extension that may contribute them, and show "… is not available" until it does.
+ */
+export function migrateRenamedView(t: unknown): unknown {
+  if (typeof t !== 'object' || t === null || (t as SavedTab).kind !== 'contrib' || (t as { view?: unknown }).view !== 'backlog.board') return t
+  const tab = t as Record<string, unknown>
+  const data = tab.data as { folder?: unknown } | null | undefined
+  const folder = typeof data === 'object' && data !== null ? data.folder : undefined
+  if (typeof folder !== 'string' || !folder.startsWith('/') || folder.length >= 4096) return null
+  const title = typeof tab.title === 'string' ? tab.title.replace(/^Backlog: /, 'Project: ') : ''
+  return { ...tab, view: 'projects.board', title, data: { folder } }
 }
 
 /** Folder → configuration id; entries that aren't an absolute path and an id are dropped. */
@@ -107,14 +123,8 @@ function parseRunConfigs(raw: unknown): Record<string, string> {
 const KINDS = new Set(['file', 'scratch', 'diff', 'history', 'terminal', 'chat', 'contrib'])
 /** Saved data of a contributed tab is at most this much JSON. */
 export const MAX_TAB_DATA = 64 << 10
-/**
- * Tab kinds of built-in features that were renamed before any release: a session saved with one does
- * not reopen it (the Projects board was "backlog.board"). Other unknown kinds are kept for the
- * extension that may contribute them later, and show "… is not available" until it does.
- */
-const RETIRED_VIEWS = new Set(['backlog.board'])
 const isContrib = (t: Record<string, unknown>) =>
-  typeof t.view === 'string' && !RETIRED_VIEWS.has(t.view) && /^[a-z0-9][a-z0-9.-]*\.[a-zA-Z0-9._-]+$/.test(t.view) && typeof t.key === 'string' && t.key !== '' && t.key.length <= 256 && typeof t.title === 'string'
+  typeof t.view === 'string' && /^[a-z0-9][a-z0-9.-]*\.[a-zA-Z0-9._-]+$/.test(t.view) && typeof t.key === 'string' && t.key !== '' && t.key.length <= 256 && typeof t.title === 'string'
 const isTab = (t: unknown): t is SavedTab =>
   typeof t === 'object' && t !== null && KINDS.has((t as SavedTab).kind) && ((t as SavedTab).kind !== 'contrib' || isContrib(t as Record<string, unknown>))
 

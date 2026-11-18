@@ -79,7 +79,7 @@ func TestPlanExtensionMessages(t *testing.T) {
 		t.Errorf("missing program: %v", err)
 	}
 	_, err = PlanExtension(Request{Lang: LangExt, Dirs: []string{root}, File: "/elsewhere/a_spec.rb"}, r)
-	if err == nil || !strings.Contains(err.Error(), "is not inside the project folder") {
+	if err == nil || !strings.Contains(err.Error(), "is not inside the workspace folder") {
 		t.Errorf("outside the project: %v", err)
 	}
 }

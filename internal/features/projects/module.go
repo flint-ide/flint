@@ -6,9 +6,9 @@
 // tasks come through feature.Host. The frontend half is
 // frontend/src/features/projects.
 //
-// In this package "project" means only such a folder. The folders open in the
-// window (what the rest of Flint calls projects) are workspace folders or
-// roots here, and the one the user works in is the active folder.
+// A project is only such a folder. The folders open in the window are
+// workspace folders (roots), and the one the user works in is the active
+// folder.
 //
 // Nothing in a project runs by itself: opening one reads files, and only the
 // user's Delegate starts agents, never in a folder in Restricted Mode. The

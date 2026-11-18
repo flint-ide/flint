@@ -14,7 +14,7 @@ export function UsageSection() {
     <section>
       <h2>Usage</h2>
       <p className="muted settings-note">
-        Flint counts the tokens (and the cost, when the agent reports it) of every agent turn per day, project, agent, model and agent
+        Flint counts the tokens (and the cost, when the agent reports it) of every agent turn per day, folder, agent, model and agent
         task, in usage.json in its configuration folder. Nothing leaves this Mac. See the Usage panel (∑).
       </p>
       <Row label="Keep daily totals for" hint="Older days are dropped.">

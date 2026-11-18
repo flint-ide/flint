@@ -38,7 +38,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	root := g.root
 	if s.opts.Allow != nil && !s.opts.Allow(root) {
-		http.Error(w, "Flint's MCP server is off for this project", http.StatusForbidden)
+		http.Error(w, "Flint's MCP server is off for this folder", http.StatusForbidden)
 		return
 	}
 	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {

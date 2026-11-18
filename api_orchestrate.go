@@ -105,7 +105,7 @@ func (o *orchestrator) authorize(caller, root string) (orchestrate.Node, orchGra
 	case !granted || !o.app.orchGranted(caller):
 		return node, grant, errors.New("this chat has no permission from the user to direct agents")
 	case filepath.Clean(grant.root) != filepath.Clean(root):
-		return node, grant, errors.New("the permission the user gave covers another project")
+		return node, grant, errors.New("the permission the user gave covers another folder")
 	}
 	return node, grant, nil
 }
@@ -120,7 +120,7 @@ func (o *orchestrator) target(caller, root, id string) (orchestrate.Node, error)
 		return node, fmt.Errorf("unknown agent %q (list_agents shows the ids)", id)
 	}
 	if !o.scopeOf(root).has(node.Cwd) {
-		return node, fmt.Errorf("agent %q is not in this project", id)
+		return node, fmt.Errorf("agent %q is not in this folder", id)
 	}
 	return node, nil
 }
@@ -290,7 +290,7 @@ func (o *orchestrator) keepOrStop(caller, child string) error {
 // queued: the caller asked for an agent now.
 func (o *orchestrator) newWorktree(ctx context.Context, root, agent string, r mcptools.StartRequest) (agenttask.Task, error) {
 	if !o.app.isTrusted(root) {
-		return agenttask.Task{}, errors.New("this project is not trusted, so Flint starts no worktree tasks in it")
+		return agenttask.Task{}, errors.New("this folder is not trusted, so Flint starts no worktree tasks in it")
 	}
 	made, _, err := o.app.createTasks(ctx, NewTaskGroup{Dir: root, Description: r.Task, Base: r.Base, Agents: []string{agent}}, false, false)
 	if err != nil {

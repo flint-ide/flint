@@ -14,7 +14,7 @@ export function AgentDefsSection() {
       <h3>Defined agents</h3>
       <p className="muted settings-note">
         A Markdown file with an optional engine (claude or codex), an optional model and standing instructions defines an agent you can pick
-        wherever an agent is chosen. Personal ones live in {defs?.personalDir || '…'}; project ones in .flint/agents of a trusted folder.
+        wherever an agent is chosen. Personal ones live in {defs?.personalDir || '…'}; repository ones in .flint/agents of a trusted folder.
         Without an engine, an agent runs on the default agent. A model tier (fast, balanced or strong) works on either engine: each engine's
         tier models above say what it means. A defined agent cannot change permissions or tools.
       </p>

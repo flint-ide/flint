@@ -124,7 +124,7 @@ function StatusMessage({ state, message, onRetry }: { state: string; message: st
   if (state === 'unauthenticated') {
     return (
       <div className="placeholder">
-        <SignInWithGitHub intro="Sign in to GitHub to see and review this project's pull requests. Flint keeps the token in the system keyring." />
+        <SignInWithGitHub intro="Sign in to GitHub to see and review this repository's pull requests. Flint keeps the token in the system keyring." />
         <button className="link" onClick={onRetry}>Retry</button>
       </div>
     )

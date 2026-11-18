@@ -57,6 +57,9 @@ func (a *API) PlanPrompt(folder, goal string) (PlanPrompt, error) {
 	if err != nil {
 		return PlanPrompt{}, err
 	}
+	if err := writable(c); err != nil {
+		return PlanPrompt{}, err
+	}
 	mcp := a.host.Settings().MCPServer
 	return PlanPrompt{Prompt: planText(c, real, goal, a.host.Agents().Available, a.host.Agents().Default, ReadContext(real)), ToolOn: mcp.Enabled && mcp.Actions.Projects}, nil
 }

@@ -6,7 +6,7 @@ import { formatKeys } from '../../lib/commands'
 
 const SHORTCUTS: [string, string][] = [
   [formatKeys('Mod+P'), 'Go to file'],
-  [formatKeys('Mod+Shift+F'), 'Search in project'],
+  [formatKeys('Mod+Shift+F'), 'Find in files'],
   [formatKeys('Mod+K'), 'Commit'],
   [formatKeys('Mod+Shift+K'), 'Push'],
   [formatKeys('Mod+J'), 'Terminal ↔ last file'],

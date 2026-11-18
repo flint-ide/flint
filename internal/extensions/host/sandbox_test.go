@@ -121,7 +121,7 @@ func TestSandboxedExtension(t *testing.T) {
 	s := needSandbox(t)
 	f := setupSandboxed(t, `{}`, nil)
 	asked := f.app.asked[0]
-	for _, want := range []string{"Sandbox: Sandboxed (" + s.Mechanism + ")", "• Reads: its own folder, system files, trusted project folders", "• Writes: its data folder, a private temporary folder", "• Network: blocked", "• Other programs: only its own", "runs inside this sandbox"} {
+	for _, want := range []string{"Sandbox: Sandboxed (" + s.Mechanism + ")", "• Reads: its own folder, system files, trusted workspace folders", "• Writes: its data folder, a private temporary folder", "• Network: blocked", "• Other programs: only its own", "runs inside this sandbox"} {
 		if !strings.Contains(asked, want) {
 			t.Errorf("the confirmation lacks %q:\n%s", want, asked)
 		}
@@ -357,7 +357,7 @@ func TestSandboxFollowsTrustedRoots(t *testing.T) {
 	waitFor(t, "the restart", func() bool {
 		return strings.Count(f.log(t), "[flint] sandboxed (") == 2 && f.state() == StateRunning
 	})
-	if !strings.Contains(f.log(t), "stopping: the project folders changed") || strings.Contains(f.log(t), "workspace/rootsChanged") {
+	if !strings.Contains(f.log(t), "stopping: the workspace folders changed") || strings.Contains(f.log(t), "workspace/rootsChanged") {
 		t.Errorf("log:\n%s", f.log(t))
 	}
 	if got := f.fs(t, "read", file); !strings.Contains(got, "-> added later") {
@@ -478,7 +478,7 @@ func TestDescribeSandbox(t *testing.T) {
 	old := sandbox.Support{Available: true, Mechanism: "Landlock (ABI 1)", Gaps: []string{"Network access and local sockets are not blocked (this needs seccomp, or Linux 6.7 for Landlock's TCP rules)."}}
 	in := describeSandbox(parse(`{"command": "x", "env": ["KUBECONFIG"], "sandbox": {"read": ["~/.kube", "${env:KUBECONFIG}"], "write": ["~/out"], "localSockets": true, "exec": true}}`, `["workspace.read", "network:api.example.com,*.example.org"]`), old, []string{"~/x is not granted: it doesn't exist"})
 	want := []string{
-		"Reads: its own folder, system files, trusted project folders, ~/.kube, ${env:KUBECONFIG}",
+		"Reads: its own folder, system files, trusted workspace folders, ~/.kube, ${env:KUBECONFIG}",
 		"Writes: its data folder, a private temporary folder, ~/out",
 		"Network: allowed, to any host (declared: api.example.com, *.example.org; the sandbox can't limit it to them)",
 		"Local sockets: allowed (services on this machine, such as Docker or the desktop's message bus)",

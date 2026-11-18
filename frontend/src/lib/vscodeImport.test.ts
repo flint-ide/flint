@@ -6,7 +6,7 @@ import type { Command } from './commands'
 const run = () => undefined
 const commands: Command[] = [
   { id: 'nav.goToFile', title: 'Go to File…', keys: 'Mod+P', run },
-  { id: 'project.recent', title: 'Recent Projects…', keys: 'Mod+O', run },
+  { id: 'project.recent', title: 'Recent Folders…', keys: 'Mod+O', run },
   { id: 'terminal.toggle', title: 'Toggle Terminal', keys: 'Mod+J', run },
 ]
 
@@ -40,7 +40,7 @@ describe('import preview', () => {
 
   it('warns about commands that would share the shortcut', () => {
     const item: ImportItem = { kind: 'keybinding', name: 'workbench.action.quickOpen', value: 'Mod+O', target: 'nav.goToFile' }
-    assert.equal(keybindingNote(item, commands, importedKeymap([item], {})), '⌘O — also Recent Projects…')
+    assert.equal(keybindingNote(item, commands, importedKeymap([item], {})), '⌘O — also Recent Folders…')
     const free: ImportItem = { ...item, value: 'Mod+E' }
     assert.equal(keybindingNote(free, commands, importedKeymap([free], {})), '⌘E')
     // A command moved away by the import no longer clashes.

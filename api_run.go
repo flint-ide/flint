@@ -301,10 +301,10 @@ func (r *RunAPI) TestMarks(path, content string) []testrun.Mark {
 
 func checkRoot(root string) error {
 	if !filepath.IsAbs(root) {
-		return fmt.Errorf("project root %q is not absolute", root)
+		return fmt.Errorf("workspace folder %q is not absolute", root)
 	}
 	if info, err := os.Stat(root); err != nil || !info.IsDir() {
-		return fmt.Errorf("project root %s is not a directory", root)
+		return fmt.Errorf("workspace folder %s is not a directory", root)
 	}
 	return nil
 }

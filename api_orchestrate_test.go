@@ -297,7 +297,7 @@ func TestSendPromptOnlyReachesDescendants(t *testing.T) {
 	if text, failed := send(stranger.ID); !failed || !strings.Contains(text, "not your descendant") {
 		t.Errorf("stranger: %q", text)
 	}
-	if text, failed := send(outside.ID); !failed || !strings.Contains(text, "not in this project") {
+	if text, failed := send(outside.ID); !failed || !strings.Contains(text, "not in this folder") {
 		t.Errorf("outside the project: %q", text)
 	}
 	if text, failed := send("nope"); !failed || !strings.Contains(text, "unknown agent") {
@@ -449,7 +449,7 @@ func TestWaitForAgentValidatesAndScopes(t *testing.T) {
 		{fmt.Sprintf(`{"id":%q,"until":["asleep"]}`, child), "not a state"},
 		{fmt.Sprintf(`{"id":%q,"until":["idle"],"timeoutSeconds":0}`, child), "at least 1"},
 		{`{"id":"nope","until":["idle"]}`, "unknown agent"},
-		{fmt.Sprintf(`{"id":%q,"until":["idle"]}`, outside.ID), "not in this project"},
+		{fmt.Sprintf(`{"id":%q,"until":["idle"]}`, outside.ID), "not in this folder"},
 	} {
 		o.fails(t, "wait_for_agent", tc.args, tc.want)
 	}

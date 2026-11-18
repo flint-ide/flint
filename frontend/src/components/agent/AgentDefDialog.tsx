@@ -59,15 +59,15 @@ export function AgentDefDialog() {
         {name && !valid && <span className="form-status error">Lowercase letters, digits and - only, starting with a letter (at most 32).</span>}
         <label className="check">
           <input type="radio" name="scope" checked={!personal} disabled={projects.length === 0} onChange={() => setPersonal(false)} />
-          Project: .flint/agents, shared with the team through the repository
+          Repository: .flint/agents, shared with the team through the repository
         </label>
         {!personal && projects.length > 1 && (
           <Select block value={root} options={projects.map((r, i) => ({ value: r, label: labels[i] ?? r }))} onChange={setRoot} />
         )}
-        {projects.length === 0 && <span className="muted">Open and trust a folder to create a project agent.</span>}
+        {projects.length === 0 && <span className="muted">Open and trust a folder to create a repository agent.</span>}
         <label className="check">
           <input type="radio" name="scope" checked={personal} onChange={() => setPersonal(true)} />
-          Personal: only you, in every project
+          Personal: only you, in every folder
         </label>
         {error && <span className="form-status error">{error}</span>}
         <div className="form-actions">

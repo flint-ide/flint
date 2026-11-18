@@ -86,7 +86,7 @@ func sandboxLines(m *manifest.Manifest) []string {
 	sb := m.Run.Sandbox
 	reads := []string{"its own folder", "system files"}
 	if m.HasPermission(manifest.PermWorkspaceRead) {
-		reads = append(reads, "trusted project folders")
+		reads = append(reads, "trusted workspace folders")
 	}
 	writes := []string{"its data folder", "a private temporary folder"}
 	lines := []string{
@@ -306,7 +306,7 @@ func (e *ext) restartForRoots() {
 	e.mu.Lock()
 	wanted := e.m.RunsAtStartup() || len(e.visible) > 0 || len(e.docs) > 0
 	e.mu.Unlock()
-	e.stop("the project folders changed, and its sandbox is rebuilt for them")
+	e.stop("the workspace folders changed, and its sandbox is rebuilt for them")
 	e.h.changed()
 	if !wanted {
 		return

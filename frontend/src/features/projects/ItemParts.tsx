@@ -13,6 +13,8 @@ import {
   dependencyMarker,
   groupTasks,
   jointHint,
+  OLD_FORMAT_NOTE,
+  RENAME_ACTION,
   reposText,
   statusLabel,
   taskPill,
@@ -22,11 +24,24 @@ import {
   type ItemInfo,
   type TaskInfo,
 } from './projects'
-import { addContext, cancelStart, delegateItem, itemKey, openContext, openItemFile, openItemTask, setStatus, useProjects } from './store'
+import { addContext, cancelStart, delegateItem, itemKey, openContext, openItemFile, openItemTask, renameOldConfig, setStatus, useProjects } from './store'
+
+/** The note on a project in the Backlog preview's format, with its one action (the panel and the board). */
+export function OldFormatNote({ folder }: { folder: string }) {
+  return (
+    <div className="project-untrusted project-old-format" role="status">
+      <span className="project-marker warn">Old format</span>
+      <span className="muted">{OLD_FORMAT_NOTE}</span>
+      <button className="link" onClick={() => void renameOldConfig(folder)} title="Flint asks first; the file's content stays as it is">
+        {RENAME_ACTION}…
+      </button>
+    </div>
+  )
+}
 
 /** The project's context file: Open when it exists, Add Project Context… when it does not (panel and board). */
 export function ProjectContext({ project }: { project: ProjectData }) {
-  const line = contextLine(project.context, project.trusted)
+  const line = contextLine(project.context, project.trusted && !project.oldFormat)
   return (
     <span className="project-context" title={line.hint}>
       <span className="muted">Context:</span>
@@ -121,6 +136,13 @@ function TaskLine({ t, all }: { t: TaskInfo; all: TaskInfo[] }) {
 export function ItemActions({ project, item }: { project: ProjectData; item: ItemInfo }) {
   const busy = useProjects((s) => !!s.busy[itemKey(project.path, item.id)])
   const [issue] = delegateIssues(item, project.repositories, activeRoot())
+  if (project.oldFormat) {
+    return (
+      <div className="task-actions project-actions">
+        <button className="link" onClick={() => openItemFile(item)} title={item.path}>Open</button>
+      </div>
+    )
+  }
   const hint = issue
     ? `${issue.message}${issue.fix === 'locate' ? ' Delegate asks for the folder.' : issue.fix === 'attach' ? ' Delegate adds it.' : issue.fix === 'trust' ? ' Delegate asks first.' : ''}`
     : item.together

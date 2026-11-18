@@ -6,7 +6,7 @@ const items = [
   { id: 'terminal.toggle', title: 'Toggle Terminal', category: 'Terminal' },
   { id: 'terminal.new', title: 'New Terminal', category: 'Terminal' },
   { id: 'git.push', title: 'Push…', category: 'Git' },
-  { id: 'git.pull', title: 'Update Project (Pull)', category: 'Git' },
+  { id: 'git.pull', title: 'Update Repository (Pull)', category: 'Git' },
   { id: 'view.sidebar', title: 'Toggle Sidebar', category: 'View', keywords: 'panel hide show' },
   { id: 'file.open', title: 'Go to File…', category: 'Navigate' },
 ]

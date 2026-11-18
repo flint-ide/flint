@@ -69,6 +69,9 @@ type ProjectInfo struct {
 	Trusted bool `json:"trusted"`
 	// Error says why the project can't be read now ("" when it can).
 	Error string `json:"error"`
+	// OldFormat: the project is marked by OldConfigFile (oldformat.go) and
+	// read-only until RenameOldConfig.
+	OldFormat bool `json:"oldFormat"`
 }
 
 // Project is a project with its items, as the panel and the board show it.
@@ -78,6 +81,8 @@ type Project struct {
 	Workspace bool   `json:"workspace"`
 	// Trusted: as ProjectInfo.Trusted.
 	Trusted bool `json:"trusted"`
+	// OldFormat: as ProjectInfo.OldFormat.
+	OldFormat bool `json:"oldFormat"`
 	// Repositories are flint-project.json's, with the checkout of each.
 	Repositories []RepositoryView `json:"repositories"`
 	// Context is the project's context file, PROJECT.md (Open, or Add
@@ -218,8 +223,8 @@ func (a *API) remembered() []string {
 	return list
 }
 
-// workspaceProjects are the workspace folders with flint-project.json at
-// their top (resolved).
+// workspaceProjects are the workspace folders with flint-project.json (or,
+// in the old format, OldConfigFile) at their top (resolved).
 func (a *API) workspaceProjects() []string {
 	var out []string
 	for _, root := range a.host.Roots() {
@@ -227,7 +232,7 @@ func (a *API) workspaceProjects() []string {
 		if err != nil || slices.Contains(out, real) {
 			continue
 		}
-		if info, err := os.Stat(filepath.Join(real, ConfigFile)); err == nil && info.Mode().IsRegular() {
+		if hasConfigFile(real) {
 			out = append(out, real)
 		}
 	}
@@ -276,7 +281,7 @@ func (a *API) Projects() []ProjectInfo {
 		if c, err := LoadConfig(folder); err != nil {
 			info.Error = err.Error()
 		} else {
-			info.Name = c.Name
+			info.Name, info.OldFormat = c.Name, c.OldFormat
 		}
 		out = append(out, info)
 	}
@@ -314,7 +319,7 @@ func (a *API) Open(folder string) (ProjectInfo, error) {
 	if err != nil {
 		return ProjectInfo{}, err
 	}
-	if _, err := os.Lstat(filepath.Join(real, ConfigFile)); errors.Is(err, fs.ErrNotExist) {
+	if _, err := os.Lstat(filepath.Join(real, configFile(real))); errors.Is(err, fs.ErrNotExist) {
 		return ProjectInfo{}, fmt.Errorf("%s is not a project: it has no %s (use New Project… to make one)", folder, ConfigFile)
 	}
 	c, err := LoadConfig(real)
@@ -324,7 +329,7 @@ func (a *API) Open(folder string) (ProjectInfo, error) {
 	if err := a.rememberFolder(real); err != nil {
 		return ProjectInfo{}, err
 	}
-	return ProjectInfo{Path: real, Name: c.Name, Workspace: slices.Contains(a.workspaceProjects(), real), Trusted: a.host.Trusted(real)}, nil
+	return ProjectInfo{Path: real, Name: c.Name, Workspace: slices.Contains(a.workspaceProjects(), real), Trusted: a.host.Trusted(real), OldFormat: c.OldFormat}, nil
 }
 
 // Create makes folder a project (flint-project.json named name, default the
@@ -338,6 +343,9 @@ func (a *API) Create(folder, name string) (ProjectInfo, error) {
 	data, err := NewConfig(name)
 	if err != nil {
 		return ProjectInfo{}, err
+	}
+	if configFile(real) == OldConfigFile {
+		return ProjectInfo{}, fmt.Errorf("%s is a project in the old format (%s): open it with Open Project… and rename the file there", folder, OldConfigFile)
 	}
 	f, err := os.OpenFile(filepath.Join(real, ConfigFile), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if errors.Is(err, fs.ErrExist) {
@@ -432,7 +440,7 @@ func (a *API) Load(folder string) (Project, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	var tasks map[string]feature.AgentTask
-	if c, err := LoadConfig(real); err == nil {
+	if c, err := LoadConfig(real); err == nil && !c.OldFormat {
 		var moved bool
 		if moved, tasks = a.reconcile(ctx, real, c); moved {
 			a.emit(real)
@@ -445,7 +453,7 @@ func (a *API) Load(folder string) (Project, error) {
 	}
 	agents := a.host.Agents()
 	b := Project{
-		Path: real, Name: l.Config.Name, Workspace: workspace, Trusted: a.host.Trusted(real),
+		Path: real, Name: l.Config.Name, Workspace: workspace, Trusted: a.host.Trusted(real), OldFormat: l.Config.OldFormat,
 		Repositories: a.resolveRepos(ctx, l.Config), Context: contextView(real, l.Context), Items: []ItemView{}, Problems: l.Problems,
 		DefaultAgent: agents.Default, Clone: a.clones.view(real),
 	}
@@ -696,6 +704,9 @@ func (a *API) NewItem(folder, title string) (ItemView, error) {
 	if err != nil {
 		return ItemView{}, err
 	}
+	if err := writable(c); err != nil {
+		return ItemView{}, err
+	}
 	data, err := NewItemFile(title)
 	if err != nil {
 		return ItemView{}, err
@@ -716,6 +727,9 @@ func (a *API) NewItem(folder, title string) (ItemView, error) {
 // that id (an error refuses the id, and stops). The project must have room
 // (MaxItems). The written file must parse. Callers hold mu.
 func (a *API) writeNewItem(real string, c Config, base string, file func(id string) ([]byte, error)) (Item, error) {
+	if err := writable(c); err != nil {
+		return Item{}, err
+	}
 	dir := filepath.Join(real, ItemsDir)
 	if prompts.CountDir(dir, real, MaxItems) >= MaxItems {
 		return Item{}, fmt.Errorf("the project has %d items, the most Flint reads: remove some first", MaxItems)
@@ -771,6 +785,9 @@ func (a *API) SetStatus(folder, id, status string) (ItemView, error) {
 	if err != nil {
 		return ItemView{}, err
 	}
+	if err := writable(c); err != nil {
+		return ItemView{}, err
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	it, err := a.writeStatus(real, id, c, status)
@@ -792,6 +809,9 @@ func (a *API) SetStatus(folder, id, status string) (ItemView, error) {
 // read just before it is replaced, which leaves the smallest window for an
 // editor's save to be lost. Callers hold mu.
 func (a *API) writeStatus(folder, id string, c Config, status string) (Item, error) {
+	if err := writable(c); err != nil {
+		return Item{}, err
+	}
 	data, real, err := ReadItemFile(folder, id)
 	if err != nil {
 		return Item{}, fmt.Errorf("%s: %w", itemPath(id), err)
@@ -935,8 +955,8 @@ func (a *API) reconcileAll(ctx context.Context) {
 			continue
 		}
 		c, err := LoadConfig(folder)
-		if err != nil {
-			continue
+		if err != nil || c.OldFormat {
+			continue // an old-format project's statuses move once it is renamed
 		}
 		if m, _ := a.reconcile(ctx, folder, c); m {
 			moved = append(moved, folder)

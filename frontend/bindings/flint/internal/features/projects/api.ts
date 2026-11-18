@@ -186,6 +186,18 @@ export function Projects(): $CancellablePromise<$models.ProjectInfo[]> {
 }
 
 /**
+ * RenameOldConfig renames a project's OldConfigFile to ConfigFile after the
+ * user confirmed it (Rename flint-backlog.json to flint-project.json). The
+ * content is not touched, and it is refused when ConfigFile exists: the
+ * rename never replaces a file.
+ */
+export function RenameOldConfig(folder: string): $CancellablePromise<$models.ProjectInfo> {
+    return $Call.ByID(4087901896, folder).then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
+/**
  * SetStatus sets an item's status (the user's choice: any status to any
  * other), rewriting only its status line.
  */

@@ -118,7 +118,7 @@ func resolveDir(dir, within string) (string, error) {
 		return "", err
 	}
 	if !inside(real, base) {
-		return "", fmt.Errorf("%s points outside the project; its files are not loaded", dir)
+		return "", fmt.Errorf("%s points outside the folder; its files are not loaded", dir)
 	}
 	return real, nil
 }
@@ -234,7 +234,7 @@ func checkCreatable(dir, within string) error {
 		real, err := filepath.EvalSymlinks(p)
 		if err == nil {
 			if !inside(real, base) {
-				return fmt.Errorf("%s points outside the project", p)
+				return fmt.Errorf("%s points outside the folder", p)
 			}
 			return nil
 		}

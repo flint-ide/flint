@@ -11,8 +11,8 @@ The keys below are the macOS ones. On Linux, read Ctrl for ⌘ and Alt for ⌥ (
 | `⇧⌘P` | Command palette |
 | `⌘,` | Settings (including the keymap) |
 | `⌘[` / `⌘]` | Back / forward |
-| `⌘O` | Open folder (Recent Projects) |
-| `⇧⌘O` | Add project to workspace |
+| `⌘O` | Open folder (Recent Folders) |
+| `⇧⌘O` | Add folder to workspace |
 | `⌘P` | Go to file |
 | `⇧⌘F` | Find in files |
 | `⇧⌘R` | Replace in files |
@@ -20,13 +20,13 @@ The keys below are the macOS ones. On Linux, read Ctrl for ⌘ and Alt for ⌥ (
 | `⌘W` | Close tab |
 | `⌘S` | Save |
 
-### In Recent Projects
+### In Recent Folders
 
 | Shortcut | Action |
 |---|---|
-| `↵` | Open the project in this window |
-| `⌘↵` | Open the project in a new window |
-| `⌥↵` | Add the project to the current workspace |
+| `↵` | Open the folder in this window |
+| `⌘↵` | Open the folder in a new window |
+| `⌥↵` | Add the folder to the current workspace |
 
 ## File tree
 

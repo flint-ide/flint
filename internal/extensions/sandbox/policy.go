@@ -119,7 +119,7 @@ func Build(r Request) Policy {
 		}
 	}
 	for _, root := range r.Roots {
-		grant(&p.Read, "the project folder "+root, path.Clean(root), false)
+		grant(&p.Read, "the workspace folder "+root, path.Clean(root), false)
 	}
 	for _, declared := range r.Read {
 		for _, target := range expand(declared, r, &p.Notes) {

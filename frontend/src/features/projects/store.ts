@@ -25,11 +25,13 @@ import {
   cloneFromInfo,
   coerceAutoStart,
   coerceCloneEvent,
+  CONFIG_FILE,
   delegateIssues,
   delegateStep,
   locateQuestion,
   noCheckoutQuestion,
   notReadyQuestion,
+  OLD_CONFIG_FILE,
   PLAN_TOOL_OFF,
   pickSelected,
   problemPrompt,
@@ -90,10 +92,17 @@ export const useProjects = createStore<ProjectsState>(() => ({
 }))
 
 const SELECTED_KEY = 'flint.projects.selected'
+/** The key of the Backlog preview (before the feature was renamed): migrated once, then removed; it can go later. */
+const OLD_SELECTED_KEY = 'flint.backlog.selected'
 
 /** The project chosen last in this browser profile; a per-viewer convenience, empty without storage. */
 function readRemembered(): string {
   try {
+    const old = localStorage.getItem(OLD_SELECTED_KEY)
+    if (old !== null) {
+      if (localStorage.getItem(SELECTED_KEY) === null) localStorage.setItem(SELECTED_KEY, old)
+      localStorage.removeItem(OLD_SELECTED_KEY)
+    }
     return localStorage.getItem(SELECTED_KEY) ?? ''
   } catch {
     return ''
@@ -382,6 +391,22 @@ export async function planWithAgent(folder: string, goal: string, agent: string)
 }
 
 export const openItemFile = (item: ItemInfo): void => useEditor.getState().openFile(item.path)
+
+/**
+ * Rename flint-backlog.json to flint-project.json: the one action of a project in the Backlog preview's format.
+ * Go asks first (as for Clone… and Delegate) and refuses when flint-project.json exists; the content is not touched.
+ */
+export async function renameOldConfig(folder: string): Promise<void> {
+  try {
+    const info = await API.RenameOldConfig(folder)
+    showToast(`Renamed ${OLD_CONFIG_FILE} to ${CONFIG_FILE}: "${info.name}" can be edited and delegated now. Commit the rename if the folder is in a repository.`)
+  } catch (err) {
+    const msg = errorMessage(err)
+    if (!/cancelled/.test(msg)) showToast(msg, 'error')
+  }
+  await refreshProjects()
+  void loadProject(folder)
+}
 
 /** Opens the project's PROJECT.md in the editor. */
 export const openContext = (project: Pick<ProjectData, 'context'>): void => useEditor.getState().openFile(project.context.path)

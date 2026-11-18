@@ -7,7 +7,7 @@ This walkthrough uses Claude Code, but Codex works the same way.
 ## Before you start
 
 - Install the `claude` (or `codex`) CLI and sign in to it in Terminal.
-- Open the project and, if you see the Restricted Mode banner, trust it. In Restricted Mode the agent runs without your project's agent settings and hooks.
+- Open the repository's folder and, if you see the Restricted Mode banner, trust it. In Restricted Mode the agent runs without the folder's agent settings and hooks.
 - Make sure your working tree is clean, or at least that you know which changes are yours. The Commit panel (`⌘K`) shows everything.
 
 ## 1. Plan with the agent
@@ -28,7 +28,7 @@ This walkthrough uses Claude Code, but Codex works the same way.
 
 ## 2. Give it the right context
 
-The agent can search the project, but pointing it at the right code saves time and tokens.
+The agent can search the code, but pointing it at the right code saves time and tokens.
 
 - Select the relevant part of a file and press `⌘L` to attach it.
 - Press `⌘L` with nothing selected to attach the whole current file, or click **＋ current file**.
@@ -39,7 +39,7 @@ Attachments appear as chips above the message box. Then ask it to implement the 
 
 ## 3. Let it work, and decide what it may do
 
-By default the agent edits and reads files inside the project without asking, and asks before running commands. When it wants to run something (for example `go build` or `npm test`), a permission card appears; choose the option you want.
+By default the agent edits and reads files inside the folder without asking, and asks before running commands. When it wants to run something (for example `go build` or `npm test`), a permission card appears; choose the option you want.
 
 Check the policy link in the chat header (for example **auto: edits**) to see or change these defaults. See [What the agent may do without asking](../guides/ai-agents.md#what-the-agent-may-do-without-asking).
 
@@ -99,5 +99,5 @@ See [Review a pull request](review-a-pull-request.md) for the review side.
 
 - **Keep chats focused.** Start a new chat for an unrelated task; the context bar in the header shows how full the current conversation is.
 - **Work in parallel with agent tasks.** Run "New Agent Task…" (`⇧⌘P`), describe the task, pick the agent and the base branch, and click **Start**: Flint creates a branch and a worktree, opens it in the window and hands the description to the agent in a new chat. The **Agent Tasks** panel shows every task's state (working, waiting for you, finished, failed), its changes, and Open, Show diff, Merge, Create PR and Remove. See [Agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel). To let two agents (or two attempts) try the same task, tick **Compare agents** in the form: each gets its own branch from the same commit, **Compare** shows their changes file by file, and **Keep: Merge** merges the one you prefer and offers to remove the others ([Compare agents](../guides/ai-agents.md#compare-agents)). Tasks beyond the limit of three working at once wait in [the queue](../guides/ai-agents.md#the-queue). You can still create a worktree by hand from the branch widget and open a terminal there.
-- **Watch the cost.** The chat header shows tokens and, for Claude, the cost; the status bar shows the total for the project.
+- **Watch the cost.** The chat header shows tokens and, for Claude, the cost; the status bar shows the total for the folder.
 - **Let it finish in the background.** Switch to another app; Flint notifies you when the agent's turn is done.

@@ -56,7 +56,7 @@ func wantError(t *testing.T, err error, parts ...string) {
 func TestExtensionDebuggerOnlyInTrustedFolders(t *testing.T) {
 	a, root, file, adapter := extensionToolsApp(t)
 	_, _, _, err := a.extensionAdapter(root, file)
-	wantError(t, err, "Debugging app.rb is off in Restricted Mode", "Ruby (rdbg) (from the extension me.ruby) runs this project's code", "Run Trust Folder")
+	wantError(t, err, "Debugging app.rb is off in Restricted Mode", "Ruby (rdbg) (from the extension me.ruby) runs this folder's code", "Run Trust Folder")
 
 	if err := a.setTrust(root, true); err != nil {
 		t.Fatal(err)
@@ -88,7 +88,7 @@ func TestExtensionDebuggerMessages(t *testing.T) {
 	wantError(t, err, "Flint debugs Go itself", "click Debug")
 
 	_, _, _, err = a.extensionAdapter(root, "/elsewhere/app.rb")
-	wantError(t, err, "app.rb is not inside the project folder")
+	wantError(t, err, "app.rb is not inside the workspace folder")
 
 	dap.SetExtensionDebuggers([]dap.ExtensionDebugger{{Type: "rdbg", Label: "Ruby (rdbg)", Languages: []string{"ruby"}, Candidates: [][]string{{"flint-no-such-rdbg", "--open"}}, Install: "gem install debug"}})
 	_, _, _, err = a.extensionAdapter(root, filepath.Join(root, "app.rb"))

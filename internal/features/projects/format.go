@@ -64,6 +64,9 @@ var (
 type Config struct {
 	Name         string           `json:"name"`
 	Repositories []RepositoryDecl `json:"repositories"`
+	// OldFormat: read from OldConfigFile (oldformat.go); the project is
+	// read-only in Flint until the file is renamed.
+	OldFormat bool `json:"-"`
 }
 
 // RepositoryDecl is one entry of Config.Repositories.

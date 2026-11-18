@@ -156,6 +156,9 @@ func (a *API) AddContext(folder string) (ContextView, error) {
 	if err != nil {
 		return ContextView{}, err
 	}
+	if err := writable(c); err != nil {
+		return ContextView{}, err
+	}
 	path := filepath.Join(real, ContextFile)
 	a.mu.Lock()
 	defer a.mu.Unlock()

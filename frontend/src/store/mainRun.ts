@@ -24,7 +24,7 @@ function targetFor(path: string, quiet = false): MainTarget | null {
   const known = useRun.getState().root === root ? allConfigs() : []
   const found = root ? mainConfigFor(root, path, known) : null
   if (!root || !found) {
-    if (!quiet) showToast(`Can't run ${baseOf(path)}: it isn't inside an open project folder.`)
+    if (!quiet) showToast(`Can't run ${baseOf(path)}: it isn't inside an open folder.`)
     return null
   }
   return { root, config: known.find((c) => c.id === found.id) ?? runconfig.Config.createFrom(found) }

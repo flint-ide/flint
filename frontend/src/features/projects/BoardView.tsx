@@ -2,7 +2,7 @@ import { useEffect, useState, type DragEvent } from 'react'
 import type { ContributedTab } from '../../lib/features'
 import { useEditor } from '../../store/editor'
 import { ProjectDialogs } from './Dialogs'
-import { ItemActions, ItemDependencies, ItemMeta, ItemTasks, ItemTitle, ProjectContext } from './ItemParts'
+import { ItemActions, ItemDependencies, ItemMeta, ItemTasks, ItemTitle, OldFormatNote, ProjectContext } from './ItemParts'
 import {
   boardProblem,
   boardTitle,
@@ -12,6 +12,7 @@ import {
   dragPayload,
   dropStatus,
   groupByStatus,
+  OLD_FORMAT_HINT,
   parseDrop,
   statusLabel,
   type ProjectData,
@@ -58,10 +59,18 @@ export function BoardView({ tab, active }: { tab: ContributedTab; active: boolea
         <span className="muted truncate" title={project.path}>{project.path}</span>
         <ProjectContext project={project} />
         <span className="spacer" />
-        <button className="icon" title="New Item…" onClick={() => openNewItem(folder, 'board')}>＋ New Item…</button>
-        <button className="icon" title="Have an agent split a goal into items (the prompt goes into a chat draft)" onClick={() => openPlan(folder, 'board')}>✦ Plan with Agent…</button>
+        <button className="icon" title={project.oldFormat ? OLD_FORMAT_HINT : 'New Item…'} disabled={project.oldFormat} onClick={() => openNewItem(folder, 'board')}>＋ New Item…</button>
+        <button
+          className="icon"
+          title={project.oldFormat ? OLD_FORMAT_HINT : 'Have an agent split a goal into items (the prompt goes into a chat draft)'}
+          disabled={project.oldFormat}
+          onClick={() => openPlan(folder, 'board')}
+        >
+          ✦ Plan with Agent…
+        </button>
         <button className="icon" title="Refresh" onClick={() => void loadProject(folder)}>↻</button>
       </div>
+      {project.oldFormat && <OldFormatNote folder={folder} />}
       {loaded?.error && <div className="project-board-error error">{loaded.error}</div>}
       <Columns project={project} />
       {project.problems.length > 0 && (
@@ -121,7 +130,7 @@ function Card({ project, item }: { project: ProjectData; item: ItemInfo }) {
   return (
     <div
       className={`project-card${dragging ? ' dragging' : ''}`}
-      draggable
+      draggable={!project.oldFormat}
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG_TYPE, dragPayload(project.path, item))
         e.dataTransfer.effectAllowed = 'move'

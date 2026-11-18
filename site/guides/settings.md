@@ -91,7 +91,7 @@ For Go, TypeScript / JavaScript, Python and Rust:
 - **Server**: empty tries the known servers in the order shown. Pick one by name (the field suggests them), give an absolute path to one, or name another server. A server Flint doesn't know starts only in trusted folders.
 - **Extra arguments**: one per line, added after the server's own arguments. Ignored in Restricted Mode.
 
-A change restarts that language's servers for the open files. Rust and Python servers run the project's code and start only in trusted folders, whatever you choose here.
+A change restarts that language's servers for the open files. Rust and Python servers run the folder's code and start only in trusted folders, whatever you choose here.
 
 ## File Watching
 

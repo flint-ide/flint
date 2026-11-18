@@ -7,7 +7,7 @@ Recipes for opening terminals, pointing them at an AWS profile or a Kubernetes c
 - Press `⌘J` to jump to a terminal (Flint opens one if there is none). Press `⌘J` again to go back to your last file.
 - Press `⇧⌘T`, or click `+` in the tab bar and choose **Terminal**, to open a new one.
 
-With several projects in the window, the new terminal starts in the active tab's project. To pick a different project, use the `+` menu, which has a section per project.
+With several folders in the window, the new terminal starts in the active tab's folder. To pick a different folder, use the `+` menu, which has a section per folder.
 
 ## Open a terminal in a specific folder
 

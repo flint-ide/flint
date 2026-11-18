@@ -19,7 +19,7 @@ Everything an extension and Flint say to each other, for extension contract **1*
 | `-32601` | Method not found. Answer it for methods you don't implement; Flint does the same |
 | `-32602` | Invalid params |
 | `-32603` | Internal error |
-| `-32001` | Permission denied: the manifest doesn't declare the permission the method needs, or the path is outside the trusted project folders |
+| `-32001` | Permission denied: the manifest doesn't declare the permission the method needs, or the path is outside the trusted workspace folders |
 | `-32800` | Cancelled (for example, the user said no to opening a link) |
 
 Editor decorations add no error code: `editor/setDecorations` and `editor/clearDecorations` are notifications, so a publish Flint refuses or drops is a line in the extension's log, not an error answer.
@@ -65,7 +65,7 @@ What the program needs from the machine. Flint confines a program that declares 
 
 An unknown field is a manifest error. `"sandbox": {}` is the **strict profile**:
 
-- **Read:** the extension's own folder; the system's programs, libraries, certificates, time zones and `/etc`; the trusted project folders, only with the `workspace.read` permission.
+- **Read:** the extension's own folder; the system's programs, libraries, certificates, time zones and `/etc`; the trusted workspace folders, only with the `workspace.read` permission.
 - **Write:** `FLINT_EXTENSION_DATA` and a private temporary folder (`TMPDIR`), made for each run and deleted when the process ends. The extension's own folder is read-only.
 - **Network:** none. No socket of any kind can be created.
 - **Programs:** only files in the extension's folder, plus what the system needs to start its program (the dynamic loader; a script's `#!` interpreter and, for `#!/usr/bin/env name`, the `name` found on `PATH`). With `exec`, anything it can read, and the folders of `PATH` become readable.
@@ -96,7 +96,7 @@ What a sandboxed program should expect:
 
 - Opening a file it wasn't granted fails with "permission denied" (`EACCES`); creating a socket without `network` or `localSockets` fails the same way. Starting a program without `exec` does too.
 - `HOME` still names the home folder, but nothing in it is readable: keep state in `FLINT_EXTENSION_DATA`, scratch files in `TMPDIR`.
-- The trusted project folders are readable directly only with `workspace.read`. When they change, Flint stops a sandboxed program and starts it again (a sandbox can't be widened while the process runs) instead of sending `workspace/rootsChanged`.
+- The trusted workspace folders are readable directly only with `workspace.read`. When they change, Flint stops a sandboxed program and starts it again (a sandbox can't be widened while the process runs) instead of sending `workspace/rootsChanged`.
 - `secrets/*`, `workspace/readFile`, `window/openUrl` and the other requests work as before: Flint does that work, outside the sandbox.
 
 ### contributes.commands
@@ -131,7 +131,7 @@ The page has no network and nothing to load: it talks to its process through `wi
 | `flint.openTab(view, key, title, data?)` | opens or focuses one of the extension's tab views |
 | `flint.setTitle(title)`, `flint.setDirty(bool)`, `flint.setData(json)` | the tab's title, unsaved dot and saved data |
 | `flint.runCommand(id, args?)`, `flint.copy(text)`, `flint.showMessage(type, text)` | one of its own commands; the clipboard; a toast |
-| `flint.openFile(path, line?)` | opens a file in a project; needs `workspace.read` |
+| `flint.openFile(path, line?)` | opens a file in a workspace folder; needs `workspace.read` |
 
 Shortcuts with ⌘/Ctrl/Alt, F-keys and Escape that the page doesn't `preventDefault()` reach Flint's keymap; ⌘A/C/V/X/Z/Y stay with the page. The example `examples/extensions/notes` uses all of this.
 
@@ -241,7 +241,7 @@ A request that times out is cancelled with `$/cancelRequest`; the process keeps 
 
 `capabilities.decorations` lists the decoration kinds this Flint draws and `quickFixes` says it sends `editor/action`; a Flint without them has no editor decorations (and ignores `contributes.decorationSets` with a warning).
 
-`roots` are the open project folders the user trusts; folders in Restricted Mode are left out. `sandbox.active` says whether the process is confined ([run.sandbox](#runsandbox)); the other three fields are present when it is. Answer:
+`roots` are the open workspace folders the user trusts; folders in Restricted Mode are left out. `sandbox.active` says whether the process is confined ([run.sandbox](#runsandbox)); the other three fields are present when it is. Answer:
 
 ```json
 { "jsonrpc": "2.0", "id": 1, "result": { "contract": 1, "capabilities": {} } }
@@ -419,7 +419,7 @@ After an accepted submit (no `errors`, no `error`) Flint resolves the view again
 { "jsonrpc": "2.0", "id": 10, "method": "agentTool/call", "params": { "name": "jira_issue", "root": "/Users/me/src/app", "arguments": { "key": "ABC-1" } } }
 ```
 
-`root` is the agent's project folder, always a trusted one. Answer `{ "text": "…" }`; an error becomes a failed tool call for the agent. Flint's MCP server cuts long answers.
+`root` is the agent's workspace folder, always a trusted one. Answer `{ "text": "…" }`; an error becomes a failed tool call for the agent. Flint's MCP server cuts long answers.
 
 ### settings/changed
 
@@ -524,9 +524,9 @@ At most 1,000 edits and 1 MiB of text. Flint applies the edits as one change (on
 | `secrets/set` | `{ "key", "value" }` → `{}` | `secrets` |
 | `secrets/delete` | `{ "key" }` → `{}` | `secrets` |
 | `agent/ask` | `{ "prompt", "attachments"?: [{ "path" }] }` → `null` | `agent.ask` |
-| `window/openTerminal` | `{ "title"?, "cwd"?, "env"?, "command"?, "tag"? }` → `null`; a terminal tab in `cwd` (a folder in a trusted project; default: the active project) that types `command` (argv, quoted by Flint) | `terminal` |
+| `window/openTerminal` | `{ "title"?, "cwd"?, "env"?, "command"?, "tag"? }` → `null`; a terminal tab in `cwd` (a folder in a trusted workspace folder; default: the active workspace folder) that types `command` (argv, quoted by Flint) | `terminal` |
 
-- **Paths** are absolute and must be inside a trusted project folder after symbolic links are resolved; otherwise the request fails with `-32001`.
+- **Paths** are absolute and must be inside a trusted workspace folder after symbolic links are resolved; otherwise the request fails with `-32001`.
 - **`workspace/readFile`** returns UTF-8 text up to 4 MiB. Files inside `.git` and credential files (`.env`, `.env.*`, `.envrc`, `.netrc`, `.npmrc`, `.pypirc`, `.pgpass`, `id_rsa` and other SSH keys, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.keystore`, `*.jks`) are refused.
 - **`window/openUrl`** accepts `http` and `https` only. The first link to a site asks the user; after that, links to the same site open without asking until Flint quits. A refusal is error `-32800`.
 - **`window/showMessageRequest`** shows a native question with the actions and Cancel; `action` is missing when the user cancels.
@@ -572,7 +572,7 @@ Each publish replaces everything the set showed in that document; an empty list 
 
 How Flint treats a publish:
 
-- **Which files.** Only a document the extension was told about with `editor/opened` and not yet `editor/closed`, for a set in that notification's `sets`. Flint announces a file only when it is inside a trusted project folder (symbolic links resolved), not inside `.git` and not a credential file (the list under `workspace/readFile`): exactly the files `workspace/readFile` would return. A publish for any other file, for a set that is off or for a set of another extension is dropped, with a line in the log.
+- **Which files.** Only a document the extension was told about with `editor/opened` and not yet `editor/closed`, for a set in that notification's `sets`. Flint announces a file only when it is inside a trusted workspace folder (symbolic links resolved), not inside `.git` and not a credential file (the list under `workspace/readFile`): exactly the files `workspace/readFile` would return. A publish for any other file, for a set that is off or for a set of another extension is dropped, with a line in the log.
 - **Versions.** Give the `version` the decorations were computed for. A publish for a version older than the editor's is dropped, so a slow extension never paints marks on text that has changed; the next `editor/changed` is the cue to publish again. Without `version` the publish is drawn as is.
 - **Positions** beyond the document are clamped to it: a line past the end lands on the last line, a column past the end of the line at its end.
 - **Edits.** Until the next publish, decorations move with the user's edits; a decoration whose text is deleted goes.

@@ -74,14 +74,14 @@ var lookPath = exec.LookPath
 // file's variables and the selected tests, run in the project root.
 func PlanExtension(req Request, r ExtensionRunner) (Plan, error) {
 	if len(req.Dirs) == 0 || req.File == "" {
-		return Plan{}, errors.New("no project folder or file given")
+		return Plan{}, errors.New("no folder or file given")
 	}
 	root, file := req.Dirs[0], req.File
 	if !filepath.IsAbs(root) || !filepath.IsAbs(file) {
 		return Plan{}, fmt.Errorf("path %q or %q is not absolute", root, file)
 	}
 	if !within(file, root) {
-		return Plan{}, fmt.Errorf("%s is not inside the project folder %s", filepath.Base(file), root)
+		return Plan{}, fmt.Errorf("%s is not inside the workspace folder %s", filepath.Base(file), root)
 	}
 	if len(r.Command) == 0 {
 		return Plan{}, fmt.Errorf("%s has no command", r.Label)

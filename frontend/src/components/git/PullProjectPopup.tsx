@@ -10,7 +10,7 @@ const optionId = (i: number) => `pull-option-${i}`
 const indexOf = (e: React.SyntheticEvent<HTMLElement>) => Number(e.currentTarget.dataset.index)
 
 /**
- * "Update Project" with several repositories in the workspace: which one to pull
+ * "Update Repository" with several repositories in the workspace: which one to pull
  * (like IntelliJ's root selector), or all of them. Arrows and Enter work too.
  */
 export function PullProjectPopup() {
@@ -61,7 +61,7 @@ export function PullProjectPopup() {
 
   if (empty) return null
   return (
-    <Modal title="Update Project" onClose={close} className="pull-popup">
+    <Modal title="Update Repository" onClose={close} className="pull-popup">
       <div className="popup-section" id="pull-popup-hint">Pull from the remote into</div>
       <div
         ref={list}
@@ -97,7 +97,7 @@ export function PullProjectPopup() {
           onMouseEnter={onHover}
           onClick={onChoose}
         >
-          <span>All Projects</span>
+          <span>All Repositories</span>
           <span className="muted path-hint">{targets.length} repositories</span>
         </div>
       </div>

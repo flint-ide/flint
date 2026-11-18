@@ -192,12 +192,12 @@ function PolicyToggle() {
   const items: DropdownItem[] = [
     { type: 'section', label: 'Without asking, the agent may…' },
     {
-      label: 'Edit files in the project',
+      label: 'Edit files in the folder',
       checked: policy.autoApproveEdits,
       onSelect: () => void setPolicy({ ...policy, autoApproveEdits: !policy.autoApproveEdits }),
     },
     {
-      label: 'Read and search the project',
+      label: 'Read and search the folder',
       checked: policy.autoApproveReads,
       onSelect: () => void setPolicy({ ...policy, autoApproveReads: !policy.autoApproveReads }),
     },

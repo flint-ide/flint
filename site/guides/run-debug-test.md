@@ -4,7 +4,7 @@ This guide covers run configurations, running tests from the gutter, the Go debu
 
 ## Run configurations
 
-A run configuration describes how to start something in your project: a server, a script, a build. Configurations live in `.flint/run.json` in the project. The file is meant to be committed, like `.idea/runConfigurations` or `.vscode/launch.json`.
+A run configuration describes how to start something in your folder: a server, a script, a build. Configurations live in `.flint/run.json` in the folder. The file is meant to be committed, like `.idea/runConfigurations` or `.vscode/launch.json`.
 
 ### Types
 
@@ -17,7 +17,7 @@ A run configuration describes how to start something in your project: a server, 
 
 Every type also accepts:
 
-- `cwd`: the working directory, relative to the project root;
+- `cwd`: the working directory, relative to the workspace folder;
 - `env`: environment variables;
 - `before`: a shell line run first (for example a build); the run stops if it fails;
 - `profileURL`: a pprof endpoint for [profiling](#profiling-go-programs);
@@ -53,7 +53,7 @@ Without a `run.json`, Flint detects Go `main` packages, `Makefile` targets and `
 
 ### Running
 
-The selector in the title bar shows the configurations of the active tab's project. Next to it:
+The selector in the title bar shows the configurations of the active tab's folder. Next to it:
 
 - **▶ Run** (`⌃R`) starts the selected configuration, or reruns it if it is already running;
 - **↻ Rerun** starts it again;
@@ -61,7 +61,7 @@ The selector in the title bar shows the configurations of the active tab's proje
 
 Output appears in a tab, and `path:line` locations in it are clickable. The process runs in its own process group, so Stop also ends child processes (for example the program started by `go run` or `npm run`): Flint sends SIGINT, then SIGKILL after 3 seconds.
 
-With several projects in the window, each project remembers its own selected configuration.
+With several folders in the window, each folder remembers its own selected configuration.
 
 ## Tests
 

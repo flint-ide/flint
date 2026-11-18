@@ -110,7 +110,7 @@ func New(opts Options) *Driver {
 // CheckTrust refuses a folder the user hasn't trusted.
 func (o Options) CheckTrust(cwd string) error {
 	if o.Untrusted != nil && o.Untrusted(cwd) {
-		return fmt.Errorf("%w: trust this folder to use %s (custom agents read the project's configuration and run commands in it)", ErrRestricted, o.Name)
+		return fmt.Errorf("%w: trust this folder to use %s (custom agents read the folder's configuration and run commands in it)", ErrRestricted, o.Name)
 	}
 	return nil
 }
@@ -492,7 +492,7 @@ func writeConfined(root, path, content string) error {
 func resolveInside(root, path string) (string, error) {
 	target := as.Resolve(path)
 	if !as.Inside(target, root) {
-		return "", fmt.Errorf("access outside the project denied: %s", path)
+		return "", fmt.Errorf("access outside the folder denied: %s", path)
 	}
 	return target, nil
 }
@@ -506,7 +506,7 @@ func confine(root, path string) (string, error) {
 	}
 	clean := filepath.Clean(path)
 	if !as.Inside(clean, root) {
-		return "", fmt.Errorf("access outside the project denied: %s", clean)
+		return "", fmt.Errorf("access outside the folder denied: %s", clean)
 	}
 	return clean, nil
 }

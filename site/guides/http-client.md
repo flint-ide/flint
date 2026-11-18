@@ -46,7 +46,7 @@ Headers follow the request line. After an empty line comes the body, either inli
 - `< ./body.json` sends the file as is (the path is relative to the `.http` file);
 - `<@ ./body.json` also substitutes variables inside it.
 
-Body files must be inside the open project.
+Body files must be inside an open folder.
 
 ### Comments and directives
 

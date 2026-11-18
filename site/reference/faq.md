@@ -38,27 +38,27 @@ Only through the agent you use, and only when you start a chat, send a message, 
 
 ### Do I have to approve every edit?
 
-No. By default the agent may edit and read files inside the project without asking, and asks before running commands. You review the result in the Commit panel and roll back what you don't want. You can change this with the policy link in the chat header; the choice applies to all chats. See [AI agents](../guides/ai-agents.md#what-the-agent-may-do-without-asking).
+No. By default the agent may edit and read files inside the folder without asking, and asks before running commands. You review the result in the Commit panel and roll back what you don't want. You can change this with the policy link in the chat header; the choice applies to all chats. See [AI agents](../guides/ai-agents.md#what-the-agent-may-do-without-asking).
 
 ### Can I keep using the agent in a terminal?
 
 Yes. Run `claude` or `codex` in any terminal tab. `⌘`-click on `path:line` in its output opens the file, and `⇧↵` inserts a new line in its prompt.
 
-## Projects
+## Folders and workspaces
 
-### Can I open several projects in one window?
+### Can I open several folders in one window?
 
-Yes. Use "Add Project to Workspace…" (`⇧⌘O`). Search, `⌘P`, terminals, chats and run configurations all work across the attached projects. See [Open projects](../how-to/open-projects.md#add-a-second-project-to-the-window).
+Yes. Use "Add Folder to Workspace…" (`⇧⌘O`). Search, `⌘P`, terminals, chats and run configurations all work across the attached folders. See [Open folders](../how-to/open-projects.md#add-a-second-folder-to-the-window).
 
-### Can I open a project in a new window?
+### Can I open a folder in a new window?
 
-Yes. In Recent Projects (`⌘O`), select the project and press `⌘↵`.
+Yes. In Recent Folders (`⌘O`), select the folder and press `⌘↵`.
 
 ### Why does a folder open in Restricted Mode?
 
 Because you haven't trusted it yet. Restricted Mode stops the folder's code from running on its own until you decide you trust it. See [Restricted Mode](../guides/restricted-mode.md).
 
-### Does Flint index my project?
+### Does Flint index my code?
 
 No. `⌘P` and search use ripgrep directly, so there is no indexing step and nothing to wait for.
 

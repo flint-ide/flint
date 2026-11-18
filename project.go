@@ -58,7 +58,7 @@ func (a *App) removeRoot(root string) error {
 		return fmt.Errorf("%s is not in the workspace", root)
 	case i == 0:
 		a.projMu.Unlock()
-		return errors.New("the main project can't be removed; open another folder instead")
+		return errors.New("the main folder can't be removed from the workspace; open another folder instead")
 	}
 	a.roots = slices.Delete(slices.Clone(a.roots), i, i+1)
 	w := a.watchers[root]

@@ -20,7 +20,7 @@ func TestLinuxMenuHasNoAccelerators(t *testing.T) {
 			t.Errorf("the Linux menu uses role %v, which may bring its own accelerator", role)
 		}
 	}
-	for _, label := range []string{"Open Folder…", "Add Project to Workspace…", "Settings…", "Quit", "About Flint", "Check Tools…", "Show Logs in File Manager"} {
+	for _, label := range []string{"Open Folder…", "Add Folder to Workspace…", "Settings…", "Quit", "About Flint", "Check Tools…", "Show Logs in File Manager"} {
 		item := m.FindByLabel(label)
 		if item == nil {
 			t.Errorf("no %q item", label)

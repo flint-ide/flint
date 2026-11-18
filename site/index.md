@@ -1,8 +1,8 @@
 # Flint
 
-Flint is a fast, AI-first IDE for macOS. Coding agents such as Claude Code and Codex write the code, in a built-in chat or in a terminal. Flint gives you the context and the control around them: you navigate and search the project, review what the agent changed, run and debug, and work with your databases, APIs and clusters, all in one window.
+Flint is a fast, AI-first IDE for macOS. Coding agents such as Claude Code and Codex write the code, in a built-in chat or in a terminal. Flint gives you the context and the control around them: you navigate and search the code, review what the agent changed, run and debug, and work with your databases, APIs and clusters, all in one window.
 
-![A tour of Flint: go to a file, search the project, review a change in the Commit panel, and hand a failing Kubernetes deploy to the agent](images/tour.gif)
+![A tour of Flint: go to a file, search the code, review a change in the Commit panel, and hand a failing Kubernetes deploy to the agent](images/tour.gif)
 
 Flint is a single native process that uses the macOS system WebView (WKWebView) instead of Electron. It starts quickly and stays light on CPU and memory, and it uses the tools you already have installed (git, ripgrep, your agent CLIs) with the same `PATH` and logins as your terminal.
 
@@ -18,9 +18,9 @@ Flint is a single native process that uses the macOS system WebView (WKWebView) 
 ### Write and navigate code
 
 - Files, terminals, agent chats, SQL consoles and diffs share one tab area with back/forward history.
-- Go to file with `⌘P`, search and replace across the project with `⇧⌘F` / `⇧⌘R`.
+- Go to file with `⌘P`, search and replace across the workspace with `⇧⌘F` / `⇧⌘R`.
 - Language servers for Go, Rust, TypeScript and Python: completion, hover, go to definition, find usages, rename, quick fixes, formatting and live diagnostics.
-- Several projects in one window.
+- Several folders in one window.
 
 See [Editor and navigation](guides/editor-and-navigation.md) and [Terminals](guides/terminals.md).
 

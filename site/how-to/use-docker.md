@@ -36,7 +36,7 @@ Flint opens a shell inside the container in a terminal tab, with bash, or sh if 
 
 ## Bring a Compose project up or down
 
-1. Find the project in the panel. Flint lists projects from running containers and from `compose.yaml` / `docker-compose.yml` files in your project folders.
+1. Find the project in the panel. Flint lists projects from running containers and from `compose.yaml` / `docker-compose.yml` files in your workspace folders.
 2. Right-click it, or use the buttons on its row:
    - **Up** runs `docker compose up -d` (needs the `docker` CLI; the button is disabled without it);
    - **Down…** stops and removes the project's containers, after a confirmation;

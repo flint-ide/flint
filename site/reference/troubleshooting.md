@@ -43,9 +43,9 @@ Check the status bar; it shows each server's state and, when a server is missing
 
    Flint finds servers through your login shell's `PATH`, so a server you can run in Terminal is found by Flint too.
 
-2. **Check Restricted Mode.** In an untrusted folder, rust-analyzer and the Python servers don't start because they run project code. The message says "Restricted Mode: trust this folder to start its language server". Trust the folder if you trust its authors. See [Restricted Mode](../guides/restricted-mode.md).
+2. **Check Restricted Mode.** In an untrusted folder, rust-analyzer and the Python servers don't start because they run the folder's code. The message says "Restricted Mode: trust this folder to start its language server". Trust the folder if you trust its authors. See [Restricted Mode](../guides/restricted-mode.md).
 
-3. **TypeScript pin message.** If you see "typescript-language-server: no TypeScript installed next to it, and the project's own is never used", Flint refuses to run the project's `node_modules/typescript`, for safety. Install TypeScript next to the server with `npm i -g typescript-language-server typescript`, or install vtsls instead, which uses its own bundled TypeScript.
+3. **TypeScript pin message.** If you see "typescript-language-server has no TypeScript installed next to it, and Flint never runs the folder's own copy", Flint refuses to run the folder's `node_modules/typescript`, for safety. Install TypeScript next to the server with `npm i -g typescript-language-server typescript`, or install vtsls instead, which uses its own bundled TypeScript.
 
 ## Search or Go to file is slow
 

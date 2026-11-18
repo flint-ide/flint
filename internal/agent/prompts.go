@@ -34,7 +34,7 @@ func ConflictPrompt(operation string, files []string) string {
 		fmt.Fprintf(&b, "- %s\n", f)
 	}
 	b.WriteString("\nResolve them: understand what both sides intended (use git log / git diff on each side), ")
-	b.WriteString("keep both intents where possible, remove all conflict markers, and run the project's build or tests if they exist. ")
+	b.WriteString("keep both intents where possible, remove all conflict markers, and run the repository's build or tests if they exist. ")
 	b.WriteString("Then stage the resolved files with git add. Do NOT commit and do NOT continue the ")
 	b.WriteString(operation)
 	b.WriteString(" — I will review and do that. If a conflict is ambiguous, ask me instead of guessing.")

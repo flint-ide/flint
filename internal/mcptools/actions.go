@@ -95,7 +95,7 @@ func (s *Sources) actionTools(cfg Config) []mcpserver.Tool {
 				"The run also shows in Flint's Tests tab. Go: pass a package folder or a _test.go file, optionally with test names (\"TestA\", \"TestA/sub\"). " +
 				"JavaScript/TypeScript: pass a *.test.* or *.spec.* file, optionally with test names. The user is asked before each run.",
 			InputSchema: json.RawMessage(fmt.Sprintf(`{"type":"object","properties":{`+
-				`"path":{"type":"string","description":"A Go package folder, a _test.go file or a JS/TS test file, relative to the project or absolute inside it."},`+
+				`"path":{"type":"string","description":"A Go package folder, a _test.go file or a JS/TS test file, relative to the folder or absolute inside it."},`+
 				`"tests":{"type":"array","items":{"type":"string"},"maxItems":%d,"description":"Names of tests in that file or package. Default: all of them."}`+
 				`},"required":["path"],"additionalProperties":false}`, maxTestNames)),
 			Acts:    true,
@@ -110,7 +110,7 @@ func (s *Sources) actionTools(cfg Config) []mcpserver.Tool {
 		out = append(out, mcpserver.Tool{
 			Name:  ToolRunConfig,
 			Title: "Run a configuration",
-			Description: "Starts (or restarts) one of the project's run configurations (.flint/run.json and the detected ones: Go main packages, package.json scripts, make targets) " +
+			Description: "Starts (or restarts) one of the folder's run configurations (.flint/run.json and the detected ones: Go main packages, package.json scripts, make targets) " +
 				"in Flint's run tab, by its name. It returns once the process started, with the run's id; read its output and state with " + ToolRunOutput + ". The user is asked before each start.",
 			InputSchema: json.RawMessage(`{"type":"object","properties":{` +
 				`"name":{"type":"string","description":"Name (or id) of the run configuration, as Flint's Run toolbar shows it."}` +
@@ -120,7 +120,7 @@ func (s *Sources) actionTools(cfg Config) []mcpserver.Tool {
 		}, mcpserver.Tool{
 			Name:  ToolRunOutput,
 			Title: "Run output",
-			Description: "Recent output and state (running, or the exit code) of the runs in Flint's run tabs for this project: run configurations and test runs. " +
+			Description: "Recent output and state (running, or the exit code) of the runs in Flint's run tabs for this folder: run configurations and test runs. " +
 				"Without a run id it lists them with their last lines; pass an id for a longer tail of one.",
 			InputSchema: json.RawMessage(fmt.Sprintf(`{"type":"object","properties":{`+
 				`"run":{"type":"string","description":"Id of one run, as %s returned it or a call without it lists."},`+
@@ -135,11 +135,11 @@ func (s *Sources) actionTools(cfg Config) []mcpserver.Tool {
 		out = append(out, mcpserver.Tool{
 			Name:  ToolHTTP,
 			Title: "Send an HTTP request",
-			Description: "Sends one named request of a .http or .rest file of the project with Flint's HTTP client (the file as saved on disk) and returns the status, " +
+			Description: "Sends one named request of a .http or .rest file of the folder with Flint's HTTP client (the file as saved on disk) and returns the status, " +
 				"the response headers and the start of the body. The response is also kept in the file's response history in Flint. " +
 				"Requests are named with \"### name\" or \"# @name name\". The user is asked before each request.",
 			InputSchema: json.RawMessage(`{"type":"object","properties":{` +
-				`"file":{"type":"string","description":"The .http or .rest file, relative to the project or absolute inside it."},` +
+				`"file":{"type":"string","description":"The .http or .rest file, relative to the folder or absolute inside it."},` +
 				`"request":{"type":"string","description":"Name of the request in that file."},` +
 				`"environment":{"type":"string","description":"Environment from http-client.env.json next to the file. Default: none."}` +
 				`},"required":["file","request"],"additionalProperties":false}`),
@@ -194,18 +194,18 @@ func existingInside(root, p string) (string, os.FileInfo, error) {
 	}
 	real, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		return "", nil, fmt.Errorf("%s does not exist in the project", rel(path, root))
+		return "", nil, fmt.Errorf("%s does not exist in the folder", rel(path, root))
 	}
 	realRoot, err := filepath.EvalSymlinks(root)
 	if err != nil {
-		return "", nil, fmt.Errorf("project folder: %v", err)
+		return "", nil, fmt.Errorf("folder: %v", err)
 	}
 	if !within(real, realRoot) {
-		return "", nil, fmt.Errorf("%s leads outside the project", rel(path, root))
+		return "", nil, fmt.Errorf("%s leads outside the folder", rel(path, root))
 	}
 	info, err := os.Stat(real)
 	if err != nil {
-		return "", nil, fmt.Errorf("%s does not exist in the project", rel(path, root))
+		return "", nil, fmt.Errorf("%s does not exist in the folder", rel(path, root))
 	}
 	return path, info, nil
 }
@@ -422,7 +422,7 @@ func relDir(dir, root string) string {
 	if r := rel(filepath.Clean(dir), root); r != "." {
 		return r
 	}
-	return "the project folder"
+	return "the folder"
 }
 
 // ---------- run_configuration / get_run_output ----------
@@ -443,7 +443,7 @@ func pickConfig(configs []runconfig.Config, name string) (runconfig.Config, erro
 		for _, c := range configs {
 			names = append(names, c.Name)
 		}
-		return runconfig.Config{}, fmt.Errorf("no run configuration named %q in this project (configurations: %s)", name, listNames(names))
+		return runconfig.Config{}, fmt.Errorf("no run configuration named %q in this folder (configurations: %s)", name, listNames(names))
 	}
 	if len(byName) > 1 {
 		ids := make([]string, 0, len(byName))
@@ -501,7 +501,7 @@ func (s *Sources) runOutput(root string, args json.RawMessage, maxLines int) (st
 	}
 	list := slices.DeleteFunc(s.Terminals.List(root), func(t TerminalInfo) bool { return t.Kind != KindRun })
 	if len(list) == 0 {
-		return "No runs of this project in Flint's run tabs.", nil
+		return "No runs for this folder in Flint's run tabs.", nil
 	}
 	return s.consoleTails(root, list, "run", in.Run, in.Lines, maxLines)
 }

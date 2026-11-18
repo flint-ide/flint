@@ -131,7 +131,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
         <RepoSwitcher fallback="Commit" />
         <button className="icon" title="Refresh" onClick={() => void refreshAll()}>↻</button>
         <button className="icon" title="Fetch" disabled={!!busy || !isRepo} onClick={() => void remote('fetch')}>⇣</button>
-        <button className="icon" title="Update project (pull)" disabled={!!busy || !isRepo} onClick={updateProject}>⤓</button>
+        <button className="icon" title="Update repository (pull)" disabled={!!busy || !isRepo} onClick={updateProject}>⤓</button>
         <button className="icon" title={`Push (${formatKeys('Mod+Shift+K')})`} disabled={!!busy || !isRepo} onClick={() => void remote('push')}>⤒</button>
         <button className="icon" title="Stash changes…" disabled={!!busy || !isRepo} onClick={openStashDialog}>⊟</button>
       </div>

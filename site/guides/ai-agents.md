@@ -32,7 +32,7 @@ What a custom agent can and can't do:
 
 - It starts only in a [trusted folder](restricted-mode.md); in Restricted Mode Flint shows an error asking you to trust the folder.
 - Its questions use the same approval policy as Claude Code and Codex (see below).
-- Flint lets it read and write files only inside the chat's project and never inside a `.git` folder (at any depth). Writes into agent or editor configuration (`.claude`, `.codex`, `.vscode`, `.idea`) ask you first in the chat. Flint offers it no terminal of its own. The agent still runs its own tools with your user's rights, as it does in a terminal.
+- Flint lets it read and write files only inside the chat's folder and never inside a `.git` folder (at any depth). Writes into agent or editor configuration (`.claude`, `.codex`, `.vscode`, `.idea`) ask you first in the chat. Flint offers it no terminal of its own. The agent still runs its own tools with your user's rights, as it does in a terminal.
 - **Generate message** runs it once in the repository: Flint lets it read files there, declines every permission request and refuses writes sent through Flint. Its own tools and configuration are outside Flint's control: if the agent's settings let it edit files or run commands without asking, it can still do so, as in a terminal.
 - Conflict resolution runs an agent interactively in a terminal, which ACP agents don't have, so Claude Code or Codex does it (the button names which one). Without either installed, the button is hidden.
 - A chat with a custom agent can't continue the old conversation after a restart; Flint starts a new one and tells you.
@@ -52,7 +52,7 @@ An example, saved as `reviewer.md`:
 description: Reviews a change for bugs; reports, never edits
 model: strong
 ---
-You are the reviewer of this project. Read the diff and the code around it.
+You are the reviewer of this repository. Read the diff and the code around it.
 Report bugs with file and line. Do not change files.
 ```
 
@@ -70,10 +70,10 @@ A file is at most 64 KB, and a folder is read up to 50 files.
 
 ### Where the files live
 
-- **Personal**: `agents/<name>.md` in Flint's configuration folder (`~/Library/Application Support/flint/agents`); yours only, in every project.
-- **Project**: `.flint/agents/<name>.md` in a workspace folder, shared with your team when you commit it.
+- **Personal**: `agents/<name>.md` in Flint's configuration folder (`~/Library/Application Support/flint/agents`); yours only, in every folder.
+- **Repository**: `.flint/agents/<name>.md` in a workspace folder, shared with your team when you commit it.
 
-**New Agent…** in Settings ▸ Agents ▸ Defined agents, or "New Agent Definition…" in the command palette, asks for a name and a place and opens the new file from a template. It never overwrites a file, and refuses a project agent in a folder in Restricted Mode. **Open** in the list opens a file in the editor. Flint has no other editor for them: a definition is a file.
+**New Agent…** in Settings ▸ Agents ▸ Defined agents, or "New Agent Definition…" in the command palette, asks for a name and a place and opens the new file from a template. It never overwrites a file, and refuses a repository agent in a folder in Restricted Mode. **Open** in the list opens a file in the editor. Flint has no other editor for them: a definition is a file.
 
 ![Settings ▸ Agents: the list of defined agents with their engine, model and source, and the New Agent… button](../images/defined-agents-settings.png)
 
@@ -109,14 +109,14 @@ Each program's block in Settings ▸ Agents has a field per tier (**Fast model**
 
 The tier is resolved when a conversation starts, on the program it starts on, from your settings at that moment: an agent without `engine` and with `model: strong` runs on `opus` with Claude Code and on your mapped model with Codex. A resumed conversation resolves it again on the program it started on. A review, a commit message and Edit with Agent resolve it the same way.
 
-A tier can only become a model from your own settings or the defaults above, so a project's file can name a tier but can't choose what it means.
+A tier can only become a model from your own settings or the defaults above, so a repository's file can name a tier but can't choose what it means.
 
 ![Settings ▸ Agents: the Fast, Balanced and Strong model fields of Claude Code with their defaults](../images/agents-tiers.png)
 
 ### Trust and names
 
-- Project definitions are not loaded at all in a folder in [Restricted Mode](restricted-mode.md): their text would steer an agent with words from a repository you haven't trusted. Settings ▸ Agents says how many files were ignored and where. They load once you trust the folder.
-- A personal definition wins over a project one with the same name, and the project file is reported as not used. A repository can't replace an agent you rely on. With several project folders open, the first one wins.
+- Repository definitions are not loaded at all in a folder in [Restricted Mode](restricted-mode.md): their text would steer an agent with words from a repository you haven't trusted. Settings ▸ Agents says how many files were ignored and where. They load once you trust the folder.
+- A personal definition wins over a repository one with the same name, and the repository's file is reported as not used. A repository can't replace an agent you rely on. With several folders open, the first one wins.
 - Names that are taken (`claude`, `codex`, a custom agent's id) are reported as problems, and so is a symbolic link that leaves its folder.
 
 ### When a change applies
@@ -139,7 +139,7 @@ Not supported yet:
 
 ## The chat
 
-Open a chat from the `+` button in the tab bar (**claude chat** / **codex chat**, a custom agent or a defined agent) or with "New Chat with claude" / "New Chat with codex" in the command palette. A chat starts in the active tab's project.
+Open a chat from the `+` button in the tab bar (**claude chat** / **codex chat**, a custom agent or a defined agent) or with "New Chat with claude" / "New Chat with codex" in the command palette. A chat starts in the active tab's folder.
 
 A chat shows:
 
@@ -153,11 +153,11 @@ Type in the box at the bottom. `↵` sends, `⇧↵` adds a new line. While the 
 
 ### Usage and cost
 
-The chat header shows cumulative input and output tokens, the cost in USD when the agent reports it, and a context bar (for example "42% context") with details in a tooltip. The status bar shows the total for the project, or for the whole workspace when several projects are open. For totals over days, budgets and an export, see [Usage and budgets](#usage-and-budgets).
+The chat header shows cumulative input and output tokens, the cost in USD when the agent reports it, and a context bar (for example "42% context") with details in a tooltip. The status bar shows the total for the folder, or for the whole workspace when several folders are open. For totals over days, budgets and an export, see [Usage and budgets](#usage-and-budgets).
 
 ### Chats after a restart
 
-Open chats are part of the project session. After a restart you see the transcript again, and the agent picks the conversation up with your next message. If a conversation can't be resumed, Flint starts a new one and tells you.
+Open chats are part of the window's session. After a restart you see the transcript again, and the agent picks the conversation up with your next message. If a conversation can't be resumed, Flint starts a new one and tells you.
 
 ## Giving the agent context
 
@@ -172,11 +172,11 @@ Open chats are part of the project session. After a restart you see the transcri
 | **Fix with agent** in the Tests tab, or "Fix Failed Tests with Agent" | The failed tests and their output |
 | **Diagnose with AI** in the [Kubernetes extension](kubernetes.md)'s panel | Rollout state, problems, events and recent logs, with secrets redacted |
 
-Context goes to the chat of the project it belongs to: the active or most recently used chat there, or a new chat with the default agent if there is none. It lands in the draft so you can add your own words before sending. `⌥`-click sends it immediately.
+Context goes to the chat of the folder it belongs to: the active or most recently used chat there, or a new chat with the default agent if there is none. It lands in the draft so you can add your own words before sending. `⌥`-click sends it immediately.
 
 ## Prompt library
 
-Prompts you use again and again live in Markdown files, and every agent chat offers them the same way: type `/` in the chat box and a list opens with each prompt's name, description and where it comes from (**project**, **personal** or **built-in**). Keep typing to filter it; `↑`/`↓` move, `↵` or `Tab` chooses. The chosen prompt replaces the draft with its text, placeholders filled in, so you can read and change it before you press `↵` to send. Nothing is sent on its own.
+Prompts you use again and again live in Markdown files, and every agent chat offers them the same way: type `/` in the chat box and a list opens with each prompt's name, description and where it comes from (**repo**, **personal** or **built-in**). Keep typing to filter it; `↑`/`↓` move, `↵` or `Tab` chooses. The chosen prompt replaces the draft with its text, placeholders filled in, so you can read and change it before you press `↵` to send. Nothing is sent on its own.
 
 "Run Prompt…" in the command palette does the same from anywhere: it puts the prompt into the current chat's draft, or opens a chat with your default agent.
 
@@ -189,16 +189,16 @@ Prompts you use again and again live in Markdown files, and every agent chat off
 | `/explain` | Explain the selection or the current file without changing files |
 | `/fix` | Fix the problems the language server reports in the current file |
 
-Commit messages already have their own button in the Commit panel, so there is no prompt for them. Turn the built-ins off in Settings ▸ Agents ▸ Prompts. A personal or project prompt with the same name replaces a built-in one.
+Commit messages already have their own button in the Commit panel, so there is no prompt for them. Turn the built-ins off in Settings ▸ Agents ▸ Prompts. A personal or repository prompt with the same name replaces a built-in one.
 
 ### Your own prompts
 
 "New Prompt…" asks for a name and a place and opens the new file from a template:
 
-- **Project**: `.flint/prompts/<name>.md` in the repository, shared with your team when you commit it.
-- **Personal**: `prompts/<name>.md` in Flint's configuration folder (`~/Library/Application Support/flint/prompts`, shown in Settings ▸ Agents ▸ Prompts); yours only, in every project.
+- **Repository**: `.flint/prompts/<name>.md` in the repository, shared with your team when you commit it.
+- **Personal**: `prompts/<name>.md` in Flint's configuration folder (`~/Library/Application Support/flint/prompts`, shown in Settings ▸ Agents ▸ Prompts); yours only, in every folder.
 
-A project prompt replaces a personal one with the same name, which replaces a built-in one. The name is the file name: letters, digits, `-` and `_`. Files are read each time the list opens, so an edit shows up right away.
+A repository prompt replaces a personal one with the same name, which replaces a built-in one. The name is the file name: letters, digits, `-` and `_`. Files are read each time the list opens, so an edit shows up right away.
 
 ```markdown
 ---
@@ -223,7 +223,7 @@ Flint fills these placeholders:
 | Placeholder | Becomes |
 |---|---|
 | `{{selection}}` | The selected text of the editor you used last, as a code block with secrets redacted (empty when nothing is selected; only a note for a credentials file such as `.env`) |
-| `{{file}}` | That editor's file, relative to the project |
+| `{{file}}` | That editor's file, relative to its workspace folder |
 | `{{problems}}` | The language server's problems in that file, one per line, secrets redacted |
 | `{{diff}}` | The uncommitted changes, including new files, as a `diff` code block (at most 60 KB, secrets redacted). Credentials files (`.env`, keys, kubeconfig, …) are left out and only named |
 | `{{branch}}` | The current branch |
@@ -236,7 +236,7 @@ Claude Code and other agents have slash commands of their own (`/compact`, …).
 
 ### Prompts in Restricted Mode
 
-A prompt is only text for the draft: it never runs anything, in any folder. In a folder you haven't trusted, the project's prompts are still listed, marked **untrusted repo**, so read them before you send them. They can't replace a built-in or personal prompt: with a hostile `.flint/prompts/review.md`, `/review` stays Flint's own, and the list says that a file was skipped. Prompt files must be regular files of at most 64 KB inside `.flint/prompts`; links that lead out of the folder are ignored.
+A prompt is only text for the draft: it never runs anything, in any folder. In a folder you haven't trusted, the repository's prompts are still listed, marked **untrusted repo**, so read them before you send them. They can't replace a built-in or personal prompt: with a hostile `.flint/prompts/review.md`, `/review` stays Flint's own, and the list says that a file was skipped. Prompt files must be regular files of at most 64 KB inside `.flint/prompts`; links that lead out of the folder are ignored.
 
 ## What agents can see in Flint
 
@@ -244,15 +244,15 @@ An agent chat in Flint can also look things up by itself. Flint runs a small [MC
 
 | Tool | What the agent gets | Default |
 |---|---|---|
-| `get_diagnostics` | The errors and warnings the language servers report, for the project, a folder or a file. Only files a language server has checked are included: usually the open files and, for Go, their packages. | On |
+| `get_diagnostics` | The errors and warnings the language servers report, for the chat's folder, a subfolder or a file. Only files a language server has checked are included: usually the open files and, for Go, their packages. | On |
 | `get_editor_state` | The files open in the editor (and which have unsaved changes), the active file, and your selection with its text, or the cursor position. Ask about "this function" and the agent can see which one. | On |
 | `get_test_results` | The last test run in Flint: totals, and each failed test with its location and output. | On |
 | `get_project` | The [Flint projects](projects.md) (folders of work items) Flint knows whose folder is trusted, and their items: id, title, status, priority, agent, repositories, the items each waits for and whether it is ready, and text. Asked by the agent of a project's item, its project comes first, in full, with that item marked. | On with the Projects feature |
-| `get_terminal_output` | The recent output your terminals and run consoles printed while they were in the project (dev servers, builds), as plain text without colors. | Off |
+| `get_terminal_output` | The recent output your terminals and run consoles printed while they were in the chat's folder (dev servers, builds), as plain text without colors. | Off |
 
 These tools only read. Claude Code shows them as `mcp__flint__…`.
 
-- Diagnostics, editor state and test results show only the project's own state. With the default approval policy ("Read and search the project" on) Claude Code runs them without asking, so the agent can look at what you are looking at without a prompt each time.
+- Diagnostics, editor state and test results show only the state of the chat's own folder. With the default approval policy ("Read and search the folder" on) Claude Code runs them without asking, so the agent can look at what you are looking at without a prompt each time.
 - `get_project` shows every trusted project Flint knows to any chat, not only one that belongs to the folder the chat works in, so it isn't one of the read tools that run without asking: like Flint's other tools outside that list, Claude Code asks before each call, unless you chose "Do everything". Projects whose folder is in Restricted Mode are left out. It has no switch under Agent Context; it goes with the Projects feature (Settings ▸ Extensions ▸ **Built-in**). See [What agents can see](projects.md#what-agents-can-see). Adding items is a separate tool that acts, below.
 - An agent that a project's **Delegate** starts doesn't need to call it first: its first message already starts with the project's context (its `PROJECT.md`, its item, what the item depends on and what else is in progress). See [Project context](projects.md#project-context-what-every-agent-knows).
 - Terminal output can show anything you saw, such as a token printed in a terminal. It is off until you turn it on, and then the agent asks before each call, even with "Read and search" on. This keeps Flint's rule that nothing goes to an AI provider without you seeing it.
@@ -265,23 +265,23 @@ You can also let an agent do a few things the way you do them in Flint, so the r
 | Tool | What it does | Where you see it |
 |---|---|---|
 | `run_tests` | Runs a Go package, a `_test.go` file or a JS/TS test file (optionally single tests) in Flint's test runner, like the ▶ in the gutter, and waits for the results (two minutes by default; a longer run answers with the results so far). | The **Tests** tab |
-| `run_configuration` | Starts or restarts one of the project's [run configurations](run-debug-test.md) by name and returns once it started. | The configuration's run tab |
+| `run_configuration` | Starts or restarts one of the folder's [run configurations](run-debug-test.md) by name and returns once it started. | The configuration's run tab |
 | `get_run_output` | Reads the last lines of a run and whether it exited. Offered with `run_configuration`; it only reads. | |
-| `send_http_request` | Sends one named request (`### name`) of a `.http` or `.rest` file in the project, as saved on disk, optionally with an environment. Returns the status, the headers and the start of the body. | The file's response tab and history |
+| `send_http_request` | Sends one named request (`### name`) of a `.http` or `.rest` file in the folder, as saved on disk, optionally with an environment. Returns the status, the headers and the start of the body. | The file's response tab and history |
 | `run_sql_query` | Runs one reading statement (`SELECT`, `WITH`, `SHOW`, …) on a saved database connection, **only if that connection is read-only**, and returns up to 500 rows. | The connection's query history |
 | `add_project_item` | Adds one `todo` item to the backlog of a [Flint project](projects.md) whose folder is trusted: title, text, and optionally priority, agent, repositories, the items it waits for and whether one agent works in all its repositories. It can't change, delete, re-status or delegate items. Switch: **Add project items**. | The Projects panel and the item's file |
 
 **You are asked before every call.** Nothing an agent starts this way runs without your yes to that one call:
 
 - **Claude Code** asks in the chat: a permission card with the tool and its arguments, with **Allow once** and **Reject** only. There is no "Always allow" for these tools, and the approval policy doesn't answer them, not even "Do everything".
-- **Codex and custom agents**, and Claude Code when its own settings already allow the tool, don't reliably ask in the chat. Flint then asks in a dialog of its own that shows the project, the tool, what it would do (the command, the request's URL, the SQL) and its arguments.
+- **Codex and custom agents**, and Claude Code when its own settings already allow the tool, don't reliably ask in the chat. Flint then asks in a dialog of its own that shows the folder, the tool, what it would do (the command, the request's URL, the SQL) and its arguments.
 - If you don't answer within five minutes, nothing runs.
 
 What the tools accept is narrow on purpose:
 
-- Paths, test names, run configurations, requests and environments must exist in the chat's project. The agent never passes a command line, a URL or connection details: it can only name what is already there. It can still edit those files like any other, so read the dialog or the card.
-- A request's body file must be inside the project, as in the editor.
-- `run_sql_query` refuses a connection that isn't read-only and says how to make it one (Edit Connection ▸ Read-only). It takes one statement without a semicolon inside it. Saved connections aren't tied to a project, so a chat in any trusted folder can ask for any read-only connection.
+- Paths, test names, run configurations, requests and environments must exist in the chat's folder. The agent never passes a command line, a URL or connection details: it can only name what is already there. It can still edit those files like any other, so read the dialog or the card.
+- A request's body file must be inside the workspace, as in the editor.
+- `run_sql_query` refuses a connection that isn't read-only and says how to make it one (Edit Connection ▸ Read-only). It takes one statement without a semicolon inside it. Saved connections aren't tied to a folder, so a chat in any trusted folder can ask for any read-only connection.
 - `add_project_item` shows you the project, the title, the item's settings and the start of its text before it writes, refuses a project whose folder is in Restricted Mode and an item Flint can't read, and adds at most 50 items per chat. See [What agents can add](projects.md#what-agents-can-add) and [Plan with an agent](projects.md#plan-with-an-agent).
 - Answers are bounded and redacted like the read tools' (response cookies are hidden).
 
@@ -290,8 +290,8 @@ Codex decides about MCP tools by its own rules and may refuse a tool that isn't 
 How it is protected:
 
 - The server listens only on `127.0.0.1`, on a port the system picks. It starts with the first chat and closes when you switch it off or quit.
-- Each chat gets its own random token, which stops working when the chat's agent stops or its project is closed. An agent only ever sees its own project. Requests without a valid token, or from a web page, are refused.
-- Terminal output is kept by where it was printed: output from before a terminal moved into the project (with `cd`) isn't shown. A command that changes folders and prints in one go (`cd ~ && cat secrets`) can still land in the project's part, because Flint learns the new folder just after the output.
+- Each chat gets its own random token, which stops working when the chat's agent stops or its folder is closed. An agent only ever sees its own folder. Requests without a valid token, or from a web page, are refused.
+- Terminal output is kept by where it was printed: output from before a terminal moved into the folder (with `cd`) isn't shown. A command that changes folders and prints in one go (`cd ~ && cat secrets`) can still land in the folder's part, because Flint learns the new folder just after the output.
 - The token reaches the agent through the `FLINT_MCP_TOKEN` environment variable (Claude Code expands it in the server's `Authorization` header; Codex reads it with `bearer_token_env_var`) or the ACP connection, never on a command line. Programs the agent runs inherit the variable, so they can use the tools too while the chat lasts.
 - Answers are bounded in size, and credentials (keys, tokens, passwords in URLs) are redacted before they reach the agent.
 - Folders in [Restricted Mode](restricted-mode.md) get no access.
@@ -311,11 +311,11 @@ The link in the chat header (for example **auto: edits**) shows and changes the 
 
 | Option | Default |
 |---|---|
-| Edit files in the project | On |
-| Read and search the project | On |
+| Edit files in the folder | On |
+| Read and search the folder | On |
 | Do everything (commands too) | Off |
 
-With the defaults, the agent edits and reads files inside the project folder without asking, and asks before running any command or touching files outside the project. For a [joint group](#joint-groups-one-agent-in-several-repositories), the project folder means the group's worktrees together. When it asks, a permission card appears in the chat with the choices the agent offers. If you choose to always allow a Claude command, Claude Code records that in `.claude/settings.local.json` in the project, as it does in the terminal.
+With the defaults, the agent edits and reads files inside the folder without asking, and asks before running any command or touching files outside the folder. For a [joint group](#joint-groups-one-agent-in-several-repositories), the folder means the group's worktrees together. When it asks, a permission card appears in the chat with the choices the agent offers. If you choose to always allow a Claude command, Claude Code records that in `.claude/settings.local.json` in the folder, as it does in the terminal.
 
 The same switches are in the command palette as "Toggle Auto-Approve: Edit Files", "Toggle Auto-Approve: Read and Search" and "Toggle Auto-Approve: Do Everything (Commands Too)".
 
@@ -336,8 +336,8 @@ Before you commit, let an agent look over what you changed: **✦ Review** in th
 - It reviews the changes ticked in the Commit panel, as the panel shows them (the last commit against your working tree, staged or not). Settings ▸ Agents ▸ Review can make it review every change instead, and a review started from a diff tab always includes that tab's file.
 - The reviewing agent (the default agent unless you pick another in Settings ▸ Agents ▸ Review) runs once, headless, like **Generate message**. A [defined agent](#defined-agents) reviews by its own instructions, on its program and model. It gets each file's diff with the line numbers of the new version and may read other files to check how the code is used. Only files `git status` reports as changed are reviewed.
 - What the agent can read on its own depends on the agent:
-  - **Claude Code** gets only Read, Grep and Glob, no MCP servers, and deny rules for credential files: the files Flint treats as credentials (`.env*`, `.envrc`, keys and certificates, `credentials`, kubeconfig, Terraform variables and state, `secrets.yaml` and the like) anywhere in the project, and `~/.ssh`, `~/.aws`, `~/.kube`, `~/.gnupg`, `~/.config/gcloud`, `~/.azure`, `~/.docker/config.json`, `~/.netrc`.
-  - **Codex** runs in its read-only sandbox: it can't change files, but it can read any file you can, including credentials outside the project.
+  - **Claude Code** gets only Read, Grep and Glob, no MCP servers, and deny rules for credential files: the files Flint treats as credentials (`.env*`, `.envrc`, keys and certificates, `credentials`, kubeconfig, Terraform variables and state, `secrets.yaml` and the like) anywhere in the folder, and `~/.ssh`, `~/.aws`, `~/.kube`, `~/.gnupg`, `~/.config/gcloud`, `~/.azure`, `~/.docker/config.json`, `~/.netrc`.
+  - **Codex** runs in its read-only sandbox: it can't change files, but it can read any file you can, including credentials outside the folder.
   - **A custom agent** gets a one-shot session in which Flint declines every permission request and refuses writes sent through Flint. Its own tools and configuration are outside Flint's control: an agent started with an auto-approve flag (such as `--yolo`) runs them without asking, so its reviews are not read-only. Settings ▸ Agents ▸ Review and the review's notes warn about such flags.
 - Flint never sends the content of credential files itself: they are left out of the diff (the panel says which), secrets elsewhere in the diff are redacted, and so are secrets in the agent's findings. The size limit (128 KB by default) is strict: small diffs go in whole, larger ones are shortened per file, files with no room left are listed in a note, and the panel says so.
 - While it works, the panel shows the agent and the elapsed time; **Cancel** stops the agent and everything it started.
@@ -345,7 +345,7 @@ Before you commit, let an agent look over what you changed: **✦ Review** in th
 - **✦ Fix it** puts that finding in the agent chat's draft, with the file, the line, the explanation, the suggested replacement and the code around it; **Fix all** puts the findings (the 20 worst; the draft says how many wait) in one draft. The findings are quoted and marked as the reviewer's output to check, not instructions. Nothing is sent until you press Send, and the fix goes through the chat as usual: there is no accept or reject step. **Dismiss** removes a finding.
 - Findings follow their code: when the review finishes and whenever the file changes, a finding moves with its line. When the line itself changed, the finding is marked **Stale** and shown above the diff, with the line it was on.
 - The agent's answer is expected as JSON; Flint reads it even with prose or code fences around it, and keeps the complete findings of an answer that was cut off. Findings about files outside the review are dropped.
-- In Restricted Mode the run follows the rules below: Claude Code without the project's settings, no extra arguments, and custom ACP agents don't start.
+- In Restricted Mode the run follows the rules below: Claude Code without the folder's settings, no extra arguments, and custom ACP agents don't start.
 
 ## Edit with Agent in the editor
 
@@ -356,7 +356,7 @@ Select code (or put the cursor on a line) and press `⌘I` ("Edit Selection with
 - The answer replaces the selection directly, as one change: one `⌘Z` takes it back. There is no accept or reject step.
 - If you edit the selected code while the agent works, its answer is not applied and the prompt says so. Typing elsewhere in the file is fine.
 - `Esc` closes the prompt; while the agent works, it also stops the agent. Errors (no agent installed, a timeout) appear in the prompt.
-- In Restricted Mode the run follows the rules below: Claude Code without the project's settings, no extra arguments, and custom ACP agents don't start.
+- In Restricted Mode the run follows the rules below: Claude Code without the folder's settings, no extra arguments, and custom ACP agents don't start.
 
 Change the shortcut in Settings ▸ Keymap.
 ## Agent tasks: agents in parallel
@@ -367,7 +367,7 @@ An agent task gives an agent its own branch in its own [git worktree](git-and-gi
 2. Describe the task. Its first line names the branch: "Add rate limiting" becomes `agent/add-rate-limiting` (`-2`, `-3`… when the name is taken).
 3. Pick the agent (the default agent is preselected; Claude Code, Codex, a custom agent or a [defined agent](#defined-agents)) and the branch to start from (the current one by default), then click **Start** (`⌘↵`).
 
-Flint creates the branch and the worktree (by default in `<repository>.worktrees/` next to your checkout, like **New Worktree…** in the branch widget), attaches the folder to the window as another project, opens a chat there and sends your description as the first message. Nothing else is added to it.
+Flint creates the branch and the worktree (by default in `<repository>.worktrees/` next to your checkout, like **New Worktree…** in the branch widget), attaches the folder to the window as another workspace folder, opens a chat there and sends your description as the first message. Nothing else is added to it.
 
 Work that isn't started yet can wait in the backlog of a [Flint project](projects.md): its **Delegate** action creates these tasks for an item, one per repository the item names, and moves the item's status as they finish and merge. An item with `together: true` starts one agent for all its repositories instead: see [joint groups](#joint-groups-one-agent-in-several-repositories).
 
@@ -439,9 +439,9 @@ The **Usage** panel (∑ in the activity bar, or **Show Agent Usage** in the pal
 
 - totals for today, the last 7 days and the last 30 days;
 - a bar per day for the last 7 or 30 days (cost when any is known, tokens otherwise; today is highlighted);
-- the same range broken down by project, agent task, agent and model. Click a project or a task to show only its usage; the chip at the top clears the filter;
+- the same range broken down by folder, agent task, agent and model. Click a folder or a task to show only its usage; the chip at the top clears the filter;
 - the chats that used the most in the range, with the first message as their name. Click an open one to show it;
-- **⇩** exports the daily totals (with the current filter) as CSV: one row per day, project, agent, model and task, with tokens, the reported cost and the estimated cost in separate columns.
+- **⇩** exports the daily totals (with the current filter) as CSV: one row per day, folder (the `project` column), agent, model and task, with tokens, the reported cost and the estimated cost in separate columns.
 
 A chat in an [agent task](#agent-tasks-agents-in-parallel) counts for the task and for the repository it was started from.
 
@@ -459,7 +459,7 @@ When an agent turn finishes while Flint isn't the active app, you get a macOS no
 
 ## Agents in Restricted Mode
 
-In a folder you haven't trusted, agents run without the project's own agent settings and hooks (Claude Code is started with `--setting-sources user`). Trust the folder to let them apply. Project [defined agents](#trust-and-names) are not loaded there. Custom ACP agents don't start there at all, and chats there don't get [Flint's MCP server](#what-agents-can-see-in-flint): a hostile repository could otherwise steer the agent into reading your terminals or cluster without a prompt. The repository's [prompts](#prompts-in-restricted-mode) are marked and can't replace yours. See [Restricted Mode](restricted-mode.md).
+In a folder you haven't trusted, agents run without the folder's own agent settings and hooks (Claude Code is started with `--setting-sources user`). Trust the folder to let them apply. Repository [defined agents](#trust-and-names) are not loaded there. Custom ACP agents don't start there at all, and chats there don't get [Flint's MCP server](#what-agents-can-see-in-flint): a hostile repository could otherwise steer the agent into reading your terminals or cluster without a prompt. The repository's [prompts](#prompts-in-restricted-mode) are marked and can't replace yours. See [Restricted Mode](restricted-mode.md).
 
 ## Related
 

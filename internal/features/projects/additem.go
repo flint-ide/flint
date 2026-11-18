@@ -222,6 +222,9 @@ func (a *API) toolProject(ref string) (string, Config, error) {
 	if err != nil {
 		return "", Config{}, err
 	}
+	if c.OldFormat {
+		return "", Config{}, fmt.Errorf("the project is in the old format (%s) and read-only in Flint until the user renames the file to %s in the Projects panel", OldConfigFile, ConfigFile)
+	}
 	return match[0], c, nil
 }
 

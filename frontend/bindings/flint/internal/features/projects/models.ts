@@ -378,6 +378,11 @@ export class Project {
     "trusted": boolean;
 
     /**
+     * OldFormat: as ProjectInfo.OldFormat.
+     */
+    "oldFormat": boolean;
+
+    /**
      * Repositories are flint-project.json's, with the checkout of each.
      */
     "repositories": RepositoryView[];
@@ -420,6 +425,9 @@ export class Project {
         if (!("trusted" in $$source)) {
             this["trusted"] = false;
         }
+        if (!("oldFormat" in $$source)) {
+            this["oldFormat"] = false;
+        }
         if (!("repositories" in $$source)) {
             this["repositories"] = [];
         }
@@ -446,26 +454,26 @@ export class Project {
      * Creates a new Project instance from a string or object.
      */
     static createFrom($$source: any = {}): Project {
-        const $$createField4_0 = $$createType7;
-        const $$createField5_0 = $$createType8;
-        const $$createField6_0 = $$createType9;
-        const $$createField7_0 = $$createType11;
-        const $$createField9_0 = $$createType13;
+        const $$createField5_0 = $$createType7;
+        const $$createField6_0 = $$createType8;
+        const $$createField7_0 = $$createType9;
+        const $$createField8_0 = $$createType11;
+        const $$createField10_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("repositories" in $$parsedSource) {
-            $$parsedSource["repositories"] = $$createField4_0($$parsedSource["repositories"]);
+            $$parsedSource["repositories"] = $$createField5_0($$parsedSource["repositories"]);
         }
         if ("context" in $$parsedSource) {
-            $$parsedSource["context"] = $$createField5_0($$parsedSource["context"]);
+            $$parsedSource["context"] = $$createField6_0($$parsedSource["context"]);
         }
         if ("items" in $$parsedSource) {
-            $$parsedSource["items"] = $$createField6_0($$parsedSource["items"]);
+            $$parsedSource["items"] = $$createField7_0($$parsedSource["items"]);
         }
         if ("problems" in $$parsedSource) {
-            $$parsedSource["problems"] = $$createField7_0($$parsedSource["problems"]);
+            $$parsedSource["problems"] = $$createField8_0($$parsedSource["problems"]);
         }
         if ("clone" in $$parsedSource) {
-            $$parsedSource["clone"] = $$createField9_0($$parsedSource["clone"]);
+            $$parsedSource["clone"] = $$createField10_0($$parsedSource["clone"]);
         }
         return new Project($$parsedSource as Partial<Project>);
     }
@@ -498,6 +506,12 @@ export class ProjectInfo {
      */
     "error": string;
 
+    /**
+     * OldFormat: the project is marked by OldConfigFile (oldformat.go) and
+     * read-only until RenameOldConfig.
+     */
+    "oldFormat": boolean;
+
     /** Creates a new ProjectInfo instance. */
     constructor($$source: Partial<ProjectInfo> = {}) {
         if (!("path" in $$source)) {
@@ -514,6 +528,9 @@ export class ProjectInfo {
         }
         if (!("error" in $$source)) {
             this["error"] = "";
+        }
+        if (!("oldFormat" in $$source)) {
+            this["oldFormat"] = false;
         }
 
         Object.assign(this, $$source);

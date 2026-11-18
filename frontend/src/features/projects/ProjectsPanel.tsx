@@ -2,13 +2,14 @@ import { useEffect, type ReactNode } from 'react'
 import { Dropdown } from '../../components/ui/Dropdown'
 import { Select } from '../../components/ui/Select'
 import { ProjectDialogs } from './Dialogs'
-import { ItemActions, ItemDependencies, ItemMeta, ItemTasks, ItemTitle, ProjectContext } from './ItemParts'
+import { ItemActions, ItemDependencies, ItemMeta, ItemTasks, ItemTitle, OldFormatNote, ProjectContext } from './ItemParts'
 import {
   allReposResolve,
   canClone,
   canClose,
   cloneTitle,
   groupByStatus,
+  OLD_FORMAT_HINT,
   PANEL_STATUSES,
   repoIssue,
   repoMarkers,
@@ -44,12 +45,13 @@ export function ProjectsPanel() {
   const info = infos?.find((i) => i.path === selected)
   const loaded = data[selected]
   const project = loaded?.project ?? null
+  const oldFormat = !!(project?.oldFormat ?? info?.oldFormat)
 
   return (
     <div className="panel projects-panel">
       <div className="panel-header">
         <span className="panel-title">Projects</span>
-        <button className="icon" title="New Item…" disabled={!info} onClick={() => openNewItem(selected)}>＋</button>
+        <button className="icon" title={oldFormat ? OLD_FORMAT_HINT : 'New Item…'} disabled={!info || oldFormat} onClick={() => openNewItem(selected)}>＋</button>
         <button className="icon" title="Refresh" disabled={!info} onClick={() => void loadProject(selected)}>↻</button>
         <Dropdown
           align="end"
@@ -57,7 +59,7 @@ export function ProjectsPanel() {
           items={[
             { label: 'Open Project…', onSelect: () => void openProject() },
             { label: 'New Project…', onSelect: () => void newProject() },
-            { label: 'Plan with Agent…', disabled: !info, onSelect: () => openPlan(selected) },
+            { label: 'Plan with Agent…', disabled: !info || oldFormat, hint: oldFormat ? 'old format' : undefined, onSelect: () => openPlan(selected) },
             { label: 'Show Board', disabled: !info, onSelect: () => info && openBoard(info) },
             { type: 'separator' },
             { label: 'Close Project', disabled: !canClose(info), hint: info?.workspace ? 'workspace folder' : undefined, onSelect: () => info && void closeProject(info) },
@@ -77,7 +79,7 @@ export function ProjectsPanel() {
             options={infos.map((i) => ({
               value: i.path,
               label: i.name,
-              hint: i.error || [i.trusted ? '' : 'Restricted Mode', i.workspace ? 'workspace folder' : i.path].filter(Boolean).join(' · '),
+              hint: i.error || [i.oldFormat ? 'old format' : '', i.trusted ? '' : 'Restricted Mode', i.workspace ? 'workspace folder' : i.path].filter(Boolean).join(' · '),
             }))}
             onChange={selectProject}
           />
@@ -86,6 +88,7 @@ export function ProjectsPanel() {
       <div className="tree scroll">
         {info?.error && <div className="placeholder error">{info.error}</div>}
         {loaded?.error && !info?.error && <div className="placeholder error">{loaded.error}</div>}
+        {info && oldFormat && <OldFormatNote folder={info.path} />}
         {info && !(project?.trusted ?? info.trusted) && <Untrusted info={info} />}
         {project && (
           <div className="project-context-row">
@@ -106,7 +109,7 @@ export function ProjectsPanel() {
             </span>
           </div>
         )}
-        {project && project.items.length === 0 && project.problems.length === 0 && (
+        {project && !oldFormat && project.items.length === 0 && project.problems.length === 0 && (
           <div className="placeholder muted">
             The backlog is empty. <button className="link" onClick={() => openNewItem(selected)}>New Item…</button> writes one to items/;{' '}
             <button className="link" onClick={() => openPlan(selected)}>Plan with Agent…</button> has an agent split a goal into items.

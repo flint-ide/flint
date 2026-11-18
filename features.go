@@ -147,6 +147,7 @@ func (s *appState) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return err
 	}
+	migrateRenamedStateKeys(doc)
 	s.features = nil
 	for _, key := range featureStateKeys() {
 		if raw, ok := doc[key]; ok {
@@ -157,4 +158,28 @@ func (s *appState) UnmarshalJSON(data []byte) error {
 		}
 	}
 	return nil
+}
+
+// renamedStateKeys migrates the pre-rename names of the Projects feature
+// (called Backlog on main for a short time, never released): its state keys
+// under their old names, whose values have the same shape. It can be removed
+// once nobody runs a main from before the rename.
+var renamedStateKeys = map[string]string{
+	"backlogs":         "projects",
+	"backlogCheckouts": "projectCheckouts",
+	"backlogTasks":     "projectTasks",
+}
+
+// migrateRenamedStateKeys moves each old key of doc to its new name when the
+// new one is absent; the old keys are dropped either way (they are not
+// declared, so the next save leaves them out).
+func migrateRenamedStateKeys(doc map[string]json.RawMessage) {
+	for old, key := range renamedStateKeys {
+		if raw, ok := doc[old]; ok {
+			if _, taken := doc[key]; !taken {
+				doc[key] = raw
+			}
+			delete(doc, old)
+		}
+	}
 }

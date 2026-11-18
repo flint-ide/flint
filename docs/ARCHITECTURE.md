@@ -81,7 +81,7 @@ flowchart LR
 - `fuzzy.Index` keeps a file list per root; with several roots it searches a combined `label/path` list (labels: `workspace.Labels`; in the UI, `lib/workspaceRoots.ts`).
 - `SearchAPI.Start` receives the list of roots (`search.RunRoots`, with a shared result limit), and every match carries its root. `git:changed` carries the root it concerns.
 - Run configurations, tests and the debugger receive the root from the frontend (`RunAPI.Configs(root)`, `Start(id, root, …)`), so Go has no notion of a "current" project.
-- Update Project (pull) with several roots is decided in the frontend: `lib/pullTargets.ts` builds the target list (labels, branch, commits to pull) and `components/git/PullProjectPopup.tsx` shows the chooser. `store/git.ts` then pulls each chosen root through `GitAPI` and collects the successes and failures for one summary, so Go still sees one repository per call.
+- Update Repository (pull) with several roots is decided in the frontend: `lib/pullTargets.ts` builds the target list (labels, branch, commits to pull) and `components/git/PullProjectPopup.tsx` shows the chooser. `store/git.ts` then pulls each chosen root through `GitAPI` and collects the successes and failures for one summary, so Go still sees one repository per call.
 
 ### Agents
 

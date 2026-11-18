@@ -142,12 +142,20 @@ describe('parseSnapshot: extension tabs', () => {
         { kind: 'contrib', view: 'flint.database.console', key: 'c1', title: 'Prod', data: { sql: 'select 1' } },
         { kind: 'contrib', view: 'flint.database.console', key: '', title: 'no key' },
         { kind: 'contrib', view: 'not an id', key: 'k', title: 'x' },
-        // The board of the Projects feature before it was renamed (never released): not reopened.
+        // The board of the Projects feature before it was renamed (never released): reopened as the new kind
+        // when its data is valid, dropped when it is not.
         { kind: 'contrib', view: 'backlog.board', key: '/p/plan', title: 'Backlog: Acme', data: { folder: '/p/plan' } },
+        { kind: 'contrib', view: 'backlog.board', key: 'x', title: 'Backlog: Bad', data: { folder: 'relative' } },
+        { kind: 'contrib', view: 'backlog.board', key: 'y', title: 'Backlog: None' },
+        { kind: 'contrib', view: 'projects.board', key: '/p/new', title: 'Project: New', data: { folder: '/p/new' } },
       ],
     })
     const snap = parseSnapshot(raw)
-    assert.deepEqual(snap?.tabs, [{ kind: 'contrib', view: 'flint.database.console', key: 'c1', title: 'Prod', data: { sql: 'select 1' } }])
+    assert.deepEqual(snap?.tabs, [
+      { kind: 'contrib', view: 'flint.database.console', key: 'c1', title: 'Prod', data: { sql: 'select 1' } },
+      { kind: 'contrib', view: 'projects.board', key: '/p/plan', title: 'Project: Acme', data: { folder: '/p/plan' } },
+      { kind: 'contrib', view: 'projects.board', key: '/p/new', title: 'Project: New', data: { folder: '/p/new' } },
+    ])
   })
 })
 

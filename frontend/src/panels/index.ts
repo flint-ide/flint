@@ -19,7 +19,7 @@ const UsagePanel = lazyPreload(() => import('../components/usage/UsagePanel').th
 
 // Command ids and titles predating the registry are kept: keymap overrides are stored by id.
 export const PANELS = definePanels([
-  { id: 'files', title: 'Files', icon: 'files', order: 10, component: FileTree, command: { keywords: 'project tree explorer' } },
+  { id: 'files', title: 'Files', icon: 'files', order: 10, component: FileTree, command: { keywords: 'folder tree explorer' } },
   {
     id: 'search', title: 'Search', icon: 'search', order: 20, component: SearchPanel, shortcutCommand: 'nav.findInFiles',
     command: { keywords: 'find grep' },

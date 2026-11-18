@@ -24,8 +24,8 @@ export default defineFeature({
     },
   ],
   commands: [
-    { id: 'projects.open', title: 'Open Project…', category: 'Projects', keywords: 'folder backlog items plan', run: () => void openProject() },
-    { id: 'projects.new', title: 'New Project…', category: 'Projects', keywords: 'create folder items plan', run: () => void newProject() },
+    { id: 'projects.open', title: 'Open Project…', category: 'Projects', keywords: 'backlog items plan', run: () => void openProject() },
+    { id: 'projects.new', title: 'New Project…', category: 'Projects', keywords: 'create backlog items plan', run: () => void newProject() },
     {
       id: 'projects.newItem', title: 'New Project Item…', category: 'Projects', keywords: 'add work item task title',
       run: () => openNewItem(useProjects.getState().selected),

@@ -14,7 +14,7 @@ import (
 
 // Events the native menu sends to the frontend.
 const (
-	eventMenuOpenRecent = "menu:open-recent" // show the Recent Projects popup
+	eventMenuOpenRecent = "menu:open-recent" // show the Recent Folders popup
 	eventMenuOpenFolder = "menu:open-folder" // open the given folder
 	eventMenuAddProject = "menu:add-project" // pick a folder to attach to the workspace
 	eventMenuSettings   = "menu:settings"    // open the Settings tab (app menu, ⌘,)
@@ -66,7 +66,7 @@ func (a *App) buildMenu() *application.Menu {
 
 	file := m.AddSubmenu("File")
 	shortcut(file.Add("Open Folder…"), "CmdOrCtrl+O").OnClick(func(*application.Context) { a.emit(eventMenuOpenRecent) })
-	shortcut(file.Add("Add Project to Workspace…"), "CmdOrCtrl+Shift+O").OnClick(func(*application.Context) { a.emit(eventMenuAddProject) })
+	shortcut(file.Add("Add Folder to Workspace…"), "CmdOrCtrl+Shift+O").OnClick(func(*application.Context) { a.emit(eventMenuAddProject) })
 	a.addRecentMenu(file)
 	if !isMac {
 		file.AddSeparator()

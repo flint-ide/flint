@@ -10,7 +10,7 @@ A downloaded archive or a fresh clone can carry configuration that runs programs
 
 A folder you open for the first time is untrusted. A **Restricted Mode** banner appears above the tabs with a **Trust Folder** button. Closing the banner with ✕ only hides it; the folder stays restricted.
 
-Trust covers the folder and all its subfolders. With several projects in the window, each one is trusted separately.
+Trust covers the folder and all its subfolders. With several folders in the window, each one is trusted separately.
 
 A worktree you create from the branch widget is a new folder and starts untrusted, even when its repository is trusted. The worktree of an [agent task](ai-agents.md#agent-tasks-agents-in-parallel) is the exception: it is trusted when the checkout the task started from is trusted.
 
@@ -22,15 +22,15 @@ In an untrusted folder, Flint:
 |---|---|---|
 | Terminal | Doesn't open one automatically (you can still open one yourself) | Shell prompts run `git status` and version-manager hooks that read the folder |
 | Rust language server | Doesn't start | rust-analyzer runs build scripts, proc macros and tools from `.cargo/config` |
-| Python language servers | Don't start | They run the virtualenv interpreter the project points at |
-| Agents (chat and commit messages) | Run without the project's agent settings and hooks, and without your extra agent arguments from Settings | Claude Code gets `--setting-sources user`, because its non-interactive mode skips its own trust prompt; an argument such as `--mcp-config` with a relative path would load the project's files |
-| Flint's MCP server for agents | Agent chats don't get it; a chat's token stops working when trust is revoked | Instructions planted in the project could steer the agent into reading your terminals or cluster through it without a prompt ([details](ai-agents.md#what-agents-can-see-in-flint)) |
-| Custom ACP agents | Don't start; Flint asks you to trust the folder | Flint can't tell an arbitrary agent to ignore the project's configuration (its settings, MCP servers, hooks) |
-| Project agent definitions (`.flint/agents`) | Not loaded at all; Settings ▸ Agents says how many files were ignored. Personal definitions still load | The instructions and model would steer an agent with text from a repository you haven't trusted ([details](ai-agents.md#trust-and-names)) |
-| Project prompts (`.flint/prompts`) | Listed as "untrusted repo"; can't replace a built-in or personal prompt | A repository could otherwise swap the text behind `/review` for instructions you didn't write ([details](ai-agents.md#prompts-in-restricted-mode)) |
+| Python language servers | Don't start | They run the virtualenv interpreter the folder points at |
+| Agents (chat and commit messages) | Run without the folder's agent settings and hooks, and without your extra agent arguments from Settings | Claude Code gets `--setting-sources user`, because its non-interactive mode skips its own trust prompt; an argument such as `--mcp-config` with a relative path would load the folder's files |
+| Flint's MCP server for agents | Agent chats don't get it; a chat's token stops working when trust is revoked | Instructions planted in the folder could steer the agent into reading your terminals or cluster through it without a prompt ([details](ai-agents.md#what-agents-can-see-in-flint)) |
+| Custom ACP agents | Don't start; Flint asks you to trust the folder | Flint can't tell an arbitrary agent to ignore the folder's configuration (its settings, MCP servers, hooks) |
+| Repository agent definitions (`.flint/agents`) | Not loaded at all; Settings ▸ Agents says how many files were ignored. Personal definitions still load | The instructions and model would steer an agent with text from a repository you haven't trusted ([details](ai-agents.md#trust-and-names)) |
+| Repository prompts (`.flint/prompts`) | Listed as "untrusted repo"; can't replace a built-in or personal prompt | A repository could otherwise swap the text behind `/review` for instructions you didn't write ([details](ai-agents.md#prompts-in-restricted-mode)) |
 | Projects | **Delegate** is refused for a repository whose checkout is in the folder, and says to trust it first. A project whose own folder is untrusted is marked, left out of `get_project`, and Delegate shows you its item and asks before sending it, and so does an item that starts by itself when its dependencies are done; its agents get only what that question showed. Agents can't plan into it (`add_project_item`, Plan with Agent…). A folder you clone with **Clone…** into an untrusted folder is untrusted until you trust it; cloned into a trusted folder it is trusted at once (trust covers subfolders), which Flint says in its question, and refuses for a project whose own folder is untrusted. Reading a project is not restricted | Delegate starts an agent in the checkout (for `together: true`, in every worktree of the group), and an item's text becomes the agent's instructions ([details](projects.md#projects-and-restricted-mode)) |
 | Language servers set in Settings | A server Flint doesn't know doesn't start; extra arguments are left out | Flint can't tell what another server runs |
-| Language servers, debuggers and test runners from extensions | Don't start; **Debug File** and **Run Tests in File** say to trust the folder | They are programs Flint doesn't know, and debuggers and test runners run the project's code |
+| Language servers, debuggers and test runners from extensions | Don't start; **Debug File** and **Run Tests in File** say to trust the folder | They are programs Flint doesn't know, and debuggers and test runners run the folder's code |
 | Git | Runs without hooks, even on commit and push | Hooks are programs from the repository |
 
 Everything else works: browsing, editing, `⌘P`, search, diffs, blame, the Go and TypeScript language servers, and the Markdown preview.
@@ -42,7 +42,7 @@ Do one of these:
 - Click **Trust Folder** in the banner.
 - Run "Trust Folder" from the command palette (`⇧⌘P`).
 
-The language servers that were held back start right away, and if the project has no terminal yet, Flint opens one in the folder.
+The language servers that were held back start right away, and if the folder has no terminal yet, Flint opens one in the folder.
 
 > **Tip:** Trust a folder when you trust its authors, not just because you want a feature. If you only need to read the code, staying in Restricted Mode costs you little.
 
@@ -57,8 +57,8 @@ Trusted folders are remembered in `state.json` in Flint's data folder (see [File
 These apply whether or not you trust the folder:
 
 - **Git filters.** Flint's own background Git calls (status, blame, diff) never run clean/smudge filters, textconv drivers or fsmonitor defined by the repository. Filters from your global Git configuration, such as Git LFS, still work.
-- **TypeScript.** typescript-language-server starts only when it can use its own TypeScript, never the project's `node_modules/typescript`. vtsls uses its bundled TypeScript.
-- **HTTP client.** A `.http` request can send body files (`< file`) only from inside the open project.
+- **TypeScript.** typescript-language-server starts only when it can use its own TypeScript, never the folder's `node_modules/typescript`. vtsls uses its bundled TypeScript.
+- **HTTP client.** A `.http` request can send body files (`< file`) only from inside the open folders.
 - **Markdown preview.** Remote images aren't loaded until you click **Load remote images**, so no tracking pixels. Raw HTML and `javascript:` links are dropped.
 - **Databases.** TLS connections verify the server certificate and host name. "Don't verify certificate (insecure)" is an explicit opt-out per connection.
 - **Terminal sessions.** Credentials are removed from terminal output before a session is saved.

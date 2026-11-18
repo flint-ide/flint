@@ -69,6 +69,9 @@ func (a *API) StartWhenReady(folder, id, root string) (ItemView, error) {
 	if err != nil {
 		return ItemView{}, err
 	}
+	if err := writable(l.Config); err != nil {
+		return ItemView{}, err
+	}
 	if !slices.ContainsFunc(l.Items, func(it Item) bool { return it.ID == id }) {
 		return ItemView{}, fmt.Errorf("the project has no usable item %s: see its problems", id)
 	}
@@ -175,8 +178,8 @@ func (a *API) startReady(ctx context.Context) {
 			continue
 		}
 		l, err := Load(folder)
-		if err != nil {
-			continue
+		if err != nil || l.Config.OldFormat {
+			continue // an old-format project starts nothing until it is renamed
 		}
 		deps := Dependencies(l.Items)
 		for id, entry := range items {

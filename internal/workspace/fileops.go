@@ -11,7 +11,7 @@ import (
 )
 
 // ErrOutsideProject is returned for paths that don't lie inside the project root.
-var ErrOutsideProject = errors.New("path is outside the project")
+var ErrOutsideProject = errors.New("path is outside the workspace")
 
 // Within reports whether path is root itself or lies under it. The check is lexical
 // on cleaned absolute paths: symlinked folders inside the project are allowed.

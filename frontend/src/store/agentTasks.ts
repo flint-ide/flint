@@ -162,7 +162,7 @@ export function closeNewTask(): void {
   useTasks.setState({ newTaskOpen: false })
 }
 
-/** Shows a task's folder in the window: attached as a project unless a project already holds it. */
+/** Shows a task's folder in the window: attached to the workspace unless a workspace folder already holds it. */
 export async function showFolder(path: string): Promise<boolean> {
   const { roots, addRoot } = useWorkspace.getState()
   if (roots.some((r) => isWithin(r, path))) return true
@@ -447,7 +447,7 @@ export function openComparedFileDiff(c: main.ComparedTask, path: string, origPat
 export async function removeTask(t: TaskView, asked = false): Promise<void> {
   const { roots } = useWorkspace.getState()
   if (roots[0] === t.worktree) {
-    showToast("The task's folder is this window's main project: open another folder first", 'error')
+    showToast("The task's folder is this window's main folder: open another folder first", 'error')
     return
   }
   let info: main.RemoveInfo

@@ -1,4 +1,4 @@
-// "Update Project" in a workspace of several repositories: which ones the
+// "Update Repository" in a workspace of several repositories: which ones the
 // picker offers and what the toast says afterwards. Pure, so it is testable
 // with node:test; store/git.ts wires it.
 import { rootLabels } from './workspaceRoots'
@@ -60,7 +60,7 @@ export interface PullFailure {
 
 /** The toast after pulling: what was updated, and every failure with its repository. */
 export function pullSummary(updated: string[], failed: PullFailure[]): { message: string; kind: 'info' | 'error' } {
-  const done = updated.length === 1 ? `Updated ${updated[0]}` : `Updated ${updated.length} projects`
+  const done = updated.length === 1 ? `Updated ${updated[0]}` : `Updated ${updated.length} repositories`
   if (failed.length === 0) return { message: updated.length ? done : 'Nothing to update', kind: 'info' }
   const errors = failed.map((f) => `${f.label}: ${firstLine(f.error)}`).join('\n')
   return { message: updated.length ? `${done}. Failed:\n${errors}` : `Update failed.\n${errors}`, kind: 'error' }

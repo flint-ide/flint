@@ -67,7 +67,7 @@ The file is readable only by your user. It never contains secrets: database pass
   "mcpServer": {
     "enabled": true,
     "tools": { "diagnostics": true, "editor": true, "terminals": true, "tests": true },
-    "actions": { "tests": true, "run": false, "http": false, "sql": false },
+    "actions": { "tests": true, "run": false, "http": false, "sql": false, "backlog": false },
     "terminalLines": 200,
     "testWaitSeconds": 120
   },
@@ -259,12 +259,13 @@ Flint's own MCP server for agent chats: read-only tools, and tools that act when
 | `actions.run` | boolean | | `false` | `run_configuration` (start a run configuration by name) and `get_run_output` (read a run's output and state). |
 | `actions.http` | boolean | | `false` | `send_http_request`: send a named request of a `.http` file in the project. |
 | `actions.sql` | boolean | | `false` | `run_sql_query`: one reading statement on a saved connection that is read-only. Needs the Database feature. |
+| `actions.backlog` | boolean | | `false` | `add_backlog_item`: add one `todo` item to a [backlog](../guides/backlog.md#what-agents-can-add) whose folder is trusted. Shown in Settings as **Add backlog items**. Needs the Backlog feature. |
 | `terminalLines` | integer | 10–2000 | `200` | The most lines of one terminal's or run's output an agent gets (clamped into the range). |
 | `testWaitSeconds` | integer | 10–540 | `120` | How long `run_tests` waits for a test run before it answers with the results so far (clamped into the range). |
 
 Tool switches apply right away, also to running chats.
 
-`get_backlog` (the [backlog](../guides/backlog.md#what-agents-can-see)) has no key here: it is offered while the Backlog feature is on (see [features](#features)).
+`get_backlog` (the [backlog](../guides/backlog.md#what-agents-can-see)) has no key here: it is offered while the Backlog feature is on (see [features](#features)). `add_backlog_item`, which adds items, is switched on with `actions.backlog`.
 ### completions
 
 Ghost-text suggestions in file editors from a fill-in-the-middle code model. See [AI in the editor](../guides/editor-and-navigation.md#ai-in-the-editor).
@@ -296,7 +297,7 @@ Used by [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel).
 |---|---|---|---|
 | `worktreeDir` | string | `""` | Folder for task worktrees, which go to `<worktreeDir>/<repository>/<branch>`. An absolute path or one starting with `~/`, up to 1024 characters. Empty puts them in `<repository>.worktrees/<branch>` next to the main checkout, like **New Worktree…** in the branch widget. |
 | `branchPrefix` | string | `"agent/"` | Starts every task branch, followed by a name made from the task's first line. Letters, digits, `.`, `_`, `-` and `/`, up to 40 characters; may be empty. It may not start with `-`, `/` or `.`, or contain `..`, `//` or `/.`. |
-| `maxParallel` | integer | `3` | How many agent tasks may work at the same time, from 0 to 32. A task started beyond it waits in [the queue](../guides/ai-agents.md#the-queue) until a working task settles. `0` means no limit. |
+| `maxParallel` | integer | `3` | How many agent tasks may work at the same time, from 0 to 32. A task started beyond it waits in [the queue](../guides/ai-agents.md#the-queue) until a working task settles. `0` means no limit. A [joint group](../guides/ai-agents.md#joint-groups-one-agent-in-several-repositories) (one agent in several repositories) counts as one task. |
 
 Slashes in a branch name become dashes in the folder name. The tasks themselves are kept in `state.json`.
 

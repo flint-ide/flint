@@ -10,7 +10,7 @@ import { useTerminal } from '../../store/terminal'
 import { requestNewEntry } from '../../store/fileOps'
 import { useAgentChat } from '../../store/agentChat'
 import { settleChat } from '../../store/agents'
-import { terminalBadge } from '../../lib/agentList'
+import { chatState, terminalBadge } from '../../lib/agentList'
 import { openContextMenu } from '../../store/contextMenu'
 import { createScratchFile, openScratchFilePicker, useScratch } from '../../store/scratch'
 import { isFeatureActive } from '../../lib/activeFeatures'
@@ -152,6 +152,7 @@ export function EditorArea() {
             <span className="tab-title">{tab.title}</span>
             {tab.kind === 'terminal' && <TerminalMachineBadge termId={tab.termId} />}
             {tab.kind === 'terminal' && <TerminalAgentBadge termId={tab.termId} />}
+            {tab.kind === 'chat' && <ChatWaitingBadge sessionId={tab.sessionId} />}
             <button
               className={`tab-close${tab.dirty ? ' dirty' : ''}`}
               onClick={(e) => {
@@ -279,6 +280,15 @@ function TerminalMachineBadge({ termId }: { termId: string }) {
 function TerminalAgentBadge({ termId }: { termId: string }) {
   const badge = useTerminal((s) => terminalBadge(s.tabs.find((t) => t.id === termId)?.agentState))
   return badge ? <span className={`task-state tab-agent ${badge.look}`} title={badge.hint}>{badge.label}</span> : null
+}
+
+/** "waiting" on a chat's tab while its agent waits for your approval, like a terminal agent's. */
+function ChatWaitingBadge({ sessionId }: { sessionId: string }) {
+  const waiting = useAgentChat((s) => {
+    const session = s.sessions[sessionId]
+    return !!session && chatState(session.chat, !!session.dormant) === 'waiting'
+  })
+  return waiting ? <span className="task-state tab-agent waiting" title="The agent waits for your approval in this chat">waiting</span> : null
 }
 
 function ChatTabIcon({ sessionId }: { sessionId: string }) {

@@ -36,8 +36,8 @@ const HINTS: Record<AgentRunState, string> = {
 const TERMINAL_WAITING_HINT = 'The agent in this terminal asked for your attention (an approval or a question)'
 
 export const stateLabel = (s: AgentRunState): string => LABELS[s]
-export const stateHint = (s: AgentRunState, kind?: AgentRow['kind']): string =>
-  kind === 'terminal' && s === 'waiting' ? TERMINAL_WAITING_HINT : HINTS[s]
+export const stateHint = (s: AgentRunState, kind?: AgentRow['kind'], blocked?: string): string =>
+  kind === 'terminal' && s === 'waiting' ? TERMINAL_WAITING_HINT : s === 'queued' && blocked ? blocked : HINTS[s]
 
 /** The states that ask something of the user. */
 const NEEDS_USER: readonly AgentRunState[] = ['waiting', 'failed', 'finished-unseen']
@@ -99,6 +99,8 @@ export interface AgentRow {
   state: AgentRunState
   /** The chat's tab is settled: not drawn in the tab strip until the agent needs the user. */
   hidden: boolean
+  /** Why a queued task does not start by itself, when it is more than a free slot. */
+  blocked?: string
 }
 
 const trimSlash = (p: string) => p.replace(/\/+$/, '')
@@ -116,6 +118,22 @@ const taskStateOf = (task: string, unseen: boolean): AgentRunState => {
     default:
       return 'idle'
   }
+}
+
+/**
+ * A task chat's state: Go's task state, unless the chat's own transcript is
+ * newer. The task list is re-read on Go's events, but a chat's events arrive
+ * first (and the list is not followed at all while its panels are closed): a
+ * live chat that waits or works says so at once, and one that ended is not
+ * shown working from a stale list.
+ */
+export function taskChatState(task: string, chat: SettledChatState | null, unseen: boolean): AgentRunState {
+  if (chat === 'waiting') return 'waiting'
+  if (chat === 'working') return task === 'waiting' ? 'waiting' : 'working' // Go may know of a request the chat shows next
+  if ((chat === 'finished' || chat === 'failed') && (task === 'working' || task === 'waiting')) {
+    return chat === 'failed' ? 'failed' : unseen ? 'finished-unseen' : 'idle'
+  }
+  return taskStateOf(task, unseen)
 }
 
 /** The state an agent CLI in a terminal reports (Go: terminal.Agent* constants, event "term:agent"). */
@@ -188,14 +206,17 @@ export function agentRows({ sessions, tasks, unseen, settled = [], terminals = [
     const task = live.find((t) => trimSlash(t.worktree) === trimSlash(s.cwd))
     const mine = unseenIds.has(s.id)
     const base = { key: `chat:${s.id}`, sessionId: s.id, agent: s.agent, root: s.cwd, project: folderName(s.cwd), hidden: settledIds.has(s.id) }
-    if (task) return { ...base, kind: 'task', taskId: task.id, title: task.title, state: taskStateOf(task.state, mine) }
+    if (task) return { ...base, kind: 'task', taskId: task.id, title: task.title, state: taskChatState(task.state, s.dormant ? null : chatState(s.chat, false), mine) }
     const state = chatState(s.chat, !!s.dormant)
     return { ...base, kind: 'chat', title: chatTitle(s.chat), state: state === 'finished' ? (mine ? 'finished-unseen' : 'idle') : state }
   })
   // A queued task has no chat yet but is an agent that will start; settled tasks without a chat are the Tasks panel's.
   for (const t of live) {
     if (t.state !== 'queued' || sessions.some((s) => trimSlash(s.cwd) === trimSlash(t.worktree))) continue
-    rows.push({ key: `task:${t.id}`, kind: 'task', taskId: t.id, agent: t.agent, title: t.title, root: t.worktree, project: folderName(t.worktree), state: 'queued', hidden: false })
+    rows.push({
+      key: `task:${t.id}`, kind: 'task', taskId: t.id, agent: t.agent, title: t.title, root: t.worktree, project: folderName(t.worktree), state: 'queued',
+      hidden: false, ...(t.blocked ? { blocked: t.blocked } : {}),
+    })
   }
   for (const t of terminals) if (isTerminalAgent(t)) rows.push(terminalRow(t, unseenIds.has(terminalAgentKey(t.id))))
   return rows.map((row, i) => ({ row, i })).sort((a, b) => RANK[a.row.state] - RANK[b.row.state] || a.i - b.i).map((x) => x.row)

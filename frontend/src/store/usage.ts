@@ -7,7 +7,7 @@ import { EventsOn } from '../wails/runtime'
 import { errorMessage } from '../api/backend'
 import { alertText, type BudgetAlert } from '../lib/usageView'
 import { chatLocalId, chatRemoteId, chatTabId, useAgentChat } from './agentChat'
-import { alertDone } from './alerts'
+import { tellUser } from './alerts'
 import { showToast } from './dialog'
 import { useSettings } from './settings'
 
@@ -89,8 +89,9 @@ export function subscribeUsageEvents(): void {
     const chatId = chatLocalId(e.sessionId)
     const text = alertText(e.alert, e.taskTitle)
     void refreshBudget(chatId)
-    if (document.hasFocus()) showToast(text)
-    else alertDone('Agent budget', text, chatTabId(chatId))
+    // In front a toast; behind, a notification and the toast again when the
+    // user is back, so it is not lost with notifications off.
+    tellUser('Agent budget', text, chatTabId(chatId), 'info')
   })
   // New budgets or prices change the warnings and the panel's estimates.
   useSettings.subscribe((s, prev) => {

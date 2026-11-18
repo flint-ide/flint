@@ -36,6 +36,8 @@ export interface TaskView {
   /** What the task's chats used so far. */
   tokens: number
   costUsd: number
+  /** Why a queued task does not start by itself (repository not open, Restricted Mode, budget); '' when it waits for a slot. */
+  blocked?: string
 }
 
 /** The counts of Go's git.DiffStat the panel shows. */

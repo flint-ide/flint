@@ -9,6 +9,7 @@ import { EventsOn } from '../../wails/runtime'
 import { errorMessage } from '../../api/backend'
 import { askAgent } from '../../lib/askAgent'
 import { chooseAction, confirmAction, showToast } from '../../store/dialog'
+import { alertDone } from '../../store/alerts'
 import { useEditor } from '../../store/editor'
 import { useWorkspace } from '../../store/workspace'
 import { useAgentDefs, loadAgentDefs } from '../../store/agentDefs'
@@ -17,7 +18,11 @@ import { showFolder, loadTasks, openTask, useTasks } from '../../store/agentTask
 import { trustFolder } from '../../store/trust'
 import {
   applyCloneEvent,
+  autoStartNotice,
   autoStartToast,
+  cloneNotice,
+  coerceItemEvent,
+  reviewText,
   BOARD_VIEW,
   boardTitle,
   cloneFailure,
@@ -239,19 +244,38 @@ function subscribe(): () => void {
 }
 
 /**
- * Tells the user how an automatic start went ("projects:auto-start": Flint delegated an item that waited for
- * others, or tried to and failed; the item keeps waiting then). Runs for the whole session, not only while a
- * view is mounted, because the start can happen at any time. Returns the unsubscribe.
+ * Tells the user about what projects do by themselves: how an automatic start went ("projects:auto-start":
+ * Flint delegated an item that waited for others, or tried to and failed; the item keeps waiting then), an
+ * item ready for review because all its agents finished ("projects:review"), and a clone that ended
+ * ("projects:clone-done"). A toast in front (a clone's comes from the Clone call), a desktop notification
+ * in the background. Runs for the whole session, not only while a view is mounted, because these happen at
+ * any time. Returns the unsubscribe.
  */
 export function subscribeAutoStart(): () => void {
-  return EventsOn('projects:auto-start', (raw: unknown) => {
-    const a = coerceAutoStart(raw)
-    if (!a) return
-    const t = autoStartToast(a)
-    showToast(t.message, t.kind, t.kind === 'error' ? 9000 : 4500)
-    if (!a.error) void loadTasks()
-    if (a.project) schedule({ folder: a.project })
-  })
+  const offs = [
+    EventsOn('projects:auto-start', (raw: unknown) => {
+      const a = coerceAutoStart(raw)
+      if (!a) return
+      const t = autoStartToast(a)
+      showToast(t.message, t.kind, t.kind === 'error' ? 9000 : 4500)
+      const n = autoStartNotice(a)
+      alertDone(n.title, n.body, '')
+      if (!a.error) void loadTasks()
+      if (a.project) schedule({ folder: a.project })
+    }),
+    EventsOn('projects:review', (raw: unknown) => {
+      const e = coerceItemEvent(raw)
+      if (!e) return
+      showToast(reviewText(e), 'info', 4500)
+      alertDone(reviewText(e), 'All its agent tasks finished', '')
+    }),
+    EventsOn('projects:clone-done', (raw: unknown) => {
+      const ev = coerceCloneEvent(raw)
+      const n = ev && cloneNotice(ev)
+      if (n) alertDone(n.title, n.body, '')
+    }),
+  ]
+  return () => offs.forEach((off) => off())
 }
 
 /**

@@ -6,6 +6,9 @@ import { AgentPeek } from '../agents/AgentPeek'
 import { ContextMenu } from '../ui/ContextMenu'
 import { closeSignInDialog, useAccounts } from '../../store/accounts'
 import { SignInWithGitHub } from '../accounts/SignInWithGitHub'
+import { dismissNotice, useAlerts } from '../../store/alerts'
+import { useEditor } from '../../store/editor'
+import { inAppNotice } from '../../lib/attention'
 
 /** Global confirm dialog, Sign in with GitHub, the Update Repository picker, context menu and toast notification. */
 export function Overlays() {
@@ -41,7 +44,34 @@ export function Overlays() {
       {pullPicker && <PullProjectPopup />}
       <AgentPeek />
       <ContextMenu />
-      {toast && <div className={`toast ${toast.kind}`} role="status">{toast.message}</div>}
+      <div className="toast-stack">
+        {toast && <div className={`toast ${toast.kind}`} role="status">{toast.message}</div>}
+        <AttentionNotice />
+      </div>
     </>
+  )
+}
+
+/**
+ * An agent waits for an answer in a tab that is not the active one: a notice that stays until the
+ * request is answered, shown or closed (the passing toast above it never replaces it).
+ */
+function AttentionNotice() {
+  const attention = useAlerts((s) => s.attention)
+  const dismissed = useAlerts((s) => s.dismissed)
+  const active = useEditor((s) => s.activeId)
+  const need = inAppNotice(attention, active, dismissed)
+  if (!need) return null
+  const show = () => {
+    if (useEditor.getState().tabs.some((t) => t.id === need.tab)) useEditor.getState().setActive(need.tab)
+    dismissNotice(need.key)
+  }
+  return (
+    <div className="toast attention" role="alert">
+      <span>{need.inApp}</span>
+      <span className="spacer" />
+      <button className="link" onClick={show}>Show</button>
+      <button className="icon" title="Close this notice (the request stays open)" onClick={() => dismissNotice(need.key)}>✕</button>
+    </div>
   )
 }

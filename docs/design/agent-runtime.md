@@ -17,7 +17,7 @@ Three facts about today's code shape the design:
 
 ## Phase 1: attention UI
 
-- **Waiting notification.** When a chat agent starts waiting for approval and the window is not focused, Flint sends a notification and counts it in the Dock badge; it clears when the request is settled.
+- **Waiting notification.** Whatever waits for the user — a chat agent's approval request (in any turn, whoever started it: every turn begins with the manager's `turn_start` event), an agent CLI in a terminal that reports waiting, a native question of Flint's — is announced once with a desktop notification: at once when Flint is in the background, or when it goes there while the request is still open. It counts in the badge until it is answered. One model (`frontend/src/lib/attention.ts`) decides for every signal; Go announces its own questions (`attention.go`), because only Go knows when a dialog is on screen and whether Flint is in front while it is.
 - **Agents panel.** One list of every chat agent and worktree-task agent in the window with its state, sorted so the ones needing the user come first. "Finished, unseen" becomes idle once the tab is viewed.
 - **Peek.** Shows an agent's chat over the current tab without switching to it, with "keep as tab" and close.
 - **Settle.** Hides an agent's tab until that agent needs attention (waiting, failed or finished).

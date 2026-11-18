@@ -416,6 +416,8 @@ Flint doesn't walk you through what is missing, as Delegate does after a click. 
 
 **When another check fails**, nothing starts. The item keeps waiting and shows why, and Flint tells you. Flint tries again only when something those checks read has changed: the item's file or the project's, the available agents, the checkouts, trust, or the active folder. It never retries in a loop. You can fix the cause and wait, **Delegate** by hand (a start that works ends the waiting), or **Cancel start**. If you answer No to the question about an untrusted project, the item keeps waiting with that reason, and the same applies.
 
+**When nobody answers the question** (it closes unanswered after 10 minutes), that is not a No: the item keeps waiting, says "nobody answered Flint's confirmation: Flint asks again when you are back", and Flint asks again the next time you come back to Flint (its window comes to the front). After three unanswered questions it stops asking and waits for you to **Delegate** it by hand or **Cancel start**. The question itself is announced like any of Flint's questions: a desktop notification when Flint is in the background (see [Notifications](ai-agents.md#notifications)).
+
 Some more rules:
 
 - If you set the item itself to `done` before it starts, it is not started and the waiting start is dropped.
@@ -497,6 +499,16 @@ An item that reaches `done`, by these rules or by your hand, can make Flint star
 Flint makes these changes when agent tasks change, when Flint starts, and whenever the panel reads the project (when it is shown and on refresh), which also notices a merge you made outside Flint. Nothing polls. A task that was merged outside Flint and removed before Flint looked counts as discarded. A change Flint can't write (the file changed meanwhile) is tried again the next time it looks.
 
 Flint remembers an item's agent tasks by the item's file name. While the file is missing for a moment, for example during a branch switch in the project's repository, the item isn't listed but its tasks are kept, and they are back with the file. Renaming the file loses them: the renamed item starts without tasks (the tasks stay in the Agent Tasks panel). Close Project forgets them too.
+
+### What you are told
+
+What a project does by itself is announced: a toast while Flint is in front, a desktop notification while it is in the background (with **Tell me when work finishes in the background** on, see [Notifications](ai-agents.md#notifications)):
+
+- an item you asked to [start when ready](#start-when-ready) started (*Started "Add login"*, with how many agent tasks), or could not start (*Couldn't start "Add login"* and why; it keeps waiting);
+- an item moved to `review` because all its agent tasks finished (*"Add login" is ready for review*);
+- a [clone](#clone-a-repository) finished or failed (in front, the clone's own message says where it went).
+
+An agent task of an item whose agent did not start is marked failed, with the reason, on the item and in Agent Tasks.
 
 ### Moving it by hand
 

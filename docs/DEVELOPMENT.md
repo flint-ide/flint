@@ -232,8 +232,31 @@ The workflow then:
 
 1. Runs the tests and builds a universal (Apple silicon + Intel) `Flint.app` with `wails3 task package:universal VERSION=vX.Y.Z`, packed as `.zip` and `.dmg` (signed and notarized when the Apple secrets below are set).
 2. Builds the Linux archives on x86_64 and arm64 with `wails3 task package:linux VERSION=vX.Y.Z` (`Flint-vX.Y.Z-linux-amd64.tar.gz`, `Flint-vX.Y.Z-linux-arm64.tar.gz`).
-3. Writes `SHA256SUMS.txt`, attests build provenance for every file, creates the tag (unless it was pushed) and publishes the release with generated notes, marked as the latest.
+3. Writes `SHA256SUMS.txt`, attests build provenance for every file, creates the tag (unless it was pushed) and publishes the release with the notes described below, marked as the latest.
 4. Runs the `homebrew` job (on macOS), which also runs when someone publishes a release by hand: it downloads the release's `.zip`, checks it against `SHA256SUMS.txt`, checks that the app is notarized (a valid signature and a stapled ticket: `codesign --verify` and `xcrun stapler validate`), renders `packaging/homebrew/flint.rb` with the version and SHA-256, and pushes it to the tap as `Casks/flint.rb`. Prereleases, tags that aren't `vX.Y.Z` and releases that aren't notarized are skipped with a notice: an ad-hoc signed app installed by Homebrew would be blocked by Gatekeeper. The tap token is passed to the push step only.
+
+### Release notes
+
+The body of a release is written by `cmd/releasenotes` from the pull requests merged since the release before. It is what users read on the Releases page, and Flint's "What's New" tab (`internal/update`) is made from the same text, so the notes are written for users, in each pull request:
+
+- The pull request template has a **Release notes** section: what users will notice, written for them (what it does, how to find it, anything that changed behaviour or needs action), in Markdown. "none", or nothing, for changes users don't see. Several parts get `###` headings; what users must do or know when they update goes under a `### Upgrade notes` heading. Edit the section before the release if a pull request's description changed since; it is read when the release is made.
+- The release body has these sections, each left out when empty:
+  - **Highlights**: for each pull request with notes, a heading made from its title (without the Conventional Commits type, first letter capitalised), the section's text with its headings moved below that heading, and a link to the pull request.
+  - **Upgrade notes**: the `### Upgrade notes` parts, each with its pull request.
+  - **All changes**: one line per change, "Title by @author in <pull request>", under Breaking changes (`type!:` or a `BREAKING CHANGE:` footer in the title or any of its commits), Features, Fixes, Performance and Other changes (a title without a type takes the type of its commits). Commits that reached `main` without a pull request are listed by themselves, with their short hash. `chore`, `docs`, `ci`, `test`, `refactor`, `build`, `style` and dependency updates are only counted, in one line. Pull requests with highlights are listed here too: Flint's "What's New" tab lists only these lines (`*` items under these headings), so list items from the pull requests' own text are written with `+`, which GitHub renders the same.
+  - **Full Changelog**: the compare link to the release before (for the first release, its commits).
+- Descriptions are untrusted text, so they can't change the structure of the release: HTML comments (the template's) are removed, other HTML is shown as text, `@mentions` become code (nobody is notified; the author in each list line is mentioned, as in GitHub's generated notes), headings are moved below the entry's own, an unclosed code fence is closed, and the sizes are bounded (10,000 bytes of notes per pull request, 120,000 for the whole body; GitHub's limit is 125,000 characters). What doesn't fit is left out with a line that says so.
+
+The command reads git itself and never the network. `.github/scripts/release-notes.sh` asks it which pull requests the range has (by their merge commits, "Merge pull request #N from …", or a squashed commit's "(#N)"), fetches them with `gh api`, and runs it with them. The job `plan` of the Release workflow runs it with `pull-requests: read`; if anything fails there, the release is still published, with GitHub's generated notes, and the step summaries of `plan` and `publish` say so.
+
+To see the notes of a range locally, write the pull requests as a JSON array (`gh pr view N --json number,title,body,author` objects) and run:
+
+```bash
+go run ./cmd/releasenotes -version v0.7.0 -to v0.7.0 -list-prs          # the pull requests: 83
+go run ./cmd/releasenotes -version v0.7.0 -to v0.7.0 -prs prs.json      # the body
+```
+
+To rewrite the notes of a published release, for example one made before this or with generated notes after a failure, or after editing a pull request's Release notes section: Actions ▸ **Release notes** ▸ Run workflow with the tag (or `gh workflow run release-notes.yml -f tag=v0.7.0`). It writes the notes the same way and replaces the release's body; only that job has `contents: write`, and the notes are in its step summary.
 
 ### Homebrew tap: one-time setup
 

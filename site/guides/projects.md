@@ -512,6 +512,8 @@ Flint refuses to write a file it can't change safely and says why. Set the statu
 
 Instead of writing every item yourself, you can state a goal and let an agent split it into items. The agent adds them to the project's backlog as `todo` items, one at a time, and you decide about each one.
 
+![Plan with Agent: the goal, the agent and the note that the prompt goes into a chat draft](../images/projects-plan.png)
+
 1. Click **Plan with Agent…** in the Projects panel, or run it from the command palette.
 2. Say what the goal is (1 to 2,000 characters, with the [character rules](#items) of an item's text) and pick the agent: a [defined agent](ai-agents.md#defined-agents) such as a planner, or any other agent. The default agent is the default choice.
 3. Flint puts a prompt into the draft of a chat with that agent. Read it, change it, and send it. Flint sends nothing for you.

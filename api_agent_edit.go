@@ -32,7 +32,8 @@ func (a *AgentAPI) InlineEdit(ctx context.Context, req agent.EditRequest) (strin
 	if err != nil {
 		return "", err
 	}
-	name, err := a.preferred()
+	v := a.app.agentView()
+	name, err := a.preferred(v)
 	if err != nil {
 		return "", err
 	}
@@ -42,7 +43,7 @@ func (a *AgentAPI) InlineEdit(ctx context.Context, req agent.EditRequest) (strin
 		stop := context.AfterFunc(a.app.ctx, cancel) // Flint quits
 		defer stop()
 	}
-	answer, err := a.headless(ctx, name, root, prompt, input)
+	answer, err := a.headless(ctx, v, name, root, prompt, input, false)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.Canceled) {
 			return "", ctx.Err()

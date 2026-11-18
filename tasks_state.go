@@ -13,6 +13,13 @@ import (
 // eventTasksChanged fires when a task is added, removed or changes state.
 const eventTasksChanged = "tasks:changed"
 
+// tasksChanged tells the UI (eventTasksChanged) and the feature modules
+// (Instance.TasksChanged) that tasks were added, removed or changed.
+func (a *App) tasksChanged() {
+	a.emit(eventTasksChanged)
+	a.features.TasksChanged()
+}
+
 // taskStore returns the remembered tasks (never modified in place).
 func (a *App) taskStore() agenttask.Store {
 	a.stateMu.Lock()
@@ -76,7 +83,7 @@ func (a *App) taskChanged(id string, l agenttask.Live) {
 			a.logf("save task state: %v", err)
 		}
 	}
-	a.emit(eventTasksChanged)
+	a.tasksChanged()
 	if busy {
 		a.releaseStart(id) // the running turn holds the slot from here on
 	} else {

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { flushSettings, useSettings } from '../../store/settings'
 import { useAgent } from '../../store/agent'
-import { EMPTY_AGENT, formatArgs, isDefaultAgent, parseArgs, withAgent, type AgentSettings } from '../../lib/toolSettings'
+import { EMPTY_AGENT, formatArgs, isDefaultAgent, parseArgs, withAgent, withTier, type AgentSettings } from '../../lib/toolSettings'
 import * as SettingsAPI from '../../../bindings/flint/settingsapi'
 import { settings as models } from '../../wails/models'
 import { Select } from '../ui/Select'
@@ -12,6 +12,10 @@ import { OrchestrationSection } from './OrchestrationSection'
 import { TerminalAgentSection } from './TerminalAgentSection'
 import { PromptsSection } from './PromptsSection'
 import { AgentReviewSection } from './AgentReviewSection'
+import { useAgentChat } from '../../store/agentChat'
+import { useAgentDefs } from '../../store/agentDefs'
+import { agentOption, DEFAULT_TIERS, MODEL_TIERS, type ModelTier } from '../../lib/agentDefs'
+import { AgentDefsSection } from './AgentDefsSection'
 import { isMac } from '../../lib/platform'
 
 // The agent CLIs Flint drives (Go: agent.known).
@@ -27,9 +31,14 @@ export function AgentsSection() {
   const notify = useSettings((s) => s.settings.notifyInBackground)
   const notifyApproval = useSettings((s) => s.settings.notifyOnApproval)
   const update = useSettings((s) => s.update)
+  const defined = useAgentDefs((s) => s.defined)
   useEffect(() => {
     if (!loaded) void useAgent.getState().load()
   }, [loaded])
+  // Definitions are files: read them again when the page opens.
+  useEffect(() => {
+    void useAgentChat.getState().load()
+  }, [])
   const first = available[0]
   // A default that is no longer installed still shows, so it can be changed back.
   const names = defaultAgent && !available.includes(defaultAgent) ? [...available, defaultAgent] : available
@@ -43,7 +52,7 @@ export function AgentsSection() {
           <Select
             value={defaultAgent}
             allowEmpty={first ? `First installed (${first})` : 'First installed'}
-            options={names.map((a) => ({ value: a, label: a, hint: available.includes(a) ? undefined : 'not installed' }))}
+            options={names.map((a) => agentOption(a, defined, available.includes(a) ? undefined : 'not installed'))}
             onChange={(a) => useAgent.getState().setPreferred(a)}
           />
         )}
@@ -57,6 +66,7 @@ export function AgentsSection() {
         are ignored in Restricted Mode.
       </p>
       <CustomAgentsSection />
+      <AgentDefsSection />
       <AgentTasksSection />
       <OrchestrationSection />
       <TerminalAgentSection />
@@ -73,7 +83,7 @@ export function AgentsSection() {
   )
 }
 
-/** Path, model and extra arguments of one agent CLI. */
+/** Path, model, tier models and extra arguments of one agent CLI. */
 function AgentRows({ id, label, modelHint }: { id: string; label: string; modelHint: string }) {
   const agent = useSettings((s) => s.settings.agents[id]) ?? EMPTY_AGENT
   const update = useSettings((s) => s.update)
@@ -92,6 +102,9 @@ function AgentRows({ id, label, modelHint }: { id: string; label: string; modelH
       <Row label="Model" hint={`Empty uses the CLI's default. ${modelHint}`}>
         <CheckedField value={agent.model} placeholder="CLI default" check={(model) => check({ model })} onCommit={(model) => commit({ model })} />
       </Row>
+      {MODEL_TIERS.map((tier) => (
+        <TierRow key={tier} id={id} tier={tier} tiers={agent.tiers ?? {}} check={check} commit={commit} />
+      ))}
       <Row label="Extra arguments" hint="One per line.">
         <CheckedField
           multiline
@@ -103,9 +116,41 @@ function AgentRows({ id, label, modelHint }: { id: string; label: string; modelH
       </Row>
       {!isDefaultAgent(agent) && (
         <div className="settings-actions">
-          <button onClick={() => commit({ ...EMPTY_AGENT, args: [] })}>Reset {label} to Defaults</button>
+          <button onClick={() => commit({ ...EMPTY_AGENT, args: [], tiers: {} })}>Reset {label} to Defaults</button>
         </div>
       )}
     </>
+  )
+}
+
+const TIER_LABELS: Record<ModelTier, string> = { fast: 'Fast model', balanced: 'Balanced model', strong: 'Strong model' }
+
+/**
+ * The model one tier means on this CLI, for defined agents whose model is the tier. Empty
+ * returns it to the default (the placeholder); a tier set to "" in settings.json has none.
+ */
+function TierRow(props: {
+  id: string
+  tier: ModelTier
+  tiers: Record<string, string>
+  check: (change: Partial<AgentSettings>) => Promise<string>
+  commit: (change: Partial<AgentSettings>) => void
+}) {
+  const { id, tier, tiers, check, commit } = props
+  const fallback = DEFAULT_TIERS[id]?.[tier]
+  const cleared = tiers[tier] === ''
+  const placeholder = fallback && !cleared ? fallback : 'Model above'
+  const set = (model: string) => withTier(tiers, tier, model === '' ? undefined : model)
+  return (
+    <Row
+      label={TIER_LABELS[tier]}
+      hint={
+        cleared
+          ? `For defined agents with model: ${tier}. Set to "" in settings.json, so they use the model above.`
+          : `For defined agents with model: ${tier}. Empty uses ${fallback ?? 'the model above'}.`
+      }
+    >
+      <CheckedField value={tiers[tier] ?? ''} placeholder={placeholder} check={(model) => check({ tiers: set(model) })} onCommit={(model) => commit({ tiers: set(model) })} />
+    </Row>
   )
 }

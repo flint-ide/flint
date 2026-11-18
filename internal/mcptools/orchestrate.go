@@ -167,7 +167,7 @@ func (s *Sources) orchestrationTools(cfg Config) []mcpserver.Tool {
 				"The child appears as a chat in Flint and what you send it is shown there. Returns its id; follow it with "+ToolWaitAgent+", "+ToolReadAgent+" and "+ToolSendPrompt+". "+
 				"Flint also tells you when a child waits, fails or finishes. Limits on how many agents and how deep apply.",
 			fmt.Sprintf(`{"type":"object","properties":{`+
-				`"agent":{"type":"string","maxLength":%d,"description":"Which agent to start (claude, codex or a custom agent's id). Default: a role's agent, else yours."},`+
+				`"agent":{"type":"string","maxLength":%d,"description":"Which agent to start (claude, codex, a custom agent's id or a defined agent's name). Default: a role's agent, else yours."},`+
 				`"role":{"type":"string","maxLength":%d,"description":"Name of a role template (letters, digits, - and _)."},`+
 				`"task":{"type":"string","maxLength":%d,"description":"What the new agent should do; it knows nothing else about your work."},`+
 				`"worktree":{"type":"boolean","description":"Run it in its own git branch and worktree (a task in Flint's Tasks panel), so its changes do not touch yours. Refused while the limit of tasks working at once is reached."},`+

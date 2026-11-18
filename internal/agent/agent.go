@@ -55,9 +55,12 @@ func Valid(k Kind) bool {
 // In an untrusted folder Claude loads only the user's settings: the project's
 // hooks and permission rules would otherwise run (-p skips the trust prompt).
 // cfg's extra arguments go before Flint's own (see ComposeArgs).
-func Headless(ctx context.Context, k Kind, cfg Config, dir, prompt, input string, untrusted bool) (string, error) {
+// instructions, when set, are a defined agent's standing instructions: one
+// argument (Claude Code's --append-system-prompt, Codex's
+// developer_instructions), never parsed as a flag and never through a shell.
+func Headless(ctx context.Context, k Kind, cfg Config, dir, prompt, input, instructions string, untrusted bool) (string, error) {
 	shellenv.Wait()
-	args, stdin, err := headlessArgs(k, cfg, prompt, input, untrusted)
+	args, stdin, err := headlessArgs(k, cfg, prompt, input, instructions, untrusted)
 	if err != nil {
 		return "", err
 	}
@@ -96,9 +99,10 @@ const headlessTools = "Read,Grep,Glob"
 
 // headlessArgs is the command line and the stdin of a headless run. NUL
 // bytes are dropped: they can't be passed and mean nothing to a model.
-func headlessArgs(k Kind, cfg Config, prompt, input string, untrusted bool) ([]string, string, error) {
+func headlessArgs(k Kind, cfg Config, prompt, input, instructions string, untrusted bool) ([]string, string, error) {
 	prompt = strings.ReplaceAll(prompt, "\x00", "")
 	input = strings.ReplaceAll(input, "\x00", "")
+	instructions = strings.ReplaceAll(instructions, "\x00", "")
 	var flint []string
 	stdin := input
 	switch k {
@@ -113,6 +117,10 @@ func headlessArgs(k Kind, cfg Config, prompt, input string, untrusted bool) ([]s
 		if cfg.Model != "" {
 			flint = append(flint, "--model", cfg.Model)
 		}
+		if instructions != "" {
+			// One argument, as in a chat: the text can't be read as a flag.
+			flint = append(flint, "--append-system-prompt="+instructions)
+		}
 		if untrusted {
 			flint = append(flint, "--setting-sources", "user")
 		}
@@ -122,6 +130,13 @@ func headlessArgs(k Kind, cfg Config, prompt, input string, untrusted bool) ([]s
 		// whatever the user's Codex configuration says. "-" reads the prompt
 		// from stdin, so a large diff never hits the argument size limit.
 		flint = []string{"exec", "--sandbox", "read-only"}
+		if instructions != "" {
+			// What a chat sends as thread/start's developerInstructions: the
+			// developer_instructions key of Codex's config, set for this run
+			// by a -c override whose value Codex parses as TOML. The pair
+			// starts with the key, so it is never read as a flag.
+			flint = append(flint, "-c", "developer_instructions="+tomlString(instructions))
+		}
 		if cfg.Model != "" {
 			flint = append(flint, "--model", cfg.Model)
 		}

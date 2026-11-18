@@ -10,5 +10,6 @@ export {
 } from "./models.js";
 
 export type {
+    ModelTiers,
     Settings
 } from "./models.js";

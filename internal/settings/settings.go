@@ -80,8 +80,9 @@ type Settings struct {
 	Terminal Font           `json:"terminal"`
 	// CustomTheme is the palette used when Theme is "custom".
 	CustomTheme CustomTheme `json:"customTheme"`
-	// DefaultAgent starts new agent chats ("claude", "codex" or a custom
-	// agent's id); empty means the first installed one.
+	// DefaultAgent starts new agent chats ("claude", "codex", a custom
+	// agent's id or a defined agent's name); empty means the first
+	// installed one.
 	DefaultAgent string `json:"defaultAgent"`
 	// AutoSave saves modified files when the window loses focus.
 	AutoSave bool `json:"autoSave"`
@@ -433,10 +434,15 @@ func validLineHeight(h float64) bool {
 	return !math.IsNaN(h) && h >= MinLineHeight && h <= MaxLineHeight
 }
 
-// validAgent: empty (the first installed), a built-in agent or a custom one.
+// validAgent: empty (the first installed), a built-in agent, a custom one or
+// a name a defined agent may have (internal/agentdefs: the custom agent id
+// rule). Definitions are files that come and go, so a defined agent's name is
+// accepted without reading them; when it is not available, Flint falls back
+// to the first installed agent, as for a missing custom agent.
 func validAgent(name string, custom []CustomAgent) bool {
 	return name == "" || agent.Valid(agent.Kind(name)) ||
-		slices.ContainsFunc(custom, func(c CustomAgent) bool { return c.ID == name })
+		slices.ContainsFunc(custom, func(c CustomAgent) bool { return c.ID == name }) ||
+		(len(name) <= maxCustomAgentID && customAgentIDPattern.MatchString(name))
 }
 
 // keysPattern matches shortcuts in the frontend's notation ('Mod+Shift+P',

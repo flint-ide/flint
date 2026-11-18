@@ -4,6 +4,7 @@
 import * as AccountsAPI from "./accountsapi.js";
 import * as AgentAPI from "./agentapi.js";
 import * as AgentChatAPI from "./agentchatapi.js";
+import * as AgentDefsAPI from "./agentdefsapi.js";
 import * as AlertsAPI from "./alertsapi.js";
 import * as AppAPI from "./appapi.js";
 import * as CompletionsAPI from "./completionsapi.js";
@@ -33,6 +34,7 @@ export {
     AccountsAPI,
     AgentAPI,
     AgentChatAPI,
+    AgentDefsAPI,
     AlertsAPI,
     AppAPI,
     CompletionsAPI,
@@ -61,6 +63,7 @@ export {
 };
 
 export {
+    AgentDefinitions,
     AgentInfo,
     AgentText,
     BudgetStatus,
@@ -70,6 +73,7 @@ export {
     CIReport,
     Collected,
     ComparedTask,
+    DefinedAgent,
     FileComparison,
     FileHistory,
     LiveTerminal,

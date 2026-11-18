@@ -54,6 +54,10 @@ type Options struct {
 	// Settings, when set, is read on every Start and Resume and replaces
 	// Binary, Model and ExtraArgs, so settings changes apply to new sessions.
 	Settings func() agent.Config
+	// Instructions, when set, are standing instructions for every
+	// conversation (a defined agent's, internal/agentdefs): the
+	// developerInstructions of thread/start and thread/resume.
+	Instructions string
 }
 
 // current returns the options for a new session.

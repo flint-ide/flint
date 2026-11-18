@@ -22,6 +22,10 @@ type Config struct {
 	Model string
 	// Args are added to every command line Flint starts for the agent.
 	Args []string
+	// Tiers maps a model tier to this engine's model (TierModels: settings
+	// over the defaults; a tier without a model is missing). Only a defined
+	// agent whose model is a tier uses it.
+	Tiers map[string]string
 }
 
 // Limits for Config values.
@@ -233,6 +237,39 @@ func tomlKeyPath(kv string) string {
 		}
 	}
 	return strings.Join(append(parts, strings.TrimSpace(cur.String())), ".")
+}
+
+// tomlString quotes s as a TOML basic string, the value of a Codex -c
+// key=value override (Codex parses it as TOML). Everything TOML does not
+// allow raw in a basic string is escaped: the quote, the backslash and every
+// control character (tab included, for simplicity). Invalid UTF-8 becomes
+// U+FFFD (ranging over a string yields it for each bad byte).
+func tomlString(s string) string {
+	var b strings.Builder
+	b.Grow(len(s) + 2)
+	b.WriteByte('"')
+	for _, r := range s {
+		switch r {
+		case '"':
+			b.WriteString(`\"`)
+		case '\\':
+			b.WriteString(`\\`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		default:
+			if r < 0x20 || r == 0x7f {
+				fmt.Fprintf(&b, `\u%04X`, r)
+			} else {
+				b.WriteRune(r)
+			}
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
 }
 
 // ComposeArgs builds a command line from Flint's own arguments and the

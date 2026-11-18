@@ -181,10 +181,16 @@ type Attachment struct {
 
 // SessionInfo is returned when a session starts.
 type SessionInfo struct {
-	ID    string `json:"id"`
-	Agent string `json:"agent"` // e.g. "claude", "codex"
-	Model string `json:"model,omitempty"`
-	Cwd   string `json:"cwd"`
+	ID string `json:"id"`
+	// Agent is the name the session was started under: "claude", "codex", a
+	// custom agent's id or a defined agent's name.
+	Agent string `json:"agent"`
+	// Engine is the program that runs it: the driver's own name ("claude",
+	// "codex" or the custom agent's id). It equals Agent except for a defined
+	// agent, whose conversation resumes on this engine.
+	Engine string `json:"engine"`
+	Model  string `json:"model,omitempty"`
+	Cwd    string `json:"cwd"`
 }
 
 // Sink receives events; drivers must call it sequentially per session (in order).

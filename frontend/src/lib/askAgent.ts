@@ -5,6 +5,8 @@ import { useAgent } from '../store/agent'
 import { showToast } from '../store/dialog'
 import type { Attachment } from './agentReducer'
 import { appendToDraft, pickChat } from './agentPrompt'
+import { engineOf } from './agentDefs'
+import { useAgentDefs } from '../store/agentDefs'
 
 export interface AskAgentOptions {
   /** Message text, added after whatever the user already typed in the draft. */
@@ -50,7 +52,9 @@ export async function askAgent({ prompt, attachments = [], send = false, root, a
 async function targetChat(root: string, only?: string): Promise<string | null> {
   const chat = useAgentChat.getState()
   const { activeId, backStack } = useEditor.getState()
-  const sessions = Object.values(chat.sessions).filter((s) => !only || s.agent === only)
+  // A prompt limited to claude also fits a chat with a defined agent that runs on Claude Code.
+  const { defined } = useAgentDefs.getState()
+  const sessions = Object.values(chat.sessions).filter((s) => !only || s.agent === only || engineOf(s.agent, defined, s.engine) === only)
   const cwds = Object.fromEntries(sessions.map((s) => [s.id, s.cwd]))
   const found = pickChat({ activeId, backStack, order: chat.order, cwds, root })
   if (found) return found

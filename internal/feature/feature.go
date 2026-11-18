@@ -74,6 +74,10 @@ type Instance struct {
 	// RootsChanged runs after a project folder was opened, attached or
 	// removed, or trusted or untrusted; it must return quickly.
 	RootsChanged func()
+	// TasksChanged runs after an agent task was created, removed or changed
+	// state, or its branch was merged or got a pull request in Flint (when
+	// the UI hears "tasks:changed"); it must return quickly.
+	TasksChanged func()
 }
 
 // Host is what Flint gives a feature: the parts of the app it may use. New
@@ -109,6 +113,74 @@ type Host interface {
 	// StartStream shows st in the terminal tab termID (the frontend picked the
 	// id) and lets agents read it like a terminal (get_terminal_output).
 	StartStream(termID, title string, st terminal.Stream) error
+
+	// The agent tasks part (the Backlog feature): the narrowest view of agent
+	// tasks, agents and repositories that lets a feature hand work to agents
+	// through the same path as New Agent Task.
+
+	// CreateAgentTasks creates one agent task per request (a branch and a
+	// worktree from Dir's current branch, the queue and its limits, the trust
+	// of the worktree) and starts the chats of those that got a slot; the
+	// others are queued. Dir must be a folder inside an open project folder.
+	// All or nothing: when one cannot be created, none is kept, and a
+	// queued task is not started before the call returns. A checkout on a
+	// detached HEAD fails with *DetachedHeadError.
+	CreateAgentTasks(ctx context.Context, reqs []NewAgentTask) ([]AgentTask, error)
+	// AgentTasks returns the tasks with these ids that still exist, by id.
+	AgentTasks(ctx context.Context, ids []string) map[string]AgentTask
+	// Repository describes the git repository dir is in (git.ErrNotRepository
+	// when none).
+	Repository(ctx context.Context, dir string) (Repository, error)
+	// Agents are the agents that can start now and the default one.
+	Agents() Agents
+}
+
+// NewAgentTask asks for one agent task: Agent works on Description in a
+// worktree of the repository of Dir.
+type NewAgentTask struct {
+	Dir, Description, Agent string
+}
+
+// DetachedHeadError is CreateAgentTasks' error for a request whose Dir is a
+// checkout on a detached HEAD: a task starts from the checkout's current
+// branch and merges back into it, so there must be one.
+type DetachedHeadError struct {
+	// Dir is the request's folder.
+	Dir string
+}
+
+func (e *DetachedHeadError) Error() string { return e.Dir + " is on a detached HEAD" }
+
+// AgentTask is an agent task as the Agent Tasks panel shows it.
+type AgentTask struct {
+	ID, Title, Agent, Branch, Base string
+	// Worktree is the task's folder.
+	Worktree string
+	// State: queued, idle, working, waiting, finished or failed.
+	State, Error string
+	// PullRequest is the URL of the pull request Flint created for it.
+	PullRequest string
+	// Merged: the branch has commits and its base has all of them.
+	Merged bool
+	// Stale: the worktree folder is gone.
+	Stale bool
+}
+
+// Repository is the git repository a folder is in.
+type Repository struct {
+	// Root is the checkout's top folder.
+	Root string
+	// Remotes are the URLs of its remotes, in git config order.
+	Remotes []string
+	// TaskWorktree: the checkout is an agent task's worktree.
+	TaskWorktree bool
+}
+
+// Agents are the agents that can start now (defined, native and custom
+// ones) and the default agent ("" when none can start).
+type Agents struct {
+	Available []string
+	Default   string
 }
 
 var idPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,39}$`)
@@ -248,6 +320,18 @@ func (s *Set) RootsChanged() {
 	for _, p := range s.parts {
 		if p.RootsChanged != nil {
 			p.RootsChanged()
+		}
+	}
+}
+
+// TasksChanged runs the TasksChanged hooks.
+func (s *Set) TasksChanged() {
+	if s == nil {
+		return
+	}
+	for _, p := range s.parts {
+		if p.TasksChanged != nil {
+			p.TasksChanged()
 		}
 	}
 }

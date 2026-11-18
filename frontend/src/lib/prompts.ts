@@ -23,16 +23,19 @@ export function slashQuery(draft: string): string | null {
   return m ? m[1] : null
 }
 
-/** Whether a prompt is offered in a chat with agent ('' = any chat). */
-export function forAgent(p: PromptInfo, agent: string): boolean {
-  return !p.agent || !agent || p.agent === agent
+/**
+ * Whether a prompt is offered in a chat with agent ('' = any chat). A prompt limited to
+ * an engine (claude) also applies to a defined agent running on it, hence engine.
+ */
+export function forAgent(p: PromptInfo, agent: string, engine = ''): boolean {
+  return !p.agent || !agent || p.agent === agent || p.agent === engine
 }
 
 /**
  * Prompts matching query, best first: the exact name, names starting with it,
  * names containing it, then descriptions containing it. Case-insensitive.
  */
-export function matchPrompts<T extends PromptInfo>(list: readonly T[], query: string, agent: string): T[] {
+export function matchPrompts<T extends PromptInfo>(list: readonly T[], query: string, agent: string, engine = ''): T[] {
   const q = query.toLowerCase()
   const rank = (p: T): number => {
     const name = p.name.toLowerCase()
@@ -43,7 +46,7 @@ export function matchPrompts<T extends PromptInfo>(list: readonly T[], query: st
     return -1
   }
   return list
-    .filter((p) => forAgent(p, agent))
+    .filter((p) => forAgent(p, agent, engine))
     .map((p) => ({ p, r: rank(p) }))
     .filter((x) => x.r >= 0)
     .sort((a, b) => a.r - b.r || a.p.name.localeCompare(b.p.name))

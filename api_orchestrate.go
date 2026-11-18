@@ -292,7 +292,7 @@ func (o *orchestrator) newWorktree(ctx context.Context, root, agent string, r mc
 	if !o.app.isTrusted(root) {
 		return agenttask.Task{}, errors.New("this project is not trusted, so Flint starts no worktree tasks in it")
 	}
-	made, _, err := o.app.createTasks(ctx, NewTaskGroup{Dir: root, Description: r.Task, Base: r.Base, Agents: []string{agent}}, false)
+	made, _, err := o.app.createTasks(ctx, NewTaskGroup{Dir: root, Description: r.Task, Base: r.Base, Agents: []string{agent}}, false, false)
 	if err != nil {
 		return agenttask.Task{}, err
 	}

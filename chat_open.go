@@ -53,13 +53,21 @@ type ChatOpened struct {
 // prompt fails (the usage budget is spent, say) the chat stays open and the
 // returned info is valid next to the error, so a caller can still address it.
 func (a *App) openChat(ctx context.Context, r ChatRequest) (as.SessionInfo, error) {
+	// A definition added, changed or removed since: read now.
+	return a.openChatWith(ctx, r, a.loadDefinedAgents())
+}
+
+// openChatWith is openChat with the agent definitions of loaded: a defined
+// agent starts on the driver of that read, on the engine resolved once here,
+// so another call's read in between can't change what this chat runs.
+func (a *App) openChatWith(ctx context.Context, r ChatRequest, loaded loadedAgents) (as.SessionInfo, error) {
 	// Before anything starts: a role that cannot be used must not leave an
 	// agent process behind.
-	r, err := a.applyRole(r)
+	r, drv, err := a.applyRole(r, loaded)
 	if err != nil {
 		return as.SessionInfo{}, err
 	}
-	info, err := a.agents.Start(ctx, r.Agent, r.Cwd)
+	info, err := a.startChat(ctx, drv, r.Agent, r.Cwd)
 	if err != nil {
 		return info, err
 	}
@@ -93,24 +101,49 @@ func (a *App) openChat(ctx context.Context, r ChatRequest) (as.SessionInfo, erro
 
 // applyRole resolves r.Role (project roles only in a trusted folder: Restricted
 // Mode) and puts its body before the prompt. A role that names an agent fixes
-// it when the request has none and must match it when it has one.
-func (a *App) applyRole(r ChatRequest) (ChatRequest, error) {
-	if r.Role == "" {
-		return r, nil
+// it when the request has none and must fit it when it has one (roleFits).
+// drv is the driver a defined agent starts on (loadedAgents.route), nil for
+// any other agent.
+func (a *App) applyRole(r ChatRequest, loaded loadedAgents) (ChatRequest, as.Driver, error) {
+	var role orchestrate.Role
+	if r.Role != "" {
+		var err error
+		if role, err = orchestrate.ResolveRole(a.configDir, r.Cwd, a.isTrusted(r.Cwd), r.Role); err != nil {
+			return r, nil, err
+		}
+		if r.Agent == "" {
+			r.Agent = role.Agent
+		}
 	}
-	role, err := orchestrate.ResolveRole(a.configDir, r.Cwd, a.isTrusted(r.Cwd), r.Role)
+	drv, engine, err := loaded.route(r.Agent, "")
 	if err != nil {
-		return r, err
+		return r, nil, err
 	}
-	switch {
-	case role.Agent == "":
-	case r.Agent == "":
-		r.Agent = role.Agent
-	case r.Agent != role.Agent:
-		return r, fmt.Errorf("role %s is for %s, not %s", role.Name, role.Agent, r.Agent)
+	if r.Role == "" {
+		return r, drv, nil
+	}
+	if !roleFits(role.Agent, r.Agent, engine) {
+		return r, nil, fmt.Errorf("role %s is for %s, not %s", role.Name, role.Agent, describeAgent(r.Agent, engine))
 	}
 	r.Prompt = role.Apply(r.Prompt)
-	return r, nil
+	return r, drv, nil
+}
+
+// roleFits reports whether a role limited to roleAgent ("" for any) may run
+// in agent name, which runs on engine. A role for a native agent (claude,
+// codex) is for that program, so it fits a defined agent that runs on it; a
+// role naming a defined or custom agent fits that agent only.
+func roleFits(roleAgent, name, engine string) bool {
+	return roleAgent == "" || roleAgent == name || isNative(roleAgent) && roleAgent == engine
+}
+
+// describeAgent names an agent with its engine when that is another name (a
+// defined agent's).
+func describeAgent(name, engine string) string {
+	if engine == "" || engine == name {
+		return name
+	}
+	return name + " (" + engine + ")"
 }
 
 // adoptChat registers a chat reopened by Resume: the UI already has its tab.

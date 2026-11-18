@@ -27,6 +27,14 @@ export class AgentSettings {
      */
     "args": string[];
 
+    /**
+     * Tiers maps a model tier ("fast", "balanced", "strong") to the model a
+     * defined agent asking for it runs on with this CLI. A missing tier uses
+     * the built-in default (agent.DefaultTiers: Claude Code's haiku, sonnet,
+     * opus; none for Codex); "" has none, so the agent runs on Model.
+     */
+    "tiers"?: ModelTiers;
+
     /** Creates a new AgentSettings instance. */
     constructor($$source: Partial<AgentSettings> = {}) {
         if (!("path" in $$source)) {
@@ -47,9 +55,13 @@ export class AgentSettings {
      */
     static createFrom($$source: any = {}): AgentSettings {
         const $$createField2_0 = $$createType0;
+        const $$createField3_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("args" in $$parsedSource) {
             $$parsedSource["args"] = $$createField2_0($$parsedSource["args"]);
+        }
+        if ("tiers" in $$parsedSource) {
+            $$parsedSource["tiers"] = $$createField3_0($$parsedSource["tiers"]);
         }
         return new AgentSettings($$parsedSource as Partial<AgentSettings>);
     }
@@ -274,9 +286,21 @@ export class MachineIssue {
 }
 
 /**
+ * ModelTiers maps a model tier to a model (AgentSettings.Tiers).
+ */
+export type ModelTiers = { [_ in string]?: string };
+
+/**
  * Settings is the whole settings.json document.
  */
 export type Settings = any;
 
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);
+var $$createType1 = (function $$initCreateType1(...args: any[]): any {
+    if ($$createType1 === $$initCreateType1) {
+        $$createType1 = $$createType2;
+    }
+    return $$createType1(...args);
+});
+const $$createType2 = $Create.Map($Create.Any, $Create.Any);

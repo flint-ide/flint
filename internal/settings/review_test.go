@@ -25,7 +25,7 @@ func TestAgentReviewValidate(t *testing.T) {
 		{"small diff", func(r *AgentReview) { r.MaxDiffKB = 1 }, "maxDiffKB"},
 		{"large diff", func(r *AgentReview) { r.MaxDiffKB = 4096 }, "maxDiffKB"},
 		{"timeout", func(r *AgentReview) { r.TimeoutSeconds = 5 }, "timeoutSeconds"},
-		{"agent", func(r *AgentReview) { r.Agent = "nope" }, "agent"},
+		{"agent", func(r *AgentReview) { r.Agent = "No pe" }, "agent"},
 	} {
 		s := Default()
 		tc.change(&s.AgentReview)
@@ -66,7 +66,7 @@ func TestAutoApproveArgs(t *testing.T) {
 }
 
 func TestAgentReviewNormalize(t *testing.T) {
-	s, err := decode([]byte(`{"agentReview": {"scope": "bogus", "maxDiffKB": 99999, "timeoutSeconds": 1, "agent": "gone"}}`))
+	s, err := decode([]byte(`{"agentReview": {"scope": "bogus", "maxDiffKB": 99999, "timeoutSeconds": 1, "agent": "Gone!"}}`))
 	if err != nil {
 		t.Fatal(err)
 	}

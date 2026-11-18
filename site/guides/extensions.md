@@ -53,7 +53,7 @@ For each installed extension:
 
 **Only run sandboxed extensions** (off by default, [`extensions.requireSandbox`](../reference/settings.md#extensions)) keeps Flint from starting any extension whose program would run unconfined. Such an extension stays installed, its card says why it isn't started, and using one of its commands or panels shows the same reason.
 
-**Built-in** lists the parts of Flint you can switch off, such as Database. A switched-off one isn't started, and the change takes effect after a restart (see [features](../reference/settings.md#features)).
+**Built-in** lists the parts of Flint you can switch off, such as Database and [Backlog](backlog.md). A switched-off one isn't started, and the change takes effect after a restart (see [features](../reference/settings.md#features)).
 
 **Reload Installed** reads the extensions folder again, for example after you rebuilt an extension you are writing.
 

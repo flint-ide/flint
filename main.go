@@ -75,6 +75,7 @@ func main() {
 			application.NewService(lspAPI),
 			application.NewService(&AgentChatAPI{app: flint}),
 			application.NewService(&PromptsAPI{app: flint, git: gitAPI}),
+			application.NewService(&AgentDefsAPI{app: flint}),
 			application.NewService(&EditorContextAPI{app: flint}),
 			application.NewService(&DiffAPI{}),
 			application.NewService(&HTTPAPI{app: flint}),

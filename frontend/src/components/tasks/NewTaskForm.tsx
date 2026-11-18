@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Git } from '../../store/git'
 import { useAgentChat } from '../../store/agentChat'
 import { useAgent } from '../../store/agent'
+import { useAgentDefs } from '../../store/agentDefs'
+import { agentLabel, agentOption } from '../../lib/agentDefs'
 import { useSettings } from '../../store/settings'
 import { activeRoot } from '../../store/activeRoot'
 import { closeNewTask, startTask } from '../../store/agentTasks'
@@ -18,6 +20,7 @@ import type { Branch } from '../../store/git'
  */
 export function NewTaskForm() {
   const agents = useAgentChat((s) => s.agents)
+  const defined = useAgentDefs((s) => s.defined)
   const preferred = useAgent((s) => s.preferred)
   const prefix = useSettings((s) => s.settings.agentTasks.branchPrefix)
   const maxParallel = useSettings((s) => s.settings.agentTasks.maxParallel)
@@ -34,7 +37,8 @@ export function NewTaskForm() {
 
   useEffect(() => {
     if (!useAgent.getState().loaded) void useAgent.getState().load()
-    if (useAgentChat.getState().agents.length === 0) void useAgentChat.getState().load()
+    // Read again: definitions are files that change while Flint runs.
+    void useAgentChat.getState().load()
     Git.Branches(root).then(
       (list) => {
         const local = (list ?? []).filter((b) => !b.remote)
@@ -94,7 +98,7 @@ export function NewTaskForm() {
             {agents.length === 0 ? (
               <span className="muted">No agent installed (claude, codex or a custom agent in Settings ▸ Agents)</span>
             ) : (
-              <Select block value={chosen} options={agents.map((a) => ({ value: a, label: a, hint: a === preferred ? 'default' : undefined }))} onChange={setAgent} />
+              <Select block value={chosen} options={agents.map((a) => agentOption(a, defined, a === preferred ? 'default' : undefined))} onChange={setAgent} />
             )}
           </label>
           <label className="grow">
@@ -124,7 +128,7 @@ export function NewTaskForm() {
                     checked={extra.includes(a)}
                     onChange={(e) => setExtra((cur) => (e.target.checked ? [...cur, a] : cur.filter((x) => x !== a)))}
                   />
-                  also {a}
+                  also {agentLabel(a, defined)}
                 </label>
               ))}
               {agents.length < 2 && <span className="muted">Only one agent is installed: use several attempts.</span>}

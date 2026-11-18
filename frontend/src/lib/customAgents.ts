@@ -106,10 +106,11 @@ export const followDefault = (defaultAgent: string, from: string, to: string): s
 /**
  * Tooltip of "Resolve with …". Conflicts are resolved in a terminal, which a
  * custom ACP agent can't drive, so a native agent may stand in for the default.
+ * A defined agent runs there as its engine (preferredEngine), without a note.
  */
-export function conflictHint(preferred: string, conflictAgent: string): string {
+export function conflictHint(preferred: string, conflictAgent: string, preferredEngine = preferred): string {
   const base = `Start ${conflictAgent} in a new terminal to resolve these conflicts`
-  return preferred && preferred !== conflictAgent ? `${base} (${preferred} has no terminal mode)` : base
+  return preferred && preferredEngine !== conflictAgent ? `${base} (${preferred} has no terminal mode)` : base
 }
 
 /** Presets not added yet (by id or command). */

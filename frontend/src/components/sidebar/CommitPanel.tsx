@@ -8,6 +8,8 @@ import { showToast } from '../../store/dialog'
 import { resolveConflictsWithAgent, suggestCommitMessage, useAgent } from '../../store/agent'
 import { errorMessage } from '../../api/backend'
 import { conflictHint } from '../../lib/customAgents'
+import { agentOption, engineOf } from '../../lib/agentDefs'
+import { useAgentDefs } from '../../store/agentDefs'
 import { Select } from '../ui/Select'
 import { openStashDialog } from '../../store/stash'
 import { StashSection } from './StashSection'
@@ -65,6 +67,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
   const [generating, setGenerating] = useState(false)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const agents = useAgent()
+  const defined = useAgentDefs((s) => s.defined)
   const reviewing = useAgentReview((s) => !!s.running)
   useFocus(textarea, focusToken)
   useEffect(() => {
@@ -146,7 +149,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
             <button
               className="link"
               onClick={() => void resolveConflictsWithAgent(root, status.operation, conflicted.map((f) => f.path))}
-              title={conflictHint(agents.preferred, agents.conflictAgent)}
+              title={conflictHint(agents.preferred, agents.conflictAgent, engineOf(agents.preferred, defined))}
             >
               Resolve with {agents.conflictAgent}
             </button>
@@ -178,7 +181,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
             <Select
               size="sm"
               value={agents.preferred}
-              options={agents.available.map((a) => ({ value: a, label: a }))}
+              options={agents.available.map((a) => agentOption(a, defined))}
               onChange={(a) => agents.setPreferred(a)}
               title="Agent used for generating messages and resolving conflicts"
             />
@@ -308,6 +311,7 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
   const { root, status } = section
   const { isIncluded, setGroup, toggleFile } = useGit.getState()
   const busy = useGit((s) => s.busy)
+  const defined = useAgentDefs((s) => s.defined)
   const openDiff = useEditor((s) => s.openDiff)
   const openFile = useEditor((s) => s.openFile)
   const agents = useAgent()
@@ -341,7 +345,7 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
               {g.key === 'conflicts' && agents.conflictAgent && (
                 <button
                   className="link agent-action"
-                  title={conflictHint(agents.preferred, agents.conflictAgent)}
+                  title={conflictHint(agents.preferred, agents.conflictAgent, engineOf(agents.preferred, defined))}
                   onClick={(e) => (e.stopPropagation(), resolve(g.files.map((f) => f.path)))}
                 >
                   ✦ Resolve with {agents.conflictAgent}

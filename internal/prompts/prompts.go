@@ -73,34 +73,79 @@ func ValidName(name string) bool {
 	return len(name) <= maxName && namePattern.MatchString(name)
 }
 
-// Parse reads a prompt file: optional front matter (simple "key: value"
-// lines between two "---" lines; '#' starts a comment line) and the body.
-// Keys: description, agent, args (comma-separated, optionally in [ ]).
-// Unknown keys are ignored, so newer files still load.
+// Parse reads a prompt file (see FrontMatter for its format). Keys:
+// description, agent, args (comma-separated, optionally in [ ]). Unknown keys
+// are ignored, so newer files still load.
 func Parse(name string, data []byte) (Prompt, error) {
 	if !ValidName(name) {
 		return Prompt{}, fmt.Errorf("name %q: use letters, digits, - and _ (at most %d)", name, maxName)
 	}
-	if !utf8.Valid(data) {
-		return Prompt{}, errors.New("not UTF-8 text")
+	fields, body, err := FrontMatter(data)
+	if err != nil {
+		return Prompt{}, err
 	}
-	text := strings.ReplaceAll(string(data), "\r\n", "\n")
 	p := Prompt{Name: name, Args: []string{}}
-	if rest, ok := strings.CutPrefix(text, "---\n"); ok {
-		header, body, found := cutFrontMatter(rest)
-		if !found {
-			return Prompt{}, errors.New("front matter has no closing ---")
+	for _, f := range fields {
+		switch f.Key {
+		case "description":
+			err = p.setDescription(f.Value)
+		case "agent":
+			err = p.setAgent(f.Value)
+		case "args":
+			err = p.setArgs(f.Value)
 		}
-		if err := p.applyHeader(header); err != nil {
+		if err != nil {
 			return Prompt{}, err
 		}
-		text = body
 	}
-	p.Body = strings.TrimSpace(text)
+	p.Body = strings.TrimSpace(body)
 	if p.Body == "" {
 		return Prompt{}, errors.New("the prompt text is empty")
 	}
 	return p, nil
+}
+
+// Field is one "key: value" line of a file's front matter.
+type Field struct {
+	// Key is lowercased; Value is trimmed and unquoted.
+	Key, Value string
+}
+
+// FrontMatter splits a Markdown file of the prompt-file format (prompts,
+// roles, agent definitions) into its front matter and its body: optional
+// simple "key: value" lines between two "---" lines, where '#' starts a
+// comment line, then the body (untrimmed). Values may not hold control
+// characters.
+func FrontMatter(data []byte) (fields []Field, body string, err error) {
+	if !utf8.Valid(data) {
+		return nil, "", errors.New("not UTF-8 text")
+	}
+	text := strings.ReplaceAll(string(data), "\r\n", "\n")
+	rest, ok := strings.CutPrefix(text, "---\n")
+	if !ok {
+		return nil, text, nil
+	}
+	header, body, found := cutFrontMatter(rest)
+	if !found {
+		return nil, "", errors.New("front matter has no closing ---")
+	}
+	for line := range strings.SplitSeq(header, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, ":")
+		if !ok {
+			return nil, "", fmt.Errorf("front matter line %q is not key: value", line)
+		}
+		key = strings.TrimSpace(key)
+		value = unquote(strings.TrimSpace(value))
+		if strings.ContainsFunc(value, unicode.IsControl) {
+			return nil, "", fmt.Errorf("%s contains control characters", key)
+		}
+		fields = append(fields, Field{Key: strings.ToLower(key), Value: value})
+	}
+	return fields, body, nil
 }
 
 // cutFrontMatter splits what follows the opening "---" at the closing one.
@@ -113,36 +158,6 @@ func cutFrontMatter(s string) (header, body string, ok bool) {
 		return strings.TrimSuffix(s, "\n---"), "", true
 	}
 	return header, body, ok
-}
-
-func (p *Prompt) applyHeader(header string) error {
-	for line := range strings.SplitSeq(header, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		key, value, ok := strings.Cut(line, ":")
-		if !ok {
-			return fmt.Errorf("front matter line %q is not key: value", line)
-		}
-		value = unquote(strings.TrimSpace(value))
-		if strings.ContainsFunc(value, unicode.IsControl) {
-			return fmt.Errorf("%s contains control characters", strings.TrimSpace(key))
-		}
-		var err error
-		switch strings.ToLower(strings.TrimSpace(key)) {
-		case "description":
-			err = p.setDescription(value)
-		case "agent":
-			err = p.setAgent(value)
-		case "args":
-			err = p.setArgs(value)
-		}
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (p *Prompt) setDescription(v string) error {

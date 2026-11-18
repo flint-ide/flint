@@ -14,8 +14,8 @@ type AgentReview struct {
 	// MaxDiffKB bounds the diff sent to the agent; larger diffs are
 	// shortened per file.
 	MaxDiffKB int `json:"maxDiffKB"`
-	// Agent reviews ("claude", "codex" or a custom agent's id); empty means
-	// the default agent.
+	// Agent reviews ("claude", "codex", a custom agent's id or a defined
+	// agent's name); empty means the default agent.
 	Agent string `json:"agent"`
 	// TimeoutSeconds stops a review that takes longer.
 	TimeoutSeconds int `json:"timeoutSeconds"`

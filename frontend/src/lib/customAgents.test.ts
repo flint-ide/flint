@@ -69,4 +69,5 @@ test('presets: the ones not added yet; displayName falls back to the id', () => 
 test('conflictHint says when a native agent stands in', () => {
   assert.equal(conflictHint('claude', 'claude'), 'Start claude in a new terminal to resolve these conflicts')
   assert.match(conflictHint('gemini', 'codex'), /codex in a new terminal.*gemini has no terminal mode/)
+  assert.equal(conflictHint('reviewer', 'claude', 'claude'), 'Start claude in a new terminal to resolve these conflicts')
 })

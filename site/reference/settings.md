@@ -52,9 +52,10 @@ The file is readable only by your user. It never contains secrets: database pass
     "claude": {
       "path": "/opt/homebrew/bin/claude",
       "model": "opus",
-      "args": ["--add-dir", "/Users/me/notes"]
+      "args": ["--add-dir", "/Users/me/notes"],
+      "tiers": { "strong": "claude-opus-4-1", "fast": "" }
     },
-    "codex": { "path": "", "model": "", "args": ["-c", "model_reasoning_effort=high"] }
+    "codex": { "path": "", "model": "", "args": ["-c", "model_reasoning_effort=high"], "tiers": { "strong": "gpt-5-codex" } }
   },
   "customAgents": [
     { "id": "gemini", "name": "Gemini CLI", "command": "gemini", "args": ["--experimental-acp"] }
@@ -109,7 +110,7 @@ The file is readable only by your user. It never contains secrets: database pass
 | `editor` | object | see below | Font for all editors (files, diffs and scratchpads), `vimMode`: Vim key bindings in every editor (default `false`), and `formatOnSave` / `organizeImportsOnSave` (default `false`). |
 | `terminal` | object | see below | Font for terminals and run consoles. |
 | `customTheme` | object | see below | The palette of the `"custom"` theme, usually imported from VS Code. See [customTheme](#customtheme). |
-| `defaultAgent` | string | `""` | Agent for new chats, commit messages and conflict resolution: `"claude"`, `"codex"` or the `id` of a custom agent. Empty means the first installed agent. Conflict resolution always uses Claude Code or Codex. |
+| `defaultAgent` | string | `""` | Agent for new chats, commit messages and conflict resolution: `"claude"`, `"codex"`, the `id` of a custom agent or the name of a [defined agent](../guides/ai-agents.md#defined-agents). Empty means the first installed agent. A name that isn't available (no such file, an untrusted folder, a program that isn't installed) falls back to the first installed agent. Conflict resolution always uses Claude Code or Codex: for a defined agent, the one it runs on. |
 | `autoSave` | boolean | `false` | Save modified files when the Flint window loses focus. |
 | `notifyInBackground` | boolean | `true` | Show a macOS notification and a Dock badge when a run, a test run or an agent finishes while Flint is in the background. |
 | `notifyOnApproval` | boolean | `true` | Also show a notification, and count it on the Dock badge, when an agent chat waits for your approval while Flint is in the background. Also needs `notifyInBackground`. |
@@ -204,6 +205,7 @@ Each entry configures one agent CLI. A missing entry or key uses the default.
 | `path` | string | `""` | The executable. Empty looks up `claude` or `codex` on your login shell's `PATH`. Otherwise a command name (looked up on the `PATH`) or an absolute path; a path relative to the project is refused. |
 | `model` | string | `""` | The model, passed as `--model` (Claude Code, Codex commit messages) or as the chat thread's model (Codex). Empty uses the CLI's default. Letters, digits and `. _ : / @ [ ] -`, up to 128 characters, not starting with `-`. |
 | `args` | array of strings | `[]` | Extra command-line arguments for chats, commit messages and conflict resolution. |
+| `tiers` | object | see below | The model each [model tier](../guides/ai-agents.md#model-tiers) means on this agent CLI, for defined agents whose `model` is `fast`, `balanced` or `strong`: `{ "fast": "…", "balanced": "…", "strong": "…" }`. A missing tier uses the default: `haiku`, `sonnet` and `opus` for Claude Code, none for Codex. `""` means none, not even the default. A tier without a model runs on `model` above. Each value follows the rules of `model`. |
 
 Extra arguments are placed before Flint's own flags, so where a CLI lets a repeated flag override an earlier one, Flint's flag wins. They also may not:
 
@@ -212,6 +214,8 @@ Extra arguments are placed before Flint's own flags, so where a CLI lets a repea
 - be more than 32 arguments or longer than 512 characters each.
 
 In [Restricted Mode](../guides/restricted-mode.md) the extra arguments are left out, because a flag such as `--mcp-config` or `--add-dir` with a relative path would load the project's files.
+
+In `tiers`, other keys than `fast`, `balanced` and `strong` are refused, and so is a value that isn't a valid model. When the file is loaded, such a tier is dropped and uses its default again. To clear one of Claude Code's defaults, set the tier to `""` here: Settings ▸ Agents can set a tier's model or return it to the default (an empty field), but not clear it.
 
 ### customAgents
 
@@ -259,6 +263,8 @@ Flint's own MCP server for agent chats: read-only tools, and tools that act when
 | `testWaitSeconds` | integer | 10–540 | `120` | How long `run_tests` waits for a test run before it answers with the results so far (clamped into the range). |
 
 Tool switches apply right away, also to running chats.
+
+`get_backlog` (the [backlog](../guides/backlog.md#what-agents-can-see)) has no key here: it is offered while the Backlog feature is on (see [features](#features)).
 ### completions
 
 Ghost-text suggestions in file editors from a fill-in-the-middle code model. See [AI in the editor](../guides/editor-and-navigation.md#ai-in-the-editor).
@@ -342,7 +348,7 @@ Used by [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-a
 |---|---|---|---|---|
 | `scope` | string | `"selected"`, `"all"` | `"selected"` | What a review covers: the changes ticked in the Commit panel, or every change. A review started from a diff tab always includes that tab's file. |
 | `maxDiffKB` | integer | 8–512 | `128` | Largest diff sent to the agent, in KB; never exceeded. Above it, small files still go in whole and the larger ones share the rest: each keeps its first hunks, or is summarized in one line, with a note that tells the agent to read the file. Files with no room left at all are left out and listed in a note. Untracked files are read only as far as their share. |
-| `agent` | string | | `""` | The reviewing agent: `"claude"`, `"codex"` or the `id` of a custom agent. Empty uses `defaultAgent`. An agent that isn't configured falls back to empty. What each agent can read on its own is described in [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-agent): Codex can read any file you can, and a custom agent started with an auto-approve flag is not read-only. |
+| `agent` | string | | `""` | The reviewing agent: `"claude"`, `"codex"`, the `id` of a custom agent or the name of a [defined agent](../guides/ai-agents.md#defined-agents). Empty uses `defaultAgent`. An agent that isn't configured falls back to empty. What each agent can read on its own is described in [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-agent): Codex can read any file you can, and a custom agent started with an auto-approve flag is not read-only. |
 | `timeoutSeconds` | integer | 30–1800 | `300` | A review that takes longer is stopped, with the agent and everything it started. |
 ### ci
 

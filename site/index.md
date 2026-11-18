@@ -29,8 +29,9 @@ See [Editor and navigation](guides/editor-and-navigation.md) and [Terminals](gui
 - Chat with Claude Code or Codex inside Flint, with streamed answers, tool calls, the plan and the list of changed files.
 - Send a selection, a file, terminal output or a compiler error to the agent with one shortcut (`⌘L`).
 - Let the agent write your commit message or resolve merge conflicts.
+- Plan work in a [backlog](guides/backlog.md) and hand each item to agents, one task per repository.
 
-See [AI agents](guides/ai-agents.md) and [Build a feature with an agent](use-cases/build-a-feature-with-an-agent.md).
+See [AI agents](guides/ai-agents.md), [Backlog](guides/backlog.md) and [Build a feature with an agent](use-cases/build-a-feature-with-an-agent.md).
 
 ### Git and GitHub
 

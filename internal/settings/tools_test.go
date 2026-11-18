@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -27,6 +28,18 @@ func TestValidateToolSettings(t *testing.T) {
 		{"model flag", func(s *Settings) {
 			s.Agents = map[string]AgentSettings{"claude": {Model: "--dangerously-skip-permissions"}}
 		}, "invalid model"},
+		{"tiers", func(s *Settings) {
+			s.Agents = map[string]AgentSettings{
+				"claude": {Tiers: map[string]string{"fast": "", "strong": "claude-opus-4-1"}},
+				"codex":  {Tiers: map[string]string{"balanced": "gpt-5-codex"}},
+			}
+		}, ""},
+		{"unknown tier", func(s *Settings) {
+			s.Agents = map[string]AgentSettings{"codex": {Tiers: map[string]string{"huge": "gpt-5"}}}
+		}, `agents.codex: unknown model tier "huge"`},
+		{"tier flag", func(s *Settings) {
+			s.Agents = map[string]AgentSettings{"claude": {Tiers: map[string]string{"strong": "--yolo"}}}
+		}, "agents.claude: tier strong: invalid model"},
 		{"arg newline", func(s *Settings) { s.Agents = map[string]AgentSettings{"claude": {Args: []string{"a\nb"}}} }, "newline"},
 		{"arg overrides setting sources", func(s *Settings) {
 			s.Agents = map[string]AgentSettings{"claude": {Args: []string{"--setting-sources", "project"}}}
@@ -140,6 +153,79 @@ func TestToolSettingsRoundtripAndViews(t *testing.T) {
 	}
 }
 
+// Tiers: an unknown tier or a bad model is dropped (back to the default), an
+// explicit "" survives a save and a load (it clears a default), and the
+// agent's Config carries the tiers with the defaults filled in.
+func TestToolSettingsTiers(t *testing.T) {
+	got, err := Load(write(t, `{"agents": {
+		"claude": {"tiers": {"fast": "", "balanced": "x y", "strong": "claude-opus-4-1", "huge": "opus"}},
+		"codex": {"tiers": {"strong": "gpt-5-codex", "fast": 3}},
+		"gemini": {"tiers": {"strong": "x"}}
+	}, "theme": "light"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]map[string]string{
+		"claude": {"fast": "", "strong": "claude-opus-4-1"},
+		"codex":  {"strong": "gpt-5-codex"},
+	}
+	for name, tiers := range want {
+		if !maps.Equal(got.Agents[name].Tiers, tiers) {
+			t.Errorf("%s tiers = %#v, want %#v", name, got.Agents[name].Tiers, tiers)
+		}
+	}
+	if err := Validate(got); err != nil {
+		t.Fatalf("normalized settings fail Validate: %v", err)
+	}
+	// Tiers of the wrong type lose only themselves (the rest of the agent
+	// and of the file loads).
+	for _, tiers := range []string{`"strong"`, `[1]`, `3`, `{"fast": 3}`} {
+		bad, err := Load(write(t, `{"agents": {"claude": {"model": "opus", "tiers": `+tiers+`}}, "theme": "light", "watchExclude": ["zzz"]}`))
+		if err != nil || bad.Theme != "light" || bad.Agents["claude"].Model != "opus" || len(bad.Agents["claude"].Tiers) != 0 ||
+			!slices.Equal(bad.WatchExclude, []string{"zzz"}) {
+			t.Errorf("tiers %s: %+v, %v", tiers, bad.Agents, err)
+		}
+	}
+	path := filepath.Join(t.TempDir(), FileName)
+	if _, err := Save(path, got); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		name string
+		want map[string]string
+	}{
+		{"claude", map[string]string{"balanced": "sonnet", "strong": "claude-opus-4-1"}}, // fast cleared
+		{"codex", map[string]string{"strong": "gpt-5-codex"}},
+	} {
+		if cfg := loaded.AgentConfig(tt.name); !reflect.DeepEqual(cfg.Tiers, tt.want) {
+			t.Errorf("AgentConfig(%s).Tiers = %v, want %v", tt.name, cfg.Tiers, tt.want)
+		}
+	}
+	// Nothing configured: Claude Code's defaults, none for Codex.
+	def := Default()
+	if got := def.AgentConfig("claude").Tiers; !reflect.DeepEqual(got, map[string]string{"fast": "haiku", "balanced": "sonnet", "strong": "opus"}) {
+		t.Errorf("default claude tiers = %v", got)
+	}
+	if got := def.AgentConfig("codex").Tiers; len(got) != 0 {
+		t.Errorf("default codex tiers = %v", got)
+	}
+	// An agent without tiers is saved without the key.
+	if _, err := Save(path, def); err != nil {
+		t.Fatal(err)
+	}
+	def.Agents["codex"] = AgentSettings{Model: "o3"}
+	if _, err := Save(path, def); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(path); strings.Contains(string(data), `"tiers"`) {
+		t.Errorf("empty tiers saved:\n%s", data)
+	}
+}
+
 func TestChangedLanguageServers(t *testing.T) {
 	prev := Default()
 	next := prev.Clone()
@@ -156,11 +242,12 @@ func TestChangedLanguageServers(t *testing.T) {
 
 func TestCloneIsDeep(t *testing.T) {
 	s := Default()
-	s.Agents["claude"] = AgentSettings{Args: []string{"a"}}
+	s.Agents["claude"] = AgentSettings{Args: []string{"a"}, Tiers: map[string]string{"fast": "haiku"}}
 	c := s.Clone()
 	c.Agents["claude"].Args[0] = "b"
+	c.Agents["claude"].Tiers["fast"] = "opus"
 	c.Agents["codex"] = AgentSettings{}
-	if s.Agents["claude"].Args[0] != "a" || len(s.Agents) != 1 {
+	if s.Agents["claude"].Args[0] != "a" || s.Agents["claude"].Tiers["fast"] != "haiku" || len(s.Agents) != 1 {
 		t.Errorf("Clone shares state: %+v", s.Agents)
 	}
 }

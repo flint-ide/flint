@@ -114,10 +114,10 @@ func (s *session) handshake(ctx context.Context, opts Options, resumeID string) 
 	approval := orDefault(opts.ApprovalPolicy, DefaultApprovalPolicy)
 	sandbox := orDefault(opts.Sandbox, DefaultSandbox)
 	method := methodThreadStart
-	var params any = threadStartParams{Cwd: s.cwd, Model: opts.Model, ApprovalPolicy: approval, Sandbox: sandbox}
+	var params any = threadStartParams{Cwd: s.cwd, Model: opts.Model, ApprovalPolicy: approval, Sandbox: sandbox, DeveloperInstructions: opts.Instructions}
 	if resumeID != "" {
 		method = methodThreadResume
-		params = threadResumeParams{ThreadID: resumeID, Cwd: s.cwd, Model: opts.Model, ApprovalPolicy: approval, Sandbox: sandbox, ExcludeTurns: true}
+		params = threadResumeParams{ThreadID: resumeID, Cwd: s.cwd, Model: opts.Model, ApprovalPolicy: approval, Sandbox: sandbox, DeveloperInstructions: opts.Instructions, ExcludeTurns: true}
 	}
 	var res threadStartResponse
 	if err := c.call(ctx, method, params, &res); err != nil {

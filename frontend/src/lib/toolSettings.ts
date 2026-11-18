@@ -8,6 +8,12 @@ export interface AgentSettings {
   model: string
   /** Extra arguments, before Flint's own flags; ignored in Restricted Mode. */
   args: string[]
+  /**
+   * Model tiers (fast, balanced, strong) → this CLI's model, for defined agents that ask for a tier.
+   * A missing tier uses the built-in default (Claude Code: haiku, sonnet, opus; Codex: none);
+   * '' has none, so the agent runs on `model`.
+   */
+  tiers: Record<string, string>
 }
 
 /** One language's server: '' command = the first installed known server. */
@@ -18,18 +24,26 @@ export interface LanguageServerSettings {
   args: string[]
 }
 
-export const EMPTY_AGENT: AgentSettings = Object.freeze({ path: '', model: '', args: Object.freeze([]) as unknown as string[] })
+export const EMPTY_AGENT: AgentSettings = Object.freeze({
+  path: '',
+  model: '',
+  args: Object.freeze([]) as unknown as string[],
+  tiers: Object.freeze({}) as Record<string, string>,
+})
 export const EMPTY_SERVER: LanguageServerSettings = Object.freeze({ disabled: false, command: '', args: Object.freeze([]) as unknown as string[] })
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
+/** String values only: a tier set to '' is kept (it clears a default), anything else is left out (the default). */
+const stringMap = (v: unknown): Record<string, string> =>
+  isObject(v) ? Object.fromEntries(Object.entries(v).filter((e): e is [string, string] => typeof e[1] === 'string')) : {}
 
 export function coerceAgents(v: unknown): Record<string, AgentSettings> {
   const out: Record<string, AgentSettings> = {}
   if (!isObject(v)) return out
   for (const [name, a] of Object.entries(v)) {
-    if (isObject(a)) out[name] = { path: str(a.path), model: str(a.model), args: strings(a.args) }
+    if (isObject(a)) out[name] = { path: str(a.path), model: str(a.model), args: strings(a.args), tiers: stringMap(a.tiers) }
   }
   return out
 }
@@ -58,6 +72,14 @@ export function withAgent(agents: Record<string, AgentSettings>, name: string, c
   return { ...agents, [name]: { ...EMPTY_AGENT, ...agents[name], ...change } }
 }
 
+/** Tiers with one tier set to a model, or back to its default (undefined). A new object. */
+export function withTier(tiers: Readonly<Record<string, string>>, tier: string, model: string | undefined): Record<string, string> {
+  const out = { ...tiers }
+  if (model === undefined) delete out[tier]
+  else out[tier] = model
+  return out
+}
+
 /** The language-server map with language's entry changed. */
 export function withServer(
   servers: Record<string, LanguageServerSettings>,
@@ -68,5 +90,6 @@ export function withServer(
 }
 
 /** True when an entry is all defaults (shown as "Default" in Settings). */
-export const isDefaultAgent = (a: AgentSettings | undefined) => !a || (a.path === '' && a.model === '' && a.args.length === 0)
+export const isDefaultAgent = (a: AgentSettings | undefined) =>
+  !a || (a.path === '' && a.model === '' && a.args.length === 0 && Object.keys(a.tiers ?? {}).length === 0)
 export const isDefaultServer = (l: LanguageServerSettings | undefined) => !l || (!l.disabled && l.command === '' && l.args.length === 0)

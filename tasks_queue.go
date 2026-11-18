@@ -37,8 +37,16 @@ type taskQueue struct {
 	// startMu guards starting: tasks given a slot whose turn has not begun.
 	startMu  sync.Mutex
 	starting map[string]time.Time
+	// held are the tasks of a CreateAgentTasks call still running, which may
+	// yet be rolled back (true: the task holds a slot; false: it is queued).
+	// startQueuedTasks leaves them alone, and their slots outlive startGrace,
+	// until the call succeeded or rolled back. Guarded by startMu.
+	held map[string]bool
 	// starts counts the chats being started in the background (tests wait on it).
 	starts sync.WaitGroup
+	// afterRequest runs after each request of CreateAgentTasks was created
+	// (tests: to interleave the queue deterministically).
+	afterRequest func(done int)
 }
 
 func (a *App) reserveStart(id string) {
@@ -56,6 +64,34 @@ func (a *App) releaseStart(id string) {
 	delete(a.queue.starting, id)
 }
 
+// hold keeps tasks just created out of the queue's hands until unhold (see
+// taskQueue.held).
+func (a *App) hold(tasks []agenttask.Task) {
+	a.queue.startMu.Lock()
+	defer a.queue.startMu.Unlock()
+	if a.queue.held == nil {
+		a.queue.held = map[string]bool{}
+	}
+	for _, t := range tasks {
+		a.queue.held[t.ID] = !t.Queued
+	}
+}
+
+func (a *App) unhold(tasks []agenttask.Task) {
+	a.queue.startMu.Lock()
+	defer a.queue.startMu.Unlock()
+	for _, t := range tasks {
+		delete(a.queue.held, t.ID)
+	}
+}
+
+func (a *App) isHeld(id string) bool {
+	a.queue.startMu.Lock()
+	defer a.queue.startMu.Unlock()
+	_, ok := a.queue.held[id]
+	return ok
+}
+
 // activeTasks counts the tasks that hold a slot: working or waiting for an
 // approval, or starting.
 func (a *App) activeTasks() int {
@@ -66,7 +102,7 @@ func (a *App) activeTasks() int {
 	a.queue.startMu.Lock()
 	defer a.queue.startMu.Unlock()
 	for id, since := range a.queue.starting {
-		if time.Since(since) > startGrace {
+		if time.Since(since) > startGrace && !a.queue.held[id] {
 			delete(a.queue.starting, id)
 			continue
 		}
@@ -105,7 +141,8 @@ func (a *App) openRepos(ctx context.Context) map[string]bool {
 // startQueuedTasks gives free slots to the oldest queued tasks that may
 // start by themselves: their repository is open in this window, their
 // worktree exists and is trusted (Flint never starts an agent in a
-// Restricted Mode folder on its own), and no budget pauses new turns. The
+// Restricted Mode folder on its own), no budget pauses new turns, and they
+// are not held by a CreateAgentTasks call that may still roll them back. The
 // others stay queued until that changes or the user starts them.
 func (a *App) startQueuedTasks() {
 	a.queue.mu.Lock()
@@ -122,7 +159,7 @@ func (a *App) startQueuedTasks() {
 	defer cancel()
 	open := a.openRepos(ctx)
 	next := agenttask.NextQueued(store, free, func(q agenttask.QueuedTask) bool {
-		return open[q.Repo] && isDir(q.Task.Worktree) && a.isTrusted(q.Task.Worktree) && a.budgetPause(q.Task.ID) == nil
+		return !a.isHeld(q.Task.ID) && open[q.Repo] && isDir(q.Task.Worktree) && a.isTrusted(q.Task.Worktree) && a.budgetPause(q.Task.ID) == nil
 	})
 	for _, task := range next {
 		if err := a.dequeue(task.ID); err != nil {
@@ -136,7 +173,7 @@ func (a *App) startQueuedTasks() {
 		}()
 	}
 	if len(next) > 0 {
-		a.emit(eventTasksChanged)
+		a.tasksChanged()
 	}
 }
 
@@ -216,7 +253,7 @@ func (t *TaskAPI) StartNow(id string) (TaskView, error) {
 		return TaskView{}, err
 	}
 	task.Queued = false
-	a.emit(eventTasksChanged)
+	a.tasksChanged()
 	ctx, cancel := t.ctx(gitTimeout)
 	defer cancel()
 	r, err := t.git.repo(ctx, task.Worktree)

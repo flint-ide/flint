@@ -10,6 +10,9 @@ import { Create as $Create } from "@wailsio/runtime";
 import * as accounts$0 from "./internal/accounts/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as agentdefs$0 from "./internal/agentdefs/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as agenttask$0 from "./internal/agenttask/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -34,6 +37,71 @@ import * as testrun$0 from "./internal/testrun/models.js";
 import * as usage$0 from "./internal/usage/models.js";
 
 /**
+ * AgentDefinitions lists the definitions of the personal folder and the
+ * workspace roots.
+ */
+export class AgentDefinitions {
+    /**
+     * Agents are sorted by name.
+     */
+    "agents": DefinedAgent[];
+
+    /**
+     * Problems are files that are not used ("path: reason").
+     */
+    "problems": string[];
+
+    /**
+     * Ignored are the project folders in Restricted Mode whose definitions
+     * were not loaded.
+     */
+    "ignored": agentdefs$0.Ignored[];
+
+    /**
+     * PersonalDir holds the user's own definitions.
+     */
+    "personalDir": string;
+
+    /** Creates a new AgentDefinitions instance. */
+    constructor($$source: Partial<AgentDefinitions> = {}) {
+        if (!("agents" in $$source)) {
+            this["agents"] = [];
+        }
+        if (!("problems" in $$source)) {
+            this["problems"] = [];
+        }
+        if (!("ignored" in $$source)) {
+            this["ignored"] = [];
+        }
+        if (!("personalDir" in $$source)) {
+            this["personalDir"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AgentDefinitions instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AgentDefinitions {
+        const $$createField0_0 = $$createType1;
+        const $$createField1_0 = $$createType2;
+        const $$createField2_0 = $$createType4;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("agents" in $$parsedSource) {
+            $$parsedSource["agents"] = $$createField0_0($$parsedSource["agents"]);
+        }
+        if ("problems" in $$parsedSource) {
+            $$parsedSource["problems"] = $$createField1_0($$parsedSource["problems"]);
+        }
+        if ("ignored" in $$parsedSource) {
+            $$parsedSource["ignored"] = $$createField2_0($$parsedSource["ignored"]);
+        }
+        return new AgentDefinitions($$parsedSource as Partial<AgentDefinitions>);
+    }
+}
+
+/**
  * AgentInfo lists installed agents and the one Flint uses.
  */
 export class AgentInfo {
@@ -46,8 +114,10 @@ export class AgentInfo {
 
     /**
      * ConflictAgent resolves merge conflicts in a terminal: the preferred
-     * agent when it is a native CLI, else the first installed native one
-     * (custom ACP agents have no interactive terminal mode); "" when none.
+     * agent when it is a native CLI, the engine of the preferred agent when
+     * that is a defined agent, else the first installed native one (custom
+     * ACP agents have no interactive terminal mode); "" when none. It is
+     * always "claude", "codex" or "".
      */
     "conflictAgent": string;
 
@@ -70,7 +140,7 @@ export class AgentInfo {
      * Creates a new AgentInfo instance from a string or object.
      */
     static createFrom($$source: any = {}): AgentInfo {
-        const $$createField0_0 = $$createType0;
+        const $$createField0_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("available" in $$parsedSource) {
             $$parsedSource["available"] = $$createField0_0($$parsedSource["available"]);
@@ -106,7 +176,7 @@ export class AgentText {
      * Creates a new AgentText instance from a string or object.
      */
     static createFrom($$source: any = {}): AgentText {
-        const $$createField1_0 = $$createType0;
+        const $$createField1_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("texts" in $$parsedSource) {
             $$parsedSource["texts"] = $$createField1_0($$parsedSource["texts"]);
@@ -151,7 +221,7 @@ export class BudgetStatus {
      * Creates a new BudgetStatus instance from a string or object.
      */
     static createFrom($$source: any = {}): BudgetStatus {
-        const $$createField0_0 = $$createType2;
+        const $$createField0_0 = $$createType6;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("alerts" in $$parsedSource) {
             $$parsedSource["alerts"] = $$createField0_0($$parsedSource["alerts"]);
@@ -266,8 +336,8 @@ export class CIJob {
      * Creates a new CIJob instance from a string or object.
      */
     static createFrom($$source: any = {}): CIJob {
-        const $$createField5_0 = $$createType0;
-        const $$createField7_0 = $$createType4;
+        const $$createField5_0 = $$createType2;
+        const $$createField7_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("lines" in $$parsedSource) {
             $$parsedSource["lines"] = $$createField5_0($$parsedSource["lines"]);
@@ -315,7 +385,7 @@ export class CILog {
      * Creates a new CILog instance from a string or object.
      */
     static createFrom($$source: any = {}): CILog {
-        const $$createField1_0 = $$createType5;
+        const $$createField1_0 = $$createType9;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
@@ -386,7 +456,7 @@ export class CIReport {
      * Creates a new CIReport instance from a string or object.
      */
     static createFrom($$source: any = {}): CIReport {
-        const $$createField8_0 = $$createType7;
+        const $$createField8_0 = $$createType11;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("jobs" in $$parsedSource) {
             $$parsedSource["jobs"] = $$createField8_0($$parsedSource["jobs"]);
@@ -478,12 +548,94 @@ export class ComparedTask {
      * Creates a new ComparedTask instance from a string or object.
      */
     static createFrom($$source: any = {}): ComparedTask {
-        const $$createField0_0 = $$createType8;
+        const $$createField0_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("task" in $$parsedSource) {
             $$parsedSource["task"] = $$createField0_0($$parsedSource["task"]);
         }
         return new ComparedTask($$parsedSource as Partial<ComparedTask>);
+    }
+}
+
+/**
+ * DefinedAgent is an agent definition as Settings and the agent pickers
+ * show it. The instructions are not sent: a definition is edited as a file.
+ */
+export class DefinedAgent {
+    /**
+     * Name is the agent name, used wherever an agent name is.
+     */
+    "name": string;
+    "description": string;
+
+    /**
+     * Engine is the pinned engine ("claude" or "codex"); "" runs on the
+     * default engine.
+     */
+    "engine": string;
+
+    /**
+     * ResolvedEngine is the engine a new conversation would run on now; ""
+     * when none is installed (the agent is then not listed in pickers).
+     */
+    "resolvedEngine": string;
+
+    /**
+     * Model is the model as the file names it: a tier ("fast", "balanced",
+     * "strong") or a model name of the pinned engine; "" keeps the settings'.
+     */
+    "model": string;
+
+    /**
+     * ResolvedModel is the model a new conversation would use on
+     * ResolvedEngine because of Model: a tier's mapped model, or Model
+     * itself. "" when Model is empty, the tier is unmapped on that engine
+     * (the engine's own model applies) or no engine is installed.
+     */
+    "resolvedModel": string;
+    "source": agentdefs$0.Source;
+
+    /**
+     * Path is the Markdown file, for Open.
+     */
+    "path": string;
+
+    /** Creates a new DefinedAgent instance. */
+    constructor($$source: Partial<DefinedAgent> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("description" in $$source)) {
+            this["description"] = "";
+        }
+        if (!("engine" in $$source)) {
+            this["engine"] = "";
+        }
+        if (!("resolvedEngine" in $$source)) {
+            this["resolvedEngine"] = "";
+        }
+        if (!("model" in $$source)) {
+            this["model"] = "";
+        }
+        if (!("resolvedModel" in $$source)) {
+            this["resolvedModel"] = "";
+        }
+        if (!("source" in $$source)) {
+            this["source"] = agentdefs$0.Source.$zero;
+        }
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new DefinedAgent instance from a string or object.
+     */
+    static createFrom($$source: any = {}): DefinedAgent {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new DefinedAgent($$parsedSource as Partial<DefinedAgent>);
     }
 }
 
@@ -511,7 +663,7 @@ export class FileComparison {
      * Creates a new FileComparison instance from a string or object.
      */
     static createFrom($$source: any = {}): FileComparison {
-        const $$createField1_0 = $$createType10;
+        const $$createField1_0 = $$createType14;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("tasks" in $$parsedSource) {
             $$parsedSource["tasks"] = $$createField1_0($$parsedSource["tasks"]);
@@ -543,7 +695,7 @@ export class FileHistory {
      * Creates a new FileHistory instance from a string or object.
      */
     static createFrom($$source: any = {}): FileHistory {
-        const $$createField1_0 = $$createType12;
+        const $$createField1_0 = $$createType16;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("commits" in $$parsedSource) {
             $$parsedSource["commits"] = $$createField1_0($$parsedSource["commits"]);
@@ -621,7 +773,7 @@ export class LiveTerminals {
      * Creates a new LiveTerminals instance from a string or object.
      */
     static createFrom($$source: any = {}): LiveTerminals {
-        const $$createField1_0 = $$createType14;
+        const $$createField1_0 = $$createType18;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("terminals" in $$parsedSource) {
             $$parsedSource["terminals"] = $$createField1_0($$parsedSource["terminals"]);
@@ -661,7 +813,7 @@ export class MergeResult {
      * Creates a new MergeResult instance from a string or object.
      */
     static createFrom($$source: any = {}): MergeResult {
-        const $$createField1_0 = $$createType0;
+        const $$createField1_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("conflicts" in $$parsedSource) {
             $$parsedSource["conflicts"] = $$createField1_0($$parsedSource["conflicts"]);
@@ -752,7 +904,7 @@ export class NewTaskGroup {
      * Creates a new NewTaskGroup instance from a string or object.
      */
     static createFrom($$source: any = {}): NewTaskGroup {
-        const $$createField3_0 = $$createType0;
+        const $$createField3_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("agents" in $$parsedSource) {
             $$parsedSource["agents"] = $$createField3_0($$parsedSource["agents"]);
@@ -871,7 +1023,7 @@ export class ProfiledTests {
      * Creates a new ProfiledTests instance from a string or object.
      */
     static createFrom($$source: any = {}): ProfiledTests {
-        const $$createField2_0 = $$createType15;
+        const $$createField2_0 = $$createType19;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField2_0($$parsedSource["files"]);
@@ -926,7 +1078,7 @@ export class PromptInput {
      * Creates a new PromptInput instance from a string or object.
      */
     static createFrom($$source: any = {}): PromptInput {
-        const $$createField3_0 = $$createType5;
+        const $$createField3_0 = $$createType9;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("args" in $$parsedSource) {
             $$parsedSource["args"] = $$createField3_0($$parsedSource["args"]);
@@ -990,8 +1142,8 @@ export class PromptLibrary {
      * Creates a new PromptLibrary instance from a string or object.
      */
     static createFrom($$source: any = {}): PromptLibrary {
-        const $$createField0_0 = $$createType17;
-        const $$createField1_0 = $$createType0;
+        const $$createField0_0 = $$createType21;
+        const $$createField1_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("prompts" in $$parsedSource) {
             $$parsedSource["prompts"] = $$createField0_0($$parsedSource["prompts"]);
@@ -1055,7 +1207,7 @@ export class ProviderInfo {
      * Creates a new ProviderInfo instance from a string or object.
      */
     static createFrom($$source: any = {}): ProviderInfo {
-        const $$createField3_0 = $$createType19;
+        const $$createField3_0 = $$createType23;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("account" in $$parsedSource) {
             $$parsedSource["account"] = $$createField3_0($$parsedSource["account"]);
@@ -1275,7 +1427,7 @@ export class ReviewRequest {
      * Creates a new ReviewRequest instance from a string or object.
      */
     static createFrom($$source: any = {}): ReviewRequest {
-        const $$createField1_0 = $$createType21;
+        const $$createField1_0 = $$createType25;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
@@ -1316,9 +1468,9 @@ export class ReviewResult {
      * Creates a new ReviewResult instance from a string or object.
      */
     static createFrom($$source: any = {}): ReviewResult {
-        const $$createField1_0 = $$createType0;
-        const $$createField2_0 = $$createType23;
-        const $$createField3_0 = $$createType0;
+        const $$createField1_0 = $$createType2;
+        const $$createField2_0 = $$createType27;
+        const $$createField3_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("files" in $$parsedSource) {
             $$parsedSource["files"] = $$createField1_0($$parsedSource["files"]);
@@ -1383,9 +1535,9 @@ export class RunConfigs {
      * Creates a new RunConfigs instance from a string or object.
      */
     static createFrom($$source: any = {}): RunConfigs {
-        const $$createField0_0 = $$createType25;
-        const $$createField1_0 = $$createType25;
-        const $$createField2_0 = $$createType27;
+        const $$createField0_0 = $$createType29;
+        const $$createField1_0 = $$createType29;
+        const $$createField2_0 = $$createType31;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("saved" in $$parsedSource) {
             $$parsedSource["saved"] = $$createField0_0($$parsedSource["saved"]);
@@ -1512,8 +1664,8 @@ export class TaskComparison {
      * Creates a new TaskComparison instance from a string or object.
      */
     static createFrom($$source: any = {}): TaskComparison {
-        const $$createField1_0 = $$createType29;
-        const $$createField2_0 = $$createType31;
+        const $$createField1_0 = $$createType33;
+        const $$createField2_0 = $$createType35;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("tasks" in $$parsedSource) {
             $$parsedSource["tasks"] = $$createField1_0($$parsedSource["tasks"]);
@@ -1584,7 +1736,7 @@ export class TaskFileDiff {
      * Creates a new TaskFileDiff instance from a string or object.
      */
     static createFrom($$source: any = {}): TaskFileDiff {
-        const $$createField4_0 = $$createType33;
+        const $$createField4_0 = $$createType37;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("lines" in $$parsedSource) {
             $$parsedSource["lines"] = $$createField4_0($$parsedSource["lines"]);
@@ -1791,7 +1943,7 @@ export class UndoResult {
      * Creates a new UndoResult instance from a string or object.
      */
     static createFrom($$source: any = {}): UndoResult {
-        const $$createField1_0 = $$createType0;
+        const $$createField1_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("skipped" in $$parsedSource) {
             $$parsedSource["skipped"] = $$createField1_0($$parsedSource["skipped"]);
@@ -1827,8 +1979,8 @@ export class UsageView {
      * Creates a new UsageView instance from a string or object.
      */
     static createFrom($$source: any = {}): UsageView {
-        const $$createField0_0 = $$createType34;
-        const $$createField1_0 = $$createType5;
+        const $$createField0_0 = $$createType38;
+        const $$createField1_0 = $$createType9;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("summary" in $$parsedSource) {
             $$parsedSource["summary"] = $$createField0_0($$parsedSource["summary"]);
@@ -1841,38 +1993,42 @@ export class UsageView {
 }
 
 // Private type creation functions
-const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = usage$0.Alert.createFrom;
-const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = CIFileRef.createFrom;
+const $$createType0 = DefinedAgent.createFrom;
+const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = $Create.Array($Create.Any);
+const $$createType3 = agentdefs$0.Ignored.createFrom;
 const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = $Create.Map($Create.Any, $Create.Any);
-const $$createType6 = CIJob.createFrom;
-const $$createType7 = $Create.Array($$createType6);
-const $$createType8 = TaskView.createFrom;
-const $$createType9 = TaskFileDiff.createFrom;
-const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = git$0.FileCommit.createFrom;
-const $$createType12 = $Create.Array($$createType11);
-const $$createType13 = LiveTerminal.createFrom;
+const $$createType5 = usage$0.Alert.createFrom;
+const $$createType6 = $Create.Array($$createType5);
+const $$createType7 = CIFileRef.createFrom;
+const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = $Create.Map($Create.Any, $Create.Any);
+const $$createType10 = CIJob.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = TaskView.createFrom;
+const $$createType13 = TaskFileDiff.createFrom;
 const $$createType14 = $Create.Array($$createType13);
-const $$createType15 = testrun$0.Profiles.createFrom;
-const $$createType16 = prompts$0.Prompt.createFrom;
-const $$createType17 = $Create.Array($$createType16);
-const $$createType18 = accounts$0.Account.createFrom;
-const $$createType19 = $Create.Nullable($$createType18);
-const $$createType20 = ReviewFile.createFrom;
+const $$createType15 = git$0.FileCommit.createFrom;
+const $$createType16 = $Create.Array($$createType15);
+const $$createType17 = LiveTerminal.createFrom;
+const $$createType18 = $Create.Array($$createType17);
+const $$createType19 = testrun$0.Profiles.createFrom;
+const $$createType20 = prompts$0.Prompt.createFrom;
 const $$createType21 = $Create.Array($$createType20);
-const $$createType22 = review$0.Finding.createFrom;
-const $$createType23 = $Create.Array($$createType22);
-const $$createType24 = runconfig$0.Config.createFrom;
+const $$createType22 = accounts$0.Account.createFrom;
+const $$createType23 = $Create.Nullable($$createType22);
+const $$createType24 = ReviewFile.createFrom;
 const $$createType25 = $Create.Array($$createType24);
-const $$createType26 = runconfig$0.Capabilities.createFrom;
-const $$createType27 = $Create.Map($Create.Any, $$createType26);
-const $$createType28 = ComparedTask.createFrom;
+const $$createType26 = review$0.Finding.createFrom;
+const $$createType27 = $Create.Array($$createType26);
+const $$createType28 = runconfig$0.Config.createFrom;
 const $$createType29 = $Create.Array($$createType28);
-const $$createType30 = agenttask$0.FileRow.createFrom;
-const $$createType31 = $Create.Array($$createType30);
-const $$createType32 = agenttask$0.DiffLine.createFrom;
+const $$createType30 = runconfig$0.Capabilities.createFrom;
+const $$createType31 = $Create.Map($Create.Any, $$createType30);
+const $$createType32 = ComparedTask.createFrom;
 const $$createType33 = $Create.Array($$createType32);
-const $$createType34 = usage$0.Summary.createFrom;
+const $$createType34 = agenttask$0.FileRow.createFrom;
+const $$createType35 = $Create.Array($$createType34);
+const $$createType36 = agenttask$0.DiffLine.createFrom;
+const $$createType37 = $Create.Array($$createType36);
+const $$createType38 = usage$0.Summary.createFrom;

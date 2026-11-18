@@ -16,44 +16,91 @@ func ProjectDir(root string) string { return filepath.Join(root, ".flint", "prom
 // PersonalDir is the user's own prompt folder in Flint's config directory.
 func PersonalDir(configDir string) string { return filepath.Join(configDir, "prompts") }
 
-// LoadDir reads the *.md files of dir. Files that can't be used are skipped and
-// described in problems ("name.md: reason"); a missing folder is no problem.
+// LoadDir reads the prompts of dir (see ReadDir). Files that can't be used are
+// skipped and described in problems ("name.md: reason"); a missing folder is
+// no problem.
+func LoadDir(dir, within string, source Source) (list []Prompt, problems []string) {
+	files, problems := ReadDir(dir, within, MaxPrompts)
+	for _, f := range files {
+		p, err := f.Prompt()
+		if err != nil {
+			problems = append(problems, fmt.Sprintf("%s.md: %v", f.Name, err))
+			continue
+		}
+		p.Source = source
+		list = append(list, p)
+	}
+	return list, problems
+}
+
+// File is one Markdown file read by ReadDir.
+type File struct {
+	// Name is the file name without .md; Path is dir joined with the file name.
+	Name, Path string
+	Data       []byte
+	// Err says why the file could not be read; Data is then empty.
+	Err error
+}
+
+// Prompt parses the file as a prompt.
+func (f File) Prompt() (Prompt, error) {
+	if f.Err != nil {
+		return Prompt{}, f.Err
+	}
+	p, err := Parse(f.Name, f.Data)
+	p.Path = f.Path
+	return p, err
+}
+
+// ReadDir reads the *.md files of dir (hidden ones are skipped), at most max
+// of them; a file that can't be read is returned with Err set. Problems are
+// about the folder itself; a missing folder is no problem.
 //
 // When within is set (a project root), dir and every file must stay inside it
 // after resolving symlinks, so a repository can't make Flint read files from
-// elsewhere on the disk. Only regular files up to MaxFileSize are read, and at
-// most MaxPrompts of them.
-func LoadDir(dir, within string, source Source) (list []Prompt, problems []string) {
+// elsewhere on the disk. Only regular files up to MaxFileSize are read.
+func ReadDir(dir, within string, max int) (files []File, problems []string) {
+	real, names, problems := listDir(dir, within, max)
+	for _, name := range names {
+		data, err := readFile(real, name+".md")
+		files = append(files, File{Name: name, Path: filepath.Join(dir, name+".md"), Data: data, Err: err})
+	}
+	return files, problems
+}
+
+// CountDir is how many files ReadDir would return, up to max, without
+// reading any of them.
+func CountDir(dir, within string, max int) int {
+	_, names, _ := listDir(dir, within, max)
+	return len(names)
+}
+
+// listDir resolves dir (see ReadDir) and lists the names of its *.md files
+// without the extension, at most max of them.
+func listDir(dir, within string, max int) (real string, names, problems []string) {
 	real, err := resolveDir(dir, within)
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
+		return "", nil, nil
 	}
 	if err != nil {
-		return nil, []string{err.Error()}
+		return "", nil, []string{err.Error()}
 	}
 	entries, err := os.ReadDir(real)
 	if err != nil {
-		return nil, []string{fmt.Sprintf("%s: %v", dir, err)}
+		return "", nil, []string{fmt.Sprintf("%s: %v", dir, err)}
 	}
 	for _, e := range entries {
 		name, ok := strings.CutSuffix(e.Name(), ".md")
 		if !ok || strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
-		if len(list) == MaxPrompts {
-			problems = append(problems, fmt.Sprintf("%s: more than %d prompts; the rest are not loaded", dir, MaxPrompts))
+		if len(names) == max {
+			problems = append(problems, fmt.Sprintf("%s: more than %d files; the rest are not loaded", dir, max))
 			break
 		}
-		p, err := loadFile(real, e.Name(), name)
-		if err != nil {
-			problems = append(problems, fmt.Sprintf("%s: %v", e.Name(), err))
-			continue
-		}
-		p.Source = source
-		p.Path = filepath.Join(dir, e.Name())
-		list = append(list, p)
+		names = append(names, name)
 	}
-	return list, problems
+	return real, names, problems
 }
 
 // resolveDir resolves dir's symlinks and, with within set, checks that it
@@ -71,46 +118,46 @@ func resolveDir(dir, within string) (string, error) {
 		return "", err
 	}
 	if !inside(real, base) {
-		return "", fmt.Errorf("%s points outside the project; its prompts are not loaded", dir)
+		return "", fmt.Errorf("%s points outside the project; its files are not loaded", dir)
 	}
 	return real, nil
 }
 
-// loadFile reads one prompt from dir (already resolved). A symlink is
-// followed only to a file inside dir.
-func loadFile(dir, file, name string) (Prompt, error) {
+// readFile reads one file of dir (already resolved). A symlink is followed
+// only to a file inside dir.
+func readFile(dir, file string) ([]byte, error) {
 	path := filepath.Join(dir, file)
 	real, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		return Prompt{}, err
+		return nil, err
 	}
 	if !inside(real, dir) {
-		return Prompt{}, errors.New("links outside the prompt folder")
+		return nil, errors.New("links outside its folder")
 	}
 	f, err := os.Open(real)
 	if err != nil {
-		return Prompt{}, err
+		return nil, err
 	}
 	defer f.Close()
 	info, err := f.Stat()
 	if err != nil {
-		return Prompt{}, err
+		return nil, err
 	}
 	if !info.Mode().IsRegular() {
-		return Prompt{}, errors.New("not a regular file")
+		return nil, errors.New("not a regular file")
 	}
 	if info.Size() > MaxFileSize {
-		return Prompt{}, fmt.Errorf("larger than %d KB", MaxFileSize>>10)
+		return nil, fmt.Errorf("larger than %d KB", MaxFileSize>>10)
 	}
 	// Read through a limit too: the file may grow after Stat.
 	data, err := io.ReadAll(io.LimitReader(f, MaxFileSize+1))
 	if err != nil {
-		return Prompt{}, err
+		return nil, err
 	}
 	if len(data) > MaxFileSize {
-		return Prompt{}, fmt.Errorf("larger than %d KB", MaxFileSize>>10)
+		return nil, fmt.Errorf("larger than %d KB", MaxFileSize>>10)
 	}
-	return Parse(name, data)
+	return data, nil
 }
 
 // inside reports whether path is dir or under it (both cleaned and resolved).
@@ -138,6 +185,18 @@ func Create(dir, within, name string) (string, error) {
 	if !ValidName(name) {
 		return "", fmt.Errorf("invalid prompt name %q: use letters, digits, - and _", name)
 	}
+	path, err := WriteNew(dir, within, name+".md", template)
+	if errors.Is(err, fs.ErrExist) {
+		return "", fmt.Errorf("a prompt named %s already exists", name)
+	}
+	return path, err
+}
+
+// WriteNew creates file in dir (and dir itself) with content and returns its
+// path. It never overwrites a file (the error then wraps fs.ErrExist). With
+// within set (a project root), dir must stay inside it after resolving
+// symlinks. file must be a plain file name the caller has checked.
+func WriteNew(dir, within, file, content string) (string, error) {
 	if within != "" {
 		// Check before creating anything: MkdirAll follows a linked .flint.
 		if err := checkCreatable(dir, within); err != nil {
@@ -152,15 +211,12 @@ func Create(dir, within, name string) (string, error) {
 			return "", err
 		}
 	}
-	path := filepath.Join(dir, name+".md")
+	path := filepath.Join(dir, file)
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
-	if errors.Is(err, fs.ErrExist) {
-		return "", fmt.Errorf("a prompt named %s already exists", name)
-	}
 	if err != nil {
 		return "", err
 	}
-	if _, err := f.WriteString(template); err != nil {
+	if _, err := f.WriteString(content); err != nil {
 		f.Close()
 		return "", err
 	}

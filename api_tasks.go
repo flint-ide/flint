@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -278,7 +277,7 @@ type NewTaskGroup struct {
 func (t *TaskAPI) CreateGroup(req NewTaskGroup) ([]TaskView, error) {
 	ctx, cancel := t.ctx(gitRemoteTimeout) // checkout hooks may run
 	defer cancel()
-	made, r, err := t.app.createTasks(ctx, req, true)
+	made, r, err := t.app.createTasks(ctx, req, true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -296,14 +295,16 @@ func (t *TaskAPI) CreateGroup(req NewTaskGroup) ([]TaskView, error) {
 // remembered as queued when queueOK, otherwise nothing is created and the
 // error says so. A task that is not queued holds a slot (reserveStart) until
 // its chat's start is reported done (releaseStart): whoever calls this starts
-// that chat, or releases the slot.
-func (a *App) createTasks(ctx context.Context, req NewTaskGroup, queueOK bool) ([]agenttask.Task, *git.Repo, error) {
+// that chat, or releases the slot. With hold, the tasks are held (hold) before
+// the queue can see them: the caller unholds them once it keeps or discards
+// them.
+func (a *App) createTasks(ctx context.Context, req NewTaskGroup, queueOK, hold bool) ([]agenttask.Task, *git.Repo, error) {
 	desc := strings.TrimSpace(req.Description)
 	switch {
 	case desc == "":
 		return nil, nil, errors.New("describe the task first")
 	case len(desc) > agenttask.MaxPrompt:
-		return nil, nil, fmt.Errorf("the description is longer than %d characters", agenttask.MaxPrompt)
+		return nil, nil, fmt.Errorf("the description is longer than %d bytes", agenttask.MaxPrompt)
 	case strings.ContainsRune(desc, 0):
 		return nil, nil, errors.New("the description contains a NUL character")
 	case len(req.Agents) == 0:
@@ -315,7 +316,7 @@ func (a *App) createTasks(ctx context.Context, req NewTaskGroup, queueOK bool) (
 		return nil, nil, err
 	}
 	s := a.currentSettings()
-	installed := installedAgents(s, exec.LookPath)
+	installed := a.availableAgents()
 	for _, agent := range req.Agents {
 		if !slices.Contains(installed, agent) {
 			return nil, nil, fmt.Errorf("the agent %q is not installed", agent)
@@ -353,15 +354,6 @@ func (a *App) createTasks(ctx context.Context, req NewTaskGroup, queueOK bool) (
 		return nil, nil, fmt.Errorf("the limit of %d tasks working at once is reached: wait for one to finish", s.AgentTasks.MaxParallel)
 	}
 	var made []agenttask.Task
-	undo := func() {
-		for _, task := range made {
-			a.releaseStart(task.ID)
-			_ = r.RemoveWorktree(ctx, task.Worktree, true)
-			_ = r.DeleteBranch(ctx, task.Branch, true)
-			_ = a.untrustTask(task)
-			_ = a.saveTasks(func(st agenttask.Store) (agenttask.Store, error) { return st.Remove(task.ID), nil })
-		}
-	}
 	for _, agent := range req.Agents {
 		task, err := a.createOne(ctx, r, agenttask.Task{
 			ID: agenttask.NewID(), Title: agenttask.Title(desc), Prompt: redact.Secrets(desc), Agent: agent,
@@ -371,15 +363,30 @@ func (a *App) createTasks(ctx context.Context, req NewTaskGroup, queueOK bool) (
 			Queued: agenttask.Slots(s.AgentTasks.MaxParallel, a.activeTasks()) == 0,
 		}, pathOf, &made)
 		if err != nil {
-			undo()
+			a.discardTasks(ctx, r, made)
 			return nil, nil, err
 		}
 		if !task.Queued {
 			a.reserveStart(task.ID) // its chat starts next
 		}
 	}
-	a.emit(eventTasksChanged)
+	if hold {
+		a.hold(made) // under queue.mu: the queue never sees them unheld
+	}
+	a.tasksChanged()
 	return made, r, nil
+}
+
+// discardTasks undoes tasks of r that were just created and whose chats have
+// not started: their slots, worktrees, branches, trust and entries go.
+func (a *App) discardTasks(ctx context.Context, r *git.Repo, made []agenttask.Task) {
+	for _, task := range made {
+		a.releaseStart(task.ID)
+		_ = r.RemoveWorktree(ctx, task.Worktree, true)
+		_ = r.DeleteBranch(ctx, task.Branch, true)
+		_ = a.untrustTask(task)
+		_ = a.saveTasks(func(st agenttask.Store) (agenttask.Store, error) { return st.Remove(task.ID), nil })
+	}
 }
 
 // createOne gives task (whose Branch is the wanted name) a free branch and a
@@ -435,6 +442,10 @@ func (a *App) checkTaskLocation(source, checkout, path string) error {
 }
 
 // taskBase checks the requested base branch, or picks the current one.
+// errDetachedHead: a task needs a base branch and the checkout has none
+// checked out (the feature host turns it into feature.DetachedHeadError).
+var errDetachedHead = errors.New("the checkout is on a detached HEAD: pick a base branch")
+
 func taskBase(ctx context.Context, r *git.Repo, base string) (string, error) {
 	if base == "" {
 		st, err := r.Status(ctx)
@@ -442,7 +453,7 @@ func taskBase(ctx context.Context, r *git.Repo, base string) (string, error) {
 			return "", err
 		}
 		if st.Branch == "" {
-			return "", errors.New("the checkout is on a detached HEAD: pick a base branch")
+			return "", errDetachedHead
 		}
 		return st.Branch, nil
 	}
@@ -497,7 +508,7 @@ func (t *TaskAPI) Merge(id string) (MergeResult, error) {
 		return MergeResult{}, err
 	}
 	res.Merged = true
-	t.app.emit(eventTasksChanged)
+	t.app.tasksChanged()
 	return res, nil
 }
 
@@ -546,7 +557,7 @@ func (t *TaskAPI) UpdateFromBase(id string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	t.app.emit(eventTasksChanged)
+	t.app.tasksChanged()
 	return append([]string{}, files...), nil
 }
 
@@ -599,7 +610,7 @@ func (t *TaskAPI) CreatePullRequest(id string) (string, error) {
 	if err != nil {
 		t.app.logf("save pull request of task: %v", err)
 	}
-	t.app.emit(eventTasksChanged)
+	t.app.tasksChanged()
 	return url, nil
 }
 
@@ -717,7 +728,7 @@ func (t *TaskAPI) Remove(id string, opts RemoveOptions) (RemoveResult, error) {
 		return RemoveResult{}, err
 	}
 	err = a.saveTasks(func(s agenttask.Store) (agenttask.Store, error) { return s.Remove(id), nil })
-	a.emit(eventTasksChanged)
+	a.tasksChanged()
 	a.startQueuedTasks() // a working task that was removed frees its slot
 	return res, err
 }

@@ -7,6 +7,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"maps"
+	"slices"
+	"strings"
 	"sync"
 
 	"flint/internal/feature"
@@ -37,6 +41,15 @@ type Host struct {
 	events   []Event
 	opened   []string
 	streams  map[string]terminal.Stream
+
+	// The agent tasks part: tasks by id, repositories by folder, agents, the
+	// requests CreateAgentTasks got, and an error it fails with.
+	tasks     map[string]feature.AgentTask
+	repos     map[string]feature.Repository
+	agents    feature.Agents
+	requested [][]feature.NewAgentTask
+	createErr error
+	nextID    int
 }
 
 // Event is one Emit call.
@@ -50,6 +63,7 @@ func New(ctx context.Context) *Host {
 	return &Host{
 		Ctx: ctx, VersionString: "v1.0.0", settings: settings.Default(),
 		state: map[string]json.RawMessage{}, streams: map[string]terminal.Stream{},
+		tasks: map[string]feature.AgentTask{}, repos: map[string]feature.Repository{},
 	}
 }
 
@@ -74,10 +88,17 @@ func (h *Host) Roots() []string {
 	return append([]string{}, h.roots...)
 }
 
+// Trusted reports a folder marked with SetTrusted or inside one, as the app
+// does (paths compared as given).
 func (h *Host) Trusted(path string) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.trusted[path]
+	for p := range h.trusted {
+		if path == p || strings.HasPrefix(path, p+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 // SetTrusted marks folders as trusted.
@@ -187,4 +208,152 @@ func (h *Host) StartStream(termID, _ string, st terminal.Stream) error {
 	defer h.mu.Unlock()
 	h.streams[termID] = st
 	return nil
+}
+
+// CreateAgentTasks records the requests and makes a task for each, working
+// in a folder named after the request's; with SetCreateError it creates none.
+// Dir must be inside a root, as the app requires.
+func (h *Host) CreateAgentTasks(_ context.Context, reqs []feature.NewAgentTask) ([]feature.AgentTask, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.requested = append(h.requested, slices.Clone(reqs))
+	if h.createErr != nil {
+		return nil, h.createErr
+	}
+	if len(reqs) == 0 {
+		return nil, errors.New("no agent task to create")
+	}
+	for _, r := range reqs {
+		if !h.inRoot(r.Dir) {
+			return nil, fmt.Errorf("%s is outside the open folders", r.Dir)
+		}
+		if !slices.Contains(h.agents.Available, r.Agent) {
+			return nil, fmt.Errorf("the agent %q is not installed", r.Agent)
+		}
+	}
+	var out []feature.AgentTask
+	for _, r := range reqs {
+		h.nextID++
+		id := fmt.Sprintf("%016x", h.nextID)
+		t := feature.AgentTask{ID: id, Title: r.Description, Agent: r.Agent, Branch: "task-" + id, Base: "main", Worktree: r.Dir + "-" + id, State: "working"}
+		h.tasks[id] = t
+		out = append(out, t)
+	}
+	return out, nil
+}
+
+func (h *Host) inRoot(dir string) bool {
+	for _, root := range h.roots {
+		if dir == root || len(dir) > len(root) && dir[:len(root)] == root && dir[len(root)] == '/' {
+			return true
+		}
+	}
+	return false
+}
+
+// SetCreateError makes CreateAgentTasks fail with err (nil: succeed).
+func (h *Host) SetCreateError(err error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.createErr = err
+}
+
+// Requested returns the requests CreateAgentTasks got, one slice per call.
+func (h *Host) Requested() [][]feature.NewAgentTask {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.requested)
+}
+
+func (h *Host) AgentTasks(_ context.Context, ids []string) map[string]feature.AgentTask {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := map[string]feature.AgentTask{}
+	for _, id := range ids {
+		if t, ok := h.tasks[id]; ok {
+			out[id] = t
+		}
+	}
+	return out
+}
+
+// SetAgentTask adds or replaces a task.
+func (h *Host) SetAgentTask(t feature.AgentTask) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.tasks[t.ID] = t
+}
+
+// UpdateAgentTask changes a task in place (nothing when it does not exist).
+func (h *Host) UpdateAgentTask(id string, fn func(*feature.AgentTask)) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if t, ok := h.tasks[id]; ok {
+		fn(&t)
+		h.tasks[id] = t
+	}
+}
+
+// RemoveAgentTask forgets a task, as removing it in the Agent Tasks panel does.
+func (h *Host) RemoveAgentTask(id string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	delete(h.tasks, id)
+}
+
+// AllAgentTasks returns every task.
+func (h *Host) AllAgentTasks() map[string]feature.AgentTask {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return maps.Clone(h.tasks)
+}
+
+// Repository describes the repository set for dir or a folder above it
+// (SetRepository); git.ErrNotRepository's text otherwise.
+func (h *Host) Repository(_ context.Context, dir string) (feature.Repository, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for d := dir; ; {
+		if r, ok := h.repos[d]; ok {
+			r.Remotes = slices.Clone(r.Remotes)
+			return r, nil
+		}
+		i := len(d) - 1
+		for i > 0 && d[i] != '/' {
+			i--
+		}
+		if i <= 0 {
+			return feature.Repository{}, errors.New("not a git repository")
+		}
+		d = d[:i]
+	}
+}
+
+// SetRepository makes dir (and folders in it) a checkout with these remotes.
+func (h *Host) SetRepository(dir string, remotes ...string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.repos[dir] = feature.Repository{Root: dir, Remotes: remotes}
+}
+
+// SetTaskWorktree marks the checkout at dir as an agent task's worktree.
+func (h *Host) SetTaskWorktree(dir string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	r := h.repos[dir]
+	r.TaskWorktree = true
+	h.repos[dir] = r
+}
+
+func (h *Host) Agents() feature.Agents {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return feature.Agents{Available: slices.Clone(h.agents.Available), Default: h.agents.Default}
+}
+
+// SetAgents sets the available agents and the default one.
+func (h *Host) SetAgents(def string, available ...string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.agents = feature.Agents{Available: available, Default: def}
 }

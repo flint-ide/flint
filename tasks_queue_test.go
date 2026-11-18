@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -10,6 +12,7 @@ import (
 	as "flint/internal/agentsession"
 	"flint/internal/agenttask"
 	"flint/internal/config"
+	"flint/internal/settings"
 )
 
 // queueFixture is a task fixture whose repository is trusted (so queued
@@ -426,5 +429,163 @@ func TestTaskWhoseChatCannotStartFails(t *testing.T) {
 	defer mu.Unlock()
 	if len(alerts) != 1 || alerts[0].Title != "An agent task did not start" || !strings.HasPrefix(alerts[0].Body, "second: the agent did not start") {
 		t.Errorf("alerts = %+v", alerts)
+	}
+}
+
+// alertRecorder records the alerts Go sends ("attention:alert").
+func alertRecorder(a *App) func() []AlertEvent {
+	var mu sync.Mutex
+	var alerts []AlertEvent
+	a.emitHook = func(name string, data ...any) {
+		if name == eventAlert {
+			mu.Lock()
+			alerts = append(alerts, data[0].(AlertEvent))
+			mu.Unlock()
+		}
+	}
+	return func() []AlertEvent {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(alerts)
+	}
+}
+
+// An agent that can't start fails the task Flint was starting, and its other
+// queued tasks stay queued, saying why, instead of failing one by one: one
+// alert, not one per task. Start now tries again (and tells again); a change
+// of the agents' settings lets the queue try by itself.
+func TestBrokenAgentStopsItsQueue(t *testing.T) {
+	f := queueFixture(t, 1)
+	alerts := alertRecorder(f.app)
+	a := f.create("first")
+	f.work(a, "sa")
+	var queued []TaskView
+	for _, d := range []string{"second", "third", "fourth"} {
+		queued = append(queued, f.create(d))
+	}
+	// The agent's program is gone by the time they leave the queue.
+	if err := f.app.saveTasks(func(s agenttask.Store) (agenttask.Store, error) {
+		for _, v := range queued {
+			s = s.Update(v.ID, func(t agenttask.Task) agenttask.Task { t.Agent = "gone"; return t })
+		}
+		return s, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	f.settle("sa")
+	if v := f.view(queued[0].ID); v.State != agenttask.Failed || !strings.Contains(v.Error, `unknown agent "gone"`) {
+		t.Fatalf("first to start: %+v", v)
+	}
+	for _, q := range queued[1:] {
+		if v := f.view(q.ID); v.State != agenttask.Queued || !strings.Contains(v.Blocked, `unknown agent "gone"`) || !strings.Contains(v.Blocked, "Start now tries again") {
+			t.Fatalf("the others: %+v", v)
+		}
+	}
+	if got := alerts(); len(got) != 1 || !strings.Contains(got[0].Body, "The other queued tasks of gone wait: Start now on one tries again") {
+		t.Fatalf("alerts %+v", got)
+	}
+	// Start now tries the agent again: it fails again, told once more, and
+	// the last one still waits.
+	if _, err := f.api.StartNow(queued[1].ID); err != nil {
+		t.Fatal(err)
+	}
+	_, task, _ := f.app.taskStore().Find(queued[1].ID)
+	f.app.startTaskChat(task) // the UI would start it; Flint's own start fails the same way
+	if v := f.view(queued[2].ID); v.State != agenttask.Queued || v.Blocked == "" {
+		t.Fatalf("the last one: %+v", v)
+	}
+	if got := alerts(); len(got) != 2 {
+		t.Fatalf("alerts %+v", got)
+	}
+	// The agents' settings change: the queue tries by itself.
+	if _, err := f.app.updateSettings(func(s settings.Settings) settings.Settings {
+		s.Agents = map[string]settings.AgentSettings{"claude": {Path: "/nowhere/claude"}}
+		return s
+	}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, "the last one tried", func() bool { return f.view(queued[2].ID).State == agenttask.Failed })
+}
+
+// A queue-started chat whose agent fails before it does anything (the
+// Manager ends the turn with an error): the task shows failed with the
+// reason, the user is told once, and the queue holds the agent's other
+// tasks. A chat of that agent that works lets the queue go on.
+func TestAgentThatDiesAtOnceStopsItsQueue(t *testing.T) {
+	f := queueFixture(t, 1)
+	alerts := alertRecorder(f.app)
+	a := f.create("first")
+	f.work(a, "sa")
+	b, c := f.create("second"), f.create("third")
+	f.driver.mu.Lock()
+	f.driver.fail = errors.New("claude: the process exited")
+	f.driver.mu.Unlock()
+	f.settle("sa")
+	waitUntil(t, "the start failed", func() bool { return len(alerts()) == 1 })
+	if v := f.view(b.ID); v.State != agenttask.Failed || !strings.Contains(v.Error, "the process exited") {
+		t.Fatalf("view %+v", v)
+	}
+	if got := alerts(); got[0].Tab == "" || !strings.Contains(got[0].Body, "second: the agent did not start: claude: the process exited") {
+		t.Fatalf("alerts %+v", got)
+	}
+	if v := f.view(c.ID); v.State != agenttask.Queued || v.Blocked == "" {
+		t.Fatalf("the next one started: %+v", v)
+	}
+	// A chat of the agent does something: it works again, the queue moves.
+	f.driver.mu.Lock()
+	f.driver.fail = nil
+	f.driver.mu.Unlock()
+	info, err := f.app.openChat(context.Background(), ChatRequest{Agent: "fake", Cwd: f.repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.app.observeTaskStart(as.Event{SessionID: info.ID, Kind: as.KindMessageChunk, Text: "hi"})
+	waitUntil(t, "the next one started", func() bool { return f.view(c.ID).State == agenttask.Working })
+	if got := alerts(); len(got) != 1 {
+		t.Errorf("alerts %+v", got)
+	}
+}
+
+// A task whose chat opened but whose first message failed shows the failure
+// (not idle) while that chat says nothing; a turn the user starts there
+// shows working, and its end replaces the failure.
+func TestTaskFailedWithAnIdleChatShowsFailed(t *testing.T) {
+	f := queueFixture(t, 0)
+	v := f.create("first")
+	f.app.tasks.Bind("s1", v.Worktree) // the chat opened
+	_, task, _ := f.app.taskStore().Find(v.ID)
+	f.app.taskStartFailed(task, "s1", errors.New("chat s1 is open, but its first prompt failed: busy"), false)
+	if got := f.view(v.ID); got.State != agenttask.Failed || !strings.Contains(got.Error, "first prompt failed") {
+		t.Fatalf("view %+v", got)
+	}
+	f.app.tasks.Prompted("s1")
+	if got := f.view(v.ID); got.State != agenttask.Working {
+		t.Fatalf("after the user wrote: %+v", got)
+	}
+	f.settle("s1")
+	if got := f.view(v.ID); got.State != agenttask.Finished || got.Error != "" {
+		t.Fatalf("after the turn: %+v", got)
+	}
+}
+
+// Tasks Flint starts at the same time (a Delegate of many items) with an
+// agent that can't start: each fails, the user is told once.
+func TestBrokenAgentAlertsOnceForTasksStartedTogether(t *testing.T) {
+	f := queueFixture(t, 0)
+	alerts := alertRecorder(f.app)
+	var tasks []agenttask.Task
+	for _, d := range []string{"one", "two", "three", "four", "five"} {
+		v := f.create(d)
+		_, task, _ := f.app.taskStore().Find(v.ID)
+		task.Agent = "gone"
+		tasks = append(tasks, task)
+	}
+	var wg sync.WaitGroup
+	for _, task := range tasks {
+		wg.Go(func() { f.app.startTaskChat(task) })
+	}
+	wg.Wait()
+	if got := alerts(); len(got) != 1 {
+		t.Fatalf("alerts %+v", got)
 	}
 }

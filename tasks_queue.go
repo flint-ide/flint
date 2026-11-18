@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -46,6 +47,14 @@ type taskQueue struct {
 	// startQueuedTasks leaves them alone, and their slots outlive startGrace,
 	// until the call succeeded or rolled back. Guarded by startMu.
 	held map[string]bool
+	// down are the agents that could not start for a task the queue started
+	// (agent name → why): their other queued tasks wait until the user
+	// chooses Start now, the agents' settings change, or a chat of that
+	// agent works (agentWorks). first are the tasks whose chat the queue
+	// started and whose agent has done nothing yet (watchFirstTurn). Both
+	// guarded by startMu.
+	down  map[string]string
+	first map[string]*firstTurn
 	// starts counts the chats being started in the background (tests wait on it).
 	starts sync.WaitGroup
 	// afterRequest runs after each request of CreateAgentTasks was created
@@ -171,7 +180,8 @@ func (a *App) startQueuedTasks() {
 	defer cancel()
 	open := a.openRepos(ctx)
 	next := agenttask.NextQueued(store, free, func(q agenttask.QueuedTask) bool {
-		return !a.isHeld(q.Task.ID) && open[q.Repo] && isDir(q.Task.Worktree) && a.isTrusted(q.Task.Worktree) && a.budgetPause(q.Task.ID) == nil
+		return !a.isHeld(q.Task.ID) && open[q.Repo] && isDir(q.Task.Worktree) && a.isTrusted(q.Task.Worktree) &&
+			a.agentDown(q.Task.Agent) == "" && a.budgetPause(q.Task.ID) == nil
 	})
 	for _, task := range next {
 		// A joint group comes as its lead and leaves the queue whole.
@@ -231,11 +241,14 @@ func (a *App) startTaskChat(task agenttask.Task) {
 	ctx, cancel := context.WithTimeout(a.ctx, agentStartTimeout)
 	defer cancel()
 	origin := taskOrigin
+	a.watchFirstTurn(task)
 	info, err := a.openChat(ctx, ChatRequest{
 		Agent: task.Agent, Cwd: task.Worktree, Prompt: prompt, TaskID: task.ID, Origin: &origin,
 	})
 	if err != nil {
-		a.taskStartFailed(task, info.ID, err)
+		a.unwatchFirstTurn(task.ID)
+		var down *agentStartError
+		a.taskStartFailed(task, info.ID, err, errors.As(err, &down))
 	}
 }
 
@@ -243,8 +256,11 @@ func (a *App) startTaskChat(task agenttask.Task) {
 // the chat Go started for it could not start or take its first message,
 // with the reason, so the Agent Tasks panel and the Projects item show it;
 // and tells the user (an alert: a toast in front, a notification behind).
-// chat is the chat that did open ("" when none did).
-func (a *App) taskStartFailed(task agenttask.Task, chat string, err error) {
+// chat is the chat that did open ("" when none did). agentDown: the agent
+// itself did not start, not something of this task; then its other queued
+// tasks do not start by themselves (agentFailed), and the user is told once
+// however many tasks were starting.
+func (a *App) taskStartFailed(task agenttask.Task, chat string, err error, agentDown bool) {
 	a.logf("start the chat of task %s: %v", task.ID, err)
 	if errors.Is(err, as.ErrClosed) || a.ctx.Err() != nil {
 		return // Flint is quitting: the task did not fail
@@ -269,11 +285,148 @@ func (a *App) taskStartFailed(task agenttask.Task, chat string, err error) {
 		a.logf("save task state: %v", err)
 	}
 	a.tasksChanged()
-	tab := ""
-	if chat != "" {
-		tab = "chat:" + chat
+	if agentDown {
+		a.agentFailed(task, chat, reason)
+		return
 	}
-	a.alert("An agent task did not start", task.Title+": "+reason, tab)
+	a.alert("An agent task did not start", task.Title+": "+reason, chatTab(chat))
+}
+
+// agentLabel names an agent in a sentence.
+func agentLabel(agent string) string { return cmp.Or(agent, "the default agent") }
+
+// chatTab is the editor tab of a chat, "" for none.
+func chatTab(chat string) string {
+	if chat == "" {
+		return ""
+	}
+	return "chat:" + chat
+}
+
+// agentFailed records that task's agent could not start (reason), so the
+// queue starts no other task of it by itself, and tells the user, once:
+// a second failure while it is recorded (tasks that were starting at the
+// same time) says nothing more.
+func (a *App) agentFailed(task agenttask.Task, chat, reason string) {
+	a.queue.startMu.Lock()
+	_, known := a.queue.down[task.Agent]
+	if a.queue.down == nil {
+		a.queue.down = map[string]string{}
+	}
+	a.queue.down[task.Agent] = reason
+	a.queue.startMu.Unlock()
+	a.tasksChanged() // the queued tasks say why they wait
+	if known {
+		return
+	}
+	body := task.Title + ": " + reason
+	if slices.ContainsFunc(a.taskStore().QueuedTasks(), func(q agenttask.QueuedTask) bool { return q.Task.Agent == task.Agent }) {
+		body += ". The other queued tasks of " + agentLabel(task.Agent) + " wait: Start now on one tries again"
+	}
+	a.alert("An agent task did not start", body, chatTab(chat))
+}
+
+// agentDown is why the queue starts no task of agent by itself ("" when it
+// may).
+func (a *App) agentDown(agent string) string {
+	a.queue.startMu.Lock()
+	defer a.queue.startMu.Unlock()
+	return a.queue.down[agent]
+}
+
+// agentUp forgets that agent could not start (every agent for ""), and lets
+// the queue move.
+func (a *App) agentUp(agent string) {
+	a.queue.startMu.Lock()
+	n := len(a.queue.down)
+	if agent == "" {
+		a.queue.down = nil
+	} else {
+		delete(a.queue.down, agent)
+	}
+	changed := len(a.queue.down) != n
+	a.queue.startMu.Unlock()
+	if changed {
+		a.tasksChanged()
+		go a.startQueuedTasks() // not on the caller's goroutine: it may be the event pipeline
+	}
+}
+
+// firstTurn is a queue-started task chat whose agent has done nothing yet.
+type firstTurn struct{ task agenttask.Task }
+
+// watchFirstTurn follows the first turn of the chat startTaskChat opens for
+// task (observeTaskStart), before it opens: its first events may come
+// before openChat returns.
+func (a *App) watchFirstTurn(task agenttask.Task) {
+	a.queue.startMu.Lock()
+	defer a.queue.startMu.Unlock()
+	if a.queue.first == nil {
+		a.queue.first = map[string]*firstTurn{}
+	}
+	a.queue.first[task.ID] = &firstTurn{task: task}
+}
+
+func (a *App) unwatchFirstTurn(id string) {
+	a.queue.startMu.Lock()
+	defer a.queue.startMu.Unlock()
+	delete(a.queue.first, id)
+}
+
+// observeTaskStart follows the chats the queue started until their agent
+// does something. An error before that (the agent's own, or the Manager's
+// for a turn the driver could not begin) is the agent failing to start (a
+// process that died at once, a login that expired), not the task:
+// taskStartFailed's agentDown case. The tracker marks the task failed with
+// the error. Output from a
+// chat of an agent recorded as down clears that. It runs for every event
+// before the tracker sees it (so the queue moves on with the agent already
+// down), and costs a lock and two map lookups when nothing is watched.
+func (a *App) observeTaskStart(e as.Event) {
+	worked := false
+	switch e.Kind {
+	case as.KindMessageChunk, as.KindThoughtChunk, as.KindToolCall, as.KindToolCallUpdate, as.KindPlan, as.KindPermission:
+		worked = true
+	case as.KindError, as.KindTurnEnd:
+	default:
+		return
+	}
+	a.queue.startMu.Lock()
+	if len(a.queue.first) == 0 && len(a.queue.down) == 0 {
+		a.queue.startMu.Unlock()
+		return
+	}
+	var w *firstTurn
+	for _, id := range a.tasks.Tasks(e.SessionID) {
+		if w = a.queue.first[id]; w != nil {
+			break
+		}
+	}
+	failed := ""
+	if w != nil {
+		// The tracker counts an error as the task failing (and the queue
+		// moves on), so the first one decides here too.
+		delete(a.queue.first, w.task.ID)
+		switch {
+		case e.Kind == as.KindError:
+			failed = cmp.Or(e.Text, "the agent reported an error")
+		case e.Kind == as.KindTurnEnd && e.StopReason == as.StopError:
+			failed = "the agent stopped with an error before it began"
+		}
+	}
+	down := ""
+	if worked && len(a.queue.down) > 0 && a.orch != nil {
+		if node, ok := a.orch.Get(e.SessionID); ok && a.queue.down[node.Agent] != "" {
+			down = node.Agent
+		}
+	}
+	a.queue.startMu.Unlock()
+	if failed != "" {
+		a.agentFailed(w.task, e.SessionID, startFailure(errors.New(failed)))
+	}
+	if down != "" {
+		a.agentUp(down)
+	}
 }
 
 // maxStartFailure bounds the reason kept for a task whose chat did not start.
@@ -301,6 +454,9 @@ func (a *App) queueBlocked(repo string, task agenttask.Task, open map[string]boo
 		return ""
 	case !a.isTrusted(task.Worktree):
 		return "Its worktree is in Restricted Mode, and Flint never starts an agent there by itself: trust the folder, or choose Start now"
+	}
+	if why := a.agentDown(task.Agent); why != "" {
+		return "Not started by itself: when Flint last started a task of " + agentLabel(task.Agent) + ", " + strings.TrimPrefix(why, "the agent did not start: ") + ". Start now tries again"
 	}
 	if err := a.budgetPause(task.ID); err != nil {
 		return "Paused by the budget: " + strings.TrimPrefix(err.Error(), "paused: ")
@@ -410,6 +566,11 @@ func (t *TaskAPI) StartNow(id string) (TaskView, error) {
 		return TaskView{}, err
 	}
 	task.Queued = false
+	// The user tries the agent again: if it starts, the queue moves on;
+	// if not, its tasks wait again, and the user is told again.
+	a.queue.startMu.Lock()
+	delete(a.queue.down, task.Agent)
+	a.queue.startMu.Unlock()
 	a.tasksChanged()
 	if flintStarts(task) {
 		lead := members[0]

@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"reflect"
 
 	"flint/internal/settings"
 )
@@ -49,6 +50,9 @@ func (a *App) updateSettings(change func(settings.Settings) settings.Settings) (
 		return settings.Settings{}, err
 	}
 	a.usage.SetRetention(saved.Usage.RetentionDays)
+	if !reflect.DeepEqual(prev.Agents, saved.Agents) || !reflect.DeepEqual(prev.CustomAgents, saved.CustomAgents) {
+		a.agentUp("") // an agent that did not start may start now
+	}
 	a.startQueuedTasks() // a higher agentTasks.maxParallel or budget frees slots
 	a.mcpSettingsChanged(prev.MCPServer, saved.MCPServer)
 	a.hostSettingsChanged() // the background host reads settings.json itself

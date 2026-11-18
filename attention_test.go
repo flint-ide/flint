@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"sync"
 	"testing"
 	"time"
 
+	"flint/internal/mcpserver"
 	"flint/internal/settings"
 )
 
@@ -37,8 +39,8 @@ type questionApp struct {
 	notes    *fakeNotifier
 	mu       sync.Mutex
 	events   []QuestionEvent
+	fronts   []FrontEvent
 	reminder []func()
-	backs    int
 }
 
 func newQuestionApp(t *testing.T, answer func(title string) bool) *questionApp {
@@ -48,14 +50,16 @@ func newQuestionApp(t *testing.T, answer func(title string) bool) *questionApp {
 	a.ask = func(title, _, _ string) bool { return answer(title) }
 	a.alerts = q.notes
 	a.emitHook = func(name string, data ...any) {
-		if name == eventQuestion {
-			q.mu.Lock()
+		q.mu.Lock()
+		defer q.mu.Unlock()
+		switch name {
+		case eventQuestion:
 			q.events = append(q.events, data[0].(QuestionEvent))
-			q.mu.Unlock()
+		case eventFront:
+			q.fronts = append(q.fronts, data[0].(FrontEvent))
 		}
 	}
 	a.attn = a.newAttention()
-	a.attn.back = func() { q.mu.Lock(); q.backs++; q.mu.Unlock() }
 	a.attn.after = func(_ time.Duration, f func()) func() bool {
 		q.mu.Lock()
 		q.reminder = append(q.reminder, f)
@@ -70,6 +74,12 @@ func (q *questionApp) questionEvents() []QuestionEvent {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return slices.Clone(q.events)
+}
+
+func (q *questionApp) frontEvents() []FrontEvent {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return slices.Clone(q.fronts)
 }
 
 func TestQuestionInFrontIsNotAnnounced(t *testing.T) {
@@ -152,12 +162,14 @@ func TestQuestionReminderAfterAWhile(t *testing.T) {
 // Questions wait for each other (confirmMu); each is announced when it
 // becomes visible, not when it was asked.
 func TestQueuedQuestionsAreAnnouncedWhenShown(t *testing.T) {
-	release := make(chan struct{})
+	release, release2 := make(chan struct{}), make(chan struct{})
 	shown := make(chan string, 2)
 	q := newQuestionApp(t, func(title string) bool {
 		shown <- title
 		if title == "first" {
 			<-release
+		} else {
+			<-release2
 		}
 		return true
 	})
@@ -177,10 +189,17 @@ func TestQueuedQuestionsAreAnnouncedWhenShown(t *testing.T) {
 	if got := q.notes.list(); got[0] != "Flint needs your answer|first|" {
 		t.Fatalf("notifications = %v", got)
 	}
+	// Answering the first takes the user to Flint: the second appears in
+	// front, and is announced when they leave again.
 	close(release)
 	if got := <-shown; got != "second" {
 		t.Fatalf("shown %q", got)
 	}
+	if !q.app.attn.InFront() {
+		t.Error("answering a question left Flint in the background")
+	}
+	q.app.attn.setActive(false)
+	close(release2)
 	wg.Wait()
 	if got := q.notes.list(); len(got) != 2 || got[1] != "Flint needs your answer|second|" {
 		t.Errorf("notifications = %v", got)
@@ -208,19 +227,120 @@ func TestQuestionNotificationFollowsTheSettings(t *testing.T) {
 	}
 }
 
-// Coming back runs the features' Foreground hook once per return; a dialog
-// closing does not count as coming back.
-func TestComingBackRunsTheHook(t *testing.T) {
+// Linux: a dialog takes the window's focus while it is open and gives it
+// back after. Neither is the user leaving or coming back: no notification,
+// and Flint stays in front throughout (no "attention:front" event at all).
+func TestDialogFocusIsNotLeavingFlint(t *testing.T) {
+	var q *questionApp
+	q = newQuestionApp(t, func(string) bool {
+		q.app.attn.setFocused(false) // the dialog takes the focus
+		if !q.app.attn.InFront() {
+			t.Error("the dialog's focus counted as leaving Flint")
+		}
+		return false // answered at once
+	})
+	q.app.askUser("Start a waiting item of an untrusted project?", "msg", "Start")
+	if !q.app.attn.InFront() {
+		t.Error("closing the dialog counted as leaving Flint")
+	}
+	q.app.attn.setFocused(true) // GTK gives the focus back to the window
+	if got := q.notes.list(); len(got) != 0 {
+		t.Errorf("notified %v", got)
+	}
+	if got := q.frontEvents(); len(got) != 0 {
+		t.Errorf("front events %+v, want none", got)
+	}
+}
+
+// Leaving and coming back are told to the UI in order (Seq), once per move.
+func TestFrontEventsFollowTheWindow(t *testing.T) {
 	q := newQuestionApp(t, func(string) bool { return true })
+	q.app.attn.setFocused(false)
+	q.app.attn.setFocused(false)
+	q.app.attn.setFocused(true)
+	q.app.attn.setActive(false)
+	q.app.attn.setActive(true)
+	want := []FrontEvent{{false, 1}, {true, 2}, {false, 3}, {true, 4}}
+	if got := q.frontEvents(); !slices.Equal(got, want) {
+		t.Errorf("front events %+v, want %+v", got, want)
+	}
+}
+
+// A question that appears while the user is elsewhere does not bring Flint
+// to the front (it is announced); the user answering it does.
+func TestQuestionInTheBackgroundKeepsFlintThere(t *testing.T) {
+	var q *questionApp
+	q = newQuestionApp(t, func(string) bool {
+		if q.app.attn.InFront() {
+			t.Error("a question shown in the background counted as Flint in front")
+		}
+		return true
+	})
+	q.app.attn.setFocused(false)
 	q.app.askUser("x", "", "OK")
-	q.app.attn.setFocused(false)
-	q.app.attn.setFocused(false)
-	q.app.attn.setFocused(true)
-	q.app.attn.setFocused(true)
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	if q.backs != 1 {
-		t.Errorf("back ran %d times, want 1", q.backs)
+	if len(q.notes.list()) != 1 {
+		t.Errorf("notifications %v", q.notes.list())
+	}
+	if !q.app.attn.InFront() {
+		t.Error("answering did not bring Flint to the front")
+	}
+	if got := q.frontEvents(); len(got) != 2 || !got[1].Front {
+		t.Errorf("front events %+v", got)
+	}
+}
+
+// An asker with a deadline (an MCP acting tool's call): a question still
+// queued behind another one when the deadline passes is never shown; one on
+// screen stays until answered, its late answer runs nothing, and the badge
+// counts it until then.
+func TestQuestionOfAnAskerThatGaveUp(t *testing.T) {
+	release := make(chan struct{})
+	shown := make(chan string, 4)
+	q := newQuestionApp(t, func(title string) bool {
+		shown <- title
+		if title == "first" {
+			<-release
+		}
+		return true
+	})
+	go q.app.askUser("first", "", "OK")
+	<-shown
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- q.app.approveAction(ctx, mcpserver.Approval{Root: "/r", Tool: "run_tests", Args: []byte("{}")})
+	}()
+	cancel()
+	if err := <-done; err == nil || errors.Is(err, mcpserver.ErrNotApproved) {
+		t.Fatalf("gave up: %v", err)
+	}
+	close(release)
+	waitUntil(t, "the first closed", func() bool { return len(q.questionEvents()) == 2 })
+	select {
+	case title := <-shown:
+		t.Fatalf("%q was shown after its asker gave up", title)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	// On screen when the asker gives up: it stays, counted, until answered.
+	answer := make(chan bool)
+	r := newQuestionApp(t, func(string) bool { return <-answer })
+	ctx, cancel = context.WithCancel(context.Background())
+	go func() {
+		done <- r.app.approveAction(ctx, mcpserver.Approval{Root: "/r", Tool: "run_tests", Args: []byte("{}")})
+	}()
+	waitUntil(t, "the question on screen", func() bool { return len(r.questionEvents()) == 1 })
+	cancel()
+	if err := <-done; err == nil || errors.Is(err, mcpserver.ErrNotApproved) {
+		t.Fatalf("gave up: %v", err)
+	}
+	if ev := r.questionEvents(); len(ev) != 1 || !r.app.attn.InFront() {
+		t.Fatalf("closed before its answer: %+v", ev)
+	}
+	answer <- true // Allow, too late
+	waitUntil(t, "the question closed", func() bool { return len(r.questionEvents()) == 2 })
+	if r.app.actionGrants.take("/r", "run_tests", []byte("{}")) {
+		t.Error("a late Allow left a grant behind")
 	}
 }
 

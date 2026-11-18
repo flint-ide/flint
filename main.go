@@ -140,6 +140,7 @@ func main() {
 	// platform-specific (window_darwin.go, window_other.go).
 	flint.onLaunched(app, win, func() {
 		flint.showWindowEarly()
+		flint.refreshForeground(nil) // shown: in front only if it has the focus
 		shellenv.Load()
 	})
 

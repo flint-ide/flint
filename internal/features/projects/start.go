@@ -29,43 +29,6 @@ type AutoStart struct {
 	// waiting with this reason. Warning is DelegateResult.Warning.
 	Error   string `json:"error"`
 	Warning string `json:"warning"`
-	// Unanswered: nobody answered the start's confirmation; it is asked
-	// again when the user is back (Waiting.Unanswered).
-	Unanswered bool `json:"unanswered"`
-}
-
-// unansweredReason is a waiting start's reason after n unanswered
-// confirmations.
-func unansweredReason(n int) string {
-	if n >= MaxUnanswered {
-		return fmt.Sprintf("nobody answered Flint's confirmation %d times: Delegate it by hand, or cancel the start.", n)
-	}
-	return "nobody answered Flint's confirmation: Flint asks again when you are back."
-}
-
-// foreground is the Foreground hook: the user is back, so the waiting
-// starts whose confirmation went unanswered (fewer than MaxUnanswered times)
-// are asked again.
-func (a *API) foreground() {
-	a.mu.Lock()
-	w := a.waiting()
-	again := false
-	for folder, items := range w {
-		for id, cur := range items {
-			if cur.Unanswered > 0 && cur.Unanswered < MaxUnanswered && cur.Tried != "" {
-				cur.Tried = "" // not "nothing changed since": it is tried again
-				w[folder][id] = cur
-				again = true
-			}
-		}
-	}
-	if again {
-		_ = a.host.SaveState(stateWaiting, w)
-	}
-	a.mu.Unlock()
-	if again {
-		a.kickStarter()
-	}
 }
 
 // waiting reads the waiting starts. Callers hold mu.
@@ -238,13 +201,15 @@ func (a *API) startReady(ctx context.Context) {
 			if entry.Reason != "" && entry.Tried == fp {
 				continue // failed before, and nothing it depends on changed
 			}
-			a.autoStart(folder, it, entry, fp)
+			a.autoStart(ctx, folder, it, entry, fp)
 		}
 	}
 }
 
-// autoStart delegates a waiting item and records how it went.
-func (a *API) autoStart(folder string, it Item, entry Waiting, fp string) {
+// autoStart delegates a waiting item and records how it went. A start that
+// ends because Flint quits (its confirmation was open) records nothing: the
+// item keeps waiting and is tried again on the next launch.
+func (a *API) autoStart(ctx context.Context, folder string, it Item, entry Waiting, fp string) {
 	still := func() bool {
 		cur, ok := a.waiting()[folder][it.ID]
 		return ok && cur.Since.Equal(entry.Since)
@@ -255,6 +220,8 @@ func (a *API) autoStart(folder string, it Item, entry Waiting, fp string) {
 		return // a click is starting it, or the start was cancelled
 	case err == nil && res.NotReady:
 		return // a dependency moved back meanwhile
+	case err != nil && ctx.Err() != nil:
+		return // Flint quits: not a refusal
 	}
 	ev := AutoStart{Project: folder, ID: it.ID, Title: it.Title}
 	if err != nil {
@@ -264,11 +231,6 @@ func (a *API) autoStart(folder string, it Item, entry Waiting, fp string) {
 		if cur, ok := w[folder][it.ID]; ok && cur.Since.Equal(entry.Since) {
 			cur.Reason, cur.Tried = err.Error(), fp
 			cur.Changed = errors.Is(err, errItemChanged)
-			if errors.Is(err, errUnanswered) {
-				cur.Unanswered++
-				cur.Reason = unansweredReason(cur.Unanswered)
-				ev.Error, ev.Unanswered = cur.Reason, true
-			}
 			w[folder][it.ID] = cur
 			_ = a.host.SaveState(stateWaiting, w)
 		}

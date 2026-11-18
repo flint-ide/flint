@@ -26,7 +26,10 @@ const eventNotificationOpen = "notification:open"
 type AlertsAPI struct {
 	app      *App
 	notifier *notifications.NotificationService
-	dock     *dock.DockService
+	// os is what sends and authorizes notifications: the notifier, a fake in
+	// tests.
+	os   osNotifier
+	dock *dock.DockService
 	// startErr is why the notification service could not start (no app
 	// bundle in development builds, no D-Bus session); nil when it did.
 	// Authorization is asked every time instead: the user may allow Flint in
@@ -36,8 +39,16 @@ type AlertsAPI struct {
 	seq      atomic.Uint64
 }
 
+// osNotifier is the part of the notification service Notify and Status use.
+type osNotifier interface {
+	CheckNotificationAuthorization() (bool, error)
+	RequestNotificationAuthorization() (bool, error)
+	SendNotification(notifications.NotificationOptions) error
+}
+
 func newAlertsAPI(app *App) *AlertsAPI {
-	s := &AlertsAPI{app: app, notifier: notifications.New(), dock: dock.New()}
+	n := notifications.New()
+	s := &AlertsAPI{app: app, notifier: n, os: n, dock: dock.New()}
 	s.status.logf = app.logf
 	app.alerts = s
 	return s
@@ -75,7 +86,7 @@ func (s *AlertsAPI) send(title, body, tab string) error {
 	if err := s.authorize(); err != nil {
 		return err
 	}
-	return s.notifier.SendNotification(notifications.NotificationOptions{
+	return s.os.SendNotification(notifications.NotificationOptions{
 		ID:    "flint-" + strconv.FormatUint(s.seq.Add(1), 10),
 		Title: notificationText(title),
 		Body:  notificationText(body),
@@ -87,9 +98,9 @@ func (s *AlertsAPI) send(title, body, tab string) error {
 // decided yet. Checked on every notification, never cached: a denial the
 // user lifts in System Settings counts from the next one.
 func (s *AlertsAPI) authorize() error {
-	ok, err := s.notifier.CheckNotificationAuthorization()
+	ok, err := s.os.CheckNotificationAuthorization()
 	if err == nil && !ok {
-		ok, err = s.notifier.RequestNotificationAuthorization()
+		ok, err = s.os.RequestNotificationAuthorization()
 	}
 	if err != nil {
 		return err
@@ -105,7 +116,7 @@ func (s *AlertsAPI) Status() NotificationStatus {
 	if err := s.startErr.Load(); err != nil {
 		return NotificationStatus{State: notifyUnavailable, Detail: unavailableDetail(*err)}
 	}
-	ok, err := s.notifier.CheckNotificationAuthorization()
+	ok, err := s.os.CheckNotificationAuthorization()
 	switch {
 	case err != nil:
 		return NotificationStatus{State: notifyUnavailable, Detail: unavailableDetail(err)}
@@ -114,6 +125,10 @@ func (s *AlertsAPI) Status() NotificationStatus {
 	}
 	return s.status.view()
 }
+
+// InFront says whether Flint is the app in front of the user, as Go follows
+// it (attention.go); the UI reads it once and then follows "attention:front".
+func (s *AlertsAPI) InFront() FrontEvent { return s.app.attn.Front() }
 
 // Test sends a test notification, asking for the permission first if the
 // user has not decided yet.

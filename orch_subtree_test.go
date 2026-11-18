@@ -90,7 +90,7 @@ func TestChatClosedWhileItsDialogIsOpenGetsNoGrantAndNoSecondDialog(t *testing.T
 func TestObtainStopsWhenTheContextIsDoneOrTheChatIsGone(t *testing.T) {
 	var g orchGrants
 	asked := false
-	ask := func() bool { asked = true; return true }
+	ask := func(context.Context) (bool, bool) { asked = true; return true, true }
 	if ok, err := g.obtain(context.Background(), "c", orchGrant{}, func() bool { return false }, ask); ok || err == nil {
 		t.Errorf("unregistered chat: ok %v, err %v", ok, err)
 	}

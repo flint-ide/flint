@@ -149,6 +149,10 @@ type App struct {
 	// alerts sends desktop notifications (AlertsAPI; a fake in tests).
 	attn   *attention
 	alerts notifier
+	// refreshForeground asks the window whether Flint is in front and tells
+	// attn (followForeground; active is the app's activation an event
+	// reported, nil for none). Set once, before the app runs.
+	refreshForeground func(active *bool)
 	// noticeProblems is the last problem told about each chat whose notice
 	// from Flint did not arrive (chat id → text), so it is told once.
 	noticeProblems sync.Map
@@ -218,7 +222,7 @@ func NewApp() (*App, error) {
 }
 
 // newAttention wires the question announcer to the notifier, the settings
-// and the features (attention.go).
+// and the UI (attention.go).
 func (a *App) newAttention() *attention {
 	return newAttention(
 		func(title, body string) error {
@@ -232,7 +236,6 @@ func (a *App) newAttention() *attention {
 			return s.NotifyInBackground && s.NotifyOnApproval
 		},
 		a.emit,
-		func() { a.features.Foreground() },
 	)
 }
 

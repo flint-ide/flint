@@ -25,8 +25,8 @@ type IndexStatus struct {
 	URL string `json:"url"`
 	// Official: URL and key are the built-in ones (nothing set in settings).
 	Official bool `json:"official"`
-	// Configured: there is a public key to verify the index with. False for
-	// the official index until its key is built into Flint.
+	// Configured: there is a public key to verify the index with. False only
+	// when neither the settings nor this build of Flint have one.
 	Configured bool `json:"configured"`
 	// Fetched: Entries come from an index whose signature verified.
 	Fetched bool `json:"fetched"`

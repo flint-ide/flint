@@ -63,7 +63,14 @@ func (a *App) openChat(ctx context.Context, r ChatRequest) (as.SessionInfo, erro
 func (a *App) openChatWith(ctx context.Context, r ChatRequest, loaded loadedAgents) (as.SessionInfo, error) {
 	// Before anything starts: a role that cannot be used must not leave an
 	// agent process behind.
-	r, drv, err := a.applyRole(r, loaded)
+	r, drv, engine, err := a.applyRoleEngine(r, loaded)
+	if err != nil {
+		return as.SessionInfo{}, err
+	}
+	// A chat in the lead's worktree of a joint group works in every worktree
+	// of the group: Flint derives the folders from the cwd, never from the
+	// caller (tasks_joint.go).
+	ctx, err = a.withJointFolders(ctx, r.Agent, engine, r.Cwd)
 	if err != nil {
 		return as.SessionInfo{}, err
 	}
@@ -105,11 +112,18 @@ func (a *App) openChatWith(ctx context.Context, r ChatRequest, loaded loadedAgen
 // drv is the driver a defined agent starts on (loadedAgents.route), nil for
 // any other agent.
 func (a *App) applyRole(r ChatRequest, loaded loadedAgents) (ChatRequest, as.Driver, error) {
+	r, drv, _, err := a.applyRoleEngine(r, loaded)
+	return r, drv, err
+}
+
+// applyRoleEngine is applyRole that also returns the engine the chat runs
+// on (loadedAgents.route: a defined agent's resolved engine, else the agent).
+func (a *App) applyRoleEngine(r ChatRequest, loaded loadedAgents) (ChatRequest, as.Driver, string, error) {
 	var role orchestrate.Role
 	if r.Role != "" {
 		var err error
 		if role, err = orchestrate.ResolveRole(a.configDir, r.Cwd, a.isTrusted(r.Cwd), r.Role); err != nil {
-			return r, nil, err
+			return r, nil, "", err
 		}
 		if r.Agent == "" {
 			r.Agent = role.Agent
@@ -117,16 +131,16 @@ func (a *App) applyRole(r ChatRequest, loaded loadedAgents) (ChatRequest, as.Dri
 	}
 	drv, engine, err := loaded.route(r.Agent, "")
 	if err != nil {
-		return r, nil, err
+		return r, nil, "", err
 	}
 	if r.Role == "" {
-		return r, drv, nil
+		return r, drv, engine, nil
 	}
 	if !roleFits(role.Agent, r.Agent, engine) {
-		return r, nil, fmt.Errorf("role %s is for %s, not %s", role.Name, role.Agent, describeAgent(r.Agent, engine))
+		return r, nil, "", fmt.Errorf("role %s is for %s, not %s", role.Name, role.Agent, describeAgent(r.Agent, engine))
 	}
 	r.Prompt = role.Apply(r.Prompt)
-	return r, drv, nil
+	return r, drv, engine, nil
 }
 
 // roleFits reports whether a role limited to roleAgent ("" for any) may run

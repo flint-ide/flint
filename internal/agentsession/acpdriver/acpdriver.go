@@ -117,6 +117,10 @@ func (o Options) CheckTrust(cwd string) error {
 
 // Start launches the agent and opens a session in cwd.
 func (d *Driver) Start(ctx context.Context, cwd string, sink as.Sink) (as.SessionInfo, error) {
+	// ACP's session/new has a cwd and nothing more: no additional folders.
+	if err := as.RefuseFolders(ctx, d.opts.Name); err != nil {
+		return as.SessionInfo{}, err
+	}
 	if err := d.opts.CheckTrust(cwd); err != nil {
 		return as.SessionInfo{}, err
 	}

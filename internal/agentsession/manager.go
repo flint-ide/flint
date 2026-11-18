@@ -26,19 +26,20 @@ type Policy struct {
 // DefaultPolicy matches Flint's "no accept/reject for edits" stance.
 func DefaultPolicy() Policy { return Policy{AutoApproveEdits: true, AutoApproveReads: true} }
 
-// autoApproves decides for one tool call in a session rooted at cwd. Edits and reads
-// are only automatic for known paths inside the project, outside .git and agent
+// autoApproves decides for one tool call in a session rooted at cwd, with
+// the session's additional folders (WithFolders). Edits and reads are only
+// automatic for known paths inside the project, outside .git and agent
 // config: writing ~/.zshrc, a launch agent or a git hook is code execution in
 // disguise, and reading ~/.ssh is exfiltration, so those always ask.
-func (p Policy) autoApproves(tc ToolCall, cwd string) bool {
+func (p Policy) autoApproves(tc ToolCall, cwd string, folders ...string) bool {
 	if p.AutoApproveAll {
 		return true
 	}
 	switch tc.Kind {
 	case ToolEdit, ToolMove, ToolDelete:
-		return p.AutoApproveEdits && allInside(tc.Paths, cwd)
+		return p.AutoApproveEdits && allInside(tc.Paths, cwd, folders...)
 	case ToolRead, ToolSearch:
-		return p.AutoApproveReads && allInside(tc.Paths, cwd)
+		return p.AutoApproveReads && allInside(tc.Paths, cwd, folders...)
 	}
 	return false
 }
@@ -50,13 +51,18 @@ func (p Policy) autoApproves(tc ToolCall, cwd string) bool {
 var protectedDirs = []string{".git", ".claude", ".codex", ".vscode", ".idea"}
 
 // allInside reports whether paths is non-empty and every path stays inside cwd
-// (after cleaning; relative paths resolve against cwd) and outside protectedDirs.
-func allInside(paths []string, cwd string) bool {
+// or one of folders (after cleaning; relative paths resolve against cwd) and
+// outside protectedDirs below the root it is in.
+func allInside(paths []string, cwd string, folders ...string) bool {
 	if len(paths) == 0 || cwd == "" {
 		return false
 	}
+	roots := append([]string{cwd}, folders...)
 	for _, p := range paths {
-		if !Inside(p, cwd) || ProtectedDir(p, cwd) != "" {
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(cwd, p)
+		}
+		if !slices.ContainsFunc(roots, func(root string) bool { return Inside(p, root) && ProtectedDir(p, root) == "" }) {
 			return false
 		}
 	}
@@ -148,10 +154,13 @@ type Manager struct {
 }
 
 type managed struct {
-	agent  string
-	cwd    string
-	driver Driver
-	cancel context.CancelFunc // non-nil while a turn runs
+	agent string
+	cwd   string
+	// folders are the session's additional folders (WithFolders): edits and
+	// reads there are auto-approved as in cwd.
+	folders []string
+	driver  Driver
+	cancel  context.CancelFunc // non-nil while a turn runs
 }
 
 // NewManager creates a manager that forwards events to emit.
@@ -303,7 +312,7 @@ func (m *Manager) open(ctx context.Context, agent string, d Driver, cwd string, 
 	if d == nil {
 		return SessionInfo{}, fmt.Errorf("unknown agent %q", agent)
 	}
-	s := &managed{agent: agent, cwd: cwd, driver: d}
+	s := &managed{agent: agent, cwd: cwd, folders: Folders(ctx), driver: d}
 	var sessionID string
 	var idMu sync.Mutex
 	slot := &CallerSlot{}
@@ -385,7 +394,7 @@ func (m *Manager) route(s *managed, e Event) {
 			m.emit(e)
 			return
 		}
-		if opt, ok := autoOption(policy, s.cwd, *e.Permission); ok {
+		if opt, ok := autoOption(policy, s, *e.Permission); ok {
 			// Answer off the driver's goroutine: drivers may hold locks while emitting.
 			go func() {
 				if err := s.driver.Respond(e.SessionID, e.Permission.ID, opt); err != nil {
@@ -398,8 +407,8 @@ func (m *Manager) route(s *managed, e Event) {
 	m.emit(e)
 }
 
-func autoOption(policy Policy, cwd string, req PermissionRequest) (string, bool) {
-	if !policy.autoApproves(req.ToolCall, cwd) {
+func autoOption(policy Policy, s *managed, req PermissionRequest) (string, bool) {
+	if !policy.autoApproves(req.ToolCall, s.cwd, s.folders...) {
 		return "", false
 	}
 	// Prefer a one-off allow so a policy change takes effect immediately.

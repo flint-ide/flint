@@ -194,7 +194,7 @@ func NewApp() (*App, error) {
 	a.wireAccounts()
 	a.mcp, a.mcpSources = newMCP(a)
 	a.features = feature.New(features, featureHost{a})
-	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
+	a.tasks = agenttask.NewTracker(a.tasksByFolder, a.taskChanged)
 	a.orch = orchestrate.New()
 	a.agentMgr = newAgentManager(a)
 	// Agent chats stay in this process even with sessions.background on: the

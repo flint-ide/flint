@@ -31,7 +31,7 @@ const Instructions = "You are running inside Flint, the user's IDE. The get_ too
 	"and the results of the last test run. Use them to find out what the user is looking at or what is failing before you ask. " +
 	"When the user switched them on, there are also tools that act in Flint (run_tests, run_configuration, send_http_request, run_sql_query): " +
 	"their results show in Flint's own tabs too, and the user is asked before each call, so call them only when the task needs it. " +
-	"If the user allowed orchestration, list_agents, start_agent, send_prompt, wait_for_agent, read_agent_output and stop_agent let you start and direct other agents in this project; " +
+	"If the user allowed orchestration, list_agents, start_agent, send_prompt, wait_for_agent, read_agent_output and stop_agent let you start and direct other agents in this folder; " +
 	"the first call asks the user once, and what you send appears in the other agents' chats."
 
 // Config selects the tools offered (settings.json "mcpServer").
@@ -85,11 +85,11 @@ func (s *Sources) Tools(cfg Config) []mcpserver.Tool {
 		out = append(out, mcpserver.Tool{
 			Name:  ToolDiagnostics,
 			Title: "Diagnostics",
-			Description: "Errors and warnings the language servers report for this project (the squiggles in Flint's editor). " +
+			Description: "Errors and warnings the language servers report for this folder (the squiggles in Flint's editor). " +
 				"Only files a language server has checked are included: usually the open files and, for Go, their packages. " +
 				"Optionally limited to a file or folder and a minimum severity.",
 			InputSchema: json.RawMessage(`{"type":"object","properties":{` +
-				`"path":{"type":"string","description":"File or folder, relative to the project or absolute inside it. Default: the whole project."},` +
+				`"path":{"type":"string","description":"File or folder, relative to the folder or absolute inside it. Default: the whole folder."},` +
 				`"severity":{"type":"string","enum":["error","warning","information","hint"],"description":"Minimum severity. Default: hint (everything)."}` +
 				`},"additionalProperties":false}`),
 			Call: s.diagnostics,
@@ -110,7 +110,7 @@ func (s *Sources) Tools(cfg Config) []mcpserver.Tool {
 		out = append(out, mcpserver.Tool{
 			Name:  ToolTerminals,
 			Title: "Terminal output",
-			Description: "Recent output of the user's terminals and run consoles (dev servers, builds, test runs) in this project, as plain text. " +
+			Description: "Recent output of the user's terminals and run consoles (dev servers, builds, test runs) in this folder, as plain text. " +
 				"Without a terminal id it lists every console with its last lines; pass an id for a longer tail of one.",
 			InputSchema: json.RawMessage(fmt.Sprintf(`{"type":"object","properties":{`+
 				`"terminal":{"type":"string","description":"Id of one console, as listed by a call without it."},`+
@@ -125,7 +125,7 @@ func (s *Sources) Tools(cfg Config) []mcpserver.Tool {
 		out = append(out, mcpserver.Tool{
 			Name:  ToolTests,
 			Title: "Last test results",
-			Description: "Results of the last test run started in Flint for this project: totals, and each failed test with its location and output. " +
+			Description: "Results of the last test run started in Flint for this folder: totals, and each failed test with its location and output. " +
 				"Tells you whether the run is still going.",
 			InputSchema: json.RawMessage(`{"type":"object","properties":{},"additionalProperties":false}`),
 			Call:        s.tests,
@@ -159,7 +159,7 @@ func scopePath(root, p string) (string, error) {
 	}
 	p = filepath.Clean(p)
 	if !within(p, root) {
-		return "", fmt.Errorf("%s is outside the project", p)
+		return "", fmt.Errorf("%s is outside the folder", p)
 	}
 	return p, nil
 }

@@ -1,6 +1,6 @@
 # Files and data
 
-This page lists where Flint stores what, on your Mac and in your projects. Flint writes its own files with permissions that only your user can read, and writes JSON files atomically so a crash never leaves a half-written file.
+This page lists where Flint stores what, on your Mac and in your folders. Flint writes its own files with permissions that only your user can read, and writes JSON files atomically so a crash never leaves a half-written file.
 
 ## Flint's data folder
 
@@ -12,30 +12,30 @@ Most of Flint's data lives in:
 
 | File or folder | What it holds |
 |---|---|
-| `state.json` | Recent folders, the agent approval policy, trusted folders, [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel) per repository (description with credentials removed, agent, branch, base, worktree folder, last state, pull request link), the [backlogs](../guides/backlog.md) you opened (folders), the folder you chose with **Locate…** for each repository URL, and which agent tasks belong to each backlog item (task id, repository name, last state, pull request link, merged or removed), whether the tool check has been shown, and the [update check](privacy-and-security.md#update-check)'s last time, the release it found and a version you skipped. |
+| `state.json` | Recent folders, the agent approval policy, trusted folders, [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel) per repository (description with credentials removed, agent, branch, base, worktree folder, last state, pull request link, for a task of a [joint group](../guides/ai-agents.md#joint-groups-one-agent-in-several-repositories) the group's id as `joint` and `lead` on the first task, and for a task that Delegate started for a project item its `origin`: the project folder, the item id and the repository, plus, for a project whose folder was not trusted, a hash of the part of `PROJECT.md` you were shown and the item's title and repositories as you confirmed them), the [projects](../guides/projects.md) you opened (folders), the folder you chose with **Locate…** or cloned with **Clone…** for each repository URL (`projectCheckouts`), which agent tasks belong to each project item (task id, repository name, last state, pull request link, merged or removed), and the items you asked to start when their dependencies are done (`projectWaiting`: since when, the active folder for an item without repositories, a hash of the item's file when you asked, and why the last automatic start failed), whether the tool check has been shown, and the [update check](privacy-and-security.md#update-check)'s last time, the release it found and a version you skipped. |
 | `settings.json` | Your preferences: theme (and an imported custom theme), fonts, Vim mode, default agent, auto-save, notifications, update check, shortcut overrides, TODO excludes, agent CLIs, language servers, agent context, inline completions, agent tasks, usage budgets and model prices. No secrets. See [Settings file](settings.md). |
 | `connections.json` | Database connection profiles: host, port, user, default database, TLS and read-only options. No passwords. A one-time `connections.json.native-backup` appears next to it when Flint moves old native ClickHouse connections to HTTP. |
-| `sessions/` | One file per project: open tabs, terminals, agent conversations, attached projects, the selected run configuration and breakpoints. |
+| `sessions/` | One file per folder you open in a window: open tabs, terminals, agent conversations, attached folders, the selected run configuration and breakpoints. |
 | `scratch/` | Scratchpads: SQL consoles and notes, with the connection and database each console uses. |
 | `history/` | Query history, one file per database connection. |
-| `usage.json` | [Agent usage](../guides/ai-agents.md#usage-and-budgets): totals per day, project, agent, model, agent task and chat (tokens, cache tokens, reported cost, turns); each chat's name, made from its first message with recognized credentials removed; which budget warnings were already shown; and the budgets you chose to continue past. Written a couple of seconds after each turn and when Flint quits. Kept for `usage.retentionDays` days (default 90), at most 20,000 rows and 500 chats. A file that can't be decoded is renamed `usage.json.bad-<date-time>` and Flint starts a new one; a file that can't be read, or that a newer Flint wrote, is left alone and nothing new is saved until that is fixed (the Usage panel says so). |
-| `prompts/` | Your personal [prompts](../guides/ai-agents.md#prompt-library), one Markdown file each. Project prompts live in the repository's `.flint/prompts`. |
-| `agents/` | Your personal [agent definitions](../guides/ai-agents.md#defined-agents), one Markdown file each. Project definitions live in the repository's `.flint/agents`, and Flint loads them only from a trusted folder. |
+| `usage.json` | [Agent usage](../guides/ai-agents.md#usage-and-budgets): totals per day, folder, agent, model, agent task and chat (tokens, cache tokens, reported cost, turns); each chat's name, made from its first message with recognized credentials removed; which budget warnings were already shown; and the budgets you chose to continue past. Written a couple of seconds after each turn and when Flint quits. Kept for `usage.retentionDays` days (default 90), at most 20,000 rows and 500 chats. A file that can't be decoded is renamed `usage.json.bad-<date-time>` and Flint starts a new one; a file that can't be read, or that a newer Flint wrote, is left alone and nothing new is saved until that is fixed (the Usage panel says so). |
+| `prompts/` | Your personal [prompts](../guides/ai-agents.md#prompt-library), one Markdown file each. Repository prompts live in the repository's `.flint/prompts`. |
+| `agents/` | Your personal [agent definitions](../guides/ai-agents.md#defined-agents), one Markdown file each. Repository definitions live in the repository's `.flint/agents`, and Flint loads them only from a trusted folder. |
 | `extensions/` | Installed [extensions](../guides/extensions.md), one folder per extension id, copied there when you install one and deleted when you uninstall it. Their settings are in `settings.json` under `extensions`; their secrets in the keychain. |
 | `extension-index/` | The signed [extension index](../extensions/index-format.md) as last downloaded (`index.json`, `index.json.sig`, and the address it came from), written when you click **Browse Extensions** or **Check for Updates**. Flint verifies the signature again each time it reads it. Safe to delete. |
 | `extension-data/` | Each extension's own data folder (`extension-data/<id>`), created before it starts. Kept when you uninstall the extension. |
 
-### Project sessions
+### Window sessions
 
 A session file in `sessions/` contains:
 
-- the other projects attached to the window;
+- the other folders attached to the window;
 - file tabs with cursor positions, scratchpads and diffs;
-- terminals: their project, last directory and the last ~400 lines of output (with recognized credentials removed);
+- terminals: their folder, last directory and the last ~400 lines of output (with recognized credentials removed);
 - agent conversations: the last 200 transcript entries, token usage and cost;
-- the selected run configuration of each project, and breakpoints.
+- the selected run configuration of each folder, and breakpoints.
 
-Sessions are written shortly after changes and when Flint quits, and are limited to 4 MB. Delete a project's file from `sessions/` to reset its session.
+Sessions are written shortly after changes and when Flint quits, and are limited to 4 MB. Delete a folder's file from `sessions/` to reset its session.
 
 ### Query history
 
@@ -53,14 +53,14 @@ Database passwords are stored in the macOS Keychain under the service `flint-db`
 
 The log rotates at 5 MB, keeping one old file (`flint.log.1`). Secrets and your home path are redacted. **Help ▸ Show Logs in Finder** opens the folder.
 
-## In your projects
+## In your folders
 
 | File | What it holds | Commit it? |
 |---|---|---|
 | `.flint/run.json` | [Run configurations](../guides/run-debug-test.md#run-configurations) | Yes, it is meant to be shared |
 | `http-client.env.json` | Public [HTTP client environments](../guides/http-client.md#environments), next to the `.http` file | Yes |
 | `http-client.private.env.json` | Secret HTTP client variables (tokens, passwords) | No, add it to `.gitignore` |
-| `flint-backlog.json` and `items/*.md` | A [backlog](../guides/backlog.md): its repositories, and one Markdown file per work item with its status. The folder can be anywhere, inside a repository or not. Flint writes an item's `status:` line | Yes, if your team shares the backlog. Which agent tasks belong to an item stays in `state.json` |
+| `flint-project.json` and `items/*.md` | A [project](../guides/projects.md): its repositories, and one Markdown file per work item with its status, `after` and `together`. The folder can be anywhere, inside a repository or not. Flint writes an item's `status:` line, and a new file when you use **New Item…** or an agent uses `add_project_item` after you said yes | Yes, if your team shares the project. Which agent tasks belong to an item stays in `state.json` |
 | `.claude/settings.local.json` | "Always allow" choices for Claude commands, written by Claude Code itself | Usually not |
 
 ## Kept by other tools

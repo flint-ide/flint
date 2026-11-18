@@ -41,7 +41,7 @@ describe('prompt library', () => {
   })
 
   it('labels where a prompt comes from', () => {
-    assert.equal(sourceLabel(prompt({ source: 'project' })), 'project')
+    assert.equal(sourceLabel(prompt({ source: 'project' })), 'repo')
     assert.equal(sourceLabel(prompt({ source: 'project', untrusted: true })), 'untrusted repo')
     assert.equal(sourceLabel(prompt({ source: 'personal' })), 'personal')
     assert.equal(sourceLabel(prompt({ source: 'builtin' })), 'built-in')

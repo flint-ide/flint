@@ -35,7 +35,7 @@ var (
 	// UI offers "Sign in with GitHub" for it (it matches on this text).
 	ErrNotAuthenticated = errors.New("not signed in to GitHub: sign in with GitHub (Settings ▸ Accounts), or use the token of the GitHub CLI")
 	// ErrNotGitHub: the project has no remote on the configured GitHub host.
-	ErrNotGitHub = errors.New("this project has no GitHub remote")
+	ErrNotGitHub = errors.New("this repository has no GitHub remote")
 )
 
 // Config wires a Client to the app.

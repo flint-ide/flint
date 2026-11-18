@@ -10,8 +10,8 @@ You just cloned a repository you don't know: a new job, an open-source project, 
 The **Restricted Mode** banner appears. Leave it for now. Until you trust the folder, Flint:
 
 - doesn't start a terminal automatically;
-- doesn't start the Rust or Python language servers, which run project code;
-- runs agents without the project's own agent settings and hooks;
+- doesn't start the Rust or Python language servers, which run the folder's code;
+- runs agents without the folder's own agent settings and hooks;
 - runs Git without hooks.
 
 Reading, searching, `⌘P`, diffs, blame and the Go and TypeScript language servers work normally. See [Restricted Mode](../guides/restricted-mode.md).
@@ -71,12 +71,12 @@ When you have read enough to trust the code and its authors:
 
 1. Click **Trust Folder** in the banner, or run "Trust Folder" from the palette.
 
-The held-back language servers start right away, and Git hooks and the project's agent settings now apply. You can now install dependencies and run the project, for example with a detected run configuration in the ▶ selector (`⌃R`) or the tests from the gutter.
+The held-back language servers start right away, and Git hooks and the folder's agent settings now apply. You can now install dependencies and run the code, for example with a detected run configuration in the ▶ selector (`⌃R`) or the tests from the gutter.
 
 Changed your mind? "Revoke Folder Trust (Restricted Mode)" turns the restrictions back on.
 
 ## Tips
 
-- **Trust is per folder.** Trusting a folder also trusts its subfolders, but not sibling projects in the same window.
+- **Trust is per folder.** Trusting a folder also trusts its subfolders, but not sibling folders in the same window.
 - **You can open a terminal yourself** in Restricted Mode (`⇧⌘T`). Remember that your shell's prompt hooks may run tools such as `git status` in the folder.
 - **Several repositories at once.** Add related repositories to the window with `⇧⌘O` and search across all of them.

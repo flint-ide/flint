@@ -304,7 +304,7 @@ func installMessage(m *manifest.Manifest) string {
 func PermissionText(p string) string {
 	switch p {
 	case manifest.PermWorkspaceRead:
-		return "Read and open files in trusted project folders (workspace.read)"
+		return "Read and open files in trusted workspace folders (workspace.read)"
 	case manifest.PermSecrets:
 		return "Keep its own secrets in the system keychain (secrets)"
 	case manifest.PermAgentAsk:

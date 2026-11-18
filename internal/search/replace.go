@@ -136,7 +136,7 @@ func (r *Replacer) Apply(targets []ReplaceTarget) (ReplaceResult, *Undo) {
 	for _, t := range targets {
 		path := filepath.Join(t.Root, filepath.FromSlash(t.Path))
 		if !filepath.IsAbs(t.Root) || !strings.HasPrefix(path, filepath.Clean(t.Root)+string(filepath.Separator)) {
-			res.Skipped = append(res.Skipped, SkippedFile{t.Root, t.Path, "outside the project"})
+			res.Skipped = append(res.Skipped, SkippedFile{t.Root, t.Path, "outside the workspace"})
 			continue
 		}
 		before, after, n, err := r.applyFile(path, t.Lines)

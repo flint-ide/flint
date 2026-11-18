@@ -52,11 +52,11 @@ Flint drives the CLIs you already use, with the same `PATH` and logins as your t
 
 ### Fast and light
 
-Flint is a single native process using the system WebView, not Electron. On an Apple M4 Pro, with a fresh profile on a 12,000-file project, its window appears after 0.29 s and it uses about 120 MB after settling. VS Code uses about 590 MB in the same test. See the [benchmark](https://github.com/flint-ide/flint/blob/main/docs/BENCHMARK.md) for the method and how to repeat it.
+Flint is a single native process using the system WebView, not Electron. On an Apple M4 Pro, with a fresh profile on a 12,000-file repository, its window appears after 0.29 s and it uses about 120 MB after settling. VS Code uses about 590 MB in the same test. See the [benchmark](https://github.com/flint-ide/flint/blob/main/docs/BENCHMARK.md) for the method and how to repeat it.
 
 ### Safe with code you don't trust yet
 
-[Restricted Mode](guides/restricted-mode.md) keeps an untrusted folder from running its own code: no automatic terminal, no language servers that execute project code, and agents ignore the project's hooks and settings.
+[Restricted Mode](guides/restricted-mode.md) keeps an untrusted folder from running its own code: no automatic terminal, no language servers that execute the folder's code, and agents ignore the folder's hooks and settings.
 
 Elsewhere:
 

@@ -1,8 +1,8 @@
 # Search and replace
 
-Recipes for finding text across the project and replacing it safely. For how search works, see [Editor and navigation](../guides/editor-and-navigation.md#search-and-replace).
+Recipes for finding text across the open folders and replacing it safely. For how search works, see [Editor and navigation](../guides/editor-and-navigation.md#search-and-replace).
 
-## Find text in the project
+## Find text in the workspace
 
 1. Press `⇧⌘F`.
 2. Type your query. Results appear as they are found, grouped by file.
@@ -20,9 +20,9 @@ Turn on **Match case**, **Whole word** or **Regular expression** with the button
 1. Right-click the folder in the file tree.
 2. Choose **Find in Folder**.
 
-With several projects open, the panel searches the whole workspace by default; this narrows it down.
+With several folders open, the panel searches the whole workspace by default; this narrows it down.
 
-## Replace across the project
+## Replace across the workspace
 
 1. Press `⇧⌘R`, or click the replace button (⇄) in the Search panel.
 2. Type the search text and the replacement.

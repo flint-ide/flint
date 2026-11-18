@@ -5,15 +5,16 @@ import { NumberField, Row } from './fields'
 const TOOLS: { key: McpToolKey; label: string; hint: string }[] = [
   { key: 'diagnostics', label: 'Diagnostics', hint: 'Errors and warnings from the language servers.' },
   { key: 'editor', label: 'Open editors and selection', hint: 'Which files are open, the active one, and the selected text.' },
-  { key: 'terminals', label: 'Terminal output', hint: 'Recent output printed in the project by terminals and run consoles. Off by default; the agent asks before each call.' },
+  { key: 'terminals', label: 'Terminal output', hint: 'Recent output printed in the chat\'s folder by terminals and run consoles. Off by default; the agent asks before each call.' },
   { key: 'tests', label: 'Test results', hint: 'The last test run: totals and failed tests with their output.' },
 ]
 
 const ACTIONS: { key: McpActionKey; label: string; hint: string }[] = [
   { key: 'tests', label: 'Run tests', hint: 'run_tests: a Go package, a test file or single tests, in the Tests tab, like the ▶ in the gutter.' },
-  { key: 'run', label: 'Run configurations', hint: 'run_configuration starts one of the project\'s run configurations in its run tab; get_run_output reads its output.' },
-  { key: 'http', label: 'Send HTTP requests', hint: 'send_http_request: a named request of a .http file in the project; the response is kept in the file\'s history.' },
+  { key: 'run', label: 'Run configurations', hint: 'run_configuration starts one of the folder\'s run configurations in its run tab; get_run_output reads its output.' },
+  { key: 'http', label: 'Send HTTP requests', hint: 'send_http_request: a named request of a .http file in the chat\'s folder; the response is kept in the file\'s history.' },
   { key: 'sql', label: 'Run SQL queries', hint: 'run_sql_query: one reading statement on a saved connection, only when that connection is read-only.' },
+  { key: 'projects', label: 'Add project items', hint: 'add_project_item: writes a new item into the backlog of a project whose folder is trusted, after you approve each one' },
 ]
 
 /** Settings ▸ Agent Context: Flint's own MCP server for the agents it starts. */
@@ -65,7 +66,7 @@ export function McpServerSection() {
         </button>
       </div>
       <p className="muted settings-note">
-        Flint serves these tools on 127.0.0.1 only, with a separate token per chat that ends with the chat: an agent sees only its own project.
+        Flint serves these tools on 127.0.0.1 only, with a separate token per chat that ends with the chat: an agent sees only its own folder.
         Answers are bounded and credentials are redacted. Folders in Restricted Mode get no access. Turning the server or a tool off applies at
         once. Commit messages and other one-shot runs don't use it.
       </p>

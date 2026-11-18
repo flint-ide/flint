@@ -180,5 +180,5 @@ func insideRoots(path string, roots []string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("body file %s is outside the project: copy it into the project to send it", path)
+	return fmt.Errorf("body file %s is outside the workspace: copy it into a workspace folder to send it", path)
 }

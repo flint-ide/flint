@@ -200,7 +200,7 @@ export async function debugTestsInFile(path: string): Promise<void> {
 export function debugFile(path: string): Promise<void> {
   const root = rootFor(path)
   if (!root) {
-    showToast(`Can't debug ${baseOf(path)}: it isn't inside an open project folder. Open its folder, then try again.`)
+    showToast(`Can't debug ${baseOf(path)}: it isn't inside an open folder. Open its folder, then try again.`)
     return Promise.resolve()
   }
   const label = extensionDebuggerFor(path)?.label ?? 'the debugger'

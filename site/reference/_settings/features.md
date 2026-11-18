@@ -1,4 +1,4 @@
-| `features` | object | see below | Which built-in extensions (Database, Backlog) are switched off. See [features](#features). |
+| `features` | object | see below | Which built-in extensions (Database, Projects) are switched off. See [features](#features). |
 
 ### features
 
@@ -6,8 +6,8 @@ Set in **Settings ▸ Extensions ▸ Built-in**. A built-in extension that is sw
 
 | Key | Type | Range | Default | Meaning |
 |---|---|---|---|---|
-| `enabled` | object | `database`, `backlog` | `{}` | Feature id → `false` to switch it off (`true` or a missing id means on). Ids of other features are ignored. Takes effect after a restart. |
+| `enabled` | object | `database`, `projects` | `{}` | Feature id → `false` to switch it off (`true` or a missing id means on). Ids of other features are ignored. Takes effect after a restart. |
 
 ```json
-"features": { "enabled": { "database": false, "backlog": false } }
+"features": { "enabled": { "database": false, "projects": false } }
 ```

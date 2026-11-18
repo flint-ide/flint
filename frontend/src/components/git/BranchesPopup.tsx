@@ -116,7 +116,7 @@ export function BranchesPopup({ onClose, initialMode = 'list' }: { onClose: () =
             <PopupAction label="＋ New Branch…" onClick={() => setMode('new-branch')} />
             <PopupAction label="＋ New Worktree…" hint="separate folder + terminal for an agent" onClick={() => setMode('new-worktree')} />
             <PopupAction label="⇣ Fetch" onClick={() => void remote('fetch').then(onClose)} />
-            <PopupAction label="⤓ Update Project (pull)" onClick={() => (onClose(), updateProject())} />
+            <PopupAction label="⤓ Update Repository (pull)" onClick={() => (onClose(), updateProject())} />
             <PopupAction label="⤒ Push" hint={status?.ahead ? `${status.ahead} commit(s)` : ''} onClick={() => void remote('push').then(onClose)} />
 
             {worktrees.length > 1 && <div className="popup-section">Worktrees</div>}

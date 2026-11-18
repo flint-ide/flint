@@ -169,7 +169,7 @@ export function FileTree() {
     <div className="panel">
       <div className="panel-header">
         <span className="panel-title" title={roots.join('\n')}>{implicitRoot ? basename(implicitRoot) : 'Workspace'}</span>
-        <button className="icon" title={`Add Project to Workspace… (${formatKeys('Mod+Shift+O')})`} onClick={() => void useWorkspace.getState().pickRoot()}>＋</button>
+        <button className="icon" title={`Add Folder to Workspace… (${formatKeys('Mod+Shift+O')})`} onClick={() => void useWorkspace.getState().pickRoot()}>＋</button>
         <button className="icon" title="Refresh" onClick={() => void reloadTree()}>↻</button>
       </div>
       <div className="tree" ref={setTreeRef} tabIndex={0} onKeyDown={onKeyDown} onContextMenu={(e) => onContextMenu(e, null)}>

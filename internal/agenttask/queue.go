@@ -48,15 +48,33 @@ func (s Store) QueuedTasks() []QueuedTask {
 // NextQueued picks the tasks to start now: the oldest queued ones that may start
 // (eligible: their repository is open, their folder trusted, no budget in
 // the way), at most free of them. A task that may not start is skipped, not
-// waited for, so a repository that is closed never blocks another.
+// waited for, so a repository that is closed never blocks another. A joint
+// group is one unit that takes one slot: it is picked when any of its tasks
+// is queued and every one of them is eligible, and it is returned as its
+// lead (Store.Joint) alone; the caller starts the group from it.
 func NextQueued(s Store, free int, eligible func(QueuedTask) bool) []Task {
 	var out []Task
+	seen := map[string]bool{}
 	for _, q := range s.QueuedTasks() {
 		if len(out) >= free {
 			break
 		}
-		if eligible(q) {
-			out = append(out, q.Task)
+		if q.Task.Joint == "" {
+			if eligible(q) {
+				out = append(out, q.Task)
+			}
+			continue
+		}
+		if seen[q.Task.Joint] {
+			continue
+		}
+		seen[q.Task.Joint] = true
+		members := s.Joint(q.Task.Joint)
+		if !slices.ContainsFunc(members, func(m Task) bool {
+			repo, _, _ := s.Find(m.ID)
+			return !eligible(QueuedTask{Repo: repo, Task: m})
+		}) {
+			out = append(out, members[0])
 		}
 	}
 	return out

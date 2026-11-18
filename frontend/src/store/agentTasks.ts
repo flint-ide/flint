@@ -12,10 +12,14 @@ import { errorMessage } from '../api/backend'
 import {
   failurePrompt,
   groupMates,
+  jointLead,
+  lacksChat,
   mergeTaskLists,
   pruneChanges,
+  removeJointNote,
   removeOthersQuestion,
   removeQuestions,
+  startsOwnChat,
   tasksTouchedBy,
   type TaskView,
 } from '../lib/agentTasks'
@@ -158,7 +162,7 @@ export function closeNewTask(): void {
   useTasks.setState({ newTaskOpen: false })
 }
 
-/** Shows a task's folder in the window: attached as a project unless a project already holds it. */
+/** Shows a task's folder in the window: attached to the workspace unless a workspace folder already holds it. */
 export async function showFolder(path: string): Promise<boolean> {
   const { roots, addRoot } = useWorkspace.getState()
   if (roots.some((r) => isWithin(r, path))) return true
@@ -225,6 +229,8 @@ export async function startQueuedNow(t: TaskView): Promise<void> {
   const started = await withBusy(t, () => TaskAPI.StartNow(t.id))
   if (!started) return
   void loadTasks()
+  // A joint group's one chat is started by Go, in the lead's worktree: a chat started here would be a stray one.
+  if (!startsOwnChat(started as TaskView)) return
   await beginTask(started as TaskView, t.prompt)
 }
 
@@ -252,10 +258,16 @@ export function subscribeTaskQueue(): void {
 
 /** Shows the task's folder and its chat (a new one when none is open). */
 export async function openTask(t: TaskView): Promise<void> {
-  if (!(await showFolder(t.worktree))) return
-  const id = chatOf(t)
+  // The tasks of a joint group have one chat, in the lead's worktree: Open on any member opens that.
+  const target = jointLead(t, useTasks.getState().tasks)
+  if (lacksChat(target)) {
+    showToast("This task shares one agent chat with its group, and the group's lead task is not listed: its repository may not be open in this window", 'error')
+    return
+  }
+  if (!(await showFolder(target.worktree))) return
+  const id = chatOf(target)
   if (id) useEditor.getState().setActive(chatTabId(id))
-  else await useAgentChat.getState().start(t.agent, t.worktree)
+  else await useAgentChat.getState().start(target.agent, target.worktree)
 }
 
 export function toggleChanges(t: TaskView): void {
@@ -435,7 +447,7 @@ export function openComparedFileDiff(c: main.ComparedTask, path: string, origPat
 export async function removeTask(t: TaskView, asked = false): Promise<void> {
   const { roots } = useWorkspace.getState()
   if (roots[0] === t.worktree) {
-    showToast("The task's folder is this window's main project: open another folder first", 'error')
+    showToast("The task's folder is this window's main folder: open another folder first", 'error')
     return
   }
   let info: main.RemoveInfo
@@ -446,13 +458,17 @@ export async function removeTask(t: TaskView, asked = false): Promise<void> {
     return
   }
   const what = t.stale ? 'The task is forgotten (its folder is already gone).' : `Its chats are stopped and the folder ${t.worktree} is deleted.`
-  if (!asked && !(await confirmAction(`Remove the task "${t.title}"? ${what}`, 'Remove'))) return
+  const joint = removeJointNote(info)
+  if (!asked && !(await confirmAction(`Remove the task "${t.title}"? ${what}${joint ? ` ${joint}` : ''}`, 'Remove'))) return
   const q = removeQuestions(info)
   const which = asked ? `${t.branch}: ` : ''
   if (q.discard && !(await confirmAction(which + q.discard, 'Delete them'))) return
   const deleteBranch = q.branch ? await confirmAction(which + q.branch, 'Delete branch') : false
   const chat = useAgentChat.getState()
   for (const s of Object.values(chat.sessions)) if (isWithin(t.worktree, s.cwd)) await chat.stop(s.id)
+  // The chat a member shares with its group runs in the lead's worktree.
+  const lead = info.stopsJointChat ? jointLead(t, useTasks.getState().tasks) : t
+  if (lead !== t) for (const s of Object.values(chat.sessions)) if (isWithin(lead.worktree, s.cwd)) await chat.stop(s.id)
   if (roots.includes(t.worktree)) await useWorkspace.getState().removeRoot(t.worktree)
   else useEditor.getState().closePaths([t.worktree])
   const res = await withBusy(t, () =>

@@ -332,10 +332,10 @@ func validateCwd(cwd string) error {
 		return nil
 	}
 	if filepath.IsAbs(cwd) {
-		return fmt.Errorf("cwd %q must be relative to the project root", cwd)
+		return fmt.Errorf("cwd %q must be relative to the workspace folder", cwd)
 	}
 	if escapes(cwd) {
-		return fmt.Errorf("cwd %q points outside the project", cwd)
+		return fmt.Errorf("cwd %q points outside the folder", cwd)
 	}
 	return nil
 }

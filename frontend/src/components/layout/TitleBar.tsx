@@ -25,7 +25,7 @@ const DEFAULT_INSET = 80
 
 /**
  * Title bar laid out around the native macOS window buttons (kept native: the
- * window uses AppKit's compact toolbar style). IntelliJ-like widgets: project,
+ * window uses AppKit's compact toolbar style). IntelliJ-like widgets: folder,
  * branch, then quick actions on the right. Empty space drags the window.
  */
 export function TitleBar() {
@@ -96,15 +96,15 @@ function ProjectWidget() {
 
   const items = (): DropdownItem[] => [
     { label: 'Open Folder…', kbd: formatKeys('Mod+O'), icon: <FileIcon name="folder" isDir open />, onSelect: () => void pick() },
-    { label: 'Add Project to Workspace…', kbd: formatKeys('Mod+Shift+O'), disabled: !root, onSelect: () => void useWorkspace.getState().pickRoot() },
-    { label: 'Recent Projects…', onSelect: () => useWorkspace.getState().setRecentOpen(true) },
+    { label: 'Add Folder to Workspace…', kbd: formatKeys('Mod+Shift+O'), disabled: !root, onSelect: () => void useWorkspace.getState().pickRoot() },
+    { label: 'Recent Folders…', onSelect: () => useWorkspace.getState().setRecentOpen(true) },
     ...(roots.length > 1 ? [{ type: 'section', label: 'Workspace' } as DropdownItem] : []),
     ...(roots.length > 1
       ? roots.map(
           (r, i): DropdownItem => ({
             key: `ws:${r}`,
             label: labels[i],
-            hint: i === 0 ? 'main project' : r.replace(/^\/Users\/[^/]+/, '~'),
+            hint: i === 0 ? 'main folder' : r.replace(/^\/Users\/[^/]+/, '~'),
             icon: <FileIcon name={labels[i]} isDir />,
             onSelect: () => void Workspace.RevealInFinder(r),
             action: i === 0 ? undefined : { label: '✕', title: 'Remove from workspace', onClick: () => void useWorkspace.getState().removeRoot(r) },

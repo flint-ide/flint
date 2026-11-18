@@ -26,6 +26,6 @@ Used by [extensions](../guides/extensions.md). Settings ▸ Extensions and each 
 | `requireSandbox` | boolean | `false` | `true` starts only extensions whose program runs in the [sandbox](../guides/extensions.md#the-sandbox). The others (no sandbox declared, declared off, or none available on this system) stay installed and are not started. Settings ▸ Extensions ▸ Only run sandboxed extensions. |
 | `<extension id>` | object | `{}` | The extension's settings, described by its manifest. Values that don't fit the manifest are replaced with the manifest's defaults before the extension sees them. |
 
-`indexUrl` and `indexPublicKey` decide what Flint is willing to download and install from, so they are read from your own `settings.json` only; nothing in a project folder can set them. Flint never downloads the index on its own.
+`indexUrl` and `indexPublicKey` decide what Flint is willing to download and install from, so they are read from your own `settings.json` only; nothing in a workspace folder can set them. Flint never downloads the index on its own.
 
 The objects of extensions that are not installed are kept, so uninstalling and installing again restores their settings. Secrets never go here: extensions keep them in the system keychain.

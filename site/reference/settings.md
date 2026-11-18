@@ -67,7 +67,7 @@ The file is readable only by your user. It never contains secrets: database pass
   "mcpServer": {
     "enabled": true,
     "tools": { "diagnostics": true, "editor": true, "terminals": true, "tests": true },
-    "actions": { "tests": true, "run": false, "http": false, "sql": false },
+    "actions": { "tests": true, "run": false, "http": false, "sql": false, "projects": false },
     "terminalLines": 200,
     "testWaitSeconds": 120
   },
@@ -202,7 +202,7 @@ Each entry configures one agent CLI. A missing entry or key uses the default.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `path` | string | `""` | The executable. Empty looks up `claude` or `codex` on your login shell's `PATH`. Otherwise a command name (looked up on the `PATH`) or an absolute path; a path relative to the project is refused. |
+| `path` | string | `""` | The executable. Empty looks up `claude` or `codex` on your login shell's `PATH`. Otherwise a command name (looked up on the `PATH`) or an absolute path; a path relative to the folder is refused. |
 | `model` | string | `""` | The model, passed as `--model` (Claude Code, Codex commit messages) or as the chat thread's model (Codex). Empty uses the CLI's default. Letters, digits and `. _ : / @ [ ] -`, up to 128 characters, not starting with `-`. |
 | `args` | array of strings | `[]` | Extra command-line arguments for chats, commit messages and conflict resolution. |
 | `tiers` | object | see below | The model each [model tier](../guides/ai-agents.md#model-tiers) means on this agent CLI, for defined agents whose `model` is `fast`, `balanced` or `strong`: `{ "fast": "…", "balanced": "…", "strong": "…" }`. A missing tier uses the default: `haiku`, `sonnet` and `opus` for Claude Code, none for Codex. `""` means none, not even the default. A tier without a model runs on `model` above. Each value follows the rules of `model`. |
@@ -213,7 +213,7 @@ Extra arguments are placed before Flint's own flags, so where a CLI lets a repea
 - be `--`, empty, or contain a newline or another control character;
 - be more than 32 arguments or longer than 512 characters each.
 
-In [Restricted Mode](../guides/restricted-mode.md) the extra arguments are left out, because a flag such as `--mcp-config` or `--add-dir` with a relative path would load the project's files.
+In [Restricted Mode](../guides/restricted-mode.md) the extra arguments are left out, because a flag such as `--mcp-config` or `--add-dir` with a relative path would load the folder's files.
 
 In `tiers`, other keys than `fast`, `balanced` and `strong` are refused, and so is a value that isn't a valid model. When the file is loaded, such a tier is dropped and uses its default again. To clear one of Claude Code's defaults, set the tier to `""` here: Settings ▸ Agents can set a tier's model or return it to the default (an empty field), but not clear it.
 
@@ -225,7 +225,7 @@ Each entry is an agent Flint starts and talks to over the [Agent Client Protocol
 |---|---|---|---|
 | `id` | string | required | Names the agent in menus and in `defaultAgent`. Lowercase letters, digits and dashes, starting with a letter, up to 32 characters; not `claude` or `codex`; unique. |
 | `name` | string | `""` | Shown in Settings. Empty shows the id. Up to 64 characters, no control characters or surrounding spaces. |
-| `command` | string | required | The executable: a command name looked up on your login shell's `PATH`, or an absolute path. A path relative to the project, or one starting with `-`, is refused. |
+| `command` | string | required | The executable: a command name looked up on your login shell's `PATH`, or an absolute path. A path relative to the folder, or one starting with `-`, is refused. |
 | `args` | array of strings | `[]` | Arguments that start the CLI in its ACP mode, for example `["--experimental-acp"]` for `gemini` or `["acp"]` for `opencode`. At most 32, each non-empty, single-line and up to 512 characters. |
 
 At most 16 custom agents. When the file is loaded, an invalid entry is dropped as a whole (half an entry could start the wrong command), as is a second entry with the same id; a `defaultAgent` that pointed at a dropped entry falls back to the first installed agent.
@@ -239,10 +239,10 @@ Each entry configures the server of one language. A missing entry or key uses th
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `disabled` | boolean | `false` | Keep the language's server off. |
-| `command` | string | `""` | The server. Empty tries the known servers in order: `gopls`; `vtsls`, then `typescript-language-server`; `basedpyright-langserver`, `pyright-langserver`, then `pylsp`; `rust-analyzer`. A known server's name, or an absolute path whose file name is a known server, gets that server's own arguments (`--stdio`). Any other command is started as is and, because Flint can't know what it runs, only in trusted folders. A path relative to the project is refused. |
+| `command` | string | `""` | The server. Empty tries the known servers in order: `gopls`; `vtsls`, then `typescript-language-server`; `basedpyright-langserver`, `pyright-langserver`, then `pylsp`; `rust-analyzer`. A known server's name, or an absolute path whose file name is a known server, gets that server's own arguments (`--stdio`). Any other command is started as is and, because Flint can't know what it runs, only in trusted folders. A path relative to the folder is refused. |
 | `args` | array of strings | `[]` | Extra arguments, added after the server's own. Ignored in Restricted Mode. Same limits as agent arguments; `--tsserver-path` is refused, because typescript-language-server always uses its own TypeScript. |
 
-A change made in the Settings tab restarts that language's servers. Servers that run the project's code (rust-analyzer, the Python servers) still start only in trusted folders, whatever this setting says.
+A change made in the Settings tab restarts that language's servers. Servers that run the folder's code (rust-analyzer, the Python servers) still start only in trusted folders, whatever this setting says.
 
 ### mcpServer
 
@@ -253,18 +253,19 @@ Flint's own MCP server for agent chats: read-only tools, and tools that act when
 | `enabled` | boolean | | `true` | Offer the server to new agent chats. When `false`, the server closes and running chats lose access. |
 | `tools.diagnostics` | boolean | | `true` | `get_diagnostics`: language-server errors and warnings. |
 | `tools.editor` | boolean | | `true` | `get_editor_state`: open files, the active file and the selection. When `false`, Flint also stops sending the editor state to its backend. |
-| `tools.terminals` | boolean | | `false` | `get_terminal_output`: recent output terminals and run consoles printed in the project. The agent asks before each call. |
+| `tools.terminals` | boolean | | `false` | `get_terminal_output`: recent output terminals and run consoles printed in the chat's folder. The agent asks before each call. |
 | `tools.tests` | boolean | | `true` | `get_test_results`: the last test run. |
 | `actions.tests` | boolean | | `false` | `run_tests`: run tests in Flint's test runner. Like every `actions` tool, it isn't offered while `false`, and you are asked before each call. |
 | `actions.run` | boolean | | `false` | `run_configuration` (start a run configuration by name) and `get_run_output` (read a run's output and state). |
-| `actions.http` | boolean | | `false` | `send_http_request`: send a named request of a `.http` file in the project. |
+| `actions.http` | boolean | | `false` | `send_http_request`: send a named request of a `.http` file in the chat's folder. |
 | `actions.sql` | boolean | | `false` | `run_sql_query`: one reading statement on a saved connection that is read-only. Needs the Database feature. |
+| `actions.projects` | boolean | | `false` | `add_project_item`: add one `todo` item to a [project](../guides/projects.md#what-agents-can-add) whose folder is trusted. Shown in Settings as **Add project items**. Needs the Projects feature. |
 | `terminalLines` | integer | 10–2000 | `200` | The most lines of one terminal's or run's output an agent gets (clamped into the range). |
 | `testWaitSeconds` | integer | 10–540 | `120` | How long `run_tests` waits for a test run before it answers with the results so far (clamped into the range). |
 
 Tool switches apply right away, also to running chats.
 
-`get_backlog` (the [backlog](../guides/backlog.md#what-agents-can-see)) has no key here: it is offered while the Backlog feature is on (see [features](#features)).
+`get_project` (the [project](../guides/projects.md#what-agents-can-see)) has no key here: it is offered while the Projects feature is on (see [features](#features)). `add_project_item`, which adds items, is switched on with `actions.projects`.
 ### completions
 
 Ghost-text suggestions in file editors from a fill-in-the-middle code model. See [AI in the editor](../guides/editor-and-navigation.md#ai-in-the-editor).
@@ -296,13 +297,13 @@ Used by [agent tasks](../guides/ai-agents.md#agent-tasks-agents-in-parallel).
 |---|---|---|---|
 | `worktreeDir` | string | `""` | Folder for task worktrees, which go to `<worktreeDir>/<repository>/<branch>`. An absolute path or one starting with `~/`, up to 1024 characters. Empty puts them in `<repository>.worktrees/<branch>` next to the main checkout, like **New Worktree…** in the branch widget. |
 | `branchPrefix` | string | `"agent/"` | Starts every task branch, followed by a name made from the task's first line. Letters, digits, `.`, `_`, `-` and `/`, up to 40 characters; may be empty. It may not start with `-`, `/` or `.`, or contain `..`, `//` or `/.`. |
-| `maxParallel` | integer | `3` | How many agent tasks may work at the same time, from 0 to 32. A task started beyond it waits in [the queue](../guides/ai-agents.md#the-queue) until a working task settles. `0` means no limit. |
+| `maxParallel` | integer | `3` | How many agent tasks may work at the same time, from 0 to 32. A task started beyond it waits in [the queue](../guides/ai-agents.md#the-queue) until a working task settles. `0` means no limit. A [joint group](../guides/ai-agents.md#joint-groups-one-agent-in-several-repositories) (one agent in several repositories) counts as one task. |
 
 Slashes in a branch name become dashes in the folder name. The tasks themselves are kept in `state.json`.
 
 ### orchestration
 
-Lets an agent chat start other agents in the same project, send them messages, wait for them and read their output, through Flint's MCP server (which must be on, see [mcpServer](#mcpserver)). **Off by default**: while `enabled` is `false` the tools are not even listed.
+Lets an agent chat start other agents in the same folder, send them messages, wait for them and read their output, through Flint's MCP server (which must be on, see [mcpServer](#mcpserver)). **Off by default**: while `enabled` is `false` the tools are not even listed.
 
 | Key | Type | Range | Default | Meaning |
 |---|---|---|---|---|
@@ -314,7 +315,7 @@ Lets an agent chat start other agents in the same project, send them messages, w
 | `outputLines` | integer | 1–2000 | `200` | The most lines `read_agent_output` returns (redacted). |
 | `maxAutoTurns` | integer | 1–400 | `40` | The most turns agents may start in each other (a `send_prompt`, a started agent's first prompt, a delivered `[Flint]` notice) in one group of chats, counted from the last message you typed in any chat of that group. Past it, agents are told to stop and report to you, and no notices are delivered; typing a message in any of the chats starts the count again. |
 
-Out-of-range numbers are clamped; `0` or a missing number is the default. What is not a setting, on purpose: the grant covers one project only, never an untrusted folder (Restricted Mode), lives in memory and ends with the chat, and an agent that was refused is not asked about again. Messages an agent sends to another are redacted and appear in the target's chat, but are not previewed first. See [ARCHITECTURE.md](https://github.com/flint-ide/flint/blob/main/docs/ARCHITECTURE.md#security-model).
+Out-of-range numbers are clamped; `0` or a missing number is the default. What is not a setting, on purpose: the grant covers one folder only, never an untrusted folder (Restricted Mode), lives in memory and ends with the chat, and an agent that was refused is not asked about again. Messages an agent sends to another are redacted and appear in the target's chat, but are not previewed first. See [ARCHITECTURE.md](https://github.com/flint-ide/flint/blob/main/docs/ARCHITECTURE.md#security-model).
 
 ### usage
 
@@ -339,7 +340,7 @@ Used by the [prompt library](../guides/ai-agents.md#prompt-library).
 |---|---|---|---|
 | `builtins` | boolean | `true` | Offer the prompts that ship with Flint (`/review`, `/test`, `/explain`, `/fix`). |
 
-The prompts themselves are Markdown files, not settings: personal ones in the `prompts` folder next to `settings.json`, project ones in the repository's `.flint/prompts`.
+The prompts themselves are Markdown files, not settings: personal ones in the `prompts` folder next to `settings.json`, repository ones in the repository's `.flint/prompts`.
 ### agentReview
 
 Used by [Review Changes with Agent](../guides/ai-agents.md#review-changes-with-agent). Settings ▸ Agents ▸ Review.

@@ -7,11 +7,11 @@ Flint's terminals are real terminals: each one runs your login shell in a pseudo
 | How | Where the terminal starts |
 |---|---|
 | `⌘J` | Toggles between the terminal and your last file; opens a terminal if there is none |
-| `⇧⌘T`, or `+` ▸ **Terminal** | A new terminal in the active tab's project |
+| `⇧⌘T`, or `+` ▸ **Terminal** | A new terminal in the active tab's folder |
 | File tree ▸ **Open in Terminal** | In the selected folder |
 | An extension's command or panel | Whatever the extension starts, such as a container's log, a login, or a shell as an AWS profile or in a Kubernetes context (see [AWS](aws.md), [Kubernetes](kubernetes.md) and [Docker](docker.md)) |
 
-With several projects in the window, the `+` menu has a section per project so you can choose where the terminal starts.
+With several folders in the window, the `+` menu has a section per folder so you can choose where the terminal starts.
 
 ## Tab names
 
@@ -27,7 +27,7 @@ A terminal tab is named after its current directory, or after the program runnin
 
 ## Sending output to the agent
 
-Select output and press `⌘L`, or right-click ▸ **Send to agent**. The text goes to the agent chat of the terminal's project as a code block, in the draft, so you can add a question before sending. See [AI agents](ai-agents.md#giving-the-agent-context).
+Select output and press `⌘L`, or right-click ▸ **Send to agent**. The text goes to the agent chat of the terminal's folder as a code block, in the draft, so you can add a question before sending. See [AI agents](ai-agents.md#giving-the-agent-context).
 
 ## Running agents in a terminal
 
@@ -35,7 +35,7 @@ You can run `claude` or `codex` interactively in a terminal tab, exactly as in a
 
 ## Terminals after a restart
 
-Terminals are saved with the project session. After a restart, each terminal starts a new shell in its last directory (it follows `cd`), with its last ~400 lines of output shown dimmed above the new prompt. Full-screen programs, such as the interactive claude interface, are not saved.
+Terminals are saved with the window's session. After a restart, each terminal starts a new shell in its last directory (it follows `cd`), with its last ~400 lines of output shown dimmed above the new prompt. Full-screen programs, such as the interactive claude interface, are not saved.
 
 Before a session is saved, Flint removes credentials it recognizes from the terminal output. The session file is readable only by your user.
 

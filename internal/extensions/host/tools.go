@@ -91,7 +91,7 @@ func uniqueName(name string, taken map[string]bool) string {
 // callTool runs agentTool/call for an agent working in root.
 func (e *ext) callTool(ctx context.Context, name, root string, args json.RawMessage) (string, error) {
 	if !e.h.o.App.Trusted(root) {
-		return "", errors.New("the project folder is not trusted (Restricted Mode)")
+		return "", errors.New("the folder is not trusted (Restricted Mode)")
 	}
 	if len(args) == 0 {
 		args = json.RawMessage("{}")

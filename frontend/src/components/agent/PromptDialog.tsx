@@ -75,7 +75,7 @@ function RunPrompt({ root }: { root: string }) {
   )
 }
 
-/** Names a new prompt and creates it from a template, in the project or the personal folder. */
+/** Names a new prompt and creates it from a template, in the repository's .flint folder or the personal folder. */
 function NewPrompt({ root }: { root: string }) {
   const [name, setName] = useState('')
   const [personal, setPersonal] = useState(!root)
@@ -99,11 +99,11 @@ function NewPrompt({ root }: { root: string }) {
         {name && !valid && <span className="form-status error">Letters, digits, - and _ only, starting with a letter or digit.</span>}
         <label className="check">
           <input type="radio" name="scope" checked={!personal} disabled={!root} onChange={() => setPersonal(false)} />
-          Project: .flint/prompts, shared with the team through the repository
+          Repository: .flint/prompts, shared with the team through the repository
         </label>
         <label className="check">
           <input type="radio" name="scope" checked={personal} onChange={() => setPersonal(true)} />
-          Personal: only you, in every project
+          Personal: only you, in every folder
         </label>
         <div className="form-actions">
           <button type="button" onClick={closePromptDialog}>Cancel</button>

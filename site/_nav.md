@@ -13,7 +13,7 @@
 - [Onboard to a new repository](use-cases/onboard-to-a-new-repository.md)
 
 ## How-to
-- [Open projects](how-to/open-projects.md)
+- [Open folders](how-to/open-projects.md)
 - [Search and replace](how-to/search-and-replace.md)
 - [Use terminals](how-to/use-terminals.md)
 - [Work with agents](how-to/work-with-agents.md)
@@ -27,7 +27,7 @@
 ## Guides
 - [Editor and navigation](guides/editor-and-navigation.md)
 - [AI agents](guides/ai-agents.md)
-- [Backlog](guides/backlog.md)
+- [Projects](guides/projects.md)
 - [Git and GitHub](guides/git-and-github.md)
 - [Run, debug and test](guides/run-debug-test.md)
 - [Databases](guides/databases.md)

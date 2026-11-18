@@ -22,6 +22,17 @@ export interface TaskView {
   merged: boolean
   /** Links the tasks started together from one description ('' for a task on its own). */
   group: string
+  /**
+   * Links the tasks, one per repository, that one agent works on in one chat ('' for a task
+   * with a chat of its own). The lead's worktree holds that chat; the others have none.
+   */
+  joint: string
+  lead: boolean
+  /**
+   * Go starts this task's chat itself, also on Start now (a joint group's, or a project item's, whose first
+   * message Flint composes with the project's context): the window starts none for it.
+   */
+  flintStarts: boolean
   /** What the task's chats used so far. */
   tokens: number
   costUsd: number
@@ -129,6 +140,8 @@ export function planNote(plan: string[], maxParallel: number): string {
 export interface TaskGroupRow {
   /** The group id; '' for a task on its own. */
   group: string
+  /** Set (and group is '') for the tasks of one joint group: one agent, one chat, lead first. */
+  joint?: string
   tasks: TaskView[]
 }
 
@@ -140,11 +153,24 @@ export interface TaskGroupRow {
  */
 export function groupRows(tasks: TaskView[]): TaskGroupRow[] {
   const members = new Map<string, TaskView[]>()
-  for (const t of tasks) if (t.group) members.set(t.group, [...(members.get(t.group) ?? []), t])
+  const joints = new Map<string, TaskView[]>()
+  for (const t of tasks) {
+    if (t.joint) joints.set(t.joint, [...(joints.get(t.joint) ?? []), t])
+    else if (t.group) members.set(t.group, [...(members.get(t.group) ?? []), t])
+  }
   const rows: TaskGroupRow[] = []
   const done = new Set<string>()
   for (const t of tasks) {
-    const group = t.group && (members.get(t.group)?.length ?? 0) > 1 ? t.group : ''
+    // A joint group (one agent across repositories) wins over a comparison group.
+    const joint = t.joint && (joints.get(t.joint)?.length ?? 0) > 1 ? t.joint : ''
+    if (joint) {
+      if (done.has(`j:${joint}`)) continue
+      done.add(`j:${joint}`)
+      const all = joints.get(joint)!
+      rows.push({ group: '', joint, tasks: [...all.filter((m) => m.lead), ...all.filter((m) => !m.lead)] })
+      continue
+    }
+    const group = !t.joint && t.group && (members.get(t.group)?.length ?? 0) > 1 ? t.group : ''
     if (!group) {
       rows.push({ group: '', tasks: [t] })
       continue
@@ -155,6 +181,34 @@ export function groupRows(tasks: TaskView[]): TaskGroupRow[] {
     rows.push({ group, tasks: [...members.get(group)!].sort((a, b) => a.createdAt - b.createdAt) })
   }
   return rows
+}
+
+/**
+ * The task whose worktree holds the chat of t: the lead of t's joint group (t itself for a
+ * task with a chat of its own, or when the lead is not in the list).
+ */
+export function jointLead<T extends { id: string; joint: string; lead: boolean }>(t: T, all: readonly T[]): T {
+  if (!t.joint || t.lead) return t
+  return all.find((o) => o.joint === t.joint && o.lead) ?? t
+}
+
+/** A member of a joint group whose lead is not known has no chat to open. */
+export const lacksChat = (t: Pick<TaskView, 'joint' | 'lead'>): boolean => !!t.joint && !t.lead
+
+/**
+ * Whether the window starts a chat for a task Go just started from the queue: not for a task of
+ * a joint group, whose one chat Go already started in the lead's worktree, nor for one Go starts
+ * itself because its first message is Flint's (a project item's, with the project's context).
+ */
+export const startsOwnChat = (t: Pick<TaskView, 'joint' | 'flintStarts'>): boolean => !t.joint && !t.flintStarts
+
+/** The sentence of the remove confirmation about a joint group; '' for a task with a chat of its own. */
+export function removeJointNote(info: Pick<RemoveInfo, 'jointTasks' | 'stopsJointChat'>): string {
+  const n = info.jointTasks
+  if (n <= 0) return ''
+  const others = n === 1 ? '1 other task' : `${n} other tasks`
+  if (info.stopsJointChat) return `It shares one agent chat with ${others}: removing it stops that chat for all of them. The other tasks and their worktrees stay.`
+  return `It is one of a group of tasks that one agent works on together: the ${n === 1 ? 'other task stays' : `other ${n} tasks stay`}.`
 }
 
 /** The other tasks of t's group. */
@@ -247,6 +301,10 @@ export interface RemoveInfo {
   /** Ignored files and folders (.env, build output): deleted with the worktree too. */
   ignored: number
   unmerged: number
+  /** The other tasks of the task's joint group (0 for a task with a chat of its own). */
+  jointTasks: number
+  /** A chat shared with the group is open: removing the task stops it for all of them. */
+  stopsJointChat: boolean
 }
 
 /** The extra questions removing a task needs: null when nothing would be lost. */

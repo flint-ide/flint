@@ -20,8 +20,8 @@ var ErrRestricted = errors.New("Restricted Mode: the language server isn't start
 // rust-analyzer runs build scripts, proc macros and .cargo/config tools; the
 // Python servers run the interpreter of a virtualenv the project points at.
 var needsTrust = map[string]string{
-	"rust":   "rust-analyzer runs the project's build scripts and proc macros",
-	"python": "the Python language server runs the project's interpreter",
+	"rust":   "rust-analyzer runs the folder's build scripts and proc macros",
+	"python": "the Python language server runs the folder's interpreter",
 }
 
 // initializationOptions returns the initialize options for the server binary.
@@ -35,7 +35,7 @@ func initializationOptions(bin string) (map[string]any, error) {
 	if ts := tsserverNextTo(bin); ts != "" {
 		return map[string]any{"tsserver": map[string]any{"path": ts}}, nil
 	}
-	return nil, errors.New("typescript-language-server has no TypeScript installed next to it, and Flint never runs the project's own copy. Install both with `npm i -g typescript-language-server typescript` (or install vtsls with `npm i -g @vtsls/language-server`), then reopen the file")
+	return nil, errors.New("typescript-language-server has no TypeScript installed next to it, and Flint never runs the folder's own copy. Install both with `npm i -g typescript-language-server typescript` (or install vtsls with `npm i -g @vtsls/language-server`), then reopen the file")
 }
 
 // tslsPackage returns the typescript-language-server package directory bin

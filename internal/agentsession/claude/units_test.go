@@ -304,7 +304,7 @@ func TestFlintToolName(t *testing.T) {
 // (Claude Code merges them); the token travels in the environment only.
 func TestBuildArgsWithFlintMCPServer(t *testing.T) {
 	srv := &agentsession.MCPServer{URL: "http://127.0.0.1:4321/mcp", Token: "tok-secret"}
-	args, err := buildArgs("sid", false, Options{ExtraArgs: []string{"--mcp-config", "/home/me/mcp.json"}}, false, srv)
+	args, err := buildArgs("sid", false, Options{ExtraArgs: []string{"--mcp-config", "/home/me/mcp.json"}}, false, srv, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,7 +344,7 @@ func TestBuildArgsWithFlintMCPServer(t *testing.T) {
 func TestBuildArgsAndEnv(t *testing.T) {
 	build := func(resume bool, opts Options, untrusted bool) string {
 		t.Helper()
-		args, err := buildArgs("sid", resume, opts, untrusted, nil)
+		args, err := buildArgs("sid", resume, opts, untrusted, nil, nil)
 		if err != nil {
 			t.Fatalf("buildArgs() error = %v", err)
 		}

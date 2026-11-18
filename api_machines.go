@@ -67,7 +67,7 @@ func (a *App) confirmRemoteCommand(m settings.Machine, kind string, argv []strin
 	}
 	return ask(fmt.Sprintf("Connect to %q over ssh?", name),
 		"Flint will run this command on your computer to open terminals on that machine:\n\n"+line+
-			"\n\nIt uses your own ssh keys and configuration and never asks for a password. Shells start in your home folder there; nothing from the open project is sent. Continue only if you added this machine yourself.",
+			"\n\nIt uses your own ssh keys and configuration and never asks for a password. Shells start in your home folder there; nothing from the open folders is sent. Continue only if you added this machine yourself.",
 		"Connect")
 }
 

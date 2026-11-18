@@ -147,7 +147,7 @@ func builtin() []Tool {
 		},
 		{
 			ID: "rg", Name: "ripgrep", Group: GroupCore,
-			Feature: "Fast project search, Go to File and the TODO list",
+			Feature: "Fast Find in Files, Go to File and the TODO list",
 			Install: install("brew install ripgrep", "sudo apt install ripgrep"), Docs: "how-to/search-and-replace.md#make-search-faster",
 			candidates: one("rg", "--version"),
 		},

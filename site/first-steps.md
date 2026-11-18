@@ -1,6 +1,6 @@
 # First steps
 
-This tour takes about ten minutes. It walks you through opening a project, finding your way around the window, and the handful of shortcuts you will use all the time.
+This tour takes about ten minutes. It walks you through opening a folder, finding your way around the window, and the handful of shortcuts you will use all the time.
 
 ## Check your tools
 
@@ -14,19 +14,19 @@ Learn more: [Recommended tools](installation.md#recommended-tools).
 
 Flint works on folders. Open one in any of these ways:
 
-- Press `⌘O` to open **Recent Projects**. Pick a folder from the list, or choose **Browse…** to select a new one.
+- Press `⌘O` to open **Recent Folders**. Pick a folder from the list, or choose **Browse…** to select a new one.
 - Drag a folder from Finder onto the Flint window.
 - Run `flint .` in a terminal (see [the flint command](installation.md#the-flint-command)).
 
 The window then shows the file tree on the left, the tab area in the middle and the status bar at the bottom. The icons on the far left (the activity bar) switch the sidebar between Files, Search, Commit, Pull Requests, Databases, Scratchpads and TODO, plus the panels of the extensions you installed. `⌘B` hides or shows the sidebar when you are not in an editor.
 
-Learn more: [Open projects](how-to/open-projects.md).
+Learn more: [Open folders](how-to/open-projects.md).
 
 ## The Restricted Mode banner
 
-The first time you open a folder, a **Restricted Mode** banner appears above the tabs. Until you trust the folder, Flint doesn't run its code on its own: no terminal starts automatically, the Rust and Python language servers stay off, agents ignore the project's own hooks and settings, and Git hooks are disabled.
+The first time you open a folder, a **Restricted Mode** banner appears above the tabs. Until you trust the folder, Flint doesn't run its code on its own: no terminal starts automatically, the Rust and Python language servers stay off, agents ignore the folder's own hooks and settings, and Git hooks are disabled.
 
-- If this is your own project or you trust its authors, click **Trust Folder**.
+- If this is your own code or you trust its authors, click **Trust Folder**.
 - If you just cloned or downloaded something you don't know yet, leave it restricted while you look around. You can trust it later from the command palette ("Trust Folder").
 
 Learn more: [Restricted Mode](guides/restricted-mode.md).
@@ -46,7 +46,7 @@ Press `⌘P` and type a few letters of a file name. Matching is fuzzy, so `usrsv
 
 There is no indexing step: the list is ready as soon as the folder opens, and it respects `.gitignore`.
 
-## Search the project
+## Search the folder
 
 Press `⇧⌘F` to open the Search panel. Type your query; results stream in grouped by file. Toggle match case, whole word and regular expressions next to the field, and use the file filters to include or exclude paths. Click a result to jump to it.
 
@@ -54,7 +54,7 @@ Learn more: [Search and replace](how-to/search-and-replace.md).
 
 ## Open the terminal
 
-Press `⌘J`. The first time, Flint opens a terminal running your login shell in the project folder. Press `⌘J` again to go back to the file you were editing; it toggles between the terminal and your last file. `⇧⌘T` always opens a new terminal.
+Press `⌘J`. The first time, Flint opens a terminal running your login shell in the folder. Press `⌘J` again to go back to the file you were editing; it toggles between the terminal and your last file. `⇧⌘T` always opens a new terminal.
 
 `⌘`-click a `path:line` in the output to open that file at that line.
 
@@ -65,7 +65,7 @@ Learn more: [Terminals](guides/terminals.md).
 If you have the `claude` or `codex` CLI installed:
 
 1. Click `+` in the tab bar and choose **claude chat** or **codex chat**.
-2. Type a question, for example "Explain how requests are routed in this project", and press `↵`.
+2. Type a question, for example "Explain how requests are routed in this repository", and press `↵`.
 3. Watch the answer stream in, with the tools the agent uses and any files it changes.
 
 Select some code and press `⌘L` to attach it to the chat. Edits the agent makes appear in the editor as they happen; review them in the Commit panel (`⌘K`).

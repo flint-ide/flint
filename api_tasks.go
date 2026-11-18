@@ -69,6 +69,16 @@ type TaskView struct {
 	// Group links the tasks started together from one description ("" for
 	// a task on its own).
 	Group string `json:"group"`
+	// Joint links the tasks, one per repository, that one agent works on in
+	// one chat ("" for a task with a chat of its own); Lead marks the task
+	// whose worktree that chat runs in (the others are its additional
+	// folders). Every task of the group shows the chat's state.
+	Joint string `json:"joint"`
+	Lead  bool   `json:"lead"`
+	// FlintStarts: Flint starts this task's chat itself when it leaves the
+	// queue, also on Start now (a joint group's one chat, or a task a feature
+	// made, whose first message Flint composes): the UI starts none for it.
+	FlintStarts bool `json:"flintStarts"`
 	// Tokens and CostUSD are what the task's chats used so far (input and
 	// output tokens; reported cost plus estimates from settings prices).
 	Tokens  int64   `json:"tokens"`
@@ -101,6 +111,12 @@ type RemoveInfo struct {
 	Ignored int `json:"ignored"`
 	// Unmerged counts the branch's commits base doesn't have.
 	Unmerged int `json:"unmerged"`
+	// JointTasks counts the other tasks of the task's joint group (0 for a
+	// task with a chat of its own).
+	JointTasks int `json:"jointTasks"`
+	// StopsJointChat: a chat the task shares with the other tasks of its
+	// joint group is open; removing the task stops it for all of them.
+	StopsJointChat bool `json:"stopsJointChat"`
 }
 
 // RemoveResult reports what Remove kept.
@@ -221,6 +237,7 @@ func (t *TaskAPI) view(ctx context.Context, r *git.Repo, task agenttask.Task) Ta
 		ID: task.ID, Title: task.Title, Prompt: task.Prompt, Agent: task.Agent, Branch: task.Branch, Base: task.Base,
 		Worktree: task.Worktree, Checkout: task.Checkout, CreatedAt: task.CreatedAt, PullRequest: task.PullRequest,
 		State: live.State, Error: live.Error, Stale: !isDir(task.Worktree), Group: task.Group,
+		Joint: task.Joint, Lead: task.Lead, FlintStarts: flintStarts(task),
 	}
 	if task.Queued && !agenttask.Busy(live.State) {
 		v.State, v.Error = agenttask.Queued, ""
@@ -299,6 +316,31 @@ func (t *TaskAPI) CreateGroup(req NewTaskGroup) ([]TaskView, error) {
 // the queue can see them: the caller unholds them once it keeps or discards
 // them.
 func (a *App) createTasks(ctx context.Context, req NewTaskGroup, queueOK, hold bool) ([]agenttask.Task, *git.Repo, error) {
+	return a.createTasksWith(ctx, req, createOptions{queueOK: queueOK, hold: hold})
+}
+
+// createOptions are createTasks' choices; joint is for createJointTasks.
+type createOptions struct {
+	queueOK, hold bool
+	// joint, when set, makes the (single) task a member of that joint group.
+	joint *jointMember
+	// origin is the tasks' agenttask.Task.Origin: a feature's note of what
+	// they are for (feature.NewAgentTask.Origin), never the UI's.
+	origin string
+}
+
+// jointMember says which task of a joint group createTasksWith makes.
+type jointMember struct {
+	id string
+	// lead: the task is the group's lead, and decides whether the group is
+	// queued (a free slot, which it holds for the group, or none).
+	lead bool
+	// queued is the lead's decision, for the other tasks: they hold no slot.
+	queued bool
+}
+
+func (a *App) createTasksWith(ctx context.Context, req NewTaskGroup, opts createOptions) ([]agenttask.Task, *git.Repo, error) {
+	queueOK, hold := opts.queueOK, opts.hold
 	desc := strings.TrimSpace(req.Description)
 	switch {
 	case desc == "":
@@ -311,6 +353,8 @@ func (a *App) createTasks(ctx context.Context, req NewTaskGroup, queueOK, hold b
 		return nil, nil, errors.New("choose an agent first")
 	case len(req.Agents) > agenttask.MaxGroup:
 		return nil, nil, fmt.Errorf("one description starts at most %d tasks: choose fewer agents or attempts", agenttask.MaxGroup)
+	case len(opts.origin) > agenttask.MaxOrigin:
+		return nil, nil, fmt.Errorf("the task's origin is longer than %d bytes", agenttask.MaxOrigin)
 	}
 	if _, err := a.rootOf(req.Dir); err != nil {
 		return nil, nil, err
@@ -355,19 +399,27 @@ func (a *App) createTasks(ctx context.Context, req NewTaskGroup, queueOK, hold b
 	}
 	var made []agenttask.Task
 	for _, agent := range req.Agents {
-		task, err := a.createOne(ctx, r, agenttask.Task{
+		task := agenttask.Task{
 			ID: agenttask.NewID(), Title: agenttask.Title(desc), Prompt: redact.Secrets(desc), Agent: agent,
 			Branch: agenttask.BranchName(s.AgentTasks.BranchPrefix, desc, agent, group != ""),
 			Base:   base, BaseCommit: baseCommit, Checkout: cleanFolder(checkout),
-			CreatedAt: time.Now().Unix(), Group: group,
+			CreatedAt: time.Now().Unix(), Group: group, Origin: opts.origin,
 			Queued: agenttask.Slots(s.AgentTasks.MaxParallel, a.activeTasks()) == 0,
-		}, pathOf, &made)
+		}
+		slot := !task.Queued // its chat starts next: it holds a slot
+		if j := opts.joint; j != nil {
+			task.Joint, task.Lead = j.id, j.lead
+			if !j.lead {
+				task.Queued, slot = j.queued, false // the lead holds the group's slot
+			}
+		}
+		task, err := a.createOne(ctx, r, task, pathOf, &made)
 		if err != nil {
 			a.discardTasks(ctx, r, made)
 			return nil, nil, err
 		}
-		if !task.Queued {
-			a.reserveStart(task.ID) // its chat starts next
+		if slot {
+			a.reserveStart(task.ID)
 		}
 	}
 	if hold {
@@ -641,8 +693,9 @@ func (t *TaskAPI) RemoveCheck(id string) (RemoveInfo, error) {
 	if err != nil {
 		return RemoveInfo{}, err
 	}
+	jointTasks, shared := t.app.jointRemoval(task)
 	if !isDir(task.Worktree) {
-		return RemoveInfo{Stale: true, Unmerged: t.unmerged(task)}, nil
+		return RemoveInfo{Stale: true, Unmerged: t.unmerged(task), JointTasks: jointTasks, StopsJointChat: len(shared) > 0}, nil
 	}
 	info, err := with(t.git, task.Worktree, gitTimeout, func(ctx context.Context, r *git.Repo) (RemoveInfo, error) {
 		st, err := r.Status(ctx)
@@ -656,6 +709,7 @@ func (t *TaskAPI) RemoveCheck(id string) (RemoveInfo, error) {
 		return RemoveInfo{}, err
 	}
 	info.Unmerged = t.unmerged(task)
+	info.JointTasks, info.StopsJointChat = jointTasks, len(shared) > 0
 	return info, nil
 }
 
@@ -683,7 +737,7 @@ func (t *TaskAPI) Remove(id string, opts RemoveOptions) (RemoveResult, error) {
 	}
 	a := t.app
 	if roots := a.projectRoots(); len(roots) > 0 && roots[0] == task.Worktree {
-		return RemoveResult{}, errors.New("the task's folder is the main project of this window: open another folder first")
+		return RemoveResult{}, errors.New("the task's folder is the main folder of this window: open another folder first")
 	}
 	info, err := t.RemoveCheck(id)
 	if err != nil {
@@ -692,6 +746,15 @@ func (t *TaskAPI) Remove(id string, opts RemoveOptions) (RemoveResult, error) {
 	if info.Changes+info.Ignored > 0 && !opts.DiscardChanges {
 		return RemoveResult{}, fmt.Errorf("%s has %d uncommitted change(s) or new file(s) and %d ignored file(s) or folder(s)",
 			task.Worktree, info.Changes, info.Ignored)
+	}
+	// A chat shared with the other tasks of a joint group works in this
+	// worktree too: it stops once, for all of them, and is forgotten, so the
+	// others are left without a chat (their worktrees stay).
+	_, shared := a.jointRemoval(task)
+	for _, s := range shared {
+		if a.agents != nil {
+			_ = a.stopChatTree(s)
+		}
 	}
 	for _, s := range a.tasks.Sessions(id) {
 		if a.agents != nil {
@@ -727,7 +790,8 @@ func (t *TaskAPI) Remove(id string, opts RemoveOptions) (RemoveResult, error) {
 	if err := a.untrustTask(task); err != nil {
 		return RemoveResult{}, err
 	}
-	err = a.saveTasks(func(s agenttask.Store) (agenttask.Store, error) { return s.Remove(id), nil })
+	// The rest of a joint group keeps a lead (or, alone, is a task on its own).
+	err = a.saveTasks(func(s agenttask.Store) (agenttask.Store, error) { return s.Remove(id).NormalizeJoint(task.Joint), nil })
 	a.tasksChanged()
 	a.startQueuedTasks() // a working task that was removed frees its slot
 	return res, err

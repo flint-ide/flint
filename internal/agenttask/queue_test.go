@@ -110,7 +110,7 @@ func TestStoreLoadsOldStateFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, task, ok := s.Find("0123456789abcdef")
-	if !ok || task.Group != "" || task.Queued || task.State != Finished || task.Branch != "agent/t" {
+	if !ok || task.Group != "" || task.Queued || task.Joint != "" || task.Lead || task.State != Finished || task.Branch != "agent/t" {
 		t.Errorf("old task = %+v", task)
 	}
 	if len(s.QueuedTasks()) != 0 {
@@ -123,7 +123,7 @@ func TestStoreLoadsOldStateFiles(t *testing.T) {
 	}
 	var raw map[string][]map[string]any
 	_ = json.Unmarshal(data, &raw)
-	for _, k := range []string{"group", "queued"} {
+	for _, k := range []string{"group", "queued", "joint", "lead"} {
 		if _, has := raw["/r/.git"][0][k]; has {
 			t.Errorf("%q written for a plain task", k)
 		}
@@ -172,7 +172,12 @@ func TestBranchName(t *testing.T) {
 
 func TestTrackerActive(t *testing.T) {
 	folders := map[string]string{"/wt/a": "a", "/wt/b": "b", "/wt/c": "c"}
-	tr := NewTracker(func(cwd string) string { return folders[cwd] }, func(string, Live) {})
+	tr := NewTracker(func(cwd string) []string {
+		if id := folders[cwd]; id != "" {
+			return []string{id}
+		}
+		return nil
+	}, func(string, Live) {})
 	tr.Bind("s1", "/wt/a")
 	tr.Bind("s2", "/wt/b")
 	tr.Bind("s3", "/wt/c")

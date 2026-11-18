@@ -118,11 +118,11 @@ Flint launches the tools already installed on your computer, with your login she
 
 On the first launch Flint opens the **Tools** window. It lists every tool below with the version it found, or "Not installed", the feature it enables, and for a missing tool an install command with a **Copy** button. Paste the command into Terminal, then click **Recheck**. Open the window again at any time with **Help ▸ Check Tools…**, "Check Tools…" in the command palette (`⇧⌘P`), or **Check installed tools…** on the Welcome screen.
 
-The check only runs each tool's version command, outside your projects, and installs nothing. A tool marked "Not working" is on your `PATH` but its version command failed; the window shows the error (for example, a `rust-analyzer` that rustup knows about but hasn't installed).
+The check only runs each tool's version command, outside your folders, and installs nothing. A tool marked "Not working" is on your `PATH` but its version command failed; the window shows the error (for example, a `rust-analyzer` that rustup knows about but hasn't installed).
 
 | Tool | What it unlocks |
 |---|---|
-| `ripgrep` (`brew install ripgrep`) | Fast project search, the TODO list and `⌘P`. Without it, a slower built-in search is used. |
+| `ripgrep` (`brew install ripgrep`) | Fast Find in Files, the TODO list and `⌘P`. Without it, a slower built-in search is used. |
 | `git` (`xcode-select --install`) | The Commit panel, diffs, blame, history, branches, stash and worktrees. |
 | `claude` (`brew install --cask claude-code`) and/or `codex` (`brew install --cask codex`) | Agent chat, generated commit messages and conflict resolution. |
 | `gopls` | Go language features (`go install golang.org/x/tools/gopls@latest`). |
@@ -151,7 +151,7 @@ Flint doesn't update itself. Once a day it checks whether a newer release exists
 
 If you installed Flint with Homebrew, `brew uninstall --cask flint` removes the app, and `brew uninstall --zap --cask flint` also removes the folders above and macOS's caches and preferences for Flint. Keychain items stay; remove them as described in step 4.
 
-Project files such as `.flint/run.json` and `.http` environment files stay in your repositories. Agent conversation histories belong to the agent CLIs (`~/.claude`, `~/.codex`) and are not removed.
+Files such as `.flint/run.json` and `.http` environment files stay in your repositories. Agent conversation histories belong to the agent CLIs (`~/.claude`, `~/.codex`) and are not removed.
 
 ## Building from source
 

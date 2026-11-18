@@ -129,7 +129,7 @@ description: Reviews a change for bugs; reports, never edits
 # model: strong      a tier (fast, balanced or strong) works on any engine: Settings ▸ Agents maps
 #                    it to each engine's model; a model name (opus) needs engine
 ---
-You are the reviewer of this project. Read the diff and the code around it.
+You are the reviewer of this repository. Read the diff and the code around it.
 Report bugs with file and line. Do not change files.
 `
 

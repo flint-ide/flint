@@ -5,11 +5,11 @@
 [![CI](https://github.com/flint-ide/flint/actions/workflows/ci.yml/badge.svg)](https://github.com/flint-ide/flint/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Flint is a fast, minimal, AI-first IDE for macOS and Linux. Coding agents (Claude Code, Codex) write the code in a built-in chat or terminal, and Flint is where you navigate, search the project, review what the agent changed, run and debug, and work with your databases, APIs and clusters. It is a single Go process with the system web view (WKWebView on macOS, WebKitGTK on Linux; Wails v3), not Electron, so it starts quickly and stays light on CPU and memory.
+Flint is a fast, minimal, AI-first IDE for macOS and Linux. Coding agents (Claude Code, Codex) write the code in a built-in chat or terminal, and Flint is where you navigate, search the code, review what the agent changed, run and debug, and work with your databases, APIs and clusters. It is a single Go process with the system web view (WKWebView on macOS, WebKitGTK on Linux; Wails v3), not Electron, so it starts quickly and stays light on CPU and memory.
 
 **Stack:** Go + [Wails v3](https://v3.wails.io) (system WebView, no Electron) · React 19 + TypeScript · CodeMirror 6 · xterm.js (WebGL)
 
-![A tour of Flint: go to a file, search the project, review a change in the Commit panel, and hand a failing Kubernetes deploy to the agent](site/images/tour.gif)
+![A tour of Flint: go to a file, search the code, review a change in the Commit panel, and hand a failing Kubernetes deploy to the agent](site/images/tour.gif)
 
 ## Fast and light
 
@@ -41,8 +41,8 @@ The full reference, with every detail and all keyboard shortcuts, is in [docs/FE
 
 **Editor and navigation**
 - One tab area for files, terminals, agent chats, SQL consoles and diffs, with IntelliJ-style back/forward history
-- File tree with in-place rename, Move to Trash and a full context menu; several projects in one window
-- `⌘P` go to file and project-wide search and replace, powered by ripgrep, with no up-front indexing
+- File tree with in-place rename, Move to Trash and a full context menu; several folders in one window
+- `⌘P` go to file and workspace-wide search and replace, powered by ripgrep, with no up-front indexing
 - Language servers (gopls, rust-analyzer, vtsls / typescript-language-server, basedpyright / pyright): completion, hover and parameter info, go to definition, implementations and symbols, find usages, rename, quick fixes and refactorings, formatting (also on save), live diagnostics
 - Files edited by agents reload in place as they change
 - `⌘I` *Edit with Agent* on the selection, optional ghost-text completions from a local model (Ollama or any OpenAI-compatible server), and a Vim mode

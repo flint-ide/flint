@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	"flint/internal/agenttask"
 	"flint/internal/feature"
 	"flint/internal/settings"
 	"flint/internal/terminal"
@@ -31,6 +32,9 @@ type Host struct {
 	// Answer is what Confirm returns; Choice what Choose returns.
 	Answer bool
 	Choice string
+	// OnConfirm, when set, runs in Confirm before it answers (outside the
+	// host's lock): what happens while the user reads the question.
+	OnConfirm func()
 
 	mu       sync.Mutex
 	settings settings.Settings
@@ -48,8 +52,12 @@ type Host struct {
 	repos     map[string]feature.Repository
 	agents    feature.Agents
 	requested [][]feature.NewAgentTask
+	joint     []JointRequest
 	createErr error
 	nextID    int
+	// origins are the tasks' origins by task id; chats the task of each chat.
+	origins map[string]string
+	chats   map[string]string
 }
 
 // Event is one Emit call.
@@ -64,6 +72,7 @@ func New(ctx context.Context) *Host {
 		Ctx: ctx, VersionString: "v1.0.0", settings: settings.Default(),
 		state: map[string]json.RawMessage{}, streams: map[string]terminal.Stream{},
 		tasks: map[string]feature.AgentTask{}, repos: map[string]feature.Repository{},
+		origins: map[string]string{}, chats: map[string]string{},
 	}
 }
 
@@ -113,12 +122,27 @@ func (h *Host) SetTrusted(paths ...string) {
 	}
 }
 
+// SetUntrusted takes the trust of folders marked with SetTrusted back.
+func (h *Host) SetUntrusted(paths ...string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, p := range paths {
+		delete(h.trusted, p)
+	}
+}
+
 func (h *Host) ConfigDir() string { return h.Dir }
 
 func (h *Host) Confirm(title, message, _ string) bool {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	h.asked = append(h.asked, title+"\n"+message)
+	on := h.OnConfirm
+	h.mu.Unlock()
+	if on != nil {
+		on()
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	return h.Answer
 }
 
@@ -213,12 +237,15 @@ func (h *Host) StartStream(termID, _ string, st terminal.Stream) error {
 // CreateAgentTasks records the requests and makes a task for each, working
 // in a folder named after the request's; with SetCreateError it creates none.
 // Dir must be inside a root, as the app requires.
-func (h *Host) CreateAgentTasks(_ context.Context, reqs []feature.NewAgentTask) ([]feature.AgentTask, error) {
+func (h *Host) CreateAgentTasks(ctx context.Context, reqs []feature.NewAgentTask) ([]feature.AgentTask, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.requested = append(h.requested, slices.Clone(reqs))
 	if h.createErr != nil {
 		return nil, h.createErr
+	}
+	if err := ctx.Err(); err != nil { // as the app's git calls would
+		return nil, err
 	}
 	if len(reqs) == 0 {
 		return nil, errors.New("no agent task to create")
@@ -237,9 +264,74 @@ func (h *Host) CreateAgentTasks(_ context.Context, reqs []feature.NewAgentTask) 
 		id := fmt.Sprintf("%016x", h.nextID)
 		t := feature.AgentTask{ID: id, Title: r.Description, Agent: r.Agent, Branch: "task-" + id, Base: "main", Worktree: r.Dir + "-" + id, State: "working"}
 		h.tasks[id] = t
+		h.origins[id] = r.Origin
 		out = append(out, t)
 	}
 	return out, nil
+}
+
+// JointRequest is one CreateJointAgentTasks call.
+type JointRequest struct {
+	Reqs  []feature.NewAgentTask
+	Agent string
+}
+
+// CreateJointAgentTasks records the call and makes one joint group, a task
+// per request (lead first, State as CreateAgentTasks'), with the checks the
+// app makes that need no git: 2 to agenttask.MaxJoint requests in folders
+// inside a root, each a different one, agent available. With
+// SetCreateError it fails with that error and creates none: to fake the
+// app's refusals, wrap feature.ErrJointEngine or feature.ErrJointUntrusted.
+func (h *Host) CreateJointAgentTasks(ctx context.Context, reqs []feature.NewAgentTask, agent string) ([]feature.AgentTask, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.joint = append(h.joint, JointRequest{slices.Clone(reqs), agent})
+	if h.createErr != nil {
+		return nil, h.createErr
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	switch {
+	case len(reqs) < 2:
+		return nil, errors.New("a joint agent task needs at least two repositories")
+	case len(reqs) > agenttask.MaxJoint:
+		return nil, fmt.Errorf("a joint agent task works in at most %d repositories", agenttask.MaxJoint)
+	case !slices.Contains(h.agents.Available, agent):
+		return nil, fmt.Errorf("the agent %q is not installed", agent)
+	}
+	seen := map[string]bool{}
+	for _, r := range reqs {
+		switch {
+		case !h.inRoot(r.Dir):
+			return nil, fmt.Errorf("%s is outside the open folders", r.Dir)
+		case r.Agent != "" && r.Agent != agent:
+			return nil, fmt.Errorf("%s: a joint agent task has one agent", r.Dir)
+		case seen[r.Dir]:
+			return nil, fmt.Errorf("%s is listed twice", r.Dir)
+		}
+		seen[r.Dir] = true
+	}
+	h.nextID++
+	group := fmt.Sprintf("j%015x", h.nextID)
+	var out []feature.AgentTask
+	for i, r := range reqs {
+		h.nextID++
+		id := fmt.Sprintf("%016x", h.nextID)
+		t := feature.AgentTask{ID: id, Title: r.Description, Agent: agent, Branch: "task-" + id, Base: "main", Worktree: r.Dir + "-" + id,
+			State: "working", Joint: group, Lead: i == 0}
+		h.tasks[id] = t
+		h.origins[id] = r.Origin
+		out = append(out, t)
+	}
+	return out, nil
+}
+
+// JointRequested returns the CreateJointAgentTasks calls.
+func (h *Host) JointRequested() []JointRequest {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.joint)
 }
 
 func (h *Host) inRoot(dir string) bool {
@@ -251,7 +343,8 @@ func (h *Host) inRoot(dir string) bool {
 	return false
 }
 
-// SetCreateError makes CreateAgentTasks fail with err (nil: succeed).
+// SetCreateError makes CreateAgentTasks and CreateJointAgentTasks fail with
+// err (nil: succeed).
 func (h *Host) SetCreateError(err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -349,6 +442,31 @@ func (h *Host) Agents() feature.Agents {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return feature.Agents{Available: slices.Clone(h.agents.Available), Default: h.agents.Default}
+}
+
+// TaskOrigin is the origin of the task SetChat bound chat to ("" when none).
+func (h *Host) TaskOrigin(chat string) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if id, ok := h.chats[chat]; ok {
+		return h.origins[id]
+	}
+	return ""
+}
+
+// SetChat binds a chat (a session id) to the task with this id, as the app's
+// tracker does for a chat in the task's worktree.
+func (h *Host) SetChat(chat, taskID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.chats[chat] = taskID
+}
+
+// Origin is the origin a task was created with.
+func (h *Host) Origin(taskID string) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.origins[taskID]
 }
 
 // SetAgents sets the available agents and the default one.

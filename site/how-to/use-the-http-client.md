@@ -75,7 +75,7 @@ When you send, Flint reports unknown variables with their line number.
 1. Add an empty line after the headers.
 2. Write `< ./payload.json` (relative to the `.http` file), or `<@ ./payload.json` to substitute variables inside it.
 
-The file must be inside the open project.
+The file must be inside an open folder.
 
 ## Save a response
 

@@ -287,7 +287,7 @@ func orchQuestion(agent string, g orchGrant) string {
 		agent = "agent"
 	}
 	return fmt.Sprintf("Let this %s chat in %s start and direct up to %d agents (depth %d)?\n\n"+
-		"It can start agents in this project, send them messages and read their output. "+
-		"Messages it sends appear in their chats. The permission lasts until this chat is closed, and covers this project only.",
+		"It can start agents in this folder, send them messages and read their output. "+
+		"Messages it sends appear in their chats. The permission lasts until this chat is closed, and covers this folder only.",
 		agent, g.root, g.maxChildren, g.maxDepth)
 }

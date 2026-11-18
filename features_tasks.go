@@ -10,7 +10,7 @@ import (
 	"flint/internal/git"
 )
 
-// The agent tasks part of the feature Host (the Backlog feature hands work to
+// The agent tasks part of the feature Host (the Projects feature hands work to
 // agents through it). It uses the code New Agent Task uses: createTasks for
 // the branches, worktrees, queue and trust, startTaskChat for the chats, and
 // TaskAPI.view for the states.
@@ -46,7 +46,8 @@ func (h featureHost) CreateAgentTasks(ctx context.Context, reqs []feature.NewAge
 	var all []agenttask.Task
 	for i, req := range reqs {
 		gctx, cancel := context.WithTimeout(ctx, gitRemoteTimeout) // checkout hooks may run
-		made, r, err := a.createTasks(gctx, NewTaskGroup{Dir: req.Dir, Description: req.Description, Agents: []string{req.Agent}}, true, true)
+		made, r, err := a.createTasksWith(gctx, NewTaskGroup{Dir: req.Dir, Description: req.Description, Agents: []string{req.Agent}},
+			createOptions{queueOK: true, hold: true, origin: req.Origin})
 		cancel()
 		if err != nil {
 			uctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), gitTimeout)
@@ -96,6 +97,71 @@ func (h featureHost) CreateAgentTasks(ctx context.Context, reqs []feature.NewAge
 	return out, nil
 }
 
+// CreateJointAgentTasks makes one joint group (createJointTasks, held from
+// the queue until it returns) and starts its one chat when the group got a
+// slot (startJointTasks); a queued group is left to the queue. Its refusals
+// keep their text and are matched by the feature errors: a detached HEAD as
+// *feature.DetachedHeadError naming the request's folder, an engine that
+// cannot work in several folders as feature.ErrJointEngine, a folder that is
+// not trusted as feature.ErrJointUntrusted.
+func (h featureHost) CreateJointAgentTasks(ctx context.Context, reqs []feature.NewAgentTask, agentName string) ([]feature.AgentTask, error) {
+	a := h.a
+	jreqs := make([]jointRequest, len(reqs))
+	for i, req := range reqs {
+		if req.Agent != "" && req.Agent != agentName {
+			return nil, fmt.Errorf("%s: a joint agent task has one agent, %s, not %s", req.Dir, agentName, req.Agent)
+		}
+		jreqs[i] = jointRequest{Dir: req.Dir, Description: req.Description, Origin: req.Origin}
+	}
+	made, err := a.createJointTasks(ctx, jreqs, agentName, true)
+	switch {
+	case errors.Is(err, errDetachedHead):
+		return nil, &feature.DetachedHeadError{Dir: detachedDir(ctx, reqs)}
+	case errors.Is(err, errJointEngine):
+		return nil, featureRefusal{err, feature.ErrJointEngine}
+	case errors.Is(err, errJointUntrusted):
+		return nil, featureRefusal{err, feature.ErrJointUntrusted}
+	case err != nil:
+		return nil, err
+	}
+	a.startJointTasks(made)
+	vctx, cancel := context.WithTimeout(ctx, gitTimeout)
+	defer cancel()
+	api := &TaskAPI{app: a}
+	out := make([]feature.AgentTask, len(made))
+	for i, task := range made {
+		if r, err := git.Open(vctx, task.Checkout); err == nil {
+			out[i] = featureTask(api.view(vctx, r, task))
+		} else {
+			out[i] = storedFeatureTask(a, task)
+		}
+	}
+	return out, nil
+}
+
+// detachedDir is the folder of the first request whose checkout is on a
+// detached HEAD: createJointTasks makes the tasks in order and stops at the
+// first that fails.
+func detachedDir(ctx context.Context, reqs []feature.NewAgentTask) string {
+	for _, req := range reqs {
+		r, err := git.Open(ctx, req.Dir)
+		if err != nil {
+			continue
+		}
+		if st, err := r.Status(ctx); err == nil && st.Branch == "" {
+			return req.Dir
+		}
+	}
+	return reqs[0].Dir
+}
+
+// featureRefusal is an error of the app that is also a feature error (kind):
+// its text stays the app's.
+type featureRefusal struct{ err, kind error }
+
+func (e featureRefusal) Error() string   { return e.err.Error() }
+func (e featureRefusal) Unwrap() []error { return []error{e.err, e.kind} }
+
 // AgentTasks looks the tasks up in the store and reads their state as the
 // Agent Tasks panel does (merged from git, live state from the tracker).
 func (h featureHost) AgentTasks(ctx context.Context, ids []string) map[string]feature.AgentTask {
@@ -121,12 +187,7 @@ func (h featureHost) AgentTasks(ctx context.Context, ids []string) map[string]fe
 			repos[task.Checkout] = r
 		}
 		if r == nil { // the checkout is gone: no git facts, the rest as known
-			live := a.tasks.State(task.ID, task.State)
-			out[id] = feature.AgentTask{
-				ID: task.ID, Title: task.Title, Agent: task.Agent, Branch: task.Branch, Base: task.Base,
-				Worktree: task.Worktree, State: live.State, Error: live.Error, PullRequest: task.PullRequest,
-				Stale: !isDir(task.Worktree),
-			}
+			out[id] = storedFeatureTask(a, task)
 			continue
 		}
 		out[id] = featureTask(api.view(ctx, r, task))
@@ -138,6 +199,18 @@ func featureTask(v TaskView) feature.AgentTask {
 	return feature.AgentTask{
 		ID: v.ID, Title: v.Title, Agent: v.Agent, Branch: v.Branch, Base: v.Base, Worktree: v.Worktree,
 		State: v.State, Error: v.Error, PullRequest: v.PullRequest, Merged: v.Merged, Stale: v.Stale,
+		Joint: v.Joint, Lead: v.Lead,
+	}
+}
+
+// storedFeatureTask is a task whose checkout can't be opened: no git facts,
+// the rest as known.
+func storedFeatureTask(a *App, task agenttask.Task) feature.AgentTask {
+	live := a.tasks.State(task.ID, task.State)
+	return feature.AgentTask{
+		ID: task.ID, Title: task.Title, Agent: task.Agent, Branch: task.Branch, Base: task.Base,
+		Worktree: task.Worktree, State: live.State, Error: live.Error, PullRequest: task.PullRequest,
+		Stale: !isDir(task.Worktree), Joint: task.Joint, Lead: task.Lead,
 	}
 }
 
@@ -156,6 +229,29 @@ func (h featureHost) Repository(ctx context.Context, dir string) (feature.Reposi
 		out.Remotes = append(out.Remotes, rm.URL)
 	}
 	return out, nil
+}
+
+// TaskOrigin is the origin of the task the chat works for: the tasks the
+// tracker bound the chat to (by its folder), and for a joint group's chat
+// its lead's.
+func (h featureHost) TaskOrigin(chat string) string {
+	if chat == "" {
+		return ""
+	}
+	store := h.a.taskStore()
+	for _, id := range h.a.tasks.Tasks(chat) {
+		_, task, ok := store.Find(id)
+		if !ok {
+			continue
+		}
+		if task.Joint != "" {
+			if members := store.Joint(task.Joint); len(members) > 0 {
+				return members[0].Origin
+			}
+		}
+		return task.Origin
+	}
+	return ""
 }
 
 // Agents are AgentAPI.Info's available agents and preferred one.

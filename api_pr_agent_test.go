@@ -160,7 +160,7 @@ func TestReviewDraftRefusesBadRequests(t *testing.T) {
 		name, dir, thread, want string
 		number                  int
 	}{
-		{"folder outside the workspace", outside, "", "outside the project", 7},
+		{"folder outside the workspace", outside, "", "outside the workspace", 7},
 		{"relative folder", "project", "", "absolute", 7},
 		{"thread id with spaces", dir, "PRRT x; rm -rf", "invalid review thread id", 7},
 		{"resolved thread", dir, fakeResolvedThread, "resolved", 7},

@@ -149,7 +149,7 @@ export function RunConfigDialog({ editing }: Props) {
         <div className="form-row">
           <label className="grow">
             Working directory
-            <input value={config.cwd ?? ''} placeholder="project root (relative path)" onChange={(e) => update({ cwd: e.target.value })} />
+            <input value={config.cwd ?? ''} placeholder="workspace folder (relative path)" onChange={(e) => update({ cwd: e.target.value })} />
           </label>
           <label className="grow">
             Before launch

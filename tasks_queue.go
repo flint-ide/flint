@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
 	as "flint/internal/agentsession"
 	"flint/internal/agenttask"
+	"flint/internal/feature"
 	"flint/internal/git"
 )
 
@@ -93,11 +95,19 @@ func (a *App) isHeld(id string) bool {
 }
 
 // activeTasks counts the tasks that hold a slot: working or waiting for an
-// approval, or starting.
+// approval, or starting. A joint group holds one slot however many of its
+// tasks work (its chat is one agent).
 func (a *App) activeTasks() int {
+	store := a.taskStore()
+	slot := func(id string) string {
+		if _, t, ok := store.Find(id); ok && t.Joint != "" {
+			return "joint:" + t.Joint
+		}
+		return id
+	}
 	active := map[string]bool{}
 	for _, id := range a.tasks.Active() {
-		active[id] = true
+		active[slot(id)] = true
 	}
 	a.queue.startMu.Lock()
 	defer a.queue.startMu.Unlock()
@@ -106,7 +116,7 @@ func (a *App) activeTasks() int {
 			delete(a.queue.starting, id)
 			continue
 		}
-		active[id] = true
+		active[slot(id)] = true
 	}
 	return len(active)
 }
@@ -162,7 +172,8 @@ func (a *App) startQueuedTasks() {
 		return !a.isHeld(q.Task.ID) && open[q.Repo] && isDir(q.Task.Worktree) && a.isTrusted(q.Task.Worktree) && a.budgetPause(q.Task.ID) == nil
 	})
 	for _, task := range next {
-		if err := a.dequeue(task.ID); err != nil {
+		// A joint group comes as its lead and leaves the queue whole.
+		if err := a.dequeue(task); err != nil {
 			a.logf("start queued task: %v", err)
 			return
 		}
@@ -187,23 +198,63 @@ var taskOrigin = as.Origin{Agent: "Flint", Role: "task"}
 // runs in its own goroutine: starting an agent can take a while and the
 // caller is the event pipeline. A chat that already works in the folder (the
 // user opened one by hand) is left alone: a task's chat is started once.
+// For a task of a joint group it starts the group's one chat, in the lead's
+// worktree, with the description of the whole group (jointPrompt); openChat
+// gives it the other worktrees as additional folders. For a task a feature
+// made (an Origin; the lead's for a joint group) the first message starts
+// with that feature's context for it, composed now (taskContext).
 func (a *App) startTaskChat(task agenttask.Task) {
 	defer func() {
 		a.releaseStart(task.ID)
 		a.startQueuedTasks()
 	}()
+	prompt := task.Prompt
+	if task.Joint != "" {
+		members := a.taskStore().Joint(task.Joint)
+		if len(members) == 0 {
+			return // removed meanwhile
+		}
+		if lead := members[0]; lead.ID != task.ID {
+			a.releaseStart(task.ID) // the deferred release is the lead's
+			task = lead
+		}
+		prompt = jointPrompt(members)
+	}
 	if a.chatIn(task.Worktree) {
 		return
+	}
+	if text := a.taskContext(task); text != "" {
+		prompt = text + "\n\n" + prompt
 	}
 	ctx, cancel := context.WithTimeout(a.ctx, agentStartTimeout)
 	defer cancel()
 	origin := taskOrigin
 	if _, err := a.openChat(ctx, ChatRequest{
-		Agent: task.Agent, Cwd: task.Worktree, Prompt: task.Prompt, TaskID: task.ID, Origin: &origin,
+		Agent: task.Agent, Cwd: task.Worktree, Prompt: prompt, TaskID: task.ID, Origin: &origin,
 	}); err != nil {
 		a.logf("start the chat of task %s: %v", task.ID, err)
 	}
 }
+
+// taskContext asks the features for the context of a task (a joint group's
+// lead) whose chat starts now: "" for a task without an origin, which no
+// feature is asked about.
+func (a *App) taskContext(task agenttask.Task) string {
+	if task.Origin == "" {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(a.ctx, gitTimeout)
+	defer cancel()
+	return a.features.TaskContext(ctx, feature.TaskStart{
+		Origin: task.Origin, Worktree: task.Worktree, Branch: task.Branch, Base: task.Base,
+		Joint: task.Joint != "", MCP: a.allowMCP(task.Worktree),
+	})
+}
+
+// flintStarts: Flint starts the task's chat itself, also on Start now (a
+// joint group's one chat, or a task with an origin, whose first message
+// Flint composes); the UI starts none for it (TaskView.FlintStarts).
+func flintStarts(task agenttask.Task) bool { return task.Joint != "" || task.Origin != "" }
 
 // chatIn reports whether a chat is open in folder.
 func (a *App) chatIn(folder string) bool {
@@ -216,13 +267,29 @@ func (a *App) chatIn(folder string) bool {
 }
 
 // dequeue takes a task off the queue and holds a slot for it until its
-// chat's turn begins (or the UI reports that it did not start).
-func (a *App) dequeue(id string) error {
+// chat's turn begins (or the UI reports that it did not start). A task of a
+// joint group takes the whole group off the queue, in one save, and the slot
+// is held for its lead (where the chat starts).
+func (a *App) dequeue(task agenttask.Task) error {
+	ids := []string{task.ID}
+	slot := task.ID
+	if task.Joint != "" {
+		ids = ids[:0]
+		for i, m := range a.taskStore().Joint(task.Joint) {
+			if i == 0 {
+				slot = m.ID
+			}
+			ids = append(ids, m.ID)
+		}
+	}
 	err := a.saveTasks(func(s agenttask.Store) (agenttask.Store, error) {
-		return s.Update(id, func(t agenttask.Task) agenttask.Task { t.Queued = false; return t }), nil
+		for _, id := range ids {
+			s = s.Update(id, func(t agenttask.Task) agenttask.Task { t.Queued = false; return t })
+		}
+		return s, nil
 	})
 	if err == nil {
-		a.reserveStart(id)
+		a.reserveStart(slot)
 	}
 	return err
 }
@@ -234,7 +301,12 @@ func (t *TaskAPI) StartQueued() { t.app.startQueuedTasks() }
 
 // StartNow starts a queued task although no slot is free: the user's
 // override. A budget that pauses new turns still holds it back. The UI then
-// starts its chat, as for a new task.
+// starts its chat, as for a new task; except for a task of a joint group:
+// the whole group leaves the queue and Go starts its one chat itself (in the
+// lead's worktree, with every worktree's folder and the group's
+// description), and for a task with an origin, whose first message starts
+// with its feature's context: the UI starts no chat when the view it gets
+// says FlintStarts.
 func (t *TaskAPI) StartNow(id string) (TaskView, error) {
 	a := t.app
 	a.queue.mu.Lock()
@@ -243,17 +315,38 @@ func (t *TaskAPI) StartNow(id string) (TaskView, error) {
 	if err != nil {
 		return TaskView{}, err
 	}
-	if !task.Queued {
+	members := []agenttask.Task{task}
+	if task.Joint != "" {
+		members = a.taskStore().Joint(task.Joint)
+	}
+	if !slices.ContainsFunc(members, func(m agenttask.Task) bool { return m.Queued }) {
 		return TaskView{}, errors.New("the task is not queued (it already started)")
 	}
-	if err := a.budgetPause(id); err != nil {
+	for _, m := range members {
+		switch {
+		case !isDir(m.Worktree):
+			return TaskView{}, fmt.Errorf("the worktree of %q is gone (%s): remove that task first", m.Title, m.Worktree)
+		case task.Joint != "" && !a.isTrusted(m.Worktree):
+			// The group's chat would not open (jointFolders): it stays queued.
+			return TaskView{}, fmt.Errorf("the worktree %s is not trusted (%w)", m.Worktree, errJointUntrusted)
+		}
+	}
+	if err := a.budgetPause(members[0].ID); err != nil {
 		return TaskView{}, err
 	}
-	if err := a.dequeue(id); err != nil {
+	if err := a.dequeue(task); err != nil {
 		return TaskView{}, err
 	}
 	task.Queued = false
 	a.tasksChanged()
+	if flintStarts(task) {
+		lead := members[0]
+		a.queue.starts.Add(1)
+		go func() {
+			defer a.queue.starts.Done()
+			a.startTaskChat(lead)
+		}()
+	}
 	ctx, cancel := t.ctx(gitTimeout)
 	defer cancel()
 	r, err := t.git.repo(ctx, task.Worktree)

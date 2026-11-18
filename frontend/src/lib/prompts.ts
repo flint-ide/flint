@@ -58,7 +58,7 @@ export function sourceLabel(p: PromptInfo): string {
   if (p.untrusted) return 'untrusted repo'
   switch (p.source) {
     case 'project':
-      return 'project'
+      return 'repo'
     case 'personal':
       return 'personal'
     default:

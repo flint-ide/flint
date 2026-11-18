@@ -107,4 +107,4 @@ go run ./cmd/flint-extindex verify -key <public key> -archives dist dist/index.j
 1. Build and sign an index as above and serve `index.json`, `index.json.sig` and the archives over `https`.
 2. In **Settings ▸ Extensions ▸ Extension index**, set **Index address** to your `index.json` and **Index public key** to your public key (`extensions.indexUrl` and `extensions.indexPublicKey` in [settings.json](../reference/settings.md#extensions)).
 
-Both are your own settings in Flint's `settings.json`. A project or repository can't set them.
+Both are your own settings in Flint's `settings.json`. A repository can't set them.

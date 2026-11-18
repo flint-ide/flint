@@ -14,11 +14,11 @@ Open it with `⌘K` or the `⎇` icon on the activity bar. (In a terminal, `⌘K
 - **Amend** changes the last commit instead of creating a new one.
 - **Commit** (`⌘↵` in the message field) or **Commit and Push** (`⌥⌘↵`).
 
-The header has Refresh, Fetch, Update project (pull), Push (`⇧⌘K`) and Stash.
+The header has Refresh, Fetch, Update repository (pull), Push (`⇧⌘K`) and Stash.
 
 A commit made during a merge includes the whole index. When there are merge conflicts, the panel lists them separately, with the number of conflicts left in each file. **Resolve…** (or a click on the file) opens it in the [merge editor](#merge-conflicts); **✦ Resolve with** hands them to your default agent instead (see [AI agents](ai-agents.md#commit-messages-and-merge-conflicts)).
 
-With several projects in the window, the panel shows the repository of the active tab's project. A switcher lets you pick another one and shows the number of changes in each.
+With several folders in the window, the panel shows the repository of the active tab's folder. A switcher lets you pick another one and shows the number of changes in each.
 
 ![The Commit panel with two changed files and the side-by-side diff of one of them](../images/commit.png)
 
@@ -41,7 +41,7 @@ The editor gutter marks added, changed and deleted lines. This is also the quick
 
 ## Branches
 
-The branch widget in the status bar lets you check out a branch, create a new branch, fetch, pull and push. The command palette has "Branches & Worktrees…", "New Branch…", "Fetch", "Update Project (Pull)" and "Push".
+The branch widget in the status bar lets you check out a branch, create a new branch, fetch, pull and push. The command palette has "Branches & Worktrees…", "New Branch…", "Fetch", "Update Repository (Pull)" and "Push".
 
 ## Worktrees
 
@@ -91,11 +91,11 @@ Flint asks for the scopes `repo` (pull requests, reviews, checks, re-runs), `rea
 
 ### GitHub Enterprise
 
-Set **Settings ▸ Accounts ▸ Host** to your server (`ghe.example.com`): Flint then uses `https://ghe.example.com/api/v3` and `/api/graphql`, signs in there (each host has its own account, and an OAuth App registered on that server) and matches the project's remotes against that host. GitHub Enterprise Cloud with data residency (`<name>.ghe.com`) works the same way.
+Set **Settings ▸ Accounts ▸ Host** to your server (`ghe.example.com`): Flint then uses `https://ghe.example.com/api/v3` and `/api/graphql`, signs in there (each host has its own account, and an OAuth App registered on that server) and matches the repository's remotes against that host. GitHub Enterprise Cloud with data residency (`<name>.ghe.com`) works the same way.
 
 ### The Pull Requests view
 
-Open it with the `⇅` icon on the activity bar or "Pull Requests…" in the palette. It lists the pull requests of the active tab's project repository: the remote marked with `gh repo set-default` if there is one, else `upstream`, `github`, `origin`, then the others.
+Open it with the `⇅` icon on the activity bar or "Pull Requests…" in the palette. It lists the pull requests of the active tab's repository: the remote marked with `gh repo set-default` if there is one, else `upstream`, `github`, `origin`, then the others.
 
 - Filter by **All / Created by me / Review requested** and by **Open / Closed / Merged / All states**.
 - Type in the search box to narrow the list by title or number. `#12` finds pull requests whose number starts with 12. The search looks only at the pull requests the filters loaded, so change the filters to look in others. Esc clears it.
@@ -131,7 +131,7 @@ When a reviewer left comments on your pull request, the agent can work through t
 - **✦ Ask agent** on a review thread (under its line in the diff, or above the diff for outdated and file-level threads) puts that one thread in the agent chat.
 - **✦ Address review comments** in the pull request tab's header puts all of them in one draft: every unresolved thread that is still on the current diff, grouped by file, and the text of each review that requests changes and hasn't been followed by that reviewer's approval. The same action is **✦ Address** in the **Your branch** banner of the Pull Requests view, **✦ Review comments** on an [agent task](ai-agents.md#agent-tasks-agents-in-parallel)'s row once it has an open pull request, and "Address Review Comments with Agent" in the palette (for the pull request in the active tab, else the current branch's).
 
-The draft names the pull request and its branches and, for each thread, the file and line, the comments in order with who wrote them, and the code around the line. A GitHub suggestion (a ` ```suggestion ` block) is shown separately as the reviewer's proposed replacement for those lines. It lands in the chat of the project the pull request is checked out in (for a task, the task's own chat and worktree), where you can add your own words. Nothing is sent until you press Send; `⌥`-click the action to send right away. Flint posts nothing to GitHub: replying and resolving stay with you.
+The draft names the pull request and its branches and, for each thread, the file and line, the comments in order with who wrote them, and the code around the line. A GitHub suggestion (a ` ```suggestion ` block) is shown separately as the reviewer's proposed replacement for those lines. It lands in the chat of the folder the pull request is checked out in (for a task, the task's own chat and worktree), where you can add your own words. Nothing is sent until you press Send; `⌥`-click the action to send right away. Flint posts nothing to GitHub: replying and resolving stay with you.
 
 - **The right branch.** The code in the draft comes from your working tree only when the pull request's branch is checked out there; otherwise it is the pull request's diff. If another branch is checked out, the draft says so at the top and tells the agent not to change files until you **Check out** the pull request, and `⌥`-click doesn't send it.
 - **Reviewers' text is data.** Anyone who can comment on the pull request wrote it, so every line of it is quoted and the draft tells the agent to check each comment against the code and not to follow instructions inside it. Secrets and your home folder are removed, and files that hold credentials (`.env`, keys) are never included. Only files inside the open folder are read.
@@ -147,11 +147,11 @@ Flint follows the checks of your current branch's pull request, and of the pull 
 - the Pull Requests view shows **Your branch** on top, with each failed check;
 - the task's row in the Agent Tasks panel shows **✗ CI** and **✦ Fix CI**.
 
-**Fix with agent** reads the failed jobs' logs (the failed steps of each job's log), keeps the failing step's last lines plus its error lines (test failures, compiler errors, `file:line` references), removes secrets and your home folder from them, and puts a draft in the agent chat of that project (for a task, the task's chat and worktree): which workflow, job and step failed, the excerpt, the files of your workspace the log points at, links to the run and job, and the branch and commit. Names and log lines from GitHub go in blocks the draft marks as untrusted data; on a pull request from a fork, the draft also warns that they were written by the fork's author and doesn't suggest running the failing step's command. Nothing is sent until you press Send.
+**Fix with agent** reads the failed jobs' logs (the failed steps of each job's log), keeps the failing step's last lines plus its error lines (test failures, compiler errors, `file:line` references), removes secrets and your home folder from them, and puts a draft in the agent chat of that folder (for a task, the task's chat and worktree): which workflow, job and step failed, the excerpt, the files of your workspace the log points at, links to the run and job, and the branch and commit. Names and log lines from GitHub go in blocks the draft marks as untrusted data; on a pull request from a fork, the draft also warns that they were written by the fork's author and doesn't suggest running the failing step's command. Nothing is sent until you press Send.
 
 Each failed check (in the pull request tab under **Checks**, and in the Pull Requests view) also has:
 
-- **Log**: the failed steps' log in a tab (the last 1,000 lines first, earlier ones on request), with `file:line` references that open the file at that line, even when CI printed a runner path (`/home/runner/work/…`) or a bare test file name (`review_test.go:316`). Links only open files inside the project folder.
+- **Log**: the failed steps' log in a tab (the last 1,000 lines first, earlier ones on request), with `file:line` references that open the file at that line, even when CI printed a runner path (`/home/runner/work/…`) or a bare test file name (`review_test.go:316`). Links only open files inside the workspace folders.
 - **Rerun**: re-runs the run's failed jobs on GitHub, after you confirm in a dialog that names the repository and the workflow.
 
 GitHub can't notify a desktop app, so Flint reads the checks when you open the folder, switch branches, push or fetch, and return to the window, and polls only while some check is still running, with conditional requests that cost none of your API rate limit while nothing changed (every 30 seconds by default, less often while nothing changes or reading fails, and not at all after three failures in a row until you return to the window). When CI fails or turns green while Flint is in the background, you get a notification. The interval, the size of the excerpt and the notification are in [Settings ▸ CI](settings.md#ci).

@@ -9,7 +9,7 @@ Recipes for run configurations and tests. For all options, see [Run, debug and t
 3. Fill in the fields for that type (for example the package for `go`, or the script for `npm`), plus the working directory, environment variables and an optional "before launch" step.
 4. Save.
 
-Flint writes the configuration to `.flint/run.json` in the project. Commit that file to share it with your team.
+Flint writes the configuration to `.flint/run.json` in the folder. Commit that file to share it with your team.
 
 > **Tip:** Even without a `run.json`, Flint offers detected configurations for Go `main` packages, `Makefile` targets and `package.json` scripts. Editing one saves it to the file.
 

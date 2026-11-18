@@ -10,12 +10,12 @@ import { useListCursor } from '../lib/useListCursor'
 
 const tildify = (p: string) => p.replace(/^\/Users\/[^/]+/, '~')
 
-/** Row of the "Add Project to Workspace…" action (paths are absolute, so it can't clash). */
+/** Row of the "Add Folder to Workspace…" action (paths are absolute, so it can't clash). */
 const ADD = '\0add'
 
 /**
- * ⌘O: IntelliJ-style Recent Projects. Enter opens here, ⌘Enter in a new window,
- * ⌥Enter attaches the project to this workspace; "Browse…" falls back to the
+ * ⌘O: Recent Folders (IntelliJ's Recent Projects). Enter opens here, ⌘Enter in a new window,
+ * ⌥Enter attaches the folder to this workspace; "Browse…" falls back to the
  * native folder picker.
  */
 export function RecentProjects() {
@@ -34,7 +34,7 @@ export function RecentProjects() {
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
     const matches = recent.filter((p) => !q || p.toLowerCase().includes(q))
-    // null = "Browse…"; ADD = "Add Project to Workspace…" (only with a folder open).
+    // null = "Browse…"; ADD = "Add Folder to Workspace…" (only with a folder open).
     return [null, ...(root ? [ADD] : []), ...matches]
   }, [recent, query, root])
 
@@ -74,7 +74,7 @@ export function RecentProjects() {
       <input
         autoFocus
         className="quick-input"
-        placeholder={`Open recent project…  (${formatKeys('Mod+Enter')} new window${root ? ` · ${formatKeys('Alt+Enter')} add to workspace` : ''})`}
+        placeholder={`Open recent folder…  (${formatKeys('Mod+Enter')} new window${root ? ` · ${formatKeys('Alt+Enter')} add to workspace` : ''})`}
         value={query}
         spellCheck={false}
         onChange={(e) => setQuery(e.target.value)}
@@ -91,7 +91,7 @@ export function RecentProjects() {
           path === ADD ? (
             <div key="add" className={`quick-item${i === cursor ? ' selected' : ''}`} onMouseMove={() => hover(i)} onClick={() => void addProject()}>
               <FileIcon name="folder" isDir />
-              <span className="file-name">Add Project to Workspace…</span>
+              <span className="file-name">Add Folder to Workspace…</span>
               <span className="muted path-hint">open it next to {root?.split('/').pop()}</span>
               <kbd>{formatKeys('Mod+Shift+O')}</kbd>
             </div>
@@ -140,7 +140,7 @@ export function RecentProjects() {
             </div>
           ),
         )}
-        {rows.length === 1 && <div className="placeholder muted">{recent.length ? 'No matching projects' : 'No recent projects yet'}</div>}
+        {rows.length === 1 && <div className="placeholder muted">{recent.length ? 'No matching folders' : 'No recent folders yet'}</div>}
       </div>
     </Modal>
   )

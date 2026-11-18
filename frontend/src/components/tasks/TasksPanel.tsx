@@ -40,8 +40,20 @@ export function TasksPanel() {
         {groupRows(tasks).map((row) => {
           const labels = row.group ? attemptLabels(row.tasks) : {}
           const rows = row.tasks.map((t) => (
-            <TaskRow key={t.id} t={t} changes={changes[t.id]} open={!!expanded[t.id]} busy={!!busy[t.id]} label={labels[t.id]} />
+            <TaskRow key={t.id} t={t} changes={changes[t.id]} open={!!expanded[t.id]} busy={!!busy[t.id]} label={labels[t.id]} heading={row.joint ? basename(t.checkout) : undefined} />
           ))
+          if (row.joint) {
+            const lead = row.tasks[0]
+            return (
+              <div key={`joint:${row.joint}`} className="task-group task-joint">
+                <div className="task-group-head" title={`${lead.prompt}\n\nOne agent works in the worktrees of all ${row.tasks.length} tasks; its chat is in the lead's.`}>
+                  <span className="file-name">{lead.title}</span>
+                  <span className="muted">one agent · {row.tasks.length} repositories · {groupSummary(row.tasks)}</span>
+                </div>
+                {rows}
+              </div>
+            )
+          }
           if (!row.group) return rows
           return (
             <div key={row.group} className="task-group">
@@ -76,9 +88,11 @@ interface RowProps {
   busy: boolean
   /** In a group: the agent (and attempt) instead of the shared title. */
   label?: string
+  /** In a joint group: the repository's folder, as the tasks of the group share one title. */
+  heading?: string
 }
 
-function TaskRow({ t, changes, open, busy, label }: RowProps) {
+function TaskRow({ t, changes, open, busy, label, heading }: RowProps) {
   const s = stateInfo(t.state)
   const a = taskActions(t)
   const status = t.stale ? 'worktree gone' : t.merged ? 'merged' : t.state === 'queued' ? '' : formatChanges(changes)
@@ -92,7 +106,9 @@ function TaskRow({ t, changes, open, busy, label }: RowProps) {
         <span className={`task-state ${t.stale ? 'stale' : s.state}`} title={t.stale ? 'The worktree folder is gone' : t.error || s.hint}>
           {t.stale ? 'stale' : s.label}
         </span>
-        <span className="file-name">{label ?? t.title}</span>
+        <span className="file-name">{label ?? heading ?? t.title}</span>
+        {t.joint && t.lead && <span className="project-marker" title="One agent works in the worktrees of this task's group; its chat is in this task's worktree">lead</span>}
+        {t.joint && !t.lead && <span className="project-marker" title="No chat of its own: the group's one agent works here from the lead's chat. Open shows that chat">lead's chat</span>}
       </div>
       <div className="task-meta muted">
         <span title={`${t.branch} from ${t.base} · ${t.agent}`}><Icon name="branch" size={12} /> {t.branch}</span>
@@ -104,7 +120,7 @@ function TaskRow({ t, changes, open, busy, label }: RowProps) {
       {t.state === 'failed' && t.error && <div className="task-error">{t.error}</div>}
       <div className="task-actions">
         {a.startNow && <button className="link" disabled={busy} onClick={() => void startQueuedNow(t)} title="Start this task now, although the limit of working tasks is reached">Start now</button>}
-        {a.open && <button className="link" disabled={busy} onClick={() => void openTask(t)} title="Open the folder and the agent chat">Open</button>}
+        {a.open && <button className="link" disabled={busy} onClick={() => void openTask(t)} title={t.joint && !t.lead ? "Open the group's chat (in the lead task's folder)" : 'Open the folder and the agent chat'}>Open</button>}
         {a.diff && <button className="link" onClick={() => toggleChanges(t)}>{open ? 'Hide diff' : 'Show diff'}</button>}
         {a.askAgent && <button className="link" onClick={() => void askAgentAboutTask(t)} title="Put the error in the task's chat for the agent">✦ Ask agent</button>}
         {a.merge && <button className="link" disabled={busy} onClick={() => void (keep ? keepTask(t, 'merge') : mergeTask(t))} title={`Merge into ${t.base} where it is checked out${keep ? ', then offer to remove the other tasks of the comparison' : ''}`}>{keep ? 'Keep: Merge' : 'Merge'}</button>}

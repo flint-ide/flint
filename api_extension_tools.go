@@ -47,7 +47,7 @@ func fileInRoot(root, path string) error {
 		return fmt.Errorf("file %q is not absolute", path)
 	}
 	if rel, err := filepath.Rel(root, path); err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
-		return fmt.Errorf("%s is not inside the project folder %s", filepath.Base(path), root)
+		return fmt.Errorf("%s is not inside the workspace folder %s", filepath.Base(path), root)
 	}
 	return nil
 }
@@ -71,7 +71,7 @@ func (a *App) extensionAdapter(root, path string) (dap.Adapter, json.RawMessage,
 		return dap.Adapter{}, nil, "", fmt.Errorf("Can't debug %s: no extension that debugs %s files is installed and on. Add one from Settings ▸ Extensions ▸ Repository, or turn it on in Settings ▸ Extensions.", name, label)
 	}
 	if !a.isTrusted(root) {
-		return dap.Adapter{}, nil, "", fmt.Errorf("Debugging %s is off in Restricted Mode, because %s (from the extension %s) runs this project's code. %s, then try again.", name, d.Label, d.Source, trustHint)
+		return dap.Adapter{}, nil, "", fmt.Errorf("Debugging %s is off in Restricted Mode, because %s (from the extension %s) runs this folder's code. %s, then try again.", name, d.Label, d.Source, trustHint)
 	}
 	argv, err := firstInstalled(d.Candidates)
 	if err != nil {
@@ -120,7 +120,7 @@ func missingProgram(label string, candidates [][]string, install string) string 
 // runner for the file's language, in a trusted project folder.
 func (a *App) planExtensionTests(req testrun.Request) (testrun.Plan, error) {
 	if len(req.Dirs) == 0 || req.File == "" {
-		return testrun.Plan{}, fmt.Errorf("no project folder or file given")
+		return testrun.Plan{}, fmt.Errorf("no folder or file given")
 	}
 	root, path := req.Dirs[0], req.File
 	if err := fileInRoot(root, path); err != nil {
@@ -136,7 +136,7 @@ func (a *App) planExtensionTests(req testrun.Request) (testrun.Plan, error) {
 		return testrun.Plan{}, fmt.Errorf("Can't run the tests of %s: no extension that runs %s tests is installed and on. Add one from Settings ▸ Extensions ▸ Repository, or turn it on in Settings ▸ Extensions.", name, label)
 	}
 	if !a.isTrusted(root) {
-		return testrun.Plan{}, fmt.Errorf("Running the tests of %s is off in Restricted Mode, because %s (from the extension %s) runs this project's code. %s, then try again.", name, r.Label, r.Source, trustHint)
+		return testrun.Plan{}, fmt.Errorf("Running the tests of %s is off in Restricted Mode, because %s (from the extension %s) runs this folder's code. %s, then try again.", name, r.Label, r.Source, trustHint)
 	}
 	return testrun.PlanExtension(req, r)
 }

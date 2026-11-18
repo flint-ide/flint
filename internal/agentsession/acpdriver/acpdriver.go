@@ -110,13 +110,17 @@ func New(opts Options) *Driver {
 // CheckTrust refuses a folder the user hasn't trusted.
 func (o Options) CheckTrust(cwd string) error {
 	if o.Untrusted != nil && o.Untrusted(cwd) {
-		return fmt.Errorf("%w: trust this folder to use %s (custom agents read the project's configuration and run commands in it)", ErrRestricted, o.Name)
+		return fmt.Errorf("%w: trust this folder to use %s (custom agents read the folder's configuration and run commands in it)", ErrRestricted, o.Name)
 	}
 	return nil
 }
 
 // Start launches the agent and opens a session in cwd.
 func (d *Driver) Start(ctx context.Context, cwd string, sink as.Sink) (as.SessionInfo, error) {
+	// ACP's session/new has a cwd and nothing more: no additional folders.
+	if err := as.RefuseFolders(ctx, d.opts.Name); err != nil {
+		return as.SessionInfo{}, err
+	}
 	if err := d.opts.CheckTrust(cwd); err != nil {
 		return as.SessionInfo{}, err
 	}
@@ -488,7 +492,7 @@ func writeConfined(root, path, content string) error {
 func resolveInside(root, path string) (string, error) {
 	target := as.Resolve(path)
 	if !as.Inside(target, root) {
-		return "", fmt.Errorf("access outside the project denied: %s", path)
+		return "", fmt.Errorf("access outside the folder denied: %s", path)
 	}
 	return target, nil
 }
@@ -502,7 +506,7 @@ func confine(root, path string) (string, error) {
 	}
 	clean := filepath.Clean(path)
 	if !as.Inside(clean, root) {
-		return "", fmt.Errorf("access outside the project denied: %s", clean)
+		return "", fmt.Errorf("access outside the folder denied: %s", clean)
 	}
 	return clean, nil
 }

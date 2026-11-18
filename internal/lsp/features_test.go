@@ -29,8 +29,12 @@ const fakeEdit = `{"range":{"start":{"line":0,"character":0},"end":{"line":0,"ch
 // FLINT_FAKE_LSP=bare it announces no capabilities.
 func runFakeServer() {
 	var c *conn
+	// newConn starts the read loop, which calls handle, before c is assigned:
+	// handle waits for ready before it uses c.
+	ready := make(chan struct{})
 	docVersion := 0
 	handle := func(method string, params json.RawMessage) (any, error) {
+		<-ready
 		raw := func(s string) (any, error) { return json.RawMessage(s), nil }
 		switch method {
 		case "initialize":
@@ -140,6 +144,7 @@ func runFakeServer() {
 		return nil, nil
 	}
 	c = newConn(os.Stdin, os.Stdout, handle)
+	close(ready)
 	<-c.done
 }
 

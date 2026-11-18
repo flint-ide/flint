@@ -86,7 +86,7 @@ function GitFileActions({ path }: { path: string }) {
 }
 
 /**
- * Tokens and cost of the agent chats in the open project and its attached folders
+ * Tokens and cost of the agent chats in the open folder and its attached folders
  * (hidden until something was used); the tooltip splits it per folder when there are several.
  */
 function AgentUsageWidget({ roots }: { roots: string[] }) {
@@ -105,7 +105,7 @@ function AgentUsageWidget({ roots }: { roots: string[] }) {
   })
   if (!summary) return null
   const [label, ...details] = summary.split('\n')
-  const scope = roots.length > 1 ? 'Agent chats in this workspace' : 'Agent chats in this project'
+  const scope = roots.length > 1 ? 'Agent chats in this workspace' : 'Agent chats in this folder'
   return <span title={`${scope}\n${details.join('\n')}`}>{label}</span>
 }
 

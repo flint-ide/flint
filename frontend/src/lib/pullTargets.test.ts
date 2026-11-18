@@ -8,7 +8,7 @@ const repo = (folder: string, over: Partial<{ branch: string; head: string; upst
   status: { branch: 'main', head: '0123456789abcdef', upstream: 'origin/main', behind: 0, ...over },
 })
 
-describe('update project picker', () => {
+describe('update repository picker', () => {
   it('has nothing to ask with one repository', () => {
     assert.deepEqual(pullTargets([], ['/ws/a'], '/ws/a'), [])
     assert.deepEqual(pullTargets([repo('/ws/a')], ['/ws/a', '/ws/docs'], '/ws/a'), [])
@@ -35,7 +35,7 @@ describe('update project picker', () => {
 
   it('says what was updated and what failed', () => {
     assert.deepEqual(pullSummary(['api'], []), { message: 'Updated api', kind: 'info' })
-    assert.deepEqual(pullSummary(['api', 'web'], []), { message: 'Updated 2 projects', kind: 'info' })
+    assert.deepEqual(pullSummary(['api', 'web'], []), { message: 'Updated 2 repositories', kind: 'info' })
     assert.deepEqual(pullSummary([], []), { message: 'Nothing to update', kind: 'info' })
     assert.deepEqual(pullSummary([], [{ label: 'web', error: 'no upstream' }]), { message: 'Update failed.\nweb: no upstream', kind: 'error' })
     assert.deepEqual(pullSummary([], [{ label: 'web', error: '\nerror: local changes would be overwritten\nhint: save them first\n  a.go' }]), {

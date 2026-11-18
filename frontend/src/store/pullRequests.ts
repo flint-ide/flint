@@ -197,7 +197,7 @@ export async function discardReview(root: string, number: number, comments: numb
 }
 
 export async function checkoutPullRequest(root: string, number: number, branch: string): Promise<void> {
-  if (!(await confirmAction(`Check out #${number} (${branch}) in this project?`, 'Check Out'))) return
+  if (!(await confirmAction(`Check out #${number} (${branch}) in this folder?`, 'Check Out'))) return
   const ok = await act(root, number, 'checkout', () => GitHub.Checkout(root, number))
   if (ok) showToast(`Checked out #${number} (${branch})`)
 }

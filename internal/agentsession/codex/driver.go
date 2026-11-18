@@ -118,6 +118,13 @@ func (d *Driver) start(ctx context.Context, cwd, resumeID string, sink agentsess
 	if sink == nil {
 		return agentsession.SessionInfo{}, errors.New("codex: nil sink")
 	}
+	// Flint gives app-server threads no additional folders: thread/start's
+	// runtimeWorkspaceRoots is an experimental field (Flint does not opt in
+	// to the experimental API), and sandbox_workspace_write.writable_roots
+	// only applies to the legacy sandbox, not to a permission profile.
+	if err := agentsession.RefuseFolders(ctx, "codex"); err != nil {
+		return agentsession.SessionInfo{}, err
+	}
 	d.mu.Lock()
 	closed := d.closed
 	d.mu.Unlock()

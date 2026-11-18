@@ -163,7 +163,7 @@ func (s *Sources) orchestrationTools(cfg Config) []mcpserver.Tool {
 				return jsonText(map[string]any{"agents": list})
 			}),
 		tool(ToolStartAgent, "Start an agent",
-			"Starts another agent chat in this project as your child and sends it the task. Optionally name the agent (default: yours) and a role (a template from Flint's roles folders whose text is put before the task). "+
+			"Starts another agent chat in this folder as your child and sends it the task. Optionally name the agent (default: yours) and a role (a template from Flint's roles folders whose text is put before the task). "+
 				"The child appears as a chat in Flint and what you send it is shown there. Returns its id; follow it with "+ToolWaitAgent+", "+ToolReadAgent+" and "+ToolSendPrompt+". "+
 				"Flint also tells you when a child waits, fails or finishes. Limits on how many agents and how deep apply.",
 			fmt.Sprintf(`{"type":"object","properties":{`+
@@ -171,7 +171,7 @@ func (s *Sources) orchestrationTools(cfg Config) []mcpserver.Tool {
 				`"role":{"type":"string","maxLength":%d,"description":"Name of a role template (letters, digits, - and _)."},`+
 				`"task":{"type":"string","maxLength":%d,"description":"What the new agent should do; it knows nothing else about your work."},`+
 				`"worktree":{"type":"boolean","description":"Run it in its own git branch and worktree (a task in Flint's Tasks panel), so its changes do not touch yours. Refused while the limit of tasks working at once is reached."},`+
-				`"base":{"type":"string","maxLength":%d,"description":"Local branch the worktree starts from (default: the branch of this project's folder). Only with worktree."}`+
+				`"base":{"type":"string","maxLength":%d,"description":"Local branch the worktree starts from (default: the branch of this folder). Only with worktree."}`+
 				`},"required":["task"],"additionalProperties":false}`, maxAgentName, maxAgentName, maxTaskBytes, maxBaseLen), 2*time.Minute,
 			func(ctx context.Context, caller, root string, args json.RawMessage) (string, error) {
 				r, err := startRequest(args)

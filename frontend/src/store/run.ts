@@ -191,7 +191,7 @@ export function closeRunConfigDialog(): void {
 /** Writes config into .flint/run.json (replacing `replaces`) and selects it. Throws on invalid input. */
 export async function saveRunConfig(config: RunConfig, replaces: string | null): Promise<RunConfig> {
   const { root, saved } = useRun.getState()
-  if (!root) throw new Error('No project open')
+  if (!root) throw new Error('No folder open')
   const list = replaces !== null && saved.some((c) => c.id === replaces)
     ? saved.map((c) => (c.id === replaces ? config : c))
     : [...saved, config]

@@ -222,7 +222,7 @@ func TestTaskQueueAfterRestart(t *testing.T) {
 	if err := config.LoadJSON(next.statePath(), &next.state); err != nil {
 		t.Fatal(err)
 	}
-	next.tasks = agenttask.NewTracker(next.taskByFolder, next.taskChanged)
+	next.tasks = agenttask.NewTracker(next.tasksByFolder, next.taskChanged)
 	installChats(t, next)
 	api := &TaskAPI{app: next, git: &GitAPI{app: next}}
 	queued := func() bool {

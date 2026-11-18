@@ -85,7 +85,7 @@ func (p *PromptsAPI) library(root string) PromptLibrary {
 	}
 	list, shadowed := prompts.Merge(builtin, personal, project, root == "" || lib.Trusted)
 	for _, name := range shadowed {
-		lib.Problems = append(lib.Problems, fmt.Sprintf("%s.md: not used in Restricted Mode, where a project prompt can't replace a built-in or personal one", name))
+		lib.Problems = append(lib.Problems, fmt.Sprintf("%s.md: not used in Restricted Mode, where a repository prompt can't replace a built-in or personal one", name))
 	}
 	lib.Prompts = list
 	return lib
@@ -250,7 +250,7 @@ func (p *PromptsAPI) Create(root string, personal bool, name string) (string, er
 		return prompts.Create(prompts.PersonalDir(p.app.configDir), "", name)
 	}
 	if root == "" {
-		return "", errors.New("open a folder to add a project prompt")
+		return "", errors.New("open a folder to add a repository prompt")
 	}
 	root, err := p.workspaceRoot(root)
 	if err != nil {

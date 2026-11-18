@@ -69,7 +69,7 @@ func TestBuildGrants(t *testing.T) {
 				r.Roots = []string{"/home/me/code/app", "/home/me", "/home/me/.ssh", "/home/me/.kube/work"}
 			},
 			read:      []string{"/home/me/code/app"},
-			noteParts: []string{"the project folder /home/me is not granted", "the project folder /home/me/.ssh is not granted: it is inside ~/.ssh", "the project folder /home/me/.kube/work is not granted"}},
+			noteParts: []string{"the workspace folder /home/me is not granted", "the workspace folder /home/me/.ssh is not granted: it is inside ~/.ssh", "the workspace folder /home/me/.kube/work is not granted"}},
 		{name: "variables: XDG folders with defaults, a run.env list, an unset runtime folder",
 			change: func(r *Request) {
 				r.Read = []string{"${XDG_CONFIG_HOME}/tool", "${XDG_DATA_HOME}/tool", "${env:KUBECONFIG}", "${XDG_RUNTIME_DIR}/bus", "${env:UNSET}"}

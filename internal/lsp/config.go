@@ -55,7 +55,7 @@ func (e notInstalledError) Is(target error) bool { return target == ErrNotInstal
 func notInstalled(msg string) error { return notInstalledError(msg) }
 
 // customServerReason explains Restricted Mode for a server Flint doesn't know.
-const customServerReason = "a language server set in Settings may run the project's code"
+const customServerReason = "a language server set in Settings may run the folder's code"
 
 // Languages lists the languages Flint has servers for.
 func Languages() []LanguageInfo {

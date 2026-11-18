@@ -275,7 +275,7 @@ You can also let an agent do a few things the way you do them in Flint, so the r
 
 - **Claude Code** asks in the chat: a permission card with the tool and its arguments, with **Allow once** and **Reject** only. There is no "Always allow" for these tools, and the approval policy doesn't answer them, not even "Do everything".
 - **Codex and custom agents**, and Claude Code when its own settings already allow the tool, don't reliably ask in the chat. Flint then asks in a dialog of its own that shows the folder, the tool, what it would do (the command, the request's URL, the SQL) and its arguments.
-- If you don't answer within five minutes, nothing runs.
+- If you don't answer within five minutes, nothing runs. A dialog already on screen then stays until you close it (Flint can't close it for you), and answering it runs nothing; one still waiting behind another of Flint's dialogs by then is never shown.
 
 What the tools accept is narrow on purpose:
 
@@ -466,24 +466,28 @@ While Flint isn't the active app you get a desktop notification for:
 | Situation | Notification | Clicking it shows |
 | --- | --- | --- |
 | An agent chat asks for your approval | *claude is waiting for your approval* — the folder and what it asks to do | the chat |
-| An agent CLI in a terminal tab waits for you (it reported *waiting*) | *claude is waiting for you* — the folder and the tab | the terminal |
+| An agent CLI in a terminal tab waits for you (it reported *waiting*) | *claude is waiting for you* — the folder | the terminal |
 | Flint asks you a question in a dialog (an agent's action, an agent that wants to direct others, a project's start, a clone, …) | *Flint needs your answer* — the question | Flint |
 | An agent's turn ends, or stops with an error | the chat's title — *The agent finished its turn* | the chat |
-| An agent CLI in a terminal finishes its turn | the tab's title | the terminal |
-| An agent task's chat could not start | *An agent task did not start* — why | the chat, if one opened |
+| An agent CLI in a terminal finishes its turn | *claude finished its turn* — the folder | the terminal |
+| An agent task's chat could not start, or its agent failed before it began | *An agent task did not start* — why | the chat, if one opened |
 | Flint could not tell a chat what its agents did (the [turn limit](../reference/settings.md#orchestration) of agents directing agents, a budget pause) | why | the chat |
 | A run or test run ends, your pull request's CI fails or passes, a budget is reached | what happened | the tab |
 | A project starts a waiting item, can't start it, an item is ready for review, a clone ends | what happened | Flint |
 
-A request is announced once. One that arrives while you are in Flint and is still unanswered when you switch to another app is announced then. A question of Flint's that waits two minutes is announced even if Flint was in front when it appeared (on Linux, Flint can't tell that you left while a dialog is open). An agent started by another agent asks for approval like any agent, but its turn ends are told to the agent that started it, not to you.
+A request is announced once. One that arrives while you are in Flint and is still unanswered when you switch to another app is announced then. A question of Flint's that waits two minutes is announced even if Flint was in front when it appeared (on Linux, Flint can't tell that you left while a dialog is open). A dialog of Flint's counts as Flint: while one is open, Flint is in front, and answering it is not "coming back". Flint's questions stay open until you answer them, one at a time; one asked while another is open appears when that one is answered. An agent started by another agent asks for approval like any agent, but its turn ends are told to the agent that started it, not to you.
 
-The **badge** counts what still waits for you (requests and questions) plus finished work you haven't seen. Coming back to Flint clears the finished part; a request counts until you answer it. On macOS the badge is on the Dock icon; Linux has no Dock badge.
+A terminal tab notifies only while it runs an agent CLI Flint knows (`claude`, `codex`, `gemini`, `opencode`): the state comes from sequences in the terminal's output, which any program can print. It sends at most one *waiting* and one *finished* notification per tab a minute; a wait inside that minute still counts on the badge and shows the notice, a finish inside it is not counted. The tab's own mark follows every state, whatever runs in it.
+
+When an agent can't start for a task Flint starts from the queue (its program is missing, it fails before it begins), the task fails with the reason and you are told once. Flint then starts no other queued task of that agent by itself: they stay queued and say why. **Start now** on one tries again; changing the agents' settings, or a chat of that agent that works, lets the queue go on.
+
+The **badge** counts what still waits for you (requests, terminal agents that wait, and Flint's questions) plus finished work announced while you were away. Coming back to Flint clears the finished part; a request counts until you answer it. On macOS the badge is on the Dock icon; Linux has no Dock badge, and nothing shows that count there.
 
 ### When Flint is in front
 
-- The **✦ Agents** button on the activity bar shows how many agents need you (waiting, failed, or finished while you were in another tab), whether the panel is open or not.
+- The **✦ Agents** button on the activity bar shows how many agents need you (waiting, failed, or finished while you were in another tab), whether the panel is open or not. That is a different number from the badge: it counts agents, including failed ones and turns that ended while you were in Flint but in another tab, and not Flint's own questions.
 - A chat tab whose agent waits for your approval reads **waiting**, like a terminal tab with an agent in it.
-- When the request is not in the tab you are looking at, a notice says *claude is waiting for your approval in my-app* with **Show**. It stays until you answer, show or close it; other messages don't replace it.
+- When the request is not in the tab you are looking at, a notice says *claude is waiting for your approval in my-app* with **Show**. It stays until you answer, show or close it; other messages don't replace it. From the keyboard, **Show Agent Waiting for You** in the command palette does what **Show** does.
 - A hidden ("Hide until needed") chat tab comes back when its agent needs you.
 
 ### Settings
@@ -497,7 +501,7 @@ In Settings ▸ Agents ▸ Notifications:
 ### Platform notes
 
 - **macOS** asks for permission the first time Flint notifies. A development build run outside its app bundle can't notify.
-- **Linux** uses the desktop's notification service (`org.freedesktop.Notifications` over D-Bus). There is no Dock badge: use the count on the Agents button.
+- **Linux** uses the desktop's notification service (`org.freedesktop.Notifications` over D-Bus). There is no Dock badge. In Flint, the count on the Agents button shows the agents that need you (not Flint's questions, which are dialogs on screen).
 
 Notification text is one short line; Flint masks secrets in it before it reaches the system, because notifications show on the lock screen.
 

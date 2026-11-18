@@ -133,12 +133,14 @@ func TestAcceptLoopBoundsConnections(t *testing.T) {
 		t.Fatal(err)
 	}
 	var served atomic.Int32
+	started := make(chan struct{}, 3)
 	release := make(chan struct{})
 	loopDone := make(chan struct{})
 	go func() {
 		defer close(loopDone)
 		acceptLoop(ln, uint32(os.Getuid()), 2, func(c net.Conn) {
 			served.Add(1)
+			started <- struct{}{}
 			<-release
 			_ = c.Close()
 		})
@@ -155,6 +157,15 @@ func TestAcceptLoopBoundsConnections(t *testing.T) {
 	_ = conns[2].SetReadDeadline(time.Now().Add(5 * time.Second))
 	if _, err := conns[2].Read(make([]byte, 1)); err == nil || os.IsTimeout(err) {
 		t.Errorf("third connection read = %v, want it closed by the host", err)
+	}
+	// The loop counts a connection before its serve goroutine runs, so the
+	// third can be refused before the first two were scheduled: wait for them.
+	for range 2 {
+		select {
+		case <-started:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("served %d connections, want 2", served.Load())
+		}
 	}
 	if n := served.Load(); n != 2 {
 		t.Errorf("served %d connections, want 2", n)

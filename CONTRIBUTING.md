@@ -72,6 +72,7 @@ Before you request a review:
 - [ ] Bindings regenerated and committed if a Go service changed
 - [ ] No new npm dependency (or it was agreed in an issue)
 - [ ] User-visible changes are documented in `docs/FEATURES.md`
+- [ ] The description's **Release notes** section says what users will notice, for them (or "none"); it becomes the release notes (see "Release process" in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#release-process))
 - [ ] The security rules above are followed
 - [ ] Commits follow Conventional Commits
 

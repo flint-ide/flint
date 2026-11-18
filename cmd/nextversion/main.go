@@ -20,14 +20,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"regexp"
-	"strconv"
 	"strings"
+
+	"flint/internal/release"
 )
-
-type version struct{ major, minor, patch int }
-
-func (v version) String() string { return fmt.Sprintf("v%d.%d.%d", v.major, v.minor, v.patch) }
 
 type bump int
 
@@ -42,52 +38,15 @@ func (b bump) String() string {
 	return [...]string{"none", "patch", "minor", "major"}[b]
 }
 
-var (
-	versionRe  = regexp.MustCompile(`^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
-	subjectRe  = regexp.MustCompile(`^(?i)([a-z]+)(\([^)]*\))?(!)?: `)
-	breakingRe = regexp.MustCompile(`(?m)^BREAKING[ -]CHANGE: `)
-)
-
-func parseVersion(s string) (version, bool) {
-	m := versionRe.FindStringSubmatch(s)
-	if m == nil {
-		return version{}, false
-	}
-	n := func(i int) int { v, _ := strconv.Atoi(m[i]); return v }
-	return version{n(1), n(2), n(3)}, true
-}
-
-func (v version) less(o version) bool {
-	if v.major != o.major {
-		return v.major < o.major
-	}
-	if v.minor != o.minor {
-		return v.minor < o.minor
-	}
-	return v.patch < o.patch
-}
-
-// latest returns the highest vX.Y.Z among tags; other tags are ignored.
-func latest(tags []string) (version, bool) {
-	var best version
-	found := false
-	for _, t := range tags {
-		if v, ok := parseVersion(strings.TrimSpace(t)); ok && (!found || best.less(v)) {
-			best, found = v, true
-		}
-	}
-	return best, found
-}
-
 func bumpOf(msg string) bump {
-	m := subjectRe.FindStringSubmatch(msg)
-	if m == nil {
+	c := release.ParseCommit(msg)
+	if c.Type == "" {
 		return bumpNone
 	}
-	if m[3] == "!" || breakingRe.MatchString(msg) {
+	if c.Breaking {
 		return bumpMajor
 	}
-	switch strings.ToLower(m[1]) {
+	switch c.Type {
 	case "feat":
 		return bumpMinor
 	case "fix", "perf":
@@ -105,17 +64,17 @@ func bumpFor(msgs []string) bump {
 	return b
 }
 
-func next(prev version, b bump) version {
-	if b == bumpMajor && prev.major == 0 {
+func next(prev release.Version, b bump) release.Version {
+	if b == bumpMajor && prev.Major == 0 {
 		b = bumpMinor
 	}
 	switch b {
 	case bumpMajor:
-		return version{prev.major + 1, 0, 0}
+		return release.Version{Major: prev.Major + 1}
 	case bumpMinor:
-		return version{prev.major, prev.minor + 1, 0}
+		return release.Version{Major: prev.Major, Minor: prev.Minor + 1}
 	case bumpPatch:
-		return version{prev.major, prev.minor, prev.patch + 1}
+		return release.Version{Major: prev.Major, Minor: prev.Minor, Patch: prev.Patch + 1}
 	}
 	return prev
 }
@@ -132,17 +91,6 @@ func parseBump(s string) (bump, error) {
 	return bumpNone, fmt.Errorf("bump must be auto, patch, minor or major, not %q", s)
 }
 
-// splitLog splits `git log --format=%B%x1e` output into commit messages.
-func splitLog(out string) []string {
-	var msgs []string
-	for m := range strings.SplitSeq(out, "\x1e") {
-		if m = strings.TrimSpace(m); m != "" {
-			msgs = append(msgs, m)
-		}
-	}
-	return msgs
-}
-
 func git(args ...string) (string, error) {
 	out, err := exec.Command("git", args...).Output()
 	if err != nil {
@@ -156,7 +104,7 @@ func run(bumpFlag string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	prev, tagged := latest(strings.Split(tags, "\n"))
+	prev, tagged := release.Latest(strings.Split(tags, "\n"))
 	logArgs := []string{"log", "--no-merges", "--format=%B%x1e"}
 	if tagged {
 		logArgs = append(logArgs, prev.String()+"..HEAD")
@@ -165,7 +113,7 @@ func run(bumpFlag string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	msgs := splitLog(out)
+	msgs := release.SplitLog(out)
 
 	b := bumpFor(msgs)
 	if bumpFlag != "auto" {

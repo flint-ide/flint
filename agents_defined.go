@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"slices"
@@ -81,8 +82,14 @@ func (l loadedAgents) route(name, engine string) (drv as.Driver, k string, err e
 
 // startChat starts a chat with agent name in cwd: on drv when it is a
 // defined agent's engine driver (loadedAgents.route), else by name.
+// A chat with additional folders (as.WithFolders, a joint agent task's)
+// starts on the in-process manager too: the folders travel in ctx, which only
+// it hands to a driver, never across a connection to another process.
 func (a *App) startChat(ctx context.Context, drv as.Driver, name, cwd string) (as.SessionInfo, error) {
-	if drv != nil {
+	if drv != nil || len(as.Folders(ctx)) > 0 {
+		if a.agentMgr == nil {
+			return as.SessionInfo{}, errors.New("agent sessions are not available")
+		}
 		return a.agentMgr.StartWith(ctx, name, cwd, drv)
 	}
 	return a.agents.Start(ctx, name, cwd)
@@ -90,13 +97,21 @@ func (a *App) startChat(ctx context.Context, drv as.Driver, name, cwd string) (a
 
 // resumeChatWith reopens conversation sessionID of agent name with the
 // definitions of loaded: a defined agent on engine, the one it started on
-// ("" resolves it now).
+// ("" resolves it now). A chat in the lead's worktree of a joint group gets
+// the group's other worktrees again, derived from cwd here (withJointFolders),
+// not from what the UI remembered.
 func (a *App) resumeChatWith(ctx context.Context, loaded loadedAgents, name, cwd, sessionID, engine string) (as.SessionInfo, error) {
-	drv, _, err := loaded.route(name, engine)
+	drv, k, err := loaded.route(name, engine)
 	if err != nil {
 		return as.SessionInfo{}, err
 	}
-	if drv != nil {
+	if ctx, err = a.withJointFolders(ctx, name, k, cwd); err != nil {
+		return as.SessionInfo{}, err
+	}
+	if drv != nil || len(as.Folders(ctx)) > 0 { // as startChat
+		if a.agentMgr == nil {
+			return as.SessionInfo{}, errors.New("agent sessions are not available")
+		}
 		return a.agentMgr.ResumeWith(ctx, name, cwd, sessionID, drv)
 	}
 	return a.agents.Resume(ctx, name, cwd, sessionID)

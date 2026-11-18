@@ -53,6 +53,13 @@ type Task struct {
 	// Queued: the branch and worktree exist, but the chat has not started and
 	// the description was not sent, because too many tasks were working.
 	Queued bool `json:"queued,omitempty"`
+	// Joint links the tasks, one per repository, that one agent works on in
+	// one chat (an id from NewID; joint.go). Empty for a task with a chat of
+	// its own, and in state files written before joint groups.
+	Joint string `json:"joint,omitempty"`
+	// Lead marks the task of a joint group whose worktree the chat runs in;
+	// the other tasks' worktrees are its additional folders.
+	Lead bool `json:"lead,omitempty"`
 }
 
 // Store holds the tasks per repository, keyed by the repository's common git

@@ -118,7 +118,7 @@ func newChatApp(t *testing.T) *chatApp {
 	t.Helper()
 	c := &chatApp{driver: newChatDriver()}
 	a := &App{configDir: t.TempDir(), settings: settings.Default(), orch: orchestrate.New(), ctx: context.Background()}
-	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
+	a.tasks = agenttask.NewTracker(a.tasksByFolder, a.taskChanged)
 	a.emitHook = func(name string, data ...any) {
 		if name == eventChatOpened {
 			c.mu.Lock()

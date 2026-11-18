@@ -78,7 +78,7 @@ func newTaskFixture(t *testing.T) *taskFixture {
 
 	a := &App{configDir: t.TempDir(), settings: settings.Default(), ctx: context.Background()}
 	a.settings.CustomAgents = []settings.CustomAgent{{ID: "fake", Command: "sh"}}
-	a.tasks = agenttask.NewTracker(a.taskByFolder, a.taskChanged)
+	a.tasks = agenttask.NewTracker(a.tasksByFolder, a.taskChanged)
 	driver := installChats(t, a)
 	a.openProject(repo, nil)
 	api := &TaskAPI{app: a, git: &GitAPI{app: a}}

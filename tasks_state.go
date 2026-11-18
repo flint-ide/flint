@@ -54,6 +54,16 @@ func (a *App) taskByFolder(cwd string) string {
 	return a.taskStore().ByWorktree(cleanFolder(cwd))
 }
 
+// tasksByFolder lists the tasks a chat in cwd works for, for the tracker:
+// the task whose worktree cwd is, or every task of a joint group when cwd is
+// its lead's worktree (agenttask.Store.ChatTasks).
+func (a *App) tasksByFolder(cwd string) []string {
+	if cwd == "" {
+		return nil
+	}
+	return a.taskStore().ChatTasks(cleanFolder(cwd))
+}
+
 // taskChanged remembers a task's settled state (so a restart still shows
 // finished or failed), forgets it when a new turn starts, and tells the UI.
 // A chat closing (idle) leaves the remembered state alone. A task that

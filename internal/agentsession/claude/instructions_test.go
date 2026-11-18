@@ -26,7 +26,7 @@ func TestBuildArgsInstructions(t *testing.T) {
 		{"none", false, Options{}, false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			args, err := buildArgs("sid", tt.resume, tt.opts, false, nil)
+			args, err := buildArgs("sid", tt.resume, tt.opts, false, nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

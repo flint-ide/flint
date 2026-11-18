@@ -8,7 +8,9 @@
 //	       --permission-mode <mode> --session-id <uuid> [--model <m>] [extra...]
 //
 // Resume replaces --session-id with --resume <uuid> to continue a saved
-// conversation.
+// conversation. A session started or resumed with additional folders
+// (agentsession.WithFolders) gets one "--add-dir <folder>" pair per folder,
+// on start and on resume alike.
 //
 // Each Prompt writes one stream-json user message to stdin; the turn ends
 // with a "result" line. Permission prompts arrive as control_request
@@ -158,6 +160,12 @@ func (d *Driver) start(ctx context.Context, cwd, id string, resume bool, sink ag
 		return agentsession.SessionInfo{}, ErrClosed
 	}
 	opts := d.opts.current()
+	// Flint's own additional folders (a joint agent task's other worktrees),
+	// checked here too: trusted like cwd, existing, absolute.
+	folders := agentsession.Folders(ctx)
+	if err := agentsession.CheckFolders(cwd, folders, opts.Untrusted); err != nil {
+		return agentsession.SessionInfo{}, fmt.Errorf("claude: %w", err)
+	}
 	path, err := resolveBinary(opts.Binary)
 	if err != nil {
 		return agentsession.SessionInfo{}, err
@@ -172,7 +180,7 @@ func (d *Driver) start(ctx context.Context, cwd, id string, resume bool, sink ag
 	if srv, ok := opts.MCP.Offer(ctx, cwd); ok {
 		mcp = &srv
 	}
-	args, err := buildArgs(id, resume, opts, opts.Untrusted != nil && opts.Untrusted(cwd), mcp)
+	args, err := buildArgs(id, resume, opts, opts.Untrusted != nil && opts.Untrusted(cwd), mcp, folders)
 	if err != nil {
 		mcp.Revoke()
 		return agentsession.SessionInfo{}, fmt.Errorf("claude: %w", err)
@@ -361,8 +369,13 @@ func (s *session) shutdownAsFailure() {
 // user's extra arguments come first, so Flint's flags (the stream protocol,
 // the permission prompt and, in untrusted folders, --setting-sources user)
 // are parsed last and win. mcp, when set, is Flint's MCP server: Claude Code
-// merges every --mcp-config, so the user's own servers stay.
-func buildArgs(sessionID string, resume bool, opts Options, untrusted bool, mcp *agentsession.MCPServer) ([]string, error) {
+// merges every --mcp-config, so the user's own servers stay. folders are
+// Flint's additional folders (agentsession.CheckFolders validated them): each
+// is its own "--add-dir <folder>" pair among Flint's flags, after the user's
+// arguments, and is followed by another flag, so Claude Code's variadic
+// --add-dir never takes a value that is not one of them, and a --add-dir the
+// user put last in the extra arguments ends at Flint's first flag.
+func buildArgs(sessionID string, resume bool, opts Options, untrusted bool, mcp *agentsession.MCPServer, folders []string) ([]string, error) {
 	mode := opts.PermissionMode
 	if mode == "" {
 		mode = defaultPermissionMode
@@ -375,6 +388,9 @@ func buildArgs(sessionID string, resume bool, opts Options, untrusted bool, mcp 
 		"--include-partial-messages",
 		"--permission-prompt-tool", "stdio",
 		"--permission-mode", mode,
+	}
+	for _, f := range folders {
+		args = append(args, "--add-dir", f)
 	}
 	if mcp != nil {
 		// --mcp-config is variadic: the next argument must be a flag.

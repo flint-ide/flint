@@ -67,7 +67,7 @@ The file is readable only by your user. It never contains secrets: database pass
   "mcpServer": {
     "enabled": true,
     "tools": { "diagnostics": true, "editor": true, "terminals": true, "tests": true },
-    "actions": { "tests": true, "run": false, "http": false, "sql": false, "backlog": false },
+    "actions": { "tests": true, "run": false, "http": false, "sql": false, "projects": false },
     "terminalLines": 200,
     "testWaitSeconds": 120
   },
@@ -259,13 +259,13 @@ Flint's own MCP server for agent chats: read-only tools, and tools that act when
 | `actions.run` | boolean | | `false` | `run_configuration` (start a run configuration by name) and `get_run_output` (read a run's output and state). |
 | `actions.http` | boolean | | `false` | `send_http_request`: send a named request of a `.http` file in the project. |
 | `actions.sql` | boolean | | `false` | `run_sql_query`: one reading statement on a saved connection that is read-only. Needs the Database feature. |
-| `actions.backlog` | boolean | | `false` | `add_backlog_item`: add one `todo` item to a [backlog](../guides/backlog.md#what-agents-can-add) whose folder is trusted. Shown in Settings as **Add backlog items**. Needs the Backlog feature. |
+| `actions.projects` | boolean | | `false` | `add_project_item`: add one `todo` item to a [project](../guides/projects.md#what-agents-can-add) whose folder is trusted. Shown in Settings as **Add project items**. Needs the Projects feature. |
 | `terminalLines` | integer | 10–2000 | `200` | The most lines of one terminal's or run's output an agent gets (clamped into the range). |
 | `testWaitSeconds` | integer | 10–540 | `120` | How long `run_tests` waits for a test run before it answers with the results so far (clamped into the range). |
 
 Tool switches apply right away, also to running chats.
 
-`get_backlog` (the [backlog](../guides/backlog.md#what-agents-can-see)) has no key here: it is offered while the Backlog feature is on (see [features](#features)). `add_backlog_item`, which adds items, is switched on with `actions.backlog`.
+`get_project` (the [project](../guides/projects.md#what-agents-can-see)) has no key here: it is offered while the Projects feature is on (see [features](#features)). `add_project_item`, which adds items, is switched on with `actions.projects`.
 ### completions
 
 Ghost-text suggestions in file editors from a fill-in-the-middle code model. See [AI in the editor](../guides/editor-and-navigation.md#ai-in-the-editor).

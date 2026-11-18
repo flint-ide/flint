@@ -22,13 +22,13 @@ Apart from the update check, data leaves your Mac only when you do something tha
 | Databases, and the Kubernetes, AWS and Docker extensions | The commands and queries you run | Your servers and cloud accounts, through your own credentials |
 | Settings ▸ Extensions (when first opened, and **Refresh Repository**) | A `git` clone or fetch of the extensions repository, with your own git credentials | GitHub (`github.com/flint-ide/extensions`), or the URL in `FLINT_EXTENSIONS_REPO` |
 | The [extension index](../extensions/index-format.md) (only **Browse Extensions**, **Check for Updates**, and **Install…** / **Update…** of an extension in it) | Anonymous requests for the index, its signature and the archive you chose, described under [Extensions](#extensions) | GitHub (`github.com/flint-ide/extensions` release files, served from GitHub's download hosts), or the address in `extensions.indexUrl` |
-| [Clone…](../guides/backlog.md#clone-a-repository) on a backlog's repository, after you confirm the URL and the folder | A `git clone` of an https or ssh URL from the backlog, with your own git credentials | The git host in that URL |
+| [Clone…](../guides/projects.md#clone-a-repository) on a project's repository, after you confirm the URL and the folder | A `git clone` of an https or ssh URL from the project, with your own git credentials | The git host in that URL |
 | Markdown preview | Requests for remote images, only after you click **Load remote images** | The image hosts |
 | Update check (on its own once a day, or Help ▸ Check for Updates…) | One anonymous request for the latest release, described below | GitHub's API (`api.github.com`) |
 
 Agents decide what they read and send to their provider. The [approval policy](../guides/ai-agents.md#what-the-agent-may-do-without-asking) controls what they may do without asking.
 
-Flint's own tools for agents only read, unless you turn on [tools that act](../guides/ai-agents.md#letting-agents-act-in-flint) (run tests, run a configuration, send a request from a `.http` file, query a read-only database connection, add an item to a backlog). Those are off by default, and each call needs your yes, in the chat or in a dialog Flint shows itself: no approval policy and no "always allow" covers them. What they return goes to the agent's provider like anything else the agent reads, so a response body or query result you approve is shared with it (bounded, with recognized credentials removed).
+Flint's own tools for agents only read, unless you turn on [tools that act](../guides/ai-agents.md#letting-agents-act-in-flint) (run tests, run a configuration, send a request from a `.http` file, query a read-only database connection, add an item to a project). Those are off by default, and each call needs your yes, in the chat or in a dialog Flint shows itself: no approval policy and no "always allow" covers them. What they return goes to the agent's provider like anything else the agent reads, so a response body or query result you approve is shared with it (bounded, with recognized credentials removed).
 
 ## Update check
 

@@ -43,7 +43,7 @@ Editing or removing an agent in Settings affects new chats; open chats keep runn
 
 A defined agent is an agent you describe in a Markdown file: who it is (standing instructions), and optionally which program and model it runs on. It is an agent wherever Flint asks for an agent name: the chat's agent picker, "New Agent Task…" and Compare agents, the default agent, the review agent, the `start_agent` tool of [orchestration](#letting-agents-act-in-flint) and the [usage](#usage-and-budgets) breakdown.
 
-Use one when you want a lasting role, such as a reviewer that never edits files or a backend developer on a stronger model, that you can pick, hand tasks to (also from a [backlog](backlog.md), where an item's `agent` can name it) or let other agents start. A [prompt](#prompt-library) is different: it fills the chat box once, with text you can edit before you send it. A defined agent's instructions apply to the whole conversation, and you don't see them in the chat.
+Use one when you want a lasting role, such as a reviewer that never edits files or a backend developer on a stronger model, that you can pick, hand tasks to (also from the backlog of a [Flint project](projects.md), where an item's `agent` can name it) or let other agents start. A [prompt](#prompt-library) is different: it fills the chat box once, with text you can edit before you send it. A defined agent's instructions apply to the whole conversation, and you don't see them in the chat.
 
 An example, saved as `reviewer.md`:
 
@@ -247,13 +247,13 @@ An agent chat in Flint can also look things up by itself. Flint runs a small [MC
 | `get_diagnostics` | The errors and warnings the language servers report, for the project, a folder or a file. Only files a language server has checked are included: usually the open files and, for Go, their packages. | On |
 | `get_editor_state` | The files open in the editor (and which have unsaved changes), the active file, and your selection with its text, or the cursor position. Ask about "this function" and the agent can see which one. | On |
 | `get_test_results` | The last test run in Flint: totals, and each failed test with its location and output. | On |
-| `get_backlog` | The [backlogs](backlog.md) Flint knows whose folder is trusted, and their items: id, title, status, priority, agent, repositories, the items each waits for and whether it is ready, and text. | On with the Backlog feature |
+| `get_project` | The [Flint projects](projects.md) (folders of work items) Flint knows whose folder is trusted, and their items: id, title, status, priority, agent, repositories, the items each waits for and whether it is ready, and text. | On with the Projects feature |
 | `get_terminal_output` | The recent output your terminals and run consoles printed while they were in the project (dev servers, builds), as plain text without colors. | Off |
 
 These tools only read. Claude Code shows them as `mcp__flint__…`.
 
 - Diagnostics, editor state and test results show only the project's own state. With the default approval policy ("Read and search the project" on) Claude Code runs them without asking, so the agent can look at what you are looking at without a prompt each time.
-- `get_backlog` shows every trusted backlog Flint knows to any chat, not only the chat's project, so it isn't one of the read tools that run without asking: like Flint's other tools outside that list, Claude Code asks before each call, unless you chose "Do everything". Backlogs whose folder is in Restricted Mode are left out. It has no switch under Agent Context; it goes with the Backlog feature (Settings ▸ Extensions ▸ **Built-in**). See [What agents can see](backlog.md#what-agents-can-see). Adding items is a separate tool that acts, below.
+- `get_project` shows every trusted project Flint knows to any chat, not only one that belongs to the folder the chat works in, so it isn't one of the read tools that run without asking: like Flint's other tools outside that list, Claude Code asks before each call, unless you chose "Do everything". Projects whose folder is in Restricted Mode are left out. It has no switch under Agent Context; it goes with the Projects feature (Settings ▸ Extensions ▸ **Built-in**). See [What agents can see](projects.md#what-agents-can-see). Adding items is a separate tool that acts, below.
 - Terminal output can show anything you saw, such as a token printed in a terminal. It is off until you turn it on, and then the agent asks before each call, even with "Read and search" on. This keeps Flint's rule that nothing goes to an AI provider without you seeing it.
 - Codex and custom agents decide about all of them with their own rules.
 
@@ -268,7 +268,7 @@ You can also let an agent do a few things the way you do them in Flint, so the r
 | `get_run_output` | Reads the last lines of a run and whether it exited. Offered with `run_configuration`; it only reads. | |
 | `send_http_request` | Sends one named request (`### name`) of a `.http` or `.rest` file in the project, as saved on disk, optionally with an environment. Returns the status, the headers and the start of the body. | The file's response tab and history |
 | `run_sql_query` | Runs one reading statement (`SELECT`, `WITH`, `SHOW`, …) on a saved database connection, **only if that connection is read-only**, and returns up to 500 rows. | The connection's query history |
-| `add_backlog_item` | Adds one `todo` item to a [backlog](backlog.md) whose folder is trusted: title, text, and optionally priority, agent, repositories, the items it waits for and whether one agent works in all its repositories. It can't change, delete, re-status or delegate items. Switch: **Add backlog items**. | The Backlog panel and the item's file |
+| `add_project_item` | Adds one `todo` item to the backlog of a [Flint project](projects.md) whose folder is trusted: title, text, and optionally priority, agent, repositories, the items it waits for and whether one agent works in all its repositories. It can't change, delete, re-status or delegate items. Switch: **Add project items**. | The Projects panel and the item's file |
 
 **You are asked before every call.** Nothing an agent starts this way runs without your yes to that one call:
 
@@ -281,7 +281,7 @@ What the tools accept is narrow on purpose:
 - Paths, test names, run configurations, requests and environments must exist in the chat's project. The agent never passes a command line, a URL or connection details: it can only name what is already there. It can still edit those files like any other, so read the dialog or the card.
 - A request's body file must be inside the project, as in the editor.
 - `run_sql_query` refuses a connection that isn't read-only and says how to make it one (Edit Connection ▸ Read-only). It takes one statement without a semicolon inside it. Saved connections aren't tied to a project, so a chat in any trusted folder can ask for any read-only connection.
-- `add_backlog_item` shows you the backlog, the title, the item's settings and the start of its text before it writes, refuses a backlog whose folder is in Restricted Mode and an item Flint can't read, and adds at most 50 items per chat. See [What agents can add](backlog.md#what-agents-can-add) and [Plan with an agent](backlog.md#plan-with-an-agent).
+- `add_project_item` shows you the project, the title, the item's settings and the start of its text before it writes, refuses a project whose folder is in Restricted Mode and an item Flint can't read, and adds at most 50 items per chat. See [What agents can add](projects.md#what-agents-can-add) and [Plan with an agent](projects.md#plan-with-an-agent).
 - Answers are bounded and redacted like the read tools' (response cookies are hidden).
 
 Codex decides about MCP tools by its own rules and may refuse a tool that isn't read-only before Flint is asked.
@@ -368,7 +368,7 @@ An agent task gives an agent its own branch in its own [git worktree](git-and-gi
 
 Flint creates the branch and the worktree (by default in `<repository>.worktrees/` next to your checkout, like **New Worktree…** in the branch widget), attaches the folder to the window as another project, opens a chat there and sends your description as the first message. Nothing else is added to it.
 
-Work that isn't started yet can wait in a [backlog](backlog.md): its **Delegate** action creates these tasks for an item, one per repository the item names, and moves the item's status as they finish and merge. An item with `together: true` starts one agent for all its repositories instead: see [joint groups](#joint-groups-one-agent-in-several-repositories).
+Work that isn't started yet can wait in the backlog of a [Flint project](projects.md): its **Delegate** action creates these tasks for an item, one per repository the item names, and moves the item's status as they finish and merge. An item with `together: true` starts one agent for all its repositories instead: see [joint groups](#joint-groups-one-agent-in-several-repositories).
 
 The panel lists the tasks of every repository open in the window, newest first. Each row shows:
 
@@ -406,7 +406,7 @@ Removing the others works like **✕** on each of them: if one has uncommitted w
 
 ### Joint groups: one agent in several repositories
 
-A task normally works in one repository. A **joint group** is one agent that works in 2 to 10 repositories at once. Only a backlog item with `together: true` makes one, when you [Delegate](backlog.md#one-agent-across-repositories) it; "New Agent Task…" doesn't.
+A task normally works in one repository. A **joint group** is one agent that works in 2 to 10 repositories at once. Only an item of a [Flint project](projects.md) with `together: true` makes one, when you [Delegate](projects.md#one-agent-across-repositories) it; "New Agent Task…" doesn't.
 
 Each repository still gets its own task, with its own branch and worktree, so **Merge**, **Create PR**, **Show diff** and **✕** work per repository. The tasks share one chat, which runs in the worktree of the first repository (the **lead**) and may read and write the other worktrees. The panel shows the tasks of a group together, with the lead marked, and they have the same state because there is one agent. A group holds one slot of the queue, is queued and started as a unit (**Start now** on one task starts the group), and works only with Claude Code, not Codex or custom agents. **✕** on one task stops the shared chat for the whole group, after asking; the other tasks and their worktrees stay. The [approval policy](#what-the-agent-may-do-without-asking) treats every worktree of the group like the chat's own folder.
 
@@ -462,7 +462,7 @@ In a folder you haven't trusted, agents run without the project's own agent sett
 
 ## Related
 
-- [Backlog](backlog.md)
+- [Projects](projects.md)
 - [Restricted Mode](restricted-mode.md)
 - [Work with agents](../how-to/work-with-agents.md)
 - [Build a feature with an agent](../use-cases/build-a-feature-with-an-agent.md)

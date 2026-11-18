@@ -16,7 +16,7 @@ import (
 )
 
 // CloneOptions are a clone of a repository whose URL came from elsewhere (a
-// backlog in someone else's repository).
+// project in someone else's repository).
 type CloneOptions struct {
 	// URL is passed after "--", never as an option.
 	URL string

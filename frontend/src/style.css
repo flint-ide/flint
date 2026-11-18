@@ -4402,19 +4402,19 @@ button.keymap-chord:hover {
   font-size: 11px;
   padding-left: 30px;
 }
-/* ---------- Backlog ---------- */
+/* ---------- Projects ---------- */
 
-.backlog-picker {
+.project-picker {
   padding: 0 10px 6px;
 }
-.backlog-group .tree-row.root-row {
+.project-group .tree-row.root-row {
   height: 24px;
 }
-.backlog-group-head:focus-visible {
+.project-group-head:focus-visible {
   outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
-.backlog-marker {
+.project-marker {
   flex: none;
   font-size: 10px;
   line-height: 15px;
@@ -4423,15 +4423,15 @@ button.keymap-chord:hover {
   color: var(--fg-faint);
   background: color-mix(in srgb, var(--fg-faint) 12%, transparent);
 }
-.backlog-marker.warn {
+.project-marker.warn {
   color: var(--warn);
   background: color-mix(in srgb, var(--warn) 14%, transparent);
 }
-.backlog-marker.error {
+.project-marker.error {
   color: var(--danger);
   background: color-mix(in srgb, var(--danger) 14%, transparent);
 }
-.backlog-untrusted {
+.project-untrusted {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -4442,7 +4442,7 @@ button.keymap-chord:hover {
   border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
   border-radius: 4px;
 }
-.backlog-untrusted .link {
+.project-untrusted .link {
   padding: 0;
   border: none;
   background: none;
@@ -4450,23 +4450,23 @@ button.keymap-chord:hover {
   font-size: 11px;
   cursor: pointer;
 }
-.backlog-repos {
+.project-repos {
   border-bottom: 1px solid var(--border);
   padding-bottom: 4px;
   margin-bottom: 2px;
 }
-.backlog-item .tree-row {
+.project-item .tree-row {
   gap: 6px;
 }
-.backlog-item .file-name,
-.backlog-card-title .file-name {
+.project-item .file-name,
+.project-card-title .file-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.backlog-prio {
+.project-prio {
   flex: none;
   font-size: 10px;
   line-height: 15px;
@@ -4475,36 +4475,36 @@ button.keymap-chord:hover {
   color: var(--fg-faint);
   background: var(--bg-hover);
 }
-.backlog-prio.high {
+.project-prio.high {
   color: var(--warn);
   background: color-mix(in srgb, var(--warn) 14%, transparent);
 }
-.backlog-meta {
+.project-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 2px 10px;
   padding: 0 10px 0 22px;
   font-size: 11px;
 }
-.backlog-meta > span {
+.project-meta > span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.backlog-tasks {
+.project-tasks {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 3px 10px 0 22px;
 }
-.backlog-task {
+.project-task {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 11px;
 }
-.backlog-task .link {
+.project-task .link {
   padding: 0;
   border: none;
   background: none;
@@ -4512,35 +4512,35 @@ button.keymap-chord:hover {
   font-size: 11px;
   cursor: pointer;
 }
-.backlog-deps {
+.project-deps {
   display: flex;
   flex-direction: column;
   gap: 1px;
   padding: 2px 10px 0 22px;
   font-size: 11px;
 }
-.backlog-dep {
+.project-dep {
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--fg-faint);
 }
-.backlog-dep.warn {
+.project-dep.warn {
   color: var(--warn);
 }
-.backlog-dep.error {
+.project-dep.error {
   color: var(--danger);
 }
-.backlog-joint {
+.project-joint {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding-left: 8px;
   border-left: 2px solid color-mix(in srgb, var(--accent) 50%, transparent);
 }
-.backlog-joint-head {
+.project-joint-head {
   font-size: 10px;
 }
-.backlog-clone {
+.project-clone {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -4550,54 +4550,54 @@ button.keymap-chord:hover {
   border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
   border-radius: 4px;
 }
-.backlog-clone-title {
+.project-clone-title {
   overflow-wrap: anywhere;
 }
-.backlog-clone-line {
+.project-clone-line {
   overflow-wrap: anywhere;
   font-family: var(--font-mono, monospace);
 }
-.backlog-task-repo {
+.project-task-repo {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.backlog-actions {
+.project-actions {
   padding-left: 22px;
   padding-top: 4px;
 }
-.backlog-problems {
+.project-problems {
   margin-top: 6px;
   border-top: 1px solid var(--border);
 }
-.backlog-problem {
+.project-problem {
   padding: 4px 10px 6px 22px;
   border-bottom: 1px solid var(--border);
 }
-.backlog-problem-file {
+.project-problem-file {
   display: block;
   font: 11px var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.backlog-problem .task-error,
-.backlog-problem .task-actions {
+.project-problem .task-error,
+.project-problem .task-actions {
   padding-left: 0;
 }
 
 /* Board tab */
 
-.backlog-board {
+.project-board {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
   background: var(--bg-editor);
 }
-.backlog-board-head {
+.project-board-head {
   flex: none;
   display: flex;
   align-items: center;
@@ -4606,22 +4606,22 @@ button.keymap-chord:hover {
   border-bottom: 1px solid var(--border);
   font-size: 12px;
 }
-.backlog-board-title {
+.project-board-title {
   font-weight: 600;
   font-size: 13px;
   flex: none;
 }
-.backlog-board-error,
-.backlog-board-problems {
+.project-board-error,
+.project-board-problems {
   flex: none;
   padding: 4px 12px;
   font-size: 11px;
 }
-.backlog-board-message {
+.project-board-message {
   padding: 24px;
   max-width: 560px;
 }
-.backlog-columns {
+.project-columns {
   flex: 1;
   min-height: 0;
   display: grid;
@@ -4630,7 +4630,7 @@ button.keymap-chord:hover {
   padding: 10px 12px;
   overflow: auto;
 }
-.backlog-column {
+.project-column {
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -4638,11 +4638,11 @@ button.keymap-chord:hover {
   border: 1px solid var(--border);
   border-radius: 8px;
 }
-.backlog-column.over {
+.project-column.over {
   border-color: var(--accent);
   background: var(--accent-dim);
 }
-.backlog-column-head {
+.project-column-head {
   flex: none;
   display: flex;
   align-items: center;
@@ -4654,10 +4654,10 @@ button.keymap-chord:hover {
   text-transform: uppercase;
   color: var(--fg-muted);
 }
-.backlog-column-head .badge {
+.project-column-head .badge {
   margin-left: 0;
 }
-.backlog-column-body {
+.project-column-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -4666,14 +4666,14 @@ button.keymap-chord:hover {
   gap: 8px;
   padding: 0 8px 8px;
 }
-.backlog-column-empty {
+.project-column-empty {
   padding: 14px 6px;
   text-align: center;
   font-size: 11px;
   border: 1px dashed var(--border);
   border-radius: 6px;
 }
-.backlog-card {
+.project-card {
   flex: none;
   padding: 8px 10px 6px;
   background: var(--bg-raised);
@@ -4681,22 +4681,22 @@ button.keymap-chord:hover {
   border-radius: 6px;
   cursor: grab;
 }
-.backlog-card:hover {
+.project-card:hover {
   border-color: var(--fg-faint);
 }
-.backlog-card.dragging {
+.project-card.dragging {
   opacity: 0.45;
 }
-.backlog-card-title {
+.project-card-title {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 13px;
 }
-.backlog-card .backlog-meta,
-.backlog-card .backlog-deps,
-.backlog-card .backlog-tasks,
-.backlog-card .backlog-actions {
+.project-card .project-meta,
+.project-card .project-deps,
+.project-card .project-tasks,
+.project-card .project-actions {
   padding-left: 0;
   padding-right: 0;
 }

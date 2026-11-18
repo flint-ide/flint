@@ -13,7 +13,7 @@ import (
 	"flint/internal/git"
 )
 
-// Joint agent task groups (docs/design/backlog.md, "One agent across
+// Joint agent task groups (docs/design/projects.md, "One agent across
 // repositories"): one agent that works in several repositories at once. Each
 // repository gets an agent task of its own, made by createTasks like any
 // other (branch, worktree, trust, merge, pull request, removal), and the tasks
@@ -56,7 +56,7 @@ func (e *jointEngineError) Unwrap() error { return errJointEngine }
 
 // jointEngine checks that agent name, which runs on engine (loadedAgents.route:
 // a defined agent's resolved engine), can work in several folders: only
-// Claude Code can (--add-dir). See docs/design/backlog.md for Codex.
+// Claude Code can (--add-dir). See docs/design/projects.md for Codex.
 func jointEngine(name, engine string) error {
 	if engine == string(agent.Claude) {
 		return nil

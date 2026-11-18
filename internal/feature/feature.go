@@ -115,7 +115,7 @@ type Host interface {
 	// id) and lets agents read it like a terminal (get_terminal_output).
 	StartStream(termID, title string, st terminal.Stream) error
 
-	// The agent tasks part (the Backlog feature): the narrowest view of agent
+	// The agent tasks part (the Projects feature): the narrowest view of agent
 	// tasks, agents and repositories that lets a feature hand work to agents
 	// through the same path as New Agent Task.
 

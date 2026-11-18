@@ -30,8 +30,8 @@ type MCPActions struct {
 	HTTP bool `json:"http"`
 	// SQL: run_sql_query (read-only database connections).
 	SQL bool `json:"sql"`
-	// Backlog: add_backlog_item (writes a new item into a trusted backlog).
-	Backlog bool `json:"backlog"`
+	// Projects: add_project_item (writes a new item into a project whose folder is trusted).
+	Projects bool `json:"projects"`
 }
 
 // MCPTools switches the server's tools on and off. Diagnostics, the editor

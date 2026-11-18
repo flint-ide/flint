@@ -107,8 +107,8 @@ function TaskRow({ t, changes, open, busy, label, heading }: RowProps) {
           {t.stale ? 'stale' : s.label}
         </span>
         <span className="file-name">{label ?? heading ?? t.title}</span>
-        {t.joint && t.lead && <span className="backlog-marker" title="One agent works in the worktrees of this task's group; its chat is in this task's worktree">lead</span>}
-        {t.joint && !t.lead && <span className="backlog-marker" title="No chat of its own: the group's one agent works here from the lead's chat. Open shows that chat">lead's chat</span>}
+        {t.joint && t.lead && <span className="project-marker" title="One agent works in the worktrees of this task's group; its chat is in this task's worktree">lead</span>}
+        {t.joint && !t.lead && <span className="project-marker" title="No chat of its own: the group's one agent works here from the lead's chat. Open shows that chat">lead's chat</span>}
       </div>
       <div className="task-meta muted">
         <span title={`${t.branch} from ${t.base} · ${t.agent}`}><Icon name="branch" size={12} /> {t.branch}</span>

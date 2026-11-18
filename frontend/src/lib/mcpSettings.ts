@@ -25,8 +25,8 @@ export interface McpActions {
   http: boolean
   /** run_sql_query (read-only connections) */
   sql: boolean
-  /** add_backlog_item (writes a new item into a trusted backlog) */
-  backlog: boolean
+  /** add_project_item (writes a new item into a project whose folder is trusted) */
+  projects: boolean
 }
 
 export type McpActionKey = keyof McpActions
@@ -51,7 +51,7 @@ export const TEST_WAIT_SECONDS = { min: 10, max: 540 }
 export const DEFAULT_MCP_SERVER: McpServerSettings = Object.freeze({
   enabled: true,
   tools: Object.freeze({ diagnostics: true, editor: true, terminals: false, tests: true }),
-  actions: Object.freeze({ tests: false, run: false, http: false, sql: false, backlog: false }),
+  actions: Object.freeze({ tests: false, run: false, http: false, sql: false, projects: false }),
   terminalLines: 200,
   testWaitSeconds: 120,
 }) as McpServerSettings
@@ -80,7 +80,7 @@ export function coerceMcpServer(v: unknown): McpServerSettings {
       tests: bool(t.tests, d.tools.tests),
     },
     // Only a literal true switches an acting tool on.
-    actions: { tests: a.tests === true, run: a.run === true, http: a.http === true, sql: a.sql === true, backlog: a.backlog === true },
+    actions: { tests: a.tests === true, run: a.run === true, http: a.http === true, sql: a.sql === true, projects: a.projects === true },
     terminalLines: lines,
     testWaitSeconds: wait,
   }

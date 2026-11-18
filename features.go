@@ -14,9 +14,9 @@ import (
 	"flint/internal/config"
 	"flint/internal/diag"
 	"flint/internal/feature"
-	"flint/internal/features/backlog"
 	"flint/internal/features/database"
 	"flint/internal/features/extensions"
+	"flint/internal/features/projects"
 	"flint/internal/features/todo"
 	"flint/internal/features/update"
 	"flint/internal/mcptools"
@@ -32,7 +32,7 @@ var features = []feature.Module{
 	todo.Module,
 	update.Module,
 	extensions.Module,
-	backlog.Module,
+	projects.Module,
 }
 
 // registerFeatures registers the modules' settings sections and tools, once

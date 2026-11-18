@@ -10,7 +10,7 @@ import (
 	"flint/internal/git"
 )
 
-// The agent tasks part of the feature Host (the Backlog feature hands work to
+// The agent tasks part of the feature Host (the Projects feature hands work to
 // agents through it). It uses the code New Agent Task uses: createTasks for
 // the branches, worktrees, queue and trust, startTaskChat for the chats, and
 // TaskAPI.view for the states.

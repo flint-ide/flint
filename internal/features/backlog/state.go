@@ -2,6 +2,7 @@ package backlog
 
 import (
 	"slices"
+	"time"
 )
 
 // The feature's state.json keys. The link between items and agent tasks and
@@ -14,6 +15,9 @@ const (
 	stateCheckouts = "backlogCheckouts"
 	// stateTasks: the agent tasks of each item, per backlog folder.
 	stateTasks = "backlogTasks"
+	// stateWaiting: the items the user asked to start when they are ready,
+	// per backlog folder.
+	stateWaiting = "backlogWaiting"
 )
 
 // Bounds of what state.json keeps.
@@ -24,7 +28,40 @@ const (
 	// MaxTasksPerItem bounds the agent tasks an item remembers: delegating
 	// again adds tasks, and removed ones are dropped first.
 	MaxTasksPerItem = 100
+	// MaxWaiting bounds the waiting starts of one backlog.
+	MaxWaiting = 100
 )
+
+// Waiting is an item the user asked to start when it is ready (Delegate on
+// an item that was not): Flint delegates it, as a click would, once the
+// last item it waits for is done.
+type Waiting struct {
+	// Project is the window's active project when the user asked, for an
+	// item without repositories (checked again when it starts).
+	Project string    `json:"project,omitempty"`
+	Since   time.Time `json:"since"`
+	// Reason says why the last start failed ("" before any); Tried is what
+	// that start saw (fingerprint): it is tried again only once something
+	// relevant changed.
+	Reason string `json:"reason,omitempty"`
+	Tried  string `json:"tried,omitempty"`
+}
+
+// waits are the waiting starts of each backlog (folder → item id).
+type waits map[string]map[string]Waiting
+
+// pruneBacklogs drops the waiting starts of backlogs that are not known
+// (keep) once more than maxLinkedBacklogs have some.
+func (w waits) pruneBacklogs(keep func(folder string) bool) {
+	if len(w) <= maxLinkedBacklogs {
+		return
+	}
+	for folder := range w {
+		if !keep(folder) {
+			delete(w, folder)
+		}
+	}
+}
 
 // Checkout is a folder chosen with Locate… for a repository.
 type Checkout struct {

@@ -1,0 +1,96 @@
+package backlog
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"unicode/utf8"
+)
+
+// Bounds of Plan with Agent….
+const (
+	// MaxGoal bounds the goal the user states (characters).
+	MaxGoal = 2000
+	// maxPromptAgents bounds the agents the prompt lists.
+	maxPromptAgents = 30
+)
+
+// PlanPrompt is the prompt of Plan with Agent… for the chat's draft.
+type PlanPrompt struct {
+	// Prompt is the text to put into the chat's draft (the user sends it).
+	Prompt string `json:"prompt"`
+	// ToolOn: agents can use add_backlog_item now (Flint's MCP server is on
+	// and Settings ▸ MCP Server ▸ "Add backlog items" is switched on). When
+	// false the UI says what to switch on; the prompt is still usable.
+	ToolOn bool `json:"toolOn"`
+}
+
+// PlanPrompt builds the prompt that asks an agent to split goal into items
+// of the backlog: the goal, the backlog's name, folder and repositories, the
+// item format with its limits, the agents available here, and how to use
+// get_backlog and add_backlog_item. The goal is one to MaxGoal characters
+// without control characters other than tab and newline or invisible ones.
+// The backlog's folder must be trusted: agents can neither read nor add to
+// an untrusted backlog.
+func (a *API) PlanPrompt(folder, goal string) (PlanPrompt, error) {
+	real, _, err := a.known(folder)
+	if err != nil {
+		return PlanPrompt{}, err
+	}
+	goal = strings.TrimSpace(strings.ReplaceAll(goal, "\r\n", "\n"))
+	switch {
+	case goal == "":
+		return PlanPrompt{}, errors.New("say what the goal is")
+	case utf8.RuneCountInString(goal) > MaxGoal:
+		return PlanPrompt{}, fmt.Errorf("the goal is longer than %d characters", MaxGoal)
+	}
+	if r, ok := hiddenRune(goal); ok {
+		return PlanPrompt{}, fmt.Errorf("the goal contains a control or invisible character (U+%04X)", r)
+	}
+	if !a.host.Trusted(real) {
+		return PlanPrompt{}, errors.New("the backlog's folder is in Restricted Mode: trust it first, so agents can read the backlog and add items to it")
+	}
+	c, err := LoadConfig(real)
+	if err != nil {
+		return PlanPrompt{}, err
+	}
+	mcp := a.host.Settings().MCPServer
+	return PlanPrompt{Prompt: planText(c, real, goal, a.host.Agents().Available, a.host.Agents().Default), ToolOn: mcp.Enabled && mcp.Actions.Backlog}, nil
+}
+
+// planText is the prompt of Plan with Agent….
+func planText(c Config, folder, goal string, agents []string, def string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Plan this goal as work items of the Flint backlog %q (folder %s):\n\n%s\n\n", c.Name, folder, goal)
+	fmt.Fprintf(&b, "First read the backlog with Flint's %s tool (backlog: %q) and don't add what is planned there already. "+
+		"Then split the goal into items that one agent can finish and that can be checked, and add each with Flint's %s tool, "+
+		"in an order where an item only waits for items that exist already. Flint asks me before each item is written.\n\n", ToolName, c.Name, AddToolName)
+	b.WriteString("Each item:\n")
+	fmt.Fprintf(&b, "- backlog: %q\n", folder)
+	fmt.Fprintf(&b, "- title: one line, at most %d characters; the item's id (its file name) is made from it\n", MaxTitle)
+	fmt.Fprintf(&b, "- text: what to do and how to tell it is done (\"Done when:\" and a list); title and text together are at most %d bytes\n", MaxDescription)
+	b.WriteString("- priority: low, normal or high (default normal)\n")
+	if len(agents) > 0 {
+		list := agents
+		more := ""
+		if len(list) > maxPromptAgents {
+			list, more = list[:maxPromptAgents], ", …"
+		}
+		fmt.Fprintf(&b, "- agent (optional): the agent that works on it, one of %s%s; default: %s\n", strings.Join(list, ", "), more, def)
+	}
+	if len(c.Repositories) > 0 {
+		b.WriteString("- repos: the repositories it changes, by name (an item with several gets one agent task per repository):\n")
+		for _, r := range c.Repositories {
+			fmt.Fprintf(&b, "  - %s: %s\n", r.Name, r.URL)
+		}
+	} else {
+		b.WriteString("- repos: leave it out (this backlog lists no repositories; its items run in the project open in Flint)\n")
+	}
+	fmt.Fprintf(&b, "- after (optional): ids of items of this backlog that must be done first, at most %d, no cycles\n\n", MaxAfter)
+	b.WriteString("Title and text must not contain control characters other than tab and newline, or invisible characters. " +
+		"New items start as todo. You can't change, delete, start or set the status of items. " +
+		"If a call is refused, correct the item as the message says and try again. " +
+		"If the " + AddToolName + " tool is missing, tell me to switch on \"Add backlog items\" in Flint's Settings ▸ MCP Server. " +
+		"When you are done, list the items you added with their ids.")
+	return b.String()
+}

@@ -37,13 +37,22 @@ type API struct {
 	mu sync.Mutex
 	// kick asks the watcher to look at the items' tasks (TasksChanged).
 	kick chan struct{}
+	// startKick asks the starter to look at the waiting starts.
+	startKick chan struct{}
+	// starting are the items being delegated now (folder NUL id), under
+	// mu: one start per item at a time, whoever asks (a click, the starter).
+	starting map[string]bool
+	// added counts the items each chat added with add_backlog_item, under mu.
+	added map[string]int
 	// beforeCompare runs in writeStatus once the new file is written, just
 	// before the old one is compared (tests: an editor saving meanwhile).
 	beforeCompare func()
+
+	clones cloner
 }
 
 func newAPI(h feature.Host) *API {
-	return &API{host: h, kick: make(chan struct{}, 1)}
+	return &API{host: h, kick: make(chan struct{}, 1), startKick: make(chan struct{}, 1), starting: map[string]bool{}, added: map[string]int{}}
 }
 
 // BacklogInfo is a backlog in the picker.
@@ -76,6 +85,8 @@ type Backlog struct {
 	Problems []Problem  `json:"problems"`
 	// DefaultAgent runs items without an agent ("" when no agent can start).
 	DefaultAgent string `json:"defaultAgent"`
+	// Clone is the clone running for this backlog (null when none).
+	Clone *CloneView `json:"clone"`
 }
 
 // RepositoryView is a repository of the backlog and its checkout here.
@@ -113,6 +124,29 @@ type ItemView struct {
 	// Failed: one of its agent tasks failed (the item stays in doing).
 	Failed bool       `json:"failed"`
 	Tasks  []TaskView `json:"tasks"`
+	// After are the items that must be done first (ids of this backlog), as
+	// the file says; WaitingFor those of them that are not done.
+	After      []string `json:"after"`
+	WaitingFor []string `json:"waitingFor"`
+	// Ready: every item of After is done and DependencyProblem is "".
+	// Delegate starts only a ready item.
+	Ready bool `json:"ready"`
+	// DependencyProblem says what is wrong with After (an unknown id, the
+	// item itself, a cycle); such an item is never ready.
+	DependencyProblem string `json:"dependencyProblem"`
+	// Waiting: the user asked to start the item when it is ready (null when
+	// not). Flint then delegates it by itself.
+	Waiting *WaitingView `json:"waiting"`
+}
+
+// WaitingView is a waiting start of an item.
+type WaitingView struct {
+	// Since is when the user asked (RFC 3339).
+	Since string `json:"since"`
+	// Reason says why the last automatic start failed ("" when none was
+	// tried); the item keeps waiting, and the start is tried again once
+	// something it depends on changed.
+	Reason string `json:"reason"`
 }
 
 // TaskView is one agent task of an item.
@@ -145,6 +179,10 @@ type DelegateResult struct {
 	// Warning: the tasks started, but something after that failed (the
 	// status could not be written).
 	Warning string `json:"warning"`
+	// NotReady: nothing was started because the item waits for items that
+	// are not done (WaitingFor). The UI offers StartWhenReady.
+	NotReady   bool     `json:"notReady"`
+	WaitingFor []string `json:"waitingFor"`
 }
 
 func (a *API) ctx(timeout time.Duration) (context.Context, context.CancelFunc) {
@@ -345,12 +383,22 @@ func (a *API) Close(folder string) error {
 	if err := a.host.SaveState(stateBacklogs, forget(list, key)); err != nil {
 		return err
 	}
-	ls := a.links()
-	if _, ok := ls[key]; ok && !slices.Contains(a.workspaceBacklogs(), key) {
-		delete(ls, key)
-		if err := a.host.SaveState(stateTasks, ls); err != nil {
-			return err
+	if !slices.Contains(a.workspaceBacklogs(), key) {
+		ls := a.links()
+		if _, ok := ls[key]; ok {
+			delete(ls, key)
+			if err := a.host.SaveState(stateTasks, ls); err != nil {
+				return err
+			}
 		}
+		w := a.waiting()
+		if _, ok := w[key]; ok {
+			delete(w, key)
+			if err := a.host.SaveState(stateWaiting, w); err != nil {
+				return err
+			}
+		}
+		a.clones.cancel(key)
 	}
 	a.emit("")
 	return nil
@@ -375,6 +423,7 @@ func (a *API) Load(folder string) (Backlog, error) {
 		var moved bool
 		if moved, tasks = a.reconcile(ctx, real, c); moved {
 			a.emit(real)
+			a.kickStarter()
 		}
 	}
 	l, err := Load(real)
@@ -385,21 +434,52 @@ func (a *API) Load(folder string) (Backlog, error) {
 	b := Backlog{
 		Path: real, Name: l.Config.Name, Workspace: workspace, Trusted: a.host.Trusted(real),
 		Repositories: a.resolveRepos(ctx, l.Config), Items: []ItemView{}, Problems: l.Problems,
-		DefaultAgent: agents.Default,
+		DefaultAgent: agents.Default, Clone: a.clones.view(real),
 	}
 	itemLinks := a.links()[real]
 	if tasks == nil {
 		tasks = a.host.AgentTasks(ctx, taskIDs(itemLinks))
 	}
+	deps := Dependencies(l.Items)
+	waiting := a.waiting()[real]
 	for _, it := range l.Items {
 		v := itemView(real, it, itemLinks[it.ID], tasks)
 		v.AgentProblem = agentProblem(it.Agent, agents)
 		if it.Agent != "" && v.AgentProblem != "" {
 			b.Problems = append(b.Problems, Problem{File: itemPath(it.ID), Reason: v.AgentProblem})
 		}
+		setDeps(&v, deps[it.ID], waiting)
+		if v.DependencyProblem != "" {
+			b.Problems = append(b.Problems, Problem{File: itemPath(it.ID), Reason: v.DependencyProblem})
+		}
 		b.Items = append(b.Items, v)
 	}
+	if len(waiting) > 0 {
+		// A dependency may have become done in the editor: the starter looks
+		// (it starts nothing that it tried before unless something changed).
+		a.kickStarter()
+	}
 	return b, nil
+}
+
+// setDeps fills in what v waits for and its waiting start.
+func setDeps(v *ItemView, d Deps, waiting map[string]Waiting) {
+	v.WaitingFor = nonNil(d.WaitingFor)
+	v.DependencyProblem = d.Problem
+	v.Ready = d.Ready()
+	if w, ok := waiting[v.ID]; ok {
+		v.Waiting = &WaitingView{Since: w.Since.UTC().Format(time.RFC3339), Reason: w.Reason}
+	}
+}
+
+// viewDeps fills in v's dependencies from the backlog as it is on disk now.
+// Callers hold mu.
+func (a *API) viewDeps(folder string, v *ItemView) {
+	l, err := Load(folder)
+	if err != nil {
+		return
+	}
+	setDeps(v, Dependencies(l.Items)[v.ID], a.waiting()[folder])
 }
 
 // agentProblem says why agent (or the default agent, for "") can't start.
@@ -416,11 +496,8 @@ func agentProblem(agent string, agents feature.Agents) string {
 func itemView(folder string, it Item, ls []Link, tasks map[string]feature.AgentTask) ItemView {
 	v := ItemView{
 		ID: it.ID, Title: it.Title, Status: it.Status, Priority: it.Priority, Agent: it.Agent,
-		Repos: it.Repos, Body: it.Body, Path: ItemFile(folder, it.ID), Tasks: []TaskView{},
-		Failed: Failed(ls),
-	}
-	if v.Repos == nil {
-		v.Repos = []string{}
+		Repos: nonNil(it.Repos), Body: it.Body, Path: ItemFile(folder, it.ID), Tasks: []TaskView{},
+		Failed: Failed(ls), After: nonNil(it.After), WaitingFor: []string{}, Ready: true,
 	}
 	for _, l := range ls {
 		tv := TaskView{ID: l.Task, Repo: l.Repo, State: l.State, PullRequest: l.PullRequest, Merged: l.Merged, Gone: l.Gone}
@@ -611,31 +688,49 @@ func (a *API) NewItem(folder, title string) (ItemView, error) {
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	it, err := a.writeNewItem(real, c, ItemID(title), func(string) ([]byte, error) { return data, nil })
+	if err != nil {
+		return ItemView{}, err
+	}
+	a.emit(real)
+	return itemView(real, it, nil, nil), nil
+}
+
+// writeNewItem writes a new item file: its id is base, or base-2, base-3 …
+// when taken (a file is never overwritten), and file makes its content for
+// that id (an error refuses the id, and stops). The backlog must have room
+// (MaxItems). The written file must parse. Callers hold mu.
+func (a *API) writeNewItem(real string, c Config, base string, file func(id string) ([]byte, error)) (Item, error) {
 	dir := filepath.Join(real, ItemsDir)
 	if prompts.CountDir(dir, real, MaxItems) >= MaxItems {
-		return ItemView{}, fmt.Errorf("the backlog has %d items, the most Flint reads: remove some first", MaxItems)
+		return Item{}, fmt.Errorf("the backlog has %d items, the most Flint reads: remove some first", MaxItems)
 	}
-	base := ItemID(title)
 	for n := 1; n <= 100; n++ {
 		id := base
 		if n > 1 {
 			id = fmt.Sprintf("%s-%d", base, n)
 		}
-		_, err := prompts.WriteNew(dir, real, id+".md", string(data))
+		if _, err := os.Lstat(ItemFile(real, id)); err == nil {
+			continue
+		}
+		data, err := file(id)
+		if err != nil {
+			return Item{}, err
+		}
+		it, err := ParseItem(id, data, c)
+		if err != nil {
+			return Item{}, err
+		}
+		_, err = prompts.WriteNew(dir, real, id+".md", string(data))
 		if errors.Is(err, fs.ErrExist) {
 			continue
 		}
 		if err != nil {
-			return ItemView{}, err
+			return Item{}, err
 		}
-		it, err := ParseItem(id, data, c)
-		if err != nil {
-			return ItemView{}, err
-		}
-		a.emit(real)
-		return itemView(real, it, nil, nil), nil
+		return it, nil
 	}
-	return ItemView{}, fmt.Errorf("items named %s already exist: choose another title", base)
+	return Item{}, fmt.Errorf("items named %s already exist: choose another title", base)
 }
 
 // SetStatus sets an item's status (the user's choice: any status to any
@@ -662,10 +757,13 @@ func (a *API) SetStatus(folder, id, status string) (ItemView, error) {
 		return ItemView{}, err
 	}
 	a.emit(real)
+	a.kickStarter() // the last item another one waits for may be done now
 	ctx, cancel := a.ctx(gitTimeout)
 	defer cancel()
 	ls := a.links()[real][id]
-	return itemView(real, it, ls, a.host.AgentTasks(ctx, taskIDs(map[string][]Link{id: ls}))), nil
+	v := itemView(real, it, ls, a.host.AgentTasks(ctx, taskIDs(map[string][]Link{id: ls})))
+	a.viewDeps(real, &v)
+	return v, nil
 }
 
 // writeStatus reads item id, checks it, and writes it back with status. The
@@ -847,6 +945,7 @@ func (a *API) watch(ctx context.Context) {
 			rctx, cancel := context.WithTimeout(ctx, gitTimeout)
 			a.reconcileAll(rctx)
 			cancel()
+			a.kickStarter() // an item another one waits for may be done now
 		}
 	}
 }

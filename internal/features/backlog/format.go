@@ -28,6 +28,8 @@ const (
 	maxRepoName     = 40
 	MaxTitle        = 120
 	maxAgentName    = 64
+	// MaxAfter bounds the items an item waits for (its after key).
+	MaxAfter = 20
 	// MaxDescription bounds title and body together, in bytes (UTF-8), as
 	// New Agent Task bounds a description: they become an agent task's.
 	MaxDescription = agenttask.MaxPrompt
@@ -145,7 +147,9 @@ type Item struct {
 	Priority string   `json:"priority"`
 	Agent    string   `json:"agent"` // "" = the default agent
 	Repos    []string `json:"repos"` // names from Config; none = the active project
-	Body     string   `json:"body"`
+	// After are the ids of the items that must be done first (same backlog).
+	After []string `json:"after"`
+	Body  string   `json:"body"`
 }
 
 // ParseItem reads an item file of backlog c. Unknown keys are ignored.
@@ -160,7 +164,7 @@ func ParseItem(id string, data []byte, c Config) (Item, error) {
 	if err != nil {
 		return Item{}, err
 	}
-	it := Item{ID: id, Status: StatusTodo, Priority: PriorityNormal, Repos: []string{}}
+	it := Item{ID: id, Status: StatusTodo, Priority: PriorityNormal, Repos: []string{}, After: []string{}}
 	for _, f := range fields {
 		switch f.Key {
 		case "title":
@@ -182,6 +186,10 @@ func ParseItem(id string, data []byte, c Config) (Item, error) {
 			it.Agent = f.Value
 		case "repos":
 			if it.Repos, err = parseRepos(f.Value, c); err != nil {
+				return Item{}, err
+			}
+		case "after":
+			if it.After, err = parseAfter(f.Value); err != nil {
 				return Item{}, err
 			}
 		}
@@ -251,6 +259,30 @@ func parseRepos(v string, c Config) ([]string, error) {
 	return out, nil
 }
 
+// parseAfter reads the after key: comma-separated item ids, at most
+// MaxAfter, none twice. Whether they exist, and cycles, are checked against
+// the whole backlog (Dependencies).
+func parseAfter(v string) ([]string, error) {
+	out := []string{}
+	for id := range strings.SplitSeq(v, ",") {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if !prompts.ValidName(id) {
+			return nil, fmt.Errorf("after: %q is not an item id (the file name without .md)", id)
+		}
+		if slices.Contains(out, id) {
+			return nil, fmt.Errorf("after: %q is listed twice", id)
+		}
+		if len(out) == MaxAfter {
+			return nil, fmt.Errorf("after: more than %d items", MaxAfter)
+		}
+		out = append(out, id)
+	}
+	return out, nil
+}
+
 // Description is what an agent task of the item is told: title and text.
 func (it Item) Description() string {
 	if it.Body == "" {
@@ -312,25 +344,40 @@ func ItemID(title string) string {
 	return id
 }
 
-// NewItemFile is the file New Item writes for title.
-func NewItemFile(title string) ([]byte, error) {
+// checkTitle checks a title for a new item and returns it trimmed.
+func checkTitle(title string) (string, error) {
 	title = strings.TrimSpace(title)
 	switch {
 	case title == "":
-		return nil, errors.New("give the item a title")
+		return "", errors.New("give the item a title")
 	case utf8.RuneCountInString(title) > MaxTitle:
-		return nil, fmt.Errorf("the title is longer than %d characters", MaxTitle)
+		return "", fmt.Errorf("the title is longer than %d characters", MaxTitle)
 	case strings.ContainsFunc(title, unicode.IsControl):
-		return nil, errors.New("the title must be one line")
+		return "", errors.New("the title must be one line")
 	}
 	if r, ok := hiddenRune(title); ok {
-		return nil, fmt.Errorf("the title contains invisible characters (U+%04X)", r)
+		return "", fmt.Errorf("the title contains invisible characters (U+%04X)", r)
 	}
+	return title, nil
+}
+
+// titleValue is title as a front matter value: FrontMatter takes one pair of
+// quotes off, so a quoted title is quoted once more.
+func titleValue(title string) string {
 	if len(title) >= 2 && (title[0] == '"' || title[0] == '\'') && title[len(title)-1] == title[0] {
-		title = `"` + title + `"` // FrontMatter takes one pair of quotes off
+		return `"` + title + `"`
+	}
+	return title
+}
+
+// NewItemFile is the file New Item writes for title.
+func NewItemFile(title string) ([]byte, error) {
+	title, err := checkTitle(title)
+	if err != nil {
+		return nil, err
 	}
 	return []byte("---\n" +
-		"title: " + title + "\n" +
+		"title: " + titleValue(title) + "\n" +
 		"status: todo\n" +
 		"priority: normal\n" +
 		"# agent: backend     the agent that works on it (default: the default agent)\n" +
@@ -339,4 +386,75 @@ func NewItemFile(title string) ([]byte, error) {
 		"What to do.\n\n" +
 		"Done when:\n" +
 		"- \n"), nil
+}
+
+// ItemSpec is an item to write in full (add_backlog_item): what an agent
+// planned. The status of a new item is always todo.
+type ItemSpec struct {
+	Title    string
+	Text     string
+	Priority string // "" = normal
+	Agent    string
+	Repos    []string
+	After    []string
+}
+
+// BuildItemFile writes spec as an item file of backlog c and checks it with the
+// parser (ParseItem, as id): the file says exactly what spec says, or it is
+// refused with the reason. Whether the items of After exist is checked
+// against the backlog (Dependencies).
+func BuildItemFile(spec ItemSpec, id string, c Config) ([]byte, error) {
+	title, err := checkTitle(spec.Title)
+	if err != nil {
+		return nil, err
+	}
+	if spec.Priority == "" {
+		spec.Priority = PriorityNormal
+	}
+	list := func(key string, v []string) string {
+		if len(v) == 0 {
+			return ""
+		}
+		return key + ": " + strings.Join(v, ", ") + "\n"
+	}
+	for _, v := range [][]string{spec.Repos, spec.After} {
+		for _, s := range v {
+			if s == "" || strings.ContainsAny(s, ",\n\r") || strings.TrimSpace(s) != s {
+				return nil, fmt.Errorf("%q is not a name", s)
+			}
+		}
+	}
+	if strings.ContainsAny(spec.Agent+spec.Priority, "\n\r") {
+		return nil, errors.New("agent and priority are one word each")
+	}
+	text := strings.TrimSpace(strings.ReplaceAll(spec.Text, "\r\n", "\n"))
+	var b strings.Builder
+	b.WriteString("---\ntitle: " + titleValue(title) + "\nstatus: todo\npriority: " + spec.Priority + "\n")
+	if spec.Agent != "" {
+		b.WriteString("agent: " + spec.Agent + "\n")
+	}
+	b.WriteString(list("repos", spec.Repos))
+	b.WriteString(list("after", spec.After))
+	b.WriteString("---\n")
+	if text != "" {
+		b.WriteString(text + "\n")
+	}
+	data := []byte(b.String())
+	it, err := ParseItem(id, data, c)
+	if err != nil {
+		return nil, err
+	}
+	// What was meant is what is written.
+	if it.Title != title || it.Body != text || it.Status != StatusTodo || it.Priority != spec.Priority || it.Agent != spec.Agent ||
+		!slices.Equal(it.Repos, nonNil(spec.Repos)) || !slices.Equal(it.After, nonNil(spec.After)) {
+		return nil, errors.New("the item can't be written as given: check the title and the names")
+	}
+	return data, nil
+}
+
+func nonNil(v []string) []string {
+	if v == nil {
+		return []string{}
+	}
+	return v
 }

@@ -31,11 +31,13 @@ const (
 	ToolHTTP      = "send_http_request"
 	// ToolSQL is offered by the Database feature (internal/features/database).
 	ToolSQL = "run_sql_query"
+	// ToolBacklogAdd is offered by the Backlog feature (internal/features/backlog).
+	ToolBacklogAdd = "add_backlog_item"
 )
 
 // ActionNames lists the tools Flint offers on top of Names when the user
 // switched their group on.
-var ActionNames = []string{ToolRunTests, ToolRunConfig, ToolRunOutput, ToolHTTP, ToolSQL}
+var ActionNames = []string{ToolRunTests, ToolRunConfig, ToolRunOutput, ToolHTTP, ToolSQL, ToolBacklogAdd}
 
 // Bounds of the acting tools' arguments and answers.
 const (

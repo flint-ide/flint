@@ -20,12 +20,22 @@ const (
 	maxToolBody   = 2000 // bytes of one item's text
 )
 
+// agentTools are get_backlog and, while the user has switched it on
+// (mcpServer.actions.backlog), add_backlog_item.
 func (a *API) agentTools() []mcpserver.Tool {
+	tools := a.readTools()
+	if a.host.Settings().MCPServer.Actions.Backlog {
+		tools = append(tools, a.addTool())
+	}
+	return tools
+}
+
+func (a *API) readTools() []mcpserver.Tool {
 	return []mcpserver.Tool{{
 		Name:  ToolName,
 		Title: "Read the backlog",
 		Description: "Returns the backlogs open in Flint (folders of planned work items for one or more repositories) with their items: " +
-			"id, title, status (doing, review, todo, done), priority, agent, repositories and text. " +
+			"id, title, status (doing, review, todo, done), priority, agent, repositories, the items it waits for (after) and whether it is ready, and text. " +
 			"Use it to answer what is planned or what to work on next. Read-only: statuses change in Flint. " +
 			"Backlogs whose folder is in Restricted Mode in Flint are left out.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{` +
@@ -96,8 +106,9 @@ func (a *API) describe(status, name string) string {
 			cut += len(items)
 			continue
 		}
+		deps := Dependencies(l.Items)
 		for _, it := range items {
-			if entry := itemText(it); fits(entry) {
+			if entry := itemText(it, deps[it.ID]); fits(entry) {
 				b.WriteString(entry)
 			} else {
 				cut++
@@ -136,7 +147,7 @@ func backlogHeader(c Config, folder string) string {
 	return b.String()
 }
 
-func itemText(it Item) string {
+func itemText(it Item, d Deps) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## %s: %s\n", it.ID, it.Title)
 	fmt.Fprintf(&b, "status: %s; priority: %s", it.Status, it.Priority)
@@ -145,6 +156,17 @@ func itemText(it Item) string {
 	}
 	if len(it.Repos) > 0 {
 		fmt.Fprintf(&b, "; repositories: %s", strings.Join(it.Repos, ", "))
+	}
+	if len(it.After) > 0 {
+		fmt.Fprintf(&b, "; after: %s", strings.Join(it.After, ", "))
+		switch {
+		case d.Problem != "":
+			fmt.Fprintf(&b, " (never ready: %s)", d.Problem)
+		case len(d.WaitingFor) > 0:
+			fmt.Fprintf(&b, " (not ready: waits for %s)", strings.Join(d.WaitingFor, ", "))
+		default:
+			b.WriteString(" (ready)")
+		}
 	}
 	b.WriteString("\n")
 	if it.Body != "" {

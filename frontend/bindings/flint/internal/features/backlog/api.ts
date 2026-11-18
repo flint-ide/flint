@@ -28,6 +28,42 @@ export function Backlogs(): $CancellablePromise<$models.BacklogInfo[]> {
 }
 
 /**
+ * CancelClone stops the clone running for a backlog; what it made is removed.
+ */
+export function CancelClone(folder: string): $CancellablePromise<void> {
+    return $Call.ByID(2491868953, folder);
+}
+
+/**
+ * CancelStart forgets the waiting start of item id (Cancel start).
+ */
+export function CancelStart(folder: string, id: string): $CancellablePromise<void> {
+    return $Call.ByID(3025721800, folder, id);
+}
+
+/**
+ * Clone clones the backlog's repository repo into a new folder inside
+ * parent (Clone…; the UI asks for parent with WorkspaceAPI.PickFolder) and
+ * remembers it as the repository's checkout, as Locate… does. The URL comes
+ * from the backlog and must pass CloneSource; the new folder is parent/<the
+ * URL's last part> and must not exist or be empty. Go asks first in a native
+ * confirmation that shows the URL and the folder. git runs with only the
+ * URL's transport, no submodules and no hooks, asks for nothing on a
+ * terminal, and can be cancelled (CancelClone) or runs out after 30
+ * minutes; a clone that does not finish leaves nothing behind (it is made in
+ * a temporary folder next to the destination and moved into place at the
+ * end). One clone per backlog at a time. It returns when the clone ended;
+ * progress comes as backlog:clone-progress events, the end as
+ * backlog:clone-done. The clone is not trusted and not added to the
+ * workspace: the UI does that, as for a located folder.
+ */
+export function Clone(folder: string, repo: string, parent: string): $CancellablePromise<$models.RepositoryView> {
+    return $Call.ByID(946891723, folder, repo, parent).then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
+/**
  * Close forgets a remembered backlog and the links of its items to agent
  * tasks (the tasks stay). A workspace folder's backlog is listed while the
  * folder is open and can't be closed.
@@ -60,10 +96,14 @@ export function Create(folder: string, name: string): $CancellablePromise<$model
  * 
  * project is used only for an item without repositories and must be one of
  * the open workspace folders.
+ * 
+ * An item that waits for items that are not done (its after key) is not
+ * started: the result says NotReady and what it waits for, and the UI offers
+ * StartWhenReady. An item whose after key has a problem is refused.
  */
 export function Delegate(folder: string, id: string, project: string): $CancellablePromise<$models.DelegateResult> {
     return $Call.ByID(292266281, folder, id, project).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType3($result);
     });
 }
 
@@ -74,7 +114,7 @@ export function Delegate(folder: string, id: string, project: string): $Cancella
  */
 export function Load(folder: string): $CancellablePromise<$models.Backlog> {
     return $Call.ByID(3992252078, folder).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType4($result);
     });
 }
 
@@ -87,7 +127,7 @@ export function Load(folder: string): $CancellablePromise<$models.Backlog> {
  */
 export function Locate(folder: string, repo: string, dir: string): $CancellablePromise<$models.RepositoryView> {
     return $Call.ByID(2858127720, folder, repo, dir).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType2($result);
     });
 }
 
@@ -112,6 +152,21 @@ export function Open(folder: string): $CancellablePromise<$models.BacklogInfo> {
 }
 
 /**
+ * PlanPrompt builds the prompt that asks an agent to split goal into items
+ * of the backlog: the goal, the backlog's name, folder and repositories, the
+ * item format with its limits, the agents available here, and how to use
+ * get_backlog and add_backlog_item. The goal is one to MaxGoal characters
+ * without control characters other than tab and newline or invisible ones.
+ * The backlog's folder must be trusted: agents can neither read nor add to
+ * an untrusted backlog.
+ */
+export function PlanPrompt(folder: string, goal: string): $CancellablePromise<$models.PlanPrompt> {
+    return $Call.ByID(323726795, folder, goal).then(($result: any) => {
+        return $$createType6($result);
+    });
+}
+
+/**
  * SetStatus sets an item's status (the user's choice: any status to any
  * other), rewriting only its status line.
  */
@@ -121,10 +176,26 @@ export function SetStatus(folder: string, id: string, status: string): $Cancella
     });
 }
 
+/**
+ * StartWhenReady remembers that the user wants item id started when every
+ * item it waits for is done (the answer to Delegate's NotReady). Flint then
+ * delegates it by itself, with every check of Delegate at that time, once.
+ * project is the window's active project, used for an item without
+ * repositories; it must be an open workspace folder now (its trust is
+ * checked when the item starts). An item that is ready already starts as
+ * soon as the starter looks.
+ */
+export function StartWhenReady(folder: string, id: string, project: string): $CancellablePromise<$models.ItemView> {
+    return $Call.ByID(3159915789, folder, id, project).then(($result: any) => {
+        return $$createType5($result);
+    });
+}
+
 // Private type creation functions
 const $$createType0 = $models.BacklogInfo.createFrom;
 const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = $models.DelegateResult.createFrom;
-const $$createType3 = $models.Backlog.createFrom;
-const $$createType4 = $models.RepositoryView.createFrom;
+const $$createType2 = $models.RepositoryView.createFrom;
+const $$createType3 = $models.DelegateResult.createFrom;
+const $$createType4 = $models.Backlog.createFrom;
 const $$createType5 = $models.ItemView.createFrom;
+const $$createType6 = $models.PlanPrompt.createFrom;

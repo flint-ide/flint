@@ -7,7 +7,9 @@
 // frontend/src/features/backlog.
 //
 // Nothing in a backlog runs by itself: opening one reads files, and only the
-// user's Delegate starts agents, never in a folder in Restricted Mode.
+// user's Delegate starts agents, never in a folder in Restricted Mode. The
+// one start without a click at that moment is a waiting start the user asked
+// for with Start When Ready, which Flint makes with every check of Delegate.
 package backlog
 
 import (
@@ -25,17 +27,22 @@ const ID = "backlog"
 var Module = feature.Module{
 	ID:       ID,
 	Optional: true,
-	State:    []string{stateBacklogs, stateCheckouts, stateTasks},
+	State:    []string{stateBacklogs, stateCheckouts, stateTasks, stateWaiting},
 	New: func(h feature.Host) feature.Instance {
 		api := newAPI(h)
 		return feature.Instance{
 			Services:     []application.Service{application.NewService(api)},
 			AgentTools:   api.agentTools,
 			TasksChanged: api.tasksChanged,
+			// A waiting start that failed for a checkout's trust or a
+			// missing workspace folder may go now.
+			RootsChanged: api.kickStarter,
 			Start: func(ctx context.Context) {
 				api.tasksChanged() // tasks may have moved on while Flint was closed
 				go api.watch(ctx)
+				go api.starter(ctx)
 			},
+			Close: api.clones.closeAll,
 		}
 	},
 }

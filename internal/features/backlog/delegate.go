@@ -23,6 +23,10 @@ import (
 //
 // project is used only for an item without repositories and must be one of
 // the open workspace folders.
+//
+// An item that waits for items that are not done (its after key) is not
+// started: the result says NotReady and what it waits for, and the UI offers
+// StartWhenReady. An item whose after key has a problem is refused.
 func (a *API) Delegate(folder, id, project string) (DelegateResult, error) {
 	real, _, err := a.known(folder)
 	if err != nil {
@@ -31,6 +35,38 @@ func (a *API) Delegate(folder, id, project string) (DelegateResult, error) {
 	if !prompts.ValidName(id) {
 		return DelegateResult{}, errors.New("invalid item id")
 	}
+	return a.delegate(real, id, project, nil)
+}
+
+// errStarting: the item is being delegated already.
+var errStarting = errors.New("the item is being started already: wait a moment")
+
+// autoStart is a Delegate that Flint makes by itself for a waiting start.
+type autoStart struct {
+	// waitedFor are the items it waited for (they are done now).
+	waitedFor []string
+	// still reports, under mu, whether the start is still wanted (the
+	// user may cancel it while the confirmation is open).
+	still func() bool
+}
+
+// delegate is Delegate for a known backlog folder and a valid id, by a click
+// (auto nil) or by the starter for a waiting start (auto). Only one delegate
+// of an item runs at a time; another one meanwhile fails with errStarting.
+func (a *API) delegate(real, id, project string, auto *autoStart) (DelegateResult, error) {
+	key := real + "\x00" + id
+	a.mu.Lock()
+	if a.starting[key] || auto != nil && !auto.still() {
+		a.mu.Unlock()
+		return DelegateResult{}, errStarting
+	}
+	a.starting[key] = true
+	a.mu.Unlock()
+	defer func() {
+		a.mu.Lock()
+		delete(a.starting, key)
+		a.mu.Unlock()
+	}()
 	c, err := LoadConfig(real)
 	if err != nil {
 		return DelegateResult{}, err
@@ -42,6 +78,24 @@ func (a *API) Delegate(folder, id, project string) (DelegateResult, error) {
 	it, err := ParseItem(id, data, c)
 	if err != nil {
 		return DelegateResult{}, fmt.Errorf("%s: %w", itemPath(id), err)
+	}
+	var deps Deps
+	if len(it.After) > 0 {
+		l, err := Load(real)
+		if err != nil {
+			return DelegateResult{}, err
+		}
+		deps = Dependencies(append(slices.DeleteFunc(l.Items, func(x Item) bool { return x.ID == id }), it))[id]
+		if deps.Problem != "" {
+			return DelegateResult{}, fmt.Errorf("%s can't start: %s: fix the item's after line", itemPath(id), deps.Problem)
+		}
+		if len(deps.WaitingFor) > 0 {
+			v := itemView(real, it, a.linksOf(real, id), nil)
+			a.mu.Lock()
+			setDeps(&v, deps, a.waiting()[real])
+			a.mu.Unlock()
+			return DelegateResult{Item: v, Tasks: []TaskView{}, NotReady: true, WaitingFor: deps.WaitingFor}, nil
+		}
 	}
 	agents := a.host.Agents()
 	if p := agentProblem(it.Agent, agents); p != "" {
@@ -103,8 +157,22 @@ func (a *API) Delegate(folder, id, project string) (DelegateResult, error) {
 			return DelegateResult{}, fmt.Errorf("the item's title and text with the note about its repositories are longer than %d bytes: shorten the text", MaxDescription)
 		}
 	}
-	if !a.host.Trusted(real) && !a.host.Confirm("Delegate from an untrusted backlog?", untrustedMessage(c.Name, real, agent, reqs), "Delegate") {
-		return DelegateResult{}, errors.New("Delegate was cancelled: the backlog's folder is in Restricted Mode")
+	if !a.host.Trusted(real) {
+		if auto == nil && !a.host.Confirm("Delegate from an untrusted backlog?", untrustedMessage(c.Name, real, agent, reqs), "Delegate") {
+			return DelegateResult{}, errors.New("Delegate was cancelled: the backlog's folder is in Restricted Mode")
+		}
+		// No click comes with this question: it says which item starts and why now.
+		if auto != nil && !a.host.Confirm("Start a waiting item of an untrusted backlog?", autoStartMessage(it, auto.waitedFor)+untrustedMessage(c.Name, real, agent, reqs), "Start") {
+			return DelegateResult{}, errors.New("the start was declined in Flint's confirmation (the backlog's folder is in Restricted Mode): Delegate it by hand, or cancel the start")
+		}
+	}
+	if auto != nil {
+		a.mu.Lock()
+		still := auto.still()
+		a.mu.Unlock()
+		if !still {
+			return DelegateResult{}, errStarting // cancelled while the question was open
+		}
 	}
 	a.mu.Lock()
 	_, room := addLinks(a.links()[real][id], make([]Link, len(reqs)))
@@ -147,6 +215,16 @@ func (a *API) Delegate(folder, id, project string) (DelegateResult, error) {
 	if err := a.host.SaveState(stateTasks, ls); err != nil {
 		warnings = append(warnings, "the item's agent tasks could not be remembered: "+err.Error())
 	}
+	// Started: a waiting start of the item is done with.
+	if w := a.waiting(); w[real] != nil {
+		if _, ok := w[real][id]; ok {
+			delete(w[real], id)
+			if len(w[real]) == 0 {
+				delete(w, real)
+			}
+			_ = a.host.SaveState(stateWaiting, w)
+		}
+	}
 	if moved, err := a.writeStatus(real, id, c, StatusDoing); err != nil {
 		warnings = append(warnings, "the status could not be set to doing: "+err.Error())
 	} else {
@@ -161,6 +239,8 @@ func (a *API) Delegate(folder, id, project string) (DelegateResult, error) {
 	}
 	res.Item = itemView(real, it, ls[real][id], all)
 	res.Item.AgentProblem = agentProblem(it.Agent, agents)
+	setDeps(&res.Item, deps, nil)
+	res.WaitingFor = []string{}
 	for _, tv := range res.Item.Tasks {
 		if _, ok := tasks[tv.ID]; ok {
 			res.Tasks = append(res.Tasks, tv)
@@ -196,6 +276,20 @@ func untrustedMessage(name, folder, agent string, reqs []feature.NewAgentTask) s
 		"Its item becomes the instructions of an agent. Read it before you go on.\n\n"+
 		"Agent: %s\nWorks in: %s%s\n\nDescription:\n%s",
 		name, folder, agent, strings.Join(dirs, ", "), note, desc)
+}
+
+// autoStartMessage opens the question of a start nobody clicked just now: it
+// names the item and why it starts now.
+func autoStartMessage(it Item, waitedFor []string) string {
+	return fmt.Sprintf("Flint is starting the backlog item %q (%s) by itself: you asked to start it when it is ready, "+
+		"and the items it waited for (%s) are done now.\n\n", it.Title, it.ID, strings.Join(waitedFor, ", "))
+}
+
+// linksOf are the links of item id of folder.
+func (a *API) linksOf(folder, id string) []Link {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.links()[folder][id]
 }
 
 // projectFolder checks the window's active project from the UI: it must be

@@ -9,9 +9,12 @@ export {
 export {
     Backlog,
     BacklogInfo,
+    CloneView,
     DelegateResult,
     ItemView,
+    PlanPrompt,
     Problem,
     RepositoryView,
-    TaskView
+    TaskView,
+    WaitingView
 } from "./models.js";

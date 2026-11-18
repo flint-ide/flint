@@ -35,6 +35,11 @@ export class Backlog {
      */
     "defaultAgent": string;
 
+    /**
+     * Clone is the clone running for this backlog (null when none).
+     */
+    "clone": CloneView | null;
+
     /** Creates a new Backlog instance. */
     constructor($$source: Partial<Backlog> = {}) {
         if (!("path" in $$source)) {
@@ -61,6 +66,9 @@ export class Backlog {
         if (!("defaultAgent" in $$source)) {
             this["defaultAgent"] = "";
         }
+        if (!("clone" in $$source)) {
+            this["clone"] = null;
+        }
 
         Object.assign(this, $$source);
     }
@@ -72,6 +80,7 @@ export class Backlog {
         const $$createField4_0 = $$createType1;
         const $$createField5_0 = $$createType3;
         const $$createField6_0 = $$createType5;
+        const $$createField8_0 = $$createType7;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("repositories" in $$parsedSource) {
             $$parsedSource["repositories"] = $$createField4_0($$parsedSource["repositories"]);
@@ -81,6 +90,9 @@ export class Backlog {
         }
         if ("problems" in $$parsedSource) {
             $$parsedSource["problems"] = $$createField6_0($$parsedSource["problems"]);
+        }
+        if ("clone" in $$parsedSource) {
+            $$parsedSource["clone"] = $$createField8_0($$parsedSource["clone"]);
         }
         return new Backlog($$parsedSource as Partial<Backlog>);
     }
@@ -144,6 +156,42 @@ export class BacklogInfo {
 }
 
 /**
+ * CloneView is the clone running for a backlog (Backlog.Clone).
+ */
+export class CloneView {
+    "repo": string;
+    "url": string;
+    "destination": string;
+    "progress": string;
+
+    /** Creates a new CloneView instance. */
+    constructor($$source: Partial<CloneView> = {}) {
+        if (!("repo" in $$source)) {
+            this["repo"] = "";
+        }
+        if (!("url" in $$source)) {
+            this["url"] = "";
+        }
+        if (!("destination" in $$source)) {
+            this["destination"] = "";
+        }
+        if (!("progress" in $$source)) {
+            this["progress"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CloneView instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CloneView {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CloneView($$parsedSource as Partial<CloneView>);
+    }
+}
+
+/**
  * DelegateResult is what Delegate started.
  */
 export class DelegateResult {
@@ -161,6 +209,13 @@ export class DelegateResult {
      */
     "warning": string;
 
+    /**
+     * NotReady: nothing was started because the item waits for items that
+     * are not done (WaitingFor). The UI offers StartWhenReady.
+     */
+    "notReady": boolean;
+    "waitingFor": string[];
+
     /** Creates a new DelegateResult instance. */
     constructor($$source: Partial<DelegateResult> = {}) {
         if (!("item" in $$source)) {
@@ -172,6 +227,12 @@ export class DelegateResult {
         if (!("warning" in $$source)) {
             this["warning"] = "";
         }
+        if (!("notReady" in $$source)) {
+            this["notReady"] = false;
+        }
+        if (!("waitingFor" in $$source)) {
+            this["waitingFor"] = [];
+        }
 
         Object.assign(this, $$source);
     }
@@ -181,13 +242,17 @@ export class DelegateResult {
      */
     static createFrom($$source: any = {}): DelegateResult {
         const $$createField0_0 = $$createType2;
-        const $$createField1_0 = $$createType7;
+        const $$createField1_0 = $$createType9;
+        const $$createField4_0 = $$createType10;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("item" in $$parsedSource) {
             $$parsedSource["item"] = $$createField0_0($$parsedSource["item"]);
         }
         if ("tasks" in $$parsedSource) {
             $$parsedSource["tasks"] = $$createField1_0($$parsedSource["tasks"]);
+        }
+        if ("waitingFor" in $$parsedSource) {
+            $$parsedSource["waitingFor"] = $$createField4_0($$parsedSource["waitingFor"]);
         }
         return new DelegateResult($$parsedSource as Partial<DelegateResult>);
     }
@@ -220,6 +285,31 @@ export class ItemView {
      */
     "failed": boolean;
     "tasks": TaskView[];
+
+    /**
+     * After are the items that must be done first (ids of this backlog), as
+     * the file says; WaitingFor those of them that are not done.
+     */
+    "after": string[];
+    "waitingFor": string[];
+
+    /**
+     * Ready: every item of After is done and DependencyProblem is "".
+     * Delegate starts only a ready item.
+     */
+    "ready": boolean;
+
+    /**
+     * DependencyProblem says what is wrong with After (an unknown id, the
+     * item itself, a cycle); such an item is never ready.
+     */
+    "dependencyProblem": string;
+
+    /**
+     * Waiting: the user asked to start the item when it is ready (null when
+     * not). Flint then delegates it by itself.
+     */
+    "waiting": WaitingView | null;
 
     /** Creates a new ItemView instance. */
     constructor($$source: Partial<ItemView> = {}) {
@@ -256,6 +346,21 @@ export class ItemView {
         if (!("tasks" in $$source)) {
             this["tasks"] = [];
         }
+        if (!("after" in $$source)) {
+            this["after"] = [];
+        }
+        if (!("waitingFor" in $$source)) {
+            this["waitingFor"] = [];
+        }
+        if (!("ready" in $$source)) {
+            this["ready"] = false;
+        }
+        if (!("dependencyProblem" in $$source)) {
+            this["dependencyProblem"] = "";
+        }
+        if (!("waiting" in $$source)) {
+            this["waiting"] = null;
+        }
 
         Object.assign(this, $$source);
     }
@@ -264,8 +369,11 @@ export class ItemView {
      * Creates a new ItemView instance from a string or object.
      */
     static createFrom($$source: any = {}): ItemView {
-        const $$createField5_0 = $$createType8;
-        const $$createField10_0 = $$createType7;
+        const $$createField5_0 = $$createType10;
+        const $$createField10_0 = $$createType9;
+        const $$createField11_0 = $$createType10;
+        const $$createField12_0 = $$createType10;
+        const $$createField15_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("repos" in $$parsedSource) {
             $$parsedSource["repos"] = $$createField5_0($$parsedSource["repos"]);
@@ -273,7 +381,53 @@ export class ItemView {
         if ("tasks" in $$parsedSource) {
             $$parsedSource["tasks"] = $$createField10_0($$parsedSource["tasks"]);
         }
+        if ("after" in $$parsedSource) {
+            $$parsedSource["after"] = $$createField11_0($$parsedSource["after"]);
+        }
+        if ("waitingFor" in $$parsedSource) {
+            $$parsedSource["waitingFor"] = $$createField12_0($$parsedSource["waitingFor"]);
+        }
+        if ("waiting" in $$parsedSource) {
+            $$parsedSource["waiting"] = $$createField15_0($$parsedSource["waiting"]);
+        }
         return new ItemView($$parsedSource as Partial<ItemView>);
+    }
+}
+
+/**
+ * PlanPrompt is the prompt of Plan with Agent… for the chat's draft.
+ */
+export class PlanPrompt {
+    /**
+     * Prompt is the text to put into the chat's draft (the user sends it).
+     */
+    "prompt": string;
+
+    /**
+     * ToolOn: agents can use add_backlog_item now (Flint's MCP server is on
+     * and Settings ▸ MCP Server ▸ "Add backlog items" is switched on). When
+     * false the UI says what to switch on; the prompt is still usable.
+     */
+    "toolOn": boolean;
+
+    /** Creates a new PlanPrompt instance. */
+    constructor($$source: Partial<PlanPrompt> = {}) {
+        if (!("prompt" in $$source)) {
+            this["prompt"] = "";
+        }
+        if (!("toolOn" in $$source)) {
+            this["toolOn"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PlanPrompt instance from a string or object.
+     */
+    static createFrom($$source: any = {}): PlanPrompt {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PlanPrompt($$parsedSource as Partial<PlanPrompt>);
     }
 }
 
@@ -464,6 +618,43 @@ export class TaskView {
     }
 }
 
+/**
+ * WaitingView is a waiting start of an item.
+ */
+export class WaitingView {
+    /**
+     * Since is when the user asked (RFC 3339).
+     */
+    "since": string;
+
+    /**
+     * Reason says why the last automatic start failed ("" when none was
+     * tried); the item keeps waiting, and the start is tried again once
+     * something it depends on changed.
+     */
+    "reason": string;
+
+    /** Creates a new WaitingView instance. */
+    constructor($$source: Partial<WaitingView> = {}) {
+        if (!("since" in $$source)) {
+            this["since"] = "";
+        }
+        if (!("reason" in $$source)) {
+            this["reason"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new WaitingView instance from a string or object.
+     */
+    static createFrom($$source: any = {}): WaitingView {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new WaitingView($$parsedSource as Partial<WaitingView>);
+    }
+}
+
 // Private type creation functions
 const $$createType0 = RepositoryView.createFrom;
 const $$createType1 = $Create.Array($$createType0);
@@ -471,6 +662,10 @@ const $$createType2 = ItemView.createFrom;
 const $$createType3 = $Create.Array($$createType2);
 const $$createType4 = Problem.createFrom;
 const $$createType5 = $Create.Array($$createType4);
-const $$createType6 = TaskView.createFrom;
-const $$createType7 = $Create.Array($$createType6);
-const $$createType8 = $Create.Array($Create.Any);
+const $$createType6 = CloneView.createFrom;
+const $$createType7 = $Create.Nullable($$createType6);
+const $$createType8 = TaskView.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = $Create.Array($Create.Any);
+const $$createType11 = WaitingView.createFrom;
+const $$createType12 = $Create.Nullable($$createType11);

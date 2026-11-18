@@ -79,6 +79,10 @@ type TaskView struct {
 	// queue, also on Start now (a joint group's one chat, or a task a feature
 	// made, whose first message Flint composes): the UI starts none for it.
 	FlintStarts bool `json:"flintStarts"`
+	// Blocked says why a queued task does not start by itself (its
+	// repository is not open, its worktree is in Restricted Mode, a budget
+	// pauses new turns); "" when it only waits for a free slot.
+	Blocked string `json:"blocked"`
 	// Tokens and CostUSD are what the task's chats used so far (input and
 	// output tokens; reported cost plus estimates from settings prices).
 	Tokens  int64   `json:"tokens"`
@@ -171,6 +175,7 @@ func (t *TaskAPI) ListAll(dirs []string) ([]TaskView, error) {
 	defer cancel()
 	out := []TaskView{}
 	seen := map[string]bool{}
+	var open map[string]bool // openRepos, read once when a task is queued
 	for _, dir := range dirs {
 		if dir == "" {
 			continue
@@ -191,6 +196,12 @@ func (t *TaskAPI) ListAll(dirs []string) ([]TaskView, error) {
 			v := t.view(ctx, r, task)
 			if v.Stale {
 				t.app.untrustTask(task)
+			}
+			if v.State == agenttask.Queued {
+				if open == nil {
+					open = t.app.openRepos(ctx)
+				}
+				v.Blocked = t.app.queueBlocked(key, task, open)
 			}
 			out = append(out, v)
 		}

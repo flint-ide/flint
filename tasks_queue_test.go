@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	as "flint/internal/agentsession"
@@ -269,6 +270,10 @@ func TestTaskQueueNeverStartsInAnUntrustedFolder(t *testing.T) {
 	if got := f.states(a, b); got != "finished queued" {
 		t.Fatalf("a queued task started by itself in Restricted Mode: %s", got)
 	}
+	// The panel says why.
+	if v := f.view(b.ID); !strings.Contains(v.Blocked, "Restricted Mode") {
+		t.Errorf("blocked = %q", v.Blocked)
+	}
 	// The user may start it, as they may start a new task there.
 	if _, err := f.api.StartNow(b.ID); err != nil {
 		t.Fatal(err)
@@ -313,6 +318,9 @@ func TestTaskQueueRespectsBudgetPause(t *testing.T) {
 	if got := f.states(b); got != "queued" {
 		t.Fatalf("a refused start took the task off the queue: %s", got)
 	}
+	if v := f.view(b.ID); !strings.HasPrefix(v.Blocked, "Paused by the budget: ") {
+		t.Errorf("blocked = %q", v.Blocked)
+	}
 	// What the queue reports is what the panel shows for the task.
 	list, _ := f.api.List(f.repo)
 	if list[0].Tokens != 110 {
@@ -350,5 +358,73 @@ func TestTaskTurnTakesItOffTheQueue(t *testing.T) {
 	}
 	if _, task, _ := f.app.taskStore().Find(b.ID); task.Queued {
 		t.Error("a working task is still queued")
+	}
+}
+
+// view is the panel's view of one task.
+func (f *taskFixture) view(id string) TaskView {
+	f.t.Helper()
+	f.waitStarts()
+	list, err := f.api.List(f.repo)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	for _, v := range list {
+		if v.ID == id {
+			return v
+		}
+	}
+	f.t.Fatalf("no task %s", id)
+	return TaskView{}
+}
+
+// A queued task that only waits for a slot says nothing more; one whose
+// repository is not open in the window says so.
+func TestQueuedTaskSaysWhyItWaits(t *testing.T) {
+	f := queueFixture(t, 1)
+	a := f.create("first")
+	f.work(a, "sa")
+	b := f.create("second")
+	if v := f.view(b.ID); v.State != agenttask.Queued || v.Blocked != "" {
+		t.Fatalf("view %+v", v)
+	}
+	repo := cleanFolder(gitT(t, f.repo, "rev-parse", "--path-format=absolute", "--git-common-dir"))
+	_, task, _ := f.app.taskStore().Find(b.ID)
+	if got := f.app.queueBlocked(repo, task, map[string]bool{}); !strings.Contains(got, "repository is not open") {
+		t.Errorf("blocked = %q", got)
+	}
+}
+
+// A chat Go starts for a task that cannot start marks the task failed with
+// the reason, and the user is told.
+func TestTaskWhoseChatCannotStartFails(t *testing.T) {
+	f := queueFixture(t, 1)
+	var alerts []AlertEvent
+	var mu sync.Mutex
+	f.app.emitHook = func(name string, data ...any) {
+		if name == eventAlert {
+			mu.Lock()
+			alerts = append(alerts, data[0].(AlertEvent))
+			mu.Unlock()
+		}
+	}
+	a := f.create("first")
+	f.work(a, "sa")
+	b := f.create("second")
+	// The agent is gone by the time the task leaves the queue.
+	if err := f.app.saveTasks(func(s agenttask.Store) (agenttask.Store, error) {
+		return s.Update(b.ID, func(t agenttask.Task) agenttask.Task { t.Agent = "gone"; return t }), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	f.settle("sa")
+	v := f.view(b.ID)
+	if v.State != agenttask.Failed || !strings.HasPrefix(v.Error, "the agent did not start: ") || !strings.Contains(v.Error, "gone") {
+		t.Fatalf("view %+v", v)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(alerts) != 1 || alerts[0].Title != "An agent task did not start" || !strings.HasPrefix(alerts[0].Body, "second: the agent did not start") {
+		t.Errorf("alerts = %+v", alerts)
 	}
 }

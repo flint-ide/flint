@@ -177,6 +177,7 @@ func (a *App) forgetChat(id string) {
 	a.orchGrants.forget(id) // a grant dies with its chat
 	a.orch.Remove(id)
 	a.notices.Drop(id) // and what its children had to tell it
+	a.noticeProblems.Delete(id)
 }
 
 // stopChatTree ends a chat and every agent it started, deepest first, so

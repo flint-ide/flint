@@ -914,6 +914,35 @@ export class NewTaskGroup {
 }
 
 /**
+ * NotificationStatus says whether notifications can be delivered, and
+ * Detail what to do when they can't.
+ */
+export class NotificationStatus {
+    "state": string;
+    "detail": string;
+
+    /** Creates a new NotificationStatus instance. */
+    constructor($$source: Partial<NotificationStatus> = {}) {
+        if (!("state" in $$source)) {
+            this["state"] = "";
+        }
+        if (!("detail" in $$source)) {
+            this["detail"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new NotificationStatus instance from a string or object.
+     */
+    static createFrom($$source: any = {}): NotificationStatus {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new NotificationStatus($$parsedSource as Partial<NotificationStatus>);
+    }
+}
+
+/**
  * PRReviewDraft is the agent chat draft for a pull request's review feedback
  * and what the UI says about it.
  */
@@ -1822,6 +1851,13 @@ export class TaskView {
     "flintStarts": boolean;
 
     /**
+     * Blocked says why a queued task does not start by itself (its
+     * repository is not open, its worktree is in Restricted Mode, a budget
+     * pauses new turns); "" when it only waits for a free slot.
+     */
+    "blocked": string;
+
+    /**
      * Tokens and CostUSD are what the task's chats used so far (input and
      * output tokens; reported cost plus estimates from settings prices).
      */
@@ -1886,6 +1922,9 @@ export class TaskView {
         }
         if (!("flintStarts" in $$source)) {
             this["flintStarts"] = false;
+        }
+        if (!("blocked" in $$source)) {
+            this["blocked"] = "";
         }
         if (!("tokens" in $$source)) {
             this["tokens"] = 0;

@@ -81,6 +81,7 @@ export {
     MergeResult,
     NewTask,
     NewTaskGroup,
+    NotificationStatus,
     PRReviewDraft,
     ProfiledTests,
     PromptInput,

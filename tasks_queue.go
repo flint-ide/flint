@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"flint/internal/agenttask"
 	"flint/internal/feature"
 	"flint/internal/git"
+	"flint/internal/redact"
 )
 
 // The queue of agent tasks. At most agentTasks.maxParallel tasks work at the
@@ -229,11 +231,81 @@ func (a *App) startTaskChat(task agenttask.Task) {
 	ctx, cancel := context.WithTimeout(a.ctx, agentStartTimeout)
 	defer cancel()
 	origin := taskOrigin
-	if _, err := a.openChat(ctx, ChatRequest{
+	info, err := a.openChat(ctx, ChatRequest{
 		Agent: task.Agent, Cwd: task.Worktree, Prompt: prompt, TaskID: task.ID, Origin: &origin,
-	}); err != nil {
-		a.logf("start the chat of task %s: %v", task.ID, err)
+	})
+	if err != nil {
+		a.taskStartFailed(task, info.ID, err)
 	}
+}
+
+// taskStartFailed marks a task (every task of its joint group) failed when
+// the chat Go started for it could not start or take its first message,
+// with the reason, so the Agent Tasks panel and the Projects item show it;
+// and tells the user (an alert: a toast in front, a notification behind).
+// chat is the chat that did open ("" when none did).
+func (a *App) taskStartFailed(task agenttask.Task, chat string, err error) {
+	a.logf("start the chat of task %s: %v", task.ID, err)
+	if errors.Is(err, as.ErrClosed) || a.ctx.Err() != nil {
+		return // Flint is quitting: the task did not fail
+	}
+	reason := startFailure(err)
+	ids := []string{task.ID}
+	if task.Joint != "" {
+		ids = ids[:0]
+		for _, m := range a.taskStore().Joint(task.Joint) {
+			ids = append(ids, m.ID)
+		}
+	}
+	if err := a.saveTasks(func(s agenttask.Store) (agenttask.Store, error) {
+		for _, id := range ids {
+			s = s.Update(id, func(t agenttask.Task) agenttask.Task {
+				t.State, t.Error = agenttask.Failed, reason
+				return t
+			})
+		}
+		return s, nil
+	}); err != nil {
+		a.logf("save task state: %v", err)
+	}
+	a.tasksChanged()
+	tab := ""
+	if chat != "" {
+		tab = "chat:" + chat
+	}
+	a.alert("An agent task did not start", task.Title+": "+reason, tab)
+}
+
+// maxStartFailure bounds the reason kept for a task whose chat did not start.
+const maxStartFailure = 300
+
+// startFailure is the reason a task shows when its chat did not start.
+func startFailure(err error) string {
+	s := "the agent did not start: " + redact.Secrets(err.Error())
+	if r := []rune(s); len(r) > maxStartFailure {
+		s = string(r[:maxStartFailure]) + "…"
+	}
+	return s
+}
+
+// queueBlocked says why a queued task does not start by itself although
+// startQueuedTasks looks at it (the rules there), "" when it only waits for
+// a free slot. open is openRepos.
+func (a *App) queueBlocked(repo string, task agenttask.Task, open map[string]bool) string {
+	switch {
+	case a.isHeld(task.ID):
+		return ""
+	case !open[repo]:
+		return "Its repository is not open in this window: open it, and the task starts when a slot is free"
+	case !isDir(task.Worktree):
+		return ""
+	case !a.isTrusted(task.Worktree):
+		return "Its worktree is in Restricted Mode, and Flint never starts an agent there by itself: trust the folder, or choose Start now"
+	}
+	if err := a.budgetPause(task.ID); err != nil {
+		return "Paused by the budget: " + strings.TrimPrefix(err.Error(), "paused: ")
+	}
+	return ""
 }
 
 // taskContext asks the features for the context of a task (a joint group's

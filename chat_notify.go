@@ -7,6 +7,7 @@ import (
 	as "flint/internal/agentsession"
 	"flint/internal/agenttask"
 	"flint/internal/orchestrate"
+	"flint/internal/redact"
 )
 
 // Telling the parent: when an agent that a chat started waits for approval,
@@ -82,6 +83,7 @@ func (a *App) flushNotices(parent string, attempt int) {
 	a.notices.MarkTurn(parent) // before the turn can end, so the end finds the mark
 	err := a.promptChat(parent, orchestrate.Compose(taken), nil, false, &origin)
 	if err == nil {
+		a.noticeProblems.Delete(parent)
 		return
 	}
 	a.notices.EndTurn(parent) // no turn started
@@ -89,6 +91,9 @@ func (a *App) flushNotices(parent string, attempt int) {
 		// The budget is spent: these notices would only ask for the next turn.
 		// Dropped, not requeued; the user writing in the group starts it again.
 		a.logf("orchestrate: notice for %s dropped: %v", parent, err)
+		a.noticeProblem(parent, "Agents stopped at the turn limit",
+			"Flint did not tell this chat what its agents did: agents may start only "+
+				"so many turns in each other before you write (Settings ▸ Agents ▸ Orchestration). Write in the chat to go on.")
 		return
 	}
 	a.notices.Requeue(parent, taken)
@@ -97,4 +102,19 @@ func (a *App) flushNotices(parent string, attempt int) {
 		return
 	}
 	a.logf("orchestrate: notice for %s not delivered: %v", parent, err)
+	if !errors.Is(err, as.ErrBusy) {
+		// The budget refused it (usageGate), or the chat failed: it waits
+		// for the next chance, and the user learns why it did not arrive.
+		a.noticeProblem(parent, "A notice from Flint is waiting", "Flint could not tell this chat what its agents did: "+redact.Secrets(err.Error()))
+	}
+}
+
+// noticeProblem tells the user, once per problem and chat, why Flint's
+// notice did not reach the chat: in the chat itself and as an alert (a
+// toast in front, a notification behind).
+func (a *App) noticeProblem(chat, title, body string) {
+	if prev, ok := a.noticeProblems.Swap(chat, body); ok && prev == body {
+		return
+	}
+	a.alert(title, body, "chat:"+chat)
 }

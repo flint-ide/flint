@@ -21,6 +21,17 @@ import (
 // data is the project folder ("" for the list).
 const EventChanged = "projects:changed"
 
+// EventReview is emitted when an item moved to review by itself because all
+// its agent tasks finished; its data is an ItemEvent.
+const EventReview = "projects:review"
+
+// ItemEvent names an item of a project, for the UI to tell the user about it.
+type ItemEvent struct {
+	Project string `json:"project"`
+	ID      string `json:"id"`
+	Title   string `json:"title"`
+}
+
 // gitTimeout bounds the git calls of one request (remotes, task states).
 const gitTimeout = 30 * time.Second
 
@@ -932,6 +943,10 @@ func (a *API) reconcile(ctx context.Context, folder string, c Config) (moved boo
 				continue
 			}
 			moved = true
+			if status == StatusReview {
+				// Every agent of the item finished: the user has work to look at.
+				a.host.Emit(EventReview, ItemEvent{Project: folder, ID: id, Title: it.Title})
+			}
 		}
 		items[id], dirty = next, true
 	}

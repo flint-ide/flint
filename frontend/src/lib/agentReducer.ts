@@ -122,7 +122,7 @@ export const emptyChat: ChatState = { items: [], plan: [], busy: false }
 /** Status given to tool calls a turn left unfinished (cancelled, failed or restored). */
 export const STOPPED_TOOL_STATUS = 'cancelled'
 
-/** Appends the user's message and marks the session busy. */
+/** Appends the user's message and marks the session busy (before Go's turn_start arrives). */
 export function addUserMessage(state: ChatState, text: string, attachments: Attachment[]): ChatState {
   return { ...state, busy: true, items: [...state.items, { type: 'user', text, attachments }] }
 }
@@ -145,6 +145,10 @@ export function applyEvent(state: ChatState, e: AgentEvent): ChatState {
       return e.origin
         ? { ...state, items: [...state.items, { type: 'user', text: e.text ?? '', attachments: [], from: originLabel(e.origin) }] }
         : state
+    case 'turn_start':
+      // A turn runs, whoever started it (a message typed here, a task Go
+      // queued, another agent): the one sign of it for every chat.
+      return state.busy ? state : { ...state, busy: true }
     case 'tool_call':
       return e.toolCall ? upsertTool(state, e.toolCall) : state
     case 'tool_call_update':

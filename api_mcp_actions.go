@@ -168,19 +168,31 @@ func (a *App) approveAction(ctx context.Context, call mcpserver.Approval) error 
 	if a.actionGrants.take(call.Root, call.Tool, call.Args) {
 		return nil
 	}
+	// The call has a deadline (the MCP server's approval timeout): a
+	// question still queued behind another one by then is never shown, and
+	// one on screen stays until answered, with its answer ignored.
 	answer := make(chan bool, 1)
-	go func() { answer <- a.askUser("Allow this agent action?", actionQuestion(call), "Allow") }()
+	go func() {
+		yes, _ := a.askUserCtx(ctx, "Allow this agent action?", actionQuestion(call), "Allow")
+		answer <- yes
+	}()
 	select {
 	case ok := <-answer:
+		if ctx.Err() != nil {
+			return errNotAnsweredInTime
+		}
 		if ok {
 			return nil
 		}
 		return mcpserver.ErrNotApproved
 	case <-ctx.Done():
-		// The dialog may still be open; its answer no longer counts.
-		return errors.New("the user did not answer Flint's question in time, so nothing was run")
+		return errNotAnsweredInTime
 	}
 }
+
+// errNotAnsweredInTime: an acting tool call's question was not answered
+// before the call's deadline.
+var errNotAnsweredInTime = errors.New("the user did not answer Flint's question in time, so nothing was run")
 
 // actionQuestion is the dialog's text: who asks, the tool, what it would do
 // and its arguments.

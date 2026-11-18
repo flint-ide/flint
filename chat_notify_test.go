@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -265,4 +266,58 @@ func TestNoticeTurnsDoNotSetOffMoreNotices(t *testing.T) {
 	}
 	f.end(p.ID, as.StopEndTurn)
 	f.waitNotices(t, g.ID, 2)
+}
+
+// A notice the budget refuses waits, and the user learns why once (in the
+// parent's chat and as an alert), not on every retry.
+func TestBudgetRefusedNoticeIsShownOnce(t *testing.T) {
+	f := newFamily(t)
+	var mu sync.Mutex
+	var alerts []AlertEvent
+	prev := f.emitHook
+	f.emitHook = func(name string, data ...any) {
+		if name == eventAlert {
+			mu.Lock()
+			alerts = append(alerts, data[0].(AlertEvent))
+			mu.Unlock()
+		}
+		prev(name, data...)
+	}
+	f.settings.Usage.DailyBudgetTokens = 100
+	f.settings.Usage.PauseOverBudget = true
+	f.openUsage()
+	t.Cleanup(f.closeUsage)
+	f.recordUsage(f.parent, mustChat(t, f.App, f.parent), &as.Usage{InputTokens: 500})
+	f.idle(t, f.child)
+	f.end(f.child, as.StopEndTurn)
+	waitUntil(t, "the alert", func() bool { mu.Lock(); defer mu.Unlock(); return len(alerts) == 1 })
+	f.flushNotices(f.parent, 0) // tried again: still refused, not told again
+	f.quiet(t, f.parent)
+	mu.Lock()
+	defer mu.Unlock()
+	if len(alerts) != 1 || alerts[0].Tab != "chat:"+f.parent || !strings.Contains(alerts[0].Body, "paused") {
+		t.Fatalf("alerts = %+v", alerts)
+	}
+}
+
+// The turn limit drops the notice; the user is told in the chat it concerns.
+func TestNoticeProblemIsToldOncePerChat(t *testing.T) {
+	c := newChatApp(t)
+	var alerts []AlertEvent
+	c.emitHook = func(name string, data ...any) {
+		if name == eventAlert {
+			alerts = append(alerts, data[0].(AlertEvent))
+		}
+	}
+	c.noticeProblem("p", "Agents stopped at the turn limit", "x")
+	c.noticeProblem("p", "Agents stopped at the turn limit", "x")
+	c.noticeProblem("q", "Agents stopped at the turn limit", "x")
+	if len(alerts) != 2 || alerts[0].Tab != "chat:p" || alerts[1].Tab != "chat:q" {
+		t.Fatalf("alerts = %+v", alerts)
+	}
+	c.forgetChat("p") // a closed chat starts over
+	c.noticeProblem("p", "Agents stopped at the turn limit", "x")
+	if len(alerts) != 3 {
+		t.Fatalf("alerts = %+v", alerts)
+	}
 }

@@ -143,8 +143,24 @@ type App struct {
 	confirmed map[string]bool // custom agent command lines the user allowed a Check of, this session
 	// emitHook replaces the Wails event bus in tests.
 	emitHook func(name string, data ...any)
-	// ask replaces the native confirmation dialog (askNative) in tests.
+	// ask replaces the native confirmation dialog (askNativeAnswered) in tests.
 	ask func(title, message, ok string) bool
+	// attn follows the foreground and Flint's open questions (attention.go);
+	// alerts sends desktop notifications (AlertsAPI; a fake in tests).
+	attn   *attention
+	alerts notifier
+	// refreshForeground asks the window whether Flint is in front and tells
+	// attn (followForeground; active is the app's activation an event
+	// reported, nil for none). Set once, before the app runs.
+	refreshForeground func(active *bool)
+	// noticeProblems is the last problem told about each chat whose notice
+	// from Flint did not arrive (chat id → text), so it is told once.
+	noticeProblems sync.Map
+}
+
+// notifier sends a desktop notification; clicking it shows tab ("" for none).
+type notifier interface {
+	Notify(title, body, tab string) error
 }
 
 // NewApp wires services from the config directory.
@@ -201,7 +217,26 @@ func NewApp() (*App, error) {
 	// host has no MCP server, approval gate, custom agents or per-agent
 	// settings yet (steps 3.8, 3.9). Moving them to the host is this switch.
 	a.agents = a.agentMgr
+	a.attn = a.newAttention()
 	return a, nil
+}
+
+// newAttention wires the question announcer to the notifier, the settings
+// and the UI (attention.go).
+func (a *App) newAttention() *attention {
+	return newAttention(
+		func(title, body string) error {
+			if a.alerts == nil {
+				return nil
+			}
+			return a.alerts.Notify(title, body, "")
+		},
+		func() bool {
+			s := a.currentSettings()
+			return s.NotifyInBackground && s.NotifyOnApproval
+		},
+		a.emit,
+	)
 }
 
 func (a *App) startup(ctx context.Context) {

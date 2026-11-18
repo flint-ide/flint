@@ -123,6 +123,8 @@ type Host interface {
 	ConfigDir() string
 	// Confirm asks the user in a native dialog that the web view can't
 	// answer or skip; Cancel is the default button. False when dismissed.
+	// It waits until the user answers, however long that takes (false when
+	// Flint quits meanwhile: the feature's context is done then).
 	Confirm(title, message, ok string) bool
 	// Choose asks a native question with these buttons (at most three) and
 	// returns the one chosen, "" when dismissed.

@@ -17,7 +17,7 @@ Three facts about today's code shape the design:
 
 ## Phase 1: attention UI
 
-- **Waiting notification.** When a chat agent starts waiting for approval and the window is not focused, Flint sends a notification and counts it in the Dock badge; it clears when the request is settled.
+- **Waiting notification.** Whatever waits for the user — a chat agent's approval request (in any turn, whoever started it: every turn begins with the manager's `turn_start` event), an agent CLI Flint knows in a terminal that reports waiting (at most one notification of each kind per tab a minute), a native question of Flint's (it stays open until answered) — is announced once with a desktop notification: at once when Flint is in the background, or when it goes there while the request is still open. It counts in the badge until it is answered. One model (`frontend/src/lib/attention.ts`) decides for every signal; Go announces its own questions (`attention.go`), because only Go knows when a dialog is on screen and whether Flint is in front while it is; the UI takes whether Flint is in front from Go too.
 - **Agents panel.** One list of every chat agent and worktree-task agent in the window with its state, sorted so the ones needing the user come first. "Finished, unseen" becomes idle once the tab is viewed.
 - **Peek.** Shows an agent's chat over the current tab without switching to it, with "keep as tab" and close.
 - **Settle.** Hides an agent's tab until that agent needs attention (waiting, failed or finished).
@@ -91,7 +91,7 @@ The tools are `Acts: true` with a new `Tool.Granted func(ctx) bool`; `approveAct
 2. `OSC 9` and `OSC 777;notify` as "needs attention".
 3. The foreground program leaving the agent (`title.go`) as `idle`.
 
-`Events` gains `AgentState(id, state string)`, emitted as `term:agent`.
+`Events` gains `AgentState(id, state string)`, emitted as `term:agent`. Any program can print these sequences, so the tab's mark follows every state, but only a known agent CLI in the foreground (the process Go reads, not the output) may notify the user, at most once a minute per kind and tab (`frontend/src/lib/attention.ts`, `terminalChanged`).
 
 Flint never edits `~/.claude/settings.json`. It writes `<config>/agent-hooks/claude-status.json` with hooks that print the sequence to `/dev/tty`, and uses it only when Flint itself types `claude` into a terminal (`claude --settings '<path>'`). Settings offers "Copy hook snippet" for the user's own setup. **Checked while building it:** a hook-like command (a child of the foreground program, output piped) can write the sequence to `/dev/tty` and the parser sees it (`internal/terminal/agentstate_test.go`); `claude --help` describes `--settings` as loading "more settings" and keeps it separate from `--setting-sources` (user, project, local). **Still unverified:** that `--settings` hooks are merged with the user's own rather than replacing them, and that Claude Code spawns hooks in the terminal's session so `/dev/tty` opens (both need a real Claude Code session). The number 6977 was checked against the private OSC numbers of iTerm2, kitty, VTE, WezTerm, Ghostty, foot, VS Code and FinalTerm from their documentation.
 

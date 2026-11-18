@@ -96,6 +96,7 @@ func installChats(t *testing.T, a *App) *chatDriver {
 	t.Cleanup(func() { close(d.hold) })
 	a.orch = orchestrate.New()
 	m := as.NewManager(func(e as.Event) {
+		a.observeTaskStart(e)
 		a.tasks.Observe(e)
 		a.observeChat(e)
 	})

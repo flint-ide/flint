@@ -52,7 +52,7 @@ function AgentRowView({ row }: { row: AgentRow }) {
         title={`${row.title}\n\n${row.root}${id ? `\n\n${modifierName('Mod')}-click to peek without leaving your tab` : ''}`}
         onClick={(e) => (id && modKey(e) ? peekAgent(id) : focusAgent(row))}
       >
-        <span className={`task-state ${look}`} title={stateHint(row.state, row.kind)}>{stateLabel(row.state)}</span>
+        <span className={`task-state ${look}`} title={stateHint(row.state, row.kind, row.blocked)}>{stateLabel(row.state)}</span>
         <span className="file-name">{row.title}</span>
       </div>
       <div className="task-meta muted">

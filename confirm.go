@@ -2,15 +2,13 @@
 
 package main
 
-import "time"
-
-// confirmWait bounds how long a binding waits for a confirmation dialog.
-const confirmWait = 10 * time.Minute
-
 // askNative shows a native question over the main window and reports
 // whether the user chose ok. Go shows it and reads the click, so no code in
 // the web view can answer or skip it. Cancel is the default button: Return
-// doesn't run anything.
+// doesn't run anything. It waits as long as the dialog is on screen: a
+// dialog can't be closed from code, so it stays until the user answers it,
+// or Flint quits (false then). An asker that can't wait that long gives up
+// on its own (askUserCtx) and ignores the late answer.
 func (a *App) askNative(title, message, ok string) bool {
 	if a.wails == nil {
 		return false
@@ -33,13 +31,13 @@ func (a *App) askNative(title, message, ok string) bool {
 	case yes := <-answer:
 		return yes
 	case <-quit:
-	case <-time.After(confirmWait):
 	}
 	return false
 }
 
 // chooseNative shows a native question with buttons (plus Cancel, the
-// default) and returns the button chosen, "" for Cancel.
+// default) and returns the button chosen, "" for Cancel; it waits like
+// askNative.
 func (a *App) chooseNative(title, message string, buttons []string) string {
 	if a.wails == nil {
 		return ""
@@ -64,7 +62,6 @@ func (a *App) chooseNative(title, message string, buttons []string) string {
 	case b := <-answer:
 		return b
 	case <-quit:
-	case <-time.After(confirmWait):
 	}
 	return ""
 }

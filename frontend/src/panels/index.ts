@@ -8,6 +8,7 @@ import { SearchPanel } from '../components/sidebar/SearchPanel'
 import { ScratchPanel } from '../components/sidebar/ScratchPanel'
 import { definePanels, mergePanels, type PanelSpec } from './registry'
 import { useContributions, type Contributions } from '../lib/contributions'
+import { useNeedingYouCount } from '../store/agents'
 
 // Light panels are imported directly; the rest are not parsed at startup but
 // fetched in the background once the app is idle (or when first opened).
@@ -33,7 +34,7 @@ export const PANELS = definePanels([
     command: { id: 'view.agentTasks', category: 'Agent', keywords: 'worktree parallel agents branch claude codex' },
   },
   {
-    id: 'agents', title: 'Agents', icon: 'agents', order: 36, component: AgentsPanel,
+    id: 'agents', title: 'Agents', icon: 'agents', order: 36, component: AgentsPanel, useBadge: () => useNeedingYouCount(),
     command: { id: 'view.agents', title: 'Show Agents', category: 'Agent', keywords: 'chats status waiting working running overview approval claude codex' },
   },
   {

@@ -272,8 +272,8 @@ func runContract(t *testing.T, mk factory) {
 			t.Fatalf("a prompt of %d bytes: %v", len(text), err)
 		}
 		got := e.collectUntilTurnEnd(t, info.ID)
-		if want := fmt.Sprintf("len:%d crc:%08x", len(text), crc32.ChecksumIEEE([]byte(text))); got[0].Text != want {
-			t.Errorf("the agent received %q, want %q", got[0].Text, want)
+		if want := fmt.Sprintf("len:%d crc:%08x", len(text), crc32.ChecksumIEEE([]byte(text))); len(got) < 2 || got[1].Text != want {
+			t.Errorf("the agent received %+v, want %q", got, want)
 		}
 	})
 
@@ -335,7 +335,9 @@ func runContract(t *testing.T, mk factory) {
 			t.Fatal(err)
 		}
 		got := e.collectUntilTurnEnd(t, info.ID)
-		if len(got) != 2 || got[0].Kind != as.KindMessageChunk || got[0].Text != "echo:hi" || got[0].Seq != 1 || got[1].Seq != 2 {
+		// The manager opens every turn with turn_start (agentsession.Manager.Prompt).
+		if len(got) != 3 || got[0].Kind != as.KindTurnStart || got[1].Kind != as.KindMessageChunk || got[1].Text != "echo:hi" ||
+			got[0].Seq != 1 || got[1].Seq != 2 || got[2].Seq != 3 {
 			t.Errorf("events = %+v", got)
 		}
 		if err := e.agents.Prompt("nope", "hi", nil); err == nil {

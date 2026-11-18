@@ -51,7 +51,10 @@ The GitHub account pull requests and CI use ([Signing in](git-and-github.md#sign
 - **Agent tasks** (see [Agent tasks](ai-agents.md#agent-tasks-agents-in-parallel)):
   - **Worktree folder**: where new task worktrees go, as `<folder>/<repository>/<branch>`. An absolute path or `~/…`; empty puts them in `<repository>.worktrees` next to the main checkout.
   - **Branch prefix**: starts every task branch (default `agent/`); may be empty.
-- **Tell me when work finishes in the background**: shows a macOS notification and a count on the Dock icon when a run, a test run or an agent turn finishes while Flint isn't the active app. On by default.
+- **Notifications** (see [Notifications](ai-agents.md#notifications)):
+  - **Tell me when work finishes in the background**: a desktop notification and a count on the badge (the Dock icon on macOS) when an agent turn, a run, a test run, CI or a project's automatic start finishes or fails while Flint isn't the active app. On by default; off, there are no notifications and no badge at all.
+  - **Tell me when an agent waits for my approval**: also a notification when an agent asks for approval (in a chat or a terminal) or Flint asks you a question in a dialog, counted on the badge until you answer. On by default; needs the first one.
+  - **Desktop notifications**: whether the system lets Flint notify (allowed, not allowed with what to do, the last one not delivered, not available in this build), and **Send Test Notification**.
 
 ## Agent Context
 
@@ -104,7 +107,7 @@ How Flint follows the checks of your pull requests ([When CI fails](git-and-gith
 - **Check again every**: how often running checks are re-read, 10 to 3600 seconds (default 30). Nothing is read while no check is running.
 - **Log lines from the end**: lines from the end of the failed step that Fix with agent puts in the draft, 5 to 1000 (default 60).
 - **Error lines before them**: error lines picked from the rest of the step, 0 to 500 (default 40).
-- **Tell me when CI fails or passes**: a notification while Flint is in the background (default on). It also needs "Tell me when work finishes in the background" in Agents.
+- **Tell me when CI fails or passes**: a desktop notification while Flint is in the background (default on). It also needs "Tell me when work finishes in the background" in Agents.
 
 ## TODO List
 

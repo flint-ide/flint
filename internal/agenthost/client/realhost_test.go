@@ -81,7 +81,7 @@ func TestStoppedChatCanStillBeAttached(t *testing.T) {
 		t.Fatal(err)
 	}
 	var kinds []string
-	for range 2 {
+	for range 3 {
 		select {
 		case e := <-events:
 			kinds = append(kinds, e.Kind)
@@ -89,7 +89,7 @@ func TestStoppedChatCanStillBeAttached(t *testing.T) {
 			t.Fatalf("history of the stopped chat: only %v", kinds)
 		}
 	}
-	if kinds[0] != as.KindMessageChunk || kinds[1] != as.KindTurnEnd {
+	if kinds[0] != as.KindTurnStart || kinds[1] != as.KindMessageChunk || kinds[2] != as.KindTurnEnd {
 		t.Errorf("history = %v", kinds)
 	}
 	if err := b.Agents().Prompt(info.ID, "again", nil); err == nil {

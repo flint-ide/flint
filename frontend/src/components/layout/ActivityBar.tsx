@@ -11,6 +11,12 @@ function tooltip(spec: PanelSpec): string {
   return panelTooltip(spec, cmd && effectiveKeys(cmd))
 }
 
+/** The panel's count on its button (useBadge), e.g. the agents that need you. */
+function PanelBadge({ use }: { use: () => number }) {
+  const n = use()
+  return n > 0 ? <span className="activity-badge" aria-label={`${n} need you`}>{n > 99 ? '99+' : n}</span> : null
+}
+
 export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {
   const terminalActive = useEditor((s) => s.activeId?.startsWith('term:') ?? false)
   const sidebar = useWorkspace((s) => s.sidebar)
@@ -33,6 +39,7 @@ export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {
           onClick={() => (visible && sidebar === v.id ? toggleSidebar() : setSidebar(v.id))}
         >
           <Icon name={v.icon} />
+          {v.useBadge && <PanelBadge use={v.useBadge} />}
         </button>
       ))}
       <span className="spacer" />

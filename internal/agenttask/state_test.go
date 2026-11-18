@@ -103,3 +103,20 @@ func TestCombine(t *testing.T) {
 		t.Errorf("failed wins over finished: %+v", got)
 	}
 }
+
+// A task whose chat opened but whose first message failed shows the failure
+// while that chat is idle; a turn the user starts there shows working.
+func TestCombineKeepsTheFailureOfAnIdleChat(t *testing.T) {
+	if got := Combine([]Live{{State: Idle}}, Failed); got.State != Failed {
+		t.Errorf("idle chat of a failed task: %+v", got)
+	}
+	if got := Combine([]Live{{State: Idle}, {State: Idle}}, Finished); got.State != Finished {
+		t.Errorf("idle chats of a finished task: %+v", got)
+	}
+	if got := Combine([]Live{{State: Idle}, {State: Working, Turn: true}}, Failed); got.State != Working {
+		t.Errorf("a turn after the failure: %+v", got)
+	}
+	if got := Combine([]Live{{State: Idle}}, ""); got.State != Idle {
+		t.Errorf("nothing remembered: %+v", got)
+	}
+}

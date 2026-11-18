@@ -109,10 +109,11 @@ Modified files are written whenever you switch to another app.
 
 ## Turn background notifications on or off
 
-1. Press `⌘,` and open **Agents**.
-2. Toggle **Tell me when work finishes in the background**.
+1. Press `⌘,` and open **Agents**, then scroll to **Notifications**.
+2. Toggle **Tell me when work finishes in the background**, and **Tell me when an agent waits for my approval**.
+3. Check **Desktop notifications**: it says whether the system lets Flint notify, and what to do if not. **Send Test Notification** shows one (on macOS it asks for the permission the first time).
 
-When on, you get a macOS notification and a Dock badge when a run, a test run or an agent finishes while Flint isn't the active app.
+When on, you get a desktop notification and a count on the badge (the Dock icon on macOS; Linux has no Dock badge) when an agent needs your approval or Flint asks you something, and when an agent turn, a run, a test run or CI finishes while Flint isn't the active app. See [Notifications](../guides/ai-agents.md#notifications).
 
 ## Use another agent model or executable
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -614,5 +615,125 @@ func TestOtherFlintToolsFollowThePolicy(t *testing.T) {
 	waitFor(t, func() bool { return contains(rec.kinds(), KindTurnEnd) })
 	if approved != 0 || contains(rec.kinds(), KindPermission) {
 		t.Fatalf("a read tool was treated as acting (approved %d)", approved)
+	}
+}
+
+// Every turn begins with turn_start, before anything the agent does in it,
+// and a refused prompt (a turn already runs) starts none; what a resumed chat
+// replays before its first prompt has no turn_start in front of it.
+func TestTurnStartOpensEveryTurn(t *testing.T) {
+	rec := &recorder{}
+	m := NewManager(rec.emit)
+	f := &resumableFake{fakeDriver: newFake(ToolExecute)}
+	m.Register("fake", f)
+	info, err := m.Resume(context.Background(), "fake", "/w", "old-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	sink := f.sinks[info.ID]
+	f.mu.Unlock()
+	sink(Event{SessionID: info.ID, Kind: KindUserMessage, Text: "replayed"}) // history
+	if err := m.Prompt(info.ID, "go", nil); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool { return contains(rec.kinds(), KindPermission) })
+	if err := m.Prompt(info.ID, "again", nil); !errors.Is(err, ErrBusy) {
+		t.Fatalf("second prompt: %v", err)
+	}
+	close(f.release)
+	waitFor(t, func() bool { return contains(rec.kinds(), KindTurnEnd) })
+	got := rec.kinds()
+	want := []string{KindUserMessage, KindTurnStart, KindPermission, KindMessageChunk, KindTurnEnd}
+	if len(got) != len(want) {
+		t.Fatalf("events = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("events = %v, want %v", got, want)
+		}
+	}
+}
+
+// earlyDriver fails its prompt the way a driver does when the agent is gone
+// before the turn began (a dead process, an unknown session, a closed
+// connection): an error and no events. With reported set it reports the
+// failure itself (KindError, KindTurnEnd) before returning it, as the ACP
+// driver does. With silentStop it waits for the context and returns its
+// error, sending nothing (a process stopped mid-turn).
+type earlyDriver struct {
+	*fakeDriver
+	reported, silentStop bool
+}
+
+func (d earlyDriver) Prompt(ctx context.Context, id, _ string, _ []Attachment) (string, error) {
+	err := errors.New("claude: the process exited")
+	if d.silentStop {
+		<-ctx.Done()
+		return StopCancelled, ctx.Err()
+	}
+	if d.reported {
+		d.mu.Lock()
+		sink := d.sinks[id]
+		d.mu.Unlock()
+		sink(Event{SessionID: id, Kind: KindError, Text: err.Error()})
+		sink(Event{SessionID: id, Kind: KindTurnEnd, StopReason: StopError})
+		sink(Event{SessionID: id, Kind: KindTurnEnd, StopReason: StopError}) // a second one is dropped
+	}
+	return StopError, err
+}
+
+// Every turn_start is followed by exactly one turn_end: the driver's, or the
+// Manager's when the driver failed before it sent one (then after the
+// error) or was stopped meanwhile (cancelled).
+func TestEveryTurnStartGetsOneTurnEnd(t *testing.T) {
+	ends := func(rec *recorder) (n int, last Event) {
+		rec.mu.Lock()
+		defer rec.mu.Unlock()
+		for _, e := range rec.events {
+			if e.Kind == KindTurnEnd {
+				n, last = n+1, e
+			}
+		}
+		return n, last
+	}
+	for _, tc := range []struct {
+		name   string
+		driver earlyDriver
+		stop   bool
+		want   []string
+		reason string
+	}{
+		{"fails before the turn", earlyDriver{}, false, []string{KindTurnStart, KindError, KindTurnEnd}, StopError},
+		{"reports its own failure", earlyDriver{reported: true}, false, []string{KindTurnStart, KindError, KindTurnEnd}, StopError},
+		{"stopped mid-turn", earlyDriver{silentStop: true}, true, []string{KindTurnStart, KindTurnEnd}, StopCancelled},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := &recorder{}
+			m := NewManager(rec.emit)
+			tc.driver.fakeDriver = newFake("")
+			m.Register("early", tc.driver)
+			info, err := m.Start(context.Background(), "early", "/w")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := m.Prompt(info.ID, "go", nil); err != nil {
+				t.Fatal(err)
+			}
+			if tc.stop {
+				_ = m.Stop(info.ID)
+			}
+			waitFor(t, func() bool { n, _ := ends(rec); return n > 0 })
+			time.Sleep(50 * time.Millisecond) // nothing more comes
+			if got := rec.kinds(); !slices.Equal(got, tc.want) {
+				t.Fatalf("events %v, want %v", got, tc.want)
+			}
+			if _, last := ends(rec); last.StopReason != tc.reason {
+				t.Errorf("stop reason %q, want %q", last.StopReason, tc.reason)
+			}
+			if m.Busy(info.ID) {
+				t.Error("still busy")
+			}
+		})
 	}
 }

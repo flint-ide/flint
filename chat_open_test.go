@@ -28,6 +28,9 @@ type chatDriver struct {
 	// startGate, when set, makes the next Start wait for it (see holdNextStart).
 	startGate chan struct{}
 	startHeld bool
+	// fail, when set, makes Prompt fail at once, before any event (an agent
+	// whose process died before the turn began).
+	fail error
 }
 
 // holdNextStart makes the next Start block until gate is closed.
@@ -63,8 +66,11 @@ func (d *chatDriver) Start(_ context.Context, cwd string, _ as.Sink) (as.Session
 func (d *chatDriver) Prompt(ctx context.Context, id, text string, _ []as.Attachment) (string, error) {
 	d.mu.Lock()
 	d.prompts[id] = append(d.prompts[id], text)
-	hold := d.hold
+	hold, fail := d.hold, d.fail
 	d.mu.Unlock()
+	if fail != nil {
+		return as.StopError, fail
+	}
 	if hold != nil {
 		select {
 		case <-hold:

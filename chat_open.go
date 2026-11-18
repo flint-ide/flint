@@ -76,7 +76,7 @@ func (a *App) openChatWith(ctx context.Context, r ChatRequest, loaded loadedAgen
 	}
 	info, err := a.startChat(ctx, drv, r.Agent, r.Cwd)
 	if err != nil {
-		return info, err
+		return info, &agentStartError{err}
 	}
 	a.tasks.Bind(info.ID, r.Cwd)
 	a.usageChats.bind(info.ID, usageChat{chat: info.ID, agent: info.Agent, cwd: r.Cwd, model: info.Model})
@@ -177,6 +177,7 @@ func (a *App) forgetChat(id string) {
 	a.orchGrants.forget(id) // a grant dies with its chat
 	a.orch.Remove(id)
 	a.notices.Drop(id) // and what its children had to tell it
+	a.noticeProblems.Delete(id)
 }
 
 // stopChatTree ends a chat and every agent it started, deepest first, so
@@ -272,3 +273,11 @@ func (a *App) promptChat(id, text string, attachments []as.Attachment, fromWeb b
 	}
 	return err
 }
+
+// agentStartError is openChat's error when the agent itself did not start
+// (its program is missing, it failed its handshake, it is unknown): nothing
+// about the chat that was asked for.
+type agentStartError struct{ err error }
+
+func (e *agentStartError) Error() string { return e.err.Error() }
+func (e *agentStartError) Unwrap() error { return e.err }

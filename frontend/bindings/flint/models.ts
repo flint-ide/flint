@@ -705,6 +705,36 @@ export class FileHistory {
 }
 
 /**
+ * FrontEvent is the payload of "attention:front". Seq orders the events:
+ * the UI ignores one older than the last it applied (events may arrive out
+ * of order).
+ */
+export class FrontEvent {
+    "front": boolean;
+    "seq": number;
+
+    /** Creates a new FrontEvent instance. */
+    constructor($$source: Partial<FrontEvent> = {}) {
+        if (!("front" in $$source)) {
+            this["front"] = false;
+        }
+        if (!("seq" in $$source)) {
+            this["seq"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new FrontEvent instance from a string or object.
+     */
+    static createFrom($$source: any = {}): FrontEvent {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new FrontEvent($$parsedSource as Partial<FrontEvent>);
+    }
+}
+
+/**
  * LiveTerminal is a terminal the host holds: its id and whether its shell
  * still runs. Nothing else: the tab that attaches learns the rest from the
  * terminal itself.
@@ -910,6 +940,35 @@ export class NewTaskGroup {
             $$parsedSource["agents"] = $$createField3_0($$parsedSource["agents"]);
         }
         return new NewTaskGroup($$parsedSource as Partial<NewTaskGroup>);
+    }
+}
+
+/**
+ * NotificationStatus says whether notifications can be delivered, and
+ * Detail what to do when they can't.
+ */
+export class NotificationStatus {
+    "state": string;
+    "detail": string;
+
+    /** Creates a new NotificationStatus instance. */
+    constructor($$source: Partial<NotificationStatus> = {}) {
+        if (!("state" in $$source)) {
+            this["state"] = "";
+        }
+        if (!("detail" in $$source)) {
+            this["detail"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new NotificationStatus instance from a string or object.
+     */
+    static createFrom($$source: any = {}): NotificationStatus {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new NotificationStatus($$parsedSource as Partial<NotificationStatus>);
     }
 }
 
@@ -1822,6 +1881,13 @@ export class TaskView {
     "flintStarts": boolean;
 
     /**
+     * Blocked says why a queued task does not start by itself (its
+     * repository is not open, its worktree is in Restricted Mode, a budget
+     * pauses new turns); "" when it only waits for a free slot.
+     */
+    "blocked": string;
+
+    /**
      * Tokens and CostUSD are what the task's chats used so far (input and
      * output tokens; reported cost plus estimates from settings prices).
      */
@@ -1886,6 +1952,9 @@ export class TaskView {
         }
         if (!("flintStarts" in $$source)) {
             this["flintStarts"] = false;
+        }
+        if (!("blocked" in $$source)) {
+            this["blocked"] = "";
         }
         if (!("tokens" in $$source)) {
             this["tokens"] = 0;

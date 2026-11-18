@@ -200,6 +200,8 @@ func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, 
 			return DelegateResult{}, errors.New("Delegate was cancelled: the project's folder is in Restricted Mode")
 		}
 		// No click comes with this question: it says which item starts and why now.
+		// It stays open until answered: the notification and the badge say
+		// it waits.
 		if auto != nil && !a.host.Confirm("Start a waiting item of an untrusted project?", autoStartMessage(it, auto.waitedFor)+untrustedMessage(c.Name, real, agent, reqs, joint, pc), "Start") {
 			return DelegateResult{}, errors.New("the start was declined in Flint's confirmation (the project's folder is in Restricted Mode): Delegate it by hand, or cancel the start")
 		}

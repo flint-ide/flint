@@ -62,10 +62,7 @@ func (a *App) confirmAgentCommand(c settings.CustomAgent) error {
 	if a.confirmed[key] {
 		return nil
 	}
-	ask := a.ask
-	if ask == nil {
-		ask = a.askNative
-	}
+	ask := a.askNowYes
 	msg := "Flint will run this command to check that it speaks the Agent Client Protocol:\n\n" +
 		commandLine(c.Command, c.Args) +
 		"\n\nIt starts in an empty temporary folder and is stopped after the handshake. Continue only if you added this agent yourself."

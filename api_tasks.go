@@ -668,12 +668,32 @@ func (t *TaskAPI) CreatePullRequest(id string) (string, error) {
 
 // askUser asks in a native dialog (a.ask in tests), one dialog at a time.
 func (a *App) askUser(title, message, ok string) bool {
+	yes, _ := a.askUserAnswered(title, message, ok)
+	return yes
+}
+
+// askUserAnswered is askUser that also says whether the user answered at
+// all: false when the question timed out or Flint quit while it was open.
+func (a *App) askUserAnswered(title, message, ok string) (yes, answered bool) {
 	a.confirmMu.Lock()
 	defer a.confirmMu.Unlock()
+	return a.askNow(title, message, ok)
+}
+
+// askNow shows the question now (callers that serialize it themselves): it
+// is announced while it is on screen (attention.shown), whoever asks.
+func (a *App) askNow(title, message, ok string) (yes, answered bool) {
+	defer a.attn.shown(title)()
 	if a.ask != nil {
-		return a.ask(title, message, ok)
+		return a.ask(title, message, ok), true
 	}
-	return a.askNative(title, message, ok)
+	return a.askNativeAnswered(title, message, ok)
+}
+
+// askNowYes is askNow's answer alone, for callers that only need yes or no.
+func (a *App) askNowYes(title, message, ok string) bool {
+	yes, _ := a.askNow(title, message, ok)
+	return yes
 }
 
 // chooseUser asks a native question with buttons, one dialog at a time;
@@ -681,6 +701,7 @@ func (a *App) askUser(title, message, ok string) bool {
 func (a *App) chooseUser(title, message string, buttons []string) string {
 	a.confirmMu.Lock()
 	defer a.confirmMu.Unlock()
+	defer a.attn.shown(title)()
 	if a.ask != nil {
 		return ""
 	}

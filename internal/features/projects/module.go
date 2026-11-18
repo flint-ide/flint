@@ -43,6 +43,8 @@ var Module = feature.Module{
 			// A waiting start that failed for a checkout's trust or a
 			// missing workspace folder may go now.
 			RootsChanged: api.kickStarter,
+			// A start whose confirmation went unanswered asks again.
+			Foreground: api.foreground,
 			Start: func(ctx context.Context) {
 				api.tasksChanged() // tasks may have moved on while Flint was closed
 				go api.watch(ctx)

@@ -58,6 +58,9 @@ func (h featureHost) ConfigDir() string           { return h.a.configDir }
 func (h featureHost) Confirm(title, msg, ok string) bool {
 	return h.a.askUser(title, msg, ok)
 }
+func (h featureHost) Ask(title, msg, ok string) (yes, answered bool) {
+	return h.a.askUserAnswered(title, msg, ok)
+}
 func (h featureHost) Choose(title, msg string, buttons []string) string {
 	return h.a.chooseUser(title, msg, buttons)
 }

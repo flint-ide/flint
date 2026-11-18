@@ -53,7 +53,16 @@ type Waiting struct {
 	// tried again until the user acts: Delegate, Start When Ready again (which
 	// records the new file) or Cancel start.
 	Changed bool `json:"changed,omitempty"`
+	// Unanswered counts the starts whose confirmation (an untrusted
+	// project's) nobody answered: silence is not a refusal, so the start is
+	// asked again when the user is back (Foreground), at most
+	// MaxUnanswered times.
+	Unanswered int `json:"unanswered,omitempty"`
 }
+
+// MaxUnanswered bounds how often a waiting start asks again after its
+// confirmation went unanswered.
+const MaxUnanswered = 3
 
 // waits are the waiting starts of each project (folder → item id).
 type waits map[string]map[string]Waiting

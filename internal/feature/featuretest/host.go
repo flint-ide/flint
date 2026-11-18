@@ -30,8 +30,11 @@ type Host struct {
 	// Dir is ConfigDir (a test's temporary folder).
 	Dir string
 	// Answer is what Confirm returns; Choice what Choose returns.
-	Answer bool
-	Choice string
+	// Unanswered makes Confirm and Ask behave as if the question timed out
+	// (no, and Ask reports it was not answered).
+	Answer     bool
+	Unanswered bool
+	Choice     string
 	// OnConfirm, when set, runs in Confirm before it answers (outside the
 	// host's lock): what happens while the user reads the question.
 	OnConfirm func()
@@ -133,7 +136,12 @@ func (h *Host) SetUntrusted(paths ...string) {
 
 func (h *Host) ConfigDir() string { return h.Dir }
 
-func (h *Host) Confirm(title, message, _ string) bool {
+func (h *Host) Confirm(title, message, ok string) bool {
+	yes, _ := h.Ask(title, message, ok)
+	return yes
+}
+
+func (h *Host) Ask(title, message, _ string) (yes, answered bool) {
 	h.mu.Lock()
 	h.asked = append(h.asked, title+"\n"+message)
 	on := h.OnConfirm
@@ -143,7 +151,10 @@ func (h *Host) Confirm(title, message, _ string) bool {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.Answer
+	if h.Unanswered {
+		return false, false
+	}
+	return h.Answer, true
 }
 
 func (h *Host) Choose(title, message string, _ []string) string {

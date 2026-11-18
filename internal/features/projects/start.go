@@ -29,6 +29,43 @@ type AutoStart struct {
 	// waiting with this reason. Warning is DelegateResult.Warning.
 	Error   string `json:"error"`
 	Warning string `json:"warning"`
+	// Unanswered: nobody answered the start's confirmation; it is asked
+	// again when the user is back (Waiting.Unanswered).
+	Unanswered bool `json:"unanswered"`
+}
+
+// unansweredReason is a waiting start's reason after n unanswered
+// confirmations.
+func unansweredReason(n int) string {
+	if n >= MaxUnanswered {
+		return fmt.Sprintf("nobody answered Flint's confirmation %d times: Delegate it by hand, or cancel the start.", n)
+	}
+	return "nobody answered Flint's confirmation: Flint asks again when you are back."
+}
+
+// foreground is the Foreground hook: the user is back, so the waiting
+// starts whose confirmation went unanswered (fewer than MaxUnanswered times)
+// are asked again.
+func (a *API) foreground() {
+	a.mu.Lock()
+	w := a.waiting()
+	again := false
+	for folder, items := range w {
+		for id, cur := range items {
+			if cur.Unanswered > 0 && cur.Unanswered < MaxUnanswered && cur.Tried != "" {
+				cur.Tried = "" // not "nothing changed since": it is tried again
+				w[folder][id] = cur
+				again = true
+			}
+		}
+	}
+	if again {
+		_ = a.host.SaveState(stateWaiting, w)
+	}
+	a.mu.Unlock()
+	if again {
+		a.kickStarter()
+	}
 }
 
 // waiting reads the waiting starts. Callers hold mu.
@@ -227,6 +264,11 @@ func (a *API) autoStart(folder string, it Item, entry Waiting, fp string) {
 		if cur, ok := w[folder][it.ID]; ok && cur.Since.Equal(entry.Since) {
 			cur.Reason, cur.Tried = err.Error(), fp
 			cur.Changed = errors.Is(err, errItemChanged)
+			if errors.Is(err, errUnanswered) {
+				cur.Unanswered++
+				cur.Reason = unansweredReason(cur.Unanswered)
+				ev.Error, ev.Unanswered = cur.Reason, true
+			}
 			w[folder][it.ID] = cur
 			_ = a.host.SaveState(stateWaiting, w)
 		}

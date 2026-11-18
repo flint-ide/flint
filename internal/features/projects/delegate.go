@@ -60,6 +60,10 @@ type autoStart struct {
 // errItemChanged refuses a waiting start whose item's file changed since the
 // user asked (its text, agent or repositories may say something else now, or
 // another item took its id).
+// errUnanswered: an automatic start's confirmation timed out with nobody
+// answering it (Waiting.Unanswered).
+var errUnanswered = errors.New("nobody answered Flint's confirmation")
+
 var errItemChanged = errors.New("the item changed since you asked: Delegate it again or cancel the start")
 
 // delegate is Delegate for a known project folder and a valid id, by a click
@@ -200,8 +204,14 @@ func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, 
 			return DelegateResult{}, errors.New("Delegate was cancelled: the project's folder is in Restricted Mode")
 		}
 		// No click comes with this question: it says which item starts and why now.
-		if auto != nil && !a.host.Confirm("Start a waiting item of an untrusted project?", autoStartMessage(it, auto.waitedFor)+untrustedMessage(c.Name, real, agent, reqs, joint, pc), "Start") {
-			return DelegateResult{}, errors.New("the start was declined in Flint's confirmation (the project's folder is in Restricted Mode): Delegate it by hand, or cancel the start")
+		if auto != nil {
+			yes, answered := a.host.Ask("Start a waiting item of an untrusted project?", autoStartMessage(it, auto.waitedFor)+untrustedMessage(c.Name, real, agent, reqs, joint, pc), "Start")
+			if !answered {
+				return DelegateResult{}, errUnanswered
+			}
+			if !yes {
+				return DelegateResult{}, errors.New("the start was declined in Flint's confirmation (the project's folder is in Restricted Mode): Delegate it by hand, or cancel the start")
+			}
 		}
 	}
 	if auto != nil {

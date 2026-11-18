@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"flint/internal/features/extensions"
 )
@@ -37,6 +38,17 @@ func (a *App) emit(name string, data ...any) {
 		return
 	}
 	a.wails.Event.Emit(name, data...)
+}
+
+// followForeground tells attention whether Flint is in front: the main
+// window's focus everywhere, and on macOS whether the app is the active one
+// (a question shown as a sheet takes the window's focus, not the app's).
+// The server build's window never sends these events: it counts as in front.
+func (a *App) followForeground(app *application.App, win *application.WebviewWindow) {
+	win.OnWindowEvent(events.Common.WindowFocus, func(*application.WindowEvent) { a.attn.setFocused(true) })
+	win.OnWindowEvent(events.Common.WindowLostFocus, func(*application.WindowEvent) { a.attn.setFocused(false) })
+	app.Event.OnApplicationEvent(events.Mac.ApplicationDidBecomeActive, func(*application.ApplicationEvent) { a.attn.setActive(true) })
+	app.Event.OnApplicationEvent(events.Mac.ApplicationDidResignActive, func(*application.ApplicationEvent) { a.attn.setActive(false) })
 }
 
 func (a *App) setWindowTitle(title string) {

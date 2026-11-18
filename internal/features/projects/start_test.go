@@ -546,3 +546,72 @@ func TestWaitingStartFollowsFlintsStatusRewrite(t *testing.T) {
 		t.Fatalf("requests %+v, events %+v", reqs, f.autoStarts())
 	}
 }
+
+// A confirmation nobody answered is not a refusal that sticks: the item keeps
+// waiting and is asked again when the user is back (Foreground), at most
+// MaxUnanswered times, never in a loop while nobody is there.
+func TestUnansweredAutoStartAsksAgainWhenTheUserIsBack(t *testing.T) {
+	f := newFixture(t, nil)
+	f.open()
+	other := newProject(t, filepath.Join(f.base, "other"), map[string]string{"dep": item("Dependency", "done", "repos: api"), "w": item("Waiter", "todo", "repos: api", "after: dep")})
+	if _, err := f.api.Open(other); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.api.StartWhenReady(other, "w", ""); err != nil {
+		t.Fatal(err)
+	}
+	f.h.Unanswered = true
+	f.startReady()
+	var w waits
+	_ = f.h.LoadState(stateWaiting, &w)
+	if cur := w[other]["w"]; cur.Unanswered != 1 || !strings.Contains(cur.Reason, "asks again when you are back") || len(f.h.Requested()) != 0 {
+		t.Fatalf("waiting %+v", cur)
+	}
+	if ev := f.autoStarts(); len(ev) != 1 || !ev[0].Unanswered {
+		t.Fatalf("events %+v", ev)
+	}
+	// Nobody came back: not asked again.
+	for range 3 {
+		f.startReady()
+	}
+	if len(f.h.Asked()) != 1 {
+		t.Fatalf("asked %d times while nobody was there", len(f.h.Asked()))
+	}
+	// Back twice more, still no answer: the third silence ends the re-asking.
+	for i := 2; i <= MaxUnanswered; i++ {
+		f.api.foreground()
+		f.startReady()
+		if len(f.h.Asked()) != i {
+			t.Fatalf("after coming back %d: asked %d times", i-1, len(f.h.Asked()))
+		}
+	}
+	_ = f.h.LoadState(stateWaiting, &w)
+	if cur := w[other]["w"]; cur.Unanswered != MaxUnanswered || !strings.Contains(cur.Reason, "Delegate it by hand") {
+		t.Fatalf("waiting %+v", cur)
+	}
+	f.api.foreground()
+	f.startReady()
+	if len(f.h.Asked()) != MaxUnanswered {
+		t.Fatal("asked again past the bound")
+	}
+
+	// An answer when the user is back starts it.
+	g := newFixture(t, nil)
+	g.open()
+	third := newProject(t, filepath.Join(g.base, "third"), map[string]string{"dep": item("Dependency", "done", "repos: api"), "w": item("Waiter", "todo", "repos: api", "after: dep")})
+	if _, err := g.api.Open(third); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := g.api.StartWhenReady(third, "w", ""); err != nil {
+		t.Fatal(err)
+	}
+	g.h.Unanswered = true
+	g.startReady()
+	g.h.Unanswered, g.h.Answer = false, true
+	g.api.foreground()
+	g.startReady()
+	_ = g.h.LoadState(stateWaiting, &w)
+	if len(g.h.Requested()) != 1 || len(w[third]) != 0 {
+		t.Fatalf("requests %+v waits %+v", g.h.Requested(), w[third])
+	}
+}

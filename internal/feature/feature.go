@@ -80,6 +80,9 @@ type Instance struct {
 	// state, or its branch was merged or got a pull request in Flint (when
 	// the UI hears "tasks:changed"); it must return quickly.
 	TasksChanged func()
+	// Foreground runs when Flint comes to the front again after it was in
+	// the background (the user is back); it must return quickly.
+	Foreground func()
 	// TaskContext is asked, when Flint starts the chat of an agent task the
 	// feature made (one whose NewAgentTask had an Origin), for text to put
 	// before the task's description in the chat's first message: the feature's
@@ -124,6 +127,10 @@ type Host interface {
 	// Confirm asks the user in a native dialog that the web view can't
 	// answer or skip; Cancel is the default button. False when dismissed.
 	Confirm(title, message, ok string) bool
+	// Ask is Confirm that also says whether the user answered at all:
+	// answered is false when the question timed out unanswered or Flint quit
+	// while it was open (yes is false then).
+	Ask(title, message, ok string) (yes, answered bool)
 	// Choose asks a native question with these buttons (at most three) and
 	// returns the one chosen, "" when dismissed.
 	Choose(title, message string, buttons []string) string
@@ -397,6 +404,18 @@ func (s *Set) TasksChanged() {
 	for _, p := range s.parts {
 		if p.TasksChanged != nil {
 			p.TasksChanged()
+		}
+	}
+}
+
+// Foreground runs the Foreground hooks.
+func (s *Set) Foreground() {
+	if s == nil {
+		return
+	}
+	for _, p := range s.parts {
+		if p.Foreground != nil {
+			p.Foreground()
 		}
 	}
 }

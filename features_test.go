@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"flint/internal/config"
+	"flint/internal/feature"
+	"flint/internal/features/projects"
 	"flint/internal/settings"
 )
 
@@ -122,5 +124,62 @@ func TestFeatureSettingsMatchFrontendAndDocs(t *testing.T) {
 		if !strings.HasPrefix(string(doc), "| `"+key+"` |") {
 			t.Errorf("_settings/%s.md does not start with its table row", key)
 		}
+	}
+}
+
+// The Projects feature was called Backlog for a few hours on main and never
+// released, so nothing is migrated; a state.json or settings.json that still
+// carries the old keys must load cleanly, keep them out of the feature, and
+// drop them on the next save.
+func TestOldBacklogKeysAreIgnored(t *testing.T) {
+	if err := registerFeatures(); err != nil {
+		t.Fatal(err)
+	}
+	cfg := t.TempDir()
+	settingsPath := filepath.Join(cfg, "settings.json")
+	if err := os.WriteFile(settingsPath, []byte(`{"features":{"enabled":{"backlog":false}},"mcpServer":{"enabled":true,"actions":{"backlog":true}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := settings.Load(settingsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := settings.Validate(s); err != nil {
+		t.Fatalf("settings with the old keys don't validate: %v", err)
+	}
+	if !feature.Section.Get(s).On(projects.Module) || s.MCPServer.Actions.Projects || !s.MCPServer.Enabled {
+		t.Errorf("settings %+v / toggles %+v", s.MCPServer, feature.Section.Get(s))
+	}
+
+	a := &App{configDir: cfg, settings: s}
+	old := `{"recentFolders":["/p"],
+		"backlogs":["/p/plan"],
+		"backlogCheckouts":[{"repo":"github.com/acme/api","folder":"/p/api"}],
+		"backlogTasks":{"/p/plan":{"x":[{"task":"0000000000000001","repo":"api"}]}},
+		"backlogWaiting":{"/p/plan":{"x":{"since":"2026-11-18T10:00:00Z"}}}}`
+	if err := os.WriteFile(a.statePath(), []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.LoadJSON(a.statePath(), &a.state); err != nil {
+		t.Fatal(err)
+	}
+	api := projectsT(t, a)
+	if infos := api.Projects(); len(infos) != 0 {
+		t.Errorf("projects from the old keys: %+v", infos)
+	}
+	for _, key := range []string{"backlogs", "backlogCheckouts", "backlogTasks", "backlogWaiting"} {
+		if err := (featureHost{a}).LoadState(key, new(any)); err == nil {
+			t.Errorf("the old key %s is declared", key)
+		}
+	}
+	if err := a.rememberFolder("/q"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(a.statePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "backlog") {
+		t.Errorf("state.json keeps the old keys: %s", data)
 	}
 }

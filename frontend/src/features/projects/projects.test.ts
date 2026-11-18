@@ -10,6 +10,7 @@ import {
   canClose,
   canOpenTask,
   cloneFailure,
+  clonedText,
   cloneFromInfo,
   cloneTitle,
   coerceAutoStart,
@@ -409,6 +410,10 @@ describe('cloning', () => {
   it('reads untrusted events', () => {
     for (const bad of [null, 3, {}, { project: '/b' }, { repo: 'api' }]) assert.equal(coerceCloneEvent(bad), null)
     assert.equal(coerceCloneEvent({ project: '/b', repo: 'api', done: 'yes', progress: 4 })?.done, false)
+  })
+  it('says whether a clone is trusted', () => {
+    assert.equal(clonedText('api', { folder: '/c/api', trusted: true }), 'Cloned api into /c/api: it is trusted, because it is inside a trusted folder')
+    assert.equal(clonedText('api', { folder: '/s/api', trusted: false }), 'Cloned api into /s/api: it is in Restricted Mode until you trust it')
   })
   it('does not show a cancel as an error', () => {
     assert.deepEqual(cloneFailure('api', 'the clone was cancelled'), { message: 'The clone of api was cancelled', kind: 'info' })

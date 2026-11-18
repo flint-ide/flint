@@ -109,6 +109,30 @@ func TestDelegatedTaskChatGetsTheProjectContext(t *testing.T) {
 	}
 }
 
+// The item whose chat starts is in doing in its own context, through the
+// real path: the chat starts inside CreateAgentTasks, before Delegate writes
+// the status (reviewer's reproduction: "status: todo" 8 times out of 8).
+func TestDelegatedTaskContextSaysDoing(t *testing.T) {
+	f := queueFixture(t, 0)
+	f.addRepoT("web", "git@github.com:acme/web.git")
+	api := projectsT(t, f.app)
+	opened := chatsOpened(f.app)
+	plan := planT(t, f.app, api, filepath.Dir(f.repo), [][2]string{{"web", "git@github.com:acme/web.git"}},
+		map[string]string{"rl": "---\ntitle: Rate limit\nagent: fake\nrepos: web\n---\nLimit it.\n"}, "Acme is a shop.\n")
+	if _, err := api.Delegate(plan, "rl", f.repo); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStarts()
+	chats := opened()
+	if len(chats) != 1 {
+		t.Fatalf("chats %+v", chats)
+	}
+	prompt := f.driver.waitPrompts(t, chats[0].Info.ID, 1)[0]
+	if !strings.Contains(prompt, "## Your item\n\nrl: Rate limit\nstatus: doing;") {
+		t.Errorf("the context does not say the item is doing:\n%s", prompt)
+	}
+}
+
 // One agent across repositories: the context comes first, then the item's
 // text and Flint's list of which folder is which (said once, after it).
 func TestDelegatedJointGroupGetsTheProjectContext(t *testing.T) {

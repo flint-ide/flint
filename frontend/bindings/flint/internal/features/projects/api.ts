@@ -56,8 +56,11 @@ export function CancelStart(folder: string, id: string): $CancellablePromise<voi
  * a temporary folder next to the destination and moved into place at the
  * end). One clone per project at a time. It returns when the clone ended;
  * progress comes as projects:clone-progress events, the end as
- * projects:clone-done. The clone is not trusted and not added to the
- * workspace: the UI does that, as for a located folder.
+ * projects:clone-done. The clone is not added to the workspace (the UI does
+ * that, as for a located folder). It is trusted only when parent is inside a
+ * trusted folder (trust covers everything under a folder): the confirmation
+ * says so, and a project whose folder is not trusted can't clone there. The
+ * returned RepositoryView carries the clone's real trust.
  */
 export function Clone(folder: string, repo: string, parent: string): $CancellablePromise<$models.RepositoryView> {
     return $Call.ByID(1452494212, folder, repo, parent).then(($result: any) => {
@@ -195,7 +198,8 @@ export function SetStatus(folder: string, id: string, status: string): $Cancella
 /**
  * StartWhenReady remembers that the user wants item id started when every
  * item it waits for is done (the answer to Delegate's NotReady). Flint then
- * delegates it by itself, with every check of Delegate at that time, once.
+ * delegates it by itself, with every check of Delegate at that time, once,
+ * and only while the item's file is still what it is now (Waiting.Hash).
  * root is the window's active folder, used for an item without
  * repositories; it must be an open workspace folder now (its trust is
  * checked when the item starts). An item that is ready already starts as

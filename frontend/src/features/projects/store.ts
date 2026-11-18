@@ -21,6 +21,7 @@ import {
   BOARD_VIEW,
   boardTitle,
   cloneFailure,
+  clonedText,
   cloneFromInfo,
   coerceAutoStart,
   coerceCloneEvent,
@@ -442,8 +443,9 @@ export async function locateRepo(folder: string, repo: string, url: string, note
 /**
  * Clone…: asks for the folder to clone into, then Go asks again with the URL and the destination and runs git.
  * Progress arrives as events (and Project.clone); Cancel calls cancelClone. Resolves when the clone ended: true
- * when the repository is located now. The clone is not trusted and not in the workspace: Add to Workspace and
- * Trust Folder… apply, as for a located folder.
+ * when the repository is located now. The clone is not in the workspace: Add to Workspace applies, as for a
+ * located folder. It is in Restricted Mode (Trust Folder… applies) unless the chosen folder is inside a trusted
+ * one: Go then says in its question that the clone will be trusted (and refuses it for an untrusted project).
  */
 export async function cloneRepo(folder: string, repo: string): Promise<boolean> {
   if (useProjects.getState().clones[folder]) {
@@ -455,7 +457,7 @@ export async function cloneRepo(folder: string, repo: string): Promise<boolean> 
   setClone(folder, { repo, destination: '', progress: '' })
   try {
     const r = await API.Clone(folder, repo, parent)
-    showToast(`Cloned ${repo} into ${r.folder}`)
+    showToast(clonedText(repo, r))
     return true
   } catch (err) {
     const f = cloneFailure(repo, errorMessage(err))

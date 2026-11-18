@@ -52,7 +52,15 @@ type autoStart struct {
 	// still reports, under mu, whether the start is still wanted (the
 	// user may cancel it while the confirmation is open).
 	still func() bool
+	// hash is the item's file when the user asked (Waiting.Hash): a file
+	// that is not that any more is not started (errItemChanged).
+	hash string
 }
+
+// errItemChanged refuses a waiting start whose item's file changed since the
+// user asked (its text, agent or repositories may say something else now, or
+// another item took its id).
+var errItemChanged = errors.New("the item changed since you asked: Delegate it again or cancel the start")
 
 // delegate is Delegate for a known project folder and a valid id, by a click
 // (auto nil) or by the starter for a waiting start (auto). Only one delegate
@@ -76,6 +84,11 @@ func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, 
 		return DelegateResult{}, err
 	}
 	data, _, err := ReadItemFile(real, id)
+	if auto != nil && (err != nil || itemHash(data) != auto.hash) {
+		// Only what the user asked for starts by itself; this data is what
+		// is sent below.
+		return DelegateResult{}, errItemChanged
+	}
 	if err != nil {
 		return DelegateResult{}, fmt.Errorf("%s: %w", itemPath(id), err)
 	}
@@ -109,8 +122,11 @@ func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, 
 	if agent == "" {
 		agent = agents.Default
 	}
-	ctx, cancel := a.ctx(delegateTimeout)
-	defer cancel()
+	// The checks get their own context: the one that bounds creating the
+	// tasks starts after the confirmation below, which may stay open for a
+	// long while (a waiting start that asks while the user is away).
+	cctx, ccancel := a.ctx(delegateTimeout)
+	defer ccancel()
 	type target struct{ repo, dir string }
 	var targets []target
 	if len(it.Repos) == 0 {
@@ -120,12 +136,12 @@ func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, 
 		}
 		targets = append(targets, target{"", dir})
 	} else {
-		roots := a.roots(ctx)
+		roots := a.roots(cctx)
 		checkouts := a.checkouts()
 		var missing, outside, untrusted, broken []string
 		for _, name := range it.Repos {
 			decl, _ := c.Repository(name) // ParseItem checked the names
-			v := a.resolveRepo(ctx, decl, roots, checkouts)
+			v := a.resolveRepo(cctx, decl, roots, checkouts)
 			switch {
 			case v.Problem != "":
 				broken = append(broken, name+": "+v.Problem)
@@ -162,7 +178,10 @@ func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, 
 	for i, t := range targets {
 		o := origin{Project: real, Item: id, Repo: t.repo}
 		if !trusted {
-			o.Confirmed = contextHash(pc.Text)
+			// What the confirmation below shows is all its chat may get
+			// (restrictedContext).
+			shown, _ := shownContext(pc.Text)
+			o.Confirmed, o.Title, o.Repos = contextHash(shown), it.Title, it.Repos
 		}
 		reqs[i] = feature.NewAgentTask{Dir: t.dir, Description: it.TaskDescription(t.repo), Agent: agent, Origin: o.String()}
 		if len(reqs[i].Description) > MaxDescription {
@@ -197,7 +216,10 @@ func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, 
 		return DelegateResult{}, fmt.Errorf("the item has %d agent tasks: remove some in the Agent Tasks panel first", MaxTasksPerItem)
 	}
 	// Not under mu: creating worktrees can take a while (checkout hooks), and
-	// the panel must still load meanwhile.
+	// the panel must still load meanwhile. The time for it counts from here,
+	// not from before the confirmation.
+	ctx, cancel := a.ctx(delegateTimeout)
+	defer cancel()
 	var made []feature.AgentTask
 	if joint {
 		made, err = a.host.CreateJointAgentTasks(ctx, reqs, agent)

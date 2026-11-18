@@ -51,7 +51,8 @@ func (a *API) kickStarter() {
 
 // StartWhenReady remembers that the user wants item id started when every
 // item it waits for is done (the answer to Delegate's NotReady). Flint then
-// delegates it by itself, with every check of Delegate at that time, once.
+// delegates it by itself, with every check of Delegate at that time, once,
+// and only while the item's file is still what it is now (Waiting.Hash).
 // root is the window's active folder, used for an item without
 // repositories; it must be an open workspace folder now (its trust is
 // checked when the item starts). An item that is ready already starts as
@@ -68,12 +69,19 @@ func (a *API) StartWhenReady(folder, id, root string) (ItemView, error) {
 	if err != nil {
 		return ItemView{}, err
 	}
-	i := slices.IndexFunc(l.Items, func(it Item) bool { return it.ID == id })
-	if i < 0 {
+	if !slices.ContainsFunc(l.Items, func(it Item) bool { return it.ID == id }) {
 		return ItemView{}, fmt.Errorf("the project has no usable item %s: see its problems", id)
 	}
-	it := l.Items[i]
-	d := Dependencies(l.Items)[id]
+	// The file as it is now is what the start may run (Waiting.Hash).
+	data, _, err := ReadItemFile(real, id)
+	if err != nil {
+		return ItemView{}, fmt.Errorf("%s: %w", itemPath(id), err)
+	}
+	it, err := ParseItem(id, data, l.Config)
+	if err != nil {
+		return ItemView{}, fmt.Errorf("%s: %w", itemPath(id), err)
+	}
+	d := Dependencies(append(slices.DeleteFunc(l.Items, func(x Item) bool { return x.ID == id }), it))[id]
 	switch {
 	case d.Problem != "":
 		return ItemView{}, fmt.Errorf("%s can't start: %s: fix the item's after line", itemPath(id), d.Problem)
@@ -94,7 +102,7 @@ func (a *API) StartWhenReady(folder, id, root string) (ItemView, error) {
 	if _, ok := w[real][id]; !ok && len(w[real]) >= MaxWaiting {
 		return ItemView{}, fmt.Errorf("%d items of this project wait to start already: cancel some first", MaxWaiting)
 	}
-	w[real][id] = Waiting{Root: root, Since: time.Now()}
+	w[real][id] = Waiting{Root: root, Since: time.Now(), Hash: itemHash(data)}
 	w.pruneProjects(func(f string) bool { return slices.Contains(a.knownSet(), f) })
 	if err := a.host.SaveState(stateWaiting, w); err != nil {
 		return ItemView{}, err
@@ -174,15 +182,17 @@ func (a *API) startReady(ctx context.Context) {
 		for id, entry := range items {
 			i := slices.IndexFunc(l.Items, func(it Item) bool { return it.ID == id })
 			if i < 0 {
-				continue // the file is gone for now, or a problem: keep waiting
+				// The file is gone for now, or a problem: keep waiting. It can
+				// start only once the file is back exactly as it was (Hash).
+				continue
 			}
 			it := l.Items[i]
 			if it.Status == StatusDone {
 				a.dropWaiting(folder, id, entry.Since)
 				continue
 			}
-			if !deps[id].Ready() {
-				continue
+			if entry.Changed || !deps[id].Ready() {
+				continue // refused until the user acts, or not ready
 			}
 			fp := a.fingerprint(ctx, folder, l.Config, it, entry.Root)
 			if entry.Reason != "" && entry.Tried == fp {
@@ -199,7 +209,7 @@ func (a *API) autoStart(folder string, it Item, entry Waiting, fp string) {
 		cur, ok := a.waiting()[folder][it.ID]
 		return ok && cur.Since.Equal(entry.Since)
 	}
-	res, err := a.delegate(folder, it.ID, entry.Root, &autoStart{waitedFor: it.After, still: still})
+	res, err := a.delegate(folder, it.ID, entry.Root, &autoStart{waitedFor: it.After, still: still, hash: entry.Hash})
 	switch {
 	case errors.Is(err, errStarting):
 		return // a click is starting it, or the start was cancelled
@@ -213,6 +223,7 @@ func (a *API) autoStart(folder string, it Item, entry Waiting, fp string) {
 		w := a.waiting()
 		if cur, ok := w[folder][it.ID]; ok && cur.Since.Equal(entry.Since) {
 			cur.Reason, cur.Tried = err.Error(), fp
+			cur.Changed = errors.Is(err, errItemChanged)
 			w[folder][it.ID] = cur
 			_ = a.host.SaveState(stateWaiting, w)
 		}
@@ -222,6 +233,26 @@ func (a *API) autoStart(folder string, it Item, entry Waiting, fp string) {
 		ev.Tasks, ev.Warning = len(res.Tasks), res.Warning
 	}
 	a.host.Emit(EventAutoStart, ev)
+}
+
+// itemHash identifies the content of an item's file (Waiting.Hash).
+func itemHash(data []byte) string {
+	sum := sha256.Sum256(data)
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+// rehashWaiting follows Flint's own rewrite of an item's status line (from
+// old to now) in the item's waiting start, when the start was made for old:
+// Flint's change is not one the user has to confirm again. Callers hold mu.
+func (a *API) rehashWaiting(folder, id string, old, now []byte) {
+	w := a.waiting()
+	cur, ok := w[folder][id]
+	if !ok || cur.Hash != itemHash(old) {
+		return
+	}
+	cur.Hash = itemHash(now)
+	w[folder][id] = cur
+	_ = a.host.SaveState(stateWaiting, w)
 }
 
 // dropWaiting forgets a waiting start (the one asked for at since).

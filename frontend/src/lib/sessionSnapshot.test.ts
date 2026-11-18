@@ -142,6 +142,8 @@ describe('parseSnapshot: extension tabs', () => {
         { kind: 'contrib', view: 'flint.database.console', key: 'c1', title: 'Prod', data: { sql: 'select 1' } },
         { kind: 'contrib', view: 'flint.database.console', key: '', title: 'no key' },
         { kind: 'contrib', view: 'not an id', key: 'k', title: 'x' },
+        // The board of the Projects feature before it was renamed (never released): not reopened.
+        { kind: 'contrib', view: 'backlog.board', key: '/p/plan', title: 'Backlog: Acme', data: { folder: '/p/plan' } },
       ],
     })
     const snap = parseSnapshot(raw)

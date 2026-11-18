@@ -32,6 +32,9 @@ type Host struct {
 	// Answer is what Confirm returns; Choice what Choose returns.
 	Answer bool
 	Choice string
+	// OnConfirm, when set, runs in Confirm before it answers (outside the
+	// host's lock): what happens while the user reads the question.
+	OnConfirm func()
 
 	mu       sync.Mutex
 	settings settings.Settings
@@ -132,8 +135,14 @@ func (h *Host) ConfigDir() string { return h.Dir }
 
 func (h *Host) Confirm(title, message, _ string) bool {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	h.asked = append(h.asked, title+"\n"+message)
+	on := h.OnConfirm
+	h.mu.Unlock()
+	if on != nil {
+		on()
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	return h.Answer
 }
 
@@ -228,12 +237,15 @@ func (h *Host) StartStream(termID, _ string, st terminal.Stream) error {
 // CreateAgentTasks records the requests and makes a task for each, working
 // in a folder named after the request's; with SetCreateError it creates none.
 // Dir must be inside a root, as the app requires.
-func (h *Host) CreateAgentTasks(_ context.Context, reqs []feature.NewAgentTask) ([]feature.AgentTask, error) {
+func (h *Host) CreateAgentTasks(ctx context.Context, reqs []feature.NewAgentTask) ([]feature.AgentTask, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.requested = append(h.requested, slices.Clone(reqs))
 	if h.createErr != nil {
 		return nil, h.createErr
+	}
+	if err := ctx.Err(); err != nil { // as the app's git calls would
+		return nil, err
 	}
 	if len(reqs) == 0 {
 		return nil, errors.New("no agent task to create")
@@ -270,12 +282,15 @@ type JointRequest struct {
 // inside a root, each a different one, agent available. With
 // SetCreateError it fails with that error and creates none: to fake the
 // app's refusals, wrap feature.ErrJointEngine or feature.ErrJointUntrusted.
-func (h *Host) CreateJointAgentTasks(_ context.Context, reqs []feature.NewAgentTask, agent string) ([]feature.AgentTask, error) {
+func (h *Host) CreateJointAgentTasks(ctx context.Context, reqs []feature.NewAgentTask, agent string) ([]feature.AgentTask, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.joint = append(h.joint, JointRequest{slices.Clone(reqs), agent})
 	if h.createErr != nil {
 		return nil, h.createErr
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	switch {
 	case len(reqs) < 2:

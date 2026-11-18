@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"flint/internal/agenttask"
@@ -93,10 +92,7 @@ func checkContext(data []byte) (string, error) {
 		return "", fmt.Errorf("longer than %d characters (%d): Flint sends at most %d to agents", MaxContextChars, n, MaxContextChars)
 	}
 	if r, ok := hiddenRune(text); ok {
-		if unicode.IsControl(r) {
-			return "", fmt.Errorf("contains a control character (U+%04X)", r)
-		}
-		return "", fmt.Errorf("contains invisible characters (U+%04X)", r)
+		return "", fmt.Errorf("contains %s", runeKind(r))
 	}
 	return text, nil
 }
@@ -195,10 +191,15 @@ type origin struct {
 	Item    string `json:"item"`
 	Repo    string `json:"repo,omitempty"`
 	// Confirmed is set for a project whose folder was not trusted at
-	// Delegate: the hash (contextHash) of the context text the user was shown
-	// in the confirmation. While the folder is not trusted, the context file
-	// is sent only when it is still that text.
+	// Delegate: the hash (contextHash) of the part of the context text the
+	// user was shown in the confirmation (shownContext). Such a task's chat
+	// gets that part only, and only while the file still starts with it.
 	Confirmed string `json:"confirmed,omitempty"`
+	// Title and Repos are the item's title and repositories as the
+	// confirmation showed them (set with Confirmed): the context of such a
+	// task takes them from here, never from the folder as it is later.
+	Title string   `json:"title,omitempty"`
+	Repos []string `json:"repos,omitempty"`
 }
 
 func (o origin) String() string {
@@ -232,11 +233,16 @@ func contextHash(text string) string {
 // for the chat of an item's agent task that starts now, built from the
 // project as it is now. An origin that is not this feature's, or that names a
 // project Flint does not know or an item that is not there (any more), gives
-// "" and the chat starts with the task's description alone.
+// "" and the chat starts with the task's description alone. A project whose
+// folder is not trusted now, or was not when the user confirmed the Delegate,
+// gets restrictedContext instead.
 func (a *API) taskContext(ctx context.Context, st feature.TaskStart) string {
 	o, ok := parseOrigin(st.Origin)
 	if !ok || !slices.Contains(a.knownSet(), o.Project) {
 		return ""
+	}
+	if o.Confirmed != "" || !a.host.Trusted(o.Project) {
+		return restrictedContext(o, st)
 	}
 	l, err := Load(o.Project)
 	if err != nil {
@@ -247,6 +253,9 @@ func (a *API) taskContext(ctx context.Context, st feature.TaskStart) string {
 		return ""
 	}
 	it := l.Items[i]
+	// The chat starts for this item: it is in doing (Delegate writes that
+	// after the chats may have started, and a queued task starts later).
+	it.Status = StatusDoing
 	if o.Repo != "" {
 		if _, ok := l.Config.Repository(o.Repo); !ok {
 			o.Repo = ""
@@ -254,14 +263,7 @@ func (a *API) taskContext(ctx context.Context, st feature.TaskStart) string {
 	}
 	in := contextInput{
 		Name: l.Config.Name, Folder: o.Project, Context: l.Context, Item: it,
-		Repos: l.Config.Repositories, Repo: o.Repo, Start: st, Restricted: !a.host.Trusted(o.Project),
-	}
-	if in.Restricted && l.Context.Exists && (o.Confirmed == "" || o.Confirmed != contextHash(l.Context.Text)) {
-		// Nothing of an untrusted project goes to an agent unconfirmed.
-		in.Context = ProjectContext{Exists: true, Problem: "the project's folder is in Restricted Mode, and the file was not shown when the Delegate was confirmed or changed since"}
-	}
-	if in.Restricted {
-		return renderContext(in)
+		Repos: l.Config.Repositories, Repo: o.Repo, Start: st,
 	}
 	byID := map[string]Item{}
 	for _, x := range l.Items {
@@ -315,6 +317,59 @@ func (a *API) taskContext(ctx context.Context, st feature.TaskStart) string {
 	return renderContext(in)
 }
 
+// restrictedContext is the context of a task of a project whose folder is
+// not trusted (now, or when the user confirmed the Delegate): only what the
+// confirmation showed reaches the agent (docs/design/projects.md, "Trust and
+// Restricted Mode"). That is the beginning of PROJECT.md exactly as shown
+// (shownContext, sent only while the file still starts with it), and the
+// item's id, title and repositories as the origin keeps them from the
+// Delegate. Nothing else is read from the folder: no project name, no other
+// item, no URL, no dependency. A task without a confirmed origin (the project
+// was trusted at Delegate) gets no PROJECT.md and no title.
+func restrictedContext(o origin, st feature.TaskStart) string {
+	in := contextInput{
+		Folder: o.Project, Item: Item{ID: o.Item, Title: o.Title, Status: StatusDoing, Repos: []string{}}, Start: st, Restricted: true,
+	}
+	for _, r := range o.Repos {
+		if repoNamePattern.MatchString(r) && len(r) <= maxRepoName {
+			in.Item.Repos = append(in.Item.Repos, r)
+			in.Repos = append(in.Repos, RepositoryDecl{Name: r})
+		}
+	}
+	if o.Repo != "" && !slices.Contains(in.Item.Repos, o.Repo) {
+		if len(in.Item.Repos) > 0 || !repoNamePattern.MatchString(o.Repo) || len(o.Repo) > maxRepoName {
+			o.Repo = ""
+		} else {
+			in.Item.Repos = []string{o.Repo}
+			in.Repos = []RepositoryDecl{{Name: o.Repo}}
+		}
+	}
+	in.Repo = o.Repo
+	pc := ReadContext(o.Project)
+	shown, cut := shownContext(pc.Text)
+	switch {
+	case o.Confirmed != "" && pc.Text != "" && contextHash(shown) == o.Confirmed:
+		in.Context = ProjectContext{Exists: true, Text: shown}
+		if cut {
+			in.ContextNote = fmt.Sprintf("(The rest of %s was left out: the project's folder is not trusted, and only this beginning was shown when the Delegate was confirmed.)", ContextFile)
+		}
+	case pc.Exists:
+		in.Context = ProjectContext{Exists: true, Problem: "the project's folder is not trusted, or was not when the Delegate was confirmed, and the file was not shown then or changed since"}
+	}
+	return renderContext(in)
+}
+
+// shownContext is the part of a context text the confirmation of a Delegate
+// from an untrusted project shows (maxConfirmContext characters), and
+// whether the text is longer. Exactly this part is what such a project's
+// agents may get.
+func shownContext(text string) (string, bool) {
+	if utf8.RuneCountInString(text) <= maxConfirmContext {
+		return text, false
+	}
+	return string([]rune(text)[:maxConfirmContext]), true
+}
+
 // contextInput is what renderContext writes.
 type contextInput struct {
 	Name, Folder string
@@ -330,8 +385,11 @@ type contextInput struct {
 	Repo  string
 	Start feature.TaskStart
 	// Restricted: the project's folder is not trusted; only what the user
-	// confirmed is written (no other item, no URL).
+	// confirmed is written (restrictedContext: no project name, no other
+	// item, no URL, no dependency).
 	Restricted bool
+	// ContextNote follows the context text (what of it was left out).
+	ContextNote string
 }
 
 type depInfo struct {
@@ -418,12 +476,19 @@ func agentName(agent string) string {
 	return agent
 }
 
+// writeContext writes the block between its delimiters. Free text in it (the
+// context file above all) can't close or reopen it: fenceSafe quotes every
+// line that looks like a delimiter.
 func writeContext(in contextInput, c cuts) string {
 	limit := fmt.Sprintf("Flint sends at most %d KB of project context", maxContextBlock>>10)
 	var b strings.Builder
-	b.WriteString(contextStart + "\n")
-	fmt.Fprintf(&b, "You are one of the agents working on the Flint project %q (a backlog of work items, in %s). "+
-		"Flint wrote this part of the message from the project's files as they are now; your task follows after it.\n", in.Name, in.Folder)
+	if in.Restricted {
+		fmt.Fprintf(&b, "You are one of the agents working on an item of a Flint project (a backlog of work items, in %s). "+
+			"Flint passes on only what the user confirmed for this start; your task follows after it.\n", in.Folder)
+	} else {
+		fmt.Fprintf(&b, "You are one of the agents working on the Flint project %q (a backlog of work items, in %s). "+
+			"Flint wrote this part of the message from the project's files as they are now; your task follows after it.\n", in.Name, in.Folder)
+	}
 
 	switch {
 	case in.Context.Text != "":
@@ -433,20 +498,24 @@ func writeContext(in contextInput, c cuts) string {
 			text = strings.TrimRight(string([]rune(text)[:c.contextText]), " \t\n")
 			note = fmt.Sprintf("\n\n[… %s is cut here: %s; read the whole file at %s]", ContextFile, limit, filepath.Join(in.Folder, ContextFile))
 		}
+		if in.ContextNote != "" {
+			note += "\n\n" + in.ContextNote
+		}
 		fmt.Fprintf(&b, "\n## About the project (%s)\n\n%s%s\n", ContextFile, text, note)
 	case in.Context.Problem != "":
 		fmt.Fprintf(&b, "\n## About the project (%s)\n\n(The project's %s was left out: %s.)\n", ContextFile, ContextFile, in.Context.Problem)
 	}
 
 	it := in.Item
-	fmt.Fprintf(&b, "\n## Your item\n\n%s: %s\nstatus: %s; priority: %s; file: %s\n", it.ID, it.Title, it.Status, it.Priority, itemPath(it.ID))
-
 	if in.Restricted {
-		if len(it.After) > 0 {
-			fmt.Fprintf(&b, "It waits for the items %s.\n", strings.Join(it.After, ", "))
+		title := ""
+		if it.Title != "" {
+			title = ": " + it.Title
 		}
-		b.WriteString("\nThe project's folder is in Restricted Mode in Flint: its other items are left out.\n")
+		fmt.Fprintf(&b, "\n## Your item\n\n%s%s\nstatus: %s; file: %s\n", it.ID, title, it.Status, itemPath(it.ID))
+		b.WriteString("\nThe project's other items are left out: its folder is not trusted in Flint, or was not when the user confirmed this start.\n")
 	} else {
+		fmt.Fprintf(&b, "\n## Your item\n\n%s: %s\nstatus: %s; priority: %s; file: %s\n", it.ID, it.Title, it.Status, it.Priority, itemPath(it.ID))
 		if len(in.Deps) > 0 {
 			b.WriteString("\n## What your item depends on\n\n")
 			for _, d := range in.Deps {
@@ -512,7 +581,7 @@ func writeContext(in contextInput, c cuts) string {
 			continue
 		}
 		line := "- " + r.Name
-		if !in.Restricted {
+		if !in.Restricted && r.URL != "" {
 			line += ": " + r.URL
 		}
 		switch {
@@ -532,6 +601,8 @@ func writeContext(in contextInput, c cuts) string {
 		b.WriteString("\n")
 	}
 	switch {
+	case st.Joint && len(it.Repos) == 0:
+		b.WriteString("You work in several repositories at once; after your task Flint lists which folder is which.\n")
 	case st.Joint:
 		fmt.Fprintf(&b, "You work in the repositories %s at once; after your task Flint lists which folder is which.\n", strings.Join(it.Repos, ", "))
 	case in.Repo != "":
@@ -546,19 +617,37 @@ func writeContext(in contextInput, c cuts) string {
 	if st.MCP && !in.Restricted {
 		fmt.Fprintf(&b, "\n## Reading more\n\nFlint's %s tool returns this project's whole backlog, your item first.\n", ToolName)
 	}
-	b.WriteString("\n" + contextEnd)
-	return b.String()
+	return contextStart + "\n" + fenceSafe(b.String()) + "\n" + contextEnd
+}
+
+// fenceSafe keeps text inside the block from closing or reopening it: a line
+// that starts (after spaces) with "=====", as both delimiters do, gets "> " in
+// front of it, so no line of the text equals contextStart or contextEnd and
+// none looks like them. Applied to the whole inside of the block, so it
+// covers the context file and every title, name and reason in it.
+func fenceSafe(s string) string {
+	if !strings.Contains(s, "=====") {
+		return s
+	}
+	lines := strings.Split(s, "\n")
+	for i, l := range lines {
+		if strings.HasPrefix(strings.TrimLeft(l, " \t"), "=====") {
+			lines[i] = "> " + l
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // confirmContext is what the confirmation of a Delegate from an untrusted
 // project says about its context file: that it is sent too, and its
-// beginning (maxConfirmContext characters, saying when it is cut).
+// beginning (shownContext: maxConfirmContext characters, saying when it is
+// cut, and that only this beginning is sent then).
 func confirmContext(c ProjectContext) string {
 	switch {
 	case c.Text != "":
-		text := c.Text
-		if n := utf8.RuneCountInString(text); n > maxConfirmContext {
-			text = string([]rune(text)[:maxConfirmContext]) + fmt.Sprintf("\n[… cut here: the file has %d characters]", n)
+		text, cut := shownContext(c.Text)
+		if cut {
+			text += fmt.Sprintf("\n[… cut here: the file has %d characters; only this beginning is sent, because the project's folder is not trusted]", utf8.RuneCountInString(c.Text))
 		}
 		return fmt.Sprintf("\n\nThe project's context file %s is sent too, before the description:\n%s", ContextFile, text)
 	case c.Problem != "":

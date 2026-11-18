@@ -449,3 +449,24 @@ func TestWatcherMovesItems(t *testing.T) {
 	}
 	t.Error("no projects:changed event")
 }
+
+// The time for creating the tasks starts after the confirmation: a question
+// left open for longer than delegateTimeout (an automatic start that asks
+// while the user is away) does not make the create fail.
+func TestDelegateTimeoutStartsAfterTheConfirmation(t *testing.T) {
+	old := delegateTimeout
+	delegateTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { delegateTimeout = old })
+	f := newFixture(t, map[string]string{"x": item("X", "todo", "repos: api")})
+	f.open()
+	f.h.SetUntrusted(f.plan)
+	f.h.Answer = true
+	f.h.OnConfirm = func() { time.Sleep(3 * delegateTimeout) }
+	res, err := f.api.Delegate(f.plan, "x", f.root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Tasks) != 1 || len(f.h.Asked()) != 1 {
+		t.Errorf("result %+v, asked %q", res, f.h.Asked())
+	}
+}

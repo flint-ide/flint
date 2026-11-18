@@ -17,7 +17,7 @@ func TestCloneSource(t *testing.T) {
 		{"https://github.com/acme/api.git", "api", "https"},
 		{"https://github.com/acme/api", "api", "https"},
 		{"https://gitlab.example.com:8443/group/sub/web.git/", "web", "https"},
-		{"https://git@github.com/acme/my.site.git", "my.site", "https"},
+		{"https://github.com/acme/my.site.git", "my.site", "https"},
 		{"ssh://git@github.com:22/acme/api", "api", "ssh"},
 		{"ssh://github.com/~me/tools_x", "tools_x", "ssh"},
 		{"git@github.com:acme/api.git", "api", "ssh"},
@@ -58,6 +58,10 @@ func TestCloneSource(t *testing.T) {
 		{"ssh://-u@host/acme/api", `user name "-u"`},
 		{"ssh://git@host:22x/acme/api", "can't be read"},
 		{"https://user:token@github.com/acme/api.git", "password"},
+		// A token pasted as the user would end up in the clone's config.
+		{"https://ghp_abc123@github.com/acme/api.git", "holds a user name"},
+		{"https://git@github.com/acme/my.site.git", "holds a user name"},
+		{"https://@github.com/acme/api.git", "holds a user name"},
 		{"https://github.com/acme/api.git?x=1", "query or a fragment"},
 		{"https://github.com/acme/api.git#main", "query or a fragment"},
 		{"https://[::1]/acme/api", "only https://"},
@@ -357,5 +361,58 @@ func TestCloseAllClones(t *testing.T) {
 	}
 	if len(leftovers(t, parent)) != 0 {
 		t.Errorf("left %v", leftovers(t, parent))
+	}
+}
+
+// Trust covers everything under a folder, so a clone into a trusted folder
+// is trusted at once. For a project whose folder is not trusted that is
+// refused; for a trusted one the confirmation says so, and the answer shows
+// the clone as trusted (reviewer's finding: ~/code trusted, an untrusted
+// project's URL cloned into it).
+func TestCloneIntoATrustedFolder(t *testing.T) {
+	f, parent, dest := cloneFixture(t)
+	f.h.Answer = true
+	f.h.SetRepository(dest, "https://github.com/acme/web.git")
+	f.h.SetTrusted(parent)
+
+	f.h.SetUntrusted(f.plan)
+	_, err := f.api.Clone(f.plan, "web", parent)
+	wantErr(t, err, "choose a folder that is not inside a trusted folder: a clone there would be trusted at once")
+	if len(f.h.Asked()) != 0 || len(leftovers(t, parent)) != 0 {
+		t.Fatal("a refused clone got further")
+	}
+	if _, err := os.Stat(dest); err == nil {
+		t.Fatal("a refused clone made the folder")
+	}
+
+	f.h.SetTrusted(f.plan)
+	v, err := f.api.Clone(f.plan, "web", parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !v.Trusted || v.Folder != dest {
+		t.Errorf("view %+v: the clone is trusted", v)
+	}
+	asked := f.h.Asked()
+	if len(asked) != 1 || !strings.Contains(asked[0], "The new folder WILL BE TRUSTED at once, because it is inside the trusted folder "+parent) ||
+		strings.Contains(asked[0], "Restricted Mode until you trust it") {
+		t.Errorf("asked %q", asked)
+	}
+}
+
+// The trust is looked at again after the question: a parent trusted while it
+// was open still refuses the clone of an untrusted project.
+func TestCloneTrustCheckedAfterTheQuestion(t *testing.T) {
+	f, parent, dest := cloneFixture(t)
+	f.h.SetUntrusted(f.plan)
+	f.h.Answer = true
+	f.h.OnConfirm = func() { f.h.SetTrusted(parent) }
+	_, err := f.api.Clone(f.plan, "web", parent)
+	wantErr(t, err, "not inside a trusted folder")
+	if _, err := os.Stat(dest); err == nil || len(leftovers(t, parent)) != 0 {
+		t.Error("the clone ran")
+	}
+	if asked := f.h.Asked(); len(asked) != 1 || !strings.Contains(asked[0], "Restricted Mode until you trust it") || !strings.Contains(asked[0], "check that you expect this URL") {
+		t.Errorf("asked %q", asked)
 	}
 }

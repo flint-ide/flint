@@ -101,7 +101,7 @@ func ParseConfig(data []byte, folderName string) (Config, error) {
 		return Config{}, errors.New("name contains control characters")
 	}
 	if r, ok := hiddenRune(c.Name); ok {
-		return Config{}, fmt.Errorf("name contains invisible characters (U+%04X)", r)
+		return Config{}, fmt.Errorf("name contains %s", runeKind(r))
 	}
 	if len(c.Repositories) > MaxRepositories {
 		return Config{}, fmt.Errorf("more than %d repositories", MaxRepositories)
@@ -129,8 +129,11 @@ func ParseConfig(data []byte, folderName string) (Config, error) {
 // NewConfig is the flint-project.json New Project writes.
 func NewConfig(name string) ([]byte, error) {
 	name = strings.TrimSpace(name)
-	if utf8.RuneCountInString(name) > maxProjectName || strings.ContainsFunc(name, unicode.IsControl) {
+	if utf8.RuneCountInString(name) > maxProjectName || strings.ContainsFunc(name, oneLineBreaker) {
 		return nil, fmt.Errorf("the name must be one line of at most %d characters", maxProjectName)
+	}
+	if r, ok := hiddenRune(name); ok {
+		return nil, fmt.Errorf("the name contains %s", runeKind(r))
 	}
 	data, err := json.MarshalIndent(Config{Name: name, Repositories: []RepositoryDecl{}}, "", "  ")
 	if err != nil {
@@ -222,10 +225,7 @@ func ParseItem(id string, data []byte, c Config) (Item, error) {
 	it.Body = strings.TrimSpace(strings.ReplaceAll(body, "\r\n", "\n"))
 	for _, part := range []struct{ name, text string }{{"title", it.Title}, {"the text", it.Body}} {
 		if r, ok := hiddenRune(part.text); ok {
-			if unicode.IsControl(r) {
-				return Item{}, fmt.Errorf("%s contains a control character (U+%04X)", part.name, r)
-			}
-			return Item{}, fmt.Errorf("%s contains invisible characters (U+%04X)", part.name, r)
+			return Item{}, fmt.Errorf("%s contains %s", part.name, runeKind(r))
 		}
 	}
 	if len(it.Description()) > MaxDescription {
@@ -242,11 +242,17 @@ func ParseItem(id string, data []byte, c Config) (Item, error) {
 // file that starts with one has no front matter, so no title). Zero-width
 // joiner and non-joiner (U+200D, U+200C) are allowed: emoji and several
 // scripts need them.
+//
+// The line and paragraph separators (U+2028, U+2029) are refused too: many
+// readers (an agent, a dialog) break the line there while the panel shows one
+// line, so a title could imitate a line of its own, such as the delimiters of
+// the project context block. NEL (U+0085) is a control character.
 func hiddenRune(s string) (rune, bool) {
 	for _, r := range s {
 		switch {
 		case r == '\t' || r == '\n':
 		case unicode.IsControl(r),
+			r == 0x2028, r == 0x2029,
 			r >= 0xE0000 && r <= 0xE007F,
 			r >= 0x202A && r <= 0x202E,
 			r >= 0x2066 && r <= 0x2069,
@@ -255,6 +261,25 @@ func hiddenRune(s string) (rune, bool) {
 		}
 	}
 	return 0, false
+}
+
+// runeKind names a character hiddenRune found, for a problem's reason:
+// "a control character (U+0007)", "a line or paragraph separator (U+2028)" or
+// "invisible characters (U+200B)".
+func runeKind(r rune) string {
+	switch {
+	case unicode.IsControl(r):
+		return fmt.Sprintf("a control character (U+%04X)", r)
+	case r == 0x2028 || r == 0x2029:
+		return fmt.Sprintf("a line or paragraph separator (U+%04X)", r)
+	}
+	return fmt.Sprintf("invisible characters (U+%04X)", r)
+}
+
+// oneLineBreaker reports a character that breaks a line: a control
+// character (newline, NEL among them) or a line or paragraph separator.
+func oneLineBreaker(r rune) bool {
+	return unicode.IsControl(r) || r == 0x2028 || r == 0x2029
 }
 
 func parseRepos(v string, c Config) ([]string, error) {
@@ -374,11 +399,11 @@ func checkTitle(title string) (string, error) {
 		return "", errors.New("give the item a title")
 	case utf8.RuneCountInString(title) > MaxTitle:
 		return "", fmt.Errorf("the title is longer than %d characters", MaxTitle)
-	case strings.ContainsFunc(title, unicode.IsControl):
+	case strings.ContainsFunc(title, oneLineBreaker):
 		return "", errors.New("the title must be one line")
 	}
 	if r, ok := hiddenRune(title); ok {
-		return "", fmt.Errorf("the title contains invisible characters (U+%04X)", r)
+		return "", fmt.Errorf("the title contains %s", runeKind(r))
 	}
 	return title, nil
 }

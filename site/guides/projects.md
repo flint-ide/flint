@@ -64,7 +64,7 @@ acme-plan/
 
 | Field | Rule |
 |---|---|
-| `name` | Shown in the panel. At most 80 characters, one line. Default: the folder's name. |
+| `name` | Shown in the panel. At most 80 characters, one line, with the [character rules](#items) of an item. Default: the folder's name. |
 | `repositories` | Optional, at most 50. A project without repositories is valid: its items run in the folder that is active in the window. |
 | `repositories[].name` | How items refer to the repository. Lowercase letters, digits and `-`, starting with a letter or digit, at most 40 characters, and unique in the file. |
 | `repositories[].url` | A git remote URL, at most 1,000 characters. It identifies the repository on every teammate's machine, wherever their checkout is. See [How repositories are matched](#how-repositories-are-matched). |
@@ -104,7 +104,7 @@ Done when:
 
 The title and the text together become the agent task's description, the first message the agent gets. They may be at most 8,000 bytes, as for New Agent Task (a letter outside ASCII takes two to four bytes). With several repositories, Delegate adds a note naming them, and the note counts too. With `together: true` there is no note: the agent is told which folder is which repository in its first message, and that text doesn't count.
 
-The title and the text can't contain characters you don't see but the agent reads: control characters other than tab and line breaks, Unicode tag characters, bidirectional controls, zero-width spaces, word joiners and byte order marks. Such a file is listed as a problem. Zero-width joiners, which emoji and several scripts need, are fine.
+The title and the text can't contain characters you don't see but the agent reads: control characters other than tab and line breaks, Unicode tag characters, bidirectional controls, zero-width spaces, word joiners and byte order marks. Nor can they contain the Unicode line and paragraph separators (U+2028, U+2029): the panel shows them as one line, while an agent or a dialog may break the line there, so a title could pass for a line of its own. Such a file is listed as a problem. Zero-width joiners, which emoji and several scripts need, are fine.
 
 Unknown keys are kept when Flint rewrites the file and are otherwise ignored.
 
@@ -134,7 +134,7 @@ A file that breaks a rule is not shown as an item, except the problems that are 
 | `title is missing`, or a `status` or `priority` that isn't one of the values above | Correct the front matter. |
 | `repository "x" is not in flint-project.json` | Add the repository to the file or fix the name in `repos`. |
 | `title and text are longer than 8000 bytes` | Shorten the text. |
-| `the text contains invisible characters (U+200B)`, or `a control character` | Remove the character it names. It is often pasted in from a web page or a chat; an agent can find it for you with **Ask the agent**. |
+| `the text contains invisible characters (U+200B)`, `a control character` or `a line or paragraph separator (U+2028)` | Remove the character it names. It is often pasted in from a web page or a chat; an agent can find it for you with **Ask the agent**. |
 | `larger than 64 KB` | Items are plain files of at most 64 KB. Split the work into several items. |
 | `front matter has no closing ---`, or a line that is not `key: value` | Fix the line. A comment starts with `#`. |
 | `after: no item x in this project (or its file has a problem)`, `after: the item names itself`, or `after: a cycle: a → b → a` | The item is shown, never ready, and Delegate refuses it. Fix the `after` line. See [Dependencies](#dependencies). |
@@ -174,10 +174,10 @@ A repository with no checkout also has **Clone…**, next to **Locate…**: see 
 **Clone…** gets a repository you don't have yet. It asks for a folder, then makes the checkout in a new folder inside it.
 
 1. **Pick the folder.** The checkout goes to a subfolder named after the last part of the URL's path, without `.git`: `api` for `git@github.com:acme/api.git`. That subfolder must not exist, or must be an empty folder (not a link). The name may have letters, digits, `.`, `-` and `_`, up to 100 characters, and may not start with `.` or `-`.
-2. **Confirm.** Flint shows the repository, the URL and the destination and asks. It says that the URL comes from the project's `flint-project.json`, that git uses your own credentials, and that the new folder is in Restricted Mode until you trust it. For a project whose folder isn't trusted it adds a note to check that you expect the URL.
+2. **Confirm.** Flint shows the repository, the URL and the destination and asks. It says that the URL comes from the project's `flint-project.json`, that git uses your own credentials, and whether the new folder will be trusted (see [below](#is-the-clone-trusted)). For a project whose folder isn't trusted it adds a note to check that you expect the URL.
 3. **Wait or cancel.** The repository shows git's latest progress line and **Cancel**. One clone runs at a time per project. Cancelling, closing the project and quitting Flint stop it, and so does a clone that takes longer than 30 minutes.
 
-What can be cloned: a URL of the form `https://host/path`, `ssh://[user@]host[:port]/path` or `user@host:path`. Flint refuses `file://`, local paths, `ext::` and every other transport, and a URL with a password, a query or a fragment, with spaces or characters outside ASCII, with `.` or `..` in its path, or with a host or user name that isn't a plain name (nothing that starts with `-`). The message is "<URL> can't be cloned", followed by the reason. A URL that can't be cloned can still be located: clone it yourself and use **Locate…**.
+What can be cloned: a URL of the form `https://host/path`, `ssh://[user@]host[:port]/path` or `user@host:path`. Flint refuses `file://`, local paths, `ext::` and every other transport, an `https://` URL with a user name (often a token pasted as the user, which would end up in the clone's configuration; use your credential helper), and a URL with a password, a query or a fragment, with spaces or characters outside ASCII, with `.` or `..` in its path, or with a host or user name that isn't a plain name (nothing that starts with `-`). The message is "<URL> can't be cloned", followed by the reason. A URL that can't be cloned can still be located: clone it yourself and use **Locate…**.
 
 What Flint runs: `git clone` with only the URL's transport allowed, the URL passed after `--` and never as an option, no submodules, no hooks and no `fsmonitor`. Submodules are not fetched.
 
@@ -185,7 +185,15 @@ Credentials come from your own git setup: the credential helper or the SSH agent
 
 The clone is made in a temporary folder inside the folder you picked and moved to its name only when it worked, so a clone that fails or is cancelled leaves nothing behind. When it worked, Flint remembers the folder as the repository's checkout, as **Locate…** does (per URL, in your `state.json`, never in the project).
 
-The new folder is **not trusted** and not open in the window. Treat it like a located folder: **Add to Workspace** and **Trust Folder…** in the group do it now, and Delegate does it for you when you delegate an item that needs it, one question at a time. Trust is for the whole folder from now on, so read what you cloned first if you don't know the repository.
+#### Is the clone trusted?
+
+Trust is for a folder and everything in it, so where you clone decides:
+
+- **Into a folder that isn't trusted**, the new folder is in [Restricted Mode](restricted-mode.md) and not open in the window. Treat it like a located folder: **Add to Workspace** and **Trust Folder…** in the group do it now, and Delegate does it for you when you delegate an item that needs it, one question at a time. Trust is for the whole folder from now on, so read what you cloned first if you don't know the repository.
+- **Into a trusted folder** (say `~/code` is trusted), the new folder is trusted at once: agents, language servers and terminals there use the repository's own settings and hooks from the start. For a project whose folder is trusted, the confirmation says so plainly: "The new folder WILL BE TRUSTED at once, because it is inside the trusted folder ~/code". To clone in Restricted Mode, cancel and pick a folder that isn't trusted.
+- **For a project whose folder isn't trusted**, Flint refuses a trusted folder: "choose a folder that is not inside a trusted folder: a clone there would be trusted at once". The URL comes from a project you haven't trusted, so its repository never becomes trusted without you trusting it yourself.
+
+The repository then shows whether the clone is trusted, and so does the message after the clone.
 
 ### How URLs are compared
 
@@ -300,11 +308,11 @@ status: doing; priority: high; file: items/rate-limit-checkout.md
 
 - add-customer-ids: Add customer ids (done)
   - api: branch agent/add-customer-ids, pull request https://github.com/acme/api/pull/7
-- cache-prices: Cache prices (doing)
+- cache-prices: Cache prices (done)
+  - api: branch agent/cache-prices, merged
 
 ## In progress in this project
 
-- cache-prices: Cache prices (doing; agent: the default agent; repositories: api)
 - cart-badge: Show the cart badge (doing; agent: frontend; repositories: web)
 
 ## Repositories and where you work
@@ -329,7 +337,7 @@ Limit POST /checkout to 10 requests a minute per customer.
 In this order:
 
 1. **The project**: its name and folder, and the text of `PROJECT.md`. Without the file this part is left out; with a file that breaks a rule, the agent is told it was left out and why.
-2. **Its item**: id, title, status, priority and file.
+2. **Its item**: id, title, status (always `doing`: the item is being started), priority and file.
 3. **What the item depends on** (its [`after`](#dependencies) line): each item's title and status, and for those that are done the branches and pull requests of their agent tasks that this computer knows about, per repository.
 4. **What else is in progress**: the project's other items in `doing` or `review`, with their agent and repositories, at most 20, saying how many more there are.
 5. **The repositories** with their URLs, which one this agent works in (folder and branch), and which ones other agents work on for the same item. For an item with [`together: true`](#one-agent-across-repositories) the agent is told that it works in all of them; which folder is which follows the item's text, as before.
@@ -338,6 +346,8 @@ In this order:
 After the line `===== Your task =====` comes the description, exactly as without a context: the item's title and text (and the note naming the other repositories). The 8,000-byte limit applies to that text only, never to the context. The Agent Tasks panel and the task's title show the item's text, as before.
 
 **The context is written when the chat starts**, not when you click Delegate. A task that waits in the [queue](ai-agents.md#the-queue), or an item that starts [when it is ready](#start-when-ready), gets the project as it is then: a `PROJECT.md` you edited meanwhile, or a dependency that is done now.
+
+**It can't be closed early.** A line of `PROJECT.md` (or of any other text in the block) that starts with `=====`, as the block's first and last lines do, gets `> ` in front of it, so no text of the project can end the block or start a new one.
 
 **It is bounded.** The whole block is at most 24 KB. When it would be longer, Flint leaves out, in this order, the items in progress, the branches and pull requests of the dependencies, the repositories the item doesn't name, and the end of `PROJECT.md`, and says in the block what it left out and where to read the rest.
 
@@ -388,6 +398,8 @@ This is the one way anything starts without a click at that moment. The click th
 
 When the last item an item waits for becomes `done`, Flint delegates it exactly as a click on **Delegate** would, through the same code and with every check of Delegate at that moment:
 
+- the item is still exactly what it was when you said yes (see below);
+
 - the agent is available, and every repository has a checkout that is in the window and trusted;
 - the item's text fits and the item has room for more agent tasks;
 - for a project whose folder isn't trusted, the question that [Restricted Mode](#projects-and-restricted-mode) describes, which then names the item and says that it starts now because the items it waited for are done;
@@ -396,9 +408,13 @@ When the last item an item waits for becomes `done`, Flint delegates it exactly 
 
 Flint looks when a status can have changed: after agent tasks change, when you set a status, when the panel reads a project that has waiting starts (when it is shown and on refresh, which also notices a status edited in a file of the window), and when the folders of the window or their trust change. Nothing polls. A status that changes in a teammate's commit is noticed when you have pulled it and the panel reads the project again.
 
+**Who makes the dependency done doesn't matter.** Only the status of the items it waits for counts, and anyone who can change their files can change it: you, Flint when their tasks are merged, a teammate whose commit you pull, or an agent that edits files in the project's folder. That is what "start when its dependencies are done" means, so ask for it only for an item you are happy to see start whenever that happens.
+
+**The item itself must not have changed.** Flint remembers the item's file as it was when you said yes, and starts it only while the file is still exactly that. If its text, agent, repositories or anything else in it changed meanwhile (a teammate's pull, an agent editing the project's folder, your own edit), nothing starts: the item keeps waiting with the reason "the item changed since you asked: Delegate it again or cancel the start", and Flint tells you once. It does not try again until you act: **Delegate** it (by hand, after reading it), ask to start it when ready again (which remembers the item as it is now), or **Cancel start**. Flint's own change of the item's status line (when you pick a status, or its tasks move it) doesn't count as a change. While the item's file is missing (a branch switch, a rename), it keeps waiting and is not shown; it can start only if the file comes back exactly as it was. A new item never takes the id of an item that is waiting to start: **New Item…** and `add_project_item` pick the next free name, as for an existing file.
+
 Flint doesn't walk you through what is missing, as Delegate does after a click. It can't ask you to **Locate…** or **Clone…** a repository, add a folder to the window or trust it: those are checks that fail.
 
-**When a check fails**, nothing starts. The item keeps waiting and shows why, and Flint tells you. Flint tries again only when something those checks read has changed: the item's file or the project's, the available agents, the checkouts, trust, or the active folder. It never retries in a loop. You can fix the cause and wait, **Delegate** by hand (a start that works ends the waiting), or **Cancel start**. If you answer No to the question about an untrusted project, the item keeps waiting with that reason, and the same applies.
+**When another check fails**, nothing starts. The item keeps waiting and shows why, and Flint tells you. Flint tries again only when something those checks read has changed: the item's file or the project's, the available agents, the checkouts, trust, or the active folder. It never retries in a loop. You can fix the cause and wait, **Delegate** by hand (a start that works ends the waiting), or **Cancel start**. If you answer No to the question about an untrusted project, the item keeps waiting with that reason, and the same applies.
 
 Some more rules:
 
@@ -434,6 +450,8 @@ Leave it out when the work in each repository can go on alone, when you want sev
 Delegate makes its usual checks and then makes the group. For each repository you get what any agent task has: its own branch from the checkout's current branch, its own worktree and its own agent task. So **Merge**, **Create PR**, **Show diff** and **✕** work per repository, as in the [Agent Tasks panel](ai-agents.md#agent-tasks-agents-in-parallel), and each repository gets its own pull request.
 
 What is shared is the agent. Flint opens one chat in the worktree of the first repository in `repos`, the **lead**, and lets it read and write the worktrees of the others. The panel shows the tasks of a group together, with the lead marked. The chat's first message is the [project context](#project-context-what-every-agent-knows), then the item's title and text, then which folder is which repository on which branch, then a request to keep the change consistent across them and to commit in each folder on its own branch. There is no note about the other repositories, so the 8,000 bytes apply to the title and text alone.
+
+Any chat that opens in the lead's worktree is the group's chat and gets the other worktrees too, not only the one Flint starts: a chat you open there yourself (a second one, or a new one after the first ended) and one an agent starts there with the `start_agent` tool of [orchestration](ai-agents.md#letting-agents-act-in-flint). The trust rules below apply to each of them. A chat in the worktree of another task of the group gets only that worktree.
 
 The tasks share the chat's state: they are working, waiting for you and finished together. **Merge** is refused while the agent works, as for any task. The item's status follows the same rules as always: `review` when the chat finished, `done` when every task is merged, or removed after its pull request was created.
 
@@ -524,7 +542,7 @@ Say no to an item and it isn't written; the agent can go on with the next. After
 
 ### What agents can't do
 
-An agent can only add items. It can't change an item, delete one, set a status, or delegate, so nothing starts until you click **Delegate** (or you asked an item to [start when ready](#start-when-ready); an agent can't ask for that). A new item is always `todo`. Read what an agent planned before you delegate it: it chose the `agent`, the `repos`, `after` and `together` too.
+Flint gives agents no tool to change an item, delete one, set a status or delegate: the one they have adds items, always as `todo`. An agent can never ask Flint to start an item. Nothing starts until you click **Delegate**, or until the items an item waits for are done when you asked it to [start when ready](#start-when-ready). An agent whose chat works in the project's folder can still edit its files like any other file there, and that can change a status: so it can make an item that you asked to start when ready start (by marking what it waits for done), but it can't change what starts (the changed item is refused, see [Start when ready](#start-when-ready)). Read what an agent planned before you delegate it: it chose the `agent`, the `repos`, `after` and `together` too.
 
 An agent whose chat runs in the project's own folder can still edit its files like any other file in the folder it works in. Flint reads them with the same rules as any item, and a file that breaks one is a problem.
 
@@ -616,11 +634,11 @@ A project is read in any folder: reading files runs nothing. What Restricted Mod
 - **The project's own folder.** An item's text becomes an agent's instructions, and a project may come from someone else's repository. A project whose folder isn't trusted is marked **Restricted Mode** in the panel (with **Trust Folder…**) and on its board, and:
   - `get_project` leaves it out, so no chat reads its items;
   - `add_project_item` refuses it, and **Plan with Agent…** and **Add Project Context…** are refused for it, because agents could neither read it nor add to it;
-  - Delegate on one of its items asks first, in a dialog of Flint's own that the page can't skip. It says the project's folder isn't trusted and shows the agent, the folders the tasks will work in and the description that will be sent (the first 1,000 characters, saying when it is cut). When the project has a `PROJECT.md`, it says that the file is sent too and shows its beginning (the first 1,000 characters, saying when it is cut). For an item with `together: true` it also says that one agent works in all of these folders together, in one chat. Cancel stops Delegate before anything is created;
-  - the agents of such a project get only what you confirmed: `PROJECT.md` only while it is the text the question showed (a file changed after your answer is left out, and the agent is told so), their own item, and the names of the repositories. The project's other items and the repositories' URLs are left out of the [context](#project-context-what-every-agent-knows), and so is `get_project`. This holds for a task that waits in the queue too;
+  - Delegate on one of its items asks first, in a dialog of Flint's own that the page can't skip. It says the project's folder isn't trusted and shows the agent, the folders the tasks will work in and the description that will be sent (the first 1,000 characters, saying when it is cut). When the project has a `PROJECT.md`, it says that the file is sent too and shows its beginning (the first 1,000 characters; when the file is longer it says so, and that only this beginning is sent). For an item with `together: true` it also says that one agent works in all of these folders together, in one chat. Cancel stops Delegate before anything is created;
+  - the agents of such a project get only what you confirmed. Of `PROJECT.md` they get exactly the beginning the question showed, and only while the file still starts with it (the rest of a longer file is left out, and so is a file whose beginning changed after your answer; the agent is told which). Of their item they get the id, and the title and repositories as they were when you answered, never read again from the folder. The project's name, its other items, the items it waits for, the repositories' URLs and `get_project` are left out of the [context](#project-context-what-every-agent-knows). This holds for a task that waits in the queue, for a chat that starts later, and also when you trust the project's folder after answering;
   - an item you asked to [start when ready](#start-when-ready) asks the same question when it starts, naming the item and saying that it starts now because the items it waited for are done. If you decline, nothing starts and the item keeps waiting;
-  - **Clone…** adds a note to its confirmation to check that you expect the URL.
-- **Clones.** A folder you cloned is in Restricted Mode until you trust it.
+  - **Clone…** adds a note to its confirmation to check that you expect the URL, and refuses a destination inside a trusted folder, where the clone would be trusted at once.
+- **Clones.** A folder you clone into a folder that isn't trusted is in Restricted Mode until you trust it. A folder you clone into a trusted folder is trusted at once, because trust covers everything inside a folder; Flint says so in its question, and does it only for a project whose folder is trusted: see [Is the clone trusted?](#is-the-clone-trusted).
 
 Read an item from a project you didn't write before you delegate it.
 
@@ -634,7 +652,7 @@ Flint fixes these because a project may come from someone else's repository.
 | Size of an item file or of `flint-project.json` | 64 KB |
 | Title | 120 characters |
 | Title and text together | 8,000 bytes, with Delegate's note about the repositories (no note with `together: true`) |
-| Item text shown before Delegate from an untrusted project | 1,000 characters, and as much of `PROJECT.md` |
+| Item text shown before Delegate from an untrusted project | 1,000 characters, and as much of `PROJECT.md` (only that much of it is sent) |
 | `PROJECT.md` | 64 KB; at most 16,000 characters are used |
 | The project context at the start of an agent's first message | 24 KB; at most 20 items in progress |
 | `PROJECT.md` in the prompt of **Plan with Agent…** | 8,000 characters |

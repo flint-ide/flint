@@ -636,6 +636,12 @@ export function applyCloneEvent(cur: CloneState | null, ev: CloneEvent): CloneSt
 /** The line of the panel while a clone runs: "Cloning api into /w/api". */
 export const cloneTitle = (c: CloneState): string => (c.destination ? `Cloning ${c.repo} into ${c.destination}` : `Cloning ${c.repo}…`)
 
+/** The toast after a clone: where it went, and whether it is trusted (inside a trusted folder) or in Restricted Mode. */
+export const clonedText = (repo: string, r: Pick<RepoView, 'folder' | 'trusted'>): string =>
+  r.trusted
+    ? `Cloned ${repo} into ${r.folder}: it is trusted, because it is inside a trusted folder`
+    : `Cloned ${repo} into ${r.folder}: it is in Restricted Mode until you trust it`
+
 /** A rejected Clone call: cancelling is not an error to show in red. */
 export function cloneFailure(repo: string, message: string): { message: string; kind: 'info' | 'error' } {
   return /clone was cancelled/i.test(message) ? { message: `The clone of ${repo} was cancelled`, kind: 'info' } : { message, kind: 'error' }

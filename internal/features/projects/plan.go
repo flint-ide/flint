@@ -48,7 +48,7 @@ func (a *API) PlanPrompt(folder, goal string) (PlanPrompt, error) {
 		return PlanPrompt{}, fmt.Errorf("the goal is longer than %d characters", MaxGoal)
 	}
 	if r, ok := hiddenRune(goal); ok {
-		return PlanPrompt{}, fmt.Errorf("the goal contains a control or invisible character (U+%04X)", r)
+		return PlanPrompt{}, fmt.Errorf("the goal contains %s", runeKind(r))
 	}
 	if !a.host.Trusted(real) {
 		return PlanPrompt{}, errors.New("the project's folder is in Restricted Mode: trust it first, so agents can read the project and add items to it")

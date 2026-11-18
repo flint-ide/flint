@@ -76,9 +76,10 @@ var (
 var errTransport = errors.New("only https://, ssh:// and user@host:path URLs can be cloned (not file://, local paths, ext:: or other transports)")
 
 // CloneSource checks a repository URL from a project for Clone…: only
-// https://host/path, ssh://[user@]host[:port]/path and scp-like
-// [user@]host:path are accepted, with a plain host and user name (nothing
-// git or ssh could take as an option), no password, query or fragment, and a
+// https://host/path (without a user), ssh://[user@]host[:port]/path and
+// scp-like [user@]host:path are accepted, with a plain host and user name
+// (nothing git or ssh could take as an option), no password, query or
+// fragment, and a
 // path without "." or ".." parts. The folder name is the path's last part
 // without ".git", checked as a file name.
 func CloneSource(raw string) (cloneSource, error) {
@@ -123,6 +124,12 @@ func CloneSource(raw string) (cloneSource, error) {
 		if u.User != nil {
 			if _, ok := u.User.Password(); ok {
 				return cloneSource{}, errors.New("the URL holds a password: use a credential helper instead")
+			}
+			// A user in an https URL is often a token pasted as the user: it
+			// would end up in the clone's configuration and in the dialog.
+			// ssh:// and scp-like URLs keep theirs (git@host).
+			if src.Protocols[0] == "https" {
+				return cloneSource{}, errors.New("the https URL holds a user name (it may be a token): use a credential helper instead")
 			}
 			if !cloneUser.MatchString(u.User.Username()) {
 				return cloneSource{}, fmt.Errorf("the user name %q is not allowed", u.User.Username())
@@ -330,8 +337,11 @@ func (c *cloner) closeAll() {
 // a temporary folder next to the destination and moved into place at the
 // end). One clone per project at a time. It returns when the clone ended;
 // progress comes as projects:clone-progress events, the end as
-// projects:clone-done. The clone is not trusted and not added to the
-// workspace: the UI does that, as for a located folder.
+// projects:clone-done. The clone is not added to the workspace (the UI does
+// that, as for a located folder). It is trusted only when parent is inside a
+// trusted folder (trust covers everything under a folder): the confirmation
+// says so, and a project whose folder is not trusted can't clone there. The
+// returned RepositoryView carries the clone's real trust.
 func (a *API) Clone(folder, repo, parent string) (RepositoryView, error) {
 	real, _, err := a.known(folder)
 	if err != nil {
@@ -357,13 +367,25 @@ func (a *API) Clone(folder, repo, parent string) (RepositoryView, error) {
 	if err := checkDestination(dest); err != nil {
 		return RepositoryView{}, err
 	}
+	// Trust goes by folder and everything under it, so a clone inside a
+	// trusted folder is trusted at once: agents there would use the
+	// repository's own settings and hooks. A URL from a project whose folder
+	// is not trusted never gets that.
+	projectTrusted := a.host.Trusted(real)
+	if err := cloneTrust(projectTrusted, a.host.Trusted(dest)); err != nil {
+		return RepositoryView{}, err
+	}
 	job, err := a.clones.claim(real, CloneView{Repo: repo, URL: decl.URL, Destination: dest})
 	if err != nil {
 		return RepositoryView{}, err
 	}
 	defer a.clones.release(real, job)
-	if !a.host.Confirm("Clone a repository?", cloneMessage(c.Name, repo, decl.URL, dest, a.host.Trusted(real)), "Clone") {
+	if !a.host.Confirm("Clone a repository?", cloneMessage(c.Name, repo, decl.URL, dest, projectTrusted, a.trustedBy(par, dest)), "Clone") {
 		return RepositoryView{}, errors.New("the clone was cancelled")
+	}
+	// Trust may have changed while the question was open.
+	if err := cloneTrust(a.host.Trusted(real), a.host.Trusted(dest)); err != nil {
+		return RepositoryView{}, err
 	}
 	base := a.host.Context()
 	if base == nil {
@@ -465,16 +487,49 @@ func (a *API) runClone(ctx context.Context, job *cloneJob, src cloneSource, par,
 	return nil
 }
 
-// cloneMessage is Clone's question: what is cloned from where into where.
-func cloneMessage(project, repo, url, dest string, trusted bool) string {
+// errCloneTrusted refuses a clone for a project whose folder is not trusted
+// into a folder that is: the clone would be trusted at once.
+var errCloneTrusted = errors.New("choose a folder that is not inside a trusted folder: a clone there would be trusted at once, " +
+	"and the URL comes from a project whose folder is in Restricted Mode")
+
+// cloneTrust refuses a clone that would be trusted at once (destTrusted) for
+// a project whose folder is not trusted.
+func cloneTrust(projectTrusted, destTrusted bool) error {
+	if destTrusted && !projectTrusted {
+		return errCloneTrusted
+	}
+	return nil
+}
+
+// trustedBy says why a clone into dest (in parent) is trusted at once, ""
+// when it is not.
+func (a *API) trustedBy(parent, dest string) string {
+	switch {
+	case a.host.Trusted(parent):
+		return "because it is inside the trusted folder " + parent
+	case a.host.Trusted(dest):
+		return "because you trusted the folder " + dest + " before"
+	}
+	return ""
+}
+
+// cloneMessage is Clone's question: what is cloned from where into where,
+// and whether the new folder is trusted at once (inside a trusted folder) or
+// in Restricted Mode; trustedBy says why it is trusted ("" when it is not).
+func cloneMessage(project, repo, url, dest string, trusted bool, trustedBy string) string {
 	note := ""
 	if !trusted {
 		note = " The project's folder is in Restricted Mode: check that you expect this URL."
 	}
+	after := "The new folder is in Restricted Mode until you trust it."
+	if trustedBy != "" {
+		after = fmt.Sprintf("The new folder WILL BE TRUSTED at once, %s: "+
+			"agents, language servers and terminals there use the repository's own settings and hooks. "+
+			"To clone it in Restricted Mode, cancel and choose a folder that is not trusted.", trustedBy)
+	}
 	return fmt.Sprintf("Clone the repository %q of the project %q?\n\nURL: %s\nInto: %s\n\n"+
-		"The URL comes from the project's %s.%s git uses your own credentials (credential helper or SSH agent) and asks for nothing here. "+
-		"The new folder is in Restricted Mode until you trust it.",
-		repo, project, url, dest, ConfigFile, note)
+		"The URL comes from the project's %s.%s git uses your own credentials (credential helper or SSH agent) and asks for nothing here. %s",
+		repo, project, url, dest, ConfigFile, note, after)
 }
 
 // CancelClone stops the clone running for a project; what it made is removed.

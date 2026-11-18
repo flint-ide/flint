@@ -107,8 +107,14 @@ function parseRunConfigs(raw: unknown): Record<string, string> {
 const KINDS = new Set(['file', 'scratch', 'diff', 'history', 'terminal', 'chat', 'contrib'])
 /** Saved data of a contributed tab is at most this much JSON. */
 export const MAX_TAB_DATA = 64 << 10
+/**
+ * Tab kinds of built-in features that were renamed before any release: a session saved with one does
+ * not reopen it (the Projects board was "backlog.board"). Other unknown kinds are kept for the
+ * extension that may contribute them later, and show "… is not available" until it does.
+ */
+const RETIRED_VIEWS = new Set(['backlog.board'])
 const isContrib = (t: Record<string, unknown>) =>
-  typeof t.view === 'string' && /^[a-z0-9][a-z0-9.-]*\.[a-zA-Z0-9._-]+$/.test(t.view) && typeof t.key === 'string' && t.key !== '' && t.key.length <= 256 && typeof t.title === 'string'
+  typeof t.view === 'string' && !RETIRED_VIEWS.has(t.view) && /^[a-z0-9][a-z0-9.-]*\.[a-zA-Z0-9._-]+$/.test(t.view) && typeof t.key === 'string' && t.key !== '' && t.key.length <= 256 && typeof t.title === 'string'
 const isTab = (t: unknown): t is SavedTab =>
   typeof t === 'object' && t !== null && KINDS.has((t as SavedTab).kind) && ((t as SavedTab).kind !== 'contrib' || isContrib(t as Record<string, unknown>))
 

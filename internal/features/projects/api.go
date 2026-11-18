@@ -24,8 +24,9 @@ const EventChanged = "projects:changed"
 // gitTimeout bounds the git calls of one request (remotes, task states).
 const gitTimeout = 30 * time.Second
 
-// delegateTimeout bounds creating an item's agent tasks (worktrees, hooks).
-const delegateTimeout = 5 * time.Minute
+// delegateTimeout bounds creating an item's agent tasks (worktrees, hooks),
+// counted from after Delegate's confirmation (a variable for tests).
+var delegateTimeout = 5 * time.Minute
 
 // API is the Projects panel's service. Every method takes a project folder
 // that Flint knows (opened or created here, or a workspace folder with
@@ -710,7 +711,8 @@ func (a *API) NewItem(folder, title string) (ItemView, error) {
 }
 
 // writeNewItem writes a new item file: its id is base, or base-2, base-3 …
-// when taken (a file is never overwritten), and file makes its content for
+// when taken (a file is never overwritten, and an id with a waiting start
+// is not used), and file makes its content for
 // that id (an error refuses the id, and stops). The project must have room
 // (MaxItems). The written file must parse. Callers hold mu.
 func (a *API) writeNewItem(real string, c Config, base string, file func(id string) ([]byte, error)) (Item, error) {
@@ -724,6 +726,12 @@ func (a *API) writeNewItem(real string, c Config, base string, file func(id stri
 			id = fmt.Sprintf("%s-%d", base, n)
 		}
 		if _, err := os.Lstat(ItemFile(real, id)); err == nil {
+			continue
+		}
+		if _, ok := a.waiting()[real][id]; ok {
+			// A waiting start of an item whose file is gone: a new item
+			// never takes its id (the start would not run it, but it would
+			// show the old start's state).
 			continue
 		}
 		data, err := file(id)
@@ -816,6 +824,7 @@ func (a *API) writeStatus(folder, id string, c Config, status string) (Item, err
 		}
 		return Item{}, err
 	}
+	a.rehashWaiting(folder, id, data, out)
 	it.Status = status
 	return it, nil
 }

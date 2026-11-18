@@ -45,6 +45,14 @@ type Waiting struct {
 	// relevant changed.
 	Reason string `json:"reason,omitempty"`
 	Tried  string `json:"tried,omitempty"`
+	// Hash is the item's file (itemHash) when the user asked: the item is
+	// started only while its file is still exactly that, so the start never
+	// runs text the user did not see, nor another item that took its id.
+	Hash string `json:"hash,omitempty"`
+	// Changed: a start found the file changed (Reason says so). It is not
+	// tried again until the user acts: Delegate, Start When Ready again (which
+	// records the new file) or Cancel start.
+	Changed bool `json:"changed,omitempty"`
 }
 
 // waits are the waiting starts of each project (folder → item id).

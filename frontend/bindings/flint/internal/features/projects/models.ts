@@ -42,6 +42,49 @@ export class CloneView {
 }
 
 /**
+ * ContextView is the project's context file, as the panel and the board show it.
+ */
+export class ContextView {
+    /**
+     * Path is the file, to open in the editor.
+     */
+    "path": string;
+
+    /**
+     * Exists: the file is there (Open); else the UI offers Add Project Context….
+     */
+    "exists": boolean;
+
+    /**
+     * Problem says why agents don't get it ("" when they do or it is absent).
+     */
+    "problem": string;
+
+    /** Creates a new ContextView instance. */
+    constructor($$source: Partial<ContextView> = {}) {
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("exists" in $$source)) {
+            this["exists"] = false;
+        }
+        if (!("problem" in $$source)) {
+            this["problem"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ContextView instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ContextView {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ContextView($$parsedSource as Partial<ContextView>);
+    }
+}
+
+/**
  * DelegateResult is what Delegate started.
  */
 export class DelegateResult {
@@ -340,6 +383,13 @@ export class Project {
     "repositories": RepositoryView[];
 
     /**
+     * Context is the project's context file, PROJECT.md (Open, or Add
+     * Project Context… when it does not exist); a problem with it is also
+     * listed in Problems.
+     */
+    "context": ContextView;
+
+    /**
      * Items in the panel's order: doing, review, todo, done, then priority
      * (high first), then title.
      */
@@ -373,6 +423,9 @@ export class Project {
         if (!("repositories" in $$source)) {
             this["repositories"] = [];
         }
+        if (!("context" in $$source)) {
+            this["context"] = (new ContextView());
+        }
         if (!("items" in $$source)) {
             this["items"] = [];
         }
@@ -395,20 +448,24 @@ export class Project {
     static createFrom($$source: any = {}): Project {
         const $$createField4_0 = $$createType7;
         const $$createField5_0 = $$createType8;
-        const $$createField6_0 = $$createType10;
-        const $$createField8_0 = $$createType12;
+        const $$createField6_0 = $$createType9;
+        const $$createField7_0 = $$createType11;
+        const $$createField9_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("repositories" in $$parsedSource) {
             $$parsedSource["repositories"] = $$createField4_0($$parsedSource["repositories"]);
         }
+        if ("context" in $$parsedSource) {
+            $$parsedSource["context"] = $$createField5_0($$parsedSource["context"]);
+        }
         if ("items" in $$parsedSource) {
-            $$parsedSource["items"] = $$createField5_0($$parsedSource["items"]);
+            $$parsedSource["items"] = $$createField6_0($$parsedSource["items"]);
         }
         if ("problems" in $$parsedSource) {
-            $$parsedSource["problems"] = $$createField6_0($$parsedSource["problems"]);
+            $$parsedSource["problems"] = $$createField7_0($$parsedSource["problems"]);
         }
         if ("clone" in $$parsedSource) {
-            $$parsedSource["clone"] = $$createField8_0($$parsedSource["clone"]);
+            $$parsedSource["clone"] = $$createField9_0($$parsedSource["clone"]);
         }
         return new Project($$parsedSource as Partial<Project>);
     }
@@ -687,8 +744,9 @@ const $$createType4 = WaitingView.createFrom;
 const $$createType5 = $Create.Nullable($$createType4);
 const $$createType6 = RepositoryView.createFrom;
 const $$createType7 = $Create.Array($$createType6);
-const $$createType8 = $Create.Array($$createType0);
-const $$createType9 = Problem.createFrom;
-const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = CloneView.createFrom;
-const $$createType12 = $Create.Nullable($$createType11);
+const $$createType8 = ContextView.createFrom;
+const $$createType9 = $Create.Array($$createType0);
+const $$createType10 = Problem.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = CloneView.createFrom;
+const $$createType13 = $Create.Nullable($$createType12);

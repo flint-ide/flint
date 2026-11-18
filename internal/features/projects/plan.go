@@ -3,6 +3,7 @@ package projects
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"unicode/utf8"
 
@@ -57,13 +58,31 @@ func (a *API) PlanPrompt(folder, goal string) (PlanPrompt, error) {
 		return PlanPrompt{}, err
 	}
 	mcp := a.host.Settings().MCPServer
-	return PlanPrompt{Prompt: planText(c, real, goal, a.host.Agents().Available, a.host.Agents().Default), ToolOn: mcp.Enabled && mcp.Actions.Projects}, nil
+	return PlanPrompt{Prompt: planText(c, real, goal, a.host.Agents().Available, a.host.Agents().Default, ReadContext(real)), ToolOn: mcp.Enabled && mcp.Actions.Projects}, nil
+}
+
+// planContext is the project's context file for the planning prompt: its
+// text, cut at maxPlanContext characters (saying so), or why it is left out.
+func planContext(folder string, pc ProjectContext) string {
+	switch {
+	case pc.Text != "":
+		text := pc.Text
+		if n := utf8.RuneCountInString(text); n > maxPlanContext {
+			text = string([]rune(text)[:maxPlanContext]) + fmt.Sprintf("\n[… cut here: the file has %d characters; read the rest in %s]", n, filepath.Join(folder, ContextFile))
+		}
+		return fmt.Sprintf("What the project is for, how its repositories fit together, its conventions and its definition of done (its %s; every agent that works on an item gets it too):\n\n%s\n\n"+
+			"Split the goal in the project's terms: items that fit its repositories, follow its conventions and can meet its definition of done.\n\n", ContextFile, text)
+	case pc.Problem != "":
+		return fmt.Sprintf("(The project's %s is left out: %s.)\n\n", ContextFile, pc.Problem)
+	}
+	return ""
 }
 
 // planText is the prompt of Plan with Agent….
-func planText(c Config, folder, goal string, agents []string, def string) string {
+func planText(c Config, folder, goal string, agents []string, def string, pc ProjectContext) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Plan this goal as work items of the Flint project %q (folder %s):\n\n%s\n\n", c.Name, folder, goal)
+	b.WriteString(planContext(folder, pc))
 	fmt.Fprintf(&b, "First read the project's backlog with Flint's %s tool (project: %q) and don't add what is planned there already. "+
 		"Then split the goal into items that one agent can finish and that can be checked, and add each with Flint's %s tool, "+
 		"in an order where an item only waits for items that exist already. Flint asks me before each item is written.\n\n", ToolName, c.Name, AddToolName)

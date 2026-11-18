@@ -10,6 +10,7 @@ import (
 
 	as "flint/internal/agentsession"
 	"flint/internal/agenttask"
+	"flint/internal/feature"
 	"flint/internal/git"
 )
 
@@ -199,7 +200,9 @@ var taskOrigin = as.Origin{Agent: "Flint", Role: "task"}
 // user opened one by hand) is left alone: a task's chat is started once.
 // For a task of a joint group it starts the group's one chat, in the lead's
 // worktree, with the description of the whole group (jointPrompt); openChat
-// gives it the other worktrees as additional folders.
+// gives it the other worktrees as additional folders. For a task a feature
+// made (an Origin; the lead's for a joint group) the first message starts
+// with that feature's context for it, composed now (taskContext).
 func (a *App) startTaskChat(task agenttask.Task) {
 	defer func() {
 		a.releaseStart(task.ID)
@@ -220,6 +223,9 @@ func (a *App) startTaskChat(task agenttask.Task) {
 	if a.chatIn(task.Worktree) {
 		return
 	}
+	if text := a.taskContext(task); text != "" {
+		prompt = text + "\n\n" + prompt
+	}
 	ctx, cancel := context.WithTimeout(a.ctx, agentStartTimeout)
 	defer cancel()
 	origin := taskOrigin
@@ -229,6 +235,26 @@ func (a *App) startTaskChat(task agenttask.Task) {
 		a.logf("start the chat of task %s: %v", task.ID, err)
 	}
 }
+
+// taskContext asks the features for the context of a task (a joint group's
+// lead) whose chat starts now: "" for a task without an origin, which no
+// feature is asked about.
+func (a *App) taskContext(task agenttask.Task) string {
+	if task.Origin == "" {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(a.ctx, gitTimeout)
+	defer cancel()
+	return a.features.TaskContext(ctx, feature.TaskStart{
+		Origin: task.Origin, Worktree: task.Worktree, Branch: task.Branch, Base: task.Base,
+		Joint: task.Joint != "", MCP: a.allowMCP(task.Worktree),
+	})
+}
+
+// flintStarts: Flint starts the task's chat itself, also on Start now (a
+// joint group's one chat, or a task with an origin, whose first message
+// Flint composes); the UI starts none for it (TaskView.FlintStarts).
+func flintStarts(task agenttask.Task) bool { return task.Joint != "" || task.Origin != "" }
 
 // chatIn reports whether a chat is open in folder.
 func (a *App) chatIn(folder string) bool {
@@ -278,7 +304,9 @@ func (t *TaskAPI) StartQueued() { t.app.startQueuedTasks() }
 // starts its chat, as for a new task; except for a task of a joint group:
 // the whole group leaves the queue and Go starts its one chat itself (in the
 // lead's worktree, with every worktree's folder and the group's
-// description), so the UI starts no chat when the view it gets has a Joint.
+// description), and for a task with an origin, whose first message starts
+// with its feature's context: the UI starts no chat when the view it gets
+// says FlintStarts.
 func (t *TaskAPI) StartNow(id string) (TaskView, error) {
 	a := t.app
 	a.queue.mu.Lock()
@@ -311,7 +339,7 @@ func (t *TaskAPI) StartNow(id string) (TaskView, error) {
 	}
 	task.Queued = false
 	a.tasksChanged()
-	if task.Joint != "" {
+	if flintStarts(task) {
 		lead := members[0]
 		a.queue.starts.Add(1)
 		go func() {

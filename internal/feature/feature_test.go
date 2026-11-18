@@ -87,3 +87,37 @@ func TestSetTasksChanged(t *testing.T) {
 	var none *Set
 	none.TasksChanged()
 }
+
+func TestSetTaskContext(t *testing.T) {
+	var asked []string
+	s := New([]Module{
+		{ID: "a", New: func(Host) Instance {
+			return Instance{TaskContext: func(_ context.Context, st TaskStart) string {
+				asked = append(asked, "a:"+st.Origin)
+				if strings.HasPrefix(st.Origin, "a:") {
+					return "context of " + st.Origin
+				}
+				return ""
+			}}
+		}},
+		{ID: "b", New: func(Host) Instance { return Instance{} }},
+	}, nil)
+	tests := []struct {
+		origin, want string
+		asked        int
+	}{
+		{"a:item", "context of a:item", 1},
+		{"other:x", "", 1},
+		{"", "", 0}, // a task without an origin: no feature is asked
+	}
+	for _, tt := range tests {
+		asked = nil
+		if got := s.TaskContext(t.Context(), TaskStart{Origin: tt.origin}); got != tt.want || len(asked) != tt.asked {
+			t.Errorf("TaskContext(%q) = %q, asked %v", tt.origin, got, asked)
+		}
+	}
+	var none *Set
+	if none.TaskContext(t.Context(), TaskStart{Origin: "a:x"}) != "" {
+		t.Error("a nil set gave context")
+	}
+}

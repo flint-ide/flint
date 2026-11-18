@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react'
 import { Dropdown } from '../../components/ui/Dropdown'
 import { Select } from '../../components/ui/Select'
 import { ProjectDialogs } from './Dialogs'
-import { ItemActions, ItemDependencies, ItemMeta, ItemTasks, ItemTitle } from './ItemParts'
+import { ItemActions, ItemDependencies, ItemMeta, ItemTasks, ItemTitle, ProjectContext } from './ItemParts'
 import {
   allReposResolve,
   canClone,
@@ -87,6 +87,11 @@ export function ProjectsPanel() {
         {info?.error && <div className="placeholder error">{info.error}</div>}
         {loaded?.error && !info?.error && <div className="placeholder error">{loaded.error}</div>}
         {info && !(project?.trusted ?? info.trusted) && <Untrusted info={info} />}
+        {project && (
+          <div className="project-context-row">
+            <ProjectContext project={project} />
+          </div>
+        )}
         {project && project.repositories.length > 0 && <Repositories project={project} collapsed={collapsed} clone={clones[project.path]} />}
         {project && <Groups project={project} collapsed={collapsed} />}
         {infos?.length === 0 && (

@@ -4450,6 +4450,25 @@ button.keymap-chord:hover {
   font-size: 11px;
   cursor: pointer;
 }
+.project-context-row {
+  padding: 0 10px 6px;
+}
+.project-context {
+  display: inline-flex;
+  flex: none;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  min-width: 0;
+}
+.project-context .link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+}
 .project-repos {
   border-bottom: 1px solid var(--border);
   padding-bottom: 4px;

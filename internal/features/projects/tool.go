@@ -36,7 +36,9 @@ func (a *API) readTools() []mcpserver.Tool {
 		Title: "Read the Flint projects",
 		Description: "Returns the Flint projects the user has open (a Flint project is a folder of planned work items, its backlog, for one or more repositories; not the folder this chat works in) with their items: " +
 			"id, title, status (doing, review, todo, done), priority, agent, repositories (and whether one agent works in all of them together), the items it waits for (after) and whether it is ready, and text. " +
-			"Use it to answer what is planned or what to work on next. Read-only: statuses change in Flint. " +
+			"Use it to answer what is planned or what to work on next. " +
+			"Called from an agent working on a project's item, it returns that project first and in full, marks that item, and names the other projects (ask for one by name). " +
+			"Read-only: statuses change in Flint. " +
 			"Projects whose folder is in Restricted Mode in Flint are left out.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{` +
 			`"status":{"type":"string","enum":["todo","doing","review","done"],"description":"Only items with this status."},` +
@@ -46,7 +48,7 @@ func (a *API) readTools() []mcpserver.Tool {
 	}}
 }
 
-func (a *API) callTool(_ context.Context, _ string, args json.RawMessage) (string, error) {
+func (a *API) callTool(ctx context.Context, root string, args json.RawMessage) (string, error) {
 	var in struct {
 		Status  string `json:"status"`
 		Project string `json:"project"`
@@ -61,31 +63,93 @@ func (a *API) callTool(_ context.Context, _ string, args json.RawMessage) (strin
 	if in.Status != "" && !slices.Contains(Statuses, in.Status) {
 		return "", fmt.Errorf("status must be one of %s", strings.Join(Statuses, ", "))
 	}
-	return a.describe(in.Status, in.Project), nil
+	return a.describeFor(a.toolCaller(ctx, root), in.Status, in.Project), nil
+}
+
+// caller is who asks get_project: the item an agent task of the calling chat
+// works on (from the task's origin), or else the folder the chat works in.
+type caller struct {
+	// Project and Item: the chat is an agent task of this item ("" when not).
+	Project, Item string
+	// Repos are the RepoKeys of the remotes of the chat's folder.
+	Repos []string
+}
+
+// toolCaller finds out who calls: the chat comes from the MCP server
+// (mcpserver.CallerFrom, the chat's token), its task's origin from the Host,
+// and root is the chat's folder (also from its token).
+func (a *API) toolCaller(ctx context.Context, root string) caller {
+	var c caller
+	if o, ok := parseOrigin(a.host.TaskOrigin(mcpserver.CallerFrom(ctx))); ok {
+		c.Project, c.Item = o.Project, o.Item
+	}
+	if root != "" {
+		if repo, err := a.host.Repository(ctx, root); err == nil {
+			for _, u := range repo.Remotes {
+				if k, ok := RepoKey(u); ok {
+					c.Repos = append(c.Repos, k)
+				}
+			}
+		}
+	}
+	return c
 }
 
 // noteRoom is kept free of describe's budget for its closing notes, so they
 // are never cut by the MCP server's own limit.
 const noteRoom = 512
 
-// describe renders the known projects as text for an agent, bounded:
+// describe is get_project's answer for a caller that is no project's task.
+func (a *API) describe(status, name string) string { return a.describeFor(caller{}, status, name) }
+
+// describeFor renders the known projects as text for an agent, bounded:
 // everything it writes (headers, repositories, items, notes) counts against
 // maxToolOutput. Projects whose folder is not trusted are left out (their
 // text could steer the agent), and it says how many.
-func (a *API) describe(status, name string) string {
+//
+// For the agent of a project's item (who.Project), without a name it is
+// that project first and in full, the caller's item marked, and the other
+// projects by name only; asking for a project by name returns that one.
+// For another chat, the projects with a repository whose URL is a remote of
+// the chat's folder come first.
+func (a *API) describeFor(who caller, status, name string) string {
 	var b strings.Builder
 	folders := a.knownSet()
+	trusted := func(f string) bool { return a.host.Trusted(f) }
+	focus := ""
+	if who.Project != "" && slices.Contains(folders, who.Project) && trusted(who.Project) {
+		focus = who.Project
+	}
+	// The order: the caller's project, then the projects of the chat's
+	// repository, then the others (each group in the known order).
+	rank := func(f string) int {
+		if f == focus {
+			return 0
+		}
+		if len(who.Repos) > 0 {
+			if c, err := LoadConfig(f); err == nil {
+				for _, r := range c.Repositories {
+					if k, ok := RepoKey(r.URL); ok && slices.Contains(who.Repos, k) {
+						return 1
+					}
+				}
+			}
+		}
+		return 2
+	}
+	slices.SortStableFunc(folders, func(x, y string) int { return rank(x) - rank(y) })
 	budget := maxToolOutput - noteRoom
 	fits := func(s string) bool { return b.Len()+len(s) <= budget }
 	shown, cut, untrusted := 0, 0, 0
+	var others []string // by name only
 	for _, folder := range folders {
-		if !a.host.Trusted(folder) {
+		if !trusted(folder) {
 			untrusted++
 			continue
 		}
 		l, err := Load(folder)
 		if err != nil {
-			if s := fmt.Sprintf("# Project at %s\n\nCannot be read: %v\n\n", folder, err); name == "" && fits(s) {
+			if s := fmt.Sprintf("# Project at %s\n\nCannot be read: %v\n\n", folder, err); name == "" && focus == "" && fits(s) {
 				b.WriteString(s)
 			}
 			continue
@@ -93,14 +157,28 @@ func (a *API) describe(status, name string) string {
 		if name != "" && l.Config.Name != name {
 			continue
 		}
+		if name == "" && focus != "" && folder != focus {
+			others = append(others, l.Config.Name)
+			continue
+		}
 		shown++
 		var items []Item
 		for _, it := range l.Items {
-			if status == "" || it.Status == status {
+			if status == "" || it.Status == status || folder == focus && it.ID == who.Item {
 				items = append(items, it)
 			}
 		}
-		if head := projectHeader(l.Config, folder); fits(head) {
+		head := projectHeader(l.Config, folder)
+		mine := ""
+		if folder == focus {
+			if i := slices.IndexFunc(l.Items, func(it Item) bool { return it.ID == who.Item }); i >= 0 {
+				mine = who.Item
+				head += fmt.Sprintf("You are working on the item %s: %s (marked below).\n\n", mine, l.Items[i].Title)
+				// The caller's item first.
+				slices.SortStableFunc(items, func(x, y Item) int { return boolRank(x.ID != mine) - boolRank(y.ID != mine) })
+			}
+		}
+		if fits(head) {
 			b.WriteString(head)
 		} else {
 			cut += len(items)
@@ -108,7 +186,11 @@ func (a *API) describe(status, name string) string {
 		}
 		deps := Dependencies(l.Items)
 		for _, it := range items {
-			if entry := itemText(it, deps[it.ID]); fits(entry) {
+			entry := itemText(it, deps[it.ID])
+			if it.ID == mine {
+				entry = strings.Replace(entry, "\n", " (you are working on this item)\n", 1)
+			}
+			if fits(entry) {
 				b.WriteString(entry)
 			} else {
 				cut++
@@ -124,6 +206,14 @@ func (a *API) describe(status, name string) string {
 	case shown == 0 && name != "":
 		fmt.Fprintf(&b, "No open project is named %q.\n", name)
 	}
+	if len(others) > 0 {
+		list := strings.Join(quoteAll(others), ", ")
+		if s := fmt.Sprintf("Other open projects (call %s with project: <name> to read one): %s\n", ToolName, list); fits(s) {
+			b.WriteString(s)
+		} else {
+			fmt.Fprintf(&b, "(%d other open project(s) not listed: call %s with a project's name to read it.)\n", len(others), ToolName)
+		}
+	}
 	if cut > 0 {
 		fmt.Fprintf(&b, "(%d more item(s) not shown: the answer is limited to %d KB; ask for one status or one project.)\n", cut, maxToolOutput>>10)
 	}
@@ -131,6 +221,21 @@ func (a *API) describe(status, name string) string {
 		fmt.Fprintf(&b, "(%d project(s) left out: their folders are in Restricted Mode in Flint. The user can trust a project's folder in Flint to let agents read it.)\n", untrusted)
 	}
 	return strings.TrimSpace(b.String())
+}
+
+func boolRank(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func quoteAll(v []string) []string {
+	out := make([]string, len(v))
+	for i, s := range v {
+		out[i] = fmt.Sprintf("%q", s)
+	}
+	return out
 }
 
 // projectHeader is a project's heading and its repositories.

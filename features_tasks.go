@@ -46,7 +46,8 @@ func (h featureHost) CreateAgentTasks(ctx context.Context, reqs []feature.NewAge
 	var all []agenttask.Task
 	for i, req := range reqs {
 		gctx, cancel := context.WithTimeout(ctx, gitRemoteTimeout) // checkout hooks may run
-		made, r, err := a.createTasks(gctx, NewTaskGroup{Dir: req.Dir, Description: req.Description, Agents: []string{req.Agent}}, true, true)
+		made, r, err := a.createTasksWith(gctx, NewTaskGroup{Dir: req.Dir, Description: req.Description, Agents: []string{req.Agent}},
+			createOptions{queueOK: true, hold: true, origin: req.Origin})
 		cancel()
 		if err != nil {
 			uctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), gitTimeout)
@@ -110,7 +111,7 @@ func (h featureHost) CreateJointAgentTasks(ctx context.Context, reqs []feature.N
 		if req.Agent != "" && req.Agent != agentName {
 			return nil, fmt.Errorf("%s: a joint agent task has one agent, %s, not %s", req.Dir, agentName, req.Agent)
 		}
-		jreqs[i] = jointRequest{Dir: req.Dir, Description: req.Description}
+		jreqs[i] = jointRequest{Dir: req.Dir, Description: req.Description, Origin: req.Origin}
 	}
 	made, err := a.createJointTasks(ctx, jreqs, agentName, true)
 	switch {
@@ -228,6 +229,29 @@ func (h featureHost) Repository(ctx context.Context, dir string) (feature.Reposi
 		out.Remotes = append(out.Remotes, rm.URL)
 	}
 	return out, nil
+}
+
+// TaskOrigin is the origin of the task the chat works for: the tasks the
+// tracker bound the chat to (by its folder), and for a joint group's chat
+// its lead's.
+func (h featureHost) TaskOrigin(chat string) string {
+	if chat == "" {
+		return ""
+	}
+	store := h.a.taskStore()
+	for _, id := range h.a.tasks.Tasks(chat) {
+		_, task, ok := store.Find(id)
+		if !ok {
+			continue
+		}
+		if task.Joint != "" {
+			if members := store.Joint(task.Joint); len(members) > 0 {
+				return members[0].Origin
+			}
+		}
+		return task.Origin
+	}
+	return ""
 }
 
 // Agents are AgentAPI.Info's available agents and preferred one.

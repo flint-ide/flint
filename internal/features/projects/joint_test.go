@@ -92,8 +92,8 @@ func TestDelegateTogether(t *testing.T) {
 	}
 	// Every member gets the item's description as is, the lead first.
 	want := []feature.NewAgentTask{
-		{Dir: f.root, Description: "Joint\n\nDo Joint.", Agent: "backend"},
-		{Dir: web, Description: "Joint\n\nDo Joint.", Agent: "backend"},
+		{Dir: f.root, Description: "Joint\n\nDo Joint.", Agent: "backend", Origin: origin{Project: f.plan, Item: "j", Repo: "api"}.String()},
+		{Dir: web, Description: "Joint\n\nDo Joint.", Agent: "backend", Origin: origin{Project: f.plan, Item: "j", Repo: "web"}.String()},
 	}
 	for i, r := range calls[0].Reqs {
 		if r != want[i] {

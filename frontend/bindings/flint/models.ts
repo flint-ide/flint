@@ -1815,6 +1815,13 @@ export class TaskView {
     "lead": boolean;
 
     /**
+     * FlintStarts: Flint starts this task's chat itself when it leaves the
+     * queue, also on Start now (a joint group's one chat, or a task a feature
+     * made, whose first message Flint composes): the UI starts none for it.
+     */
+    "flintStarts": boolean;
+
+    /**
      * Tokens and CostUSD are what the task's chats used so far (input and
      * output tokens; reported cost plus estimates from settings prices).
      */
@@ -1876,6 +1883,9 @@ export class TaskView {
         }
         if (!("lead" in $$source)) {
             this["lead"] = false;
+        }
+        if (!("flintStarts" in $$source)) {
+            this["flintStarts"] = false;
         }
         if (!("tokens" in $$source)) {
             this["tokens"] = 0;

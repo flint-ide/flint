@@ -306,9 +306,9 @@ func TestJointCreateRefusals(t *testing.T) {
 	}{
 		{"codex", j.requests("x"), "codex", errJointEngine, "codex runs on codex, which cannot work in several folders at once: delegate per repository instead"},
 		{"a custom ACP agent", j.requests("x"), "fake", errJointEngine, "fake cannot work in several folders at once"},
-		{"an untrusted repository", []jointRequest{{j.repos[0], "x"}, {untrusted, "x"}}, "claude", errJointUntrusted, "not trusted"},
+		{"an untrusted repository", []jointRequest{{Dir: j.repos[0], Description: "x"}, {Dir: untrusted, Description: "x"}}, "claude", errJointUntrusted, "not trusted"},
 		{"one repository", j.requests("x")[:1], "claude", nil, "at least two"},
-		{"the same repository twice", []jointRequest{{j.repos[0], "x"}, {j.repos[0], "y"}}, "claude", nil, "same repository"},
+		{"the same repository twice", []jointRequest{{Dir: j.repos[0], Description: "x"}, {Dir: j.repos[0], Description: "y"}}, "claude", nil, "same repository"},
 	} {
 		_, err := j.app.createJointTasks(context.Background(), c.reqs, c.agent, false)
 		if err == nil || (c.is != nil && !errors.Is(err, c.is)) || !strings.Contains(err.Error(), c.want) {

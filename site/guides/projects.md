@@ -1,6 +1,6 @@
 # Projects
 
-A project holds work that is planned but not started: a folder of work items, its **backlog**, for one or more repositories, that Flint shows as a list and as a board. **Delegate** turns an item into [agent tasks](ai-agents.md#agent-tasks-agents-in-parallel), one per repository the item names (or one agent for all of them), run by the agent the item names, and the item's status follows them. An item can wait for other items, an agent can plan the items for you, and a repository you don't have yet can be cloned. You can have several projects at once. This guide explains the folder and its files, how repositories are matched to your checkouts and cloned, what Delegate does and refuses, how items wait for each other, how one agent works across repositories, how an agent plans a project, how the status moves, and what is shared with a team.
+A project holds work that is planned but not started: a folder of work items, its **backlog**, for one or more repositories, that Flint shows as a list and as a board. **Delegate** turns an item into [agent tasks](ai-agents.md#agent-tasks-agents-in-parallel), one per repository the item names (or one agent for all of them), run by the agent the item names, and the item's status follows them. Every agent Delegate starts knows the project it works on: what it is for (from the project's `PROJECT.md`), where its item stands, what it depends on and what else is in progress. An item can wait for other items, an agent can plan the items for you, and a repository you don't have yet can be cloned. You can have several projects at once. This guide explains the folder and its files, how repositories are matched to your checkouts and cloned, what Delegate does and refuses, what every agent is told about the project, how items wait for each other, how one agent works across repositories, how an agent plans a project, how the status moves, and what is shared with a team.
 
 **Two meanings of "project".** Elsewhere in Flint, and in [Open projects](../how-to/open-projects.md), a project is a folder you open in the window ("Open Folder…", "Recent Projects…"). This guide says "project" only for the folder of work items described here, and calls the folders open in the window *folders*, *workspace folders* or *checkouts*; the one you are working in is the *active folder*. A project's folder may also be open in the window, but it doesn't have to be.
 
@@ -35,17 +35,20 @@ Flint remembers the projects you opened or created, most recent first, up to 20.
 
 The project folder can be its own git repository, a folder inside one of your repositories, or a plain folder. A project is known by its real path, with symbolic links resolved.
 
-The panel shows one project at a time: the picker under its header lists your projects and chooses the one shown. Below it come the [Repositories](#the-repositories-group) group and the project's backlog: its items, grouped by status: **Doing**, **Review**, **To do** and **Done** (Done starts collapsed). Each group header opens and closes with a click, or with Enter or Space when it has the keyboard focus. A row shows what an item [waits for](#dependencies), and marks an item that runs as [one agent across its repositories](#one-agent-across-repositories). Problem files are listed at the end.
+The panel shows one project at a time: the picker under its header lists your projects and chooses the one shown. Below it come the **Context** line, with **Open** for the project's [`PROJECT.md`](#project-context-what-every-agent-knows) or **Add Project Context…** when it has none, the [Repositories](#the-repositories-group) group and the project's backlog: its items, grouped by status: **Doing**, **Review**, **To do** and **Done** (Done starts collapsed). Each group header opens and closes with a click, or with Enter or Space when it has the keyboard focus. A row shows what an item [waits for](#dependencies), and marks an item that runs as [one agent across its repositories](#one-agent-across-repositories). Problem files are listed at the end.
 
 ## The folder
 
 ```text
 acme-plan/
   flint-project.json
+  PROJECT.md            optional: what every agent is told about the project
   items/
     rate-limit-checkout.md
     cart-badge.md
 ```
+
+`PROJECT.md` is described in [Project context](#project-context-what-every-agent-knows).
 
 ### flint-project.json
 
@@ -139,6 +142,7 @@ A file that breaks a rule is not shown as an item, except the problems that are 
 | `the agent "x" is not available here` | The item stays listed. Define or install the agent, or change `agent`. Delegate says the same. |
 | `more than 500 files; the rest are not loaded` | A project's backlog holds at most 500 items. |
 | `links outside its folder` | A symbolic link that leaves the project folder is refused. |
+| `PROJECT.md`: `longer than 16000 characters`, `contains invisible characters (U+200B)`, `not UTF-8 text`, `links outside the project folder` | The [context file](#project-context-what-every-agent-knows) breaks a rule, so agents don't get it until it is fixed. Delegate still works and says that the context was left out. |
 
 ## How repositories are matched
 
@@ -203,7 +207,7 @@ The path keeps its case. Local paths (`/srv/git/api.git`, `file:///srv/git/api.g
 1. **Checks the agent.** The item's `agent`, else the default agent. It must be available now. For an item with `together: true` it must also be one that can [work in several folders](#one-agent-across-repositories).
 2. **Finds a checkout for every repository** the item names, as described above. An item without `repos` uses the folder that is active in the window, which must be one of the folders open in it. If something is missing, Delegate walks you through it one step at a time before it starts anything: **Locate…** for a repository without a checkout, adding a located folder to the window, trusting a checkout in Restricted Mode. A step you cancel stops Delegate; a step that doesn't help shows why Delegate can't go on.
 3. **Creates one agent task per repository**, the way New Agent Task does: a branch from the checkout's current branch, a worktree, the [queue](ai-agents.md#the-queue) and its limit, and the trust of the worktree. The description is the item's title and text. When the item names several repositories, each task also gets a note naming the item's other repositories and saying which one this task works in. With `together: true` the tasks are one [joint group](#one-agent-across-repositories) and get no note.
-4. **Starts the agents.** A task that gets a slot starts its chat at once, with the description as its first message. The others wait in the queue, like any queued task. A joint group takes one slot and starts one chat.
+4. **Starts the agents.** A task that gets a slot starts its chat at once. Its first message is the [project context](#project-context-what-every-agent-knows), then the description. The others wait in the queue, like any queued task, and get the context when they leave it. A joint group takes one slot and starts one chat.
 5. **Remembers the tasks for the item and sets its status to `doing`.**
 
 Delegate is all or nothing, for a joint group too. If one task can't be created, Flint removes the ones it already created for this Delegate and shows the error. None of its tasks leaves the queue before all of them exist, so a task that is removed again never had an agent working in it.
@@ -213,6 +217,8 @@ For an item of a project whose folder isn't trusted, Flint asks first in a dialo
 The item row lists its agent tasks with their states (queued, working, waiting for you, finished, failed, as in the [Agent Tasks panel](ai-agents.md#agent-tasks-agents-in-parallel)), and **Open** on a task shows its folder and chat, as in that panel. Review, merge or create a pull request there.
 
 **Delegating again** (after a failure, or to try another agent) adds agent tasks. The item shows all of them.
+
+When the project's `PROJECT.md` can't be used, Delegate still starts the tasks and tells you that the agents got no project context from it, and why.
 
 ### What Delegate refuses
 
@@ -234,6 +240,108 @@ Delegate checks everything before it creates anything, and lists every repositor
 | Delegate was cancelled | You answered Cancel when Flint showed the item of an untrusted project | Read the item; Delegate again if it is what you want, or trust the project's folder. |
 
 An item that waits for other items is not a refusal: Delegate starts nothing and asks if it should start the item when it is ready. An item that is listed as a problem can't be delegated, because it isn't an item yet. If the tasks start but Flint can't write the status, it tells you; the tasks keep running.
+
+## Project context: what every agent knows
+
+An item says what to do. An agent that works on it also needs to know what the project is for, how the repositories fit together, what is done already and what other agents are doing at the same time. Flint gives every agent Delegate starts this **project context**, at the start of its chat's first message, before the item's text.
+
+### PROJECT.md
+
+Write what an agent should know about the whole project in `PROJECT.md`, at the top of the project folder: plain Markdown, written by you or your team and committed with the items. It is optional. **Add Project Context…** on the panel's **Context** line (or in the board's header) writes one from a template with four headings, and opens it; it never overwrites a file. When the file exists, the line says `PROJECT.md` with **Open**.
+
+```markdown
+# Acme Shop
+
+## What this project is for
+
+The online shop of Acme: customers browse, fill a cart and pay. This project
+moves checkout to the new payment provider before the end of June.
+
+## Repositories
+
+- api: the Go service behind /api. It owns the database; nothing else writes to it.
+- web: the React client. It talks to the api only through the generated client in src/api.
+
+## Conventions
+
+- Every API change comes with a migration and an entry in api/CHANGELOG.md.
+- Errors are JSON: {"error": "...", "code": "..."}.
+- No new dependencies without asking.
+
+## Definition of done
+
+Tests pass (`make test` in api, `npm test` in web), the docs are updated,
+and the change is behind the `new-checkout` flag.
+```
+
+Keep it short: it is sent to every agent, and only its first 16,000 characters may be used. The file follows the [character rules](#items) of an item, may be at most 64 KB, and must be in the project folder (a symbolic link that leaves it is refused). A file that breaks a rule is listed under **Problems**, with **Ask the agent**, and agents don't get it until it is fixed; the **Context** line marks it as not sent.
+
+### What an agent receives
+
+The first message of an item's agent starts with a block that Flint writes from the project's files. For the item `rate-limit-checkout` of the project above, delegated to the `api` repository, it reads:
+
+```text
+===== Project context (from Flint) =====
+You are one of the agents working on the Flint project "Acme Shop" (a backlog of work items, in /home/me/acme-plan). Flint wrote this part of the message from the project's files as they are now; your task follows after it.
+
+## About the project (PROJECT.md)
+
+# Acme Shop
+
+## What this project is for
+…the rest of PROJECT.md…
+
+## Your item
+
+rate-limit-checkout: Rate limit the checkout API
+status: doing; priority: high; file: items/rate-limit-checkout.md
+
+## What your item depends on
+
+- add-customer-ids: Add customer ids (done)
+  - api: branch agent/add-customer-ids, pull request https://github.com/acme/api/pull/7
+- cache-prices: Cache prices (doing)
+
+## In progress in this project
+
+- cache-prices: Cache prices (doing; agent: the default agent; repositories: api)
+- cart-badge: Show the cart badge (doing; agent: frontend; repositories: web)
+
+## Repositories and where you work
+
+- api: git@github.com:acme/api.git (you work in it)
+- web: https://github.com/acme/web.git
+
+You work in api only, in /home/me/api.worktrees/agent-rate-limit-the-checkout-api on the branch agent/rate-limit-the-checkout-api (from main).
+
+## Reading more
+
+Flint's get_project tool returns this project's whole backlog, your item first.
+
+===== Your task =====
+
+Rate limit the checkout API
+
+Limit POST /checkout to 10 requests a minute per customer.
+…
+```
+
+In this order:
+
+1. **The project**: its name and folder, and the text of `PROJECT.md`. Without the file this part is left out; with a file that breaks a rule, the agent is told it was left out and why.
+2. **Its item**: id, title, status, priority and file.
+3. **What the item depends on** (its [`after`](#dependencies) line): each item's title and status, and for those that are done the branches and pull requests of their agent tasks that this computer knows about, per repository.
+4. **What else is in progress**: the project's other items in `doing` or `review`, with their agent and repositories, at most 20, saying how many more there are.
+5. **The repositories** with their URLs, which one this agent works in (folder and branch), and which ones other agents work on for the same item. For an item with [`together: true`](#one-agent-across-repositories) the agent is told that it works in all of them; which folder is which follows the item's text, as before.
+6. **How to read more**: the [`get_project`](#what-agents-can-see) tool, when the chat is offered Flint's tools.
+
+After the line `===== Your task =====` comes the description, exactly as without a context: the item's title and text (and the note naming the other repositories). The 8,000-byte limit applies to that text only, never to the context. The Agent Tasks panel and the task's title show the item's text, as before.
+
+**The context is written when the chat starts**, not when you click Delegate. A task that waits in the [queue](ai-agents.md#the-queue), or an item that starts [when it is ready](#start-when-ready), gets the project as it is then: a `PROJECT.md` you edited meanwhile, or a dependency that is done now.
+
+**It is bounded.** The whole block is at most 24 KB. When it would be longer, Flint leaves out, in this order, the items in progress, the branches and pull requests of the dependencies, the repositories the item doesn't name, and the end of `PROJECT.md`, and says in the block what it left out and where to read the rest.
+
+Ordinary agent tasks made with **New Agent Task…** get no context: only tasks of a project's item do.
 
 ## Dependencies
 
@@ -325,7 +433,7 @@ Leave it out when the work in each repository can go on alone, when you want sev
 
 Delegate makes its usual checks and then makes the group. For each repository you get what any agent task has: its own branch from the checkout's current branch, its own worktree and its own agent task. So **Merge**, **Create PR**, **Show diff** and **✕** work per repository, as in the [Agent Tasks panel](ai-agents.md#agent-tasks-agents-in-parallel), and each repository gets its own pull request.
 
-What is shared is the agent. Flint opens one chat in the worktree of the first repository in `repos`, the **lead**, and lets it read and write the worktrees of the others. The panel shows the tasks of a group together, with the lead marked. The chat's first message is the item's title and text, then which folder is which repository on which branch, then a request to keep the change consistent across them and to commit in each folder on its own branch. There is no note about the other repositories, so the 8,000 bytes apply to the title and text alone.
+What is shared is the agent. Flint opens one chat in the worktree of the first repository in `repos`, the **lead**, and lets it read and write the worktrees of the others. The panel shows the tasks of a group together, with the lead marked. The chat's first message is the [project context](#project-context-what-every-agent-knows), then the item's title and text, then which folder is which repository on which branch, then a request to keep the change consistent across them and to commit in each folder on its own branch. There is no note about the other repositories, so the 8,000 bytes apply to the title and text alone.
 
 The tasks share the chat's state: they are working, waiting for you and finished together. **Merge** is refused while the agent works, as for any task. The item's status follows the same rules as always: `review` when the chat finished, `done` when every task is merged, or removed after its pull request was created.
 
@@ -380,7 +488,7 @@ Flint refuses to write a file it can't change safely and says why. Set the statu
 
 ## The board
 
-**Show Board** in the panel's `⋯` menu, or "Show Project Board" in the command palette, opens the board in a tab titled "Project: <name>": one column per status, **To do**, **Doing**, **Review** and **Done**, with the items as cards. A card shows what an item row shows and has the same actions: **Delegate**, **Open**, **Status ⌄**, and **Open** on an agent task. Drag a card to another column to set its status. **＋ New Item…** in the board's header adds an item. A card shows what the item waits for, with **Cancel start** when you asked it to start when ready, and marks an item that runs as one agent. An open board comes back with the session when Flint restarts.
+**Show Board** in the panel's `⋯` menu, or "Show Project Board" in the command palette, opens the board in a tab titled "Project: <name>": one column per status, **To do**, **Doing**, **Review** and **Done**, with the items as cards. Its header has the same **Context** link as the panel: **Open** for `PROJECT.md`, or **Add Project Context…**. A card shows what an item row shows and has the same actions: **Delegate**, **Open**, **Status ⌄**, and **Open** on an agent task. Drag a card to another column to set its status. **＋ New Item…** in the board's header adds an item. A card shows what the item waits for, with **Cancel start** when you asked it to start when ready, and marks an item that runs as one agent. An open board comes back with the session when Flint restarts.
 
 ## Plan with an agent
 
@@ -390,7 +498,7 @@ Instead of writing every item yourself, you can state a goal and let an agent sp
 2. Say what the goal is (1 to 2,000 characters, with the [character rules](#items) of an item's text) and pick the agent: a [defined agent](ai-agents.md#defined-agents) such as a planner, or any other agent. The default agent is the default choice.
 3. Flint puts a prompt into the draft of a chat with that agent. Read it, change it, and send it. Flint sends nothing for you.
 
-The prompt gives the agent your goal, the project's name, folder and repositories, the item format with its limits (including `after` and `together`), and the agents available on this computer. It tells the agent to read the project's backlog first with `get_project` and not to add what is planned already, to split the goal into items that one agent can finish and that can be checked, to add each with `add_project_item` in an order where an item only waits for items that exist, and to list what it added when it is done. It also says that the agent can't change, delete, start or set the status of items, and to correct an item and try again when a call is refused.
+The prompt gives the agent your goal, the project's `PROJECT.md` (its first 8,000 characters), so that it splits the goal in the project's terms, the project's name, folder and repositories, the item format with its limits (including `after` and `together`), and the agents available on this computer. It tells the agent to read the project's backlog first with `get_project` and not to add what is planned already, to split the goal into items that one agent can finish and that can be checked, to add each with `add_project_item` in an order where an item only waits for items that exist, and to list what it added when it is done. It also says that the agent can't change, delete, start or set the status of items, and to correct an item and try again when a call is refused.
 
 ### What to switch on
 
@@ -445,19 +553,19 @@ Put the project's folder in a git repository, or in a folder of one, and commit 
 
 | Shared (in the project folder) | Local to your machine |
 |---|---|
-| `flint-project.json`, the items and their text, priority, agent, repositories, `after` and `together` | Which agent tasks belong to an item |
+| `flint-project.json`, `PROJECT.md`, the items and their text, priority, agent, repositories, `after` and `together` | Which agent tasks belong to an item |
 | Each item's status | The agent tasks themselves, their worktrees and chats |
 | | The items you asked to [start when ready](#start-when-ready) |
 | | The folders you chose with **Locate…** or cloned |
 | | The list of projects you opened |
 
-So a teammate sees that an item is `doing`, not the tasks on your machine. Waiting starts are yours alone: a teammate who pulls your commit doesn't start your item, and when you pull theirs, only the items you asked to start do. If two of you asked for the same item, each Flint starts its own tasks when the item is ready. When you commit and push, your status changes go with it. When a teammate delegates an item you haven't, the status moves on their machine and reaches you with their commit. Two people changing the same item's status at once is an ordinary git merge conflict on the `status:` line.
+So a teammate sees that an item is `doing`, not the tasks on your machine. `PROJECT.md` is shared too, so every teammate's agents start from the same context; the branches and pull requests it lists for done dependencies are the ones your machine knows. Waiting starts are yours alone: a teammate who pulls your commit doesn't start your item, and when you pull theirs, only the items you asked to start do. If two of you asked for the same item, each Flint starts its own tasks when the item is ready. When you commit and push, your status changes go with it. When a teammate delegates an item you haven't, the status moves on their machine and reaches you with their commit. Two people changing the same item's status at once is an ordinary git merge conflict on the `status:` line.
 
 Because statuses are written to the files, a status that moves by itself leaves an uncommitted change in the project's repository. Commit it with the rest.
 
 Flint reads the files again when the panel is shown, on refresh, after its own writes, when agent tasks change, and, for a project inside a folder open in the window, when a file changes. It does not watch a project folder outside the window, and it does not notice a teammate's push by itself: pull, then refresh.
 
-Don't put secrets in an item. It is a plain file in your repository, and its text is sent to an agent.
+Don't put secrets in an item or in `PROJECT.md`. They are plain files in your repository, and their text is sent to agents.
 
 ## What agents can see
 
@@ -469,6 +577,8 @@ An agent chat can read the project through Flint's [MCP server](ai-agents.md#wha
 | `project` | Optional. Only the project with this name. |
 
 The answer lists each project Flint knows whose folder is trusted, with its repositories and its items: id, title, status, priority, agent, repositories (marked when one agent works in all of them), the items it waits for with whether it is ready, and text. It does not include agent tasks. Projects whose folder is in Restricted Mode are left out, and the answer says how many and why. The text of one item is cut at 2,000 bytes, and the whole answer, headings and repository lists included, at 60 KB, with a line saying how many items were left out; ask for one status or one project to see them.
+
+It knows who is asking. Called by the agent of a project's item, without arguments it returns that project first and in full, says "You are working on the item …" and marks that item, and lists the other projects by name only; ask for one with `project` to read it. Called from any other chat, the projects with a repository whose URL is a remote of the chat's folder come first.
 
 It shows every trusted project Flint knows to any chat, not only one that belongs to the folder the chat works in. So in Claude Code it is not one of the read tools that run without asking: like Flint's other tools outside that list, such as terminal output, you are asked before each call, unless you chose "Do everything". It is offered while the Projects feature is on and, like all of Flint's tools, not to a chat in a folder in Restricted Mode.
 
@@ -505,8 +615,9 @@ A project is read in any folder: reading files runs nothing. What Restricted Mod
 - **Joint groups.** A `together: true` item needs every repository's checkout and every worktree of the group to be trusted, because one agent writes in all of them. A chat in a group doesn't open while one of them is untrusted.
 - **The project's own folder.** An item's text becomes an agent's instructions, and a project may come from someone else's repository. A project whose folder isn't trusted is marked **Restricted Mode** in the panel (with **Trust Folder…**) and on its board, and:
   - `get_project` leaves it out, so no chat reads its items;
-  - `add_project_item` refuses it, and **Plan with Agent…** is refused for it, because agents could neither read it nor add to it;
-  - Delegate on one of its items asks first, in a dialog of Flint's own that the page can't skip. It says the project's folder isn't trusted and shows the agent, the folders the tasks will work in and the description that will be sent (the first 1,000 characters, saying when it is cut). For an item with `together: true` it also says that one agent works in all of these folders together, in one chat. Cancel stops Delegate before anything is created;
+  - `add_project_item` refuses it, and **Plan with Agent…** and **Add Project Context…** are refused for it, because agents could neither read it nor add to it;
+  - Delegate on one of its items asks first, in a dialog of Flint's own that the page can't skip. It says the project's folder isn't trusted and shows the agent, the folders the tasks will work in and the description that will be sent (the first 1,000 characters, saying when it is cut). When the project has a `PROJECT.md`, it says that the file is sent too and shows its beginning (the first 1,000 characters, saying when it is cut). For an item with `together: true` it also says that one agent works in all of these folders together, in one chat. Cancel stops Delegate before anything is created;
+  - the agents of such a project get only what you confirmed: `PROJECT.md` only while it is the text the question showed (a file changed after your answer is left out, and the agent is told so), their own item, and the names of the repositories. The project's other items and the repositories' URLs are left out of the [context](#project-context-what-every-agent-knows), and so is `get_project`. This holds for a task that waits in the queue too;
   - an item you asked to [start when ready](#start-when-ready) asks the same question when it starts, naming the item and saying that it starts now because the items it waited for are done. If you decline, nothing starts and the item keeps waiting;
   - **Clone…** adds a note to its confirmation to check that you expect the URL.
 - **Clones.** A folder you cloned is in Restricted Mode until you trust it.
@@ -523,7 +634,10 @@ Flint fixes these because a project may come from someone else's repository.
 | Size of an item file or of `flint-project.json` | 64 KB |
 | Title | 120 characters |
 | Title and text together | 8,000 bytes, with Delegate's note about the repositories (no note with `together: true`) |
-| Item text shown before Delegate from an untrusted project | 1,000 characters |
+| Item text shown before Delegate from an untrusted project | 1,000 characters, and as much of `PROJECT.md` |
+| `PROJECT.md` | 64 KB; at most 16,000 characters are used |
+| The project context at the start of an agent's first message | 24 KB; at most 20 items in progress |
+| `PROJECT.md` in the prompt of **Plan with Agent…** | 8,000 characters |
 | Project name | 80 characters |
 | Repositories per project | 50; a name is at most 40 characters, a URL at most 1,000 |
 | Item id and agent name | 64 characters |

@@ -23,6 +23,9 @@ type Loaded struct {
 	Config   Config
 	Items    []Item
 	Problems []Problem
+	// Context is the project's context file (ContextFile); a file that breaks
+	// a rule is also one of Problems.
+	Context ProjectContext
 }
 
 // Resolve makes folder absolute and resolves its symlinks: a project is
@@ -53,15 +56,19 @@ func LoadConfig(folder string) (Config, error) {
 }
 
 // Load reads a project: its config (an error when that is unusable) and its
-// items, at most MaxItems, one directory level. A file that breaks a rule is
-// a problem, not an item. Files are resolved inside the folder: a symlink
-// that leaves it is refused.
+// items, at most MaxItems, one directory level, and its context file
+// (ReadContext). A file that breaks a rule is a problem, not an item (a
+// context file that breaks one is not used). Files are resolved inside the
+// folder: a symlink that leaves it is refused.
 func Load(folder string) (Loaded, error) {
 	c, err := LoadConfig(folder)
 	if err != nil {
 		return Loaded{}, err
 	}
-	l := Loaded{Config: c, Items: []Item{}, Problems: []Problem{}}
+	l := Loaded{Config: c, Items: []Item{}, Problems: []Problem{}, Context: ReadContext(folder)}
+	if p, ok := l.Context.problem(); ok {
+		l.Problems = append(l.Problems, p)
+	}
 	files, problems := prompts.ReadDir(filepath.Join(folder, ItemsDir), folder, MaxItems)
 	for _, p := range problems {
 		l.Problems = append(l.Problems, Problem{File: ItemsDir, Reason: strings.TrimPrefix(p, filepath.Join(folder, ItemsDir)+": ")})

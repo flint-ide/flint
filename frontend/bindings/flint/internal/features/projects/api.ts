@@ -18,6 +18,18 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as $models from "./models.js";
 
 /**
+ * AddContext writes the project's ContextFile from a template with the
+ * headings What this project is for, Repositories, Conventions and Definition
+ * of done (Add Project Context…; the UI then opens it). It never overwrites a
+ * file, and it is refused for a project whose folder is not trusted.
+ */
+export function AddContext(folder: string): $CancellablePromise<$models.ContextView> {
+    return $Call.ByID(2312046365, folder).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
+/**
  * CancelClone stops the clone running for a project; what it made is removed.
  */
 export function CancelClone(folder: string): $CancellablePromise<void> {
@@ -49,7 +61,7 @@ export function CancelStart(folder: string, id: string): $CancellablePromise<voi
  */
 export function Clone(folder: string, repo: string, parent: string): $CancellablePromise<$models.RepositoryView> {
     return $Call.ByID(1452494212, folder, repo, parent).then(($result: any) => {
-        return $$createType0($result);
+        return $$createType1($result);
     });
 }
 
@@ -69,7 +81,7 @@ export function Close(folder: string): $CancellablePromise<void> {
  */
 export function Create(folder: string, name: string): $CancellablePromise<$models.ProjectInfo> {
     return $Call.ByID(390255695, folder, name).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType2($result);
     });
 }
 
@@ -97,7 +109,7 @@ export function Create(folder: string, name: string): $CancellablePromise<$model
  */
 export function Delegate(folder: string, id: string, root: string): $CancellablePromise<$models.DelegateResult> {
     return $Call.ByID(2284649680, folder, id, root).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType3($result);
     });
 }
 
@@ -108,7 +120,7 @@ export function Delegate(folder: string, id: string, root: string): $Cancellable
  */
 export function Load(folder: string): $CancellablePromise<$models.Project> {
     return $Call.ByID(2913798303, folder).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType4($result);
     });
 }
 
@@ -121,7 +133,7 @@ export function Load(folder: string): $CancellablePromise<$models.Project> {
  */
 export function Locate(folder: string, repo: string, dir: string): $CancellablePromise<$models.RepositoryView> {
     return $Call.ByID(860742865, folder, repo, dir).then(($result: any) => {
-        return $$createType0($result);
+        return $$createType1($result);
     });
 }
 
@@ -131,7 +143,7 @@ export function Locate(folder: string, repo: string, dir: string): $CancellableP
  */
 export function NewItem(folder: string, title: string): $CancellablePromise<$models.ItemView> {
     return $Call.ByID(710887936, folder, title).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType5($result);
     });
 }
 
@@ -141,7 +153,7 @@ export function NewItem(folder: string, title: string): $CancellablePromise<$mod
  */
 export function Open(folder: string): $CancellablePromise<$models.ProjectInfo> {
     return $Call.ByID(2781488171, folder).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType2($result);
     });
 }
 
@@ -156,7 +168,7 @@ export function Open(folder: string): $CancellablePromise<$models.ProjectInfo> {
  */
 export function PlanPrompt(folder: string, goal: string): $CancellablePromise<$models.PlanPrompt> {
     return $Call.ByID(2568547830, folder, goal).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType6($result);
     });
 }
 
@@ -166,7 +178,7 @@ export function PlanPrompt(folder: string, goal: string): $CancellablePromise<$m
  */
 export function Projects(): $CancellablePromise<$models.ProjectInfo[]> {
     return $Call.ByID(1687989125).then(($result: any) => {
-        return $$createType6($result);
+        return $$createType7($result);
     });
 }
 
@@ -176,7 +188,7 @@ export function Projects(): $CancellablePromise<$models.ProjectInfo[]> {
  */
 export function SetStatus(folder: string, id: string, status: string): $CancellablePromise<$models.ItemView> {
     return $Call.ByID(2865783975, folder, id, status).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType5($result);
     });
 }
 
@@ -191,15 +203,16 @@ export function SetStatus(folder: string, id: string, status: string): $Cancella
  */
 export function StartWhenReady(folder: string, id: string, root: string): $CancellablePromise<$models.ItemView> {
     return $Call.ByID(1348452616, folder, id, root).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType5($result);
     });
 }
 
 // Private type creation functions
-const $$createType0 = $models.RepositoryView.createFrom;
-const $$createType1 = $models.ProjectInfo.createFrom;
-const $$createType2 = $models.DelegateResult.createFrom;
-const $$createType3 = $models.Project.createFrom;
-const $$createType4 = $models.ItemView.createFrom;
-const $$createType5 = $models.PlanPrompt.createFrom;
-const $$createType6 = $Create.Array($$createType1);
+const $$createType0 = $models.ContextView.createFrom;
+const $$createType1 = $models.RepositoryView.createFrom;
+const $$createType2 = $models.ProjectInfo.createFrom;
+const $$createType3 = $models.DelegateResult.createFrom;
+const $$createType4 = $models.Project.createFrom;
+const $$createType5 = $models.ItemView.createFrom;
+const $$createType6 = $models.PlanPrompt.createFrom;
+const $$createType7 = $Create.Array($$createType2);

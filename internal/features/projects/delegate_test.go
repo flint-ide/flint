@@ -54,7 +54,8 @@ func TestDelegateOneRepository(t *testing.T) {
 	f.open()
 	res := f.delegate("rl")
 	reqs := f.h.Requested()
-	if len(reqs) != 1 || len(reqs[0]) != 1 || reqs[0][0] != (feature.NewAgentTask{Dir: f.root, Description: "Rate limit\n\nLimit it.", Agent: "backend"}) {
+	if len(reqs) != 1 || len(reqs[0]) != 1 || reqs[0][0] != (feature.NewAgentTask{Dir: f.root, Description: "Rate limit\n\nLimit it.", Agent: "backend",
+		Origin: origin{Project: f.plan, Item: "rl", Repo: "api"}.String()}) {
 		t.Fatalf("requests %+v", reqs)
 	}
 	if res.Warning != "" || res.Item.Status != StatusDoing || len(res.Tasks) != 1 || res.Tasks[0].Repo != "api" || res.Tasks[0].Worktree == "" || len(res.Item.Tasks) != 1 {

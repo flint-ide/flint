@@ -38,6 +38,8 @@ var Module = feature.Module{
 			Services:     []application.Service{application.NewService(api)},
 			AgentTools:   api.agentTools,
 			TasksChanged: api.tasksChanged,
+			// The project context every item's agent gets, when its chat starts.
+			TaskContext: api.taskContext,
 			// A waiting start that failed for a checkout's trust or a
 			// missing workspace folder may go now.
 			RootsChanged: api.kickStarter,

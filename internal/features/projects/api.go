@@ -79,6 +79,10 @@ type Project struct {
 	Trusted bool `json:"trusted"`
 	// Repositories are flint-project.json's, with the checkout of each.
 	Repositories []RepositoryView `json:"repositories"`
+	// Context is the project's context file, PROJECT.md (Open, or Add
+	// Project Context… when it does not exist); a problem with it is also
+	// listed in Problems.
+	Context ContextView `json:"context"`
 	// Items in the panel's order: doing, review, todo, done, then priority
 	// (high first), then title.
 	Items    []ItemView `json:"items"`
@@ -441,7 +445,7 @@ func (a *API) Load(folder string) (Project, error) {
 	agents := a.host.Agents()
 	b := Project{
 		Path: real, Name: l.Config.Name, Workspace: workspace, Trusted: a.host.Trusted(real),
-		Repositories: a.resolveRepos(ctx, l.Config), Items: []ItemView{}, Problems: l.Problems,
+		Repositories: a.resolveRepos(ctx, l.Config), Context: contextView(real, l.Context), Items: []ItemView{}, Problems: l.Problems,
 		DefaultAgent: agents.Default, Clone: a.clones.view(real),
 	}
 	itemLinks := a.links()[real]

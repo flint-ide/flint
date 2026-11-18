@@ -28,6 +28,11 @@ export interface TaskView {
    */
   joint: string
   lead: boolean
+  /**
+   * Go starts this task's chat itself, also on Start now (a joint group's, or a project item's, whose first
+   * message Flint composes with the project's context): the window starts none for it.
+   */
+  flintStarts: boolean
   /** What the task's chats used so far. */
   tokens: number
   costUsd: number
@@ -192,9 +197,10 @@ export const lacksChat = (t: Pick<TaskView, 'joint' | 'lead'>): boolean => !!t.j
 
 /**
  * Whether the window starts a chat for a task Go just started from the queue: not for a task of
- * a joint group, whose one chat Go already started in the lead's worktree.
+ * a joint group, whose one chat Go already started in the lead's worktree, nor for one Go starts
+ * itself because its first message is Flint's (a project item's, with the project's context).
  */
-export const startsOwnChat = (t: Pick<TaskView, 'joint'>): boolean => !t.joint
+export const startsOwnChat = (t: Pick<TaskView, 'joint' | 'flintStarts'>): boolean => !t.joint && !t.flintStarts
 
 /** The sentence of the remove confirmation about a joint group; '' for a task with a chat of its own. */
 export function removeJointNote(info: Pick<RemoveInfo, 'jointTasks' | 'stopsJointChat'>): string {

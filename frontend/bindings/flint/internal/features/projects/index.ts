@@ -8,6 +8,7 @@ export {
 
 export {
     CloneView,
+    ContextView,
     DelegateResult,
     ItemView,
     PlanPrompt,

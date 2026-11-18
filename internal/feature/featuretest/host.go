@@ -52,6 +52,9 @@ type Host struct {
 	joint     []JointRequest
 	createErr error
 	nextID    int
+	// origins are the tasks' origins by task id; chats the task of each chat.
+	origins map[string]string
+	chats   map[string]string
 }
 
 // Event is one Emit call.
@@ -66,6 +69,7 @@ func New(ctx context.Context) *Host {
 		Ctx: ctx, VersionString: "v1.0.0", settings: settings.Default(),
 		state: map[string]json.RawMessage{}, streams: map[string]terminal.Stream{},
 		tasks: map[string]feature.AgentTask{}, repos: map[string]feature.Repository{},
+		origins: map[string]string{}, chats: map[string]string{},
 	}
 }
 
@@ -112,6 +116,15 @@ func (h *Host) SetTrusted(paths ...string) {
 	}
 	for _, p := range paths {
 		h.trusted[p] = true
+	}
+}
+
+// SetUntrusted takes the trust of folders marked with SetTrusted back.
+func (h *Host) SetUntrusted(paths ...string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, p := range paths {
+		delete(h.trusted, p)
 	}
 }
 
@@ -239,6 +252,7 @@ func (h *Host) CreateAgentTasks(_ context.Context, reqs []feature.NewAgentTask) 
 		id := fmt.Sprintf("%016x", h.nextID)
 		t := feature.AgentTask{ID: id, Title: r.Description, Agent: r.Agent, Branch: "task-" + id, Base: "main", Worktree: r.Dir + "-" + id, State: "working"}
 		h.tasks[id] = t
+		h.origins[id] = r.Origin
 		out = append(out, t)
 	}
 	return out, nil
@@ -292,6 +306,7 @@ func (h *Host) CreateJointAgentTasks(_ context.Context, reqs []feature.NewAgentT
 		t := feature.AgentTask{ID: id, Title: r.Description, Agent: agent, Branch: "task-" + id, Base: "main", Worktree: r.Dir + "-" + id,
 			State: "working", Joint: group, Lead: i == 0}
 		h.tasks[id] = t
+		h.origins[id] = r.Origin
 		out = append(out, t)
 	}
 	return out, nil
@@ -412,6 +427,31 @@ func (h *Host) Agents() feature.Agents {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return feature.Agents{Available: slices.Clone(h.agents.Available), Default: h.agents.Default}
+}
+
+// TaskOrigin is the origin of the task SetChat bound chat to ("" when none).
+func (h *Host) TaskOrigin(chat string) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if id, ok := h.chats[chat]; ok {
+		return h.origins[id]
+	}
+	return ""
+}
+
+// SetChat binds a chat (a session id) to the task with this id, as the app's
+// tracker does for a chat in the task's worktree.
+func (h *Host) SetChat(chat, taskID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.chats[chat] = taskID
+}
+
+// Origin is the origin a task was created with.
+func (h *Host) Origin(taskID string) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.origins[taskID]
 }
 
 // SetAgents sets the available agents and the default one.

@@ -382,6 +382,20 @@ export async function planWithAgent(folder: string, goal: string, agent: string)
 
 export const openItemFile = (item: ItemInfo): void => useEditor.getState().openFile(item.path)
 
+/** Opens the project's PROJECT.md in the editor. */
+export const openContext = (project: Pick<ProjectData, 'context'>): void => useEditor.getState().openFile(project.context.path)
+
+/** Add Project Context…: Go writes PROJECT.md from a template (never over a file), then it opens in the editor. */
+export async function addContext(folder: string): Promise<void> {
+  try {
+    const c = await API.AddContext(folder)
+    useEditor.getState().openFile(c.path)
+  } catch (err) {
+    showToast(errorMessage(err), 'error')
+  }
+  void loadProject(folder)
+}
+
 async function withBusy(folder: string, id: string, fn: () => Promise<void>): Promise<void> {
   const key = itemKey(folder, id)
   if (useProjects.getState().busy[key]) return

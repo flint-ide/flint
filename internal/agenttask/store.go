@@ -60,7 +60,17 @@ type Task struct {
 	// Lead marks the task of a joint group whose worktree the chat runs in;
 	// the other tasks' worktrees are its additional folders.
 	Lead bool `json:"lead,omitempty"`
+	// Origin says which feature made the task and for what (an opaque string
+	// of that feature, at most MaxOrigin bytes; the Projects feature names the
+	// project and its item). When the task's chat starts, Flint asks the
+	// features for context to put before Prompt (feature.Instance.TaskContext).
+	// Empty for a task the user made, and in state files written before it.
+	// Set only by Go, never taken from the UI.
+	Origin string `json:"origin,omitempty"`
 }
+
+// MaxOrigin bounds Task.Origin (bytes).
+const MaxOrigin = 8 << 10
 
 // Store holds the tasks per repository, keyed by the repository's common git
 // dir (shared by all its worktrees). Methods never change the receiver:

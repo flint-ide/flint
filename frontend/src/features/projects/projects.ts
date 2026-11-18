@@ -77,12 +77,23 @@ export interface ProjectInfo {
   error: string
 }
 
+/** The project's context file, PROJECT.md (Go: projects.ContextView). */
+export interface ContextInfo {
+  /** The file, to open in the editor. */
+  path: string
+  /** The file is there (Open); otherwise the UI offers Add Project Context…. */
+  exists: boolean
+  /** Why agents don't get it ('' when they do or it is absent); also one of the problems. */
+  problem: string
+}
+
 export interface ProjectData {
   path: string
   name: string
   workspace: boolean
   trusted: boolean
   repositories: RepoView[]
+  context: ContextInfo
   items: ItemInfo[]
   problems: ProblemInfo[]
   defaultAgent: string
@@ -399,8 +410,43 @@ export function problemPrompt(projectName: string, projectPath: string, p: Probl
     '',
     `${p.file}: ${p.reason}`,
     '',
-    'Fix the file so that it follows the format of a project item (front matter with title, status, priority, agent and repos, then the text), and keep what it says.',
+    p.file === CONTEXT_FILE
+      ? `Fix the file so that Flint can give it to agents again: plain Markdown in UTF-8, at most ${MAX_CONTEXT_CHARS.toLocaleString('en-US')} characters, without control characters (other than tab and newline) or invisible ones, and not a link to a file outside the project's folder. Keep what it says.`
+      : 'Fix the file so that it follows the format of a project item (front matter with title, status, priority, agent and repos, then the text), and keep what it says.',
   ].join('\n')
+}
+
+// ---- Project context
+
+/** The project's context file (Go: projects.ContextFile). */
+export const CONTEXT_FILE = 'PROJECT.md'
+/** The characters of it agents get at most (Go: projects.MaxContextChars). */
+export const MAX_CONTEXT_CHARS = 16000
+
+/** What the Context line of the panel and the board says, and the action it offers. */
+export interface ContextLine {
+  text: string
+  hint: string
+  /** 'open': Open the file; 'add': Add Project Context…; null: nothing (an untrusted project without one). */
+  action: 'open' | 'add' | null
+  problem: boolean
+}
+
+export function contextLine(c: ContextInfo | undefined, trusted: boolean): ContextLine {
+  if (c?.exists && c.problem) {
+    return { text: `${CONTEXT_FILE} (not sent)`, hint: `Agents don't get ${CONTEXT_FILE} until it is fixed: ${c.problem}`, action: 'open', problem: true }
+  }
+  if (c?.exists) {
+    return { text: CONTEXT_FILE, hint: `Every agent Delegate starts gets ${CONTEXT_FILE} at the start of its first message, with where its item stands in the project`, action: 'open', problem: false }
+  }
+  return {
+    text: 'none',
+    hint: trusted
+      ? `Agents get their item and where it stands in the project. Add ${CONTEXT_FILE} to tell every one of them what the project is for, how its repositories fit together and when work is done`
+      : `This project has no ${CONTEXT_FILE}. Trust the project's folder to add one`,
+    action: trusted ? 'add' : null,
+    problem: false,
+  }
 }
 
 // ---- Dependencies

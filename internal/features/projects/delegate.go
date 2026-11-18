@@ -154,9 +154,17 @@ func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, 
 			return DelegateResult{}, errors.New("Delegate needs every repository of the item: " + strings.Join(why, "; "))
 		}
 	}
+	// The context file as the user may be shown it now: an untrusted
+	// project's is sent only while it is still this text (origin.Confirmed).
+	pc := ReadContext(real)
+	trusted := a.host.Trusted(real)
 	reqs := make([]feature.NewAgentTask, len(targets))
 	for i, t := range targets {
-		reqs[i] = feature.NewAgentTask{Dir: t.dir, Description: it.TaskDescription(t.repo), Agent: agent}
+		o := origin{Project: real, Item: id, Repo: t.repo}
+		if !trusted {
+			o.Confirmed = contextHash(pc.Text)
+		}
+		reqs[i] = feature.NewAgentTask{Dir: t.dir, Description: it.TaskDescription(t.repo), Agent: agent, Origin: o.String()}
 		if len(reqs[i].Description) > MaxDescription {
 			if d := reqs[i].Description; d == it.Description() {
 				return DelegateResult{}, fmt.Errorf("the item's title and text are longer than %d bytes: shorten the text", MaxDescription)
@@ -165,12 +173,12 @@ func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, 
 		}
 	}
 	joint := it.Together && len(reqs) > 1 // ParseItem: together only with repos
-	if !a.host.Trusted(real) {
-		if auto == nil && !a.host.Confirm("Delegate from an untrusted project?", untrustedMessage(c.Name, real, agent, reqs, joint), "Delegate") {
+	if !trusted {
+		if auto == nil && !a.host.Confirm("Delegate from an untrusted project?", untrustedMessage(c.Name, real, agent, reqs, joint, pc), "Delegate") {
 			return DelegateResult{}, errors.New("Delegate was cancelled: the project's folder is in Restricted Mode")
 		}
 		// No click comes with this question: it says which item starts and why now.
-		if auto != nil && !a.host.Confirm("Start a waiting item of an untrusted project?", autoStartMessage(it, auto.waitedFor)+untrustedMessage(c.Name, real, agent, reqs, joint), "Start") {
+		if auto != nil && !a.host.Confirm("Start a waiting item of an untrusted project?", autoStartMessage(it, auto.waitedFor)+untrustedMessage(c.Name, real, agent, reqs, joint, pc), "Start") {
 			return DelegateResult{}, errors.New("the start was declined in Flint's confirmation (the project's folder is in Restricted Mode): Delegate it by hand, or cancel the start")
 		}
 	}
@@ -228,6 +236,9 @@ func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, 
 	ls[real][id] = next
 	ls.pruneProjects(func(f string) bool { return slices.Contains(a.knownSet(), f) })
 	var warnings []string
+	if pc.Problem != "" {
+		warnings = append(warnings, fmt.Sprintf("the agents got no project context from %s: %s", ContextFile, pc.Problem))
+	}
 	if err := a.host.SaveState(stateTasks, ls); err != nil {
 		warnings = append(warnings, "the item's agent tasks could not be remembered: "+err.Error())
 	}
@@ -274,8 +285,10 @@ const maxConfirmText = 1000
 // an item from a project whose folder is not trusted: the item may come from
 // someone else's repository, and its text becomes an agent's instructions.
 // It names the agent, the folders the tasks work in and the description
-// (the first task's, cut at maxConfirmText characters and saying so).
-func untrustedMessage(name, folder, agent string, reqs []feature.NewAgentTask, joint bool) string {
+// (the first task's, cut at maxConfirmText characters and saying so), and
+// says that the project's context file is sent too, with its beginning
+// (confirmContext).
+func untrustedMessage(name, folder, agent string, reqs []feature.NewAgentTask, joint bool, pc ProjectContext) string {
 	dirs := make([]string, len(reqs))
 	for i, r := range reqs {
 		dirs[i] = r.Dir
@@ -292,10 +305,14 @@ func untrustedMessage(name, folder, agent string, reqs []feature.NewAgentTask, j
 	case len(reqs) > 1:
 		note = "\nEach task also gets a note naming the item's repositories."
 	}
+	read := "Its item becomes the instructions of an agent. Read it before you go on."
+	if pc.Text != "" {
+		read = "Its item and its context file become the instructions of an agent. Read them before you go on."
+	}
 	return fmt.Sprintf("The project %q is in a folder you have not trusted (Restricted Mode):\n%s\n\n"+
-		"Its item becomes the instructions of an agent. Read it before you go on.\n\n"+
-		"Agent: %s\nWorks in: %s%s\n\nDescription:\n%s",
-		name, folder, agent, strings.Join(dirs, ", "), note, desc)
+		"%s\n\n"+
+		"Agent: %s\nWorks in: %s%s\n\nDescription:\n%s%s",
+		name, folder, read, agent, strings.Join(dirs, ", "), note, desc, confirmContext(pc))
 }
 
 // autoStartMessage opens the question of a start nobody clicked just now: it

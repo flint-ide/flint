@@ -3,6 +3,7 @@ package agenttask
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -66,6 +67,43 @@ func TestStoreJSONRoundTrip(t *testing.T) {
 	}
 	if _, task, ok := back.Find("a1"); !ok || task.Branch != "agent/fix" || task.CreatedAt != 5 {
 		t.Errorf("round trip = %+v", back)
+	}
+}
+
+// A task's origin is kept in state.json; a file written before origins
+// loads with none, and a task without one writes no key.
+func TestStoreOriginRoundTrip(t *testing.T) {
+	tests := []struct {
+		name, json, want string
+	}{
+		{"with an origin", `{"/r/.git":[{"id":"a1","prompt":"Fix","origin":"projects:{\"p\":\"/plan\"}"}]}`, `projects:{"p":"/plan"}`},
+		{"an old file", `{"/r/.git":[{"id":"a1","prompt":"Fix","joint":"j","lead":true}]}`, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var s Store
+			if err := json.Unmarshal([]byte(tt.json), &s); err != nil {
+				t.Fatal(err)
+			}
+			_, task, ok := s.Find("a1")
+			if !ok || task.Origin != tt.want || task.Prompt != "Fix" {
+				t.Fatalf("task = %+v", task)
+			}
+			out, err := json.Marshal(s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var back Store
+			if err := json.Unmarshal(out, &back); err != nil {
+				t.Fatal(err)
+			}
+			if _, again, _ := back.Find("a1"); again.Origin != tt.want {
+				t.Errorf("after a round trip: %+v", again)
+			}
+			if tt.want == "" && strings.Contains(string(out), "origin") {
+				t.Errorf("a task without an origin writes one: %s", out)
+			}
+		})
 	}
 }
 

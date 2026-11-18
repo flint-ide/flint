@@ -6,6 +6,7 @@ import { Dropdown } from '../../components/ui/Dropdown'
 import {
   agentText,
   BOARD_STATUSES,
+  contextLine,
   canOpenTask,
   delegateIssues,
   dependencyLines,
@@ -21,7 +22,24 @@ import {
   type ItemInfo,
   type TaskInfo,
 } from './projects'
-import { cancelStart, delegateItem, itemKey, openItemFile, openItemTask, setStatus, useProjects } from './store'
+import { addContext, cancelStart, delegateItem, itemKey, openContext, openItemFile, openItemTask, setStatus, useProjects } from './store'
+
+/** The project's context file: Open when it exists, Add Project Context… when it does not (panel and board). */
+export function ProjectContext({ project }: { project: ProjectData }) {
+  const line = contextLine(project.context, project.trusted)
+  return (
+    <span className="project-context" title={line.hint}>
+      <span className="muted">Context:</span>
+      <span className={line.problem ? 'error' : line.action === 'open' ? '' : 'muted'}>{line.text}</span>
+      {line.action === 'open' && (
+        <button className="link" onClick={() => openContext(project)} title={`Open ${project.context.path}`}>Open</button>
+      )}
+      {line.action === 'add' && (
+        <button className="link" onClick={() => void addContext(project.path)} title="Write PROJECT.md from a template and open it">Add Project Context…</button>
+      )}
+    </span>
+  )
+}
 
 /** Title, the failed and dependency markers, and the priority. */
 export function ItemTitle({ item, items }: { item: ItemInfo; items: readonly ItemInfo[] }) {

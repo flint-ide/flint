@@ -15,6 +15,7 @@ import {
   coerceAutoStart,
   coerceBoardData,
   coerceCloneEvent,
+  contextLine,
   dependencyLines,
   dependencyMarker,
   delegateIssues,
@@ -247,6 +248,37 @@ describe('problems', () => {
     const p = problemPrompt('Acme', '/b', { file: 'items/x.md', reason: 'title is required' })
     assert.match(p, /items\/x\.md: title is required/)
     assert.match(p, /"Acme" \(\/b\)/)
+    assert.match(p, /format of a project item/)
+  })
+
+  it('asks for a context file Flint can send', () => {
+    const p = problemPrompt('Acme', '/b', { file: 'PROJECT.md', reason: 'contains invisible characters (U+200B)' })
+    assert.match(p, /PROJECT\.md: contains invisible characters/)
+    assert.match(p, /at most 16,000 characters/)
+    assert.ok(!p.includes('project item'))
+  })
+})
+
+describe('project context', () => {
+  const cases: [string, Parameters<typeof contextLine>[0], boolean, string, 'open' | 'add' | null, boolean][] = [
+    ['a usable file', { path: '/p/PROJECT.md', exists: true, problem: '' }, true, 'PROJECT.md', 'open', false],
+    ['a file with a problem', { path: '/p/PROJECT.md', exists: true, problem: 'not UTF-8 text' }, true, 'PROJECT.md (not sent)', 'open', true],
+    ['none', { path: '/p/PROJECT.md', exists: false, problem: '' }, true, 'none', 'add', false],
+    ['none, untrusted', { path: '/p/PROJECT.md', exists: false, problem: '' }, false, 'none', null, false],
+    ['an untrusted file is opened', { path: '/p/PROJECT.md', exists: true, problem: '' }, false, 'PROJECT.md', 'open', false],
+    ['no data from an older Go', undefined, true, 'none', 'add', false],
+  ]
+  for (const [name, c, trusted, text, action, problem] of cases) {
+    it(name, () => {
+      const line = contextLine(c, trusted)
+      assert.equal(line.text, text)
+      assert.equal(line.action, action)
+      assert.equal(line.problem, problem)
+      assert.ok(line.hint.length > 0)
+    })
+  }
+  it('says why a file is not sent', () => {
+    assert.match(contextLine({ path: '/p/PROJECT.md', exists: true, problem: 'not UTF-8 text' }, true).hint, /not UTF-8 text/)
   })
 })
 

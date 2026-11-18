@@ -31,6 +31,8 @@ import (
 type jointRequest struct {
 	Dir         string
 	Description string
+	// Origin is the task's agenttask.Task.Origin (a feature's; "" for none).
+	Origin string
 }
 
 // errJointEngine is wrapped by the error createJointTasks and openChat return
@@ -133,7 +135,7 @@ func (a *App) createJointTasks(ctx context.Context, reqs []jointRequest, agentNa
 	for _, req := range reqs {
 		rctx, cancel := context.WithTimeout(ctx, gitRemoteTimeout) // checkout hooks may run
 		tasks, r, err := a.createTasksWith(rctx, NewTaskGroup{Dir: req.Dir, Description: req.Description, Agents: []string{agentName}},
-			createOptions{queueOK: true, hold: true, joint: member})
+			createOptions{queueOK: true, hold: true, joint: member, origin: req.Origin})
 		cancel()
 		if err != nil {
 			undo()

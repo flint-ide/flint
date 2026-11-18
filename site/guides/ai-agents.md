@@ -247,13 +247,14 @@ An agent chat in Flint can also look things up by itself. Flint runs a small [MC
 | `get_diagnostics` | The errors and warnings the language servers report, for the project, a folder or a file. Only files a language server has checked are included: usually the open files and, for Go, their packages. | On |
 | `get_editor_state` | The files open in the editor (and which have unsaved changes), the active file, and your selection with its text, or the cursor position. Ask about "this function" and the agent can see which one. | On |
 | `get_test_results` | The last test run in Flint: totals, and each failed test with its location and output. | On |
-| `get_project` | The [Flint projects](projects.md) (folders of work items) Flint knows whose folder is trusted, and their items: id, title, status, priority, agent, repositories, the items each waits for and whether it is ready, and text. | On with the Projects feature |
+| `get_project` | The [Flint projects](projects.md) (folders of work items) Flint knows whose folder is trusted, and their items: id, title, status, priority, agent, repositories, the items each waits for and whether it is ready, and text. Asked by the agent of a project's item, its project comes first, in full, with that item marked. | On with the Projects feature |
 | `get_terminal_output` | The recent output your terminals and run consoles printed while they were in the project (dev servers, builds), as plain text without colors. | Off |
 
 These tools only read. Claude Code shows them as `mcp__flint__…`.
 
 - Diagnostics, editor state and test results show only the project's own state. With the default approval policy ("Read and search the project" on) Claude Code runs them without asking, so the agent can look at what you are looking at without a prompt each time.
 - `get_project` shows every trusted project Flint knows to any chat, not only one that belongs to the folder the chat works in, so it isn't one of the read tools that run without asking: like Flint's other tools outside that list, Claude Code asks before each call, unless you chose "Do everything". Projects whose folder is in Restricted Mode are left out. It has no switch under Agent Context; it goes with the Projects feature (Settings ▸ Extensions ▸ **Built-in**). See [What agents can see](projects.md#what-agents-can-see). Adding items is a separate tool that acts, below.
+- An agent that a project's **Delegate** starts doesn't need to call it first: its first message already starts with the project's context (its `PROJECT.md`, its item, what the item depends on and what else is in progress). See [Project context](projects.md#project-context-what-every-agent-knows).
 - Terminal output can show anything you saw, such as a token printed in a terminal. It is off until you turn it on, and then the agent asks before each call, even with "Read and search" on. This keeps Flint's rule that nothing goes to an AI provider without you seeing it.
 - Codex and custom agents decide about all of them with their own rules.
 

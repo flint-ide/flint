@@ -2,7 +2,7 @@ import { useEffect, useState, type DragEvent } from 'react'
 import type { ContributedTab } from '../../lib/features'
 import { useEditor } from '../../store/editor'
 import { ProjectDialogs } from './Dialogs'
-import { ItemActions, ItemDependencies, ItemMeta, ItemTasks, ItemTitle } from './ItemParts'
+import { ItemActions, ItemDependencies, ItemMeta, ItemTasks, ItemTitle, ProjectContext } from './ItemParts'
 import {
   boardProblem,
   boardTitle,
@@ -56,6 +56,7 @@ export function BoardView({ tab, active }: { tab: ContributedTab; active: boolea
           </span>
         )}
         <span className="muted truncate" title={project.path}>{project.path}</span>
+        <ProjectContext project={project} />
         <span className="spacer" />
         <button className="icon" title="New Item…" onClick={() => openNewItem(folder, 'board')}>＋ New Item…</button>
         <button className="icon" title="Have an agent split a goal into items (the prompt goes into a chat draft)" onClick={() => openPlan(folder, 'board')}>✦ Plan with Agent…</button>

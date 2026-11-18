@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -79,6 +80,31 @@ type Instance struct {
 	// state, or its branch was merged or got a pull request in Flint (when
 	// the UI hears "tasks:changed"); it must return quickly.
 	TasksChanged func()
+	// TaskContext is asked, when Flint starts the chat of an agent task the
+	// feature made (one whose NewAgentTask had an Origin), for text to put
+	// before the task's description in the chat's first message: the feature's
+	// context for that task as it is now, at the start (a queued task gets the
+	// state of when it leaves the queue). It returns "" for an origin that is
+	// not its own or that it no longer knows, and must not fail the start. It
+	// is called once per chat, from the goroutine that starts it, so it may
+	// read files and the Host's agent tasks; it must not ask the user.
+	TaskContext func(ctx context.Context, start TaskStart) string
+}
+
+// TaskStart is the chat of an agent task Flint is starting, for
+// Instance.TaskContext.
+type TaskStart struct {
+	// Origin is the NewAgentTask.Origin the task was made with (never "").
+	Origin string
+	// Worktree is where the chat runs (the lead's for a joint group), Branch
+	// its branch and Base the branch it started from.
+	Worktree, Branch, Base string
+	// Joint: the chat works for a joint group; Flint adds to the first
+	// message which folder is which repository (after the description).
+	Joint bool
+	// MCP: Flint's MCP server, with the features' agent tools, is offered to
+	// this chat (the server is on and the worktree is trusted).
+	MCP bool
 }
 
 // Host is what Flint gives a feature: the parts of the app it may use. New
@@ -147,12 +173,21 @@ type Host interface {
 	Repository(ctx context.Context, dir string) (Repository, error)
 	// Agents are the agents that can start now and the default one.
 	Agents() Agents
+	// TaskOrigin is the Origin of the agent task the chat with this session
+	// id works for (a chat of a joint group: its lead's), "" when the chat is
+	// no task's or its task has none. The id comes from Flint (an agent
+	// tool's caller, mcpserver.CallerFrom), not from the UI.
+	TaskOrigin(chat string) string
 }
 
 // NewAgentTask asks for one agent task: Agent works on Description in a
-// worktree of the repository of Dir.
+// worktree of the repository of Dir. Origin, when set, is the feature's own
+// note of what the task is for (at most agenttask.MaxOrigin bytes, kept with
+// the task): Flint passes it back to Instance.TaskContext when the task's
+// chat starts, and Host.TaskOrigin gives it for the task's chat.
 type NewAgentTask struct {
 	Dir, Description, Agent string
+	Origin                  string
 }
 
 // DetachedHeadError is CreateAgentTasks' error for a request whose Dir is a
@@ -364,6 +399,25 @@ func (s *Set) TasksChanged() {
 			p.TasksChanged()
 		}
 	}
+}
+
+// TaskContext is the context the features give for a task's chat that
+// starts (Instance.TaskContext), the non-empty answers joined; "" when the
+// task has no origin or no feature knows it.
+func (s *Set) TaskContext(ctx context.Context, start TaskStart) string {
+	if s == nil || start.Origin == "" {
+		return ""
+	}
+	var out []string
+	for _, p := range s.parts {
+		if p.TaskContext == nil {
+			continue
+		}
+		if text := p.TaskContext(ctx, start); text != "" {
+			out = append(out, text)
+		}
+	}
+	return strings.Join(out, "\n\n")
 }
 
 // Closers are the Close hooks, for the app's parallel shutdown.

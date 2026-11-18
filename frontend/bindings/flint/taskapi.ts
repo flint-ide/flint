@@ -162,7 +162,9 @@ export function StartDone(id: string): $CancellablePromise<void> {
  * starts its chat, as for a new task; except for a task of a joint group:
  * the whole group leaves the queue and Go starts its one chat itself (in the
  * lead's worktree, with every worktree's folder and the group's
- * description), so the UI starts no chat when the view it gets has a Joint.
+ * description), and for a task with an origin, whose first message starts
+ * with its feature's context: the UI starts no chat when the view it gets
+ * says FlintStarts.
  */
 export function StartNow(id: string): $CancellablePromise<$models.TaskView> {
     return $Call.ByID(656043389, id).then(($result: any) => {

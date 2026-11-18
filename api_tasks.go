@@ -75,6 +75,10 @@ type TaskView struct {
 	// folders). Every task of the group shows the chat's state.
 	Joint string `json:"joint"`
 	Lead  bool   `json:"lead"`
+	// FlintStarts: Flint starts this task's chat itself when it leaves the
+	// queue, also on Start now (a joint group's one chat, or a task a feature
+	// made, whose first message Flint composes): the UI starts none for it.
+	FlintStarts bool `json:"flintStarts"`
 	// Tokens and CostUSD are what the task's chats used so far (input and
 	// output tokens; reported cost plus estimates from settings prices).
 	Tokens  int64   `json:"tokens"`
@@ -233,7 +237,7 @@ func (t *TaskAPI) view(ctx context.Context, r *git.Repo, task agenttask.Task) Ta
 		ID: task.ID, Title: task.Title, Prompt: task.Prompt, Agent: task.Agent, Branch: task.Branch, Base: task.Base,
 		Worktree: task.Worktree, Checkout: task.Checkout, CreatedAt: task.CreatedAt, PullRequest: task.PullRequest,
 		State: live.State, Error: live.Error, Stale: !isDir(task.Worktree), Group: task.Group,
-		Joint: task.Joint, Lead: task.Lead,
+		Joint: task.Joint, Lead: task.Lead, FlintStarts: flintStarts(task),
 	}
 	if task.Queued && !agenttask.Busy(live.State) {
 		v.State, v.Error = agenttask.Queued, ""
@@ -320,6 +324,9 @@ type createOptions struct {
 	queueOK, hold bool
 	// joint, when set, makes the (single) task a member of that joint group.
 	joint *jointMember
+	// origin is the tasks' agenttask.Task.Origin: a feature's note of what
+	// they are for (feature.NewAgentTask.Origin), never the UI's.
+	origin string
 }
 
 // jointMember says which task of a joint group createTasksWith makes.
@@ -346,6 +353,8 @@ func (a *App) createTasksWith(ctx context.Context, req NewTaskGroup, opts create
 		return nil, nil, errors.New("choose an agent first")
 	case len(req.Agents) > agenttask.MaxGroup:
 		return nil, nil, fmt.Errorf("one description starts at most %d tasks: choose fewer agents or attempts", agenttask.MaxGroup)
+	case len(opts.origin) > agenttask.MaxOrigin:
+		return nil, nil, fmt.Errorf("the task's origin is longer than %d bytes", agenttask.MaxOrigin)
 	}
 	if _, err := a.rootOf(req.Dir); err != nil {
 		return nil, nil, err
@@ -394,7 +403,7 @@ func (a *App) createTasksWith(ctx context.Context, req NewTaskGroup, opts create
 			ID: agenttask.NewID(), Title: agenttask.Title(desc), Prompt: redact.Secrets(desc), Agent: agent,
 			Branch: agenttask.BranchName(s.AgentTasks.BranchPrefix, desc, agent, group != ""),
 			Base:   base, BaseCommit: baseCommit, Checkout: cleanFolder(checkout),
-			CreatedAt: time.Now().Unix(), Group: group,
+			CreatedAt: time.Now().Unix(), Group: group, Origin: opts.origin,
 			Queued: agenttask.Slots(s.AgentTasks.MaxParallel, a.activeTasks()) == 0,
 		}
 		slot := !task.Queued // its chat starts next: it holds a slot

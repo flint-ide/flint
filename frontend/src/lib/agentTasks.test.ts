@@ -51,6 +51,7 @@ const task = (over: Partial<TaskView> = {}): TaskView => ({
   group: '',
   joint: '',
   lead: false,
+  flintStarts: false,
   tokens: 0,
   costUsd: 0,
   ...over,
@@ -326,10 +327,11 @@ describe('joint groups (one agent across repositories)', () => {
     assert.equal(lacksChat(other), false)
   })
 
-  it('starts no chat for a task of a joint group that left the queue', () => {
+  it('starts no chat for a task of a joint group that left the queue, nor for one Go starts itself', () => {
     assert.equal(startsOwnChat(task()), true)
     assert.equal(startsOwnChat(lead), false)
     assert.equal(startsOwnChat(member), false)
+    assert.equal(startsOwnChat(task({ flintStarts: true })), false)
   })
 
   it('words the remove confirmation for a shared chat', () => {

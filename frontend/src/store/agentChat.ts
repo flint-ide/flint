@@ -23,7 +23,7 @@ import { useEditor } from './editor'
 import { loadAgentDefs } from './agentDefs'
 import { savedEngine } from '../lib/agentDefs'
 import { chatSignalled, setChatNoter, tabClosed } from './alerts'
-import { chatSignals, turnAfter } from '../lib/attention'
+import { createChatAnnouncer } from '../lib/chatAnnouncer'
 
 export interface ChatSession {
   id: string
@@ -168,7 +168,7 @@ export const useAgentChat = createStore<AgentChatState>((set, get) => ({
     useEditor.getState().closeTab(chatTabId(id))
     if (!get().sessions[id]?.dormant) await Chat.Stop(remoteId(id)).catch(() => undefined)
     deliverAgent?.forget(remoteId(id))
-    turns.delete(id)
+    announcer.forget(id)
     tabClosed(chatTabId(id))
     localIds.delete(remoteId(id))
     remoteIds.delete(id)
@@ -263,23 +263,19 @@ function enqueue(id: string, e: AgentEvent): void {
   pendingFlush ??= { frame: requestAnimationFrame(flushEvents), timer: setTimeout(flushEvents, FLUSH_FALLBACK_MS) }
 }
 
-/**
- * Chats in a turn, from Go's turn_start to turn_end, whoever started it. Kept
- * as events arrive (the transcript is updated once per frame): a request
- * that comes in the same batch as its turn_start is already in a turn.
- */
-const turns = new Set<string>()
+/** Which chats are in a turn, and what their events mean for the user. */
+const announcer = createChatAnnouncer()
 
-/** Tells the attention model what an event of a chat means for the user (lib/attention.ts). */
+/** Tells the attention model what an event of a chat means for the user (lib/chatAnnouncer.ts). */
 function announce(id: string, e: AgentEvent): void {
-  const inTurn = turns.has(id)
-  if (turnAfter(inTurn, e)) turns.add(id)
-  else turns.delete(id)
-  const session = useAgentChat.getState().sessions[id]
-  if (!session) return
-  const tab = chatTabId(id)
-  const title = useEditor.getState().tabs.find((t) => t.id === tab)?.title ?? session.agent
-  chatSignalled(chatSignals(id, e, inTurn, { agent: session.agent, cwd: session.cwd, title, parent: session.parent }))
+  const signals = announcer.event(id, e, () => {
+    const session = useAgentChat.getState().sessions[id]
+    if (!session) return null
+    const tab = chatTabId(id)
+    const title = useEditor.getState().tabs.find((t) => t.id === tab)?.title ?? session.agent
+    return { agent: session.agent, cwd: session.cwd, title, parent: session.parent }
+  })
+  if (signals.length) chatSignalled(signals)
 }
 
 /** Shows a line of Flint's in a chat (a notice that did not arrive, a first message that failed): only in the window. */

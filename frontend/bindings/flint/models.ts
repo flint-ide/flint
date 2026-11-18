@@ -705,6 +705,36 @@ export class FileHistory {
 }
 
 /**
+ * FrontEvent is the payload of "attention:front". Seq orders the events:
+ * the UI ignores one older than the last it applied (events may arrive out
+ * of order).
+ */
+export class FrontEvent {
+    "front": boolean;
+    "seq": number;
+
+    /** Creates a new FrontEvent instance. */
+    constructor($$source: Partial<FrontEvent> = {}) {
+        if (!("front" in $$source)) {
+            this["front"] = false;
+        }
+        if (!("seq" in $$source)) {
+            this["seq"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new FrontEvent instance from a string or object.
+     */
+    static createFrom($$source: any = {}): FrontEvent {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new FrontEvent($$parsedSource as Partial<FrontEvent>);
+    }
+}
+
+/**
  * LiveTerminal is a terminal the host holds: its id and whether its shell
  * still runs. Nothing else: the tab that attaches learns the rest from the
  * terminal itself.

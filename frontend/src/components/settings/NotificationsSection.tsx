@@ -47,7 +47,15 @@ export function NotificationsSection() {
       >
         <input type="checkbox" checked={notifyApproval} onChange={(e) => update({ notifyOnApproval: e.target.checked })} />
       </Row>
-      <Row label="Desktop notifications" hint={status?.detail || (isMac() ? '' : 'Linux has no Dock badge: the count shows on the Agents button in the activity bar.')}>
+      <Row
+        label="Desktop notifications"
+        hint={
+          status?.detail ||
+          (isMac()
+            ? ''
+            : "Linux has no Dock badge, so nothing counts what waits for you while Flint is in the background. In Flint, the ✦ Agents button counts the agents that need you (waiting, failed, or finished while you were in another tab); Flint's own questions are dialogs and are not in that count.")
+        }
+      >
         <span className={`notify-status ${status?.state ?? ''}`}>{status ? notificationStatusLabel(status.state) : 'Checking…'}</span>
       </Row>
       <div className="settings-actions">

@@ -6,7 +6,7 @@ import { AgentPeek } from '../agents/AgentPeek'
 import { ContextMenu } from '../ui/ContextMenu'
 import { closeSignInDialog, useAccounts } from '../../store/accounts'
 import { SignInWithGitHub } from '../accounts/SignInWithGitHub'
-import { dismissNotice, useAlerts } from '../../store/alerts'
+import { dismissNotice, showNeed, useAlerts } from '../../store/alerts'
 import { useEditor } from '../../store/editor'
 import { inAppNotice } from '../../lib/attention'
 
@@ -54,7 +54,8 @@ export function Overlays() {
 
 /**
  * An agent waits for an answer in a tab that is not the active one: a notice that stays until the
- * request is answered, shown or closed (the passing toast above it never replaces it).
+ * request is answered, shown or closed (the passing toast above it never replaces it). From the
+ * keyboard: the command "Show Agent Waiting for You" does what Show does.
  */
 function AttentionNotice() {
   const attention = useAlerts((s) => s.attention)
@@ -62,16 +63,12 @@ function AttentionNotice() {
   const active = useEditor((s) => s.activeId)
   const need = inAppNotice(attention, active, dismissed)
   if (!need) return null
-  const show = () => {
-    if (useEditor.getState().tabs.some((t) => t.id === need.tab)) useEditor.getState().setActive(need.tab)
-    dismissNotice(need.key)
-  }
   return (
-    <div className="toast attention" role="alert">
+    <div className="toast attention" role="alert" title="From the keyboard: Show Agent Waiting for You in the command palette">
       <span>{need.inApp}</span>
       <span className="spacer" />
-      <button className="link" onClick={show}>Show</button>
-      <button className="icon" title="Close this notice (the request stays open)" onClick={() => dismissNotice(need.key)}>✕</button>
+      <button className="link" aria-label={`Show: ${need.inApp}`} onClick={() => showNeed(need)}>Show</button>
+      <button className="icon" aria-label="Close this notice (the request stays open)" title="Close this notice (the request stays open)" onClick={() => dismissNotice(need.key)}>✕</button>
     </div>
   )
 }

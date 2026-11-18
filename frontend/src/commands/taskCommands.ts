@@ -4,6 +4,7 @@ import { registerCommands } from '../lib/commands'
 import { useGit } from '../store/git'
 import { openNewTask } from '../store/agentTasks'
 import { peekAttention } from '../store/agents'
+import { currentNotice, showNeed } from '../store/alerts'
 import { showToast } from '../store/dialog'
 
 export function registerTaskCommands(): () => void {
@@ -23,6 +24,17 @@ export function registerTaskCommands(): () => void {
       keywords: 'waiting approval permission failed finished chat overlay',
       run: () => {
         if (!peekAttention()) showToast('No agent needs you')
+      },
+    },
+    {
+      id: 'agent.showNotice',
+      title: 'Show Agent Waiting for You',
+      category: 'Agent',
+      keywords: 'notice approval waiting terminal show',
+      run: () => {
+        const need = currentNotice()
+        if (need) showNeed(need)
+        else showToast('No agent waits for you in another tab')
       },
     },
   ])

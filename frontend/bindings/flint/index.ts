@@ -76,6 +76,7 @@ export {
     DefinedAgent,
     FileComparison,
     FileHistory,
+    FrontEvent,
     LiveTerminal,
     LiveTerminals,
     MergeResult,

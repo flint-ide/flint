@@ -390,7 +390,7 @@ describe('automatic starts', () => {
     const ok = coerceAutoStart({ project: '/b', id: 'a', title: 'Build', tasks: 2, error: '', warning: '' })
     assert.deepEqual(autoStartToast(ok!), { message: 'Started Build (2 agent tasks)', kind: 'info' })
     assert.equal(autoStartToast({ ...ok!, tasks: 1 }).message, 'Started Build (1 agent task)')
-    assert.deepEqual(autoStartToast({ ...ok!, tasks: 0, error: 'api has no checkout' }), { message: 'Couldn\'t start "Build": api has no checkout It keeps waiting.', kind: 'error' })
+    assert.deepEqual(autoStartToast({ ...ok!, tasks: 0, error: 'api has no checkout' }), { message: 'Couldn\'t start "Build": api has no checkout. It keeps waiting.', kind: 'error' })
     assert.equal(autoStartToast({ ...ok!, warning: 'the status could not be written' }).kind, 'error')
     assert.equal(coerceAutoStart({ project: '/b', id: 'a' })?.title, 'a')
     for (const bad of [null, 'x', {}, { project: 1, id: 'a' }]) assert.equal(coerceAutoStart(bad), null)
@@ -459,9 +459,8 @@ describe('project notifications', () => {
   it('tell how an automatic start went', () => {
     const a = { project: '/p', id: 'w', title: 'Waiter', tasks: 2, error: '', warning: '' }
     assert.deepEqual(autoStartNotice(a), { title: 'Started "Waiter"', body: '2 agent tasks started' })
-    assert.deepEqual(autoStartNotice({ ...a, tasks: 0, error: 'nobody answered Flint\'s confirmation: Flint asks again when you are back.' }), {
-      title: 'Couldn\'t start "Waiter"', body: 'nobody answered Flint\'s confirmation: Flint asks again when you are back. It keeps waiting.',
-    })
+    const declined = "the start was declined in Flint's confirmation (the project's folder is in Restricted Mode): Delegate it by hand, or cancel the start"
+    assert.deepEqual(autoStartNotice({ ...a, tasks: 0, error: declined }), { title: 'Couldn\'t start "Waiter"', body: `${declined}. It keeps waiting.` })
   })
   it('say when an item is ready for review', () => {
     const e = coerceItemEvent({ project: '/p', id: 'x', title: 'Add login' })

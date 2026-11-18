@@ -34,9 +34,23 @@ export interface Attention {
   needs: readonly Need[]
   /** Finished work announced since the user was last in front. */
   finished: number
+  /**
+   * Flint is the app in front, as Go says ("attention:front"): the one source,
+   * in which a dialog of Flint's (which takes the web view's focus) counts as Flint.
+   */
+  front: boolean
+  /** The newest front event applied (events may arrive out of order). */
+  frontSeq: number
+  /** When each terminal tab last notified (terminalChanged), in ms. */
+  terminals: Readonly<Record<string, TerminalSent>>
 }
 
-export const emptyAttention: Attention = { needs: [], finished: 0 }
+export interface TerminalSent {
+  waiting?: number
+  finished?: number
+}
+
+export const emptyAttention: Attention = { needs: [], finished: 0, front: true, frontSeq: 0, terminals: {} }
 
 /** The settings of Settings ▸ Agents ▸ Notifications. */
 export interface NotifyPrefs {
@@ -101,6 +115,27 @@ export function wentToBackground(a: Attention, prefs: NotifyPrefs): Step {
 
 /** The user is back: finished work is seen; what still waits stays counted. */
 export const cameBack = (a: Attention): Attention => (a.finished === 0 ? a : { ...a, finished: 0 })
+
+/**
+ * Go says Flint came to the front or left it (event seq; an older one than the
+ * last applied is ignored). Leaving announces what waits (wentToBackground);
+ * coming back clears the finished work (cameBack).
+ */
+export function frontChanged(a: Attention, front: boolean, seq: number, prefs: NotifyPrefs): Step {
+  if (seq < a.frontSeq || (seq === a.frontSeq && front === a.front)) return { state: a, notify: [] }
+  const moved = { ...a, front, frontSeq: seq }
+  if (front === a.front) return { state: moved, notify: [] }
+  return front ? { state: cameBack(moved), notify: [] } : wentToBackground(moved, prefs)
+}
+
+/** A tab closed (a chat, a terminal): what it asked is gone, and so is what is kept about it. */
+export function tabGone(a: Attention, tab: string): Attention {
+  const next = needsOfTabClosed(a, tab)
+  if (!(tab in next.terminals)) return next
+  const terminals = { ...next.terminals }
+  delete terminals[tab]
+  return { ...next, terminals }
+}
 
 /** The Dock badge: what still waits plus finished work not seen yet, as far as the settings show them. */
 export function badgeCount(a: Attention, prefs: NotifyPrefs): number {
@@ -192,31 +227,85 @@ export type TerminalSignal = { kind: 'need'; need: Omit<Need, 'announced'> } | {
 export interface TerminalInfo {
   /** The editor tab id ("term:<id>"). */
   tab: string
-  title: string
+  /** The folder the program runs in (Go reads it from the process, not from the output). */
   cwd: string
-  /** The running command ("claude --resume"). */
+  /** The running command ("claude --resume"), as Go reads it from the process. */
   command: string
 }
 
-/** The signals of a terminal agent moving from prev to next (Go: terminal.Agent* states; undefined: none). */
+/**
+ * The agent CLIs whose state a terminal tells the user about. The state comes
+ * from sequences in the terminal's output, which any program can print: only
+ * these, running in the foreground, may notify (the tab's own badge follows
+ * every state).
+ */
+export const TERMINAL_AGENTS: readonly string[] = ['claude', 'codex', 'gemini', 'opencode']
+
+/** The agent CLI a terminal runs ('' for none): the program of its command, if it is a known one. */
+export function terminalAgentName(command: string): string {
+  const program = command.split(' ')[0] ?? ''
+  return TERMINAL_AGENTS.includes(program) ? program : ''
+}
+
+/** At most one "waiting" and one "finished" notification per terminal tab in this long. */
+export const TERMINAL_NOTIFY_INTERVAL_MS = 60_000
+
+/**
+ * The signals of a terminal agent moving from prev to next (Go: terminal.Agent*
+ * states; undefined: none). None for a program that is not a known agent CLI.
+ * The texts name the program and the folder, both read by Go from the process:
+ * nothing the terminal's output controls (its title).
+ */
 export function terminalSignals(t: TerminalInfo, prev: string | undefined, next: string | undefined): TerminalSignal[] {
-  if (prev === next) return []
-  const agent = t.command.split(' ')[0] || 'The agent'
+  const agent = terminalAgentName(t.command)
+  if (prev === next || !agent) return []
+  const folder = folderName(t.cwd)
   const out: TerminalSignal[] = []
   if (prev === 'waiting') out.push({ kind: 'closed', key: t.tab })
   if (next === 'waiting') {
     out.push({
       kind: 'need',
-      need: {
-        key: t.tab, kind: 'terminal', title: `${agent} is waiting for you`, body: `${folderName(t.cwd)}: ${t.title}`, tab: t.tab,
-        inApp: `${agent} is waiting for you in the terminal ${t.title}`,
-      },
+      need: { key: t.tab, kind: 'terminal', title: `${agent} is waiting for you`, body: `In a terminal in ${folder}`, tab: t.tab, inApp: `${agent} is waiting for you in a terminal in ${folder}` },
     })
   }
   if (next === 'done' && (prev === 'working' || prev === 'waiting')) {
-    out.push({ kind: 'finished', notice: { title: t.title, body: `${agent} finished its turn`, tab: t.tab } })
+    out.push({ kind: 'finished', notice: { title: `${agent} finished its turn`, body: `In a terminal in ${folder}`, tab: t.tab } })
   }
   return out
+}
+
+/**
+ * A terminal agent's state changed (at time now, in ms): its signals applied
+ * to the model, with at most one "waiting" and one "finished" notification
+ * per tab per TERMINAL_NOTIFY_INTERVAL_MS. A wait inside that interval still
+ * counts (badge, in-app notice) but is not announced; a finish inside it is
+ * not counted either.
+ */
+export function terminalChanged(a: Attention, t: TerminalInfo, prev: string | undefined, next: string | undefined, now: number, prefs: NotifyPrefs): Step {
+  let state = a
+  const notify: Notice[] = []
+  const recent = (at: number | undefined) => at !== undefined && now - at < TERMINAL_NOTIFY_INTERVAL_MS
+  const sent = (kind: keyof TerminalSent) => {
+    state = { ...state, terminals: { ...state.terminals, [t.tab]: { ...state.terminals[t.tab], [kind]: now } } }
+  }
+  for (const s of terminalSignals(t, prev, next)) {
+    if (s.kind === 'closed') {
+      state = needClosed(state, s.key)
+    } else if (s.kind === 'need') {
+      const quiet = recent(state.terminals[t.tab]?.waiting)
+      const step = needOpened(state, s.need, !state.front && !quiet, prefs)
+      state = step.state
+      if (quiet) state = { ...state, needs: state.needs.map((n) => (n.key === s.need.key ? { ...n, announced: true } : n)) }
+      if (step.notify.length) sent('waiting')
+      notify.push(...step.notify)
+    } else if (!recent(state.terminals[t.tab]?.finished)) {
+      const step = workFinished(state, s.notice, !state.front, prefs)
+      state = step.state
+      if (step.notify.length) sent('finished')
+      notify.push(...step.notify)
+    }
+  }
+  return { state, notify }
 }
 
 // ---- Settings ▸ Agents ▸ Notifications

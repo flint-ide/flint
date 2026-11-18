@@ -594,9 +594,12 @@ export function coerceAutoStart(raw: unknown): AutoStart | null {
   }
 }
 
+/** Ends a reason from Go with a full stop when it has none. */
+const sentence = (s: string): string => (/[.!?…]$/.test(s) ? s : `${s}.`)
+
 /** The desktop notification of an automatic start (in the background). */
 export function autoStartNotice(a: AutoStart): { title: string; body: string } {
-  if (a.error) return { title: `Couldn't start "${a.title}"`, body: `${a.error} It keeps waiting.` }
+  if (a.error) return { title: `Couldn't start "${a.title}"`, body: `${sentence(a.error)} It keeps waiting.` }
   const body = `${a.tasks} agent ${a.tasks === 1 ? 'task' : 'tasks'} started`
   return { title: `Started "${a.title}"`, body: a.warning ? `${body}, but ${a.warning}` : body }
 }
@@ -621,7 +624,7 @@ export const reviewText = (e: ItemEvent): string => `"${e.title}" is ready for r
 
 /** The toast of an automatic start: started (with how many tasks), or why not (the item keeps waiting). */
 export function autoStartToast(a: AutoStart): { message: string; kind: 'info' | 'error' } {
-  if (a.error) return { message: `Couldn't start "${a.title}": ${a.error} It keeps waiting.`, kind: 'error' }
+  if (a.error) return { message: `Couldn't start "${a.title}": ${sentence(a.error)} It keeps waiting.`, kind: 'error' }
   const base = `Started ${a.title} (${a.tasks} agent ${a.tasks === 1 ? 'task' : 'tasks'})`
   return a.warning ? { message: `${base}, but ${a.warning}`, kind: 'error' } : { message: base, kind: 'info' }
 }

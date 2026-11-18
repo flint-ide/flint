@@ -326,7 +326,7 @@ export function subscribeTerminalEvents(): void {
     if (!tab || tab.agentState === msg.state) return
     useTerminal.setState((s) => ({ tabs: s.tabs.map((t) => (t.id === msg.id ? { ...t, agentState: msg.state } : t)) }))
     // Waiting or done tells the user like a chat does (a notification in the background, the badge).
-    terminalAgentChanged({ tab: terminalTabId(tab.id), title: tab.title, cwd: tab.cwd, command: tab.command }, tab.agentState, msg.state)
+    terminalAgentChanged({ tab: terminalTabId(tab.id), cwd: tab.cwd, command: tab.command }, tab.agentState, msg.state)
   })
   EventsOn('term:exit', (msg: { id: string; code: number }) => {
     tabClosed(terminalTabId(msg.id)) // an agent that waited there waits no more

@@ -6,12 +6,17 @@ import {
   cameBack,
   chatSignals,
   emptyAttention,
+  frontChanged,
   inAppNotice,
   needClosed,
   needOpened,
   needsOfTabClosed,
   notificationStatusLabel,
+  tabGone,
+  terminalAgentName,
+  terminalChanged,
   terminalSignals,
+  TERMINAL_NOTIFY_INTERVAL_MS,
   turnAfter,
   wentToBackground,
   workFinished,
@@ -160,16 +165,92 @@ describe('chat events', () => {
 })
 
 describe('terminal agents', () => {
-  const t = { tab: 'term:t1', title: 'zsh', cwd: '/src/app', command: 'claude --resume' }
+  const t = { tab: 'term:t1', cwd: '/src/app', command: 'claude --resume' }
   it('waits while the agent waits and finishes once', () => {
     const waiting = terminalSignals(t, 'working', 'waiting')
     assert.equal(waiting.length, 1)
     assert.ok(waiting[0].kind === 'need' && waiting[0].need.title === 'claude is waiting for you' && waiting[0].need.tab === 'term:t1')
+    assert.ok(waiting[0].kind === 'need' && waiting[0].need.body === 'In a terminal in app')
     assert.deepEqual(terminalSignals(t, 'waiting', 'working').map((s) => s.kind), ['closed'])
     const fin = terminalSignals(t, 'waiting', 'done')
     assert.deepEqual(fin.map((s) => s.kind), ['closed', 'finished'])
+    assert.ok(fin[1].kind === 'finished' && fin[1].notice.title === 'claude finished its turn' && fin[1].notice.body === 'In a terminal in app')
     assert.deepEqual(terminalSignals(t, 'done', 'done'), [])
     assert.deepEqual(terminalSignals(t, undefined, 'done'), [])
+  })
+
+  it('says nothing for a program that is not a known agent CLI, whatever its output reports', () => {
+    for (const command of ['npm test', 'printf', '', 'claudette', 'sh -c claude']) {
+      assert.deepEqual(terminalSignals({ ...t, command }, 'working', 'waiting'), [], command)
+    }
+    assert.equal(terminalAgentName('codex resume --last'), 'codex')
+    assert.equal(terminalAgentName('vim claude.md'), '')
+  })
+
+  it('notifies at most once per minute per tab for waiting and for finished: a storm of states sends two', () => {
+    let a: Attention = { ...emptyAttention, front: false }
+    let sent = 0
+    let prev: string | undefined
+    for (let i = 0; i < 100; i++) {
+      for (const next of ['waiting', 'done']) {
+        const step = terminalChanged(a, t, prev, next, 1000 + i, on)
+        a = step.state
+        sent += step.notify.length
+        prev = next
+      }
+    }
+    assert.equal(sent, 2)
+    assert.equal(a.finished, 1)
+    // Another tab has its own minute; the same tab is announced again after it.
+    const other = terminalChanged(a, { ...t, tab: 'term:t2' }, 'working', 'waiting', 2000, on)
+    assert.equal(other.notify.length, 1)
+    const later = terminalChanged(other.state, t, 'working', 'waiting', 1000 + TERMINAL_NOTIFY_INTERVAL_MS + 200, on)
+    assert.equal(later.notify.length, 1)
+  })
+
+  it('counts a wait inside the minute without announcing it, then or when Flint goes to the background', () => {
+    const away = { ...emptyAttention, front: false }
+    const first = terminalChanged(away, t, 'working', 'waiting', 0, on)
+    const answered = terminalChanged(first.state, t, 'waiting', 'working', 10, on)
+    const again = terminalChanged(answered.state, t, 'working', 'waiting', 20, on)
+    assert.equal(again.notify.length, 0)
+    assert.equal(badgeCount(again.state, on), 1)
+    const back = frontChanged(again.state, true, 1, on).state
+    assert.deepEqual(frontChanged(back, false, 2, on).notify, [])
+  })
+
+  it('forgets a closed tab', () => {
+    const a = terminalChanged({ ...emptyAttention, front: false }, t, 'working', 'waiting', 0, on).state
+    const gone = tabGone(a, 'term:t1')
+    assert.deepEqual(gone.needs, [])
+    assert.deepEqual(gone.terminals, {})
+  })
+})
+
+describe('front', () => {
+  it('follows Go: leaving announces what waits, coming back clears finished work', () => {
+    const waiting = needOpened(emptyAttention, need('a'), false, on).state
+    const away = frontChanged(waiting, false, 1, on)
+    assert.equal(away.notify.length, 1)
+    assert.equal(away.state.front, false)
+    const done = workFinished(away.state, { title: 'x', body: 'y', tab: '' }, true, on).state
+    const back = frontChanged(done, true, 2, on)
+    assert.equal(back.state.front, true)
+    assert.equal(back.state.finished, 0)
+  })
+
+  it('ignores an event older than the last one applied (Go may deliver them out of order)', () => {
+    const away = frontChanged(emptyAttention, false, 3, on).state
+    const stale = frontChanged(away, true, 2, on)
+    assert.equal(stale.state, away)
+    assert.equal(frontChanged(away, false, 3, on).state, away)
+  })
+
+  it('keeps Flint in front while one of its questions is open: Go counts the dialog as Flint, the question only counts on the badge', () => {
+    const asked = needOpened(needOpened(emptyAttention, need('a'), false, on).state, need('q1', { kind: 'question', tab: '', inApp: '' }), false, on)
+    assert.deepEqual(asked.notify, [])
+    assert.equal(asked.state.front, true)
+    assert.equal(badgeCount(asked.state, on), 2)
   })
 })
 

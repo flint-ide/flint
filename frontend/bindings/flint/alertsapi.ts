@@ -18,6 +18,16 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as $models from "./models.js";
 
 /**
+ * InFront says whether Flint is the app in front of the user, as Go follows
+ * it (attention.go); the UI reads it once and then follows "attention:front".
+ */
+export function InFront(): $CancellablePromise<$models.FrontEvent> {
+    return $Call.ByID(1380694955).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
+/**
  * Notify shows a notification; clicking it brings Flint forward on tab (an
  * editor tab id, may be ""). macOS asks the user for permission the first
  * time. A failure is logged once and shown in Settings ▸ Agents (Status).
@@ -38,7 +48,7 @@ export function SetBadge(count: number): $CancellablePromise<void> {
  */
 export function Status(): $CancellablePromise<$models.NotificationStatus> {
     return $Call.ByID(4125641537).then(($result: any) => {
-        return $$createType0($result);
+        return $$createType1($result);
     });
 }
 
@@ -51,4 +61,5 @@ export function Test(): $CancellablePromise<void> {
 }
 
 // Private type creation functions
-const $$createType0 = $models.NotificationStatus.createFrom;
+const $$createType0 = $models.FrontEvent.createFrom;
+const $$createType1 = $models.NotificationStatus.createFrom;

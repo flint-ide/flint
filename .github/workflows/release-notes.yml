@@ -1,0 +1,103 @@
+name: Release notes
+
+# Rewrites the notes of a published release the way the Release workflow
+# writes them (cmd/releasenotes, through .github/scripts/release-notes.sh):
+# for a release published with GitHub's generated notes, one made before the
+# notes were written this way, or after a pull request's Release notes section
+# was edited. Only the body changes: the assets, the title and "latest" stay.
+#
+# Actions ▸ Release notes ▸ Run workflow, with the tag (vX.Y.Z), or
+# `gh workflow run release-notes.yml -f tag=v0.7.0`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release whose notes to rewrite (vX.Y.Z)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-notes-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  write:
+    name: Write the notes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read # the merged pull requests' descriptions
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: Check the tag
+        run: |
+          if ! [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::The tag must be vX.Y.Z"
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # all tags and history, to find the release before
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Write the notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::There is no tag $TAG"
+            exit 1
+          fi
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json tagName >/dev/null
+          mkdir -p "$RUNNER_TEMP/notes"
+          .github/scripts/release-notes.sh "$TAG" "refs/tags/$TAG" "$RUNNER_TEMP/notes/notes.md"
+          {
+            echo "## Notes for $TAG"
+            echo
+            cat "$RUNNER_TEMP/notes/notes.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: notes
+          path: ${{ runner.temp }}/notes/notes.md
+          if-no-files-found: error
+          retention-days: 7
+
+  edit:
+    name: Update the release
+    needs: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # edit the release
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: notes
+          path: ${{ runner.temp }}/notes
+
+      - name: Replace the release's notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::The tag must be vX.Y.Z"
+            exit 1
+          fi
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/notes/notes.md"
+          echo "Rewrote the notes of [Flint $TAG]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG)" >> "$GITHUB_STEP_SUMMARY"

@@ -18,7 +18,7 @@ There is no marketplace. **Settings ▸ Extensions** (**Show Extensions** in the
 
 Flint contacts the index only when you click one of these buttons or run one of these commands, never on its own, and it never updates anything by itself. Extensions you installed from a folder are left alone unless you click **Update** on them.
 
-The official index's public key is not built into Flint yet. Until it is, this section says the index is not configured and requests nothing; use the repository below or a folder.
+The official index is verified with a public key built into Flint. A version of Flint from before that key was added says the index is not configured and requests nothing; update Flint, or use the repository below or a folder.
 
 To use an index of your own (for example your company's), set **Index address** and **Index public key** below the list; see [The extension index](../extensions/index-format.md#your-own-index).
 

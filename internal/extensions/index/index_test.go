@@ -248,11 +248,10 @@ func TestSignAndVerify(t *testing.T) {
 }
 
 func TestKeys(t *testing.T) {
-	if OfficialPublicKey != "" {
-		// The constant is set by the maintainer; it must then be a real key.
-		if _, err := ParsePublicKey(OfficialPublicKey); err != nil {
-			t.Fatalf("OfficialPublicKey: %v", err)
-		}
+	// The key built into Flint must be a real key: an empty or damaged
+	// constant would leave the official index unusable in every build.
+	if _, err := ParsePublicKey(OfficialPublicKey); err != nil {
+		t.Fatalf("OfficialPublicKey: %v", err)
 	}
 	if _, err := ParsePublicKey(""); !errors.Is(err, ErrNoKey) {
 		t.Errorf("empty public key: %v", err)

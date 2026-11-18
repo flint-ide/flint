@@ -1,0 +1,82 @@
+[
+  {
+    "sha": "0879e5a206ec8e9841af7c32a214f981a2c9b08f",
+    "message": "docs: design of agent definitions (agents you define)\n\nA defined agent is an engine (claude or codex), a model and standing\ninstructions in a Markdown file, usable wherever an agent name is.\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  },
+  {
+    "sha": "bfb632681d07c89a038e098b5aba3b6a66b88bab",
+    "message": "docs: an agent definition's engine is optional\n\nWithout an engine the agent runs on the user's default engine, so one\ndefinition works for a whole team; a model needs a pinned engine.\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  },
+  {
+    "sha": "e1818a4248bbb0f5e4bf5309f407738de456aa63",
+    "message": "feat: agent definitions - agents made of an engine, a model and instructions\n\nA Markdown file in the config folder's agents/ or a trusted project's\n.flint/agents defines an agent usable wherever an agent name is: chats,\nagent tasks, defaultAgent and start_agent. The engine is optional; without\nit the agent runs on the default native agent. Instructions reach Claude\nCode as --append-system-prompt and Codex as developerInstructions. A\nsession records its engine and resumes on it.\n\nThe frontend still calls AgentChatAPI.Resume without the engine; the next\ncommit updates it.\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  },
+  {
+    "sha": "3bde933b2acb3c428a5c76dd438f9f96832f5843",
+    "message": "docs: defined agents in the agents guide, settings reference and feature list\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  },
+  {
+    "sha": "4aacc0c1504c3316feedd28ce17337f3047ffd7a",
+    "message": "feat: defined agents in pickers, Settings and the command palette\n\nChats save their engine and pass it to Resume. Pickers label a defined\nagent with its engine, Settings ▸ Agents lists the definitions with their\nproblems, and New Agent Definition… creates one and opens it. A prompt\nlimited to an agent also applies to defined agents on that engine.\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  },
+  {
+    "sha": "8758981ad7e0bcba38e266c277c60121a8c3dc8f",
+    "message": "fix: review findings on agent definitions\n\n- Loading the definitions is serialized from reading the files to\n  registering them, so an older read can't register what a newer one\n  removed (a definition of a folder untrusted in between).\n- A review agent that names a defined agent no longer available falls\n  back to the default agent instead of failing every review.\n- New Agent… may create a personal definition under a project one's name.\n- The conflict tooltip no longer says a defined agent has no terminal\n  mode when the terminal runs its engine.\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  },
+  {
+    "sha": "c601135e350c4f655eaaf8933ff784e2eadac37e",
+    "message": "feat: reviews carry a defined agent's instructions; a chat starts on its own read\n\n- Review Changes with Agent passes the instructions of a defined review\n  agent (Claude: --append-system-prompt, Codex: -c developer_instructions\n  as a TOML string). Commit messages and Edit with Agent still run\n  without them: their answers have a fixed format.\n- A chat starts or resumes on the definition its own call read. Defined\n  agents are no longer registered with the session manager by name; the\n  manager is handed the driver (StartWith, ResumeWith).\n- An orchestration role for claude or codex fits a defined agent on that\n  engine.\n- One call reads the definitions once (agentView).\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  },
+  {
+    "sha": "19c6868df669c6c10b13f6020f338dcf896226ff",
+    "message": "docs: screenshots of defined agents in Settings, New Agent Task and the palette\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  },
+  {
+    "sha": "8cacb2cb6093be0222a936303ed961d76d39d2ff",
+    "message": "docs: design of the backlog (work items above repositories, delegated to agents)\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  },
+  {
+    "sha": "4d8dcc7c1d0d1e61e3f6a25693eca4b0d0a03af4",
+    "message": "test: trust the resolved folder in the defined agents tests\n\nOn macOS a temp folder is reached through a symbolic link (/var →\n/private/var), and trust compares resolved paths, so the project\ndefinition was not loaded there and three tests failed.\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  },
+  {
+    "sha": "4fd16063cba6d8cb4996137f2a0163982a9af6f0",
+    "message": "feat: model tiers for defined agents (fast, balanced, strong)\n\nA definition can name a tier instead of a model, with or without an\nengine; agents.<engine>.tiers maps each tier to a model. Claude Code\ndefaults to haiku, sonnet and opus; Codex has no defaults, so an\nunmapped tier keeps the engine's model. The tier resolves on the engine\nthe conversation runs on, on start, on resume and in headless runs.\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  },
+  {
+    "sha": "5fb05d3d11b1ae0eff55522b0ca490a2a09d70ec",
+    "message": "feat: backlog - work items above repositories, delegated to agents (Go side)\n\nA backlog is a folder with flint-backlog.json and items/*.md. Delegate\nstarts one agent task per repository an item names, with the agent it\nnames; the item's status follows its agent tasks (doing, review, done)\nand is written to its file. Repositories are matched to checkouts by\nremote URL. A read-only agent tool, get_backlog, lists the items.\n\nThe feature contract is widened on purpose: a TasksChanged hook and Host\nmethods for agent tasks, repositories and agents.\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  },
+  {
+    "sha": "4ec83542884753b70b2934021c43b93616862884",
+    "message": "docs: the backlog guide, its cross-references and the feature list\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  },
+  {
+    "sha": "da5870a172daa3ba5dacedaf5be38d873d68025d",
+    "message": "feat: the Backlog panel, board tab and commands\n\nA sidebar panel lists a backlog's items by status with Delegate, Open and\na status menu; a board tab shows them as cards that can be dragged between\ncolumns. Delegate walks through what is missing first (Locate…, adding the\nfolder to the workspace, trusting it).\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  },
+  {
+    "sha": "37a84f84a7fe451177e8f4071973c193ccc67259",
+    "message": "fix: review findings on the backlog\n\n- A repository resolves to a trusted checkout before an untrusted one that\n  claims the same URL; the trust question says it trusts the whole folder.\n- An item moves by itself only when its agent tasks changed, so a status\n  the user set stays; links of an item whose file is missing are kept.\n- Tasks of a Delegate in progress are held back from the queue, so a\n  rollback can't remove a task whose chat already started.\n- A backlog in an untrusted folder is left out of get_backlog, and\n  Delegate from it asks first, showing what the agent will get.\n- Items with invisible or control characters are problems; limits are in\n  bytes everywhere; detached HEAD has a message Delegate can act on.\n- The panel lists the repositories with Locate…, Add to Workspace and\n  Trust Folder…; group headers work from the keyboard; the Delegate\n  walk-through says what it asks for and why it stops.\n- The guide and the design match the UI.\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  },
+  {
+    "sha": "9771a5ea260695304f1109dac99554de4c1ecf60",
+    "message": "docs: screenshots of the backlog and the model tiers; refresh the defined agents ones\n\nCo-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01RDemkNgnazAvXXCCuUFomL",
+    "pr": 83
+  }
+]

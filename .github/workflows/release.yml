@@ -18,6 +18,11 @@ name: Release
 # HOMEBREW_TAP_TOKEN secret is set and the app is notarized. It also runs when
 # someone publishes a release by hand (a release created with the workflow's
 # own token doesn't start other workflow runs, hence the `needs`).
+#
+# The release's notes are written by cmd/releasenotes from the pull requests'
+# "Release notes" sections (.github/scripts/release-notes.sh, in the job
+# "plan"); if that fails, the release is published with GitHub's generated
+# notes, and release-notes.yml can rebuild them later.
 
 on:
   workflow_run:
@@ -60,10 +65,14 @@ jobs:
        github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read # the release notes: the merged pull requests' descriptions
     outputs:
       release: ${{ steps.version.outputs.release }}
       version: ${{ steps.version.outputs.version }}
       sha: ${{ steps.version.outputs.sha }}
+      notes: ${{ steps.notes.outcome }}
     env:
       EVENT: ${{ github.event_name }}
       SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
@@ -130,6 +139,37 @@ jobs:
           } >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
+
+      # A failure here doesn't stop the release: "publish" falls back to
+      # GitHub's generated notes.
+      - name: Write the release notes
+        id: notes
+        if: steps.version.outputs.release == 'true'
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/notes"
+          .github/scripts/release-notes.sh "$VERSION" "$SHA" "$RUNNER_TEMP/notes/notes.md"
+          echo "Release notes written by cmd/releasenotes ($(wc -c < "$RUNNER_TEMP/notes/notes.md") bytes)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report the fallback
+        if: steps.notes.outcome == 'failure'
+        run: |
+          echo "::warning::The release notes could not be written; the release gets GitHub's generated notes."
+          echo "**Release notes:** writing them failed (see the step \"Write the release notes\"), so the release gets GitHub's generated notes. Fix the cause, then run the workflow \"Release notes\" for this tag." >> "$GITHUB_STEP_SUMMARY"
+
+      # Not named release-*: "publish" puts every release-* artifact in the release.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.notes.outcome == 'success'
+        continue-on-error: true
+        with:
+          name: notes
+          path: ${{ runner.temp }}/notes/notes.md
+          if-no-files-found: error
+          retention-days: 7
 
   macos:
     name: Build (macOS universal)
@@ -283,6 +323,13 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.plan.outputs.notes == 'success'
+        continue-on-error: true
+        with:
+          name: notes
+          path: ${{ runner.temp }}/notes
+
       - name: Checksums
         working-directory: dist
         run: |
@@ -303,10 +350,18 @@ jobs:
           else
             set -- --target "$SHA"
           fi
+          # The notes written in "plan", else GitHub's list of pull requests.
+          notes="$RUNNER_TEMP/notes/notes.md"
+          if [ -s "$notes" ]; then
+            set -- "$@" --notes-file "$notes"
+          else
+            set -- "$@" --generate-notes
+            echo "::warning::No release notes from the job \"Plan the release\"; publishing with GitHub's generated notes."
+            echo "**Release notes:** GitHub's generated notes, because the job \"Plan the release\" didn't write them. Rebuild them with the workflow \"Release notes\" once the cause is fixed." >> "$GITHUB_STEP_SUMMARY"
+          fi
           gh release create "$VERSION" dist/* "$@" \
             --repo "$GITHUB_REPOSITORY" \
             --title "Flint $VERSION" \
-            --generate-notes \
             --latest
           echo "Published [Flint $VERSION]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$VERSION)" >> "$GITHUB_STEP_SUMMARY"
 

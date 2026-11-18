@@ -1238,6 +1238,18 @@ export class RemoveInfo {
      */
     "unmerged": number;
 
+    /**
+     * JointTasks counts the other tasks of the task's joint group (0 for a
+     * task with a chat of its own).
+     */
+    "jointTasks": number;
+
+    /**
+     * StopsJointChat: a chat the task shares with the other tasks of its
+     * joint group is open; removing the task stops it for all of them.
+     */
+    "stopsJointChat": boolean;
+
     /** Creates a new RemoveInfo instance. */
     constructor($$source: Partial<RemoveInfo> = {}) {
         if (!("stale" in $$source)) {
@@ -1251,6 +1263,12 @@ export class RemoveInfo {
         }
         if (!("unmerged" in $$source)) {
             this["unmerged"] = 0;
+        }
+        if (!("jointTasks" in $$source)) {
+            this["jointTasks"] = 0;
+        }
+        if (!("stopsJointChat" in $$source)) {
+            this["stopsJointChat"] = false;
         }
 
         Object.assign(this, $$source);
@@ -1788,6 +1806,15 @@ export class TaskView {
     "group": string;
 
     /**
+     * Joint links the tasks, one per repository, that one agent works on in
+     * one chat ("" for a task with a chat of its own); Lead marks the task
+     * whose worktree that chat runs in (the others are its additional
+     * folders). Every task of the group shows the chat's state.
+     */
+    "joint": string;
+    "lead": boolean;
+
+    /**
      * Tokens and CostUSD are what the task's chats used so far (input and
      * output tokens; reported cost plus estimates from settings prices).
      */
@@ -1843,6 +1870,12 @@ export class TaskView {
         }
         if (!("group" in $$source)) {
             this["group"] = "";
+        }
+        if (!("joint" in $$source)) {
+            this["joint"] = "";
+        }
+        if (!("lead" in $$source)) {
+            this["lead"] = false;
         }
         if (!("tokens" in $$source)) {
             this["tokens"] = 0;

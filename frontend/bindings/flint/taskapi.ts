@@ -159,7 +159,10 @@ export function StartDone(id: string): $CancellablePromise<void> {
 /**
  * StartNow starts a queued task although no slot is free: the user's
  * override. A budget that pauses new turns still holds it back. The UI then
- * starts its chat, as for a new task.
+ * starts its chat, as for a new task; except for a task of a joint group:
+ * the whole group leaves the queue and Go starts its one chat itself (in the
+ * lead's worktree, with every worktree's folder and the group's
+ * description), so the UI starts no chat when the view it gets has a Joint.
  */
 export function StartNow(id: string): $CancellablePromise<$models.TaskView> {
     return $Call.ByID(656043389, id).then(($result: any) => {

@@ -142,11 +142,46 @@ A read-only agent tool, `get_backlog`, returns the known backlogs whose folder i
 - The `Host` methods: `CreateAgentTasks` (requests of folder, description and agent; all or nothing, its tasks held from the queue until it returns; `*DetachedHeadError` for a checkout on a detached HEAD), `AgentTasks` (the states of given task ids, merged and pull request included), `Repository` (a folder's checkout, its remote URLs and whether it is a task's worktree) and `Agents` (the available agents and the default one). `featuretest.Host` fakes them.
 - Every service method takes a backlog folder that must be one Flint knows (above) and an item id that is validated; paths are taken from the UI only for Open, New Backlog and Locate (existing folders the user picked with the native folder picker, `WorkspaceAPI.PickFolder`) and as Delegate's active project (which must be an open workspace folder).
 
-## Not in version 1
+## Version 2: planning, dependencies, cloning, one agent across repositories
 
-- Cloning a repository that has no checkout.
-- Dependencies between items and automatic start when a dependency is done.
-- One agent working in several repositories at once; a coordinating agent above the per-repository ones.
-- Asking an agent to split a goal into items, milestones, budgets per item, assignees who are people.
+Status: in progress. The four parts below extend version 1; everything above still holds unless a part says otherwise.
+
+### Planning with an agent
+
+The user states a goal; an agent splits it into items.
+
+- **Plan with Agent…** (panel, board, command) asks for the goal and the agent (a defined agent such as a planner, or any other; default: the default agent) and puts a prompt into a chat's draft, as every "Ask the agent" does. The prompt gives the goal, the backlog's name and repositories, the item format and its limits, and tells the agent to read the backlog with `get_backlog` and add items with `add_backlog_item`. The user sends it; nothing is sent for them.
+- A new agent tool, **`add_backlog_item`**, writes one item: `{backlog, title, text, priority?, agent?, repos?, after?}`. It is a tool that **acts** (`mcpserver.Tool.Acts`): Flint asks the user before each call, showing the arguments, and it is off unless the user allows Flint's acting tools, like the others. It goes through the same code as New Item… and the parser: the id comes from the title, the file is never overwritten, every limit and character rule applies, the status is always `todo`, and a call that would produce a problem file is refused with the reason so the agent can correct it. It refuses a backlog whose folder is not trusted.
+- Agents never get a tool that changes or deletes an item, sets a status or delegates. An agent whose chat runs in the backlog's folder can still edit its files like any file of a project it works in; Flint's parser decides what counts as an item.
+
+### Dependencies
+
+- An item may name items that must be done first: `after: id1, id2` (ids of the same backlog, at most 20). An unknown id, an item naming itself and a cycle are problems of the item.
+- An item is **ready** when every item in `after` has status `done`. The panel and board show what an item waits for.
+- **Delegate** on an item that is not ready does not start it. It asks to **start it when it is ready**; a yes records that locally (a state key, like the links) and the item shows "starts when … is done". **Cancel start** removes it. This is the only way anything starts without a click at that moment, and the click that allowed it names the item.
+- When the last dependency becomes `done` (by Flint or by the user), Flint delegates the waiting item exactly as a click would, with every check of Delegate at that time: the agent, the checkouts, trust, the untrusted-backlog confirmation, the limits. If a check fails, nothing starts, the item keeps waiting with the reason shown, and the user can Delegate by hand or cancel. A waiting start is forgotten when its backlog is closed.
+- Starting follows the agent task queue and its limits; nothing new is added there.
+
+### Cloning a repository
+
+- A repository with no checkout gets **Clone…** next to **Locate…**: the user picks the folder to clone into, Flint shows the URL and the destination and asks, then runs `git clone` and treats the result as located.
+- Only `https://`, `ssh://` and scp-like (`user@host:path`) URLs can be cloned; `file://`, local paths, `ext::` and every other transport are refused. The URL comes from a backlog, so it is passed after `--`, never as an option, with `protocol.ext.allow=never`, no submodule recursion and no hooks or config from the clone run by Flint. git asks for nothing on a terminal Flint does not have (`GIT_TERMINAL_PROMPT=0`): credentials come from the user's own helper or agent, and a failure shows git's message.
+- The destination must not exist or must be an empty folder inside the folder the user picked; the name is the last element of the URL's path, validated as a file name.
+- A cloned folder is like any new folder: not trusted, so Delegate still needs the user to trust it, and it is added to the workspace by the UI when the item is delegated.
+- One clone at a time per backlog; it can be cancelled; a clone that fails or is cancelled removes what it created.
+
+### One agent across repositories
+
+- An item with several repositories may say `together: true`. Delegate then starts **one agent** that works in all of them, instead of one agent per repository.
+- Each repository still gets its own branch and worktree, as its own agent task, so Merge, Create PR, Compare and removal work per repository as today. The tasks are a **joint group**: one chat, started in the first repository's worktree, which is given the other worktrees as additional folders it may read and write. Every task of the group follows that one chat's state.
+- The description says which folder is which repository and that the change must be consistent across them.
+- An engine can run a joint group only if it can be given additional folders. Claude Code can (`--add-dir`). For another engine, Delegate refuses and says so; whether Codex can is to be verified against its source and recorded here.
+- Trust and Restricted Mode apply to every worktree of the group as to any task's worktree; the additional folders are only the group's own worktrees.
+- Removing one task of a joint group while its chat runs stops the chat for all of them, after asking.
+
+## Not yet
+
+- A coordinating agent above per-repository agents.
+- Milestones, budgets per item, assignees who are people.
 - Watching a backlog folder outside the workspace; live updates from a teammate's push.
 - Import from or synchronization with trackers.

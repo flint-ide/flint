@@ -19,13 +19,14 @@ import (
 //   - a signature file ("index.json.sig") is one line: the 64-byte Ed25519
 //     signature over the exact bytes of the index file, in standard base64.
 
-// OfficialPublicKey verifies the index flint-ide/extensions publishes. It is
-// empty until the maintainer generates the key pair (`flint-extindex
-// keygen`), stores the secret key as that repository's signing secret and
-// puts the public key here. While it is empty the official index is "not
-// configured", and only an index with its own key in settings
-// (extensions.indexPublicKey) can be used.
-const OfficialPublicKey = ""
+// OfficialPublicKey verifies the index flint-ide/extensions publishes. Its
+// secret key is that repository's signing secret (FLINT_EXTINDEX_KEY) and
+// exists nowhere else; the pair was made with `flint-extindex keygen`.
+// Replacing the pair means changing this constant and that secret together:
+// a Flint with the old key refuses an index signed with the new one. A build
+// with an empty constant has no official index ("not configured") and can
+// only use an index with its own key in settings (extensions.indexPublicKey).
+const OfficialPublicKey = "LIoeWPbzyMSJFYNoJo/VfkXcIW2FOQJuJzQBxrO3wew="
 
 // ErrNoKey: there is no public key to verify an index with.
 var ErrNoKey = errors.New("no public key is configured for the extension index")

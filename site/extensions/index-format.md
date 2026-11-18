@@ -74,7 +74,7 @@ The signature is a file next to the index, `index.json.sig`: one line with the E
 - A **public key** is the 32-byte Ed25519 public key in base64 (44 characters). Flint has the official index's key built in; `extensions.indexPublicKey` sets another one.
 - A **secret key** is the 64-byte Ed25519 private key in base64 (88 characters). It belongs in the publishing workflow's secret store and nowhere else.
 
-The official key is not built into Flint yet. Until a maintainer generates the key pair and adds the public key, Settings ▸ Extensions says the official index is not configured and Flint requests nothing; an index of your own with `extensions.indexPublicKey` works.
+The official index's public key is `LIoeWPbzyMSJFYNoJo/VfkXcIW2FOQJuJzQBxrO3wew=`. Its secret key is the signing secret of the publishing workflow in flint-ide/extensions. A version of Flint from before the key was built in says in Settings ▸ Extensions that the official index is not configured and requests nothing; an index of your own with `extensions.indexPublicKey` works in every version.
 
 ## flint-extindex
 

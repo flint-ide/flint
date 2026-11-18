@@ -411,24 +411,30 @@ func TestIndexWithoutAKeyMakesNoRequest(t *testing.T) {
 	f := newIndexFixture(t)
 	f.publish(extFolder(t, themesV1, false))
 	f.settings.IndexPublicKey = ""
-	if index.OfficialPublicKey != "" {
-		t.Skip("an official key is built in")
+	// An empty setting falls back to the key built into Flint, so "no key at
+	// all" only exists in a build without one.
+	if index.OfficialPublicKey == "" {
+		st := f.store.status()
+		if st.Configured {
+			t.Errorf("status = %+v", st)
+		}
+		st, err := f.store.fetch(context.Background())
+		if err != errNotConfigured || st.Fetched {
+			t.Errorf("fetch = %+v, %v", st, err)
+		}
+		if n := f.requestCount(); n != 0 {
+			t.Errorf("%d requests without a key", n)
+		}
 	}
+	// The official index with nothing set: configured exactly when a key is
+	// built in, and asking for its status requests nothing.
+	f.settings = Settings{}
 	st := f.store.status()
-	if st.Configured {
-		t.Errorf("status = %+v", st)
-	}
-	st, err := f.store.fetch(context.Background())
-	if err != errNotConfigured || st.Fetched {
-		t.Errorf("fetch = %+v, %v", st, err)
+	if !st.Official || st.URL != index.DefaultURL || st.Configured != (index.OfficialPublicKey != "") {
+		t.Errorf("official status = %+v", st)
 	}
 	if n := f.requestCount(); n != 0 {
-		t.Errorf("%d requests without a key", n)
-	}
-	// The official index with nothing set: not configured, and said so.
-	f.settings = Settings{}
-	if st := f.store.status(); !st.Official || st.Configured || st.URL != index.DefaultURL {
-		t.Errorf("official status = %+v", st)
+		t.Errorf("%d requests for the status", n)
 	}
 }
 

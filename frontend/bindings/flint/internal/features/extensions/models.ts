@@ -115,8 +115,8 @@ export class IndexStatus {
     "official": boolean;
 
     /**
-     * Configured: there is a public key to verify the index with. False for
-     * the official index until its key is built into Flint.
+     * Configured: there is a public key to verify the index with. False only
+     * when neither the settings nor this build of Flint have one.
      */
     "configured": boolean;
 

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	"flint/internal/agenttask"
 	"flint/internal/feature"
 	"flint/internal/settings"
 	"flint/internal/terminal"
@@ -48,6 +49,7 @@ type Host struct {
 	repos     map[string]feature.Repository
 	agents    feature.Agents
 	requested [][]feature.NewAgentTask
+	joint     []JointRequest
 	createErr error
 	nextID    int
 }
@@ -242,6 +244,66 @@ func (h *Host) CreateAgentTasks(_ context.Context, reqs []feature.NewAgentTask) 
 	return out, nil
 }
 
+// JointRequest is one CreateJointAgentTasks call.
+type JointRequest struct {
+	Reqs  []feature.NewAgentTask
+	Agent string
+}
+
+// CreateJointAgentTasks records the call and makes one joint group, a task
+// per request (lead first, State as CreateAgentTasks'), with the checks the
+// app makes that need no git: 2 to agenttask.MaxJoint requests in folders
+// inside a root, each a different one, agent available. With
+// SetCreateError it fails with that error and creates none: to fake the
+// app's refusals, wrap feature.ErrJointEngine or feature.ErrJointUntrusted.
+func (h *Host) CreateJointAgentTasks(_ context.Context, reqs []feature.NewAgentTask, agent string) ([]feature.AgentTask, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.joint = append(h.joint, JointRequest{slices.Clone(reqs), agent})
+	if h.createErr != nil {
+		return nil, h.createErr
+	}
+	switch {
+	case len(reqs) < 2:
+		return nil, errors.New("a joint agent task needs at least two repositories")
+	case len(reqs) > agenttask.MaxJoint:
+		return nil, fmt.Errorf("a joint agent task works in at most %d repositories", agenttask.MaxJoint)
+	case !slices.Contains(h.agents.Available, agent):
+		return nil, fmt.Errorf("the agent %q is not installed", agent)
+	}
+	seen := map[string]bool{}
+	for _, r := range reqs {
+		switch {
+		case !h.inRoot(r.Dir):
+			return nil, fmt.Errorf("%s is outside the open folders", r.Dir)
+		case r.Agent != "" && r.Agent != agent:
+			return nil, fmt.Errorf("%s: a joint agent task has one agent", r.Dir)
+		case seen[r.Dir]:
+			return nil, fmt.Errorf("%s is listed twice", r.Dir)
+		}
+		seen[r.Dir] = true
+	}
+	h.nextID++
+	group := fmt.Sprintf("j%015x", h.nextID)
+	var out []feature.AgentTask
+	for i, r := range reqs {
+		h.nextID++
+		id := fmt.Sprintf("%016x", h.nextID)
+		t := feature.AgentTask{ID: id, Title: r.Description, Agent: agent, Branch: "task-" + id, Base: "main", Worktree: r.Dir + "-" + id,
+			State: "working", Joint: group, Lead: i == 0}
+		h.tasks[id] = t
+		out = append(out, t)
+	}
+	return out, nil
+}
+
+// JointRequested returns the CreateJointAgentTasks calls.
+func (h *Host) JointRequested() []JointRequest {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.joint)
+}
+
 func (h *Host) inRoot(dir string) bool {
 	for _, root := range h.roots {
 		if dir == root || len(dir) > len(root) && dir[:len(root)] == root && dir[len(root)] == '/' {
@@ -251,7 +313,8 @@ func (h *Host) inRoot(dir string) bool {
 	return false
 }
 
-// SetCreateError makes CreateAgentTasks fail with err (nil: succeed).
+// SetCreateError makes CreateAgentTasks and CreateJointAgentTasks fail with
+// err (nil: succeed).
 func (h *Host) SetCreateError(err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()

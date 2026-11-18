@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,6 +15,7 @@ import (
 
 	"flint/internal/agenttask"
 	"flint/internal/feature"
+	"flint/internal/settings"
 )
 
 // addRepoT makes a second repository next to the fixture's, with a remote,
@@ -282,5 +284,98 @@ func TestFeatureHostCreateDetachedHead(t *testing.T) {
 	}
 	if n := len(f.app.taskStore().List(cleanFolder(filepath.Join(f.repo, ".git")))); n != 0 {
 		t.Errorf("%d tasks kept", n)
+	}
+}
+
+// CreateJointAgentTasks makes one joint group in two real repositories: one
+// task per repository, linked, lead first, and one chat in the lead's
+// worktree with the other worktree as an additional folder.
+func TestFeatureHostCreatesJointAgentTasks(t *testing.T) {
+	j := newJointFixture(t, 2, 0)
+	h := featureHost{j.app}
+	ctx := context.Background()
+	made, err := h.CreateJointAgentTasks(ctx, []feature.NewAgentTask{
+		{Dir: j.repos[0], Description: "Rename the field\n\nIn both.", Agent: "claude"},
+		{Dir: j.repos[1], Description: "Rename the field\n\nIn both."},
+	}, "claude")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(made) != 2 || made[0].Joint == "" || made[0].Joint != made[1].Joint || !made[0].Lead || made[1].Lead ||
+		made[0].Agent != "claude" || made[0].Title != "Rename the field" ||
+		!within(made[0].Worktree, filepath.Dir(j.repos[0])) || made[0].Worktree == made[1].Worktree {
+		t.Fatalf("made %+v", made)
+	}
+	store := j.app.taskStore()
+	if g := store.Joint(made[0].Joint); len(g) != 2 || g[0].ID != made[0].ID || g[1].ID != made[1].ID {
+		t.Fatalf("group %+v", g)
+	}
+	j.waitStarts()
+	chats := j.claude.chats()
+	if len(chats) != 1 || len(chats[made[0].Worktree]) != 1 {
+		t.Fatalf("chats = %v", chats)
+	}
+	if got := j.claude.foldersOf(chats[made[0].Worktree][0]); !slices.Equal(got, []string{made[1].Worktree}) {
+		t.Errorf("folders = %v", got)
+	}
+	// The description is said once, then which folder is which.
+	prompt := j.claude.prompt(t)
+	if strings.Count(prompt, "In both.") != 1 || !strings.Contains(prompt, made[1].Worktree) {
+		t.Errorf("prompt:\n%s", prompt)
+	}
+	got := h.AgentTasks(ctx, []string{made[0].ID, made[1].ID})
+	if got[made[0].ID].Joint != made[0].Joint || !got[made[0].ID].Lead || got[made[1].ID].Joint != made[0].Joint || got[made[1].ID].Lead {
+		t.Errorf("AgentTasks = %+v", got)
+	}
+}
+
+// Its refusals are the feature errors, keep the app's text and leave nothing.
+func TestFeatureHostCreateJointRefusals(t *testing.T) {
+	j := newJointFixture(t, 3, 0)
+	sh, _ := exec.LookPath("sh")
+	j.app.settings.Agents["codex"] = settings.AgentSettings{Path: sh}
+	h := featureHost{j.app}
+	ctx := context.Background()
+	reqs := func(dirs ...string) []feature.NewAgentTask {
+		var out []feature.NewAgentTask
+		for _, d := range dirs {
+			out = append(out, feature.NewAgentTask{Dir: d, Description: "x"})
+		}
+		return out
+	}
+	_, err := h.CreateJointAgentTasks(ctx, reqs(j.repos[0], j.repos[1]), "codex")
+	if !errors.Is(err, feature.ErrJointEngine) || errors.Is(err, feature.ErrJointUntrusted) ||
+		err.Error() != "codex runs on codex, which cannot work in several folders at once: delegate per repository instead" {
+		t.Errorf("codex: %v", err)
+	}
+	if _, err := h.CreateJointAgentTasks(ctx, reqs(j.repos[0], j.repos[1]), "fake"); !errors.Is(err, feature.ErrJointEngine) {
+		t.Errorf("a custom ACP agent: %v", err)
+	}
+	if err := j.app.setTrust(cleanFolder(j.repos[1]), false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.CreateJointAgentTasks(ctx, reqs(j.repos[0], j.repos[1]), "claude"); !errors.Is(err, feature.ErrJointUntrusted) ||
+		!strings.Contains(err.Error(), "is not trusted") {
+		t.Errorf("untrusted: %v", err)
+	}
+	gitT(t, j.repos[2], "checkout", "-q", "--detach")
+	_, err = h.CreateJointAgentTasks(ctx, reqs(j.repos[0], j.repos[2]), "claude")
+	var dh *feature.DetachedHeadError
+	if !errors.As(err, &dh) || dh.Dir != j.repos[2] {
+		t.Errorf("detached HEAD: %v", err)
+	}
+	mixed := reqs(j.repos[0], j.repos[2])
+	mixed[1].Agent = "fake"
+	if _, err := h.CreateJointAgentTasks(ctx, mixed, "claude"); err == nil || !strings.Contains(err.Error(), "one agent") {
+		t.Errorf("two agents: %v", err)
+	}
+	if n := len(j.app.taskStore()); n != 0 {
+		t.Errorf("refusals left %d tasks", n)
+	}
+	if out := gitT(t, j.repos[0], "worktree", "list"); strings.Count(out, "\n") != 0 {
+		t.Errorf("worktrees kept:\n%s", out)
+	}
+	if len(j.claude.chats()) != 0 {
+		t.Error("a chat started")
 	}
 }

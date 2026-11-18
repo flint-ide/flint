@@ -149,7 +149,11 @@ type Item struct {
 	Repos    []string `json:"repos"` // names from Config; none = the active project
 	// After are the ids of the items that must be done first (same backlog).
 	After []string `json:"after"`
-	Body  string   `json:"body"`
+	// Together: one agent works in all of Repos at once (a joint group of
+	// agent tasks) instead of one agent per repository. Only with two to
+	// agenttask.MaxJoint repositories.
+	Together bool   `json:"together"`
+	Body     string `json:"body"`
 }
 
 // ParseItem reads an item file of backlog c. Unknown keys are ignored.
@@ -192,7 +196,22 @@ func ParseItem(id string, data []byte, c Config) (Item, error) {
 			if it.After, err = parseAfter(f.Value); err != nil {
 				return Item{}, err
 			}
+		case "together":
+			switch f.Value {
+			case "true":
+				it.Together = true
+			case "false":
+				it.Together = false
+			default:
+				return Item{}, fmt.Errorf("together %q: use true or false", f.Value)
+			}
 		}
+	}
+	switch {
+	case it.Together && len(it.Repos) < 2:
+		return Item{}, errors.New("together: true needs two or more repositories in repos (one agent works in all of them)")
+	case it.Together && len(it.Repos) > agenttask.MaxJoint:
+		return Item{}, fmt.Errorf("together: true works with at most %d repositories", agenttask.MaxJoint)
 	}
 	switch {
 	case it.Title == "":
@@ -293,10 +312,13 @@ func (it Item) Description() string {
 
 // TaskDescription is the description of the item's task in repository repo:
 // with several repositories it names the others and says which one this
-// task works in.
+// task works in. An item with together has one agent for all of them: every
+// task of the group gets the item's description as is, and Flint's first
+// message of the group's chat (jointPrompt in package main) adds once which
+// folder is which repository.
 func (it Item) TaskDescription(repo string) string {
 	d := it.Description()
-	if len(it.Repos) < 2 {
+	if len(it.Repos) < 2 || it.Together {
 		return d
 	}
 	var others []string
@@ -382,6 +404,7 @@ func NewItemFile(title string) ([]byte, error) {
 		"priority: normal\n" +
 		"# agent: backend     the agent that works on it (default: the default agent)\n" +
 		"# repos: api, web    repositories from " + ConfigFile + " (default: the active project)\n" +
+		"# together: true     with several repos: one agent works in all of them (default: one per repository)\n" +
 		"---\n" +
 		"What to do.\n\n" +
 		"Done when:\n" +
@@ -397,6 +420,8 @@ type ItemSpec struct {
 	Agent    string
 	Repos    []string
 	After    []string
+	// Together: one agent across Repos (written only when true).
+	Together bool
 }
 
 // BuildItemFile writes spec as an item file of backlog c and checks it with the
@@ -435,6 +460,9 @@ func BuildItemFile(spec ItemSpec, id string, c Config) ([]byte, error) {
 	}
 	b.WriteString(list("repos", spec.Repos))
 	b.WriteString(list("after", spec.After))
+	if spec.Together {
+		b.WriteString("together: true\n")
+	}
 	b.WriteString("---\n")
 	if text != "" {
 		b.WriteString(text + "\n")
@@ -445,7 +473,7 @@ func BuildItemFile(spec ItemSpec, id string, c Config) ([]byte, error) {
 		return nil, err
 	}
 	// What was meant is what is written.
-	if it.Title != title || it.Body != text || it.Status != StatusTodo || it.Priority != spec.Priority || it.Agent != spec.Agent ||
+	if it.Title != title || it.Body != text || it.Status != StatusTodo || it.Priority != spec.Priority || it.Agent != spec.Agent || it.Together != spec.Together ||
 		!slices.Equal(it.Repos, nonNil(spec.Repos)) || !slices.Equal(it.After, nonNil(spec.After)) {
 		return nil, errors.New("the item can't be written as given: check the title and the names")
 	}

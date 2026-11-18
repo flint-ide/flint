@@ -86,7 +86,11 @@ export function Create(folder: string, name: string): $CancellablePromise<$model
 /**
  * Delegate starts an item's agent tasks: one per repository it names (in the
  * window's active project, project, when it names none), run by its agent
- * (else the default agent), through the same path as New Agent Task. Before
+ * (else the default agent), through the same path as New Agent Task. An
+ * item with together gets one joint group instead (Host.CreateJointAgentTasks:
+ * one agent, one chat, across all of its repositories), after the same
+ * checks; an agent that cannot work in several folders is refused by Flint
+ * with its reason, and nothing is created. Before
  * anything is created it checks the agent can start and every repository
  * has a trusted checkout inside the workspace; when one task cannot be
  * created, none is kept. An item of a backlog whose folder is not trusted is

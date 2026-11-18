@@ -268,6 +268,12 @@ export class ItemView {
     "priority": string;
     "agent": string;
     "repos": string[];
+
+    /**
+     * Together: Delegate starts one agent that works in all of Repos (one
+     * joint group of agent tasks, one chat) instead of one per repository.
+     */
+    "together": boolean;
     "body": string;
 
     /**
@@ -331,6 +337,9 @@ export class ItemView {
         if (!("repos" in $$source)) {
             this["repos"] = [];
         }
+        if (!("together" in $$source)) {
+            this["together"] = false;
+        }
         if (!("body" in $$source)) {
             this["body"] = "";
         }
@@ -370,25 +379,25 @@ export class ItemView {
      */
     static createFrom($$source: any = {}): ItemView {
         const $$createField5_0 = $$createType10;
-        const $$createField10_0 = $$createType9;
-        const $$createField11_0 = $$createType10;
+        const $$createField11_0 = $$createType9;
         const $$createField12_0 = $$createType10;
-        const $$createField15_0 = $$createType12;
+        const $$createField13_0 = $$createType10;
+        const $$createField16_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("repos" in $$parsedSource) {
             $$parsedSource["repos"] = $$createField5_0($$parsedSource["repos"]);
         }
         if ("tasks" in $$parsedSource) {
-            $$parsedSource["tasks"] = $$createField10_0($$parsedSource["tasks"]);
+            $$parsedSource["tasks"] = $$createField11_0($$parsedSource["tasks"]);
         }
         if ("after" in $$parsedSource) {
-            $$parsedSource["after"] = $$createField11_0($$parsedSource["after"]);
+            $$parsedSource["after"] = $$createField12_0($$parsedSource["after"]);
         }
         if ("waitingFor" in $$parsedSource) {
-            $$parsedSource["waitingFor"] = $$createField12_0($$parsedSource["waitingFor"]);
+            $$parsedSource["waitingFor"] = $$createField13_0($$parsedSource["waitingFor"]);
         }
         if ("waiting" in $$parsedSource) {
-            $$parsedSource["waiting"] = $$createField15_0($$parsedSource["waiting"]);
+            $$parsedSource["waiting"] = $$createField16_0($$parsedSource["waiting"]);
         }
         return new ItemView($$parsedSource as Partial<ItemView>);
     }
@@ -567,6 +576,14 @@ export class TaskView {
     "stale": boolean;
     "gone": boolean;
 
+    /**
+     * Joint is the id of the task's joint group ("" for a task with a chat
+     * of its own, and for a removed task); Lead marks the group's task whose
+     * worktree its one chat runs in (open that one for the chat).
+     */
+    "joint": string;
+    "lead": boolean;
+
     /** Creates a new TaskView instance. */
     constructor($$source: Partial<TaskView> = {}) {
         if (!("id" in $$source)) {
@@ -604,6 +621,12 @@ export class TaskView {
         }
         if (!("gone" in $$source)) {
             this["gone"] = false;
+        }
+        if (!("joint" in $$source)) {
+            this["joint"] = "";
+        }
+        if (!("lead" in $$source)) {
+            this["lead"] = false;
         }
 
         Object.assign(this, $$source);

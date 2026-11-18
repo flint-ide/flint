@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"unicode/utf8"
+
+	"flint/internal/agenttask"
 )
 
 // Bounds of Plan with Agent….
@@ -79,10 +81,12 @@ func planText(c Config, folder, goal string, agents []string, def string) string
 		fmt.Fprintf(&b, "- agent (optional): the agent that works on it, one of %s%s; default: %s\n", strings.Join(list, ", "), more, def)
 	}
 	if len(c.Repositories) > 0 {
-		b.WriteString("- repos: the repositories it changes, by name (an item with several gets one agent task per repository):\n")
+		b.WriteString("- repos: the repositories it changes, by name (an item with several gets one agent task per repository, unless together is true):\n")
 		for _, r := range c.Repositories {
 			fmt.Fprintf(&b, "  - %s: %s\n", r.Name, r.URL)
 		}
+		fmt.Fprintf(&b, "- together (optional, only with 2 to %d repos): true when one agent should work in all of them at once, in one chat "+
+			"(a change that must stay consistent across them); it needs an agent that can work in several folders (Claude Code, not Codex); default false\n", agenttask.MaxJoint)
 	} else {
 		b.WriteString("- repos: leave it out (this backlog lists no repositories; its items run in the project open in Flint)\n")
 	}

@@ -116,7 +116,10 @@ type ItemView struct {
 	Priority string   `json:"priority"`
 	Agent    string   `json:"agent"`
 	Repos    []string `json:"repos"`
-	Body     string   `json:"body"`
+	// Together: Delegate starts one agent that works in all of Repos (one
+	// joint group of agent tasks, one chat) instead of one per repository.
+	Together bool   `json:"together"`
+	Body     string `json:"body"`
 	// Path is the item's file, to open in the editor.
 	Path string `json:"path"`
 	// AgentProblem says why Delegate can't start the item's agent now.
@@ -168,6 +171,11 @@ type TaskView struct {
 	// Stale: the worktree folder is gone. Gone: the task was removed.
 	Stale bool `json:"stale"`
 	Gone  bool `json:"gone"`
+	// Joint is the id of the task's joint group ("" for a task with a chat
+	// of its own, and for a removed task); Lead marks the group's task whose
+	// worktree its one chat runs in (open that one for the chat).
+	Joint string `json:"joint"`
+	Lead  bool   `json:"lead"`
 }
 
 // DelegateResult is what Delegate started.
@@ -496,7 +504,7 @@ func agentProblem(agent string, agents feature.Agents) string {
 func itemView(folder string, it Item, ls []Link, tasks map[string]feature.AgentTask) ItemView {
 	v := ItemView{
 		ID: it.ID, Title: it.Title, Status: it.Status, Priority: it.Priority, Agent: it.Agent,
-		Repos: nonNil(it.Repos), Body: it.Body, Path: ItemFile(folder, it.ID), Tasks: []TaskView{},
+		Repos: nonNil(it.Repos), Together: it.Together, Body: it.Body, Path: ItemFile(folder, it.ID), Tasks: []TaskView{},
 		Failed: Failed(ls), After: nonNil(it.After), WaitingFor: []string{}, Ready: true,
 	}
 	for _, l := range ls {
@@ -504,6 +512,7 @@ func itemView(folder string, it Item, ls []Link, tasks map[string]feature.AgentT
 		if t, ok := tasks[l.Task]; ok && !l.Gone {
 			tv.Title, tv.Agent, tv.Branch, tv.Worktree = t.Title, t.Agent, t.Branch, t.Worktree
 			tv.State, tv.Error, tv.Merged, tv.Stale = t.State, t.Error, t.Merged, t.Stale
+			tv.Joint, tv.Lead = t.Joint, t.Lead
 			if t.PullRequest != "" {
 				tv.PullRequest = t.PullRequest
 			}

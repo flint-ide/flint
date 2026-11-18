@@ -35,7 +35,7 @@ func (a *API) readTools() []mcpserver.Tool {
 		Name:  ToolName,
 		Title: "Read the backlog",
 		Description: "Returns the backlogs open in Flint (folders of planned work items for one or more repositories) with their items: " +
-			"id, title, status (doing, review, todo, done), priority, agent, repositories, the items it waits for (after) and whether it is ready, and text. " +
+			"id, title, status (doing, review, todo, done), priority, agent, repositories (and whether one agent works in all of them together), the items it waits for (after) and whether it is ready, and text. " +
 			"Use it to answer what is planned or what to work on next. Read-only: statuses change in Flint. " +
 			"Backlogs whose folder is in Restricted Mode in Flint are left out.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{` +
@@ -156,6 +156,9 @@ func itemText(it Item, d Deps) string {
 	}
 	if len(it.Repos) > 0 {
 		fmt.Fprintf(&b, "; repositories: %s", strings.Join(it.Repos, ", "))
+		if it.Together {
+			b.WriteString(" (together: one agent works in all of them)")
+		}
 	}
 	if len(it.After) > 0 {
 		fmt.Fprintf(&b, "; after: %s", strings.Join(it.After, ", "))

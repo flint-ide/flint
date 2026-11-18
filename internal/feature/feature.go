@@ -22,6 +22,7 @@ package feature
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -126,6 +127,19 @@ type Host interface {
 	// queued task is not started before the call returns. A checkout on a
 	// detached HEAD fails with *DetachedHeadError.
 	CreateAgentTasks(ctx context.Context, reqs []NewAgentTask) ([]AgentTask, error)
+	// CreateJointAgentTasks creates one joint group: an agent task per
+	// request, each in another repository (2 to agenttask.MaxJoint of them), and one
+	// chat of agent that works in all of their worktrees, started in the
+	// first one's (the lead) or queued as a unit. Each request's Agent must
+	// be agent or empty. The chat's first message is Flint's: the lead's
+	// description, which folder is which repository, and a request's own
+	// description only where it differs from the lead's. All or nothing,
+	// like CreateAgentTasks, and a detached HEAD fails with
+	// *DetachedHeadError. An agent whose engine cannot work in several
+	// folders fails with an error that is ErrJointEngine, a repository or
+	// worktree that is not trusted with one that is ErrJointUntrusted; both
+	// before anything is created. The tasks are returned lead first.
+	CreateJointAgentTasks(ctx context.Context, reqs []NewAgentTask, agent string) ([]AgentTask, error)
 	// AgentTasks returns the tasks with these ids that still exist, by id.
 	AgentTasks(ctx context.Context, ids []string) map[string]AgentTask
 	// Repository describes the git repository dir is in (git.ErrNotRepository
@@ -151,6 +165,17 @@ type DetachedHeadError struct {
 
 func (e *DetachedHeadError) Error() string { return e.Dir + " is on a detached HEAD" }
 
+// CreateJointAgentTasks' refusals, matched with errors.Is; the error's own
+// text is the one to show (it names the agent, engine or folder).
+var (
+	// ErrJointEngine: the agent's engine cannot be given additional folders
+	// (only Claude Code can; not Codex, not a custom ACP agent).
+	ErrJointEngine = errors.New("the agent cannot work in several folders at once")
+	// ErrJointUntrusted: a repository or a worktree of the group is not
+	// trusted (Restricted Mode).
+	ErrJointUntrusted = errors.New("a joint agent task works only in trusted folders")
+)
+
 // AgentTask is an agent task as the Agent Tasks panel shows it.
 type AgentTask struct {
 	ID, Title, Agent, Branch, Base string
@@ -164,6 +189,11 @@ type AgentTask struct {
 	Merged bool
 	// Stale: the worktree folder is gone.
 	Stale bool
+	// Joint is the id of the task's joint group ("" for a task with a chat
+	// of its own); Lead marks the group's task whose worktree its one chat
+	// runs in.
+	Joint string
+	Lead  bool
 }
 
 // Repository is the git repository a folder is in.

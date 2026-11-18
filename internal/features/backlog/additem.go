@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"flint/internal/agenttask"
 	"flint/internal/mcpserver"
 	"flint/internal/mcptools"
 )
@@ -46,8 +47,9 @@ func (a *API) addTool() mcpserver.Tool {
 			`"priority":{"type":"string","enum":["low","normal","high"],"description":"Default: normal."},`+
 			`"agent":{"type":"string","description":"The agent that works on it (default: the user's default agent)."},`+
 			`"repos":{"type":"array","items":{"type":"string"},"maxItems":%d,"description":"Names of the backlog's repositories it changes (default: the project open in Flint)."},`+
-			`"after":{"type":"array","items":{"type":"string"},"maxItems":%d,"description":"Ids of existing items of this backlog that must be done first."}`+
-			`},"required":["backlog","title","text"],"additionalProperties":false}`, MaxTitle, MaxDescription, MaxRepositories, MaxAfter)),
+			`"after":{"type":"array","items":{"type":"string"},"maxItems":%d,"description":"Ids of existing items of this backlog that must be done first."},`+
+			`"together":{"type":"boolean","description":"Only with 2 to %d repos: true makes one agent work in all of them at once, in one chat, instead of one agent per repository (only agents that can work in several folders, such as Claude Code). Default: false."}`+
+			`},"required":["backlog","title","text"],"additionalProperties":false}`, MaxTitle, MaxDescription, MaxRepositories, MaxAfter, agenttask.MaxJoint)),
 		Acts: true,
 		Plan: a.planAdd,
 	}
@@ -61,6 +63,7 @@ type addArgs struct {
 	Agent    string   `json:"agent"`
 	Repos    []string `json:"repos"`
 	After    []string `json:"after"`
+	Together bool     `json:"together"`
 }
 
 // planAdd checks a call of add_backlog_item and says what it will write; the
@@ -85,7 +88,7 @@ func (a *API) planAdd(ctx context.Context, root string, raw json.RawMessage) (mc
 	if err != nil {
 		return mcpserver.Planned{}, err
 	}
-	spec := ItemSpec{Title: in.Title, Text: *in.Text, Priority: in.Priority, Agent: in.Agent, Repos: in.Repos, After: in.After}
+	spec := ItemSpec{Title: in.Title, Text: *in.Text, Priority: in.Priority, Agent: in.Agent, Repos: in.Repos, After: in.After, Together: in.Together}
 	caller := mcpserver.CallerFrom(ctx)
 	if caller == "" {
 		caller = "project:" + root
@@ -237,6 +240,9 @@ func addSummary(name, folder, base string, spec ItemSpec) string {
 	}
 	if len(spec.Repos) > 0 {
 		fmt.Fprintf(&b, " · Repositories: %s", strings.Join(spec.Repos, ", "))
+	}
+	if spec.Together {
+		b.WriteString(" · Together: one agent in all of its repositories")
 	}
 	if len(spec.After) > 0 {
 		fmt.Fprintf(&b, " · After: %s", strings.Join(spec.After, ", "))

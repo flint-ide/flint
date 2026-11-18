@@ -13,7 +13,11 @@ import (
 
 // Delegate starts an item's agent tasks: one per repository it names (in the
 // window's active project, project, when it names none), run by its agent
-// (else the default agent), through the same path as New Agent Task. Before
+// (else the default agent), through the same path as New Agent Task. An
+// item with together gets one joint group instead (Host.CreateJointAgentTasks:
+// one agent, one chat, across all of its repositories), after the same
+// checks; an agent that cannot work in several folders is refused by Flint
+// with its reason, and nothing is created. Before
 // anything is created it checks the agent can start and every repository
 // has a trusted checkout inside the workspace; when one task cannot be
 // created, none is kept. An item of a backlog whose folder is not trusted is
@@ -154,15 +158,19 @@ func (a *API) delegate(real, id, project string, auto *autoStart) (DelegateResul
 	for i, t := range targets {
 		reqs[i] = feature.NewAgentTask{Dir: t.dir, Description: it.TaskDescription(t.repo), Agent: agent}
 		if len(reqs[i].Description) > MaxDescription {
+			if d := reqs[i].Description; d == it.Description() {
+				return DelegateResult{}, fmt.Errorf("the item's title and text are longer than %d bytes: shorten the text", MaxDescription)
+			}
 			return DelegateResult{}, fmt.Errorf("the item's title and text with the note about its repositories are longer than %d bytes: shorten the text", MaxDescription)
 		}
 	}
+	joint := it.Together && len(reqs) > 1 // ParseItem: together only with repos
 	if !a.host.Trusted(real) {
-		if auto == nil && !a.host.Confirm("Delegate from an untrusted backlog?", untrustedMessage(c.Name, real, agent, reqs), "Delegate") {
+		if auto == nil && !a.host.Confirm("Delegate from an untrusted backlog?", untrustedMessage(c.Name, real, agent, reqs, joint), "Delegate") {
 			return DelegateResult{}, errors.New("Delegate was cancelled: the backlog's folder is in Restricted Mode")
 		}
 		// No click comes with this question: it says which item starts and why now.
-		if auto != nil && !a.host.Confirm("Start a waiting item of an untrusted backlog?", autoStartMessage(it, auto.waitedFor)+untrustedMessage(c.Name, real, agent, reqs), "Start") {
+		if auto != nil && !a.host.Confirm("Start a waiting item of an untrusted backlog?", autoStartMessage(it, auto.waitedFor)+untrustedMessage(c.Name, real, agent, reqs, joint), "Start") {
 			return DelegateResult{}, errors.New("the start was declined in Flint's confirmation (the backlog's folder is in Restricted Mode): Delegate it by hand, or cancel the start")
 		}
 	}
@@ -182,9 +190,17 @@ func (a *API) delegate(real, id, project string, auto *autoStart) (DelegateResul
 	}
 	// Not under mu: creating worktrees can take a while (checkout hooks), and
 	// the panel must still load meanwhile.
-	made, err := a.host.CreateAgentTasks(ctx, reqs)
+	var made []feature.AgentTask
+	if joint {
+		made, err = a.host.CreateJointAgentTasks(ctx, reqs, agent)
+	} else {
+		made, err = a.host.CreateAgentTasks(ctx, reqs)
+	}
 	if dh := (*feature.DetachedHeadError)(nil); errors.As(err, &dh) {
 		return DelegateResult{}, fmt.Errorf("%s is on a detached HEAD: check out a branch there, then Delegate again", dh.Dir)
+	}
+	if errors.Is(err, feature.ErrJointEngine) {
+		return DelegateResult{}, fmt.Errorf("%w (the item says together: true; without that line each repository gets its own agent)", err)
 	}
 	if err != nil {
 		return DelegateResult{}, err
@@ -259,7 +275,7 @@ const maxConfirmText = 1000
 // someone else's repository, and its text becomes an agent's instructions.
 // It names the agent, the folders the tasks work in and the description
 // (the first task's, cut at maxConfirmText characters and saying so).
-func untrustedMessage(name, folder, agent string, reqs []feature.NewAgentTask) string {
+func untrustedMessage(name, folder, agent string, reqs []feature.NewAgentTask, joint bool) string {
 	dirs := make([]string, len(reqs))
 	for i, r := range reqs {
 		dirs[i] = r.Dir
@@ -269,7 +285,11 @@ func untrustedMessage(name, folder, agent string, reqs []feature.NewAgentTask) s
 		desc = string([]rune(desc)[:maxConfirmText]) + fmt.Sprintf("\n[… cut here: the description has %d characters]", n)
 	}
 	note := ""
-	if len(reqs) > 1 {
+	switch {
+	case joint:
+		note = "\nOne agent works in all of these folders together, in one chat (the item says together: true); " +
+			"Flint adds to its first message which folder is which repository."
+	case len(reqs) > 1:
 		note = "\nEach task also gets a note naming the item's repositories."
 	}
 	return fmt.Sprintf("The backlog %q is in a folder you have not trusted (Restricted Mode):\n%s\n\n"+
@@ -280,9 +300,14 @@ func untrustedMessage(name, folder, agent string, reqs []feature.NewAgentTask) s
 
 // autoStartMessage opens the question of a start nobody clicked just now: it
 // names the item and why it starts now.
+// An item with together says that one agent works across its repositories.
 func autoStartMessage(it Item, waitedFor []string) string {
+	together := ""
+	if it.Together {
+		together = fmt.Sprintf(" It runs as one agent across the repositories %s.", strings.Join(it.Repos, ", "))
+	}
 	return fmt.Sprintf("Flint is starting the backlog item %q (%s) by itself: you asked to start it when it is ready, "+
-		"and the items it waited for (%s) are done now.\n\n", it.Title, it.ID, strings.Join(waitedFor, ", "))
+		"and the items it waited for (%s) are done now.%s\n\n", it.Title, it.ID, strings.Join(waitedFor, ", "), together)
 }
 
 // linksOf are the links of item id of folder.

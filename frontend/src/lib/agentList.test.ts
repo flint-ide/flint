@@ -72,7 +72,7 @@ const session = (id: string, over: Partial<AgentChatInput> = {}): AgentChatInput
 const task = (over: Partial<TaskView> = {}): TaskView => ({
   id: 'k1', title: 'Add a button', prompt: 'Add a button', agent: 'codex', branch: 'agent/b', base: 'main',
   worktree: '/src/p.wt/b', checkout: '/src/p', createdAt: 1, pullRequest: '', state: 'idle', error: '', stale: false,
-  ahead: 0, merged: false, group: '', tokens: 0, costUsd: 0, ...over,
+  ahead: 0, merged: false, group: '', joint: '', lead: false, tokens: 0, costUsd: 0, ...over,
 })
 
 describe('agentRows', () => {

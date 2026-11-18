@@ -8,7 +8,7 @@ import * as Workspace from '../../../bindings/flint/workspaceapi'
 import { EventsOn } from '../../wails/runtime'
 import { errorMessage } from '../../api/backend'
 import { askAgent } from '../../lib/askAgent'
-import { confirmAction, showToast } from '../../store/dialog'
+import { chooseAction, confirmAction, showToast } from '../../store/dialog'
 import { useEditor } from '../../store/editor'
 import { useWorkspace } from '../../store/workspace'
 import { useAgentDefs, loadAgentDefs } from '../../store/agentDefs'
@@ -16,18 +16,31 @@ import { activeRoot, rootFor } from '../../store/activeRoot'
 import { showFolder, loadTasks, openTask, useTasks } from '../../store/agentTasks'
 import { trustFolder } from '../../store/trust'
 import {
+  applyCloneEvent,
+  autoStartToast,
   BOARD_VIEW,
   boardTitle,
+  cloneFailure,
+  cloneFromInfo,
+  coerceAutoStart,
+  coerceCloneEvent,
   delegateIssues,
   delegateStep,
   locateQuestion,
+  noCheckoutQuestion,
+  notReadyQuestion,
+  PLAN_TOOL_OFF,
   pickSelected,
   problemPrompt,
+  startedText,
+  togetherNote,
   touchesBacklog,
   trustBacklogQuestion,
   trustQuestion,
+  waitingToast,
   type BacklogData,
   type BacklogInfo,
+  type CloneState,
   type DelegateIssue,
   type ItemInfo,
   type ProblemInfo,
@@ -39,7 +52,10 @@ import {
 /** Where a dialog is drawn: in the panel (the commands switch to it) or in a board tab. */
 export type DialogHost = 'panel' | 'board'
 
-export type BacklogDialog = { kind: 'newBacklog'; folder: string } | { kind: 'newItem'; folder: string; host: DialogHost }
+export type BacklogDialog =
+  | { kind: 'newBacklog'; folder: string }
+  | { kind: 'newItem'; folder: string; host: DialogHost }
+  | { kind: 'plan'; folder: string; host: DialogHost }
 
 interface Loaded {
   backlog: BacklogData | null
@@ -57,6 +73,8 @@ interface BacklogState {
   busy: Record<string, boolean>
   /** Groups the user collapsed or opened (statuses, "repositories"); done is collapsed until then. */
   collapsed: Record<string, boolean>
+  /** The clone running for a backlog, by folder (from Backlog.clone and the clone events). */
+  clones: Record<string, CloneState>
   dialog: BacklogDialog | null
 }
 
@@ -66,6 +84,7 @@ export const useBacklog = createStore<BacklogState>(() => ({
   data: {},
   busy: {},
   collapsed: { done: true },
+  clones: {},
   dialog: null,
 }))
 
@@ -116,7 +135,27 @@ export async function loadBacklog(folder: string): Promise<void> {
   } catch (err) {
     next = { backlog: useBacklog.getState().data[folder]?.backlog ?? null, error: errorMessage(err) }
   }
-  if (seq === loadSeq[folder]) useBacklog.setState((s) => ({ data: { ...s.data, [folder]: next } }))
+  if (seq !== loadSeq[folder]) return
+  useBacklog.setState((s) => ({ data: { ...s.data, [folder]: next }, clones: syncClone(s.clones, folder, next.backlog) }))
+}
+
+/**
+ * The clone of a backlog as the load saw it. A clone this window has just asked for (no destination
+ * yet: Go is still asking the user) stays until the call ends.
+ */
+function syncClone(clones: Record<string, CloneState>, folder: string, backlog: BacklogData | null): Record<string, CloneState> {
+  const running = cloneFromInfo(backlog?.clone)
+  if (running) return { ...clones, [folder]: running }
+  if (!clones[folder] || clones[folder].destination === '') return clones
+  const { [folder]: _gone, ...rest } = clones
+  return rest
+}
+
+function setClone(folder: string, state: CloneState | null): void {
+  useBacklog.setState((s) => {
+    const { [folder]: _old, ...rest } = s.clones
+    return { clones: state ? { ...rest, [folder]: state } : rest }
+  })
 }
 
 export function selectBacklog(folder: string): void {
@@ -163,6 +202,16 @@ function subscribe(): () => void {
     EventsOn('backlog:changed', (folder: unknown) => (typeof folder === 'string' && folder ? schedule({ folder }) : schedule({ list: true, all: true }))),
     EventsOn('tasks:changed', () => schedule({ all: true })),
     EventsOn('git:changed', () => schedule({ all: true })),
+    EventsOn('backlog:clone-progress', (raw: unknown) => {
+      const ev = coerceCloneEvent(raw)
+      if (ev) setClone(ev.backlog, applyCloneEvent(useBacklog.getState().clones[ev.backlog] ?? null, ev))
+    }),
+    EventsOn('backlog:clone-done', (raw: unknown) => {
+      const ev = coerceCloneEvent(raw)
+      if (!ev) return
+      setClone(ev.backlog, null)
+      schedule({ folder: ev.backlog })
+    }),
     EventsOn('fs:changed', (paths: string[]) => {
       for (const f of targets()) if (touchesBacklog(f, paths ?? [])) schedule({ folder: f })
     }),
@@ -177,6 +226,22 @@ function subscribe(): () => void {
     offs.forEach((off) => off())
     offRoots()
   }
+}
+
+/**
+ * Tells the user how an automatic start went ("backlog:auto-start": Flint delegated an item that waited for
+ * others, or tried to and failed; the item keeps waiting then). Runs for the whole session, not only while a
+ * view is mounted, because the start can happen at any time. Returns the unsubscribe.
+ */
+export function subscribeAutoStart(): () => void {
+  return EventsOn('backlog:auto-start', (raw: unknown) => {
+    const a = coerceAutoStart(raw)
+    if (!a) return
+    const t = autoStartToast(a)
+    showToast(t.message, t.kind, t.kind === 'error' ? 9000 : 4500)
+    if (!a.error) void loadTasks()
+    if (a.backlog) schedule({ folder: a.backlog })
+  })
 }
 
 /**
@@ -286,6 +351,35 @@ export async function createItem(folder: string, title: string): Promise<string>
   }
 }
 
+/** Plan with Agent…: asks for the goal and the agent in the panel (or in the board that asked). */
+export function openPlan(folder: string, host: DialogHost = 'panel'): void {
+  if (!folder) {
+    showToast('Open or create a backlog first: Open Backlog… or New Backlog…', 'error')
+    return
+  }
+  if (host === 'panel') useWorkspace.getState().setSidebar('backlog')
+  useBacklog.setState({ dialog: { kind: 'plan', folder, host } })
+}
+
+/**
+ * Asks Go for the planning prompt and puts it into a chat draft with the chosen agent: the user reads it,
+ * adds words and sends it; nothing is sent for them. When the planning tool is off the user is told what to
+ * switch on. Returns the error to show in the dialog, '' on success.
+ */
+export async function planWithAgent(folder: string, goal: string, agent: string): Promise<string> {
+  let plan
+  try {
+    plan = await API.PlanPrompt(folder, goal.trim())
+  } catch (err) {
+    return errorMessage(err)
+  }
+  if (!plan.toolOn) showToast(PLAN_TOOL_OFF, 'info', 8000)
+  const id = await askAgent({ prompt: plan.prompt, root: rootFor(folder) || activeRoot(), agent })
+  if (!id) return `No chat with ${agent} could be opened.`
+  closeDialog()
+  return ''
+}
+
 export const openItemFile = (item: ItemInfo): void => useEditor.getState().openFile(item.path)
 
 async function withBusy(folder: string, id: string, fn: () => Promise<void>): Promise<void> {
@@ -313,9 +407,12 @@ export function setStatus(folder: string, id: string, status: Status): Promise<v
 
 // ---- Repositories and Delegate
 
-/** Locate…: says which repository to find, then asks for the folder. False when the user stopped or it was refused. */
-export async function locateRepo(folder: string, repo: string, url: string): Promise<boolean> {
-  if (!(await confirmAction(locateQuestion(repo, url), 'Choose Folder…'))) return false
+/**
+ * Locate…: says which repository to find, then asks for the folder. False when the user stopped or it was
+ * refused. asked: the user has just been told which repository (Delegate's question), so go on to the folder.
+ */
+export async function locateRepo(folder: string, repo: string, url: string, note = '', asked = false): Promise<boolean> {
+  if (!asked && !(await confirmAction(locateQuestion(repo, url, note), 'Choose Folder…'))) return false
   const dir = await pickFolder()
   if (!dir) return false
   try {
@@ -328,6 +425,55 @@ export async function locateRepo(folder: string, repo: string, url: string): Pro
   return true
 }
 
+/**
+ * Clone…: asks for the folder to clone into, then Go asks again with the URL and the destination and runs git.
+ * Progress arrives as events (and Backlog.clone); Cancel calls cancelClone. Resolves when the clone ended: true
+ * when the repository is located now. The clone is not trusted and not in the workspace: Add to Workspace and
+ * Trust Folder… apply, as for a located folder.
+ */
+export async function cloneRepo(folder: string, repo: string): Promise<boolean> {
+  if (useBacklog.getState().clones[folder]) {
+    showToast('A clone of this backlog is running: wait for it or cancel it', 'error')
+    return false
+  }
+  const parent = await pickFolder()
+  if (!parent) return false
+  setClone(folder, { repo, destination: '', progress: '' })
+  try {
+    const r = await API.Clone(folder, repo, parent)
+    showToast(`Cloned ${repo} into ${r.folder}`)
+    return true
+  } catch (err) {
+    const f = cloneFailure(repo, errorMessage(err))
+    showToast(f.message, f.kind)
+    return false
+  } finally {
+    setClone(folder, null)
+    void loadBacklog(folder)
+  }
+}
+
+/** Stops the clone running for a backlog; what it made is removed. */
+export async function cancelClone(folder: string): Promise<void> {
+  try {
+    await API.CancelClone(folder)
+  } catch (err) {
+    showToast(errorMessage(err), 'error')
+  }
+}
+
+/** Cancel start: forgets an item's waiting start. */
+export function cancelStart(folder: string, id: string): Promise<void> {
+  return withBusy(folder, id, async () => {
+    try {
+      await API.CancelStart(folder, id)
+    } catch (err) {
+      showToast(errorMessage(err), 'error')
+    }
+    await loadBacklog(folder)
+  })
+}
+
 /** Adds a located checkout outside the workspace to it. */
 export async function attachRepo(folder: string, repo: string, dir: string): Promise<boolean> {
   if (!(await showFolder(dir))) return false
@@ -337,8 +483,8 @@ export async function attachRepo(folder: string, repo: string, dir: string): Pro
 }
 
 /** Trusts a repository's checkout after saying that it is for the whole folder, from now on. */
-export async function trustRepo(folder: string, repo: string, dir: string): Promise<boolean> {
-  if (!(await confirmAction(trustQuestion(repo, dir), 'Trust Folder'))) return false
+export async function trustRepo(folder: string, repo: string, dir: string, note = ''): Promise<boolean> {
+  if (!(await confirmAction(trustQuestion(repo, dir, note), 'Trust Folder'))) return false
   await trustFolder(dir)
   void loadBacklog(folder)
   return true
@@ -352,22 +498,29 @@ export async function trustBacklog(info: Pick<BacklogInfo, 'path' | 'name'>): Pr
   void loadBacklog(info.path)
 }
 
-/** The actions of the Repositories group: Locate…, Add to Workspace, Trust. */
+/** The actions of the Repositories group: Locate…, Clone…, Add to Workspace, Trust. */
 export const repoActions = {
   locate: (folder: string, r: RepoView) => void locateRepo(folder, r.name, r.url),
+  clone: (folder: string, r: RepoView) => void cloneRepo(folder, r.name),
   attach: (folder: string, r: RepoView) => void attachRepo(folder, r.name, r.folder),
   trust: (folder: string, r: RepoView) => void trustRepo(folder, r.name, r.folder),
 }
 
 /** Fixes one thing in the way of Delegate with the user's help; false when the user stopped. */
-async function resolve(folder: string, issue: DelegateIssue): Promise<boolean> {
+async function resolve(folder: string, issue: DelegateIssue, item: ItemInfo): Promise<boolean> {
+  const note = togetherNote(item)
   switch (issue.fix) {
-    case 'locate':
-      return locateRepo(folder, issue.repo, issue.url)
+    case 'locate': {
+      // No checkout at all: clone is an alternative to locating one. A located folder that went bad is located again.
+      if (issue.folder) return locateRepo(folder, issue.repo, issue.url, note)
+      const choice = await chooseAction(noCheckoutQuestion(issue.repo, issue.url, note), 'Locate…', 'Clone…')
+      if (choice === 'cancel') return false
+      return choice === 'alternate' ? cloneRepo(folder, issue.repo) : locateRepo(folder, issue.repo, issue.url, note, true)
+    }
     case 'attach':
       return attachRepo(folder, issue.repo, issue.folder)
     case 'trust':
-      return trustRepo(folder, issue.repo, issue.folder)
+      return trustRepo(folder, issue.repo, issue.folder, note)
     default:
       return false
   }
@@ -391,14 +544,24 @@ export function delegateItem(folder: string, id: string): Promise<void> {
       const next = delegateStep(delegateIssues(item, backlog.repositories, activeRoot()), last)
       if (next.kind === 'delegate') break
       if (next.kind === 'stuck') return showToast(next.message, 'error')
-      if (!(await resolve(folder, next.issue))) return // the user stopped
+      if (!(await resolve(folder, next.issue, item))) return // the user stopped
       last = next.sig
     }
     try {
       const res = await API.Delegate(folder, id, activeRoot())
+      if (res.notReady) {
+        // Nothing was started: the item waits for others. Offer to start it when they are done.
+        const items = useBacklog.getState().data[folder]?.backlog?.items ?? []
+        const waitingFor = res.waitingFor?.length ? res.waitingFor : res.item.waitingFor
+        if (await confirmAction(notReadyQuestion(res.item, waitingFor, items), 'Start When Ready')) {
+          await API.StartWhenReady(folder, id, activeRoot())
+          showToast(waitingToast(res.item.title, waitingFor, items))
+        }
+        return await loadBacklog(folder)
+      }
       const n = res.tasks?.length ?? 0
-      if (res.warning) showToast(`${n} agent ${n === 1 ? 'task' : 'tasks'} started, but ${res.warning}`, 'error')
-      else showToast(`Started ${n} agent ${n === 1 ? 'task' : 'tasks'}`)
+      if (res.warning) showToast(`${startedText(res.item, n)}, but ${res.warning}`, 'error')
+      else showToast(startedText(res.item, n))
       void loadTasks()
     } catch (err) {
       showToast(errorMessage(err), 'error')

@@ -2,10 +2,12 @@ import { useEffect, type ReactNode } from 'react'
 import { Dropdown } from '../../components/ui/Dropdown'
 import { Select } from '../../components/ui/Select'
 import { BacklogDialogs } from './Dialogs'
-import { ItemActions, ItemMeta, ItemTasks, ItemTitle } from './ItemParts'
+import { ItemActions, ItemDependencies, ItemMeta, ItemTasks, ItemTitle } from './ItemParts'
 import {
   allReposResolve,
+  canClone,
   canClose,
+  cloneTitle,
   groupByStatus,
   PANEL_STATUSES,
   repoIssue,
@@ -13,11 +15,13 @@ import {
   statusLabel,
   type BacklogData,
   type BacklogInfo,
+  type CloneState,
   type ProblemInfo,
   type RepoView,
 } from './backlog'
 import {
   askAboutProblem,
+  cancelClone,
   closeBacklog,
   followBacklogs,
   loadBacklog,
@@ -25,6 +29,7 @@ import {
   openBacklog,
   openBoard,
   openNewItem,
+  openPlan,
   repoActions,
   selectBacklog,
   toggleGroup,
@@ -34,7 +39,7 @@ import {
 
 /** The Backlog panel: the picker, the items by status and the problems of the selected backlog. */
 export function BacklogPanel() {
-  const { infos, selected, data, collapsed } = useBacklog()
+  const { infos, selected, data, collapsed, clones } = useBacklog()
   useEffect(() => followBacklogs(() => [useBacklog.getState().selected]), [])
   const info = infos?.find((i) => i.path === selected)
   const loaded = data[selected]
@@ -52,6 +57,7 @@ export function BacklogPanel() {
           items={[
             { label: 'Open Backlog…', onSelect: () => void openBacklog() },
             { label: 'New Backlog…', onSelect: () => void newBacklog() },
+            { label: 'Plan with Agent…', disabled: !info, onSelect: () => openPlan(selected) },
             { label: 'Show Board', disabled: !info, onSelect: () => info && openBoard(info) },
             { type: 'separator' },
             { label: 'Close Backlog', disabled: !canClose(info), hint: info?.workspace ? 'workspace folder' : undefined, onSelect: () => info && void closeBacklog(info) },
@@ -81,7 +87,7 @@ export function BacklogPanel() {
         {info?.error && <div className="placeholder error">{info.error}</div>}
         {loaded?.error && !info?.error && <div className="placeholder error">{loaded.error}</div>}
         {info && !(backlog?.trusted ?? info.trusted) && <Untrusted info={info} />}
-        {backlog && backlog.repositories.length > 0 && <Repositories backlog={backlog} collapsed={collapsed} />}
+        {backlog && backlog.repositories.length > 0 && <Repositories backlog={backlog} collapsed={collapsed} clone={clones[backlog.path]} />}
         {backlog && <Groups backlog={backlog} collapsed={collapsed} />}
         {infos?.length === 0 && (
           <div className="placeholder muted">
@@ -97,7 +103,8 @@ export function BacklogPanel() {
         )}
         {backlog && backlog.items.length === 0 && backlog.problems.length === 0 && (
           <div className="placeholder muted">
-            No items. <button className="link" onClick={() => openNewItem(selected)}>New Item…</button> writes one to items/.
+            No items. <button className="link" onClick={() => openNewItem(selected)}>New Item…</button> writes one to items/;{' '}
+            <button className="link" onClick={() => openPlan(selected)}>Plan with Agent…</button> has an agent split a goal into items.
           </div>
         )}
         {backlog && backlog.problems.length > 0 && <Problems backlog={backlog} />}
@@ -143,9 +150,10 @@ function Untrusted({ info }: { info: BacklogInfo }) {
 }
 
 /** The repositories of flint-backlog.json with their checkouts here; open while one can't be used by Delegate. */
-function Repositories({ backlog, collapsed }: { backlog: BacklogData; collapsed: Record<string, boolean> }) {
+function Repositories({ backlog, collapsed, clone }: { backlog: BacklogData; collapsed: Record<string, boolean>; clone: CloneState | undefined }) {
   const repos = backlog.repositories
-  const open = collapsed.repositories === undefined ? !allReposResolve(repos) : !collapsed.repositories
+  // A running clone keeps the group open until the user closes it: its progress is shown here.
+  const open = collapsed.repositories === undefined ? !allReposResolve(repos) || !!clone : !collapsed.repositories
   const waiting = repos.filter((r) => repoIssue(r) !== null).length
   return (
     <div className="backlog-group backlog-repos">
@@ -155,12 +163,26 @@ function Repositories({ backlog, collapsed }: { backlog: BacklogData; collapsed:
           {waiting ? `${waiting}/${repos.length}` : repos.length}
         </span>
       </GroupHeader>
-      {open && repos.map((r) => <RepoRow key={r.name} folder={backlog.path} repo={r} />)}
+      {open && clone && <CloneProgress folder={backlog.path} clone={clone} />}
+      {open && repos.map((r) => <RepoRow key={r.name} folder={backlog.path} repo={r} cloning={!!clone} />)}
     </div>
   )
 }
 
-function RepoRow({ folder, repo }: { folder: string; repo: RepoView }) {
+/** The clone that runs for the backlog: git's latest progress line and Cancel. */
+function CloneProgress({ folder, clone }: { folder: string; clone: CloneState }) {
+  return (
+    <div className="backlog-clone" role="status">
+      <span className="backlog-clone-title" title={clone.destination}>{cloneTitle(clone)}</span>
+      {clone.progress && <span className="backlog-clone-line muted" title={clone.progress}>{clone.progress}</span>}
+      <div className="task-actions">
+        <button className="link" onClick={() => void cancelClone(folder)} title="Stop git; what it made is removed">Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+function RepoRow({ folder, repo, cloning }: { folder: string; repo: RepoView; cloning: boolean }) {
   const issue = repoIssue(repo)
   return (
     <div className="task backlog-item backlog-repo">
@@ -178,6 +200,16 @@ function RepoRow({ folder, repo }: { folder: string; repo: RepoView }) {
       </div>
       <div className="task-actions backlog-actions">
         <button className="link" onClick={() => repoActions.locate(folder, repo)} title="Choose the folder of your checkout of this repository">Locate…</button>
+        {canClone(repo) && (
+          <button
+            className="link"
+            disabled={cloning}
+            onClick={() => repoActions.clone(folder, repo)}
+            title={cloning ? 'A clone of this backlog is running' : `Clone ${repo.url} into a folder you choose (asks again before it runs)`}
+          >
+            Clone…
+          </button>
+        )}
         {issue?.fix === 'attach' && (
           <button className="link" onClick={() => repoActions.attach(folder, repo)} title={`Add ${repo.folder} to the workspace`}>Add to Workspace</button>
         )}
@@ -207,9 +239,10 @@ function Groups({ backlog, collapsed }: { backlog: BacklogData; collapsed: Recor
               items.map((item) => (
                 <div key={item.id} className="task backlog-item">
                   <div className="tree-row static task-row" title={item.path}>
-                    <ItemTitle item={item} />
+                    <ItemTitle item={item} items={backlog.items} />
                   </div>
                   <ItemMeta item={item} backlog={backlog} />
+                  <ItemDependencies item={item} items={backlog.items} />
                   <ItemTasks tasks={item.tasks} />
                   <ItemActions backlog={backlog} item={item} />
                 </div>

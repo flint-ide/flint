@@ -3,20 +3,44 @@ import assert from 'node:assert/strict'
 import {
   agentText,
   allReposResolve,
+  applyCloneEvent,
+  autoStartToast,
   boardProblem,
+  canClone,
   canClose,
   canOpenTask,
+  cloneFailure,
+  cloneFromInfo,
+  cloneTitle,
+  coerceAutoStart,
   coerceBoardData,
+  coerceCloneEvent,
+  dependencyLines,
+  dependencyMarker,
   delegateIssues,
   delegateStep,
   dragPayload,
   dropStatus,
+  goalProblem,
   groupByStatus,
+  groupTasks,
+  isRestrictedError,
+  itemTitleOf,
+  joinList,
   locateQuestion,
+  MAX_GOAL,
+  noCheckoutQuestion,
+  notReadyQuestion,
   otherStatuses,
   parseDrop,
+  pickPlanAgent,
   pickSelected,
   problemPrompt,
+  startedText,
+  titlesOf,
+  togetherMarker,
+  togetherNote,
+  waitingToast,
   repoMarkers,
   reposText,
   statusLabel,
@@ -30,13 +54,13 @@ import {
 } from './backlog'
 
 const item = (over: Partial<ItemInfo> = {}): ItemInfo => ({
-  id: 'a', title: 'A', status: 'todo', priority: 'normal', agent: '', repos: [], body: '', path: '/b/items/a.md', agentProblem: '', failed: false, tasks: [], ...over,
+  id: 'a', title: 'A', status: 'todo', priority: 'normal', agent: '', repos: [], body: '', path: '/b/items/a.md', agentProblem: '', failed: false, tasks: [], together: false, after: [], waitingFor: [], ready: true, dependencyProblem: '', waiting: null, ...over,
 })
 const repo = (over: Partial<RepoView> = {}): RepoView => ({
   name: 'api', url: 'git@h:a/api.git', folder: '/w/api', located: false, inWorkspace: true, trusted: true, problem: '', ...over,
 })
 const task = (over: Partial<TaskInfo> = {}): TaskInfo => ({
-  id: 't', repo: 'api', title: '', agent: '', branch: '', worktree: '/w/t', state: 'working', error: '', pullRequest: '', merged: false, stale: false, gone: false, ...over,
+  id: 't', repo: 'api', title: '', agent: '', branch: '', worktree: '/w/t', state: 'working', error: '', pullRequest: '', merged: false, stale: false, gone: false, joint: '', lead: false, ...over,
 })
 
 describe('grouping', () => {
@@ -223,5 +247,161 @@ describe('problems', () => {
     const p = problemPrompt('Acme', '/b', { file: 'items/x.md', reason: 'title is required' })
     assert.match(p, /items\/x\.md: title is required/)
     assert.match(p, /"Acme" \(\/b\)/)
+  })
+})
+
+describe('dependencies', () => {
+  const items = [
+    item({ id: 'schema', title: 'Design the schema', status: 'doing' }),
+    item({ id: 'api', title: 'Build the API', status: 'todo', after: ['schema'], waitingFor: ['schema'], ready: false }),
+    item({ id: 'ui', title: 'Build the UI', status: 'todo', after: ['api', 'ghost'], waitingFor: ['api', 'ghost'], ready: false }),
+  ]
+  it('looks titles up and falls back to the id', () => {
+    assert.equal(itemTitleOf('schema', items), 'Design the schema')
+    assert.equal(itemTitleOf('ghost', items), 'ghost')
+    assert.deepEqual(titlesOf(['api', 'ghost'], items), ['Build the API', 'ghost'])
+    assert.equal(joinList([]), '')
+    assert.equal(joinList(['a']), 'a')
+    assert.equal(joinList(['a', 'b']), 'a and b')
+    assert.equal(joinList(['a', 'b', 'c']), 'a, b and c')
+  })
+  it('marks an item that is not ready, waiting, or has a dependency problem', () => {
+    assert.equal(dependencyMarker(items[0], items), null)
+    assert.deepEqual(dependencyMarker(items[1], items), { label: 'not ready', cls: 'warn', hint: 'Waits for Design the schema: Delegate offers to start it when it is done' })
+    const waiting = item({ ...items[1], waiting: { since: 't', reason: '' } })
+    assert.equal(dependencyMarker(waiting, items)?.label, 'waiting to start')
+    const bad = item({ id: 'x', after: ['x'], ready: false, dependencyProblem: 'it names itself' })
+    assert.deepEqual(dependencyMarker(bad, items), { label: 'dependency problem', cls: 'error', hint: 'it names itself' })
+    // A done item does not care what it waited for.
+    assert.equal(dependencyMarker(item({ ...items[1], status: 'done' }), items), null)
+  })
+  it('says what an item waits for', () => {
+    assert.deepEqual(dependencyLines(items[0], items), [])
+    assert.deepEqual(dependencyLines(items[1], items), [{ kind: 'after', text: 'waits for Design the schema', cls: 'warn' }])
+    assert.equal(dependencyLines(items[2], items)[0].text, 'waits for Build the API and ghost')
+    const ready = item({ id: 'r', after: ['schema'], waitingFor: [], ready: true })
+    assert.deepEqual(dependencyLines(ready, items), [{ kind: 'after', text: 'after Design the schema (done)', cls: 'muted' }])
+  })
+  it('shows the waiting start with its reason, and the problem', () => {
+    const w = item({ ...items[2], waiting: { since: 't', reason: 'api has no checkout' } })
+    assert.deepEqual(dependencyLines(w, items).map((l) => [l.kind, l.text]), [
+      ['after', 'waits for Build the API and ghost'],
+      ['waiting', 'starts when Build the API and ghost are done'],
+      ['reason', 'Last start failed: api has no checkout'],
+    ])
+    assert.equal(dependencyLines(item({ ...items[1], waiting: { since: 't', reason: '' } }), items)[1].text, 'starts when Design the schema is done')
+    const ready = item({ after: ['schema'], waitingFor: [], ready: true, waiting: { since: 't', reason: '' } })
+    assert.match(dependencyLines(ready, items)[1].text, /^ready: starts as soon as/)
+    // With a problem the after line says nothing more (waitingFor is empty then, which would read as done).
+    assert.deepEqual(dependencyLines(item({ after: ['a', 'b'], dependencyProblem: 'cycle: a, b' }), items), [{ kind: 'problem', text: 'cycle: a, b', cls: 'error' }])
+  })
+  it('asks to start an item when its dependencies are done', () => {
+    const q = notReadyQuestion(items[1], ['schema'], items)
+    assert.match(q, /^Start "Build the API" when Design the schema is done\?/)
+    assert.match(q, /Nothing starts now/)
+    assert.ok(!/one agent/.test(q))
+    assert.match(notReadyQuestion(items[2], ['api', 'schema'], items).split('\n')[0], /when Build the API and Design the schema are done\?$/)
+    const together = item({ title: 'Rename', together: true, repos: ['api', 'web'] })
+    assert.match(notReadyQuestion(together, ['schema'], items), /\nIt runs as one agent across the repositories api, web\.\n/)
+    assert.equal(waitingToast('Build the API', ['schema'], items), '"Build the API" starts when Design the schema is done')
+  })
+})
+
+describe('one agent across repositories', () => {
+  it('marks a together item and names the repositories in the walk-through', () => {
+    assert.equal(togetherMarker(item()), null)
+    const t = item({ together: true, repos: ['api', 'web'] })
+    assert.equal(togetherMarker(t)?.label, 'one agent')
+    assert.match(togetherMarker(t)?.hint ?? '', /api, web/)
+    assert.match(togetherNote(t), /one agent across the repositories api, web/)
+    assert.equal(togetherNote(item({ repos: ['api', 'web'] })), '')
+    assert.match(noCheckoutQuestion('api', 'u', togetherNote(t)), /one agent across/)
+    assert.match(locateQuestion('api', 'u', 'NOTE'), /NOTE$/)
+  })
+  it('words the start', () => {
+    assert.equal(startedText({ together: false }, 2), 'Started 2 agent tasks')
+    assert.equal(startedText({ together: false }, 1), 'Started 1 agent task')
+    assert.equal(startedText({ together: true }, 2), 'Started one agent across 2 repositories')
+  })
+  it('groups the tasks of one joint group, lead first, and opens the lead', () => {
+    const tasks = [
+      task({ id: 'solo', repo: 'x' }),
+      task({ id: 'm', joint: 'j', repo: 'web' }),
+      task({ id: 'l', joint: 'j', lead: true, repo: 'api' }),
+      task({ id: 'alone', joint: 'k', lead: true }),
+    ]
+    assert.deepEqual(groupTasks(tasks).map((r) => [r.joint, r.tasks.map((t) => t.id).join(',')]), [['', 'solo'], ['j', 'l,m'], ['', 'alone']])
+    assert.equal(canOpenTask(tasks[1], tasks), true)
+    // The lead is gone or queued: a member has no chat to open either.
+    assert.equal(canOpenTask(tasks[1], [tasks[1], { ...tasks[2], gone: true }]), false)
+    assert.equal(canOpenTask(tasks[1], [tasks[1], { ...tasks[2], state: 'queued' }]), false)
+    assert.equal(canOpenTask(tasks[1], [tasks[1]]), false)
+    assert.equal(canOpenTask(tasks[0]), true)
+  })
+})
+
+describe('automatic starts', () => {
+  it('reads the event and tells how it went', () => {
+    const ok = coerceAutoStart({ backlog: '/b', id: 'a', title: 'Build', tasks: 2, error: '', warning: '' })
+    assert.deepEqual(autoStartToast(ok!), { message: 'Started Build (2 agent tasks)', kind: 'info' })
+    assert.equal(autoStartToast({ ...ok!, tasks: 1 }).message, 'Started Build (1 agent task)')
+    assert.deepEqual(autoStartToast({ ...ok!, tasks: 0, error: 'api has no checkout' }), { message: 'Couldn\'t start "Build": api has no checkout It keeps waiting.', kind: 'error' })
+    assert.equal(autoStartToast({ ...ok!, warning: 'the status could not be written' }).kind, 'error')
+    assert.equal(coerceAutoStart({ backlog: '/b', id: 'a' })?.title, 'a')
+    for (const bad of [null, 'x', {}, { backlog: 1, id: 'a' }]) assert.equal(coerceAutoStart(bad), null)
+  })
+})
+
+describe('cloning', () => {
+  const ev = (over = {}) => coerceCloneEvent({ backlog: '/b', repo: 'api', destination: '/p/api', progress: '', done: false, error: '', cancelled: false, ...over })!
+  it('offers Clone… for a repository with no checkout only', () => {
+    assert.equal(canClone(repo({ folder: '' })), true)
+    assert.equal(canClone(repo({ folder: '/w/api' })), false)
+  })
+  it('follows the progress events and clears at the end', () => {
+    const start = cloneFromInfo({ repo: 'api', destination: '/p/api', progress: 'Cloning into…' })
+    assert.deepEqual(start, { repo: 'api', destination: '/p/api', progress: 'Cloning into…' })
+    assert.equal(cloneFromInfo(null), null)
+    const next = applyCloneEvent(start, ev({ progress: 'Receiving objects: 40%' }))
+    assert.equal(next?.progress, 'Receiving objects: 40%')
+    // An event without a line keeps the last one; the first event of a clone starts from nothing.
+    assert.equal(applyCloneEvent(next, ev())?.progress, 'Receiving objects: 40%')
+    assert.deepEqual(applyCloneEvent(null, ev({ progress: 'x' })), { repo: 'api', destination: '/p/api', progress: 'x' })
+    assert.equal(applyCloneEvent(next, ev({ done: true })), null)
+    assert.equal(applyCloneEvent(next, ev({ done: true, cancelled: true })), null)
+  })
+  it('titles a running clone', () => {
+    assert.equal(cloneTitle({ repo: 'api', destination: '/p/api', progress: '' }), 'Cloning api into /p/api')
+    assert.equal(cloneTitle({ repo: 'api', destination: '', progress: '' }), 'Cloning api…')
+  })
+  it('reads untrusted events', () => {
+    for (const bad of [null, 3, {}, { backlog: '/b' }, { repo: 'api' }]) assert.equal(coerceCloneEvent(bad), null)
+    assert.equal(coerceCloneEvent({ backlog: '/b', repo: 'api', done: 'yes', progress: 4 })?.done, false)
+  })
+  it('does not show a cancel as an error', () => {
+    assert.deepEqual(cloneFailure('api', 'the clone was cancelled'), { message: 'The clone of api was cancelled', kind: 'info' })
+    assert.deepEqual(cloneFailure('api', 'fatal: repository not found'), { message: 'fatal: repository not found', kind: 'error' })
+  })
+})
+
+describe('planning with an agent', () => {
+  it('checks the goal like Go: 1 to 2,000 characters', () => {
+    assert.match(goalProblem('') ?? '', /Say what the goal is/)
+    assert.match(goalProblem('  \n ') ?? '', /Say what the goal is/)
+    assert.equal(goalProblem('Add rate limiting'), null)
+    assert.equal(goalProblem('x'.repeat(MAX_GOAL)), null)
+    assert.match(goalProblem('x'.repeat(MAX_GOAL + 1)) ?? '', /At most 2000/)
+    // Characters, not UTF-16 units.
+    assert.equal(goalProblem('😀'.repeat(MAX_GOAL)), null)
+  })
+  it('recognises the Restricted Mode refusal', () => {
+    assert.equal(isRestrictedError("the backlog's folder is in Restricted Mode: trust it first"), true)
+    assert.equal(isRestrictedError('say what the goal is'), false)
+  })
+  it('starts with the default agent when it is installed', () => {
+    assert.equal(pickPlanAgent(['claude', 'codex'], 'codex', 'claude'), 'codex')
+    assert.equal(pickPlanAgent(['claude', 'codex'], 'gone', 'codex'), 'codex')
+    assert.equal(pickPlanAgent(['claude', 'codex'], '', ''), 'claude')
+    assert.equal(pickPlanAgent([], 'claude', 'claude'), '')
   })
 })

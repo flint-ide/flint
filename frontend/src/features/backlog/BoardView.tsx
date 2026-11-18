@@ -2,7 +2,7 @@ import { useEffect, useState, type DragEvent } from 'react'
 import type { ContributedTab } from '../../lib/features'
 import { useEditor } from '../../store/editor'
 import { BacklogDialogs } from './Dialogs'
-import { ItemActions, ItemMeta, ItemTasks, ItemTitle } from './ItemParts'
+import { ItemActions, ItemDependencies, ItemMeta, ItemTasks, ItemTitle } from './ItemParts'
 import {
   boardProblem,
   boardTitle,
@@ -18,7 +18,7 @@ import {
   type ItemInfo,
   type Status,
 } from './backlog'
-import { followBacklogs, loadBacklog, openBacklog, openNewItem, refreshBacklogs, setStatus, useBacklog } from './store'
+import { followBacklogs, loadBacklog, openBacklog, openNewItem, openPlan, refreshBacklogs, setStatus, useBacklog } from './store'
 
 /** The Board tab: one column per status; a card can be dragged to another column or moved with its Status menu. */
 export function BoardView({ tab, active }: { tab: ContributedTab; active: boolean }) {
@@ -58,6 +58,7 @@ export function BoardView({ tab, active }: { tab: ContributedTab; active: boolea
         <span className="muted truncate" title={backlog.path}>{backlog.path}</span>
         <span className="spacer" />
         <button className="icon" title="New Item…" onClick={() => openNewItem(folder, 'board')}>＋ New Item…</button>
+        <button className="icon" title="Have an agent split a goal into items (the prompt goes into a chat draft)" onClick={() => openPlan(folder, 'board')}>✦ Plan with Agent…</button>
         <button className="icon" title="Refresh" onClick={() => void loadBacklog(folder)}>↻</button>
       </div>
       {loaded?.error && <div className="backlog-board-error error">{loaded.error}</div>}
@@ -128,9 +129,10 @@ function Card({ backlog, item }: { backlog: BacklogData; item: ItemInfo }) {
       onDragEnd={() => setDragging(false)}
     >
       <div className="backlog-card-title">
-        <ItemTitle item={item} />
+        <ItemTitle item={item} items={backlog.items} />
       </div>
       <ItemMeta item={item} backlog={backlog} />
+      <ItemDependencies item={item} items={backlog.items} />
       <ItemTasks tasks={item.tasks} />
       <ItemActions backlog={backlog} item={item} />
     </div>

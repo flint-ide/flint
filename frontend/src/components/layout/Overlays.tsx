@@ -22,6 +22,7 @@ export function Overlays() {
           <div className="form-actions">
             <span className="spacer" />
             <button onClick={() => confirm.resolve(false)}>Cancel</button>
+            {confirm.alternateLabel && <button onClick={() => confirm.resolve(false, true)}>{confirm.alternateLabel}</button>}
             <button className="danger" autoFocus onClick={() => confirm.resolve(true)}>
               {confirm.confirmLabel}
             </button>

@@ -84,12 +84,20 @@ describe('MCP server settings', () => {
     assert.equal(sharesEditor({ ...DEFAULT_MCP_SERVER, tools: { ...DEFAULT_MCP_SERVER.tools, editor: false } }), false)
   })
   it('keeps the tools that act off unless a group is switched on', () => {
-    assert.deepEqual(DEFAULT_MCP_SERVER.actions, { tests: false, run: false, http: false, sql: false })
+    assert.deepEqual(DEFAULT_MCP_SERVER.actions, { tests: false, run: false, http: false, sql: false, backlog: false })
     assert.equal(DEFAULT_MCP_SERVER.testWaitSeconds, 120)
     const m = coerceMcpServer({ actions: { tests: true, run: 'true', http: 1, shell: true }, testWaitSeconds: 5 })
-    assert.deepEqual(m.actions, { tests: true, run: false, http: false, sql: false })
+    assert.deepEqual(m.actions, { tests: true, run: false, http: false, sql: false, backlog: false })
     assert.equal(m.testWaitSeconds, 10)
     assert.equal(coerceMcpServer({ actions: 'all', testWaitSeconds: 'long' }).testWaitSeconds, 120)
     assert.deepEqual(coerceMcpServer({ actions: 'all' }).actions, DEFAULT_MCP_SERVER.actions)
+  })
+  it('keeps the planning tool (actions.backlog) switched on through a save and a load', () => {
+    const on = coerceMcpServer({ actions: { backlog: true } })
+    assert.equal(on.actions.backlog, true)
+    assert.equal(on.actions.sql, false)
+    // What the Settings tab writes (JSON) reads back the same.
+    assert.deepEqual(coerceMcpServer(JSON.parse(JSON.stringify(on))), on)
+    assert.equal(coerceMcpServer({ actions: { backlog: 'yes' } }).actions.backlog, false)
   })
 })

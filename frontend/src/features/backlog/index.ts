@@ -5,7 +5,7 @@ import { lazy } from 'react'
 import { lazyPreload } from '../../lib/lazyPreload'
 import { defineFeature } from '../../lib/features'
 import { BOARD_VIEW } from './backlog'
-import { newBacklog, openBacklog, openNewItem, showBoard, useBacklog } from './store'
+import { newBacklog, openBacklog, openNewItem, openPlan, showBoard, subscribeAutoStart, useBacklog } from './store'
 
 const BacklogPanel = lazyPreload(() => import('./BacklogPanel').then((m) => ({ default: m.BacklogPanel })))
 const BoardView = lazy(() => import('./BoardView').then((m) => ({ default: m.BoardView })))
@@ -28,7 +28,12 @@ export default defineFeature({
       id: 'backlog.newItem', title: 'New Backlog Item…', category: 'Backlog', keywords: 'add work item task title',
       run: () => openNewItem(useBacklog.getState().selected),
     },
+    {
+      id: 'backlog.plan', title: 'Plan with Agent…', category: 'Backlog', keywords: 'goal split items agent planner ai',
+      run: () => openPlan(useBacklog.getState().selected),
+    },
     { id: 'backlog.board', title: 'Show Backlog Board', category: 'Backlog', keywords: 'kanban columns status drag', run: () => void showBoard() },
   ],
+  activate: subscribeAutoStart,
   tabKinds: [{ id: BOARD_VIEW, component: BoardView, icon: 'checkbox', restore: true }],
 })

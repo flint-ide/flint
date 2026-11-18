@@ -2,7 +2,7 @@
 // board, testable with node:test. The shapes mirror the Go service's views
 // (the generated binding classes fit them structurally).
 import { isWithin } from '../../lib/fileTree'
-import { stateInfo } from '../../lib/agentTasks'
+import { jointLead, stateInfo } from '../../lib/agentTasks'
 
 export interface RepoView {
   name: string
@@ -27,6 +27,17 @@ export interface TaskInfo {
   merged: boolean
   stale: boolean
   gone: boolean
+  /** The joint group (one agent across repositories) the task belongs to; '' for a task with a chat of its own. */
+  joint: string
+  /** The lead of its joint group: the chat runs in this task's worktree. */
+  lead: boolean
+}
+
+/** A waiting start: the user asked to start the item when it is ready (Go: WaitingView). */
+export interface WaitingInfo {
+  since: string
+  /** Why the last automatic start failed ('' when none was tried). */
+  reason: string
 }
 
 export interface ItemInfo {
@@ -41,6 +52,15 @@ export interface ItemInfo {
   agentProblem: string
   failed: boolean
   tasks: TaskInfo[]
+  /** one agent works in all of repos (a joint group) instead of one per repository. */
+  together: boolean
+  /** The items that must be done first (ids), those of them that are not done, and whether the item may start. */
+  after: string[]
+  waitingFor: string[]
+  ready: boolean
+  /** What is wrong with after (an unknown id, the item itself, a cycle); '' when nothing. */
+  dependencyProblem: string
+  waiting: WaitingInfo | null
 }
 
 export interface ProblemInfo {
@@ -66,6 +86,8 @@ export interface BacklogData {
   items: ItemInfo[]
   problems: ProblemInfo[]
   defaultAgent: string
+  /** The clone running for this backlog (null when none). */
+  clone: CloneInfo | null
 }
 
 export type Status = 'doing' | 'review' | 'todo' | 'done'
@@ -166,22 +188,41 @@ export function delegateStep(issues: readonly DelegateIssue[], last: string): De
 }
 
 /** The question before the folder picker of Locate…: which repository the user is asked to find. */
-export function locateQuestion(repo: string, url: string): string {
+export function locateQuestion(repo: string, url: string, note = ''): string {
   return [
     `Locate your checkout of "${repo}"`,
     '',
     `Flint needs a folder on this computer that is a git checkout of ${url} (a remote with that URL).`,
     'It is remembered on this computer only, not in the backlog.',
+    ...(note ? ['', note] : []),
   ].join('\n')
 }
 
+/** Delegate's question for a repository with no checkout: locate one, or clone it. */
+export function noCheckoutQuestion(repo: string, url: string, note = ''): string {
+  return [
+    `There is no checkout of "${repo}" on this computer`,
+    '',
+    `${url}`,
+    '',
+    'Locate… takes a folder that already is a checkout of it. Clone… asks for a folder to clone it into, then shows the URL and the destination once more before it runs git.',
+    ...(note ? ['', note] : []),
+  ].join('\n')
+}
+
+/** The sentence about an item that runs as one agent; '' for any other. */
+export function togetherNote(item: Pick<ItemInfo, 'together' | 'repos'>): string {
+  return item.together && item.repos.length > 1 ? `It runs as one agent across the repositories ${item.repos.join(', ')}: every one of them must be usable before it starts.` : ''
+}
+
 /** The question before trusting a repository's folder: trust is for the whole folder, from now on. */
-export function trustQuestion(repo: string, folder: string): string {
+export function trustQuestion(repo: string, folder: string, note = ''): string {
   return [
     `Trust the folder ${folder}?`,
     '',
     `${repo} is checked out there, and it is in Restricted Mode, so no agent can start in it.`,
     'Trusting it turns Restricted Mode off for the whole folder from now on, not just for this Delegate: its hooks, settings and language servers run, and agents use its project settings. Trust it only if you trust its authors. Revoke Folder Trust turns it back on.',
+    ...(note ? ['', note] : []),
   ].join('\n')
 }
 
@@ -226,8 +267,52 @@ export function taskPill(t: TaskInfo): { cls: string; label: string; hint: strin
   return { cls: s.state, label: s.label, hint: t.error || s.hint }
 }
 
-/** Open finds the task's folder and chat; a removed task, a missing folder and a queued task have none. */
-export const canOpenTask = (t: TaskInfo): boolean => !t.gone && !t.stale && t.state !== 'queued'
+/**
+ * Open finds the task's folder and chat; a removed task, a missing folder and a queued task have
+ * none. A member of a joint group has no chat of its own: Open goes to its lead (in all, the
+ * item's tasks), so it is as good as the lead is.
+ */
+export function canOpenTask(t: TaskInfo, all: readonly TaskInfo[] = [t]): boolean {
+  const target = jointLead(t, all)
+  if (t.joint && !target.lead) return false
+  return !target.gone && !target.stale && target.state !== 'queued'
+}
+
+/** A line of an item's task list: a task on its own, or the tasks of one joint group (lead first). */
+export interface TaskRow {
+  /** The joint group's id; '' for a task on its own. */
+  joint: string
+  tasks: TaskInfo[]
+}
+
+/**
+ * The item's tasks as rows: the tasks of one joint group together, where the first of them stands, the
+ * lead first; the others in the order Go listed them. A group with one task listed is a plain task.
+ */
+export function groupTasks(tasks: readonly TaskInfo[]): TaskRow[] {
+  const members = new Map<string, TaskInfo[]>()
+  for (const t of tasks) if (t.joint) members.set(t.joint, [...(members.get(t.joint) ?? []), t])
+  const rows: TaskRow[] = []
+  const seen = new Set<string>()
+  for (const t of tasks) {
+    const all = t.joint ? members.get(t.joint)! : []
+    if (all.length < 2) {
+      rows.push({ joint: '', tasks: [t] })
+      continue
+    }
+    if (seen.has(t.joint)) continue
+    seen.add(t.joint)
+    rows.push({ joint: t.joint, tasks: [...all.filter((m) => m.lead), ...all.filter((m) => !m.lead)] })
+  }
+  return rows
+}
+
+/** The repositories of a joint group, lead first: "api, web". */
+export const jointRepos = (tasks: readonly TaskInfo[]): string => tasks.map(taskRepo).join(', ')
+
+/** What a joint group's tasks have in common, said once above them. */
+export const jointHint = (tasks: readonly TaskInfo[]): string =>
+  `One agent works in the worktrees of all ${tasks.length} tasks (${jointRepos(tasks)}). Its one chat is in the lead's worktree; Open on any of them shows it.`
 
 /** "api" for a task in a repository of the backlog, "active project" otherwise. */
 export const taskRepo = (t: Pick<TaskInfo, 'repo'>): string => t.repo || 'active project'
@@ -316,4 +401,229 @@ export function problemPrompt(backlogName: string, backlogPath: string, p: Probl
     '',
     'Fix the file so that it follows the backlog format (front matter with title, status, priority, agent and repos, then the text), and keep what it says.',
   ].join('\n')
+}
+
+// ---- Dependencies
+
+/** The title of the item with this id; the id itself when the backlog has no such item (yet). */
+export function itemTitleOf(id: string, items: readonly Pick<ItemInfo, 'id' | 'title'>[]): string {
+  return items.find((i) => i.id === id)?.title ?? id
+}
+
+/** The titles of the items with these ids (ids for the unknown ones), in the order given. */
+export const titlesOf = (ids: readonly string[], items: readonly Pick<ItemInfo, 'id' | 'title'>[]): string[] => ids.map((id) => itemTitleOf(id, items))
+
+/** "a", "a and b", "a, b and c". */
+export function joinList(names: readonly string[]): string {
+  if (names.length <= 1) return names.join('')
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+/** "A is done" / "A and B are done". */
+export const areDone = (names: readonly string[]): string => `${joinList(names)} ${names.length === 1 ? 'is' : 'are'} done`
+
+/** A marker next to an item's title or repositories (same look as the repository markers). */
+export type ItemMarker = RepoMarker
+
+/**
+ * The marker of an item that cannot start: a problem with its after line, a start that waits, or just
+ * not ready. None for a ready item and for a done one (what it waited for no longer matters).
+ */
+export function dependencyMarker(item: ItemInfo, items: readonly ItemInfo[]): ItemMarker | null {
+  if (item.dependencyProblem) return { label: 'dependency problem', cls: 'error', hint: item.dependencyProblem }
+  if (item.status === 'done') return null
+  const on = joinList(titlesOf(item.waitingFor, items))
+  if (item.waiting) return { label: 'waiting to start', cls: 'warn', hint: `Starts by itself when ${areDone(titlesOf(item.waitingFor, items))}` }
+  if (!item.ready) return { label: 'not ready', cls: 'warn', hint: `Waits for ${on}: Delegate offers to start it when it is done` }
+  return null
+}
+
+/** "one agent": the marker of an item that runs as one agent across its repositories. */
+export function togetherMarker(item: Pick<ItemInfo, 'together' | 'repos'>): ItemMarker | null {
+  return item.together
+    ? { label: 'one agent', cls: 'muted', hint: `Delegate starts one agent that works in all of ${item.repos.join(', ')}, in one chat, instead of one agent per repository` }
+    : null
+}
+
+/** A line under an item: what it waits for, its dependency problem, its waiting start. */
+export interface DependencyLine {
+  kind: 'after' | 'problem' | 'waiting' | 'reason'
+  text: string
+  cls: 'muted' | 'warn' | 'error'
+}
+
+/** The dependency lines of an item, in the order they are shown. */
+export function dependencyLines(item: ItemInfo, items: readonly ItemInfo[]): DependencyLine[] {
+  const out: DependencyLine[] = []
+  if (item.dependencyProblem) out.push({ kind: 'problem', text: item.dependencyProblem, cls: 'error' })
+  if (item.after.length > 0 && item.status !== 'done' && !item.dependencyProblem) {
+    out.push(
+      item.waitingFor.length > 0
+        ? { kind: 'after', text: `waits for ${joinList(titlesOf(item.waitingFor, items))}`, cls: 'warn' }
+        : { kind: 'after', text: `after ${joinList(titlesOf(item.after, items))} (done)`, cls: 'muted' },
+    )
+  }
+  if (item.waiting) {
+    out.push({
+      kind: 'waiting',
+      text: item.waitingFor.length > 0 ? `starts when ${areDone(titlesOf(item.waitingFor, items))}` : 'ready: starts as soon as its checks pass',
+      cls: 'muted',
+    })
+    if (item.waiting.reason) out.push({ kind: 'reason', text: `Last start failed: ${item.waiting.reason}`, cls: 'error' })
+  }
+  return out
+}
+
+/**
+ * Delegate's question for an item that is not ready (Go answered notReady and what it waits for): start it
+ * when those items are done. waitingFor is Go's answer (ids); an item that runs as one agent says so.
+ */
+export function notReadyQuestion(item: Pick<ItemInfo, 'title' | 'together' | 'repos'>, waitingFor: readonly string[], items: readonly ItemInfo[]): string {
+  const together = item.together && item.repos.length > 1 ? `It runs as one agent across the repositories ${item.repos.join(', ')}.` : ''
+  return [
+    `Start "${item.title}" when ${areDone(titlesOf(waitingFor, items))}?`,
+    ...(together ? ['', together] : []),
+    '',
+    'Nothing starts now. Flint then delegates it by itself, with every check Delegate makes at that time (the agent, the checkouts, trust). Cancel start takes it back.',
+  ].join('\n')
+}
+
+/** The toast after the user said yes to the question above. */
+export const waitingToast = (title: string, waitingFor: readonly string[], items: readonly ItemInfo[]): string =>
+  `"${title}" starts when ${areDone(titlesOf(waitingFor, items))}`
+
+/** "Started 2 agent tasks", "Started one agent across 2 repositories" for a joint group. */
+export function startedText(item: Pick<ItemInfo, 'together'>, tasks: number): string {
+  if (item.together && tasks > 1) return `Started one agent across ${tasks} repositories`
+  return `Started ${tasks} agent ${tasks === 1 ? 'task' : 'tasks'}`
+}
+
+// ---- Events of Go
+
+/** The data of "backlog:auto-start" (Go: AutoStart). */
+export interface AutoStart {
+  backlog: string
+  id: string
+  title: string
+  tasks: number
+  error: string
+  warning: string
+}
+
+/** An event's data (untrusted) as an AutoStart, or null. */
+export function coerceAutoStart(raw: unknown): AutoStart | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const o = raw as Record<string, unknown>
+  if (typeof o.backlog !== 'string' || typeof o.id !== 'string') return null
+  return {
+    backlog: o.backlog,
+    id: o.id,
+    title: typeof o.title === 'string' && o.title ? o.title : o.id,
+    tasks: typeof o.tasks === 'number' && Number.isFinite(o.tasks) ? o.tasks : 0,
+    error: typeof o.error === 'string' ? o.error : '',
+    warning: typeof o.warning === 'string' ? o.warning : '',
+  }
+}
+
+/** The toast of an automatic start: started (with how many tasks), or why not (the item keeps waiting). */
+export function autoStartToast(a: AutoStart): { message: string; kind: 'info' | 'error' } {
+  if (a.error) return { message: `Couldn't start "${a.title}": ${a.error} It keeps waiting.`, kind: 'error' }
+  const base = `Started ${a.title} (${a.tasks} agent ${a.tasks === 1 ? 'task' : 'tasks'})`
+  return a.warning ? { message: `${base}, but ${a.warning}`, kind: 'error' } : { message: base, kind: 'info' }
+}
+
+// ---- Cloning
+
+/** The clone running for a backlog (Go: CloneView). */
+export interface CloneInfo {
+  repo: string
+  url: string
+  destination: string
+  progress: string
+}
+
+/** What the panel shows of a running clone. */
+export interface CloneState {
+  repo: string
+  destination: string
+  progress: string
+}
+
+/** The data of "backlog:clone-progress" and "backlog:clone-done" (Go: CloneEvent). */
+export interface CloneEvent {
+  backlog: string
+  repo: string
+  destination: string
+  progress: string
+  done: boolean
+  error: string
+  cancelled: boolean
+}
+
+/** The state of a clone from the backlog's own view of it (Backlog.clone); null when none runs. */
+export const cloneFromInfo = (c: Pick<CloneInfo, 'repo' | 'destination' | 'progress'> | null | undefined): CloneState | null =>
+  c ? { repo: c.repo, destination: c.destination, progress: c.progress } : null
+
+/** An event's data (untrusted) as a CloneEvent, or null. */
+export function coerceCloneEvent(raw: unknown): CloneEvent | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const o = raw as Record<string, unknown>
+  if (typeof o.backlog !== 'string' || typeof o.repo !== 'string') return null
+  const str = (v: unknown) => (typeof v === 'string' ? v : '')
+  return {
+    backlog: o.backlog,
+    repo: o.repo,
+    destination: str(o.destination),
+    progress: str(o.progress),
+    done: o.done === true,
+    error: str(o.error),
+    cancelled: o.cancelled === true,
+  }
+}
+
+/** The state after an event: a progress line updates the clone, the end clears it. */
+export function applyCloneEvent(cur: CloneState | null, ev: CloneEvent): CloneState | null {
+  if (ev.done) return null
+  return { repo: ev.repo, destination: ev.destination || cur?.destination || '', progress: ev.progress || (cur?.repo === ev.repo ? cur.progress : '') }
+}
+
+/** The line of the panel while a clone runs: "Cloning api into /w/api". */
+export const cloneTitle = (c: CloneState): string => (c.destination ? `Cloning ${c.repo} into ${c.destination}` : `Cloning ${c.repo}…`)
+
+/** A rejected Clone call: cancelling is not an error to show in red. */
+export function cloneFailure(repo: string, message: string): { message: string; kind: 'info' | 'error' } {
+  return /clone was cancelled/i.test(message) ? { message: `The clone of ${repo} was cancelled`, kind: 'info' } : { message, kind: 'error' }
+}
+
+/** Whether Clone… is offered for a repository: it has no checkout at all (Locate… stays for the rest). */
+export const canClone = (r: Pick<RepoView, 'folder'>): boolean => !r.folder
+
+// ---- Planning with an agent
+
+/** Go's MaxGoal. */
+export const MAX_GOAL = 2000
+
+/** The goal's length in characters, as Go counts them. */
+export const goalLength = (goal: string): number => Array.from(goal).length
+
+/** Why a goal cannot be sent; null when it can. */
+export function goalProblem(goal: string): string | null {
+  if (goal.trim() === '') return 'Say what the goal is.'
+  if (goalLength(goal) > MAX_GOAL) return `At most ${MAX_GOAL} characters.`
+  return null
+}
+
+/** Go refuses the plan of a backlog whose folder is in Restricted Mode: the dialog then offers Trust Folder…. */
+export const isRestrictedError = (message: string): boolean => /Restricted Mode/.test(message)
+
+/**
+ * What to tell the user when the planning tool is off (PlanPrompt.toolOn false): the agent gets the
+ * prompt but can only add items once the switch is on. The names are the Settings labels.
+ */
+export const PLAN_TOOL_OFF =
+  'The prompt is in the chat draft. The agent can only add items after you switch on Add backlog items in Settings ▸ Agent Context ▸ Actions (and Share Flint\'s context with agents).'
+
+/** The agent the Plan with Agent… dialog starts with: the default agent, else the preferred one, else the first. */
+export function pickPlanAgent(agents: readonly string[], defaultAgent: string, preferred: string): string {
+  return [defaultAgent, preferred].find((a) => a && agents.includes(a)) ?? agents[0] ?? ''
 }

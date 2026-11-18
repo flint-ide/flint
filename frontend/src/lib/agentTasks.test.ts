@@ -11,14 +11,18 @@ import {
   groupMates,
   groupRows,
   groupSummary,
+  jointLead,
+  lacksChat,
   MAX_GROUP,
   mergeTaskLists,
   planAgents,
   planNote,
   planProblem,
   pruneChanges,
+  removeJointNote,
   removeOthersQuestion,
   removeQuestions,
+  startsOwnChat,
   stateInfo,
   taskActions,
   tasksTouchedBy,
@@ -45,6 +49,8 @@ const task = (over: Partial<TaskView> = {}): TaskView => ({
   ahead: 0,
   merged: false,
   group: '',
+  joint: '',
+  lead: false,
   tokens: 0,
   costUsd: 0,
   ...over,
@@ -128,17 +134,19 @@ describe('pruneChanges', () => {
   })
 })
 
+const noJoint = { jointTasks: 0, stopsJointChat: false }
+
 describe('removeQuestions', () => {
   it('asks about lost work only when there is some', () => {
-    assert.deepEqual(removeQuestions({ stale: false, changes: 0, ignored: 0, unmerged: 0 }), { discard: null, branch: null })
-    const q = removeQuestions({ stale: false, changes: 2, ignored: 0, unmerged: 3 })
+    assert.deepEqual(removeQuestions({ ...noJoint, stale: false, changes: 0, ignored: 0, unmerged: 0 }), { discard: null, branch: null })
+    const q = removeQuestions({ ...noJoint, stale: false, changes: 2, ignored: 0, unmerged: 3 })
     assert.match(q.discard ?? '', /2 uncommitted/)
     assert.match(q.branch ?? '', /3 commit/)
-    assert.match(removeQuestions({ stale: true, changes: 0, ignored: 0, unmerged: -1 }).branch ?? '', /could not tell/)
+    assert.match(removeQuestions({ ...noJoint, stale: true, changes: 0, ignored: 0, unmerged: -1 }).branch ?? '', /could not tell/)
   })
 
   it('counts ignored files (.env) as lost work', () => {
-    const q = removeQuestions({ stale: false, changes: 0, ignored: 1, unmerged: 0 })
+    const q = removeQuestions({ ...noJoint, stale: false, changes: 0, ignored: 1, unmerged: 0 })
     assert.match(q.discard ?? '', /1 ignored/)
   })
 })
@@ -284,5 +292,51 @@ describe('changeCell', () => {
     assert.equal(changeCell({ ...c, binary: true }), 'bin')
     assert.equal(changeCell(null), '—')
     assert.equal(changeCell(undefined), '—')
+  })
+})
+
+describe('joint groups (one agent across repositories)', () => {
+  const lead = task({ id: 'l', joint: 'j1', lead: true, createdAt: 5 })
+  const member = task({ id: 'm', joint: 'j1', createdAt: 5 })
+  const other = task({ id: 'o', createdAt: 4 })
+
+  it('shows the tasks of a joint group together, lead first, at the first member', () => {
+    const rows = groupRows([other, member, task({ id: 'x', createdAt: 3 }), lead])
+    assert.deepEqual(rows.map((r) => [r.group, r.joint ?? '', r.tasks.map((t) => t.id).join(',')]), [
+      ['', '', 'o'],
+      ['', 'j1', 'l,m'],
+      ['', '', 'x'],
+    ])
+  })
+
+  it('treats a joint group with one task left as a plain task, and lets joint win over a comparison group', () => {
+    assert.equal(groupRows([lead])[0].joint, undefined)
+    const rows = groupRows([task({ id: 'a', joint: 'j', lead: true, group: 'g' }), task({ id: 'b', joint: 'j', group: 'g' })])
+    assert.deepEqual(rows.map((r) => [r.group, r.joint]), [['', 'j']])
+  })
+
+  it('finds the lead whose worktree holds the chat', () => {
+    assert.equal(jointLead(member, [other, member, lead]).id, 'l')
+    assert.equal(jointLead(lead, [member, lead]).id, 'l')
+    assert.equal(jointLead(other, [other, lead]).id, 'o')
+    // The lead is not listed: the member is returned, and has no chat of its own.
+    assert.equal(jointLead(member, [member]).id, 'm')
+    assert.equal(lacksChat(member), true)
+    assert.equal(lacksChat(lead), false)
+    assert.equal(lacksChat(other), false)
+  })
+
+  it('starts no chat for a task of a joint group that left the queue', () => {
+    assert.equal(startsOwnChat(task()), true)
+    assert.equal(startsOwnChat(lead), false)
+    assert.equal(startsOwnChat(member), false)
+  })
+
+  it('words the remove confirmation for a shared chat', () => {
+    assert.equal(removeJointNote({ jointTasks: 0, stopsJointChat: false }), '')
+    assert.match(removeJointNote({ jointTasks: 2, stopsJointChat: true }), /shares one agent chat with 2 other tasks: removing it stops that chat for all of them/)
+    assert.match(removeJointNote({ jointTasks: 1, stopsJointChat: true }), /with 1 other task:/)
+    assert.match(removeJointNote({ jointTasks: 1, stopsJointChat: false }), /the other task stays/)
+    assert.match(removeJointNote({ jointTasks: 2, stopsJointChat: false }), /the other 2 tasks stay/)
   })
 })

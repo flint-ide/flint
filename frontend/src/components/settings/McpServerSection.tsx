@@ -14,6 +14,7 @@ const ACTIONS: { key: McpActionKey; label: string; hint: string }[] = [
   { key: 'run', label: 'Run configurations', hint: 'run_configuration starts one of the project\'s run configurations in its run tab; get_run_output reads its output.' },
   { key: 'http', label: 'Send HTTP requests', hint: 'send_http_request: a named request of a .http file in the project; the response is kept in the file\'s history.' },
   { key: 'sql', label: 'Run SQL queries', hint: 'run_sql_query: one reading statement on a saved connection, only when that connection is read-only.' },
+  { key: 'backlog', label: 'Add backlog items', hint: 'add_backlog_item: writes a new item into a trusted backlog, after you approve each one' },
 ]
 
 /** Settings ▸ Agent Context: Flint's own MCP server for the agents it starts. */

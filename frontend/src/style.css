@@ -4325,6 +4325,14 @@ button.keymap-chord:hover {
   font-size: 11px;
   cursor: pointer;
 }
+.task-joint .task-group-head {
+  flex-direction: column;
+  gap: 0;
+  align-items: stretch;
+}
+.task-joint .task-group-head .muted {
+  flex: auto;
+}
 .task-group .task:last-child {
   border-bottom: 1px solid var(--border);
 }
@@ -4504,6 +4512,51 @@ button.keymap-chord:hover {
   font-size: 11px;
   cursor: pointer;
 }
+.backlog-deps {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 10px 0 22px;
+  font-size: 11px;
+}
+.backlog-dep {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--fg-faint);
+}
+.backlog-dep.warn {
+  color: var(--warn);
+}
+.backlog-dep.error {
+  color: var(--danger);
+}
+.backlog-joint {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 8px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.backlog-joint-head {
+  font-size: 10px;
+}
+.backlog-clone {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 10px 4px 22px;
+  padding: 6px 8px;
+  font-size: 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 4px;
+}
+.backlog-clone-title {
+  overflow-wrap: anywhere;
+}
+.backlog-clone-line {
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono, monospace);
+}
 .backlog-task-repo {
   flex: 1;
   min-width: 0;
@@ -4641,6 +4694,7 @@ button.keymap-chord:hover {
   font-size: 13px;
 }
 .backlog-card .backlog-meta,
+.backlog-card .backlog-deps,
 .backlog-card .backlog-tasks,
 .backlog-card .backlog-actions {
   padding-left: 0;
@@ -4649,6 +4703,18 @@ button.keymap-chord:hover {
 
 .modal.new-task {
   width: min(620px, 94vw);
+}
+.modal.plan-goal {
+  width: min(560px, 94vw);
+}
+.modal.plan-goal textarea {
+  font: 13px/1.45 var(--font-ui);
+  background: var(--bg-editor);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  resize: vertical;
 }
 .modal.new-task textarea {
   font: 13px/1.45 var(--font-ui);

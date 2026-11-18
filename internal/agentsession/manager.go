@@ -161,6 +161,8 @@ type managed struct {
 	folders []string
 	driver  Driver
 	cancel  context.CancelFunc // non-nil while a turn runs
+	// turn: a turn_start was emitted and its turn_end not yet (Prompt).
+	turn bool
 }
 
 // NewManager creates a manager that forwards events to emit.
@@ -378,6 +380,17 @@ func (m *Manager) route(s *managed, e Event) {
 	if e.Kind == KindPermissionSettled {
 		m.settleAction(e.SessionID, e.RequestID, "")
 	}
+	if e.Kind == KindTurnEnd {
+		// One turn_end per turn_start: a driver's second one, or one that
+		// comes after Prompt ended the turn for it, is dropped.
+		m.mu.Lock()
+		open := s.turn
+		s.turn = false
+		m.mu.Unlock()
+		if !open {
+			return
+		}
+	}
 	if e.Kind == KindPermission && e.Permission != nil {
 		if opt, ok := m.grantedOption(e.SessionID, *e.Permission); ok {
 			// Covered by the chat's orchestration grant (actions.go).
@@ -421,7 +434,9 @@ func autoOption(policy Policy, s *managed, req PermissionRequest) (string, bool)
 }
 
 // Prompt starts a turn in the background; progress arrives as events, from
-// KindTurnStart to KindTurnEnd. It fails fast when a turn is already running.
+// KindTurnStart to KindTurnEnd: every turn_start is followed by exactly one
+// turn_end, from the driver or, when the driver failed or was stopped before
+// it sent one, from here. It fails fast when a turn is already running.
 func (m *Manager) Prompt(sessionID, text string, attachments []Attachment) error {
 	m.mu.Lock()
 	s := m.sessions[sessionID]
@@ -434,7 +449,7 @@ func (m *Manager) Prompt(sessionID, text string, attachments []Attachment) error
 		return ErrBusy
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	s.cancel = cancel
+	s.cancel, s.turn = cancel, true
 	m.mu.Unlock()
 	// Every turn starts here, whoever sent the prompt (the web view, the task
 	// queue, another agent, Flint's notice), so this event is what tells the
@@ -447,10 +462,26 @@ func (m *Manager) Prompt(sessionID, text string, attachments []Attachment) error
 		_, err := s.driver.Prompt(ctx, sessionID, text, attachments)
 		m.mu.Lock()
 		s.cancel = nil
+		// Drivers end their turns themselves (KindError, then KindTurnEnd,
+		// before Prompt returns). One that failed before it got that far (a
+		// process that died, an empty prompt, an unknown session, a closed
+		// connection) or was stopped meanwhile did not: the error is
+		// reported and the turn ends here, or the chat would look busy
+		// forever.
+		open := s.turn && (err != nil || ctx.Err() != nil)
+		if open {
+			s.turn = false
+		}
 		m.mu.Unlock()
-		if err != nil && ctx.Err() == nil {
-			// Drivers emit KindError/KindTurnEnd themselves; this covers early failures.
-			m.emit(Event{SessionID: sessionID, Kind: KindError, Text: err.Error()})
+		if open {
+			if err != nil && ctx.Err() == nil {
+				m.emit(Event{SessionID: sessionID, Kind: KindError, Text: err.Error()})
+			}
+			stop := StopError
+			if ctx.Err() != nil {
+				stop = StopCancelled // stopped (Stop, Close): not the agent's failure
+			}
+			m.emit(Event{SessionID: sessionID, Kind: KindTurnEnd, StopReason: stop})
 		}
 	}()
 	return nil

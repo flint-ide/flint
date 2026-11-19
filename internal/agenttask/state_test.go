@@ -105,8 +105,11 @@ func TestCombine(t *testing.T) {
 	if got := Combine(nil, Interrupted); got.State != Interrupted {
 		t.Errorf("no chats, a turn was running when they went: %s", got.State)
 	}
-	if got := Combine([]Live{{State: Idle}}, Interrupted); got.State != Idle {
-		t.Errorf("an open chat shows its own state: %s", got.State)
+	if got := Combine([]Live{{State: Idle}}, Interrupted); got.State != Interrupted {
+		t.Errorf("an idle chat has said nothing since the turn was cut off: %s", got.State)
+	}
+	if got := Combine([]Live{{State: Working, Turn: true}}, Interrupted); got.State != Working {
+		t.Errorf("a new turn shows working: %s", got.State)
 	}
 }
 
@@ -121,5 +124,22 @@ func TestSettled(t *testing.T) {
 		if got := Settled(state); got != want {
 			t.Errorf("Settled(%s) = %q, want %q", state, got, want)
 		}
+	}
+}
+
+// A task whose chat opened but whose first message failed shows the failure
+// while that chat is idle; a turn the user starts there shows working.
+func TestCombineKeepsTheFailureOfAnIdleChat(t *testing.T) {
+	if got := Combine([]Live{{State: Idle}}, Failed); got.State != Failed {
+		t.Errorf("idle chat of a failed task: %+v", got)
+	}
+	if got := Combine([]Live{{State: Idle}, {State: Idle}}, Finished); got.State != Finished {
+		t.Errorf("idle chats of a finished task: %+v", got)
+	}
+	if got := Combine([]Live{{State: Idle}, {State: Working, Turn: true}}, Failed); got.State != Working {
+		t.Errorf("a turn after the failure: %+v", got)
+	}
+	if got := Combine([]Live{{State: Idle}}, ""); got.State != Idle {
+		t.Errorf("nothing remembered: %+v", got)
 	}
 }

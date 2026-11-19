@@ -103,7 +103,7 @@ function TaskRow({ t, changes, open, busy, label, heading }: RowProps) {
     <div className="task">
       <div className="tree-row static task-row" title={`${t.prompt}\n\n${t.worktree}`} onClick={() => a.diff && toggleChanges(t)}>
         <span className="twisty">{a.diff ? (open ? '▾' : '▸') : ' '}</span>
-        <span className={`task-state ${t.stale ? 'stale' : s.state}`} title={t.stale ? 'The worktree folder is gone' : t.error || s.hint}>
+        <span className={`task-state ${t.stale ? 'stale' : s.state}`} title={t.stale ? 'The worktree folder is gone' : t.error || t.blocked || s.hint}>
           {t.stale ? 'stale' : s.label}
         </span>
         <span className="file-name">{label ?? heading ?? t.title}</span>
@@ -118,6 +118,7 @@ function TaskRow({ t, changes, open, busy, label, heading }: RowProps) {
         <TaskCI t={t} />
       </div>
       {t.state === 'failed' && t.error && <div className="task-error">{t.error}</div>}
+      {t.state === 'queued' && t.blocked && <div className="task-error">{t.blocked}</div>}
       <div className="task-actions">
         {a.startNow && <button className="link" disabled={busy} onClick={() => void startQueuedNow(t)} title="Start this task now, although the limit of working tasks is reached">Start now</button>}
         {a.open && <button className="link" disabled={busy} onClick={() => void openTask(t)} title={t.joint && !t.lead ? "Open the group's chat (in the lead task's folder)" : 'Open the folder and the agent chat'}>Open</button>}

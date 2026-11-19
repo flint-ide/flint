@@ -66,7 +66,7 @@ export function CISection() {
       ))}
       <Row
         label="Tell me when CI fails or passes"
-        hint={`A macOS notification when your pull request's CI fails or turns green while Flint isn't the active app.${notifyInBackground ? '' : ' Needs "Tell me when work finishes in the background" (Settings ▸ Agents), which is off.'}`}
+        hint={`A desktop notification when your pull request's CI fails or turns green while Flint isn't the active app.${notifyInBackground ? '' : ' Needs "Tell me when work finishes in the background" (Settings ▸ Agents), which is off.'}`}
       >
         <input type="checkbox" checked={ci.notify} onChange={(e) => set({ notify: e.target.checked })} />
       </Row>

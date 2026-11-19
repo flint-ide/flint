@@ -2,8 +2,9 @@
 // their tab was not the open one, which chat is peeked at, and what a click on a
 // row does. Chat and task state stay where they are (store/agentChat.ts,
 // store/agentTasks.ts); a settled tab is the editor's hidden tab (store/editor.ts).
+import { useMemo } from 'react'
 import { createStore } from '../lib/store'
-import { agentRows, firstNeedingAttention, needsUser, nextUnseen, terminalAgentKey, type AgentRow, type TerminalAgentInput } from '../lib/agentList'
+import { agentRows, attentionCount, firstNeedingAttention, needsUser, nextUnseen, terminalAgentKey, type AgentRow, type TerminalAgentInput } from '../lib/agentList'
 import { settledToReveal } from '../lib/settledTabs'
 import { chatTabId, useAgentChat } from './agentChat'
 import { useTasks } from './agentTasks'
@@ -43,6 +44,25 @@ export function currentRows(): AgentRow[] {
     settled: settledChats(),
     terminals: useTerminal.getState().tabs.map(terminalInput),
   })
+}
+
+/**
+ * How many agents need you (waiting, failed, or finished while you were in
+ * another tab): the Agents button's badge on the activity bar. A hook over the
+ * same rows as the panel, so it is right while the panel is closed.
+ */
+export function useNeedingYouCount(): number {
+  const sessions = useAgentChat((s) => s.sessions)
+  const order = useAgentChat((s) => s.order)
+  const tasks = useTasks((s) => s.tasks)
+  const unseen = useAgents((s) => s.unseen)
+  const terminals = useTerminal((s) => s.tabs)
+  return useMemo(
+    () => attentionCount(agentRows({
+      sessions: order.flatMap((id) => (sessions[id] ? [sessions[id]] : [])), tasks, unseen, terminals: terminals.map(terminalInput),
+    })),
+    [sessions, order, tasks, unseen, terminals],
+  )
 }
 
 function refresh(ended: string[]): void {

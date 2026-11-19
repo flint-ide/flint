@@ -169,8 +169,11 @@ func (g *orchGrants) forget(chat string) {
 // and a refusal is final. The answer is recorded even when this call gave up
 // waiting (ctx), so a late yes is not asked for again. It stops, asking
 // nothing, once ctx is done or alive says the chat is gone: a chat closed
-// while its dialog was open must not bring the dialog back.
-func (g *orchGrants) obtain(ctx context.Context, chat string, want orchGrant, alive func() bool, ask func() bool) (bool, error) {
+// while its dialog was open must not bring the dialog back. ask gets the
+// context of the call that started it and reports whether it showed the
+// dialog: one still queued behind another of Flint's questions when that
+// call gave up is not shown and records nothing (a later call asks).
+func (g *orchGrants) obtain(ctx context.Context, chat string, want orchGrant, alive func() bool, ask func(context.Context) (yes, shown bool)) (bool, error) {
 	want.from = chat
 	for {
 		if err := ctx.Err(); err != nil {
@@ -195,7 +198,7 @@ func (g *orchGrants) obtain(ctx context.Context, chat string, want orchGrant, al
 				g.asking = map[string]chan struct{}{}
 			}
 			g.asking[chat] = wait
-			go g.askOnce(chat, want, wait, alive, ask)
+			go g.askOnce(ctx, chat, want, wait, alive, ask)
 		}
 		g.mu.Unlock()
 		select {
@@ -206,8 +209,8 @@ func (g *orchGrants) obtain(ctx context.Context, chat string, want orchGrant, al
 	}
 }
 
-func (g *orchGrants) askOnce(chat string, want orchGrant, done chan struct{}, alive func() bool, ask func() bool) {
-	yes := ask()
+func (g *orchGrants) askOnce(ctx context.Context, chat string, want orchGrant, done chan struct{}, alive func() bool, ask func(context.Context) (bool, bool)) {
+	yes, shown := ask(ctx)
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	defer close(done)
@@ -215,6 +218,9 @@ func (g *orchGrants) askOnce(chat string, want orchGrant, done chan struct{}, al
 		return // the chat ended meanwhile
 	}
 	delete(g.asking, chat)
+	if !shown {
+		return // its caller gave up before the dialog's turn came
+	}
 	if yes {
 		if !alive() {
 			return // closed while the dialog was open: nothing may outlive the chat
@@ -268,8 +274,8 @@ func (a *App) approveOrchestration(ctx context.Context, call mcpserver.Approval)
 	}
 	want := orchGrant{root: call.Root, maxChildren: cfg.MaxChildren, maxDepth: cfg.MaxDepth}
 	alive := func() bool { _, registered := a.orch.Get(chat); return registered }
-	ok, err := a.orchGrants.obtain(ctx, chat, want, alive, func() bool {
-		return a.askUser("Let this agent direct other agents?", orchQuestion(node.Agent, want), "Allow")
+	ok, err := a.orchGrants.obtain(ctx, chat, want, alive, func(ctx context.Context) (bool, bool) {
+		return a.askUserCtx(ctx, "Let this agent direct other agents?", orchQuestion(node.Agent, want), "Allow")
 	})
 	switch {
 	case err != nil:

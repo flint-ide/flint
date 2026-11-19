@@ -50,10 +50,7 @@ func (a *App) wireRemote(events terminal.Events) {
 // Settings are saved by the web view, which renders untrusted content, so a
 // machine being in settings proves nothing about who put it there.
 func (a *App) confirmRemoteCommand(m settings.Machine, kind string, argv []string) bool {
-	ask := a.ask
-	if ask == nil {
-		ask = a.askNative
-	}
+	ask := a.askNow
 	name := m.Name
 	if name == "" {
 		name = m.ID

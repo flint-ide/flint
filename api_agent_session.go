@@ -27,9 +27,10 @@ type AgentChatAPI struct {
 func newAgentManager(a *App) *as.Manager {
 	m := as.NewManager(func(e as.Event) {
 		a.emit(eventAgentEvent, e)
-		a.tasks.Observe(e) // agent tasks follow their chats (tasks_state.go)
-		a.observeChat(e)   // states and output for orchestration, notices (chat_notify.go)
-		a.observeUsage(e)  // usage_state.go
+		a.observeTaskStart(e) // before the tracker moves the queue (tasks_queue.go)
+		a.tasks.Observe(e)    // agent tasks follow their chats (tasks_state.go)
+		a.observeChat(e)      // states and output for orchestration, notices (chat_notify.go)
+		a.observeUsage(e)     // usage_state.go
 	})
 	m.SetActionGate(a.actionGate()) // Flint's tools that act always ask (api_mcp_actions.go)
 	registerDrivers(m, a.untrusted, a.agentConfig, a.offerMCP)

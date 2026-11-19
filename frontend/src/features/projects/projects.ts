@@ -594,9 +594,37 @@ export function coerceAutoStart(raw: unknown): AutoStart | null {
   }
 }
 
+/** Ends a reason from Go with a full stop when it has none. */
+const sentence = (s: string): string => (/[.!?…]$/.test(s) ? s : `${s}.`)
+
+/** The desktop notification of an automatic start (in the background). */
+export function autoStartNotice(a: AutoStart): { title: string; body: string } {
+  if (a.error) return { title: `Couldn't start "${a.title}"`, body: `${sentence(a.error)} It keeps waiting.` }
+  const body = `${a.tasks} agent ${a.tasks === 1 ? 'task' : 'tasks'} started`
+  return { title: `Started "${a.title}"`, body: a.warning ? `${body}, but ${a.warning}` : body }
+}
+
+/** The data of "projects:review" (Go: ItemEvent): an item moved to review because all its agents finished. */
+export interface ItemEvent {
+  project: string
+  id: string
+  title: string
+}
+
+/** An event's data (untrusted) as an ItemEvent, or null. */
+export function coerceItemEvent(raw: unknown): ItemEvent | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const o = raw as Record<string, unknown>
+  if (typeof o.project !== 'string' || typeof o.id !== 'string') return null
+  return { project: o.project, id: o.id, title: typeof o.title === 'string' && o.title ? o.title : o.id }
+}
+
+/** What the user is told when an item is ready for review. */
+export const reviewText = (e: ItemEvent): string => `"${e.title}" is ready for review`
+
 /** The toast of an automatic start: started (with how many tasks), or why not (the item keeps waiting). */
 export function autoStartToast(a: AutoStart): { message: string; kind: 'info' | 'error' } {
-  if (a.error) return { message: `Couldn't start "${a.title}": ${a.error} It keeps waiting.`, kind: 'error' }
+  if (a.error) return { message: `Couldn't start "${a.title}": ${sentence(a.error)} It keeps waiting.`, kind: 'error' }
   const base = `Started ${a.title} (${a.tasks} agent ${a.tasks === 1 ? 'task' : 'tasks'})`
   return a.warning ? { message: `${base}, but ${a.warning}`, kind: 'error' } : { message: base, kind: 'info' }
 }
@@ -648,6 +676,13 @@ export function coerceCloneEvent(raw: unknown): CloneEvent | null {
     error: str(o.error),
     cancelled: o.cancelled === true,
   }
+}
+
+/** The desktop notification of a clone that ended (in the background); none for a cancelled one. */
+export function cloneNotice(ev: CloneEvent): { title: string; body: string } | null {
+  if (!ev.done || ev.cancelled) return null
+  if (ev.error) return { title: `Couldn't clone ${ev.repo}`, body: ev.error }
+  return { title: `Cloned ${ev.repo}`, body: ev.destination ? `Into ${ev.destination}` : 'The clone finished' }
 }
 
 /** The state after an event: a progress line updates the clone, the end clears it. */

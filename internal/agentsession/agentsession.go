@@ -13,6 +13,7 @@ const (
 	KindMessageChunk      = "message_chunk"      // assistant text (streamed)
 	KindThoughtChunk      = "thought_chunk"      // reasoning / thinking text
 	KindUserMessage       = "user_message"       // echo of what was sent (e.g. replayed history)
+	KindTurnStart         = "turn_start"         // a prompt turn began (Manager.Prompt, whoever sent it)
 	KindToolCall          = "tool_call"          // a tool call started
 	KindToolCallUpdate    = "tool_call_update"   // status/output/diff of an existing tool call
 	KindPlan              = "plan"               // the agent's current plan (full replacement)

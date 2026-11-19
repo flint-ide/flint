@@ -16,7 +16,7 @@ import { useAgentChat } from '../../store/agentChat'
 import { useAgentDefs } from '../../store/agentDefs'
 import { agentOption, DEFAULT_TIERS, MODEL_TIERS, type ModelTier } from '../../lib/agentDefs'
 import { AgentDefsSection } from './AgentDefsSection'
-import { isMac } from '../../lib/platform'
+import { NotificationsSection } from './NotificationsSection'
 
 // The agent CLIs Flint drives (Go: agent.known).
 const AGENTS = [
@@ -28,9 +28,6 @@ export function AgentsSection() {
   const available = useAgent((s) => s.available)
   const loaded = useAgent((s) => s.loaded)
   const defaultAgent = useSettings((s) => s.settings.defaultAgent)
-  const notify = useSettings((s) => s.settings.notifyInBackground)
-  const notifyApproval = useSettings((s) => s.settings.notifyOnApproval)
-  const update = useSettings((s) => s.update)
   const defined = useAgentDefs((s) => s.defined)
   useEffect(() => {
     if (!loaded) void useAgent.getState().load()
@@ -72,13 +69,7 @@ export function AgentsSection() {
       <TerminalAgentSection />
       <PromptsSection />
       <AgentReviewSection />
-      <h3>Notifications</h3>
-      <Row label="Tell me when work finishes in the background" hint={`${isMac() ? 'A macOS notification and a count on the Dock icon' : 'A desktop notification'} when a run, tests or an agent finish while Flint isn't the active app.`}>
-        <input type="checkbox" checked={notify} onChange={(e) => update({ notifyInBackground: e.target.checked })} />
-      </Row>
-      <Row label="Tell me when an agent waits for my approval" hint={`A notification naming the agent and what it asks for, and a count on the badge until you answer.${notify ? '' : ' Needs "Tell me when work finishes in the background", which is off.'}`}>
-        <input type="checkbox" checked={notifyApproval} onChange={(e) => update({ notifyOnApproval: e.target.checked })} />
-      </Row>
+      <NotificationsSection />
     </section>
   )
 }

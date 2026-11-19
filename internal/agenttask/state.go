@@ -96,21 +96,22 @@ func shorten(s string) string {
 // most is shown.
 var urgency = map[string]int{Waiting: 5, Working: 4, Failed: 3, Finished: 2, Idle: 1}
 
-// Combine is a task's state from its chats; with none, the state remembered
-// from before (finished, failed or interrupted), else idle.
+// Combine is a task's state from its chats; when none is open or every one
+// is idle, the state remembered from before (finished, failed or
+// interrupted), else idle. An idle chat has said nothing since the
+// remembered state was saved: a chat that opened but whose first message
+// failed, or one reopened after a restart. A turn the user starts makes it
+// working, and the saved state is replaced then (App.taskChanged); a
+// cancelled turn clears interrupted.
 func Combine(chats []Live, remembered string) Live {
 	best := Live{State: Idle}
-	if remembered == Finished || remembered == Failed || remembered == Interrupted {
-		best.State = remembered
-	}
-	if len(chats) == 0 {
-		return best
-	}
-	best = chats[0]
-	for _, l := range chats[1:] {
-		if urgency[l.State] > urgency[best.State] {
+	for i, l := range chats {
+		if i == 0 || urgency[l.State] > urgency[best.State] {
 			best = l
 		}
+	}
+	if best.State == Idle && (remembered == Finished || remembered == Failed || remembered == Interrupted) {
+		return Live{State: remembered}
 	}
 	return Live{State: best.State, Error: best.Error}
 }

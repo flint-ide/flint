@@ -10,11 +10,13 @@ import {
   stateHint,
   stateLabel,
   terminalAgentKey,
+  taskChatState,
   terminalBadge,
   type AgentChatInput,
   type TerminalAgentInput,
 } from './agentList'
-import type { ChatItem, ChatState } from './agentReducer'
+import { applyEvent, applyEvents, emptyChat, type ChatItem, type ChatState } from './agentReducer'
+import { settledToReveal } from './settledTabs'
 import type { TaskView } from './agentTasks'
 
 const chat = (items: ChatItem[], busy = false): ChatState => ({ items, plan: [], busy })
@@ -224,5 +226,62 @@ describe('hidden rows', () => {
   it('marks settled chats and keeps them listed', () => {
     const rows = agentRows({ sessions: [session('a'), session('b')], tasks: [], unseen: [], settled: ['b'] })
     assert.deepEqual(rows.map((r) => [r.sessionId, r.hidden]), [['a', false], ['b', true]])
+  })
+})
+
+describe('chats whose turn Go started', () => {
+  // A queued task, a project's Delegate or another agent sent the prompt: the
+  // chat's events open the turn (turn_start), nobody typed in the web view.
+  const goStarted = applyEvents(emptyChat, [
+    { sessionId: 's', kind: 'user_message', text: 'Fix it', origin: { sessionId: '', agent: 'Flint', role: 'task' } },
+    { sessionId: 's', kind: 'turn_start' },
+    { sessionId: 's', kind: 'permission_request', permission: { id: 'r1', toolCall: { id: 't', title: 'Run npm test' }, options: [] } },
+  ])
+
+  it('wait for the user when they ask', () => {
+    assert.equal(chatState(goStarted, false), 'waiting')
+    const rows = agentRows({ sessions: [session('go', { chat: goStarted })], tasks: [], unseen: [], settled: ['go'] })
+    assert.equal(rows[0].state, 'waiting')
+    // A settled tab comes back.
+    assert.deepEqual(settledToReveal(['go'], rows), ['go'])
+  })
+
+  it('finish unseen when their turn ends', () => {
+    const ended = applyEvent(goStarted, { sessionId: 's', kind: 'turn_end', stopReason: 'end_turn' })
+    assert.equal(chatState(ended, false), 'finished')
+    const rows = agentRows({ sessions: [session('go', { chat: ended })], tasks: [], unseen: ['go'], settled: ['go'] })
+    assert.equal(rows[0].state, 'finished-unseen')
+    assert.deepEqual(settledToReveal(['go'], rows), ['go'])
+  })
+
+  it("a task's chat that waits says so before the task list is read again", () => {
+    const t = task({ worktree: '/src/p.wt/b', state: 'working' })
+    const rows = agentRows({ sessions: [session('go', { cwd: '/src/p.wt/b', chat: goStarted })], tasks: [t], unseen: [], settled: ['go'] })
+    assert.equal(rows[0].kind, 'task')
+    assert.equal(rows[0].state, 'waiting')
+    assert.deepEqual(settledToReveal(['go'], rows), ['go'])
+  })
+})
+
+describe('taskChatState', () => {
+  const cases: [string, string, Parameters<typeof taskChatState>[1], boolean, string][] = [
+    ['the chat waits', 'working', 'waiting', false, 'waiting'],
+    ['the chat works on a finished task', 'finished', 'working', false, 'working'],
+    ['the chat ended, the list still says working', 'working', 'finished', true, 'finished-unseen'],
+    ['the chat failed, the list still says waiting', 'waiting', 'failed', false, 'failed'],
+    ['the list is newer than an idle chat', 'failed', 'idle', false, 'failed'],
+    ['a restored chat', 'finished', null, true, 'finished-unseen'],
+    ['a queued task', 'queued', null, false, 'queued'],
+  ]
+  for (const [name, t, c, unseen, want] of cases) it(name, () => assert.equal(taskChatState(t, c, unseen), want))
+})
+
+describe('a queued task that cannot start by itself', () => {
+  it('says why', () => {
+    const t = task({ state: 'queued', blocked: 'Paused by the budget: today\'s budget is spent' })
+    const rows = agentRows({ sessions: [], tasks: [t], unseen: [] })
+    assert.equal(rows[0].blocked, t.blocked)
+    assert.equal(stateHint('queued', 'task', rows[0].blocked), t.blocked)
+    assert.equal(stateHint('queued', 'task'), 'Waits for a working task to settle: its chat has not started')
   })
 })

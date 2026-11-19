@@ -207,6 +207,9 @@ func featureTask(v TaskView) feature.AgentTask {
 // the rest as known.
 func storedFeatureTask(a *App, task agenttask.Task) feature.AgentTask {
 	live := a.tasks.State(task.ID, task.State)
+	if live.State == agenttask.Failed && live.Error == "" {
+		live.Error = task.Error
+	}
 	return feature.AgentTask{
 		ID: task.ID, Title: task.Title, Agent: task.Agent, Branch: task.Branch, Base: task.Base,
 		Worktree: task.Worktree, State: live.State, Error: live.Error, PullRequest: task.PullRequest,

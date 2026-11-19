@@ -275,7 +275,7 @@ You can also let an agent do a few things the way you do them in Flint, so the r
 
 - **Claude Code** asks in the chat: a permission card with the tool and its arguments, with **Allow once** and **Reject** only. There is no "Always allow" for these tools, and the approval policy doesn't answer them, not even "Do everything".
 - **Codex and custom agents**, and Claude Code when its own settings already allow the tool, don't reliably ask in the chat. Flint then asks in a dialog of its own that shows the folder, the tool, what it would do (the command, the request's URL, the SQL) and its arguments.
-- If you don't answer within five minutes, nothing runs.
+- If you don't answer within five minutes, nothing runs. A dialog already on screen then stays until you close it (Flint can't close it for you), and answering it runs nothing; one still waiting behind another of Flint's dialogs by then is never shown.
 
 What the tools accept is narrow on purpose:
 
@@ -423,6 +423,8 @@ A task you start beyond the limit is **queued**. Its branch and worktree are cre
 
 The queue is saved with the tasks, so it survives a restart. After a restart nothing starts until the task's repository is open in a window and a slot is free. Flint never starts a queued task by itself in a folder that is in [Restricted Mode](restricted-mode.md); use **Start now** there. If you turned on **Pause new turns over budget** for a spent [budget](#budgets), queued tasks wait too, and **Start now** is refused, until you choose **Continue anyway** in a chat's budget warning or raise the budget. A [joint group](#joint-groups-one-agent-in-several-repositories) counts as one task. The limit counts the tasks of one window; a second Flint window counts its own.
 
+A queued task that can't start by itself says why under its row in Agent Tasks (and in the Agents panel's tooltip): its repository is not open in this window, its worktree is in Restricted Mode, or a budget pauses new turns. Without such a line it only waits for a free slot. When Flint starts a task's chat and the agent does not start (it was removed, it fails to launch, the budget refuses the first message), the task is marked **failed** with the reason, in Agent Tasks and in its project item, and you are told.
+
 ### Where tasks are kept
 
 Tasks are remembered per repository in `state.json`, so they survive a restart. If Flint quits (or crashes) while an agent is in the middle of a turn, the task shows as **interrupted**, not idle, and **Open** brings back the task's own conversation: the chat may look empty, but the agent remembers it and continues with your next message. **Ask agent** on an interrupted task asks it to check what is already done and carry on. A task of a [joint group](#joint-groups-one-agent-in-several-repositories) is stored with the group's id and a mark on the lead. A task whose worktree folder was deleted outside Flint shows as **stale** and can only be removed; removing it forgets only that worktree, not other missing ones (for example on a disk that isn't connected).
@@ -447,7 +449,7 @@ A chat in an [agent task](#agent-tasks-agents-in-parallel) counts for the task a
 
 ### Budgets
 
-In Settings ▸ Usage you can set a daily budget (in USD, tokens or both, for all chats of the day) and a budget per agent task (everything the task's chats used). When a turn reaches one, the chat shows a warning under its header and Flint tells you once: a short message when Flint is in front, a macOS notification when it isn't (if notifications are on). Each budget is reported once per day or per task; raising it arms it again.
+In Settings ▸ Usage you can set a daily budget (in USD, tokens or both, for all chats of the day) and a budget per agent task (everything the task's chats used). When a turn reaches one, the chat shows a warning under its header and Flint tells you once: a short message when Flint is in front, a desktop notification when it isn't (if notifications are on), and the message again when you are back. Each budget is reported once per day or per task; raising it arms it again.
 
 The warning never stops you typing. If you turn on **Pause new turns over budget**, a chat over budget doesn't send new messages and says why; **Continue anyway** in the warning lets that day (and that task) go on for another budget's worth, after which it pauses again. Raising a budget also starts it over. Token budgets count input and output but leave out input read from the prompt cache, which a long Claude Code chat re-reads on every call; turn on **Count cached input in token budgets** to include it.
 
@@ -455,7 +457,55 @@ Usage is kept for 90 days by default (Settings ▸ Usage ▸ Keep daily totals f
 
 ## Notifications
 
-When an agent turn finishes while Flint isn't the active app, you get a macOS notification (click it to jump to the chat) and a badge on the Dock icon. Turn this off in Settings ▸ Agents.
+Flint tells you when an agent needs you, whoever started it: a chat you wrote in, an [agent task](#agent-tasks-agents-in-parallel) that left the queue, a [project](projects.md) item Flint delegated, an agent another agent started, or an agent CLI in a terminal tab.
+
+![An agent waits for approval while another tab is in front: a count on the Agents button, "waiting" on the chat's tab and a notice with Show](../images/agent-waiting.png)
+
+### What notifies
+
+While Flint isn't the active app you get a desktop notification for:
+
+| Situation | Notification | Clicking it shows |
+| --- | --- | --- |
+| An agent chat asks for your approval | *claude is waiting for your approval* — the folder and what it asks to do | the chat |
+| An agent CLI in a terminal tab waits for you (it reported *waiting*) | *claude is waiting for you* — the folder | the terminal |
+| Flint asks you a question in a dialog (an agent's action, an agent that wants to direct others, a project's start, a clone, …) | *Flint needs your answer* — the question | Flint |
+| An agent's turn ends, or stops with an error | the chat's title — *The agent finished its turn* | the chat |
+| An agent CLI in a terminal finishes its turn | *claude finished its turn* — the folder | the terminal |
+| An agent task's chat could not start, or its agent failed before it began | *An agent task did not start* — why | the chat, if one opened |
+| Flint could not tell a chat what its agents did (the [turn limit](../reference/settings.md#orchestration) of agents directing agents, a budget pause) | why | the chat |
+| A run or test run ends, your pull request's CI fails or passes, a budget is reached | what happened | the tab |
+| A project starts a waiting item, can't start it, an item is ready for review, a clone ends | what happened | Flint |
+
+A request is announced once. One that arrives while you are in Flint and is still unanswered when you switch to another app is announced then. A question of Flint's that waits two minutes is announced even if Flint was in front when it appeared (on Linux, Flint can't tell that you left while a dialog is open). A dialog of Flint's counts as Flint: while one is open, Flint is in front, and answering it is not "coming back". Flint's questions stay open until you answer them, one at a time; one asked while another is open appears when that one is answered. An agent started by another agent asks for approval like any agent, but its turn ends are told to the agent that started it, not to you.
+
+A terminal tab notifies only while it runs an agent CLI Flint knows (`claude`, `codex`, `gemini`, `opencode`): the state comes from sequences in the terminal's output, which any program can print. It sends at most one *waiting* and one *finished* notification per tab a minute; a wait inside that minute still counts on the badge and shows the notice, a finish inside it is not counted. The tab's own mark follows every state, whatever runs in it.
+
+When an agent can't start for a task Flint starts from the queue (its program is missing, it fails before it begins), the task fails with the reason and you are told once. Flint then starts no other queued task of that agent by itself: they stay queued and say why. **Start now** on one tries again; changing the agents' settings, or a chat of that agent that works, lets the queue go on.
+
+The **badge** counts what still waits for you (requests, terminal agents that wait, and Flint's questions) plus finished work announced while you were away. Coming back to Flint clears the finished part; a request counts until you answer it. On macOS the badge is on the Dock icon; Linux has no Dock badge, and nothing shows that count there.
+
+### When Flint is in front
+
+- The **✦ Agents** button on the activity bar shows how many agents need you (waiting, failed, or finished while you were in another tab), whether the panel is open or not. That is a different number from the badge: it counts agents, including failed ones and turns that ended while you were in Flint but in another tab, and not Flint's own questions.
+- A chat tab whose agent waits for your approval reads **waiting**, like a terminal tab with an agent in it.
+- When the request is not in the tab you are looking at, a notice says *claude is waiting for your approval in my-app* with **Show**. It stays until you answer, show or close it; other messages don't replace it. From the keyboard, **Show Agent Waiting for You** in the command palette does what **Show** does.
+- A hidden ("Hide until needed") chat tab comes back when its agent needs you.
+
+### Settings
+
+In Settings ▸ Agents ▸ Notifications:
+
+- **Tell me when work finishes in the background** (`notifyInBackground`, on by default): the notifications for finished and failed work, and the badge. Off, nothing is sent and there is no badge; a budget warning is shown when you are back instead.
+- **Tell me when an agent waits for my approval** (`notifyOnApproval`, on by default): also notify for what waits for your answer (approval requests in chats, agent CLIs in terminals, Flint's questions) and count it on the badge. It needs the first setting.
+- **Desktop notifications** shows whether they can be delivered: *Allowed*, *Not allowed by the system* (with what to do), *Allowed, but the last one was not delivered* (with the error), or *Not available* (a build without an app bundle, no notification service, or the browser build). **Send Test Notification** sends one, and on macOS asks for the permission if you haven't decided yet. Flint checks the permission on every notification, so allowing Flint in System Settings takes effect without a restart.
+
+### Platform notes
+
+- **macOS** asks for permission the first time Flint notifies. A development build run outside its app bundle can't notify.
+- **Linux** uses the desktop's notification service (`org.freedesktop.Notifications` over D-Bus). There is no Dock badge. In Flint, the count on the Agents button shows the agents that need you (not Flint's questions, which are dialogs on screen).
+
+Notification text is one short line; Flint masks secrets in it before it reaches the system, because notifications show on the lock screen.
 
 ## Agents in Restricted Mode
 

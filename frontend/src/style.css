@@ -460,6 +460,27 @@ kbd {
   color: var(--fg);
   background: var(--bg-hover);
 }
+.activity {
+  position: relative;
+}
+/* A panel's count (PanelSpec.useBadge): the agents that need you. */
+.activity-badge {
+  position: absolute;
+  top: 2px;
+  right: 1px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  text-align: center;
+  pointer-events: none;
+}
 
 .sidebar {
   flex: none;
@@ -1902,11 +1923,23 @@ button.small {
   align-items: center;
 }
 
-.toast {
+/* Toasts stack in the bottom right corner, above the status bar: an agent's
+   request (it stays until answered, shown or closed) under the passing toast. */
+.toast-stack {
   position: fixed;
-  /* Bottom right corner, above the status bar. */
   bottom: 34px;
   right: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  z-index: 60;
+  pointer-events: none;
+}
+.toast-stack > * {
+  pointer-events: auto;
+}
+.toast {
   max-width: min(460px, calc(100vw - 28px));
   max-height: 40vh;
   overflow-y: auto;
@@ -1917,13 +1950,30 @@ button.small {
   background: var(--bg-raised);
   border: 1px solid var(--border);
   box-shadow: 0 10px 30px var(--shadow);
-  z-index: 60;
   user-select: text;
   -webkit-user-select: text;
 }
 .toast.error {
   border-color: var(--danger);
   color: var(--danger);
+}
+.notify-status.denied,
+.notify-status.unavailable,
+.notify-status.failed {
+  color: var(--warn);
+}
+.notify-status.allowed {
+  color: var(--ok);
+}
+
+.toast.attention {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-color: var(--warn);
+}
+.toast.attention .spacer {
+  flex: 1;
 }
 
 /* ---------- git ---------- */

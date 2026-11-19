@@ -7,6 +7,7 @@ import { terminalTitle } from '../lib/terminalTitle'
 import { machineLabel, remoteTabTitle, remoteTermId, splitRemoteTermId } from '../lib/machines'
 import { useSettings } from './settings'
 import type { TerminalAgentState } from '../lib/agentList'
+import { tabClosed, terminalAgentChanged } from './alerts'
 
 export interface TerminalTab {
   id: string
@@ -106,6 +107,7 @@ export const useTerminal = createStore<TerminalState>((set, get) => ({
     selections.delete(id)
     set((s) => ({ tabs: s.tabs.filter((t) => t.id !== id) }))
     useEditor.getState().closeTab(terminalTabId(id))
+    tabClosed(terminalTabId(id))
   },
 }))
 
@@ -320,12 +322,14 @@ export function subscribeTerminalEvents(): void {
   })
   EventsOn('term:agent', (msg: { id: string; state: TerminalAgentState }) => {
     if (closed.has(msg.id)) return
-    useTerminal.setState((s) => {
-      const tab = s.tabs.find((t) => t.id === msg.id)
-      return !tab || tab.agentState === msg.state ? {} : { tabs: s.tabs.map((t) => (t.id === msg.id ? { ...t, agentState: msg.state } : t)) }
-    })
+    const tab = useTerminal.getState().tabs.find((t) => t.id === msg.id)
+    if (!tab || tab.agentState === msg.state) return
+    useTerminal.setState((s) => ({ tabs: s.tabs.map((t) => (t.id === msg.id ? { ...t, agentState: msg.state } : t)) }))
+    // Waiting or done tells the user like a chat does (a notification in the background, the badge).
+    terminalAgentChanged({ tab: terminalTabId(tab.id), cwd: tab.cwd, command: tab.command }, tab.agentState, msg.state)
   })
   EventsOn('term:exit', (msg: { id: string; code: number }) => {
+    tabClosed(terminalTabId(msg.id)) // an agent that waited there waits no more
     if (closed.has(msg.id)) return forgetClosedLater(msg.id)
     useTerminal.setState((s) => ({
       tabs: s.tabs.map((t) => (t.id === msg.id ? { ...t, exitCode: msg.code, agentState: undefined } : t)),

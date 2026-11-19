@@ -4,8 +4,10 @@ import (
 	"context"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"flint/internal/features/extensions"
 )
@@ -37,6 +39,35 @@ func (a *App) emit(name string, data ...any) {
 		return
 	}
 	a.wails.Event.Emit(name, data...)
+}
+
+// followForeground tells attention whether Flint is in front: the main
+// window's focus everywhere, and on macOS whether the app is the active one
+// (a question shown as a sheet takes the window's focus, not the app's).
+// Wails runs each listener in a goroutine of its own, so two events can be
+// handled in the reverse order they happened: a listener does not trust its
+// event but asks the window (IsFocused runs on the main thread and waits for
+// it, which is safe from these goroutines), one listener at a time. The app's
+// activation can't be asked; a focused window proves it, whatever the event
+// says. The state is read once more after the window is shown
+// (refreshForeground). The server build's window never sends these events:
+// it counts as in front.
+func (a *App) followForeground(app *application.App, win *application.WebviewWindow) {
+	var mu sync.Mutex
+	a.refreshForeground = func(active *bool) {
+		mu.Lock()
+		defer mu.Unlock()
+		focused := win.IsFocused()
+		a.attn.setFocused(focused)
+		if active != nil {
+			a.attn.setActive(*active || focused)
+		}
+	}
+	yes, no := true, false
+	win.OnWindowEvent(events.Common.WindowFocus, func(*application.WindowEvent) { a.refreshForeground(nil) })
+	win.OnWindowEvent(events.Common.WindowLostFocus, func(*application.WindowEvent) { a.refreshForeground(nil) })
+	app.Event.OnApplicationEvent(events.Mac.ApplicationDidBecomeActive, func(*application.ApplicationEvent) { a.refreshForeground(&yes) })
+	app.Event.OnApplicationEvent(events.Mac.ApplicationDidResignActive, func(*application.ApplicationEvent) { a.refreshForeground(&no) })
 }
 
 func (a *App) setWindowTitle(title string) {

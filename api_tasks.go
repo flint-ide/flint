@@ -84,6 +84,10 @@ type TaskView struct {
 	// of the task is open.
 	Session string `json:"session"`
 	Engine  string `json:"engine"`
+	// Blocked says why a queued task does not start by itself (its
+	// repository is not open, its worktree is in Restricted Mode, a budget
+	// pauses new turns); "" when it only waits for a free slot.
+	Blocked string `json:"blocked"`
 	// Tokens and CostUSD are what the task's chats used so far (input and
 	// output tokens; reported cost plus estimates from settings prices).
 	Tokens  int64   `json:"tokens"`
@@ -176,6 +180,7 @@ func (t *TaskAPI) ListAll(dirs []string) ([]TaskView, error) {
 	defer cancel()
 	out := []TaskView{}
 	seen := map[string]bool{}
+	var open map[string]bool // openRepos, read once when a task is queued
 	for _, dir := range dirs {
 		if dir == "" {
 			continue
@@ -196,6 +201,12 @@ func (t *TaskAPI) ListAll(dirs []string) ([]TaskView, error) {
 			v := t.view(ctx, r, task)
 			if v.Stale {
 				t.app.untrustTask(task)
+			}
+			if v.State == agenttask.Queued {
+				if open == nil {
+					open = t.app.openRepos(ctx)
+				}
+				v.Blocked = t.app.queueBlocked(key, task, open)
 			}
 			out = append(out, v)
 		}
@@ -673,9 +684,31 @@ func (t *TaskAPI) CreatePullRequest(id string) (string, error) {
 }
 
 // askUser asks in a native dialog (a.ask in tests), one dialog at a time.
+// It waits until the user answers, however long that takes (or Flint quits:
+// false); the question is announced while it is on screen
+// (attention.shown).
 func (a *App) askUser(title, message, ok string) bool {
+	yes, _ := a.askUserCtx(context.Background(), title, message, ok)
+	return yes
+}
+
+// askUserCtx is askUser for an asker that gives up when ctx ends (an MCP
+// tool call has a deadline). A question still waiting behind another one
+// when ctx ends is never shown (shown is false). One already on screen
+// can't be taken back: it stays until answered, and the asker, which no
+// longer listens, ignores the answer.
+func (a *App) askUserCtx(ctx context.Context, title, message, ok string) (yes, shown bool) {
 	a.confirmMu.Lock()
 	defer a.confirmMu.Unlock()
+	if ctx.Err() != nil {
+		return false, false
+	}
+	return a.askNow(title, message, ok), true
+}
+
+// askNow shows the question now, for callers that serialize it themselves.
+func (a *App) askNow(title, message, ok string) bool {
+	defer a.attn.shown(title)()
 	if a.ask != nil {
 		return a.ask(title, message, ok)
 	}
@@ -687,6 +720,7 @@ func (a *App) askUser(title, message, ok string) bool {
 func (a *App) chooseUser(title, message string, buttons []string) string {
 	a.confirmMu.Lock()
 	defer a.confirmMu.Unlock()
+	defer a.attn.shown(title)()
 	if a.ask != nil {
 		return ""
 	}

@@ -546,3 +546,40 @@ func TestWaitingStartFollowsFlintsStatusRewrite(t *testing.T) {
 		t.Fatalf("requests %+v, events %+v", reqs, f.autoStarts())
 	}
 }
+
+// The question of an automatic start stays open until answered. Flint
+// quitting while it is open is not a refusal: nothing is recorded, and the
+// next launch asks again through the normal start; a No there is final until
+// something changes, however often the starter looks.
+func TestQuitWhileAskedIsNotADecline(t *testing.T) {
+	f := newFixture(t, nil)
+	f.open()
+	other := newProject(t, filepath.Join(f.base, "other"), map[string]string{"dep": item("Dependency", "done", "repos: api"), "w": item("Waiter", "todo", "repos: api", "after: dep")})
+	if _, err := f.api.Open(other); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.api.StartWhenReady(other, "w", ""); err != nil {
+		t.Fatal(err)
+	}
+	ctx, quit := context.WithCancel(t.Context())
+	f.h.Answer = false
+	f.h.OnConfirm = quit // Flint quits while the question is open (Confirm says no then)
+	f.api.startReady(ctx)
+	f.h.OnConfirm = nil
+	var w waits
+	_ = f.h.LoadState(stateWaiting, &w)
+	if cur, ok := w[other]["w"]; !ok || cur.Reason != "" || cur.Tried != "" || len(f.autoStarts()) != 0 {
+		t.Fatalf("quitting recorded %+v, events %+v", cur, f.autoStarts())
+	}
+	// The next launch asks again; No is final from here on.
+	for range 4 {
+		f.startReady()
+	}
+	if len(f.h.Asked()) != 2 {
+		t.Fatalf("asked %d times, want 2 (before the quit and once after)", len(f.h.Asked()))
+	}
+	_ = f.h.LoadState(stateWaiting, &w)
+	if !strings.Contains(w[other]["w"].Reason, "declined") || len(f.h.Requested()) != 0 {
+		t.Fatalf("waiting %+v", w[other]["w"])
+	}
+}

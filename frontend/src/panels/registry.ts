@@ -40,6 +40,11 @@ export interface PanelSpec<Id extends string = string> {
   command?: PanelCommand | false
   /** Availability: false hides the activity bar button and the command. Read stores with getState(). */
   when?: () => boolean
+  /**
+   * A count shown on the activity bar button (0: none), such as the agents that need you: a React hook,
+   * called while the button is drawn, so it re-renders when its stores change.
+   */
+  useBadge?: () => number
 }
 
 /** The panel shown when the stored id is unknown (a removed or renamed panel). */

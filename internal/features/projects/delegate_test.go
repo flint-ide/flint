@@ -212,9 +212,25 @@ func TestStatusFollowsTasks(t *testing.T) {
 	if got := status(); got != StatusDoing {
 		t.Fatalf("one of two finished: %s", got)
 	}
+	reviews := func() []ItemEvent {
+		var out []ItemEvent
+		for _, e := range f.h.Events() {
+			if e.Name == EventReview {
+				out = append(out, e.Data[0].(ItemEvent))
+			}
+		}
+		return out
+	}
+	if len(reviews()) != 0 {
+		t.Fatal("ready for review before every task finished")
+	}
 	f.h.UpdateAgentTask(w, func(t *feature.AgentTask) { t.State = "finished" })
 	if got := status(); got != StatusReview {
 		t.Fatalf("both finished: %s", got)
+	}
+	// The UI tells the user once: the item is ready for review.
+	if got := reviews(); len(got) != 1 || got[0] != (ItemEvent{Project: f.plan, ID: "x", Title: "X"}) {
+		t.Fatalf("review events %+v", got)
 	}
 	if got := f.read("x"); got != "---\ntitle: X\r\nrepos: api, web\r\nstatus: review\r\n---\r\nText\r\n" {
 		t.Errorf("file %q", got)

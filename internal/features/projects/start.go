@@ -201,13 +201,15 @@ func (a *API) startReady(ctx context.Context) {
 			if entry.Reason != "" && entry.Tried == fp {
 				continue // failed before, and nothing it depends on changed
 			}
-			a.autoStart(folder, it, entry, fp)
+			a.autoStart(ctx, folder, it, entry, fp)
 		}
 	}
 }
 
-// autoStart delegates a waiting item and records how it went.
-func (a *API) autoStart(folder string, it Item, entry Waiting, fp string) {
+// autoStart delegates a waiting item and records how it went. A start that
+// ends because Flint quits (its confirmation was open) records nothing: the
+// item keeps waiting and is tried again on the next launch.
+func (a *API) autoStart(ctx context.Context, folder string, it Item, entry Waiting, fp string) {
 	still := func() bool {
 		cur, ok := a.waiting()[folder][it.ID]
 		return ok && cur.Since.Equal(entry.Since)
@@ -218,6 +220,8 @@ func (a *API) autoStart(folder string, it Item, entry Waiting, fp string) {
 		return // a click is starting it, or the start was cancelled
 	case err == nil && res.NotReady:
 		return // a dependency moved back meanwhile
+	case err != nil && ctx.Err() != nil:
+		return // Flint quits: not a refusal
 	}
 	ev := AutoStart{Project: folder, ID: it.ID, Title: it.Title}
 	if err != nil {

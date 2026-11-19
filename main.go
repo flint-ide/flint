@@ -131,6 +131,7 @@ func main() {
 		flint.emit(eventFilesDropped, droppedPaths(e.Context().DroppedFiles()))
 	})
 	flint.window = win
+	flint.followForeground(app, win)
 	// Show the window as soon as the app has launched, then import the
 	// login-shell PATH (git hooks, rg, brew) in the background: the login shell
 	// runs the user's startup files, and while it ran during launch the window
@@ -139,6 +140,7 @@ func main() {
 	// platform-specific (window_darwin.go, window_other.go).
 	flint.onLaunched(app, win, func() {
 		flint.showWindowEarly()
+		flint.refreshForeground(nil) // shown: in front only if it has the focus
 		shellenv.Load()
 	})
 

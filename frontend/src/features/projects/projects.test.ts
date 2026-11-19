@@ -4,7 +4,11 @@ import {
   agentText,
   allReposResolve,
   applyCloneEvent,
+  autoStartNotice,
   autoStartToast,
+  cloneNotice,
+  coerceItemEvent,
+  reviewText,
   boardProblem,
   canClone,
   canClose,
@@ -386,7 +390,7 @@ describe('automatic starts', () => {
     const ok = coerceAutoStart({ project: '/b', id: 'a', title: 'Build', tasks: 2, error: '', warning: '' })
     assert.deepEqual(autoStartToast(ok!), { message: 'Started Build (2 agent tasks)', kind: 'info' })
     assert.equal(autoStartToast({ ...ok!, tasks: 1 }).message, 'Started Build (1 agent task)')
-    assert.deepEqual(autoStartToast({ ...ok!, tasks: 0, error: 'api has no checkout' }), { message: 'Couldn\'t start "Build": api has no checkout It keeps waiting.', kind: 'error' })
+    assert.deepEqual(autoStartToast({ ...ok!, tasks: 0, error: 'api has no checkout' }), { message: 'Couldn\'t start "Build": api has no checkout. It keeps waiting.', kind: 'error' })
     assert.equal(autoStartToast({ ...ok!, warning: 'the status could not be written' }).kind, 'error')
     assert.equal(coerceAutoStart({ project: '/b', id: 'a' })?.title, 'a')
     for (const bad of [null, 'x', {}, { project: 1, id: 'a' }]) assert.equal(coerceAutoStart(bad), null)
@@ -448,5 +452,28 @@ describe('planning with an agent', () => {
     assert.equal(pickPlanAgent(['claude', 'codex'], 'gone', 'codex'), 'codex')
     assert.equal(pickPlanAgent(['claude', 'codex'], '', ''), 'claude')
     assert.equal(pickPlanAgent([], 'claude', 'claude'), '')
+  })
+})
+
+describe('project notifications', () => {
+  it('tell how an automatic start went', () => {
+    const a = { project: '/p', id: 'w', title: 'Waiter', tasks: 2, error: '', warning: '' }
+    assert.deepEqual(autoStartNotice(a), { title: 'Started "Waiter"', body: '2 agent tasks started' })
+    const declined = "the start was declined in Flint's confirmation (the project's folder is in Restricted Mode): Delegate it by hand, or cancel the start"
+    assert.deepEqual(autoStartNotice({ ...a, tasks: 0, error: declined }), { title: 'Couldn\'t start "Waiter"', body: `${declined}. It keeps waiting.` })
+  })
+  it('say when an item is ready for review', () => {
+    const e = coerceItemEvent({ project: '/p', id: 'x', title: 'Add login' })
+    assert.ok(e)
+    assert.equal(reviewText(e), '"Add login" is ready for review')
+    assert.equal(coerceItemEvent({ project: 1 }), null)
+    assert.equal(coerceItemEvent({ project: '/p', id: 'x' })?.title, 'x')
+  })
+  it('tell how a clone ended, but not a cancelled one', () => {
+    const ev = { project: '/p', repo: 'api', destination: '/w/api', progress: '', done: true, error: '', cancelled: false }
+    assert.deepEqual(cloneNotice(ev), { title: 'Cloned api', body: 'Into /w/api' })
+    assert.deepEqual(cloneNotice({ ...ev, error: 'exit status 128' }), { title: "Couldn't clone api", body: 'exit status 128' })
+    assert.equal(cloneNotice({ ...ev, cancelled: true }), null)
+    assert.equal(cloneNotice({ ...ev, done: false }), null)
   })
 })

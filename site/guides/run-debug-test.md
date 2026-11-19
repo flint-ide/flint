@@ -150,7 +150,7 @@ The profile tab shows CPU and memory (allocated space by default; you can switch
 
 ## Notifications
 
-When a run or test run finishes while Flint isn't the active app, you get a macOS notification and a badge on the Dock icon. Turn this off in Settings ▸ Agents.
+When a run or test run finishes while Flint isn't the active app, you get a desktop notification and a count on the badge (the Dock icon on macOS). Turn this off in Settings ▸ Agents ▸ Notifications.
 
 ## Related
 

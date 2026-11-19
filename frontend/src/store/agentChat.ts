@@ -22,7 +22,8 @@ import type { SavedChat } from '../lib/sessionSnapshot'
 import { useEditor } from './editor'
 import { loadAgentDefs } from './agentDefs'
 import { savedEngine } from '../lib/agentDefs'
-import { alertApproval, alertDone, approvalSettled, approvalsEnded } from './alerts'
+import { chatSignalled, setChatNoter, tabClosed } from './alerts'
+import { createChatAnnouncer } from '../lib/chatAnnouncer'
 
 export interface ChatSession {
   id: string
@@ -37,6 +38,8 @@ export interface ChatSession {
   attachments: Attachment[]
   /** Restored after a restart: the agent is reconnected on the next message. */
   dormant?: boolean
+  /** The chat whose agent started this one (start_agent); its turn ends are told to that parent, not to the user. */
+  parent?: string
 }
 
 interface AgentChatState {
@@ -53,7 +56,7 @@ interface AgentChatState {
    * start_agent) and its tab. Ids it already has are ignored. With
    * `background` the tab opens without taking focus.
    */
-  adopt: (info: agentsession.SessionInfo, opts?: { background?: boolean }) => void
+  adopt: (info: agentsession.SessionInfo, opts?: { background?: boolean; parent?: string }) => void
   send: (id: string) => Promise<void>
   cancel: (id: string) => void
   respond: (id: string, requestId: string, optionId: string, optionName: string) => Promise<void>
@@ -125,6 +128,7 @@ export const useAgentChat = createStore<AgentChatState>((set, get) => ({
     if (get().sessions[chatLocalId(info.id)]) return
     const session: ChatSession = {
       id: info.id, agent: info.agent, engine: info.engine, cwd: info.cwd, model: info.model, chat: emptyChat, draft: '', attachments: [],
+      ...(opts?.parent ? { parent: opts.parent } : {}),
     }
     set((s) => ({ sessions: { ...s.sessions, [info.id]: session }, order: [...s.order, info.id] }))
     useEditor.getState().openChat(info.id, session.agent, opts?.background)
@@ -164,6 +168,8 @@ export const useAgentChat = createStore<AgentChatState>((set, get) => ({
     useEditor.getState().closeTab(chatTabId(id))
     if (!get().sessions[id]?.dormant) await Chat.Stop(remoteId(id)).catch(() => undefined)
     deliverAgent?.forget(remoteId(id))
+    announcer.forget(id)
+    tabClosed(chatTabId(id))
     localIds.delete(remoteId(id))
     remoteIds.delete(id)
     set((s) => {
@@ -250,26 +256,33 @@ let pendingFlush: { frame: number; timer: ReturnType<typeof setTimeout> } | null
 
 function enqueue(id: string, e: AgentEvent): void {
   if (adopting.offer(id, e)) return
-  announceApproval(id, e)
-  if (e.kind === 'turn_end' && e.stopReason !== 'cancelled') {
-    const tab = `chat:${id}`
-    const title = useEditor.getState().tabs.find((t) => t.id === tab)?.title ?? 'Agent'
-    alertDone(title, e.stopReason === 'error' ? 'The agent stopped with an error' : 'The agent finished its turn', tab)
-  }
+  announce(id, e)
   const q = queued.get(id)
   if (q) q.push(e)
   else queued.set(id, [e])
   pendingFlush ??= { frame: requestAnimationFrame(flushEvents), timer: setTimeout(flushEvents, FLUSH_FALLBACK_MS) }
 }
 
-/** Keeps the background alerts for permission requests in step with the agent's events. */
-function announceApproval(id: string, e: AgentEvent): void {
-  const session = useAgentChat.getState().sessions[id]
-  if (e.kind === 'permission_request' && e.permission) {
-    // Only a turn the user started asks: a resumed chat replaying its history does not.
-    if (session?.chat.busy) alertApproval(id, session.agent, session.cwd, e.permission)
-  } else if (e.kind === 'permission_settled' && e.requestId) approvalSettled(id, e.requestId)
-  else if (e.kind === 'turn_end') approvalsEnded(id)
+/** Which chats are in a turn, and what their events mean for the user. */
+const announcer = createChatAnnouncer()
+
+/** Tells the attention model what an event of a chat means for the user (lib/chatAnnouncer.ts). */
+function announce(id: string, e: AgentEvent): void {
+  const signals = announcer.event(id, e, () => {
+    const session = useAgentChat.getState().sessions[id]
+    if (!session) return null
+    const tab = chatTabId(id)
+    const title = useEditor.getState().tabs.find((t) => t.id === tab)?.title ?? session.agent
+    return { agent: session.agent, cwd: session.cwd, title, parent: session.parent }
+  })
+  if (signals.length) chatSignalled(signals)
+}
+
+/** Shows a line of Flint's in a chat (a notice that did not arrive, a first message that failed): only in the window. */
+function noteInChat(tab: string, text: string): void {
+  if (!tab.startsWith('chat:')) return
+  const id = chatLocalId(tab.slice('chat:'.length))
+  update(id, (cs) => ({ ...cs, chat: applyEvent(cs.chat, { sessionId: id, kind: 'error', text }) }))
 }
 
 /** Applies every queued event in one store update. */
@@ -325,15 +338,16 @@ const adopting = createEventHold<AgentEvent>(2000)
  */
 async function chatOpened(e: ChatOpened): Promise<void> {
   const open = showTaskFolder
+  const opts = { background: e.background, parent: e.parent }
   if (!e.taskId || !open || useAgentChat.getState().sessions[chatLocalId(e.info.id)]) {
-    useAgentChat.getState().adopt(e.info, { background: e.background })
+    useAgentChat.getState().adopt(e.info, opts)
     return
   }
   adopting.begin(e.info.id)
   try {
     await open(e.info.cwd).catch(() => false) // a folder that cannot be shown must not lose the chat
   } finally {
-    useAgentChat.getState().adopt(e.info, { background: e.background })
+    useAgentChat.getState().adopt(e.info, opts)
     for (const ev of adopting.end(e.info.id)) enqueue(chatLocalId(e.info.id), ev)
   }
 }
@@ -342,6 +356,7 @@ let subscribed = false
 export function subscribeAgentChatEvents(): void {
   if (subscribed) return
   subscribed = true
+  setChatNoter(noteInChat)
   const deliver = createReorderer<AgentEvent>((id, e) => enqueue(localId(id), e))
   deliverAgent = deliver
   EventsOn('agent:event', (e: AgentEvent) => deliver(e.sessionId, e))

@@ -2,6 +2,8 @@
 // Go). Pure helpers for the Tasks panel and the settings, testable with node:test.
 import { isWithin } from './fileTree'
 import { formatCost, formatTokens } from './usage'
+import { emptyChat } from './agentReducer'
+import type { SavedChat } from './sessionSnapshot'
 
 /** Mirrors Go's TaskView. */
 export interface TaskView {
@@ -33,6 +35,12 @@ export interface TaskView {
    * message Flint composes with the project's context): the window starts none for it.
    */
   flintStarts: boolean
+  /**
+   * The agent's id of the task's latest chat ('' before the first) and the program it ran on:
+   * Open resumes that conversation when no chat of the task is open (after a restart).
+   */
+  session: string
+  engine: string
   /** What the task's chats used so far. */
   tokens: number
   costUsd: number
@@ -47,7 +55,7 @@ export interface ChangeCounts {
   deleted: number
 }
 
-export type TaskState = 'queued' | 'idle' | 'working' | 'waiting' | 'finished' | 'failed'
+export type TaskState = 'queued' | 'idle' | 'working' | 'waiting' | 'finished' | 'failed' | 'interrupted'
 
 const STATES: Record<TaskState, { label: string; hint: string }> = {
   queued: { label: 'queued', hint: 'Waits for a working task to settle: its chat has not started and nothing was sent' },
@@ -56,6 +64,10 @@ const STATES: Record<TaskState, { label: string; hint: string }> = {
   waiting: { label: 'waiting for you', hint: 'The agent asks for your approval in its chat' },
   finished: { label: 'finished', hint: 'The agent finished its turn: review the changes' },
   failed: { label: 'failed', hint: 'The agent stopped with an error' },
+  interrupted: {
+    label: 'interrupted',
+    hint: "The agent's turn was cut off before it ended (Flint quit or the chat closed): Open resumes the conversation",
+  },
 }
 
 export function stateInfo(state: string): { state: TaskState; label: string; hint: string } {
@@ -95,7 +107,7 @@ export function taskActions(t: TaskView): TaskActions {
     merge: hasWork,
     pr: hasWork && !t.pullRequest,
     remove: true,
-    askAgent: live && t.state === 'failed',
+    askAgent: live && (t.state === 'failed' || t.state === 'interrupted'),
     startNow: live && queued,
   }
 }
@@ -234,7 +246,7 @@ export function attemptLabels(tasks: TaskView[]): Record<string, string> {
 
 /** "2 working · 1 queued · 1 finished" for a group's header. */
 export function groupSummary(tasks: TaskView[]): string {
-  const order: string[] = ['working', 'waiting', 'queued', 'finished', 'failed', 'idle', 'stale']
+  const order: string[] = ['working', 'waiting', 'queued', 'finished', 'failed', 'interrupted', 'idle', 'stale']
   const counts = new Map<string, number>()
   for (const t of tasks) {
     const key = t.stale ? 'stale' : stateInfo(t.state).state
@@ -272,8 +284,20 @@ export function removeOthersQuestion(kept: TaskView, others: TaskView[]): string
 
 /** The message a failed task's chat gets (in the draft, for the user to review). */
 export function failurePrompt(t: TaskView): string {
+  if (t.state === 'interrupted') {
+    return `You were working on this task: "${t.title}". Your last turn was cut off before it ended (Flint quit or the chat closed). Check what is already done in the worktree, then continue the task.`
+  }
   const why = t.error ? `It stopped with this error:\n\n${t.error}\n\n` : 'It stopped with an error. '
   return `You were working on this task: "${t.title}". ${why}Find out what went wrong, fix it if you can, and continue the task.`
+}
+
+/**
+ * The task's remembered conversation as a chat to reopen (dormant: the agent resumes it with the
+ * next message), or null before the task had a chat. Its messages are the agent's to remember.
+ */
+export function resumableChat(t: TaskView): SavedChat | null {
+  if (!t.session) return null
+  return { id: t.session, agent: t.agent, engine: t.engine || undefined, cwd: t.worktree, chat: emptyChat, draft: '' }
 }
 
 /** Ids of the tasks whose worktree contains one of the changed paths. */

@@ -1909,6 +1909,14 @@ export class TaskView {
     "flintStarts": boolean;
 
     /**
+     * Session is the agent's id of the task's latest chat ("" before the
+     * first), and Engine the program it ran on: Open resumes it when no chat
+     * of the task is open.
+     */
+    "session": string;
+    "engine": string;
+
+    /**
      * Blocked says why a queued task does not start by itself (its
      * repository is not open, its worktree is in Restricted Mode, a budget
      * pauses new turns); "" when it only waits for a free slot.
@@ -1980,6 +1988,12 @@ export class TaskView {
         }
         if (!("flintStarts" in $$source)) {
             this["flintStarts"] = false;
+        }
+        if (!("session" in $$source)) {
+            this["session"] = "";
+        }
+        if (!("engine" in $$source)) {
+            this["engine"] = "";
         }
         if (!("blocked" in $$source)) {
             this["blocked"] = "";

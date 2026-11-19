@@ -102,6 +102,29 @@ func TestCombine(t *testing.T) {
 	if got.State != Failed || got.Error != "boom" {
 		t.Errorf("failed wins over finished: %+v", got)
 	}
+	if got := Combine(nil, Interrupted); got.State != Interrupted {
+		t.Errorf("no chats, a turn was running when they went: %s", got.State)
+	}
+	if got := Combine([]Live{{State: Idle}}, Interrupted); got.State != Interrupted {
+		t.Errorf("an idle chat has said nothing since the turn was cut off: %s", got.State)
+	}
+	if got := Combine([]Live{{State: Working, Turn: true}}, Interrupted); got.State != Working {
+		t.Errorf("a new turn shows working: %s", got.State)
+	}
+}
+
+func TestSettled(t *testing.T) {
+	for state, want := range map[string]string{
+		Finished: Finished,
+		Failed:   Failed,
+		Working:  Interrupted, // a turn does not survive a restart: remembered as cut off
+		Waiting:  Interrupted,
+		Idle:     "",
+	} {
+		if got := Settled(state); got != want {
+			t.Errorf("Settled(%s) = %q, want %q", state, got, want)
+		}
+	}
 }
 
 // A task whose chat opened but whose first message failed shows the failure

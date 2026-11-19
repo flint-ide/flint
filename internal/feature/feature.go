@@ -218,7 +218,8 @@ type AgentTask struct {
 	ID, Title, Agent, Branch, Base string
 	// Worktree is the task's folder.
 	Worktree string
-	// State: queued, idle, working, waiting, finished or failed.
+	// State: queued, idle, working, waiting, finished, failed or interrupted
+	// (a turn cut off before it ended, e.g. by quitting Flint).
 	State, Error string
 	// PullRequest is the URL of the pull request Flint created for it.
 	PullRequest string

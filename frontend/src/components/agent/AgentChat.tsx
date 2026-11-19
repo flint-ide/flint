@@ -79,7 +79,12 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40
         }}
       >
-        {chat.items.length === 0 && (
+        {chat.items.length === 0 && session.dormant && (
+          <div className="placeholder muted">
+            An earlier conversation with {session.agent} in {root.split('/').pop()}: its messages are not shown here, but {session.agent} remembers them and picks the conversation up with your next message.
+          </div>
+        )}
+        {chat.items.length === 0 && !session.dormant && (
           <div className="placeholder muted">
             Ask {session.agent} anything about {root.split('/').pop()}. Edits are applied directly; review them in the Commit panel ({formatKeys('Mod+K')}).
           </div>

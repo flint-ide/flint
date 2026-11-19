@@ -15,6 +15,10 @@ const (
 	// Queued is shown for a task that waits for a free slot (queue.go); it
 	// is never a chat's state.
 	Queued = "queued"
+	// Interrupted is remembered while a turn runs and shown when no chat of
+	// the task is open: the turn was cut off (Flint quit or crashed, the
+	// chat closed) before it ended. Never a chat's state.
+	Interrupted = "interrupted"
 )
 
 // Busy reports a state that holds a slot of the queue: a turn is running.
@@ -93,11 +97,12 @@ func shorten(s string) string {
 var urgency = map[string]int{Waiting: 5, Working: 4, Failed: 3, Finished: 2, Idle: 1}
 
 // Combine is a task's state from its chats; when none is open or every one
-// is idle, the state remembered from before (finished or failed), else idle.
-// An idle chat has said nothing since the remembered state was saved: a chat
-// that opened but whose first message failed, or one reopened after a
-// restart. A turn the user starts makes it working, and the saved state is
-// cleared then (App.taskChanged), so it is not shown again.
+// is idle, the state remembered from before (finished, failed or
+// interrupted), else idle. An idle chat has said nothing since the
+// remembered state was saved: a chat that opened but whose first message
+// failed, or one reopened after a restart. A turn the user starts makes it
+// working, and the saved state is replaced then (App.taskChanged); a
+// cancelled turn clears interrupted.
 func Combine(chats []Live, remembered string) Live {
 	best := Live{State: Idle}
 	for i, l := range chats {
@@ -105,17 +110,22 @@ func Combine(chats []Live, remembered string) Live {
 			best = l
 		}
 	}
-	if best.State == Idle && (remembered == Finished || remembered == Failed) {
+	if best.State == Idle && (remembered == Finished || remembered == Failed || remembered == Interrupted) {
 		return Live{State: remembered}
 	}
 	return Live{State: best.State, Error: best.Error}
 }
 
-// Settled is the state worth remembering across a restart: a running turn
-// does not survive one.
+// Settled is the state worth remembering across a restart. A running turn
+// does not survive one, so it is remembered as interrupted from its start:
+// a crash or a kill leaves no chance to save it later, and the turn's end
+// replaces it.
 func Settled(state string) string {
-	if state == Finished || state == Failed {
+	switch state {
+	case Finished, Failed:
 		return state
+	case Working, Waiting:
+		return Interrupted
 	}
 	return ""
 }

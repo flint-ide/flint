@@ -22,6 +22,7 @@ import {
   removeJointNote,
   removeOthersQuestion,
   removeQuestions,
+  resumableChat,
   startsOwnChat,
   stateInfo,
   taskActions,
@@ -52,6 +53,8 @@ const task = (over: Partial<TaskView> = {}): TaskView => ({
   joint: '',
   lead: false,
   flintStarts: false,
+  session: '',
+  engine: '',
   tokens: 0,
   costUsd: 0,
   ...over,
@@ -91,8 +94,9 @@ describe('taskActions', () => {
     assert.equal(a.merge || a.pr, false)
   })
 
-  it('offers the agent hand-off only for failures', () => {
+  it('offers the agent hand-off only for failures and cut-off turns', () => {
     assert.equal(taskActions(task({ state: 'failed' })).askAgent, true)
+    assert.equal(taskActions(task({ state: 'interrupted' })).askAgent, true)
     assert.equal(taskActions(task({ state: 'finished' })).askAgent, false)
   })
 
@@ -106,6 +110,37 @@ describe('failurePrompt', () => {
     const p = failurePrompt(task({ state: 'failed', error: 'rate limited' }))
     assert.match(p, /rate limited/)
     assert.match(p, /Add a button/)
+  })
+
+  it('says a cut-off turn was cut off, not that it failed', () => {
+    const p = failurePrompt(task({ state: 'interrupted' }))
+    assert.match(p, /cut off/)
+    assert.ok(!/error/.test(p))
+    assert.match(p, /Add a button/)
+  })
+})
+
+describe('stateInfo interrupted', () => {
+  it('is a state of its own', () => {
+    assert.equal(stateInfo('interrupted').state, 'interrupted')
+    assert.equal(stateInfo('interrupted').label, 'interrupted')
+  })
+})
+
+describe('resumableChat', () => {
+  it('is the task\'s remembered conversation, dormant until the next message', () => {
+    const saved = resumableChat(task({ session: 's-9', engine: 'claude', agent: 'reviewer' }))
+    assert.ok(saved)
+    assert.equal(saved.id, 's-9')
+    assert.equal(saved.agent, 'reviewer')
+    assert.equal(saved.engine, 'claude')
+    assert.equal(saved.cwd, '/src/p.worktrees/agent-add-a-button')
+    assert.equal(saved.chat.items.length, 0)
+    assert.equal(saved.draft, '')
+  })
+
+  it('is none before the task had a chat', () => {
+    assert.equal(resumableChat(task()), null)
   })
 })
 

@@ -4398,6 +4398,10 @@ button.keymap-chord:hover {
   color: var(--ok);
   background: color-mix(in srgb, var(--ok) 14%, transparent);
 }
+.task-state.interrupted {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+}
 .task-state.failed,
 .task-state.stale {
   color: var(--danger);

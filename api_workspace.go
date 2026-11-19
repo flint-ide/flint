@@ -43,6 +43,10 @@ func (w *WorkspaceAPI) InitialFolder() string {
 	return ""
 }
 
+// InitialFiles returns the files Flint was opened with (Finder's Open With,
+// `flint <file>`), once; files opened later arrive as files:dropped.
+func (w *WorkspaceAPI) InitialFiles() []DroppedPath { return w.app.takeOpenedFiles() }
+
 // ForgetRecent removes a folder from the recent list.
 func (w *WorkspaceAPI) ForgetRecent(path string) error { return w.app.forgetRecentFolder(path) }
 

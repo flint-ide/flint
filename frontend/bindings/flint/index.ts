@@ -74,6 +74,7 @@ export {
     Collected,
     ComparedTask,
     DefinedAgent,
+    DroppedPath,
     FileComparison,
     FileHistory,
     LiveTerminal,

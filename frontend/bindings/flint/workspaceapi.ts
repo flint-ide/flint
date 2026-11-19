@@ -17,6 +17,10 @@ import * as fuzzy$0 from "./internal/fuzzy/models.js";
 // @ts-ignore: Unused imports
 import * as workspace$0 from "./internal/workspace/models.js";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 /**
  * AddRoot attaches another project folder to the workspace and returns its path.
  */
@@ -64,6 +68,16 @@ export function IndexFiles(root: string): $CancellablePromise<number> {
 }
 
 /**
+ * InitialFiles returns the files Flint was opened with (Finder's Open With,
+ * `flint <file>`), once; files opened later arrive as files:dropped.
+ */
+export function InitialFiles(): $CancellablePromise<$models.DroppedPath[]> {
+    return $Call.ByID(2533252882).then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
+/**
  * InitialFolder returns the folder to open on launch: the CLI argument, else the last used one.
  */
 export function InitialFolder(): $CancellablePromise<string> {
@@ -82,7 +96,7 @@ export function IsTrusted(path: string): $CancellablePromise<boolean> {
  */
 export function ListDir(path: string): $CancellablePromise<workspace$0.Entry[]> {
     return $Call.ByID(759128168, path).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType4($result);
     });
 }
 
@@ -105,7 +119,7 @@ export function PickFolder(): $CancellablePromise<string> {
  */
 export function ReadFile(path: string): $CancellablePromise<workspace$0.FileContent> {
     return $Call.ByID(1515435483, path).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType5($result);
     });
 }
 
@@ -114,7 +128,7 @@ export function ReadFile(path: string): $CancellablePromise<workspace$0.FileCont
  */
 export function RecentFolders(): $CancellablePromise<string[]> {
     return $Call.ByID(3406063935).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType6($result);
     });
 }
 
@@ -146,7 +160,7 @@ export function RevealInFinder(path: string): $CancellablePromise<void> {
  */
 export function TrashPaths(paths: string[]): $CancellablePromise<string[]> {
     return $Call.ByID(1905251671, paths).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType6($result);
     });
 }
 
@@ -162,7 +176,7 @@ export function TrustFolder(path: string): $CancellablePromise<void> {
  */
 export function TrustedFolders(): $CancellablePromise<string[]> {
     return $Call.ByID(4156167161).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType6($result);
     });
 }
 
@@ -183,7 +197,9 @@ export function WriteFile(path: string, content: string): $CancellablePromise<vo
 
 // Private type creation functions
 const $$createType0 = fuzzy$0.Result.createFrom;
-const $$createType1 = workspace$0.Entry.createFrom;
+const $$createType1 = $models.DroppedPath.createFrom;
 const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = workspace$0.FileContent.createFrom;
-const $$createType4 = $Create.Array($Create.Any);
+const $$createType3 = workspace$0.Entry.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = workspace$0.FileContent.createFrom;
+const $$createType6 = $Create.Array($Create.Any);

@@ -74,6 +74,8 @@ type App struct {
 	pageLoaded atomic.Bool
 	configDir  string
 	argFolder  string
+	// opened are files opened from outside Flint (open_files.go).
+	opened openedFiles
 
 	scratch   *scratch.Store
 	terminals sessions.Terminals // the router (terminals_router.go)
@@ -167,6 +169,7 @@ func NewApp() (*App, error) {
 		sessions:  restore.New(filepath.Join(dir, "sessions")),
 		http:      httpfile.NewClient(),
 	}
+	a.openFiles(filesFromArgs(os.Args[1:], ""))
 	a.runEvents = newRunEvents(a)
 	a.runs = runner.NewManager(a.runEvents)
 	a.debugEvents = newDebugEvents(a)
@@ -287,6 +290,19 @@ func (a *App) recentFolders() []string {
 // extension to install, not a project. Relative paths are resolved against
 // cwd ("" = this process's).
 func folderFromArgs(args []string, cwd string) string {
+	for _, p := range argPaths(args, cwd) {
+		if info, err := os.Stat(p); err == nil && info.IsDir() {
+			return p
+		}
+	}
+	return ""
+}
+
+// argPaths are the absolute paths named by args, in order: flags and the
+// extension of `--install-extension` left out, relative paths resolved against
+// cwd ("" = this process's). Whether they exist is not checked.
+func argPaths(args []string, cwd string) []string {
+	var out []string
 	for _, arg := range extensions.WithoutInstallArg(args) {
 		if strings.HasPrefix(arg, "-") {
 			continue
@@ -294,13 +310,9 @@ func folderFromArgs(args []string, cwd string) string {
 		if cwd != "" && !filepath.IsAbs(arg) {
 			arg = filepath.Join(cwd, arg)
 		}
-		abs, err := filepath.Abs(arg)
-		if err != nil {
-			continue
-		}
-		if info, err := os.Stat(abs); err == nil && info.IsDir() {
-			return abs
+		if abs, err := filepath.Abs(arg); err == nil {
+			out = append(out, abs)
 		}
 	}
-	return ""
+	return out
 }

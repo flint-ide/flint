@@ -22,7 +22,7 @@ import { subscribeAutoSave } from './store/settings'
 import { subscribeScratchAutosave } from './store/scratch'
 import { subscribeEditorContext } from './store/editorContext'
 import { activeRoot } from './store/activeRoot'
-import { openDropped } from './store/drop'
+import { openDropped, openInitialFiles } from './store/drop'
 import { refreshTrust, useTrust } from './store/trust'
 import { TrustBanner } from './components/layout/TrustBanner'
 import { copyDiagnostics, reportIssue, showLogs } from './store/diagnostics'
@@ -119,7 +119,7 @@ subscribeUsageEvents()
     EventsOn('menu:check-tools', openToolCheck)
     EventsOn('files:dropped', (dropped: DroppedPath[]) => void openDropped(dropped))
     void useScratch.getState().load()
-    void useWorkspace.getState().init()
+    void useWorkspace.getState().init().then(openInitialFiles)
     void openToolCheckOnFirstRun()
     void refreshBackgroundTerminals()
     // Panels, dialogs and views load on first use; fetch them once startup settled

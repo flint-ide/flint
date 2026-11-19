@@ -52,7 +52,8 @@ func (a *App) setWindowBackground(c application.RGBA) {
 }
 
 // secondLaunch handles `flint <folder>` while Flint already runs: the folder is
-// opened (like Open Recent) and the window comes to the front. With
+// opened (like Open Recent) and the window comes to the front; files named
+// (`flint README.md`) open in tabs. With
 // `flint --install-extension <dir>` the frontend is asked to install that
 // folder, which shows the usual native confirmation.
 func (a *App) secondLaunch(args []string, cwd string) {
@@ -60,6 +61,7 @@ func (a *App) secondLaunch(args []string, cwd string) {
 	if folder := folderFromArgs(args, cwd); folder != "" {
 		a.emit(eventMenuOpenFolder, folder)
 	}
+	a.openFiles(filesFromArgs(args, cwd))
 	if req, ok := extensions.RequestOf(args, cwd); ok {
 		a.emit(extensions.EventInstallRequest, req)
 	}

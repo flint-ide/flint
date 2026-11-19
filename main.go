@@ -130,6 +130,11 @@ func main() {
 	win.OnWindowEvent(events.Common.WindowFilesDropped, func(e *application.WindowEvent) {
 		flint.emit(eventFilesDropped, droppedPaths(e.Context().DroppedFiles()))
 	})
+	// Finder's Open With and double-click on a document type of Info.plist,
+	// both at launch and while Flint runs (see open_files.go).
+	app.Event.OnApplicationEvent(events.Common.ApplicationOpenedWithFile, func(e *application.ApplicationEvent) {
+		flint.openFiles([]string{e.Context().Filename()})
+	})
 	flint.window = win
 	// Show the window as soon as the app has launched, then import the
 	// login-shell PATH (git hooks, rg, brew) in the background: the login shell

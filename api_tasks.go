@@ -79,6 +79,11 @@ type TaskView struct {
 	// queue, also on Start now (a joint group's one chat, or a task a feature
 	// made, whose first message Flint composes): the UI starts none for it.
 	FlintStarts bool `json:"flintStarts"`
+	// Session is the agent's id of the task's latest chat ("" before the
+	// first), and Engine the program it ran on: Open resumes it when no chat
+	// of the task is open.
+	Session string `json:"session"`
+	Engine  string `json:"engine"`
 	// Tokens and CostUSD are what the task's chats used so far (input and
 	// output tokens; reported cost plus estimates from settings prices).
 	Tokens  int64   `json:"tokens"`
@@ -238,6 +243,7 @@ func (t *TaskAPI) view(ctx context.Context, r *git.Repo, task agenttask.Task) Ta
 		Worktree: task.Worktree, Checkout: task.Checkout, CreatedAt: task.CreatedAt, PullRequest: task.PullRequest,
 		State: live.State, Error: live.Error, Stale: !isDir(task.Worktree), Group: task.Group,
 		Joint: task.Joint, Lead: task.Lead, FlintStarts: flintStarts(task),
+		Session: task.Session, Engine: task.Engine,
 	}
 	if task.Queued && !agenttask.Busy(live.State) {
 		v.State, v.Error = agenttask.Queued, ""

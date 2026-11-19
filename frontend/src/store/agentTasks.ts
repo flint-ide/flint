@@ -19,6 +19,7 @@ import {
   removeJointNote,
   removeOthersQuestion,
   removeQuestions,
+  resumableChat,
   startsOwnChat,
   tasksTouchedBy,
   type TaskView,
@@ -266,8 +267,17 @@ export async function openTask(t: TaskView): Promise<void> {
   }
   if (!(await showFolder(target.worktree))) return
   const id = chatOf(target)
-  if (id) useEditor.getState().setActive(chatTabId(id))
-  else await useAgentChat.getState().start(target.agent, target.worktree)
+  if (id) {
+    useEditor.getState().setActive(chatTabId(id))
+    return
+  }
+  // The task's earlier conversation (its tab is gone, e.g. after a restart): reopened dormant, the
+  // agent picks it up with the next message, rather than a new chat that knows nothing of it.
+  const saved = resumableChat(target)
+  if (saved) {
+    useAgentChat.getState().restore(saved)
+    useEditor.getState().setActive(chatTabId(saved.id))
+  } else await useAgentChat.getState().start(target.agent, target.worktree)
 }
 
 export function toggleChanges(t: TaskView): void {
@@ -351,6 +361,8 @@ export async function createTaskPullRequest(t: TaskView): Promise<boolean> {
 /** Hands a failed task to its agent: a draft in the task's chat, for the user to send. */
 export async function askAgentAboutTask(t: TaskView): Promise<void> {
   if (!(await showFolder(t.worktree))) return
+  // In the task's own conversation when it can be resumed: the agent then knows what it did.
+  await openTask(t)
   await askAgent({ prompt: failurePrompt(t), root: t.worktree })
 }
 

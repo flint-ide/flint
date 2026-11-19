@@ -1822,6 +1822,14 @@ export class TaskView {
     "flintStarts": boolean;
 
     /**
+     * Session is the agent's id of the task's latest chat ("" before the
+     * first), and Engine the program it ran on: Open resumes it when no chat
+     * of the task is open.
+     */
+    "session": string;
+    "engine": string;
+
+    /**
      * Tokens and CostUSD are what the task's chats used so far (input and
      * output tokens; reported cost plus estimates from settings prices).
      */
@@ -1886,6 +1894,12 @@ export class TaskView {
         }
         if (!("flintStarts" in $$source)) {
             this["flintStarts"] = false;
+        }
+        if (!("session" in $$source)) {
+            this["session"] = "";
+        }
+        if (!("engine" in $$source)) {
+            this["engine"] = "";
         }
         if (!("tokens" in $$source)) {
             this["tokens"] = 0;

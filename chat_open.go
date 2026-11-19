@@ -78,7 +78,7 @@ func (a *App) openChatWith(ctx context.Context, r ChatRequest, loaded loadedAgen
 	if err != nil {
 		return info, err
 	}
-	a.tasks.Bind(info.ID, r.Cwd)
+	a.bindTaskChat(info, r.Cwd, r.Parent == "")
 	a.usageChats.bind(info.ID, usageChat{chat: info.ID, agent: info.Agent, cwd: r.Cwd, model: info.Model})
 	node := orchestrate.Node{ID: info.ID, Agent: info.Agent, Role: r.Role, Parent: r.Parent, Cwd: r.Cwd}
 	register := func() error { return a.orch.Register(node) }

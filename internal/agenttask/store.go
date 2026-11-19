@@ -41,9 +41,15 @@ type Task struct {
 	// worktree is gone.
 	Checkout  string `json:"checkout"`
 	CreatedAt int64  `json:"createdAt"` // unix seconds
-	// State is the settled state (finished / failed) shown after a restart.
+	// State is the state shown when no chat of the task is open (after a
+	// restart): finished or failed, or interrupted while a turn runs.
 	State string `json:"state,omitempty"`
 	Error string `json:"error,omitempty"`
+	// Session is the agent's id of the task's latest chat, and Engine the
+	// program it ran on: Open resumes that conversation when no chat of the
+	// task is open. Empty before the first chat, and in older state files.
+	Session string `json:"session,omitempty"`
+	Engine  string `json:"engine,omitempty"`
 	// PullRequest is the URL of the pull request created for the branch.
 	PullRequest string `json:"pullRequest,omitempty"`
 	// Group links the tasks started together from one description (the same

@@ -494,7 +494,8 @@ func TestJointRemoval(t *testing.T) {
 	if got := stopped; !slices.Equal(got, []string{chat}) {
 		t.Errorf("stopped = %v", got)
 	}
-	if got := j.jointStates(made...); got != "idle gone idle" {
+	// The others' turn was cut off with the chat: they show it until a new one runs.
+	if got := j.jointStates(made...); got != "interrupted gone interrupted" {
 		t.Errorf("states = %s", got)
 	}
 	if len(j.app.tasks.Sessions(made[0].ID)) != 0 || len(j.app.tasks.Sessions(made[2].ID)) != 0 {

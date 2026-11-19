@@ -15,6 +15,10 @@ const (
 	// Queued is shown for a task that waits for a free slot (queue.go); it
 	// is never a chat's state.
 	Queued = "queued"
+	// Interrupted is remembered while a turn runs and shown when no chat of
+	// the task is open: the turn was cut off (Flint quit or crashed, the
+	// chat closed) before it ended. Never a chat's state.
+	Interrupted = "interrupted"
 )
 
 // Busy reports a state that holds a slot of the queue: a turn is running.
@@ -93,10 +97,10 @@ func shorten(s string) string {
 var urgency = map[string]int{Waiting: 5, Working: 4, Failed: 3, Finished: 2, Idle: 1}
 
 // Combine is a task's state from its chats; with none, the state remembered
-// from before (finished or failed), else idle.
+// from before (finished, failed or interrupted), else idle.
 func Combine(chats []Live, remembered string) Live {
 	best := Live{State: Idle}
-	if remembered == Finished || remembered == Failed {
+	if remembered == Finished || remembered == Failed || remembered == Interrupted {
 		best.State = remembered
 	}
 	if len(chats) == 0 {
@@ -111,11 +115,16 @@ func Combine(chats []Live, remembered string) Live {
 	return Live{State: best.State, Error: best.Error}
 }
 
-// Settled is the state worth remembering across a restart: a running turn
-// does not survive one.
+// Settled is the state worth remembering across a restart. A running turn
+// does not survive one, so it is remembered as interrupted from its start:
+// a crash or a kill leaves no chance to save it later, and the turn's end
+// replaces it.
 func Settled(state string) string {
-	if state == Finished || state == Failed {
+	switch state {
+	case Finished, Failed:
 		return state
+	case Working, Waiting:
+		return Interrupted
 	}
 	return ""
 }

@@ -367,6 +367,120 @@ func TestTaskStateFollowsSessions(t *testing.T) {
 	}
 }
 
+// savedTask reads a task back from state.json, as the next run of Flint does.
+func (f *taskFixture) savedTask(id string) agenttask.Task {
+	f.t.Helper()
+	var saved appState
+	if err := config.LoadJSON(f.app.statePath(), &saved); err != nil {
+		f.t.Fatal(err)
+	}
+	_, task, ok := saved.AgentTasks.Find(id)
+	if !ok {
+		f.t.Fatalf("task %s not saved", id)
+	}
+	return task
+}
+
+// restart drops every live chat, as quitting Flint (or it crashing) does.
+func (f *taskFixture) restart() {
+	f.app.tasks = agenttask.NewTracker(f.app.tasksByFolder, f.app.taskChanged)
+}
+
+func (f *taskFixture) stateOf(id string) string {
+	f.t.Helper()
+	list, err := f.api.List(f.repo)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	for _, v := range list {
+		if v.ID == id {
+			return v.State
+		}
+	}
+	f.t.Fatalf("task %s not listed", id)
+	return ""
+}
+
+func TestTaskTurnCutOffByRestartIsInterrupted(t *testing.T) {
+	f := newTaskFixture(t)
+	v := f.create("cut off")
+	f.app.tasks.Bind("s1", v.Worktree)
+	f.app.tasks.Prompted("s1")
+	if got := f.stateOf(v.ID); got != agenttask.Working {
+		t.Fatalf("live state = %s", got)
+	}
+	// Saved while the turn runs: a kill leaves no chance to save later.
+	if got := f.savedTask(v.ID).State; got != agenttask.Interrupted {
+		t.Fatalf("saved state during the turn = %q", got)
+	}
+	f.restart()
+	if got := f.stateOf(v.ID); got != agenttask.Interrupted {
+		t.Errorf("after a restart = %s, want interrupted", got)
+	}
+}
+
+func TestTaskChatClosedMidTurnIsInterrupted(t *testing.T) {
+	f := newTaskFixture(t)
+	v := f.create("closed")
+	f.app.tasks.Bind("s1", v.Worktree)
+	f.app.tasks.Prompted("s1")
+	f.app.tasks.Unbind("s1")
+	if got := f.stateOf(v.ID); got != agenttask.Interrupted {
+		t.Errorf("state = %s", got)
+	}
+}
+
+func TestTaskCancelledTurnIsNotInterrupted(t *testing.T) {
+	f := newTaskFixture(t)
+	v := f.create("cancelled")
+	f.app.tasks.Bind("s1", v.Worktree)
+	f.app.tasks.Prompted("s1")
+	f.app.tasks.Observe(as.Event{SessionID: "s1", Kind: as.KindTurnEnd, StopReason: as.StopCancelled})
+	if got := f.savedTask(v.ID).State; got != "" {
+		t.Errorf("saved state after a cancel = %q", got)
+	}
+	f.app.tasks.Unbind("s1")
+	if got := f.stateOf(v.ID); got != agenttask.Idle {
+		t.Errorf("state = %s", got)
+	}
+}
+
+func TestTaskTurnEndOverwritesInterrupted(t *testing.T) {
+	f := newTaskFixture(t)
+	v := f.create("ends")
+	f.app.tasks.Bind("s1", v.Worktree)
+	f.app.tasks.Prompted("s1")
+	f.app.tasks.Observe(as.Event{SessionID: "s1", Kind: as.KindTurnEnd, StopReason: as.StopEndTurn})
+	if got := f.savedTask(v.ID).State; got != agenttask.Finished {
+		t.Errorf("saved state = %q", got)
+	}
+}
+
+func TestTaskRemembersItsChatSession(t *testing.T) {
+	f := newTaskFixture(t)
+	v := f.create("session")
+	chat := &AgentChatAPI{app: f.app}
+	info, err := chat.Start("fake", v.Worktree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := f.savedTask(v.ID).Session; got != info.ID {
+		t.Fatalf("saved session = %q, want %q", got, info.ID)
+	}
+	f.restart()
+	list, _ := f.api.List(f.repo)
+	if list[0].Session != info.ID {
+		t.Errorf("listed session = %q, want %q", list[0].Session, info.ID)
+	}
+	// A chat the task's agent starts (a child) is not the task's conversation.
+	if _, err := f.app.openChat(context.Background(), ChatRequest{Agent: "fake", Cwd: v.Worktree, Parent: info.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.savedTask(v.ID).Session; got != info.ID {
+		t.Errorf("a child chat replaced the session: %q", got)
+	}
+}
+
 type fakePR struct {
 	calls []github.NewPullRequest
 }

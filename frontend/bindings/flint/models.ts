@@ -640,6 +640,34 @@ export class DefinedAgent {
 }
 
 /**
+ * DroppedPath is one path dragged from Finder.
+ */
+export class DroppedPath {
+    "path": string;
+    "dir": boolean;
+
+    /** Creates a new DroppedPath instance. */
+    constructor($$source: Partial<DroppedPath> = {}) {
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("dir" in $$source)) {
+            this["dir"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new DroppedPath instance from a string or object.
+     */
+    static createFrom($$source: any = {}): DroppedPath {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new DroppedPath($$parsedSource as Partial<DroppedPath>);
+    }
+}
+
+/**
  * FileComparison is one file's diff in every task of a group, in the order
  * of TaskComparison.Tasks.
  */

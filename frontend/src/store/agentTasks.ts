@@ -361,9 +361,10 @@ export async function createTaskPullRequest(t: TaskView): Promise<boolean> {
 /** Hands a failed task to its agent: a draft in the task's chat, for the user to send. */
 export async function askAgentAboutTask(t: TaskView): Promise<void> {
   if (!(await showFolder(t.worktree))) return
-  // In the task's own conversation when it can be resumed: the agent then knows what it did.
+  // In the task's own conversation when it can be resumed: the agent then knows what it did. A
+  // joint group's one chat runs in its lead's worktree, which openTask shows.
   await openTask(t)
-  await askAgent({ prompt: failurePrompt(t), root: t.worktree })
+  await askAgent({ prompt: failurePrompt(t), root: jointLead(t, useTasks.getState().tasks).worktree })
 }
 
 /**

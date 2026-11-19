@@ -70,7 +70,7 @@ func (c *AgentChatAPI) Resume(agent, cwd, sessionID, engine string) (as.SessionI
 	// exactly what this read found.
 	info, err := c.app.resumeChatWith(ctx, c.app.loadDefinedAgents(), agent, cwd, sessionID, engine)
 	if err == nil {
-		c.app.bindTaskChat(info, cwd, true)
+		c.app.bindTaskChat(info, cwd, true, sessionID)
 		c.app.usageChats.bind(info.ID, usageChat{chat: sessionID, agent: info.Agent, cwd: cwd, model: info.Model})
 		c.app.adoptChat(info, cwd)
 	}

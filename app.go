@@ -72,8 +72,12 @@ type App struct {
 	window application.Window // the main window
 	// pageLoaded is set once the window's page has loaded (window_darwin.go).
 	pageLoaded atomic.Bool
-	configDir  string
-	argFolder  string
+	// shuttingDown is set when shutdown begins (beginShutdown, tasks_state.go).
+	shuttingDown atomic.Bool
+	// taskStateMu serializes saving the tasks' states (taskChanged).
+	taskStateMu sync.Mutex
+	configDir   string
+	argFolder   string
 
 	scratch   *scratch.Store
 	terminals sessions.Terminals // the router (terminals_router.go)
@@ -213,6 +217,8 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) shutdown() {
+	// Before the agents stop: the turns they cut off stay interrupted.
+	a.beginShutdown()
 	// Language servers and agents each have grace periods; stop them in parallel
 	// so quitting stays fast.
 	var wg sync.WaitGroup

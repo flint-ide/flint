@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+
 	as "flint/internal/agentsession"
 	"flint/internal/agenttask"
 	"flint/internal/config"
@@ -68,8 +70,12 @@ func (a *App) tasksByFolder(cwd string) []string {
 // bindTaskChat follows a chat that started or resumed in cwd (the tracker)
 // and, for the task's own conversation (own: not a chat its agent started),
 // remembers the session on every task it works for, so Open can resume it
-// after a restart even when its tab is gone.
-func (a *App) bindTaskChat(info as.SessionInfo, cwd string, own bool) {
+// after a restart even when its tab is gone. resumed is the id a resumed
+// chat had ("" for a new chat): it replaces only the task's own session (the
+// agent may fork it), never another one, since a tab restored after a
+// restart does not say whether a chat was the task's or one its agent
+// started.
+func (a *App) bindTaskChat(info as.SessionInfo, cwd string, own bool, resumed string) {
 	a.tasks.Bind(info.ID, cwd)
 	if !own || info.ID == "" {
 		return
@@ -78,29 +84,38 @@ func (a *App) bindTaskChat(info as.SessionInfo, cwd string, own bool) {
 	if len(ids) == 0 {
 		return
 	}
-	stale := false
-	store := a.taskStore()
-	for _, id := range ids {
-		if _, t, ok := store.Find(id); ok && (t.Session != info.ID || t.Engine != info.Engine) {
-			stale = true
-		}
-	}
-	if !stale {
-		return
+	replaces := func(t agenttask.Task) bool {
+		mine := resumed == "" || t.Session == "" || t.Session == resumed
+		return mine && (t.Session != info.ID || t.Engine != info.Engine)
 	}
 	err := a.saveTasks(func(s agenttask.Store) (agenttask.Store, error) {
+		changed := false
 		for _, id := range ids {
-			s = s.Update(id, func(t agenttask.Task) agenttask.Task {
-				t.Session, t.Engine = info.ID, info.Engine
-				return t
-			})
+			if _, t, ok := s.Find(id); ok && replaces(t) {
+				changed = true
+				s = s.Update(id, func(t agenttask.Task) agenttask.Task {
+					t.Session, t.Engine = info.ID, info.Engine
+					return t
+				})
+			}
+		}
+		if !changed {
+			return nil, errUnchanged
 		}
 		return s, nil
 	})
-	if err != nil {
+	if err != nil && !errors.Is(err, errUnchanged) {
 		a.logf("save task session: %v", err)
 	}
 }
+
+// errUnchanged tells saveTasks there is nothing to write.
+var errUnchanged = errors.New("unchanged")
+
+// beginShutdown marks Flint as quitting, before the agents are stopped: the
+// turns they cut off are interrupted, not cancelled by the user, and no
+// queued task starts any more.
+func (a *App) beginShutdown() { a.shuttingDown.Store(true) }
 
 // rememberedState is what a task should remember once its combined live
 // state is live, given what it remembers (prev) and whether a chat of it is
@@ -122,35 +137,50 @@ func rememberedState(prev, live string, chatOpen bool) (state string, keep bool)
 // interrupted from the moment a turn starts, since a crash leaves no chance
 // to save it later) and tells the UI. A chat closing (idle, no chat left)
 // leaves the remembered state alone: a turn it cut off stays interrupted. A
-// cancelled turn (idle, its chat still open) is not interrupted. A task that
-// settles frees its slot for the oldest queued task (tasks_queue.go).
-func (a *App) taskChanged(id string, l agenttask.Live) {
-	_, task, ok := a.taskStore().Find(id)
-	settled, keep := rememberedState(task.State, l.State, len(a.tasks.Sessions(id)) > 0)
-	errText := ""
-	if settled == agenttask.Failed {
-		errText = l.Error
+// cancelled turn (idle, its chat still open) is not interrupted, unless Flint
+// is quitting. A task that settles frees its slot for the oldest queued task
+// (tasks_queue.go).
+//
+// The tracker reports changes outside its lock, so a notification may come
+// after a later one: the state is read from the tracker again, under
+// taskStateMu, so the latest one is saved whatever the order.
+func (a *App) taskChanged(id string, _ agenttask.Live) {
+	if a.shuttingDown.Load() {
+		return
 	}
-	busy := agenttask.Busy(l.State)
-	// A turn in a queued task's folder (a chat the user started there by
-	// hand) means it is not waiting any more.
-	unqueue := busy && task.Queued
-	if ok && !keep && (task.State != settled || task.Error != errText || unqueue) {
-		err := a.saveTasks(func(s agenttask.Store) (agenttask.Store, error) {
-			return s.Update(id, func(t agenttask.Task) agenttask.Task {
-				t.State, t.Error = settled, errText
-				if unqueue {
-					t.Queued = false
-				}
-				return t
-			}), nil
-		})
-		if err != nil {
-			a.logf("save task state: %v", err)
+	a.taskStateMu.Lock()
+	l := a.tasks.State(id, "")
+	chatOpen := len(a.tasks.Sessions(id)) > 0
+	err := a.saveTasks(func(s agenttask.Store) (agenttask.Store, error) {
+		_, task, ok := s.Find(id)
+		if !ok {
+			return nil, errUnchanged
 		}
+		settled, keep := rememberedState(task.State, l.State, chatOpen)
+		errText := ""
+		if settled == agenttask.Failed {
+			errText = l.Error
+		}
+		// A turn in a queued task's folder (a chat the user started there
+		// by hand) means it is not waiting any more.
+		unqueue := agenttask.Busy(l.State) && task.Queued
+		if keep || task.State == settled && task.Error == errText && !unqueue {
+			return nil, errUnchanged
+		}
+		return s.Update(id, func(t agenttask.Task) agenttask.Task {
+			t.State, t.Error = settled, errText
+			if unqueue {
+				t.Queued = false
+			}
+			return t
+		}), nil
+	})
+	a.taskStateMu.Unlock()
+	if err != nil && !errors.Is(err, errUnchanged) {
+		a.logf("save task state: %v", err)
 	}
 	a.tasksChanged()
-	if busy {
+	if agenttask.Busy(l.State) {
 		a.releaseStart(id) // the running turn holds the slot from here on
 	} else {
 		a.startQueuedTasks() // settled (finished, failed, cancelled or closed): a slot is free

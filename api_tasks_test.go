@@ -456,6 +456,48 @@ func TestTaskTurnEndOverwritesInterrupted(t *testing.T) {
 	}
 }
 
+func TestTaskQuitMidTurnIsInterrupted(t *testing.T) {
+	f := newTaskFixture(t)
+	v := f.create("quit")
+	f.app.tasks.Bind("s1", v.Worktree)
+	f.app.tasks.Prompted("s1")
+	// Quitting cancels the running turns: that is no cancel by the user.
+	f.app.beginShutdown()
+	f.app.tasks.Observe(as.Event{SessionID: "s1", Kind: as.KindTurnEnd, StopReason: as.StopCancelled})
+	if got := f.savedTask(v.ID).State; got != agenttask.Interrupted {
+		t.Errorf("saved state after quitting = %q", got)
+	}
+}
+
+func TestTaskStaleNotificationDoesNotOverwrite(t *testing.T) {
+	f := newTaskFixture(t)
+	v := f.create("late")
+	f.app.tasks.Bind("s1", v.Worktree)
+	f.app.tasks.Prompted("s1")
+	f.app.tasks.Observe(as.Event{SessionID: "s1", Kind: as.KindTurnEnd, StopReason: as.StopEndTurn})
+	// The turn's start, reported after its end (notifications run outside the tracker's lock).
+	f.app.taskChanged(v.ID, agenttask.Live{State: agenttask.Working, Turn: true})
+	if got := f.savedTask(v.ID).State; got != agenttask.Finished {
+		t.Errorf("saved state = %q, want finished", got)
+	}
+}
+
+func TestTaskResumedChildDoesNotReplaceSession(t *testing.T) {
+	f := newTaskFixture(t)
+	v := f.create("resume")
+	f.app.bindTaskChat(as.SessionInfo{ID: "own", Engine: "claude"}, v.Worktree, true, "")
+	// A chat restored from a tab may be one the task's agent started: resuming it keeps the task's own.
+	f.app.bindTaskChat(as.SessionInfo{ID: "child", Engine: "claude"}, v.Worktree, true, "child")
+	if got := f.savedTask(v.ID).Session; got != "own" {
+		t.Errorf("session = %q, want own", got)
+	}
+	// Resuming the task's own conversation may fork it: the new id is remembered.
+	f.app.bindTaskChat(as.SessionInfo{ID: "own-2", Engine: "claude"}, v.Worktree, true, "own")
+	if got := f.savedTask(v.ID).Session; got != "own-2" {
+		t.Errorf("session after a forked resume = %q", got)
+	}
+}
+
 func TestTaskRemembersItsChatSession(t *testing.T) {
 	f := newTaskFixture(t)
 	v := f.create("session")

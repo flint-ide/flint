@@ -257,3 +257,56 @@ describe('hidden tabs', () => {
     assert.deepEqual(st().hidden, [])
   })
 })
+
+describe('cycling through tabs', () => {
+  const open = () => {
+    st().openFile('/p/a.go')
+    st().openTerminal('t1', 'zsh')
+    st().openFile('/p/b.go')
+  }
+
+  it('goes to the next and the previous tab in the strip, whatever their kind', () => {
+    open()
+    st().setActive('file:/p/a.go')
+    st().cycleTab(1)
+    assert.equal(st().activeId, 'term:t1')
+    st().cycleTab(1)
+    assert.equal(st().activeId, 'file:/p/b.go')
+    st().cycleTab(-1)
+    assert.equal(st().activeId, 'term:t1')
+  })
+
+  it('wraps around at both ends', () => {
+    open()
+    st().setActive('file:/p/b.go')
+    st().cycleTab(1)
+    assert.equal(st().activeId, 'file:/p/a.go')
+    st().cycleTab(-1)
+    assert.equal(st().activeId, 'file:/p/b.go')
+  })
+
+  it('skips tabs that are not drawn', () => {
+    open()
+    st().setActive('file:/p/a.go')
+    st().hideTab('term:t1')
+    st().cycleTab(1)
+    assert.equal(st().activeId, 'file:/p/b.go')
+    assert.deepEqual(st().hidden, ['term:t1'])
+  })
+
+  it('remembers the tab it left for Back', () => {
+    open()
+    st().setActive('file:/p/a.go')
+    st().cycleTab(1)
+    st().back()
+    assert.equal(st().activeId, 'file:/p/a.go')
+  })
+
+  it('does nothing with one tab or none', () => {
+    st().cycleTab(1)
+    assert.equal(st().activeId, null)
+    st().openFile('/p/a.go')
+    st().cycleTab(-1)
+    assert.equal(st().activeId, 'file:/p/a.go')
+  })
+})

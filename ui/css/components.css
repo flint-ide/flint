@@ -1,0 +1,107 @@
+/* Flint's composite components (ui/src). Plain CSS on Flint's variables, class
+   prefix fui-; no Tailwind classes (see wunderui.input.css). */
+
+.fui-grow { flex: 1; min-width: 0; }
+.fui-muted { color: var(--fg-muted); }
+.fui-mono { font-family: var(--font-mono); font-size: 12px; }
+.fui-nowrap { white-space: nowrap; }
+.fui-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fui-ok { color: var(--ok); }
+.fui-danger { color: var(--danger); }
+.fui-added { color: var(--git-added); }
+.fui-removed { color: var(--git-deleted); }
+
+/* CommandPalette */
+.fui-palette {
+  width: min(560px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 0.35);
+}
+.fui-palette-search { padding: 8px; border-bottom: 1px solid var(--border); }
+.fui-palette-list { margin: 0; padding: 4px; list-style: none; max-height: 320px; overflow: auto; }
+.fui-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.fui-palette-item[aria-selected='true'] { background: var(--bg-active); }
+.fui-palette-keys { width: 72px; display: flex; justify-content: flex-end; }
+.fui-palette-empty { padding: 12px; color: var(--fg-muted); }
+
+/* EditorTabs */
+.fui-tabs { display: flex; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--bg); }
+.fui-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 0 12px;
+  height: 34px;
+  flex: none;
+  cursor: pointer;
+  color: var(--fg-muted);
+  border-right: 1px solid var(--border);
+}
+.fui-tab svg { width: 14px; height: 14px; }
+.fui-tab:hover { color: var(--fg); }
+.fui-tab[aria-selected='true'] { color: var(--fg); background: var(--bg-raised); box-shadow: inset 0 2px 0 var(--accent); }
+.fui-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.fui-tab-title { white-space: nowrap; }
+.fui-tab-dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; display: none; }
+.fui-tab-close[data-dirty] .fui-tab-dot { display: block; }
+.fui-tab-close[data-dirty] .fui-tab-x { display: none; }
+.fui-tab-close[data-dirty]:hover .fui-tab-dot { display: none; }
+.fui-tab-close[data-dirty]:hover .fui-tab-x { display: block; }
+.fui-tab:not([aria-selected='true']):not(:hover) .fui-tab-close:not([data-dirty]) { visibility: hidden; }
+
+/* StatusBar */
+.fui-statusbar {
+  display: flex;
+  align-items: stretch;
+  height: 24px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  background: var(--bg-raised);
+  border-top: 1px solid var(--border);
+}
+.fui-statusitem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.fui-statusitem:hover { color: var(--fg); background: var(--bg-hover); }
+.fui-statusitem svg { width: 12px; height: 12px; }
+
+/* DiffStat */
+.fui-diffstat { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 12px; }
+.fui-diffstat-bar { display: inline-flex; gap: 1px; }
+.fui-diffstat-bar > span { width: 7px; height: 7px; border-radius: 1px; background: var(--git-deleted); }
+.fui-diffstat-bar > span[data-added] { background: var(--git-added); }
+
+/* JobList */
+.fui-joblist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.fui-job { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 6px; }
+.fui-job[data-clickable] { cursor: pointer; }
+.fui-job[data-clickable]:hover { background: var(--bg-hover); }
+.fui-job-icon { display: inline-flex; flex: none; }
+.fui-job-icon svg { width: 14px; height: 14px; }
+
+/* AgentRow */
+.fui-agent { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 6px; }
+.fui-agent[data-clickable] { cursor: pointer; }
+.fui-agent[data-clickable]:hover { background: var(--bg-hover); }
+.fui-agent-text { font-size: 12px; }
+.fui-agent-text strong { font-size: 13px; }
+.fui-agent-head { display: flex; align-items: baseline; gap: 6px; }
+.fui-agent-time { width: 32px; text-align: right; }
+.fui-agent-action { width: 32px; display: flex; justify-content: flex-end; }

@@ -1,0 +1,21 @@
+{
+  // The package has no node_modules of its own: it is type checked (and bundled)
+  // against the ones installed for the app in ../frontend.
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "typeRoots": ["../frontend/node_modules/@types"],
+    "paths": {
+      "*": ["../frontend/node_modules/@types/*", "../frontend/node_modules/*"]
+    }
+  },
+  // node:test and node:assert types: the same small shim the app's tests use.
+  "include": ["src", "../frontend/src/testing/node.d.ts"]
+}

@@ -38,6 +38,11 @@ tasks:
     cmds:
       - go run ../cmd/webbuild --typecheck
 
+  wunderui:css:
+    summary: Regenerates ui/css/wunderui.css after a @wunderui/react update (downloads the pinned Tailwind CLI)
+    cmds:
+      - go run ./cmd/wuicss
+
   icons:
     summary: Makes the macOS icon from build/appicon.png
     sources: [build/appicon.png]

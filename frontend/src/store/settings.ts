@@ -140,6 +140,7 @@ let customVars: string[] = []
 function applyToDocument(s: AppSettings, theme: ResolvedTheme): void {
   const root = document.documentElement
   root.dataset.theme = theme
+  root.classList.toggle('dark', theme === 'dark') // WunderUI's dark tokens (ui/css/wunderui.css)
   for (const [name, value] of Object.entries(editorCssVars(s))) root.style.setProperty(name, value)
   const custom = themeCssVars(s)
   for (const name of customVars) if (!(name in custom)) root.style.removeProperty(name)

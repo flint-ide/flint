@@ -83,7 +83,10 @@ func bundleOptions(root string, dev bool) api.BuildOptions {
 		Target:     api.ESNext,
 		Engines:    []api.Engine{{Name: api.EngineSafari, Version: strings.TrimPrefix(browserTarget, "safari")}},
 		JSX:        api.JSXAutomatic,
-		Define:     map[string]string{"process.env.NODE_ENV": fmt.Sprintf("%q", mode)},
+		// ../ui (@flint-ide/ui, mapped in tsconfig.json) has no node_modules of its
+		// own: its imports resolve from the app's.
+		NodePaths: []string{filepath.Join(root, "node_modules")},
+		Define:    map[string]string{"process.env.NODE_ENV": fmt.Sprintf("%q", mode)},
 		Loader: map[string]api.Loader{
 			".woff": api.LoaderFile, ".woff2": api.LoaderFile, ".ttf": api.LoaderFile,
 			".png": api.LoaderFile, ".svg": api.LoaderFile, ".wasm": api.LoaderFile,

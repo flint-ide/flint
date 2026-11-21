@@ -1,7 +1,8 @@
 name: Docs site
 
-# Builds the user documentation (site/, rendered by cmd/docsite) and
-# publishes it to GitHub Pages. Pull requests only build it, which also
+# Builds the user documentation (site/, rendered by cmd/docsite) and the
+# Storybook of the UI components (storybook/, served under /storybook/), and
+# publishes both to GitHub Pages. Pull requests only build it, which also
 # fails on broken links between pages. A private repository only builds it
 # too: Pages needs a public repository on the free plan, and uploading the
 # site there would only use up the account's artifact storage.
@@ -9,9 +10,9 @@ name: Docs site
 on:
   push:
     branches: [main]
-    paths: ["site/**", "cmd/docsite/**", ".github/workflows/pages.yml"]
+    paths: ["site/**", "cmd/docsite/**", "storybook/**", "third_party/wunderui/**", "ui/**", "frontend/src/style.css", "frontend/src/components/ui/**", ".github/workflows/pages.yml"]
   pull_request:
-    paths: ["site/**", "cmd/docsite/**", ".github/workflows/pages.yml"]
+    paths: ["site/**", "cmd/docsite/**", "storybook/**", "third_party/wunderui/**", "ui/**", "frontend/src/style.css", "frontend/src/components/ui/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -39,6 +40,20 @@ jobs:
 
       - name: Build the site
         run: go run ./cmd/docsite -src site -out _site
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: storybook/package-lock.json
+
+      - name: Install Storybook dependencies (no install scripts)
+        working-directory: storybook
+        run: npm ci --ignore-scripts
+
+      - name: Build Storybook into the site
+        working-directory: storybook
+        run: ./node_modules/.bin/storybook build -o ../_site/storybook
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         if: github.event_name != 'pull_request' && !github.event.repository.private

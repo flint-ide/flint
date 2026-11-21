@@ -1,0 +1,66 @@
+/* Base page styles for an extension webview (not used by the app, which has
+   style.css). Flint puts its theme variables on :root of the frame (flint.theme);
+   the fallbacks (Flint's default dark theme) only matter when the page is
+   opened outside Flint. */
+
+:root {
+  --bg: #18191c;
+  --bg-sidebar: #1c1d21;
+  --bg-editor: #141518;
+  --bg-raised: #23252a;
+  --bg-hover: #26282e;
+  --bg-active: #2d3038;
+  --border: #2a2c32;
+  --fg: #d4d4d8;
+  --fg-muted: #8b8f98;
+  --fg-faint: #555963;
+  --accent: #f59e0b;
+  --accent-fg: #1a1305;
+  --ok: #86efac;
+  --warn: #fcd34d;
+  --danger: #f87171;
+  --info: #82aaff;
+  --git-added: #3f8f5a;
+  --git-deleted: #c45555;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font: 13px/1.4 var(--font-ui);
+  color: var(--fg);
+  background: var(--bg-sidebar);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+[contenteditable] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--fg-muted) 30%, transparent);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}

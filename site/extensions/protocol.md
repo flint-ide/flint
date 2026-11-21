@@ -133,6 +133,8 @@ The page has no network and nothing to load: it talks to its process through `wi
 | `flint.runCommand(id, args?)`, `flint.copy(text)`, `flint.showMessage(type, text)` | one of its own commands; the clipboard; a toast |
 | `flint.openFile(path, line?)` | opens a file in a workspace folder; needs `workspace.read` |
 
+**Building a page with Flint's components.** A page written in TypeScript/React can use Flint's UI kit, `@flint-ide/ui` (`ui/` in the Flint repository: the components Flint itself uses, on its palette, with Lucide icons from `@flint-ide/ui/icons`). From a Flint checkout, after `npm ci --ignore-scripts` in `frontend/`, `go run ./cmd/flint-webview -o <extension>/ui/panel.html <extension>/webview/panel.tsx` bundles the page into the one self-contained file this section asks for, with only the components the page uses, the kit's styles and base page styles on Flint's theme variables. The page renders into `<div id="root">`; `syncFlintTheme()` keeps the components' dark and light tokens in step with Flint, `flint()` is `window.flint` with types. The extensions repository's Kubernetes panel is an example.
+
 Shortcuts with ⌘/Ctrl/Alt, F-keys and Escape that the page doesn't `preventDefault()` reach Flint's keymap; ⌘A/C/V/X/Z/Y stay with the page. The example `examples/extensions/notes` uses all of this.
 
 ### contributes.statusItems

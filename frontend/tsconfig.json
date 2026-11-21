@@ -17,7 +17,15 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    // @flint-ide/ui is ../ui (source, no node_modules of its own); "*" lets its
+    // files resolve react, @wunderui/react and lucide-react from here too.
+    "paths": {
+      "@flint-ide/ui": ["../ui/src/index.ts"],
+      "@flint-ide/ui/icons": ["../ui/src/icons.ts"],
+      "@flint-ide/ui/styles.css": ["../ui/css/index.css"],
+      "*": ["./node_modules/@types/*", "./node_modules/*"]
+    }
   },
   "include": [
     "src"

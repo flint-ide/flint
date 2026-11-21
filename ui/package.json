@@ -1,0 +1,22 @@
+{
+  "name": "@flint-ide/ui",
+  "version": "0.1.0",
+  "description": "Flint's UI kit: WunderUI components on Flint's palette plus Flint's composite components, for the app, the Storybook and extension webviews (built with cmd/flint-webview).",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./icons": "./src/icons.ts",
+    "./styles.css": "./css/index.css",
+    "./webview.css": "./css/webview.css"
+  },
+  "peerDependencies": {
+    "@wunderui/react": "0.3.0-git.7f15310",
+    "lucide-react": "1.77.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  }
+}

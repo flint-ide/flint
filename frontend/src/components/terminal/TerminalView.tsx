@@ -23,7 +23,7 @@ import { errorMessage } from '../../api/backend'
 import { focusSoon } from '../../lib/focusSoon'
 import { fitTerminal } from '../../lib/terminalFit'
 import { registerUrlLinks } from '../../lib/terminalLinks'
-import { NEWLINE_SEQUENCE, isNewlineKey, terminalClipboardKey } from '../../lib/terminalKeys'
+import { NEWLINE_SEQUENCE, isNewlineKey, macLineKey, terminalClipboardKey } from '../../lib/terminalKeys'
 import { sendTerminalSelectionToAgent } from '../../lib/agentContext'
 import type { DropdownItem } from '../ui/Dropdown'
 import { openContextMenu } from '../../store/contextMenu'
@@ -85,6 +85,14 @@ export function TerminalView({ tab, active }: Props) {
       }
       if (e.metaKey && e.key === 'k') {
         xterm.clear()
+        return false
+      }
+      const line = macLineKey(e)
+      if (line) {
+        if ('send' in line) sendInput(tab.id, line.send)
+        else if (line.scroll === 'top') xterm.scrollToTop()
+        else xterm.scrollToBottom()
+        e.preventDefault()
         return false
       }
       // Leave other ⌘ shortcuts to the app (⌘P, ⌘J, ...) and the Edit menu (⌘C, ⌘V).

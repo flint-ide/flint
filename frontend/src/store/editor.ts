@@ -253,6 +253,8 @@ interface EditorState {
   /** Closes file, diff, history and response tabs at or under the given (deleted) paths, and pull requests of removed projects. */
   closePaths: (paths: string[]) => void
   setActive: (id: string) => void
+  /** Switches to the next (1) or previous (-1) tab drawn in the strip, wrapping around at the ends. */
+  cycleTab: (step: 1 | -1) => void
   /** Stops drawing a tab (it still counts as open); shows a drawn neighbour if it was active. False when no other tab is drawn. */
   hideTab: (id: string) => boolean
   /** Draws a hidden tab again without switching to it. */
@@ -529,6 +531,14 @@ export const useEditor = createStore<EditorState>((set, get) => ({
     }),
 
   setActive: (id) => set((s) => activate(s, id)),
+
+  cycleTab: (step) =>
+    set((s) => {
+      const drawn = s.tabs.map((t) => t.id).filter((id) => !s.hidden.includes(id))
+      const at = s.activeId ? drawn.indexOf(s.activeId) : -1
+      if (at < 0 || drawn.length < 2) return {}
+      return activate(s, drawn[(at + step + drawn.length) % drawn.length])
+    }),
 
   hideTab: (id) => {
     const s = get()

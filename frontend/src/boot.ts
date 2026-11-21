@@ -8,7 +8,9 @@ import { bootSidebarWidth, bootTheme } from './lib/bootTheme'
 try {
   const root = document.documentElement
   const systemDark = matchMedia('(prefers-color-scheme: dark)').matches
-  root.dataset.theme = bootTheme(localStorage.getItem('flint.settings'), systemDark)
+  const theme = bootTheme(localStorage.getItem('flint.settings'), systemDark)
+  root.dataset.theme = theme
+  root.classList.toggle('dark', theme === 'dark') // WunderUI's dark tokens (ui/css/wunderui.css)
   const width = bootSidebarWidth(localStorage.getItem('flint.sidebarWidth'))
   if (width !== null) root.style.setProperty('--boot-sidebar', `${width}px`)
 } catch {

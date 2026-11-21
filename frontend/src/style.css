@@ -199,66 +199,69 @@ body.resizing * {
   display: none !important;
 }
 
-button,
-input,
-select {
+/* Base controls. WunderUI components (components/ui, marked with data-slot) style
+   themselves from wunderui.css; these unlayered rules would beat its layered
+   utilities, so they skip them. :where keeps the specificity of a bare element. */
+button:where(:not([data-slot], [data-slot] *)),
+input:where(:not([data-slot], [data-slot] *)),
+select:where(:not([data-slot], [data-slot] *)) {
   font: inherit;
   color: inherit;
 }
 
-button {
+button:where(:not([data-slot], [data-slot] *)) {
   background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: 5px;
   padding: 3px 10px;
   cursor: pointer;
 }
-button:hover {
+button:where(:not([data-slot], [data-slot] *)):hover {
   background: var(--bg-active);
 }
-button:disabled {
+button:where(:not([data-slot], [data-slot] *)):disabled {
   opacity: 0.5;
   cursor: default;
 }
-button.primary {
+button:where(:not([data-slot], [data-slot] *)).primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-fg);
   font-weight: 600;
 }
-button.danger {
+button:where(:not([data-slot], [data-slot] *)).danger {
   background: transparent;
   border-color: var(--danger);
   color: var(--danger);
 }
-button.link {
+button:where(:not([data-slot], [data-slot] *)).link {
   background: none;
   border: none;
   padding: 0;
   color: var(--accent);
 }
-button.icon {
+button:where(:not([data-slot], [data-slot] *)).icon {
   background: none;
   border: none;
   padding: 2px 6px;
   color: var(--fg-muted);
   font-size: 12px;
 }
-button.icon:hover {
+button:where(:not([data-slot], [data-slot] *)).icon:hover {
   color: var(--fg);
   background: var(--bg-hover);
 }
 
-input,
-select {
+input:where(:not([data-slot], [data-slot] *)),
+select:where(:not([data-slot], [data-slot] *)) {
   background: var(--bg-editor);
   border: 1px solid var(--border);
   border-radius: 5px;
   padding: 4px 8px;
   outline: none;
 }
-input:focus,
-select:focus {
+input:where(:not([data-slot], [data-slot] *)):focus,
+select:where(:not([data-slot], [data-slot] *)):focus {
   border-color: var(--accent);
 }
 
@@ -267,7 +270,7 @@ code {
   font-size: 12px;
 }
 
-kbd {
+kbd:where(:not([data-slot], [data-slot] *)) {
   font-family: var(--font-mono);
   font-size: 11px;
   background: var(--bg-raised);

@@ -30,8 +30,10 @@
     "@lezer/highlight": "1.2.5",
     "@replit/codemirror-vim": "6.4.0",
     "@wailsio/runtime": "3.1.0",
+    "@wunderui/react": "file:../third_party/wunderui/wunderui-react-0.3.0-git.7f15310.tgz",
     "@xterm/addon-webgl": "0.19.0",
     "@xterm/xterm": "6.0.0",
+    "lucide-react": "1.77.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },

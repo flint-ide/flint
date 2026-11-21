@@ -1,0 +1,57 @@
+/* Input for `go run ./cmd/wuicss`, which compiles it to wunderui.css with the
+   standalone Tailwind CLI. WunderUI's tokens plus every Tailwind utility its
+   components use. Flint's own code doesn't write Tailwind classes, so only the
+   package is scanned. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+/* The package installed for the app (frontend/), which also builds this one. */
+@import "../../frontend/node_modules/@wunderui/react/dist/styles.css";
+@source "../../frontend/node_modules/@wunderui/react/dist/*.js";
+
+/* Tailwind's preflight, scoped to WunderUI elements (data-slot) and what they
+   contain: the components expect it (no UA borders, margins or button fills), but
+   the global preflight would restyle all of Flint. :where keeps it at zero
+   specificity, so every utility still wins. */
+@layer base {
+  :where([data-slot], [data-slot] *),
+  :where([data-slot], [data-slot] *)::before,
+  :where([data-slot], [data-slot] *)::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+  :where([data-slot], [data-slot] *):is(button, input, select, optgroup, textarea),
+  :where([data-slot], [data-slot] *)::file-selector-button {
+    font: inherit;
+    font-feature-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    border-radius: 0;
+    background-color: transparent;
+    opacity: 1;
+  }
+  :where([data-slot], [data-slot] *):is(button, [role='button']) {
+    cursor: pointer;
+  }
+  :where([data-slot], [data-slot] *):is(h1, h2, h3, h4, h5, h6) {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  :where([data-slot], [data-slot] *):is(ol, ul, menu) {
+    list-style: none;
+  }
+  :where([data-slot], [data-slot] *):is(img, svg, video, canvas) {
+    display: block;
+    vertical-align: middle;
+  }
+  :where([data-slot], [data-slot] *):is(img, video) {
+    max-width: 100%;
+    height: auto;
+  }
+  :where([data-slot], [data-slot] *)::placeholder {
+    opacity: 1;
+    color: color-mix(in oklab, currentcolor 50%, transparent);
+  }
+}

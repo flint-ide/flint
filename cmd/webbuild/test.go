@@ -12,7 +12,8 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 )
 
-// runTests bundles every src/**/*.test.ts(x) for Node into a temp directory and
+// runTests bundles every src/**/*.test.ts(x) (and ../ui/src's, the @flint-ide/ui
+// package) for Node into a temp directory and
 // runs them with the built-in test runner. Arguments starting with "-" are
 // passed to node (e.g. --test-reporter=tap, --test-name-pattern=… from Flint's
 // test runner); the others are filters that keep only test files whose path
@@ -26,9 +27,13 @@ func runTests(root string, args []string) (int, error) {
 			filters = append(filters, a)
 		}
 	}
-	tests, err := findTests(filepath.Join(root, "src"), filters)
-	if err != nil {
-		return 1, err
+	var tests []string
+	for _, dir := range testDirs(root) {
+		found, err := findTests(dir, filters)
+		if err != nil {
+			return 1, err
+		}
+		tests = append(tests, found...)
 	}
 	if len(tests) == 0 {
 		return 1, errors.New("no test files found")
@@ -49,7 +54,7 @@ func runTests(root string, args []string) (int, error) {
 		AbsWorkingDir: root,
 		EntryPoints:   tests,
 		Outdir:        out,
-		Outbase:       filepath.Join(root, "src"),
+		Outbase:       filepath.Dir(root),
 		OutExtension:  map[string]string{".js": ".mjs"},
 		Bundle:        true,
 		Write:         true,
@@ -57,6 +62,7 @@ func runTests(root string, args []string) (int, error) {
 		Platform:      api.PlatformNode,
 		Target:        api.ESNext,
 		JSX:           api.JSXAutomatic,
+		NodePaths:     []string{filepath.Join(root, "node_modules")},
 		Sourcemap:     api.SourceMapInline,
 		Define:        map[string]string{"process.env.NODE_ENV": `"test"`},
 		// CSS imported by components is irrelevant under Node.
@@ -70,7 +76,7 @@ func runTests(root string, args []string) (int, error) {
 
 	nodeArgs := append([]string{"--enable-source-maps", "--test"}, nodeFlags...)
 	for _, t := range tests {
-		rel, _ := filepath.Rel(filepath.Join(root, "src"), t)
+		rel, _ := filepath.Rel(filepath.Dir(root), t)
 		nodeArgs = append(nodeArgs, filepath.Join(out, strings.TrimSuffix(rel, filepath.Ext(rel))+".mjs"))
 	}
 	cmd := exec.Command("node", nodeArgs...)
@@ -83,6 +89,20 @@ func runTests(root string, args []string) (int, error) {
 		return 1, fmt.Errorf("run node: %w", err)
 	}
 	return 0, nil
+}
+
+// testDirs is the app's src and, when present, the UI package's (../ui/src).
+func testDirs(root string) []string {
+	dirs := []string{filepath.Join(root, "src")}
+	if ui := filepath.Join(filepath.Dir(root), "ui", "src"); isDir(ui) {
+		dirs = append(dirs, ui)
+	}
+	return dirs
+}
+
+func isDir(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
 
 func findTests(src string, filters []string) ([]string, error) {

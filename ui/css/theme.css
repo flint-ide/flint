@@ -1,0 +1,126 @@
+/* Flint's theme for WunderUI. Hand-written (unlike the generated wunderui.css):
+   maps WunderUI's tokens onto Flint's palette from style.css, so the components
+   use Flint's amber accent, its surfaces, borders and text colors, and follow
+   Settings ▸ Appearance (including custom themes) with no extra work.
+
+   Loaded after wunderui.css and before style.css. These rules are unlayered and
+   at least as specific as WunderUI's `:root, .light` / `.dark` blocks, so they
+   win; the selectors also cover WunderUI's nested .light / .dark scopes. */
+
+/* ---------- both themes: everything that can follow a Flint variable ---------- */
+:root,
+.light,
+.dark {
+  --font-sans: var(--font-ui);
+
+  /* surfaces */
+  --background: var(--bg);
+  --bg-page: var(--bg);
+  --sidebar: var(--bg-sidebar);
+  --card: var(--bg-raised);
+  --card-foreground: var(--fg);
+  --popover: var(--bg-raised);
+  --popover-foreground: var(--fg);
+  --secondary: var(--bg-raised);
+  --secondary-foreground: var(--fg);
+  --muted: var(--bg-hover);
+  --muted-foreground: var(--fg-muted);
+  --subtle: var(--bg-active);
+  --wui-accent: var(--bg-hover);
+  --accent-foreground: var(--fg);
+
+  /* text */
+  --foreground: var(--fg);
+  --text-secondary: color-mix(in srgb, var(--fg) 72%, var(--fg-muted));
+  --text-tertiary: var(--fg-muted);
+  --text-link: var(--accent);
+  --text-link-hover: color-mix(in srgb, var(--accent) 80%, var(--fg));
+  --text-link-pressed: color-mix(in srgb, var(--accent) 65%, var(--fg));
+  --text-success: var(--ok);
+  --text-error: var(--danger);
+  --text-warning: var(--warn);
+
+  /* lines and focus */
+  --wui-border: var(--border);
+  --border-control: var(--border);
+  --input: var(--border);
+  --code-border: var(--border);
+  --ring: var(--accent);
+
+  /* brand = Flint's accent */
+  --primary: var(--brand-600);
+  --brand-primary: var(--brand-600);
+  --primary-foreground: var(--accent-fg);
+  --brand-primary-foreground: var(--accent-fg);
+  --tint-indigo: var(--brand-tint);
+  --tint-text-indigo: var(--brand-tint-text);
+
+  /* status */
+  --destructive: var(--git-deleted);
+  --destructive-foreground: #ffffff;
+  --success: var(--git-added);
+  --success-foreground: #ffffff;
+}
+
+/* ---------- dark: the amber scale around #f59e0b (Flint's dark accent) ---------- */
+:root,
+.dark {
+  --brand-50: #2a1d05;
+  --brand-100: #3d2a06;
+  --brand-200: #5c3d07;
+  --brand-300: #fcd34d;
+  --brand-400: #fbbf24;
+  --brand-500: #f8ab1c;
+  --brand-600: var(--accent);
+  --brand-700: #e08d09;
+  --brand-800: #c77a06;
+  --brand-900: #3d2a06;
+  --brand-1000: #1f1503;
+  --brand-tint: rgba(245, 158, 11, 0.16);
+  --brand-tint-text: #fcd34d;
+  --indigo-100: var(--brand-100);
+  --indigo-200: var(--brand-200);
+  --indigo-300: var(--brand-300);
+  --indigo-400: var(--brand-400);
+  --indigo-500: var(--brand-500);
+  --indigo-600: var(--brand-600);
+  --indigo-700: var(--brand-700);
+  --indigo-800: var(--brand-800);
+  --indigo-900: var(--brand-900);
+  --indigo-1000: var(--brand-1000);
+}
+
+/* ---------- light: the amber scale around #b45309 (Flint's light accent) ---------- */
+:root[data-theme='light'],
+.light {
+  --brand-50: #fffbeb;
+  --brand-100: #fef3c7;
+  --brand-200: #fde68a;
+  --brand-300: #fcd34d;
+  --brand-400: #d97706;
+  --brand-500: #c2620a;
+  --brand-600: var(--accent);
+  --brand-700: #92400e;
+  --brand-800: #78350f;
+  --brand-900: #451a03;
+  --brand-1000: #2b1002;
+  --brand-tint: #fef3c7;
+  --brand-tint-text: #92400e;
+  --primary-foreground: #ffffff;
+  --brand-primary-foreground: #ffffff;
+  --indigo-100: var(--brand-100);
+  --indigo-200: var(--brand-200);
+  --indigo-300: var(--brand-300);
+  --indigo-400: var(--brand-400);
+  --indigo-500: var(--brand-500);
+  --indigo-600: var(--brand-600);
+  --indigo-700: var(--brand-700);
+  --indigo-800: var(--brand-800);
+  --indigo-900: var(--brand-900);
+  --indigo-1000: var(--brand-1000);
+}
+
+/* The gradient button's top stop is a literal indigo in WunderUI's markup. */
+.from-\[\#5a5ef4\] {
+  --tw-gradient-from: color-mix(in srgb, var(--brand-600) 82%, #ffffff);
+}

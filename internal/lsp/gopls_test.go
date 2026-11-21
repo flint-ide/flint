@@ -213,10 +213,19 @@ func TestUnavailableServer(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "pipx install basedpyright") {
 		t.Errorf("err = %v, want install hint", err)
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	if last.State != StateUnavailable || last.Language != "python" {
-		t.Errorf("status = %+v", last)
+	// start() releases waiting requests before it emits the final status, so the
+	// status can arrive just after Completion returns.
+	var got Status
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		mu.Lock()
+		got = last
+		mu.Unlock()
+		if got.State == StateUnavailable || time.Now().After(deadline) {
+			break
+		}
+	}
+	if got.State != StateUnavailable || got.Language != "python" {
+		t.Errorf("status = %+v", got)
 	}
 }
 

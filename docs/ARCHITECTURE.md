@@ -171,6 +171,7 @@ internal/extensions/sandbox    the OS sandbox of extension processes: policy, La
 internal/features/extensions   the level-1 module: "extensions" settings section, ExtensionsAPI, MCP tools, hooks
 frontend/src/features/extensions   contributions per extension (extension:<id>), ExtensionPanel (tree, list), DeclarativeView (table, form, chart;
                                logic in lib/viewTable.ts, lib/chartScale.ts, formModel.ts), generated Settings page, Settings ▸ Extensions
+cmd/flint-webview              builds a webview page (TSX) with @flint-ide/ui (ui/) into one self-contained HTML file
 examples/extensions/stats      an example extension in Go (stdlib): tree and table panels, a chart tab; built and driven by host's conformance test
 examples/extensions/todos      an example of editor decorations and a quick fix, with its own conformance test
 ```

@@ -1,33 +1,19 @@
-import { useState } from 'react'
 import { closeContextMenu, useContextMenu } from '../../store/contextMenu'
-import { Menu, type DropdownItem } from './Dropdown'
+import { AppMenu } from './AppMenu'
 
-/** The menu opened by openContextMenu, anchored at the click position. */
+/** The menu opened by openContextMenu, at the click position (the UI kit's menu, AppMenu). */
 export function ContextMenu() {
   const menu = useContextMenu((s) => s.menu)
   if (!menu) return null
-  return <AnchoredMenu key={menu.seq} x={menu.x} y={menu.y} items={menu.items} minWidth={menu.minWidth} />
-}
-
-function AnchoredMenu({ x, y, items, minWidth }: { x: number; y: number; items: DropdownItem[]; minWidth: number }) {
-  // A zero-size element at the pointer stands in for the trigger a dropdown has.
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   return (
-    <>
-      <span ref={setAnchor} className="context-anchor" style={{ left: x, top: y }} />
-      {anchor && (
-        <Menu
-          anchor={anchor}
-          atPoint
-          items={items}
-          align="start"
-          searchable={false}
-          placeholder=""
-          minWidth={minWidth}
-          emptyText="Nothing here"
-          onClose={closeContextMenu}
-        />
-      )}
-    </>
+    <AppMenu
+      key={menu.seq}
+      at={{ left: menu.x, top: menu.y, width: 0, height: 0 }}
+      items={menu.items}
+      align="start"
+      minWidth={menu.minWidth}
+      emptyText="Nothing here"
+      onClose={closeContextMenu}
+    />
   )
 }

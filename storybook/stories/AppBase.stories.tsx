@@ -40,7 +40,7 @@ export const Controls: Story = {
           </span>
           <span className="badge" style={{ marginLeft: 0 }}>12</span>
         </div>
-        <div className="modal" style={{ position: 'static' }}>
+        <div className="modal" style={{ position: 'static', translate: 'none' }}>
           <div className="modal-title">New worktree</div>
           <div style={{ display: 'grid', gap: 8 }}>
             <input placeholder="feat/ui-kit" />

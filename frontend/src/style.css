@@ -1800,9 +1800,11 @@ button.small {
   font-weight: 600;
   margin-bottom: 12px;
 }
-.modal.confirm p {
-  margin: 0 0 16px;
+/* ConfirmDialog: multi-line messages keep their line breaks. */
+.confirm-dialog [data-slot='alert-dialog-description'] {
   white-space: pre-line;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .modal.peek {
   width: min(860px, 94vw);

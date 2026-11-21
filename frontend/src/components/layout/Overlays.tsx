@@ -9,11 +9,11 @@ import { SignInWithGitHub } from '../accounts/SignInWithGitHub'
 import { dismissNotice, showNeed, useAlerts } from '../../store/alerts'
 import { useEditor } from '../../store/editor'
 import { inAppNotice } from '../../lib/attention'
+import { Toasts } from './Toasts'
 
-/** Global confirm dialog, Sign in with GitHub, the Update Repository picker, context menu and toast notification. */
+/** Global confirm dialog, Sign in with GitHub, the Update Repository picker, context menu, toasts and the agent attention notice. */
 export function Overlays() {
   const confirm = useDialog((s) => s.confirm)
-  const toast = useDialog((s) => s.toast)
   const signIn = useAccounts((s) => s.dialog)
   const pullPicker = useGit((s) => s.pullPicker)
 
@@ -44,8 +44,8 @@ export function Overlays() {
       {pullPicker && <PullProjectPopup />}
       <AgentPeek />
       <ContextMenu />
+      <Toasts />
       <div className="toast-stack">
-        {toast && <div className={`toast ${toast.kind}`} role="status">{toast.message}</div>}
         <AttentionNotice />
       </div>
     </>
@@ -54,7 +54,7 @@ export function Overlays() {
 
 /**
  * An agent waits for an answer in a tab that is not the active one: a notice that stays until the
- * request is answered, shown or closed (the passing toast above it never replaces it). From the
+ * request is answered, shown or closed (passing toasts stack above it and never replace it). From the
  * keyboard: the command "Show Agent Waiting for You" does what Show does.
  */
 function AttentionNotice() {

@@ -8,7 +8,7 @@ require (
 	github.com/fsnotify/fsevents v0.2.0
 	github.com/godbus/dbus/v5 v5.2.4
 	github.com/google/pprof v0.0.0-20260709232956-b9395ee17fa0
-	github.com/jackc/pgx/v5 v5.12.0
+	github.com/jackc/pgx/v5 v5.13.0
 	github.com/wailsapp/wails/v3 v3.1.0
 	github.com/yuin/goldmark v1.8.7
 	github.com/zalando/go-keyring v0.2.8

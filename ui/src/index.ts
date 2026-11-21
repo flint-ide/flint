@@ -7,6 +7,8 @@
 export * from '@wunderui/react'
 
 export { AgentRow, type AgentRowProps, type AgentState } from './AgentRow'
+export { type ContextMenuApi, ContextMenuProvider, type ContextMenuProviderProps, useContextMenu } from './ContextMenu'
+export { contextMenuPoint, type ContextMenuEntry, type ContextMenuItems, visibleEntries } from './menuEntries'
 export { CommandPalette, type CommandPaletteProps, type PaletteCommand } from './CommandPalette'
 export { DiffStat, type DiffStatProps } from './DiffStat'
 export { EditorTabs, type EditorTab, type EditorTabsProps } from './EditorTabs'

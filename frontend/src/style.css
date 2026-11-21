@@ -1956,9 +1956,26 @@ button.small {
   user-select: text;
   -webkit-user-select: text;
 }
-.toast.error {
-  border-color: var(--danger);
-  color: var(--danger);
+/* The toast stack (Toasts.tsx, WunderUI's Toaster): above the status bar like
+   .toast-stack, and above the attention notice while it is shown. Messages keep
+   their line breaks and can be selected and copied (error output). */
+[data-slot='toast-viewport'][data-position='bottom-right'] {
+  bottom: 34px;
+  right: 14px;
+  width: min(460px, calc(100vw - 28px));
+}
+body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-right'] {
+  bottom: 84px;
+}
+[data-slot='toast-title'] {
+  font-size: 13px;
+  max-height: 40vh;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  font-weight: 500;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .notify-status.denied,
 .notify-status.unavailable,

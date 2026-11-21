@@ -124,3 +124,29 @@
 .from-\[\#5a5ef4\] {
   --tw-gradient-from: color-mix(in srgb, var(--brand-600) 82%, #ffffff);
 }
+
+/* ---------- Badge: the named colors on Flint's status palette ----------
+   Badge's light, light_border and border_color styles read --tint-<color> and
+   --tint-text-<color>; plain sets a fixed hex inline, so it needs !important. */
+:root,
+.light,
+.dark {
+  --tint-blue: color-mix(in srgb, var(--info) 16%, transparent);
+  --tint-text-blue: var(--info);
+  --tint-green: color-mix(in srgb, var(--ok) 16%, transparent);
+  --tint-text-green: var(--ok);
+  --tint-red: color-mix(in srgb, var(--danger) 16%, transparent);
+  --tint-text-red: var(--danger);
+  --tint-yellow: color-mix(in srgb, var(--warn) 16%, transparent);
+  --tint-text-yellow: var(--warn);
+  --tint-orange: var(--brand-tint);
+  --tint-text-orange: var(--brand-tint-text);
+}
+[data-slot='badge'][data-badgestyle='plain']:is([data-color='blue'], [data-color='green'], [data-color='red'], [data-color='yellow'], [data-color='orange']) {
+  color: var(--bg) !important;
+}
+[data-slot='badge'][data-badgestyle='plain'][data-color='blue'] { background: var(--info) !important; border-color: var(--info) !important; }
+[data-slot='badge'][data-badgestyle='plain'][data-color='green'] { background: var(--ok) !important; border-color: var(--ok) !important; }
+[data-slot='badge'][data-badgestyle='plain'][data-color='red'] { background: var(--danger) !important; border-color: var(--danger) !important; }
+[data-slot='badge'][data-badgestyle='plain'][data-color='yellow'] { background: var(--warn) !important; border-color: var(--warn) !important; }
+[data-slot='badge'][data-badgestyle='plain'][data-color='orange'] { background: var(--accent) !important; border-color: var(--accent) !important; }

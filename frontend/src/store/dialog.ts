@@ -1,4 +1,5 @@
 import { createStore } from '../lib/store'
+import { createToastChannel, type ToastKind, type ToastSink, toastDuration } from '../lib/toastChannel'
 
 interface ConfirmRequest {
   message: string
@@ -10,10 +11,9 @@ interface ConfirmRequest {
 
 interface DialogState {
   confirm: ConfirmRequest | null
-  toast: { message: string; kind: 'info' | 'error' } | null
 }
 
-export const useDialog = createStore<DialogState>(() => ({ confirm: null, toast: null }))
+export const useDialog = createStore<DialogState>(() => ({ confirm: null }))
 
 /** Shows an in-app confirmation (native window.confirm isn't available in the webview). */
 export function confirmAction(message: string, confirmLabel = 'OK'): Promise<boolean> {
@@ -48,10 +48,14 @@ export function chooseAction(message: string, confirmLabel: string, alternateLab
   })
 }
 
-let toastTimer: ReturnType<typeof setTimeout> | undefined
+const toasts = createToastChannel()
 
-export function showToast(message: string, kind: 'info' | 'error' = 'info', ms = kind === 'error' ? 6000 : 2500): void {
-  clearTimeout(toastTimer)
-  useDialog.setState({ toast: { message, kind } })
-  toastTimer = setTimeout(() => useDialog.setState({ toast: null }), ms)
+/** Attaches the toast stack (components/layout/Toasts.tsx); returns the detach function. */
+export function connectToasts(sink: ToastSink): () => void {
+  return toasts.connect(sink)
+}
+
+/** A passing notification in the bottom right corner. Toasts stack; the same message twice shows once. */
+export function showToast(message: string, kind: ToastKind = 'info', ms = toastDuration(kind)): void {
+  toasts.send({ message, kind, ms })
 }

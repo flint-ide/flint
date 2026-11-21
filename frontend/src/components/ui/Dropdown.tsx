@@ -13,10 +13,14 @@ import { createPortal } from 'react-dom'
 import { modKey } from '../../lib/platform'
 import { useListCursor } from '../../lib/useListCursor'
 import { useEventCallback } from '../../lib/useEventCallback'
+import { AppMenu } from './AppMenu'
 
 // The one popover menu used across Flint (title bar, "+" menu, selects, settings,
-// right-click context menus via store/contextMenu). Rendered in a portal with fixed
-// positioning so it never gets clipped by scrolling tab strips or panels.
+// right-click context menus via store/contextMenu). A menu without a filter box is
+// the UI kit's DropdownMenu (AppMenu.tsx); a long or searchable one is Menu below,
+// a list with a filter box on top, styled like the kit's (Base UI menus have no
+// text input). Both render in a portal with fixed positioning, so they never get
+// clipped by scrolling tab strips or panels.
 
 export type DropdownItem =
   | {
@@ -97,7 +101,7 @@ export function Dropdown({ trigger, items, align = 'start', searchable, placehol
         'data-open': open,
       })}
       {open && anchor.current && (
-        <Menu
+        <OpenMenu
           anchor={anchor.current}
           items={typeof items === 'function' ? items() : items}
           align={align}
@@ -110,6 +114,19 @@ export function Dropdown({ trigger, items, align = 'start', searchable, placehol
       )}
     </>
   )
+}
+
+/** The open menu: with a filter box (Menu) when asked for or long, the kit's otherwise (AppMenu). */
+function OpenMenu(props: Omit<MenuProps, 'atPoint'>) {
+  const { anchor, items, align, searchable, minWidth, emptyText, onClose } = props
+  const [at] = useState(() => boxOf(anchor))
+  if (searchable ?? items.filter(isItem).length >= AUTO_SEARCH_AT) return <Menu {...props} />
+  return <AppMenu at={at} items={items} align={align} minWidth={minWidth} emptyText={emptyText} onClose={onClose} trigger={anchor} />
+}
+
+function boxOf(el: HTMLElement) {
+  const r = el.getBoundingClientRect()
+  return { left: r.left, top: r.top, width: r.width, height: r.height }
 }
 
 export interface MenuProps {

@@ -1,4 +1,3 @@
-import { useDialog } from '../../store/dialog'
 import { useGit } from '../../store/git'
 import { PullProjectPopup } from '../git/PullProjectPopup'
 import { Modal } from './Modal'
@@ -9,29 +8,17 @@ import { SignInWithGitHub } from '../accounts/SignInWithGitHub'
 import { dismissNotice, showNeed, useAlerts } from '../../store/alerts'
 import { useEditor } from '../../store/editor'
 import { inAppNotice } from '../../lib/attention'
+import { ConfirmDialog } from './ConfirmDialog'
 import { Toasts } from './Toasts'
 
 /** Global confirm dialog, Sign in with GitHub, the Update Repository picker, context menu, toasts and the agent attention notice. */
 export function Overlays() {
-  const confirm = useDialog((s) => s.confirm)
   const signIn = useAccounts((s) => s.dialog)
   const pullPicker = useGit((s) => s.pullPicker)
 
   return (
     <>
-      {confirm && (
-        <Modal onClose={() => confirm.resolve(false)} className="confirm">
-          <p>{confirm.message}</p>
-          <div className="form-actions">
-            <span className="spacer" />
-            <button onClick={() => confirm.resolve(false)}>Cancel</button>
-            {confirm.alternateLabel && <button onClick={() => confirm.resolve(false, true)}>{confirm.alternateLabel}</button>}
-            <button className="danger" autoFocus onClick={() => confirm.resolve(true)}>
-              {confirm.confirmLabel}
-            </button>
-          </div>
-        </Modal>
-      )}
+      <ConfirmDialog />
       {signIn && (
         <Modal title="Sign in to GitHub" onClose={closeSignInDialog} className="signin-dialog">
           <SignInWithGitHub intro="This needs a GitHub account. Flint keeps its token in the system keyring and sends it only to GitHub's API." />

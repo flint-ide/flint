@@ -105,3 +105,41 @@
 .fui-agent-head { display: flex; align-items: baseline; gap: 6px; }
 .fui-agent-time { width: 32px; text-align: right; }
 .fui-agent-action { width: 32px; display: flex; justify-content: flex-end; }
+
+/* ContextMenu: the invisible point the shared menu opens at. */
+.fui-menu-anchor {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Dense: sidebar-sized controls. Put .fui-dense on <body> (a sidebar webview:
+   it reaches menus and lists rendered in portals too), on a popup
+   (DropdownMenuContent, ComboboxContent, ContextMenuProvider's className) or on
+   a panel. Menu and list rows become 24 px instead of 32, text 12 px. */
+.fui-dense {
+  --menu-item-py: 2px;
+}
+.fui-dense :is([data-slot='dropdown-menu-item'], [data-slot='dropdown-menu-sub-trigger'],
+  [data-slot='dropdown-menu-checkbox-item'], [data-slot='dropdown-menu-radio-item']) {
+  font-size: 12px;
+  line-height: 20px;
+}
+.fui-dense :is([data-slot='combobox-item'], [data-slot='select-item']) {
+  padding-block: 3px;
+  font-size: 12px;
+  line-height: 18px;
+}
+.fui-dense [data-slot='dropdown-menu-shortcut'] {
+  padding-left: 16px;
+  font-size: 11px;
+  letter-spacing: 0;
+}
+/* CollapsibleContent puts its body 16 px under the trigger. */
+.fui-dense [data-slot='collapsible-content'] > div > div {
+  padding-top: 4px;
+}

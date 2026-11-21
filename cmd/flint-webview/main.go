@@ -7,7 +7,10 @@
 // npm, and the page carries only the components and icons it uses.
 //
 //	go run ./cmd/flint-webview -o path/to/ext/ui/panel.html [-title Kubernetes] path/to/ext/webview/panel.tsx
+//	go run ./cmd/flint-webview -check [-o …] path/to/ext/webview/panel.tsx
 //
+// -check type checks the page's sources first (needs Node.js; see check.go);
+// without -o it only checks.
 // Run it from a Flint checkout after `npm ci --ignore-scripts` in frontend/.
 // The base webview styles (ui/css/webview.css) and the kit's styles are always
 // included; the entry renders into <div id="root">. WunderUI's rich text editor
@@ -39,14 +42,24 @@ const safariTarget = "16"
 func main() {
 	out := flag.String("o", "", "output HTML file (required)")
 	title := flag.String("title", "", "page <title> (default: the entry's file name)")
+	check := flag.Bool("check", false, "type check the page's sources (without -o: only check)")
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), "usage: flint-webview -o page.html [-title T] entry.tsx")
+		fmt.Fprintln(flag.CommandLine.Output(), "usage: flint-webview [-check] -o page.html [-title T] entry.tsx")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
-	if *out == "" || flag.NArg() != 1 {
+	if (*out == "" && !*check) || flag.NArg() != 1 {
 		flag.Usage()
 		os.Exit(2)
+	}
+	if *check {
+		if err := typecheck(".", flag.Arg(0)); err != nil {
+			fmt.Fprintln(os.Stderr, "flint-webview:", err)
+			os.Exit(1)
+		}
+		if *out == "" {
+			return
+		}
 	}
 	size, err := buildPage(".", flag.Arg(0), *out, *title)
 	if err != nil {

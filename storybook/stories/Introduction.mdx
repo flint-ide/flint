@@ -1,0 +1,34 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Introduction" />
+
+# Flint UI
+
+Flint's UI kit, **`@flint-ide/ui`** (`ui/` in the repository): every [WunderUI](https://wunderui.com/) component (MIT, built on Base UI) on Flint's palette, [Lucide](https://lucide.dev/) icons, and Flint's own compositions (**Flint ▸ Workbench / Panels**). The **Flint ▸ Dropdown & Select** stories are the app's older menus. WunderUI is a build of its repository (`third_party/wunderui/`), newer than the 0.3.0 release on npm.
+
+Use the **Theme** switch in the toolbar to see every story in Flint's dark and light themes. The stories load the same CSS as the app, in the same order: `@flint-ide/ui/styles.css` (`ui/css`: the generated `wunderui.css`, `theme.css` mapping WunderUI's tokens onto Flint's palette, the compositions' `components.css`), then `frontend/src/style.css`.
+
+## Using a component in Flint
+
+```tsx
+import { Button, Badge, Alert, AlertTitle, StatusBar, StatusItem } from '@flint-ide/ui'
+import { Play } from '@flint-ide/ui/icons'
+
+<Button size="sm">
+  <Play data-icon="inline-start" /> Run
+</Button>
+```
+
+- The same kit builds extension webviews: `go run ./cmd/flint-webview -o ui/panel.html webview/panel.tsx` (see `docs/DEVELOPMENT.md` ▸ UI components).
+- Lay out with Flint's CSS; don't write Tailwind classes in Flint's code. `wunderui.css` holds only the utilities the WunderUI package uses, so a class only Flint uses would be missing.
+- After changing the `@wunderui/react` version, regenerate the CSS: `go run ./cmd/wuicss` (see `docs/DEVELOPMENT.md` ▸ UI components).
+- WunderUI elements carry `data-slot`. Flint's base `button`, `input`, `select` and `kbd` rules skip them, and a scoped Tailwind preflight resets them instead.
+
+## Running Storybook
+
+```bash
+cd storybook
+npm ci --ignore-scripts
+npm run storybook   # http://localhost:6006
+npm run build       # static site in storybook/dist
+```

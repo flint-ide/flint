@@ -1,0 +1,63 @@
+/* Flint's style.css locks the window (overflow hidden, no text selection) for the
+   app shell; a story page has to scroll and let you copy text. */
+html,
+body,
+#storybook-root,
+#storybook-docs {
+  height: auto;
+  min-height: 100%;
+  overflow: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Layout helpers for stories only. */
+.sb-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.sb-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+.sb-label {
+  width: 110px;
+  flex-shrink: 0;
+  font: 12px var(--font-mono);
+  color: var(--fg-muted);
+}
+.sb-icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 4px;
+}
+.sb-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 4px;
+  border-radius: 8px;
+  color: var(--fg);
+  font-size: 11px;
+}
+.sb-icon:hover {
+  background: var(--bg-hover);
+}
+.sb-icon span {
+  color: var(--fg-muted);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.sb-search {
+  width: 280px;
+  margin-bottom: 12px;
+}

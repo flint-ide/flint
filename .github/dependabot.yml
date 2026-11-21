@@ -12,6 +12,12 @@ updates:
     groups:
       npm-minor:
         update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /storybook
+    schedule: { interval: weekly }
+    groups:
+      storybook-minor:
+        update-types: [minor, patch]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }

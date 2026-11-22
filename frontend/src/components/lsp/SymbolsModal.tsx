@@ -9,6 +9,7 @@ import { filterSymbols, symbolKindName } from '../../lib/lspText'
 import { Modal } from '../layout/Modal'
 import { useListCursor } from '../../lib/useListCursor'
 import { useEventCallback } from '../../lib/useEventCallback'
+import { PaletteSearch } from '../ui/PaletteSearch'
 
 const QUERY_DELAY_MS = 150
 
@@ -109,12 +110,10 @@ export function SymbolsModal() {
 
   return (
     <Modal onClose={close} className="quick-open symbols">
-      <input
+      <PaletteSearch
         autoFocus
-        className="quick-input"
         placeholder={workspace ? 'Go to symbol in workspace…' : 'Go to symbol in this file…'}
         value={query}
-        spellCheck={false}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={onKeyDown}
       />

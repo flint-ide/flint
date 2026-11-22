@@ -7,6 +7,7 @@ import { Modal } from './layout/Modal'
 import { FileIcon } from './icons/FileIcon'
 import { useListCursor } from '../lib/useListCursor'
 import { useEventCallback } from '../lib/useEventCallback'
+import { PaletteSearch } from './ui/PaletteSearch'
 
 const MAX_RESULTS = 60
 const STALE_MS = 15_000
@@ -66,12 +67,10 @@ export function QuickOpen() {
 
   return (
     <Modal onClose={close} className="quick-open">
-      <input
+      <PaletteSearch
         autoFocus
-        className="quick-input"
         placeholder={root ? `Go to file… (${fileCount.toLocaleString()} files)` : 'Open a folder first'}
         value={query}
-        spellCheck={false}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={onKeyDown}
       />

@@ -9,6 +9,7 @@ import { NewWorktreeForm } from './NewWorktreeForm'
 import { Icon } from '../ui/Icon'
 import { Button, IconButton, Input } from '@flint-ide/ui'
 import { ExternalLink, X } from '@flint-ide/ui/icons'
+import { PaletteSearch } from '../ui/PaletteSearch'
 
 /** IntelliJ-like branches popup: filter, checkout, new branch, worktrees, remote ops. */
 export function BranchesPopup({ onClose, initialMode = 'list' }: { onClose: () => void; initialMode?: BranchesMode }) {
@@ -113,7 +114,7 @@ export function BranchesPopup({ onClose, initialMode = 'list' }: { onClose: () =
         </form>
       ) : (
         <>
-          <input autoFocus className="quick-input" placeholder="Search branches and worktrees" value={filter} spellCheck={false} onChange={(e) => setFilter(e.target.value)} />
+          <PaletteSearch autoFocus placeholder="Search branches and worktrees" value={filter} onChange={(e) => setFilter(e.target.value)} />
           <div className="quick-list">
             <PopupAction label="＋ New Branch…" onClick={() => setMode('new-branch')} />
             <PopupAction label="＋ New Worktree…" hint="separate folder + terminal for an agent" onClick={() => setMode('new-worktree')} />

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSettings } from '../../store/settings'
 import { DEFAULT_USAGE, formatPrices, parsePrices, USAGE_LIMITS, type UsageSettings } from '../../lib/usageSettings'
 import { NumberField, Row } from './fields'
+import { Button, Switch, Textarea } from '@flint-ide/ui'
 
 /** Settings ▸ Usage: how long usage is kept, budgets, and prices for estimates. */
 export function UsageSection() {
@@ -39,16 +40,16 @@ export function UsageSection() {
         label="Count cached input in token budgets"
         hint="Off: token budgets leave out input read from the prompt cache, which a long Claude chat re-reads on every call and which costs a fraction of fresh input."
       >
-        <input type="checkbox" checked={u.countCacheReads} onChange={(e) => set({ countCacheReads: e.target.checked })} />
+        <Switch checked={u.countCacheReads} onCheckedChange={(checked) => set({ countCacheReads: checked })} />
       </Row>
       <Row label="Pause new turns over budget" hint="A chat over budget doesn't send new messages until you choose Continue anyway in its warning.">
-        <input type="checkbox" checked={u.pauseOverBudget} onChange={(e) => set({ pauseOverBudget: e.target.checked })} />
+        <Switch checked={u.pauseOverBudget} onCheckedChange={(checked) => set({ pauseOverBudget: checked })} />
       </Row>
 
       <h3>Prices</h3>
       <PricesField />
       <div className="settings-actions">
-        <button disabled={JSON.stringify(u) === JSON.stringify(DEFAULT_USAGE)} onClick={() => update({ usage: DEFAULT_USAGE })}>Reset to Defaults</button>
+        <Button variant="plain" disabled={JSON.stringify(u) === JSON.stringify(DEFAULT_USAGE)} onClick={() => update({ usage: DEFAULT_USAGE })}>Reset to Defaults</Button>
       </div>
     </section>
   )
@@ -70,8 +71,9 @@ function PricesField() {
       hint={'One "model input output [cached]" per line, in USD per million tokens, for agents that report no cost (Codex). The model name must match the Usage panel. Without a cached-input price, cached tokens are left out of the estimate. Costs computed from these are marked as estimates.'}
     >
       <div className="settings-control settings-control-stack">
-        <textarea
-          className={`settings-textarea${invalid.length ? ' invalid' : ''}`}
+        <Textarea
+          className="settings-text settings-multiline"
+          aria-invalid={invalid.length > 0 || undefined}
           value={draft}
           spellCheck={false}
           placeholder={'gpt-5-codex 1.25 10 0.125'}

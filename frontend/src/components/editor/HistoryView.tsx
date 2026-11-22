@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Button } from '@flint-ide/ui'
 import { Git, useHeadVersion } from '../../store/git'
 import { revisionDiffTabId, type DiffTab, type HistoryTab } from '../../store/editor'
 import { compareWithCurrent, openCommitDiff, type FileRevision } from '../../store/gitHistory'
@@ -85,22 +86,24 @@ export function HistoryView({ tab, active }: { tab: HistoryTab; active: boolean 
         <span className="truncate" title={tab.path}>History of {tab.path.split('/').pop()}</span>
         <span className="muted">{history ? `${commits.length}${commits.length === LIMIT ? '+' : ''} commits` : ''}</span>
         <span className="spacer" />
-        <button
-          className="link"
+        <Button
+          variant="ghost"
+          size="sm"
           disabled={!current}
           title="Open this commit's change in its own diff tab (↵)"
           onClick={() => history && current && openCommitDiff(history.root, revisionOf(current))}
         >
           Open in tab
-        </button>
-        <button
-          className="link"
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           disabled={!current}
           title="Compare the file at this commit with the working tree"
           onClick={() => history && current && compareWithCurrent(history.root, current.commit.hash, current.path, tab.path)}
         >
           Compare with current
-        </button>
+        </Button>
       </div>
       {error && <div className="placeholder error selectable">{error}</div>}
       {!history && !error && <div className="placeholder">Loading…</div>}

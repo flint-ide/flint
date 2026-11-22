@@ -1,3 +1,5 @@
+import { IconButton } from '@flint-ide/ui'
+import { RefreshCw, SquareTerminal } from '@flint-ide/ui/icons'
 import { useEffect, useState, type MouseEvent } from 'react'
 import { errorMessage, type Connection, type DatabaseInfo, type Table } from '../../../api/backend'
 import { defaultDatabase, previewQuery, resolveDatabase, schemaKey } from '../lib/databases'
@@ -93,8 +95,8 @@ function DatabaseNode({ conn, info }: { conn: Connection; info: DatabaseInfo }) 
         <DatabaseIcon />
         <span className={`schema-name${isDefault ? ' default-db' : ''}`}>{info.name}</span>
         <span className="row-actions" onClick={(e) => e.stopPropagation()}>
-          <button className="icon" title="New SQL console in this database" onClick={newConsole}>⌨</button>
-          <button className="icon" title="Refresh schema" onClick={refresh}>↻</button>
+          <IconButton variant="ghost" size="sm" aria-label="New SQL console in this database" title="New SQL console in this database" onClick={newConsole}><SquareTerminal /></IconButton>
+          <IconButton variant="ghost" size="sm" aria-label="Refresh schema" title="Refresh schema" onClick={refresh}><RefreshCw /></IconButton>
         </span>
       </div>
       {open && (

@@ -1,3 +1,4 @@
+import { Button, Checkbox } from '@flint-ide/ui'
 import { useSettings } from '../../store/settings'
 import { Row } from '../../components/settings/fields'
 import { checkForUpdates, useUpdate } from './store'
@@ -11,10 +12,10 @@ export function UpdatesSection() {
     <section>
       <h2>Updates</h2>
       <Row label="Check for new releases" hint="Once a day Flint asks GitHub which release is the latest and shows a notice in the status bar when there is a newer one.">
-        <input type="checkbox" checked={enabled} onChange={(e) => update({ checkForUpdates: e.target.checked })} />
+        <Checkbox checked={enabled} onCheckedChange={(checked) => update({ checkForUpdates: checked })} />
       </Row>
       <div className="settings-actions">
-        <button disabled={checking} onClick={() => void checkForUpdates()}>{checking ? 'Checking…' : 'Check Now'}</button>
+        <Button variant="plain" disabled={checking} onClick={() => void checkForUpdates()}>{checking ? 'Checking…' : 'Check Now'}</Button>
       </div>
       <p className="muted settings-note">
         The check is one anonymous request to api.github.com for the latest release of flint-ide/flint, with Flint's version in the User-Agent and no

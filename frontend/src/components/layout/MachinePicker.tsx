@@ -1,3 +1,4 @@
+import { Button } from '@flint-ide/ui'
 import { useSettings } from '../../store/settings'
 import { useEditor } from '../../store/editor'
 import { closeMachinePicker, newTerminalOnMachine, useMachines } from '../../store/machines'
@@ -31,9 +32,9 @@ export function MachinePicker() {
                   <span className="tool-name selectable">{machineLabel(m)}</span>
                   <span className="muted selectable">{m.port ? `${m.target}:${m.port}` : m.target}</span>
                   <span className="spacer" />
-                  <button autoFocus={m === machines[0]} onClick={() => pick(m.id)}>
+                  <Button variant="plain" size="sm" autoFocus={m === machines[0]} onClick={() => pick(m.id)}>
                     Open Terminal
-                  </button>
+                  </Button>
                 </div>
                 {status && state !== 'idle' && state !== 'closed' && <div className="muted">{machineLine(status)}</div>}
               </div>
@@ -42,18 +43,19 @@ export function MachinePicker() {
         })}
       </div>
       <div className="form-actions">
-        <button
+        <Button
+          variant="plain"
           onClick={() => {
             closeMachinePicker()
             useEditor.getState().openSettings('machines')
           }}
         >
           Machines Settings…
-        </button>
+        </Button>
         <span className="spacer" />
-        <button className="primary" onClick={closeMachinePicker}>
+        <Button variant="primary" onClick={closeMachinePicker}>
           Close
-        </button>
+        </Button>
       </div>
     </Modal>
   )

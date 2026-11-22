@@ -1,4 +1,5 @@
 import { copyHookSnippet } from '../../store/terminalAgent'
+import { Button } from '@flint-ide/ui'
 
 /** Settings ▸ Agents ▸ Claude in a terminal tab: hooks that make the tab show what Claude is doing. */
 export function TerminalAgentSection() {
@@ -12,7 +13,7 @@ export function TerminalAgentSection() {
         hooks from <code>--settings</code> with your own has not been verified.
       </p>
       <div className="settings-actions">
-        <button onClick={() => void copyHookSnippet()}>Copy hook snippet</button>
+        <Button variant="plain" onClick={() => void copyHookSnippet()}>Copy hook snippet</Button>
       </div>
     </>
   )

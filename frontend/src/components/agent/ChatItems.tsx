@@ -1,4 +1,5 @@
 import { memo, useMemo, useState, type ReactNode } from 'react'
+import { Button } from '@flint-ide/ui'
 import type { Diff, PermissionRequest, PlanEntry, ToolCall, Usage, UsageTotals } from '../../lib/agentReducer'
 import { contextPercent, formatCost, formatTokens, hasUsage, usageTooltip } from '../../lib/usage'
 import { countLines, previewLines, useHunks } from '../../lib/editDiff'
@@ -127,9 +128,9 @@ export function FileLink({ path, root }: { path: string; root: string }) {
   const openFile = useEditor((s) => s.openFile)
   const rel = root && path.startsWith(root + '/') ? path.slice(root.length + 1) : path
   return (
-    <button className="link file-link" onClick={() => openFile(path)} title={path}>
+    <Button variant="link" size="sm" className="file-link" onClick={() => openFile(path)} title={path}>
       {rel}
-    </button>
+    </Button>
   )
 }
 
@@ -154,13 +155,14 @@ export const PermissionCard = memo(function PermissionCard(props: {
       ) : (
         <div className="permission-actions">
           {request.options.map((o) => (
-            <button
+            <Button
               key={o.id}
-              className={o.kind.startsWith('allow') ? (o.kind === 'allow_once' ? 'primary' : '') : 'danger'}
+              size="sm"
+              variant={o.kind.startsWith('allow') ? (o.kind === 'allow_once' ? 'primary' : 'plain') : 'destructive'}
               onClick={() => onAnswer(o.id, o.name)}
             >
               {o.name}
-            </button>
+            </Button>
           ))}
         </div>
       )}

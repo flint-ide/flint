@@ -1,3 +1,4 @@
+import { Button } from '@flint-ide/ui'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import type { EditorView } from '@codemirror/view'
 import { Database, errorMessage, type Connection, type ExplainResult, type HistoryEntry, type QueryResult } from '../../../api/backend'
@@ -249,20 +250,24 @@ export function QueryPanel({ tabId, scratchId, connId, database, runner, editor,
           />
         )}
         {state.running ? (
-          <button className="danger" onClick={runner.cancel}>■ Cancel</button>
+          <Button variant="destructive" size="sm" onClick={runner.cancel}>■ Cancel</Button>
         ) : (
-          <button className="primary" onClick={() => view.current && runner.runAtCursor(view.current)} title={`Run statement under cursor or selection (${formatKeys('Mod+Enter')})`}>
+          <Button variant="primary" size="sm" onClick={() => view.current && runner.runAtCursor(view.current)} title={`Run statement under cursor or selection (${formatKeys('Mod+Enter')})`}>
             ▶ Run
-          </button>
+          </Button>
         )}
-        <button
+        <Button
+          variant="plain"
+          size="sm"
           disabled={state.running || !conn}
           onClick={() => view.current && runner.explainAtCursor(view.current, false)}
           title={`${isClickHouse ? 'EXPLAIN PLAN of' : 'EXPLAIN'} the statement under the cursor (${formatKeys('Mod+Shift+E')})`}
         >
           Explain
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="plain"
+          size="sm"
           disabled={state.running || !conn}
           onClick={() => view.current && runner.explainAtCursor(view.current, true)}
           title={
@@ -272,7 +277,7 @@ export function QueryPanel({ tabId, scratchId, connId, database, runner, editor,
           }
         >
           {isClickHouse ? 'Pipeline' : 'Analyze'}
-        </button>
+        </Button>
         <Select
           size="sm"
           label="limit"
@@ -282,9 +287,9 @@ export function QueryPanel({ tabId, scratchId, connId, database, runner, editor,
           title="Maximum rows fetched"
         />
         <span className="spacer" />
-        <button disabled={!conn} onClick={() => setHistoryOpen(true)} title={`Statements run on this connection (${formatKeys('Mod+Shift+H')})`}>
+        <Button variant="plain" size="sm" disabled={!conn} onClick={() => setHistoryOpen(true)} title={`Statements run on this connection (${formatKeys('Mod+Shift+H')})`}>
           History
-        </button>
+        </Button>
       </div>
       <div className="query-split">
         <div style={{ flex: `${split} 1 0` }} className="query-editor">{editor}</div>

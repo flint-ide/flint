@@ -1,3 +1,4 @@
+import { Button, Checkbox } from '@flint-ide/ui'
 import { memo, useEffect, useState } from 'react'
 import { Database, errorMessage, historyFilter, type HistoryEntry } from '../../../api/backend'
 import { formatDuration } from '../../../lib/format'
@@ -98,7 +99,7 @@ export function QueryHistory({ connId, connName, driver, database, onInsert, onR
           onKeyDown={onKeyDown}
         />
         <label className="history-scope" title="Show statements run on every database of this connection">
-          <input type="checkbox" checked={allDatabases} onChange={(e) => setAllDatabases(e.target.checked)} />
+          <Checkbox checked={allDatabases} onCheckedChange={setAllDatabases} />
           All databases
         </label>
       </div>
@@ -125,7 +126,7 @@ export function QueryHistory({ connId, connName, driver, database, onInsert, onR
       <div className="history-footer muted">
         <span>↵ insert · {formatKeys('Mod+Enter')} run · {formatKeys('Mod+C')} copy</span>
         <span className="spacer" />
-        <button className="link" onClick={() => void clear()}>Clear History…</button>
+        <Button variant="ghost" size="sm" onClick={() => void clear()}>Clear History…</Button>
       </div>
     </Modal>
   )
@@ -171,9 +172,9 @@ const HistoryRow = memo(function HistoryRow({ entry, index, selected, badge, whe
         {entry.error && <span className="history-error">{entry.error}</span>}
         <span className="spacer" />
         <span className="row-actions">
-          <button className="link" onClick={() => onInsert(entry)} title="Insert into the editor (↵)">Insert</button>
-          {canRun(entry) && <button className="link" onClick={() => onRun(entry)} title={`Run again (${formatKeys('Mod+Enter')})`}>Run</button>}
-          <button className="link" onClick={() => void copy(entry)} title={`Copy (${formatKeys('Mod+C')})`}>Copy</button>
+          <Button variant="ghost" size="sm" onClick={() => onInsert(entry)} title="Insert into the editor (↵)">Insert</Button>
+          {canRun(entry) && <Button variant="ghost" size="sm" onClick={() => onRun(entry)} title={`Run again (${formatKeys('Mod+Enter')})`}>Run</Button>}
+          <Button variant="ghost" size="sm" onClick={() => void copy(entry)} title={`Copy (${formatKeys('Mod+C')})`}>Copy</Button>
         </span>
       </div>
     </div>

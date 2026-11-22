@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSettings } from '../../store/settings'
 import { loadPrompts, openPromptDialog } from '../../store/prompts'
 import { Row } from './fields'
+import { Button, Switch } from '@flint-ide/ui'
 
 /** Settings ▸ Agents ▸ Prompts: the "/" prompt library of the agent chat. */
 export function PromptsSection() {
@@ -15,13 +16,13 @@ export function PromptsSection() {
     <>
       <h3>Prompts</h3>
       <Row label="Offer Flint's built-in prompts" hint="/review, /test, /explain and /fix. A personal or repository prompt with the same name replaces one.">
-        <input type="checkbox" checked={builtins} onChange={(e) => update((s) => ({ prompts: { ...s.prompts, builtins: e.target.checked } }))} />
+        <Switch checked={builtins} onCheckedChange={(checked) => update((s) => ({ prompts: { ...s.prompts, builtins: checked } }))} />
       </Row>
       <Row label="Personal prompts" hint="Markdown files for you only, in every folder. Repository prompts live in a folder's .flint/prompts and override personal ones with the same name.">
         <span className="selectable muted">{personalDir || '…'}</span>
       </Row>
       <div className="settings-actions">
-        <button onClick={() => openPromptDialog('new')}>New Prompt…</button>
+        <Button variant="plain" onClick={() => openPromptDialog('new')}>New Prompt…</Button>
       </div>
     </>
   )

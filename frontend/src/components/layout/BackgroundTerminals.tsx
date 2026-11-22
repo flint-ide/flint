@@ -1,3 +1,4 @@
+import { Button } from '@flint-ide/ui'
 import { useTerminal } from '../../store/terminal'
 import {
   attachBackgroundTerminal, closeBackgroundTerminals, endBackgroundTerminal, useBackgroundTerminals,
@@ -28,8 +29,8 @@ export function BackgroundTerminals() {
               <div className="tool-head">
                 <span className="tool-name selectable">{backgroundTerminalLabel(t, i)}</span>
                 <span className="spacer" />
-                <button onClick={() => attachBackgroundTerminal(t.id)}>Attach</button>
-                <button onClick={() => void endBackgroundTerminal(t.id)}>End</button>
+                <Button variant="plain" size="sm" onClick={() => attachBackgroundTerminal(t.id)}>Attach</Button>
+                <Button variant="plain" size="sm" onClick={() => void endBackgroundTerminal(t.id)}>End</Button>
               </div>
             </div>
           </div>
@@ -37,7 +38,7 @@ export function BackgroundTerminals() {
       </div>
       <div className="form-actions">
         <span className="spacer" />
-        <button className="primary" autoFocus onClick={closeBackgroundTerminals}>Done</button>
+        <Button variant="primary" autoFocus onClick={closeBackgroundTerminals}>Done</Button>
       </div>
     </Modal>
   )

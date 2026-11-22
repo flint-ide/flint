@@ -25,16 +25,18 @@ import {
   type TaskInfo,
 } from './projects'
 import { addContext, cancelStart, delegateItem, itemKey, openContext, openItemFile, openItemTask, renameOldConfig, setStatus, useProjects } from './store'
+import { Button } from '@flint-ide/ui'
+import { MarkerBadge, TaskStateBadge } from '../../components/tasks/badges'
 
 /** The note on a project in the Backlog preview's format, with its one action (the panel and the board). */
 export function OldFormatNote({ folder }: { folder: string }) {
   return (
     <div className="project-untrusted project-old-format" role="status">
-      <span className="project-marker warn">Old format</span>
+      <MarkerBadge tone="warn">Old format</MarkerBadge>
       <span className="muted">{OLD_FORMAT_NOTE}</span>
-      <button className="link" onClick={() => void renameOldConfig(folder)} title="Flint asks first; the file's content stays as it is">
+      <Button variant="ghost" size="sm" onClick={() => void renameOldConfig(folder)} title="Flint asks first; the file's content stays as it is">
         {RENAME_ACTION}…
-      </button>
+      </Button>
     </div>
   )
 }
@@ -47,10 +49,10 @@ export function ProjectContext({ project }: { project: ProjectData }) {
       <span className="muted">Context:</span>
       <span className={line.problem ? 'error' : line.action === 'open' ? '' : 'muted'}>{line.text}</span>
       {line.action === 'open' && (
-        <button className="link" onClick={() => openContext(project)} title={`Open ${project.context.path}`}>Open</button>
+        <Button variant="ghost" size="sm" onClick={() => openContext(project)} title={`Open ${project.context.path}`}>Open</Button>
       )}
       {line.action === 'add' && (
-        <button className="link" onClick={() => void addContext(project.path)} title="Write PROJECT.md from a template and open it">Add Project Context…</button>
+        <Button variant="ghost" size="sm" onClick={() => void addContext(project.path)} title="Write PROJECT.md from a template and open it">Add Project Context…</Button>
       )}
     </span>
   )
@@ -62,8 +64,8 @@ export function ItemTitle({ item, items }: { item: ItemInfo; items: readonly Ite
   return (
     <>
       <span className="file-name" title={item.body ? `${item.title}\n\n${item.body}` : item.title}>{item.title}</span>
-      {item.failed && <span className="task-state failed" title="An agent task of this item failed: the item stays in doing">failed</span>}
-      {dep && <span className={`project-marker ${dep.cls}`} title={dep.hint}>{dep.label}</span>}
+      {item.failed && <TaskStateBadge state="failed" title="An agent task of this item failed: the item stays in doing">failed</TaskStateBadge>}
+      {dep && <MarkerBadge tone={dep.cls} title={dep.hint}>{dep.label}</MarkerBadge>}
       <span className={`project-prio ${item.priority}`} title={`${item.priority} priority`}>{item.priority}</span>
     </>
   )
@@ -78,7 +80,7 @@ export function ItemMeta({ item, project }: { item: ItemInfo; project: ProjectDa
     <div className="project-meta muted">
       <span title={item.agentProblem || `Runs with ${agent}`} className={item.agentProblem ? 'error' : ''}>✦ {agent}</span>
       <span title={item.together ? 'The repositories one agent works in together' : 'The repositories Delegate starts an agent task in'}>{reposText(item)}</span>
-      {together && <span className={`project-marker ${together.cls}`} title={together.hint}>{together.label}</span>}
+      {together && <MarkerBadge tone={together.cls} title={together.hint}>{together.label}</MarkerBadge>}
     </div>
   )
 }
@@ -121,13 +123,13 @@ function TaskLine({ t, all }: { t: TaskInfo; all: TaskInfo[] }) {
   const pill = taskPill(t)
   return (
     <div className="project-task">
-      <span className={`task-state ${pill.cls}`} title={t.gone ? `${pill.hint} (the task was removed)` : pill.hint}>{pill.label}</span>
+      <TaskStateBadge state={pill.cls} title={t.gone ? `${pill.hint} (the task was removed)` : pill.hint}>{pill.label}</TaskStateBadge>
       <span className="project-task-repo muted" title={t.branch ? `${t.title}\n${t.branch}` : taskRepo(t)}>{taskRepo(t)}</span>
-      {t.joint && t.lead && <span className="project-marker" title="The lead of the group: the one chat runs in this task's worktree">lead</span>}
+      {t.joint && t.lead && <MarkerBadge title="The lead of the group: the one chat runs in this task's worktree">lead</MarkerBadge>}
       {canOpenTask(t, all) && (
-        <button className="link" onClick={() => void openItemTask(t)} title={t.joint && !t.lead ? "Open the group's chat (in the lead task's folder)" : 'Open the folder and the agent chat'}>Open</button>
+        <Button variant="ghost" size="sm" onClick={() => void openItemTask(t)} title={t.joint && !t.lead ? "Open the group's chat (in the lead task's folder)" : 'Open the folder and the agent chat'}>Open</Button>
       )}
-      {t.pullRequest && <button className="link" onClick={() => BrowserOpenURL(t.pullRequest)} title={t.pullRequest}>PR ↗</button>}
+      {t.pullRequest && <Button variant="ghost" size="sm" onClick={() => BrowserOpenURL(t.pullRequest)} title={t.pullRequest}>PR ↗</Button>}
     </div>
   )
 }
@@ -139,7 +141,7 @@ export function ItemActions({ project, item }: { project: ProjectData; item: Ite
   if (project.oldFormat) {
     return (
       <div className="task-actions project-actions">
-        <button className="link" onClick={() => openItemFile(item)} title={item.path}>Open</button>
+        <Button variant="ghost" size="sm" onClick={() => openItemFile(item)} title={item.path}>Open</Button>
       </div>
     )
   }
@@ -152,11 +154,11 @@ export function ItemActions({ project, item }: { project: ProjectData; item: Ite
         : 'Start one agent task per repository of the item'
   return (
     <div className="task-actions project-actions">
-      <button className="link" disabled={busy} onClick={() => void delegateItem(project.path, item.id)} title={hint}>Delegate</button>
+      <Button variant="ghost" size="sm" disabled={busy} onClick={() => void delegateItem(project.path, item.id)} title={hint}>Delegate</Button>
       {item.waiting && (
-        <button className="link" disabled={busy} onClick={() => void cancelStart(project.path, item.id)} title="Don't start this item by itself when its dependencies are done">Cancel start</button>
+        <Button variant="ghost" size="sm" disabled={busy} onClick={() => void cancelStart(project.path, item.id)} title="Don't start this item by itself when its dependencies are done">Cancel start</Button>
       )}
-      <button className="link" onClick={() => openItemFile(item)} title={item.path}>Open</button>
+      <Button variant="ghost" size="sm" onClick={() => openItemFile(item)} title={item.path}>Open</Button>
       <Dropdown
         minWidth={140}
         items={BOARD_STATUSES.map((s) => ({
@@ -166,7 +168,7 @@ export function ItemActions({ project, item }: { project: ProjectData; item: Ite
           onSelect: () => item.status !== s && void setStatus(project.path, item.id, s),
         }))}
         trigger={(t) => (
-          <button {...t} className="link" title="Set the item's status">Status ⌄</button>
+          <Button variant="ghost" size="sm" {...t} title="Set the item's status">Status ⌄</Button>
         )}
       />
     </div>

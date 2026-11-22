@@ -1,3 +1,4 @@
+import { Button, Checkbox, Input } from '@flint-ide/ui'
 import { useState } from 'react'
 import { Database, errorMessage, newConnection, type Connection, type Driver } from '../../../api/backend'
 import { db } from '../../../wails/models'
@@ -71,16 +72,16 @@ export function ConnectionForm({ initial, onClose }: Props) {
         </label>
         <label>
           Name
-          <input value={conn.name} placeholder="prod-analytics" onChange={(e) => update({ name: e.target.value })} />
+          <Input value={conn.name} placeholder="prod-analytics" onChange={(e) => update({ name: e.target.value })} />
         </label>
         <div className="form-row">
           <label className="grow">
             Host
-            <input value={conn.host} onChange={(e) => update({ host: e.target.value })} required />
+            <Input value={conn.host} onChange={(e) => update({ host: e.target.value })} required />
           </label>
           <label className="port">
             Port
-            <input
+            <Input
               type="number"
               value={conn.port || ''}
               placeholder={String(defaultPort)}
@@ -90,16 +91,16 @@ export function ConnectionForm({ initial, onClose }: Props) {
         </div>
         <label>
           Default database <span className="muted">(optional — every database on the server is listed)</span>
-          <input value={conn.database} placeholder={isClickHouse ? 'default' : 'postgres'} onChange={(e) => update({ database: e.target.value })} />
+          <Input value={conn.database} placeholder={isClickHouse ? 'default' : 'postgres'} onChange={(e) => update({ database: e.target.value })} />
         </label>
         <div className="form-row">
           <label className="grow">
             User
-            <input value={conn.user} onChange={(e) => update({ user: e.target.value })} required autoComplete="off" />
+            <Input value={conn.user} onChange={(e) => update({ user: e.target.value })} required autoComplete="off" />
           </label>
           <label className="grow">
             Password
-            <input
+            <Input
               type="password"
               value={password}
               placeholder={passwordTouched ? '' : `•••••• (stored in ${keyringName()})`}
@@ -113,17 +114,17 @@ export function ConnectionForm({ initial, onClose }: Props) {
         </div>
         <div className="form-row checks">
           <label className="check">
-            <input type="checkbox" checked={conn.tls} onChange={(e) => update({ tls: e.target.checked, tlsInsecure: false, port: 0 })} />
+            <Checkbox checked={conn.tls} onCheckedChange={(checked) => update({ tls: checked, tlsInsecure: false, port: 0 })} />
             TLS
           </label>
           {conn.tls && (
             <label className="check" title="Encrypts without checking the server's certificate: anyone in between can read the traffic. Only for self-signed or private CAs.">
-              <input type="checkbox" checked={conn.tlsInsecure} onChange={(e) => update({ tlsInsecure: e.target.checked })} />
+              <Checkbox checked={conn.tlsInsecure} onCheckedChange={(checked) => update({ tlsInsecure: checked })} />
               Don't verify certificate (insecure)
             </label>
           )}
           <label className="check">
-            <input type="checkbox" checked={conn.readOnly} onChange={(e) => update({ readOnly: e.target.checked })} />
+            <Checkbox checked={conn.readOnly} onCheckedChange={(checked) => update({ readOnly: checked })} />
             Read-only
           </label>
         </div>
@@ -131,10 +132,10 @@ export function ConnectionForm({ initial, onClose }: Props) {
           <div className={`form-status ${status.kind}`}>{status.kind === 'busy' ? status.label : status.message}</div>
         )}
         <div className="form-actions">
-          <button type="button" onClick={() => void test()} disabled={busy}>Test</button>
+          <Button type="button" variant="plain" onClick={() => void test()} disabled={busy}>Test</Button>
           <span className="spacer" />
-          <button type="button" onClick={onClose}>Cancel</button>
-          <button type="submit" className="primary" disabled={busy}>Save</button>
+          <Button type="button" variant="plain" onClick={onClose}>Cancel</Button>
+          <Button type="submit" variant="primary" disabled={busy}>Save</Button>
         </div>
       </form>
     </Modal>

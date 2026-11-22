@@ -19,8 +19,11 @@ import {
 import { BrowserOpenURL } from '../../wails/runtime'
 import { NewTaskForm } from './NewTaskForm'
 import { Icon } from '../ui/Icon'
+import { MarkerBadge, TaskStateBadge } from './badges'
 import { TaskCI, TaskCIFix, TaskReviewComments } from './TaskCI'
 import { CompareView } from './CompareView'
+import { Button, IconButton } from '@flint-ide/ui'
+import { Plus, X } from '@flint-ide/ui/icons'
 
 const basename = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 
@@ -33,7 +36,9 @@ export function TasksPanel() {
     <div className="panel tasks-panel">
       <div className="panel-header">
         <span className="panel-title">Agent Tasks</span>
-        <button className="icon" title="New Agent Task…" onClick={openNewTask}>＋</button>
+        <IconButton variant="ghost" size="sm" aria-label="New Agent Task" title="New Agent Task…" onClick={openNewTask}>
+          <Plus />
+        </IconButton>
       </div>
       <div className="tree scroll">
         {error && <div className="placeholder error">{error}</div>}
@@ -60,9 +65,9 @@ export function TasksPanel() {
               <div className="task-group-head" title={row.tasks[0].prompt}>
                 <span className="file-name">{row.tasks[0].title}</span>
                 <span className="muted">{groupSummary(row.tasks)}</span>
-                <button className="link" onClick={() => void openCompare(row.group)} title="Compare what each task changed, file by file">
+                <Button variant="ghost" size="sm" onClick={() => void openCompare(row.group)} title="Compare what each task changed, file by file">
                   Compare
-                </button>
+                </Button>
               </div>
               {rows}
             </div>
@@ -70,7 +75,7 @@ export function TasksPanel() {
         })}
         {!error && tasks.length === 0 && (
           <div className="placeholder muted">
-            No agent tasks. <button className="link" onClick={openNewTask}>New Agent Task…</button> gives an agent its own branch and
+            No agent tasks. <Button variant="link" size="sm" onClick={openNewTask}>New Agent Task…</Button> gives an agent its own branch and
             worktree, so several can work in parallel.
           </div>
         )}
@@ -103,12 +108,12 @@ function TaskRow({ t, changes, open, busy, label, heading }: RowProps) {
     <div className="task">
       <div className="tree-row static task-row" title={`${t.prompt}\n\n${t.worktree}`} onClick={() => a.diff && toggleChanges(t)}>
         <span className="twisty">{a.diff ? (open ? '▾' : '▸') : ' '}</span>
-        <span className={`task-state ${t.stale ? 'stale' : s.state}`} title={t.stale ? 'The worktree folder is gone' : t.error || t.blocked || s.hint}>
+        <TaskStateBadge state={t.stale ? 'stale' : s.state} title={t.stale ? 'The worktree folder is gone' : t.error || t.blocked || s.hint}>
           {t.stale ? 'stale' : s.label}
-        </span>
+        </TaskStateBadge>
         <span className="file-name">{label ?? heading ?? t.title}</span>
-        {t.joint && t.lead && <span className="project-marker" title="One agent works in the worktrees of this task's group; its chat is in this task's worktree">lead</span>}
-        {t.joint && !t.lead && <span className="project-marker" title="No chat of its own: the group's one agent works here from the lead's chat. Open shows that chat">lead's chat</span>}
+        {t.joint && t.lead && <MarkerBadge title="One agent works in the worktrees of this task's group; its chat is in this task's worktree">lead</MarkerBadge>}
+        {t.joint && !t.lead && <MarkerBadge title="No chat of its own: the group's one agent works here from the lead's chat. Open shows that chat">lead's chat</MarkerBadge>}
       </div>
       <div className="task-meta muted">
         <span title={`${t.branch} from ${t.base} · ${t.agent}`}><Icon name="branch" size={12} /> {t.branch}</span>
@@ -120,17 +125,19 @@ function TaskRow({ t, changes, open, busy, label, heading }: RowProps) {
       {t.state === 'failed' && t.error && <div className="task-error">{t.error}</div>}
       {t.state === 'queued' && t.blocked && <div className="task-error">{t.blocked}</div>}
       <div className="task-actions">
-        {a.startNow && <button className="link" disabled={busy} onClick={() => void startQueuedNow(t)} title="Start this task now, although the limit of working tasks is reached">Start now</button>}
-        {a.open && <button className="link" disabled={busy} onClick={() => void openTask(t)} title={t.joint && !t.lead ? "Open the group's chat (in the lead task's folder)" : 'Open the folder and the agent chat'}>Open</button>}
-        {a.diff && <button className="link" onClick={() => toggleChanges(t)}>{open ? 'Hide diff' : 'Show diff'}</button>}
-        {a.askAgent && <button className="link" onClick={() => void askAgentAboutTask(t)} title="Put the error in the task's chat for the agent">✦ Ask agent</button>}
-        {a.merge && <button className="link" disabled={busy} onClick={() => void (keep ? keepTask(t, 'merge') : mergeTask(t))} title={`Merge into ${t.base} where it is checked out${keep ? ', then offer to remove the other tasks of the comparison' : ''}`}>{keep ? 'Keep: Merge' : 'Merge'}</button>}
-        {a.pr && <button className="link" disabled={busy} onClick={() => void (keep ? keepTask(t, 'pr') : createTaskPullRequest(t))} title={`Push the branch and create a pull request on GitHub (asks first)${keep ? ', then offer to remove the other tasks of the comparison' : ''}`}>{keep ? 'Keep: PR' : 'Create PR'}</button>}
-        {t.pullRequest && <button className="link" onClick={() => BrowserOpenURL(t.pullRequest)} title={t.pullRequest}>PR ↗</button>}
+        {a.startNow && <Button variant="ghost" size="sm" disabled={busy} onClick={() => void startQueuedNow(t)} title="Start this task now, although the limit of working tasks is reached">Start now</Button>}
+        {a.open && <Button variant="ghost" size="sm" disabled={busy} onClick={() => void openTask(t)} title={t.joint && !t.lead ? "Open the group's chat (in the lead task's folder)" : 'Open the folder and the agent chat'}>Open</Button>}
+        {a.diff && <Button variant="ghost" size="sm" onClick={() => toggleChanges(t)}>{open ? 'Hide diff' : 'Show diff'}</Button>}
+        {a.askAgent && <Button variant="ghost" size="sm" onClick={() => void askAgentAboutTask(t)} title="Put the error in the task's chat for the agent">✦ Ask agent</Button>}
+        {a.merge && <Button variant="ghost" size="sm" disabled={busy} onClick={() => void (keep ? keepTask(t, 'merge') : mergeTask(t))} title={`Merge into ${t.base} where it is checked out${keep ? ', then offer to remove the other tasks of the comparison' : ''}`}>{keep ? 'Keep: Merge' : 'Merge'}</Button>}
+        {a.pr && <Button variant="ghost" size="sm" disabled={busy} onClick={() => void (keep ? keepTask(t, 'pr') : createTaskPullRequest(t))} title={`Push the branch and create a pull request on GitHub (asks first)${keep ? ', then offer to remove the other tasks of the comparison' : ''}`}>{keep ? 'Keep: PR' : 'Create PR'}</Button>}
+        {t.pullRequest && <Button variant="ghost" size="sm" onClick={() => BrowserOpenURL(t.pullRequest)} title={t.pullRequest}>PR ↗</Button>}
         <TaskCIFix t={t} />
         <TaskReviewComments t={t} />
         <span className="spacer" />
-        <button className="icon" disabled={busy} title="Remove the task" onClick={() => void removeTask(t)}>✕</button>
+        <IconButton variant="ghost" size="sm" aria-label="Remove the task" disabled={busy} title="Remove the task" onClick={() => void removeTask(t)}>
+          <X />
+        </IconButton>
       </div>
       {open &&
         changes?.files?.map((f) => (

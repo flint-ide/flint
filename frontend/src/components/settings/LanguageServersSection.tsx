@@ -5,6 +5,7 @@ import * as LSP from '../../../bindings/flint/lspapi'
 import * as SettingsAPI from '../../../bindings/flint/settingsapi'
 import { lsp, settings as models } from '../../wails/models'
 import { CheckedField, Row } from './fields'
+import { Button, Switch } from '@flint-ide/ui'
 
 const LABELS: Record<string, string> = { go: 'Go', typescript: 'TypeScript / JavaScript', python: 'Python', rust: 'Rust' }
 
@@ -40,7 +41,7 @@ function ServerRows({ info }: { info: lsp.LanguageInfo }) {
     <>
       <h3>{LABELS[language] ?? language}</h3>
       <Row label="Enabled" hint={needsTrust ? 'Runs the folder\'s code: starts only in trusted folders.' : undefined}>
-        <input type="checkbox" checked={!server.disabled} onChange={(e) => commit({ disabled: !e.target.checked })} />
+        <Switch checked={!server.disabled} onCheckedChange={(checked) => commit({ disabled: !checked })} />
       </Row>
       <Row label="Server" hint={`Empty tries ${(servers ?? []).join(', ')} in this order. Install: ${install}`}>
         <CheckedField
@@ -64,7 +65,7 @@ function ServerRows({ info }: { info: lsp.LanguageInfo }) {
       </Row>
       {!isDefaultServer(server) && (
         <div className="settings-actions">
-          <button onClick={() => commit({ ...EMPTY_SERVER, args: [] })}>Reset {LABELS[language] ?? language} to Defaults</button>
+          <Button variant="plain" onClick={() => commit({ ...EMPTY_SERVER, args: [] })}>Reset {LABELS[language] ?? language} to Defaults</Button>
         </div>
       )}
     </>

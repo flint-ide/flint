@@ -5,6 +5,7 @@ import { errorMessage } from '../../api/backend'
 import { notificationStatusLabel } from '../../lib/attention'
 import { isMac } from '../../lib/platform'
 import { Row } from './fields'
+import { Button, Switch } from '@flint-ide/ui'
 
 /** Settings ▸ Agents ▸ Notifications: what notifies, whether the system lets it, and a test. */
 export function NotificationsSection() {
@@ -39,13 +40,13 @@ export function NotificationsSection() {
         label="Tell me when work finishes in the background"
         hint={`A desktop notification${badge} when an agent's turn, a run, tests, CI or a project's automatic start finish or fail while Flint isn't the active app. Off: nothing is sent and there is no badge; a budget warning waits until you are back.`}
       >
-        <input type="checkbox" checked={notify} onChange={(e) => update({ notifyInBackground: e.target.checked })} />
+        <Switch checked={notify} onCheckedChange={(checked) => update({ notifyInBackground: checked })} />
       </Row>
       <Row
         label="Tell me when an agent waits for my approval"
         hint={`Also a desktop notification when an agent asks for approval (in a chat, or an agent CLI in a terminal) or Flint asks you a question in a dialog (an agent's action, an agent directing others, a project's start): at once in the background, or when you leave Flint while it still waits. It counts on the badge until you answer.${notify ? '' : ' Needs "Tell me when work finishes in the background", which is off.'}`}
       >
-        <input type="checkbox" checked={notifyApproval} onChange={(e) => update({ notifyOnApproval: e.target.checked })} />
+        <Switch checked={notifyApproval} onCheckedChange={(checked) => update({ notifyOnApproval: checked })} />
       </Row>
       <Row
         label="Desktop notifications"
@@ -59,7 +60,7 @@ export function NotificationsSection() {
         <span className={`notify-status ${status?.state ?? ''}`}>{status ? notificationStatusLabel(status.state) : 'Checking…'}</span>
       </Row>
       <div className="settings-actions">
-        <button disabled={testing} onClick={() => void test()}>Send Test Notification</button>
+        <Button variant="plain" disabled={testing} onClick={() => void test()}>Send Test Notification</Button>
         {testResult && <span className="muted">{testResult}</span>}
       </div>
     </>

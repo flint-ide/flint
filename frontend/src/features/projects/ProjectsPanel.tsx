@@ -37,6 +37,9 @@ import {
   trustProject,
   useProjects,
 } from './store'
+import { Button, IconButton } from '@flint-ide/ui'
+import { CountBadge, MarkerBadge } from '../../components/tasks/badges'
+import { Ellipsis, Plus, RefreshCw } from '@flint-ide/ui/icons'
 
 /** The Projects panel: the picker, the items by status and the problems of the selected project. */
 export function ProjectsPanel() {
@@ -51,8 +54,15 @@ export function ProjectsPanel() {
     <div className="panel projects-panel">
       <div className="panel-header">
         <span className="panel-title">Projects</span>
-        <button className="icon" title={oldFormat ? OLD_FORMAT_HINT : 'New Item…'} disabled={!info || oldFormat} onClick={() => openNewItem(selected)}>＋</button>
-        <button className="icon" title="Refresh" disabled={!info} onClick={() => void loadProject(selected)}>↻</button>
+        {/* The title is on a wrapper: a disabled kit button takes no hover, and the hint says why. */}
+        <span title={oldFormat ? OLD_FORMAT_HINT : 'New Item…'}>
+          <IconButton variant="ghost" size="sm" aria-label="New Item" disabled={!info || oldFormat} onClick={() => openNewItem(selected)}>
+            <Plus />
+          </IconButton>
+        </span>
+        <IconButton variant="ghost" size="sm" aria-label="Refresh" title="Refresh" disabled={!info} onClick={() => void loadProject(selected)}>
+          <RefreshCw />
+        </IconButton>
         <Dropdown
           align="end"
           minWidth={190}
@@ -65,7 +75,9 @@ export function ProjectsPanel() {
             { label: 'Close Project', disabled: !canClose(info), hint: info?.workspace ? 'workspace folder' : undefined, onSelect: () => info && void closeProject(info) },
           ]}
           trigger={(t) => (
-            <button {...t} className="icon" title="Open, create or close a project">⋯</button>
+            <IconButton variant="ghost" size="sm" {...t} aria-label="Project actions" title="Open, create or close a project">
+              <Ellipsis />
+            </IconButton>
           )}
         />
       </div>
@@ -104,15 +116,15 @@ export function ProjectsPanel() {
               into agent tasks, one per repository, and the item&apos;s status follows them.
             </span>
             <span>
-              <button className="link" onClick={() => void openProject()}>Open Project…</button> ·{' '}
-              <button className="link" onClick={() => void newProject()}>New Project…</button>
+              <Button variant="link" size="sm" onClick={() => void openProject()}>Open Project…</Button> ·{' '}
+              <Button variant="link" size="sm" onClick={() => void newProject()}>New Project…</Button>
             </span>
           </div>
         )}
         {project && !oldFormat && project.items.length === 0 && project.problems.length === 0 && (
           <div className="placeholder muted">
-            The backlog is empty. <button className="link" onClick={() => openNewItem(selected)}>New Item…</button> writes one to items/;{' '}
-            <button className="link" onClick={() => openPlan(selected)}>Plan with Agent…</button> has an agent split a goal into items.
+            The backlog is empty. <Button variant="link" size="sm" onClick={() => openNewItem(selected)}>New Item…</Button> writes one to items/;{' '}
+            <Button variant="link" size="sm" onClick={() => openPlan(selected)}>Plan with Agent…</Button> has an agent split a goal into items.
           </div>
         )}
         {project && project.problems.length > 0 && <Problems project={project} />}
@@ -148,11 +160,11 @@ function GroupHeader({ open, onToggle, children }: { open: boolean; onToggle: ()
 function Untrusted({ info }: { info: ProjectInfo }) {
   return (
     <div className="project-untrusted" role="status">
-      <span className="project-marker warn">Restricted Mode</span>
+      <MarkerBadge tone="warn">Restricted Mode</MarkerBadge>
       <span className="muted">
         This project&apos;s folder is not trusted: agents can&apos;t read it with get_project, and Delegate shows you each item before it sends it.
       </span>
-      <button className="link" onClick={() => void trustProject(info)} title={info.path}>Trust Folder…</button>
+      <Button variant="ghost" size="sm" onClick={() => void trustProject(info)} title={info.path}>Trust Folder…</Button>
     </div>
   )
 }
@@ -167,9 +179,9 @@ function Repositories({ project, collapsed, clone }: { project: ProjectData; col
     <div className="project-group project-repos">
       <GroupHeader open={open} onToggle={() => toggleGroup('repositories', !open)}>
         <span className="dir-name">Repositories</span>
-        <span className="badge" title={waiting ? `${waiting} can't be used by Delegate yet` : 'Every repository has a checkout here'}>
+        <CountBadge title={waiting ? `${waiting} can't be used by Delegate yet` : 'Every repository has a checkout here'}>
           {waiting ? `${waiting}/${repos.length}` : repos.length}
-        </span>
+        </CountBadge>
       </GroupHeader>
       {open && clone && <CloneProgress folder={project.path} clone={clone} />}
       {open && repos.map((r) => <RepoRow key={r.name} folder={project.path} repo={r} cloning={!!clone} />)}
@@ -184,7 +196,7 @@ function CloneProgress({ folder, clone }: { folder: string; clone: CloneState })
       <span className="project-clone-title" title={clone.destination}>{cloneTitle(clone)}</span>
       {clone.progress && <span className="project-clone-line muted" title={clone.progress}>{clone.progress}</span>}
       <div className="task-actions">
-        <button className="link" onClick={() => void cancelClone(folder)} title="Stop git; what it made is removed">Cancel</button>
+        <Button variant="ghost" size="sm" onClick={() => void cancelClone(folder)} title="Stop git; what it made is removed">Cancel</Button>
       </div>
     </div>
   )
@@ -197,7 +209,7 @@ function RepoRow({ folder, repo, cloning }: { folder: string; repo: RepoView; cl
       <div className="tree-row static task-row" title={repo.url}>
         <span className="file-name">{repo.name}</span>
         {repoMarkers(repo).map((m) => (
-          <span key={m.label} className={`project-marker ${m.cls}`} title={m.hint}>{m.label}</span>
+          <MarkerBadge key={m.label} tone={m.cls} title={m.hint}>{m.label}</MarkerBadge>
         ))}
       </div>
       <div className="project-meta muted">
@@ -207,22 +219,19 @@ function RepoRow({ folder, repo, cloning }: { folder: string; repo: RepoView; cl
         <span title={repo.folder || undefined} className={repo.folder ? '' : 'error'}>{repo.folder || 'no checkout on this computer'}</span>
       </div>
       <div className="task-actions project-actions">
-        <button className="link" onClick={() => repoActions.locate(folder, repo)} title="Choose the folder of your checkout of this repository">Locate…</button>
+        <Button variant="ghost" size="sm" onClick={() => repoActions.locate(folder, repo)} title="Choose the folder of your checkout of this repository">Locate…</Button>
         {canClone(repo) && (
-          <button
-            className="link"
-            disabled={cloning}
-            onClick={() => repoActions.clone(folder, repo)}
-            title={cloning ? 'A clone of this project is running' : `Clone ${repo.url} into a folder you choose (asks again before it runs)`}
-          >
-            Clone…
-          </button>
+          <span title={cloning ? 'A clone of this project is running' : `Clone ${repo.url} into a folder you choose (asks again before it runs)`}>
+            <Button variant="ghost" size="sm" disabled={cloning} onClick={() => repoActions.clone(folder, repo)}>
+              Clone…
+            </Button>
+          </span>
         )}
         {issue?.fix === 'attach' && (
-          <button className="link" onClick={() => repoActions.attach(folder, repo)} title={`Add ${repo.folder} to the workspace`}>Add to Workspace</button>
+          <Button variant="ghost" size="sm" onClick={() => repoActions.attach(folder, repo)} title={`Add ${repo.folder} to the workspace`}>Add to Workspace</Button>
         )}
         {issue?.fix === 'trust' && (
-          <button className="link" onClick={() => repoActions.trust(folder, repo)} title={`Trust ${repo.folder}`}>Trust Folder…</button>
+          <Button variant="ghost" size="sm" onClick={() => repoActions.trust(folder, repo)} title={`Trust ${repo.folder}`}>Trust Folder…</Button>
         )}
       </div>
     </div>
@@ -241,7 +250,7 @@ function Groups({ project, collapsed }: { project: ProjectData; collapsed: Recor
           <div key={status} className="project-group">
             <GroupHeader open={open} onToggle={() => toggleGroup(status, !open)}>
               <span className="dir-name">{statusLabel(status)}</span>
-              <span className="badge">{items.length}</span>
+              <CountBadge>{items.length}</CountBadge>
             </GroupHeader>
             {open &&
               items.map((item) => (
@@ -268,14 +277,14 @@ function Problems({ project }: { project: ProjectData }) {
     <div className="project-problems">
       <div className="tree-row static root-row">
         <span className="dir-name">Problems</span>
-        <span className="badge">{project.problems.length}</span>
+        <CountBadge>{project.problems.length}</CountBadge>
       </div>
       {project.problems.map((p: ProblemInfo, i) => (
         <div key={`${p.file}:${i}`} className="project-problem">
           <span className="project-problem-file" title={p.file}>{p.file}</span>
           <span className="task-error">{p.reason}</span>
           <div className="task-actions">
-            <button className="link" onClick={() => askAboutProblem(project, p)} title="Put the problem in an agent chat">✦ Ask the agent</button>
+            <Button variant="ghost" size="sm" onClick={() => askAboutProblem(project, p)} title="Put the problem in an agent chat">✦ Ask the agent</Button>
           </div>
         </div>
       ))}

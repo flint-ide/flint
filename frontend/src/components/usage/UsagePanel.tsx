@@ -11,6 +11,8 @@ import { chatTabId, useAgentChat } from '../../store/agentChat'
 import { showToast } from '../../store/dialog'
 import { useEditor } from '../../store/editor'
 import { useUsage } from '../../store/usage'
+import { Badge, IconButton, Segment } from '@flint-ide/ui'
+import { Download } from '@flint-ide/ui/icons'
 
 interface Group {
   key: string
@@ -54,6 +56,7 @@ interface Filter {
 }
 
 const RANGES = [7, 30] as const
+const RANGE_OPTIONS = RANGES.map((d) => ({ value: String(d), label: `${d}d` }))
 
 /** Agent usage from usage.json: totals, a daily chart, breakdowns and top chats. */
 export function UsagePanel() {
@@ -86,12 +89,24 @@ export function UsagePanel() {
       <div className="panel-header">
         <span className="panel-title">Usage</span>
         <span className="spacer" />
-        <div className="usage-range" role="group" aria-label="Range">
-          {RANGES.map((d) => (
-            <button key={d} className={filter.days === d ? 'active' : ''} onClick={() => setFilter({ ...filter, days: d })}>{d}d</button>
-          ))}
-        </div>
-        <button className="icon" title="Export the daily aggregates (with the current filter) as CSV" onClick={() => void exportCSV(filter)}>⇩</button>
+        <Segment
+          size="sm"
+          shape="rounded"
+          className="usage-range"
+          aria-label="Range"
+          options={RANGE_OPTIONS}
+          value={String(filter.days)}
+          onValueChange={(d) => setFilter({ ...filter, days: Number(d) })}
+        />
+        <IconButton
+          variant="ghost"
+          size="sm"
+          aria-label="Export the daily aggregates as CSV"
+          title="Export the daily aggregates (with the current filter) as CSV"
+          onClick={() => void exportCSV(filter)}
+        >
+          <Download />
+        </IconButton>
       </div>
       <div className="scroll usage-body">
         {error && <div className="placeholder error">{error}</div>}
@@ -99,16 +114,14 @@ export function UsagePanel() {
         {(filter.project || filter.task) && (
           <div className="usage-filters">
             {filter.project && (
-              <span className="chip" title={filter.project}>
+              <Badge title={filter.project} removeLabel="Clear folder filter" onRemove={() => setFilter({ ...filter, project: '' })}>
                 {projectName(filter.project)}
-                <button className="icon" aria-label="Clear folder filter" onClick={() => setFilter({ ...filter, project: '' })}>✕</button>
-              </span>
+              </Badge>
             )}
             {filter.task && (
-              <span className="chip">
+              <Badge removeLabel="Clear task filter" onRemove={() => setFilter({ ...filter, task: '' })}>
                 {taskName(filter.task)}
-                <button className="icon" aria-label="Clear task filter" onClick={() => setFilter({ ...filter, task: '' })}>✕</button>
-              </span>
+              </Badge>
             )}
           </div>
         )}

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Badge, IconButton, Kbd } from '@flint-ide/ui'
+import { Plus, X } from '@flint-ide/ui/icons'
 import { Workspace, errorMessage } from '../api/backend'
 import { Git } from '../store/git'
 import { useWorkspace } from '../store/workspace'
@@ -93,14 +95,14 @@ export function RecentProjects() {
               <FileIcon name="folder" isDir />
               <span className="file-name">Add Folder to Workspace…</span>
               <span className="muted path-hint">open it next to {root?.split('/').pop()}</span>
-              <kbd>{formatKeys('Mod+Shift+O')}</kbd>
+              <Kbd>{formatKeys('Mod+Shift+O')}</Kbd>
             </div>
           ) : path === null ? (
             <div key="browse" className={`quick-item${i === cursor ? ' selected' : ''}`} onMouseMove={() => hover(i)} onClick={() => void browse()}>
               <FileIcon name="folder" isDir open />
               <span className="file-name">Browse…</span>
               <span className="muted path-hint">choose a folder</span>
-              <kbd>{formatKeys('Mod+O')}</kbd>
+              <Kbd>{formatKeys('Mod+O')}</Kbd>
             </div>
           ) : (
             <div
@@ -113,30 +115,36 @@ export function RecentProjects() {
               <FileIcon name={path.split('/').pop() ?? path} isDir />
               <span className="file-name">{path.split('/').pop()}</span>
               <span className="muted path-hint">{tildify(path)}</span>
-              {path === root && <span className="badge">open</span>}
-              {path !== root && roots.includes(path) && <span className="badge">in workspace</span>}
+              {path === root && <Badge size="sm">open</Badge>}
+              {path !== root && roots.includes(path) && <Badge size="sm">in workspace</Badge>}
               {root && !roots.includes(path) && (
-                <button
-                  className="icon recent-forget"
+                <IconButton
+                  variant="ghost"
+                  size="sm"
+                  className="recent-action"
+                  aria-label="Add to workspace"
                   title={`Add to workspace (${formatKeys('Alt+Enter')})`}
                   onClick={(e) => {
                     e.stopPropagation()
                     void addProject(path)
                   }}
                 >
-                  ＋
-                </button>
+                  <Plus />
+                </IconButton>
               )}
-              <button
-                className="icon recent-forget"
+              <IconButton
+                variant="ghost"
+                size="sm"
+                className="recent-action"
+                aria-label="Remove from list"
                 title="Remove from list"
                 onClick={(e) => {
                   e.stopPropagation()
                   void forget(path)
                 }}
               >
-                ✕
-              </button>
+                <X />
+              </IconButton>
             </div>
           ),
         )}

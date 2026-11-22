@@ -7,6 +7,7 @@ import { showToast } from '../../store/dialog'
 import { Modal } from '../layout/Modal'
 import { Select } from '../ui/Select'
 import { TabKindIcon } from '../icons/FileIcon'
+import { Button, Input, RadioGroup, RadioGroupItem } from '@flint-ide/ui'
 
 type After = 'terminal' | 'window' | 'switch'
 
@@ -71,18 +72,20 @@ export function NewWorktreeForm({ root, branches, onClose, onBack }: Props) {
         }}
       >
         <div className="form-row checks">
-          <label className="check">
-            <input type="radio" checked={isNew} onChange={() => setIsNew(true)} /> New branch
-          </label>
-          <label className="check">
-            <input type="radio" checked={!isNew} onChange={() => setIsNew(false)} disabled={free.length === 0} /> Existing branch
-          </label>
+          <RadioGroup className="radio-row" value={isNew ? 'new' : 'existing'} onValueChange={(v) => setIsNew(v === 'new')}>
+            <label className="check">
+              <RadioGroupItem value="new" /> New branch
+            </label>
+            <label className="check">
+              <RadioGroupItem value="existing" disabled={free.length === 0} /> Existing branch
+            </label>
+          </RadioGroup>
         </div>
         {isNew ? (
           <div className="form-row">
             <label className="grow">
               Branch
-              <input autoFocus value={branch} placeholder="agent/feature-x" spellCheck={false} onChange={(e) => setBranch(e.target.value)} required />
+              <Input autoFocus value={branch} placeholder="agent/feature-x" spellCheck={false} onChange={(e) => setBranch(e.target.value)} required />
             </label>
             <label className="grow">
               From
@@ -110,7 +113,7 @@ export function NewWorktreeForm({ root, branches, onClose, onBack }: Props) {
         )}
         <label>
           Folder
-          <input
+          <Input
             value={path}
             spellCheck={false}
             onChange={(e) => {
@@ -135,11 +138,11 @@ export function NewWorktreeForm({ root, branches, onClose, onBack }: Props) {
         </label>
         {error && <div className="form-status error">{error}</div>}
         <div className="form-actions">
-          <button type="button" onClick={onBack}>Back</button>
+          <Button type="button" variant="plain" onClick={onBack}>Back</Button>
           <span className="spacer" />
-          <button type="submit" className="primary" disabled={busy || !branch.trim() || !path}>
+          <Button type="submit" variant="primary" disabled={busy || !branch.trim() || !path}>
             {busy ? 'Creating…' : 'Create worktree'}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

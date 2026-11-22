@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { formatValue, percent, shortName, sortTop, type TopRow, type TopSortKey } from '../../lib/flame'
-import { Icon } from '../ui/Icon'
+import { IconButton } from '@flint-ide/ui'
+import { Search } from '@flint-ide/ui/icons'
 
 interface Props {
   rows: TopRow[]
@@ -57,16 +58,19 @@ export function TopTable({ rows, total, unit, query, onOpen, onHighlight }: Prop
               <td className="name">
                 <div className="fn">
                   <span className="truncate">{shortName(r.name)}</span>
-                  <button
-                    className="icon"
+                  <IconButton
+                    variant="ghost"
+                    size="sm"
+                    className="fn-action"
+                    aria-label="Highlight in the flame graph"
                     title="Highlight in the flame graph"
                     onClick={(e) => {
                       e.stopPropagation()
                       onHighlight(r)
                     }}
                   >
-                    <Icon name="search" size={14} />
-                  </button>
+                    <Search />
+                  </IconButton>
                 </div>
               </td>
               <td className="loc muted truncate">{r.file ? `${r.file.slice(r.file.lastIndexOf('/') + 1)}${r.line ? `:${r.line}` : ''}` : ''}</td>

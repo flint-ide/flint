@@ -29,6 +29,9 @@ const preview: Preview = {
       const theme = (context.globals.theme ?? 'dark') as Theme
       useEffect(() => applyTheme(theme), [theme])
       applyTheme(theme)
+      // Flint's own stories at the app's density (frontend/index.html), the kit's at its own.
+      if (context.title.startsWith('Flint/')) document.documentElement.dataset.density = 'ide'
+      else delete document.documentElement.dataset.density
       return <Story />
     },
   ],

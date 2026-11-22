@@ -14,6 +14,8 @@ import {
 } from '../../lib/commands'
 import { useSettings } from '../../store/settings'
 import { isMac } from '../../lib/platform'
+import { Button, IconButton, Input } from '@flint-ide/ui'
+import { RotateCcw, X } from '@flint-ide/ui/icons'
 
 /** Every command with its shortcut: search, record a new chord, reset or remove it. */
 export function KeymapSection({ active }: { active: boolean }) {
@@ -62,16 +64,16 @@ export function KeymapSection({ active }: { active: boolean }) {
     <section className="keymap">
       <h2>Keymap</h2>
       <div className="keymap-toolbar">
-        <input
+        <Input
           className="settings-text"
           placeholder={`Search actions or shortcuts (e.g. push, ${formatKeys('Mod+K')})…`}
           value={query}
           spellCheck={false}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <button disabled={overrides === 0} onClick={() => update({ keymap: {} })} title="Restore every default shortcut">
+        <Button variant="plain" disabled={overrides === 0} onClick={() => update({ keymap: {} })} title="Restore every default shortcut">
           Reset All{overrides ? ` (${overrides})` : ''}
-        </button>
+        </Button>
       </div>
       <p className="muted settings-note">
         Click a shortcut and press the new keys; Esc cancels. {isMac() ? 'Keys of the macOS menu (⌘Q, ⌘C, ⌘V, ⌘O, ⌘,) stay with the menu.' : 'Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z and Ctrl+A stay with text fields, and plain Ctrl+letter keys in a terminal go to the shell.'}
@@ -103,10 +105,20 @@ export function KeymapSection({ active }: { active: boolean }) {
                 )}
                 <span className="keymap-actions">
                   {changed && (
-                    <button className="icon" title={`Reset to ${cmd.keys ? safeFormat(cmd.keys) : 'no shortcut'}`} onClick={() => setKeys(cmd, null)}>↺</button>
+                    <IconButton
+                      variant="ghost"
+                      size="sm"
+                      aria-label="Reset the shortcut"
+                      title={`Reset to ${cmd.keys ? safeFormat(cmd.keys) : 'no shortcut'}`}
+                      onClick={() => setKeys(cmd, null)}
+                    >
+                      <RotateCcw />
+                    </IconButton>
                   )}
                   {isRebindable(cmd) && keys && (
-                    <button className="icon" title="Remove the shortcut" onClick={() => setKeys(cmd, '')}>✕</button>
+                    <IconButton variant="ghost" size="sm" aria-label="Remove the shortcut" title="Remove the shortcut" onClick={() => setKeys(cmd, '')}>
+                      <X />
+                    </IconButton>
                   )}
                 </span>
                 {notice?.id === cmd.id ? (

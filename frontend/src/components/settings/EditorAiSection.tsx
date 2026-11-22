@@ -18,6 +18,7 @@ import { Select } from '../ui/Select'
 import { NumberField, Row, TextField } from './fields'
 import { formatKeys } from '../../lib/commands'
 import { keyringName } from '../../lib/platform'
+import { Button, Input, Switch } from '@flint-ide/ui'
 
 const PROVIDERS: { value: CompletionProvider; label: string }[] = [
   { value: 'ollama', label: 'Ollama' },
@@ -45,14 +46,14 @@ export function EditorAiSection() {
         />
       </Row>
       <div className="settings-actions">
-        <button disabled={inlineEdit.contextLines === DEFAULT_INLINE_EDIT.contextLines} onClick={() => update({ inlineEdit: DEFAULT_INLINE_EDIT })}>
+        <Button variant="plain" disabled={inlineEdit.contextLines === DEFAULT_INLINE_EDIT.contextLines} onClick={() => update({ inlineEdit: DEFAULT_INLINE_EDIT })}>
           Reset to Default
-        </button>
+        </Button>
       </div>
 
       <h3>Inline completions</h3>
       <Row label="Suggest code as I type" hint="Ghost text from a code model after a typing pause; Tab accepts, Esc dismisses. Off by default: it sends the code around the cursor to the endpoint.">
-        <input type="checkbox" checked={c.enabled} onChange={(e) => set({ enabled: e.target.checked })} />
+        <Switch checked={c.enabled} onCheckedChange={(checked) => set({ enabled: checked })} />
       </Row>
       <Row label="Provider">
         <Select
@@ -78,7 +79,7 @@ export function EditorAiSection() {
       </Row>
       <ApiKeyRow endpoint={c.endpoint} />
       <div className="settings-actions">
-        <button disabled={isDefault} onClick={() => set({ ...DEFAULT_COMPLETIONS, enabled: c.enabled })}>Reset to Defaults</button>
+        <Button variant="plain" disabled={isDefault} onClick={() => set({ ...DEFAULT_COMPLETIONS, enabled: c.enabled })}>Reset to Defaults</Button>
       </div>
     </section>
   )
@@ -115,7 +116,7 @@ function ApiKeyRow({ endpoint }: { endpoint: string }) {
         : `Only if the endpoint needs one. Stored in the ${keyringName()} for this endpoint only.`}
     >
       <span className="settings-control">
-        <input
+        <Input
           type="password"
           className="settings-text"
           value={draft}
@@ -125,8 +126,8 @@ function ApiKeyRow({ endpoint }: { endpoint: string }) {
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && draft.trim() && void save(draft)}
         />
-        <button disabled={!draft.trim()} onClick={() => void save(draft)}>Save</button>
-        {stored && <button onClick={() => void save('')}>Remove</button>}
+        <Button variant="plain" disabled={!draft.trim()} onClick={() => void save(draft)}>Save</Button>
+        {stored && <Button variant="plain" onClick={() => void save('')}>Remove</Button>}
       </span>
     </Row>
   )

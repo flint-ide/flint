@@ -6,6 +6,7 @@ import { useEditor } from '../../store/editor'
 import { useWorkspace } from '../../store/workspace'
 import { headingAt, headingLines, resolveRelative } from '../../lib/previewFiles'
 import { inside } from '../../lib/sessionSnapshot'
+import { Button } from '@flint-ide/ui'
 
 interface Props {
   path: string
@@ -102,7 +103,7 @@ export function MarkdownPreview({ path, source, topLine }: Props) {
       {blocked && (
         <div className="preview-remote-bar">
           Remote images are blocked so the file can't track you.
-          <button className="link" onClick={loadRemote}>Load remote images</button>
+          <Button variant="ghost" size="sm" onClick={loadRemote}>Load remote images</Button>
         </div>
       )}
       <div ref={box} className="markdown-preview" onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />

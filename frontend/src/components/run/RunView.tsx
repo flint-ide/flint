@@ -17,6 +17,7 @@ import { currentTerminalOptions, useTerminalSettings } from '../terminal/useTerm
 import { PlayIcon, RerunIcon, StopIcon } from './RunWidget'
 import { formatKeys, keyHint } from '../../lib/commands'
 import { modifierName } from '../../lib/platform'
+import { Button, Checkbox, IconButton } from '@flint-ide/ui'
 
 interface Props {
   runKey: string
@@ -35,29 +36,27 @@ export function RunView({ runKey, active }: Props) {
   return (
     <div className="run-view">
       <div className="run-toolbar">
-        <button className="icon" title={`Rerun (${keyHint('run.selected')})`} onClick={() => void rerun(runKey)}>
+        <IconButton variant="ghost" size="sm" aria-label="Rerun" title={`Rerun (${keyHint('run.selected')})`} onClick={() => void rerun(runKey)}>
           {session.running ? <RerunIcon /> : <PlayIcon />}
-        </button>
-        <button className="icon run-stop" title={`Stop (${formatKeys('Mod+F2')})`} disabled={!session.running} onClick={() => void stopRun(runKey)}>
+        </IconButton>
+        <IconButton variant="ghost" size="sm" aria-label="Stop" title={`Stop (${formatKeys('Mod+F2')})`} disabled={!session.running} onClick={() => void stopRun(runKey)} className="run-stop">
           <StopIcon />
-        </button>
+        </IconButton>
         {isTests && (
           <>
-            <button className="icon" title="Rerun failed tests" disabled={session.running || noFailures} onClick={() => void rerunFailedTests()}>
+            <Button variant="ghost" size="sm" aria-label="Rerun failed tests" title="Rerun failed tests" disabled={session.running || noFailures} onClick={() => void rerunFailedTests()}>
               ✗↻
-            </button>
-            <button
-              className="run-fix"
+            </Button>
+            <Button
+              variant="plain"
+              size="sm"
               title={`Send the failures to the agent chat (${modifierName('Alt')}-click sends right away)`}
               disabled={session.running || noFailures}
               onClick={(e) => void fixFailedTestsWithAgent(e.altKey)}
             >
               Fix with agent
-            </button>
-            <label className="run-check" title="Hide passed tests">
-              <input type="checkbox" checked={hidePassed} onChange={(e) => setHidePassed(e.target.checked)} />
-              Hide passed
-            </label>
+            </Button>
+            <Checkbox wrapperClassName="run-check" label="Hide passed" title="Hide passed tests" checked={hidePassed} onCheckedChange={setHidePassed} />
           </>
         )}
         <span className="spacer" />
@@ -188,14 +187,16 @@ function TestPanel({ session, hidePassed }: { session: RunSession; hidePassed: b
               <span className={`test-icon ${node.status}`}>{STATUS_ICON[node.status]}</span>
               <span className="test-name truncate">{node.name}</span>
               {node.elapsedMs ? <span className="test-time">{formatElapsed(node.elapsedMs)}</span> : null}
-              <button
-                className="icon test-run"
+              <Button
+                variant="ghost"
+                size="sm"
+                className="test-run"
                 title={`Run ${node.test ?? node.name}`}
                 disabled={session.running}
                 onClick={(e) => (e.stopPropagation(), void runTestNode(node))}
               >
                 ▶
-              </button>
+              </Button>
             </div>
           ))}
         </div>
@@ -224,9 +225,9 @@ function TestDetails({ runKey, node }: { runKey: string; node: TestNode }) {
   return (
     <div className="test-details selectable">
       {node.location && (
-        <button className="link" onClick={() => void openRunLink(runKey, node.location!.path, node.location!.line, node.location!.column)}>
+        <Button variant="link" size="sm" onClick={() => void openRunLink(runKey, node.location!.path, node.location!.line, node.location!.column)}>
           {node.location.path.split('/').pop()}:{node.location.line}
-        </button>
+        </Button>
       )}
       <pre>
         {lines.map((line, i) => (

@@ -1,6 +1,8 @@
+import { Button } from '@flint-ide/ui'
 import { useEffect } from 'react'
 import { useSettings } from '../../store/settings'
 import { Row, TextField } from '../../components/settings/fields'
+import { ExtensionStateBadge } from './ExtensionStateBadge'
 import { uninstallExtension, useExtensions } from './store'
 import { fetchIndex, installFromIndex, loadIndex, useIndex, type IndexEntry, type IndexStatus } from './indexStore'
 import { formatSize, indexRows, kindLabel } from './indexModel'
@@ -46,9 +48,9 @@ export function IndexSection() {
       </p>
       {status && !status.configured && <NotConfigured status={status} />}
       <div className="settings-actions">
-        <button disabled={loading || !status?.configured} onClick={() => void fetchIndex()}>
+        <Button variant="plain" disabled={loading || !status?.configured} onClick={() => void fetchIndex()}>
           {loading ? 'Downloading…' : status?.fetched ? 'Check for Updates' : 'Browse Extensions'}
-        </button>
+        </Button>
         {status?.fetched && <span className="muted">{[when(status.fetchedAt) && `Downloaded ${when(status.fetchedAt)}`, when(status.generatedAt) && `built ${when(status.generatedAt)}`].filter(Boolean).join(', ')}</span>}
       </div>
       {error && <p className="error">{sentence(error)}</p>}
@@ -97,9 +99,9 @@ function IndexCard({ row }: { row: CatalogRow<IndexEntry> }) {
         <span className="muted">{entry.id}</span>
         <span className="muted">{kindLabel(entry.kind)}</span>
         {size && <span className="muted">{size}</span>}
-        <span className={`extension-state ${status === 'installed' ? 'running' : status === 'broken' ? 'invalid' : ''}`}>
+        <ExtensionStateBadge tone={status === 'installed' ? 'ok' : status === 'broken' ? 'bad' : 'none'}>
           {status === 'update' || status === 'newer' ? `${STATUS_LABELS[status]} (installed ${installedVersion})` : STATUS_LABELS[status]}
-        </span>
+        </ExtensionStateBadge>
       </div>
       {entry.description && <p className="extension-description">{entry.description}</p>}
       {entry.error && <p className="error">{sentence(entry.error)}</p>}
@@ -111,14 +113,14 @@ function IndexCard({ row }: { row: CatalogRow<IndexEntry> }) {
       )}
       <div className="settings-actions">
         {(status === 'available' || status === 'update') && (
-          <button disabled={busy} onClick={() => void installFromIndex(entry.id)}>
+          <Button variant="plain" disabled={busy} onClick={() => void installFromIndex(entry.id)}>
             {busy ? 'Downloading…' : status === 'update' ? `Update to ${entry.version}…` : 'Install…'}
-          </button>
+          </Button>
         )}
         {(status === 'installed' || status === 'update' || status === 'newer') && (
-          <button className="danger" disabled={busy} onClick={() => void uninstallExtension(entry.id)}>
+          <Button variant="destructive" disabled={busy} onClick={() => void uninstallExtension(entry.id)}>
             Uninstall…
-          </button>
+          </Button>
         )}
       </div>
     </div>

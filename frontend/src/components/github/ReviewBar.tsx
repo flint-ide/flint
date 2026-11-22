@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { PullRequestDetails } from '../../api/backend'
 import { detailsKey, discardReview, submitReview, usePullRequests, type ReviewEvent } from '../../store/pullRequests'
+import { Button, Textarea } from '@flint-ide/ui'
+import { PrBadge } from './PrBadge'
 
 /** "Submit review": a summary plus Comment / Approve / Request changes, and my pending review. */
 export function ReviewBar({ root, details }: { root: string; details: PullRequestDetails }) {
@@ -24,15 +26,15 @@ export function ReviewBar({ root, details }: { root: string; details: PullReques
     <div className={`pr-review-bar${expanded ? ' expanded' : ''}`}>
       {pending >= 0 && (
         <div className="pr-pending">
-          <span className="pr-badge pending">Pending review</span>
+          <PrBadge tone="pending">Pending review</PrBadge>
           <span className="muted">
             {pending} comment{pending === 1 ? '' : 's'} only you can see until you submit
           </span>
           <span className="spacer" />
-          <button className="link" disabled={!!busy} onClick={() => void discardReview(root, details.number, pending)}>Discard</button>
+          <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => void discardReview(root, details.number, pending)}>Discard</Button>
         </div>
       )}
-      <textarea
+      <Textarea
         rows={expanded ? 4 : 1}
         value={body}
         placeholder="Review summary (Markdown, optional for approvals)"
@@ -43,9 +45,9 @@ export function ReviewBar({ root, details }: { root: string; details: PullReques
       <div className="pr-actions">
         {busy === 'submit' && <span className="muted">Submitting…</span>}
         <span className="spacer" />
-        <button disabled={!!busy || needsBody} onClick={() => void submit('COMMENT')} title="Submit general feedback">Comment</button>
-        <button className="pr-approve" disabled={!!busy} onClick={() => void submit('APPROVE')}>Approve</button>
-        <button className="pr-request" disabled={!!busy || needsBody} onClick={() => void submit('REQUEST_CHANGES')}>Request changes</button>
+        <Button size="sm" variant="plain" disabled={!!busy || needsBody} onClick={() => void submit('COMMENT')} title="Submit general feedback">Comment</Button>
+        <Button size="sm" variant="plain" className="pr-approve" disabled={!!busy} onClick={() => void submit('APPROVE')}>Approve</Button>
+        <Button size="sm" variant="plain" className="pr-request" disabled={!!busy || needsBody} onClick={() => void submit('REQUEST_CHANGES')}>Request changes</Button>
       </div>
     </div>
   )

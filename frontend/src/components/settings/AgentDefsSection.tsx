@@ -1,5 +1,6 @@
 import { engineLabel, ignoredNote, modelLabel } from '../../lib/agentDefs'
 import { openAgentDefDialog, openAgentDefFile, useAgentDefs } from '../../store/agentDefs'
+import { Button } from '@flint-ide/ui'
 
 /**
  * Settings ▸ Agents ▸ Defined agents: Markdown files that define an agent (engine, model, instructions).
@@ -27,7 +28,7 @@ export function AgentDefsSection() {
             {a.description && <span className="muted"> · {a.description}</span>}
             {!a.resolvedEngine && <span className="muted"> · no engine installed</span>}
           </span>
-          <button onClick={() => openAgentDefFile(a.path)}>Open</button>
+          <Button variant="plain" onClick={() => openAgentDefFile(a.path)}>Open</Button>
         </div>
       ))}
       {(defs?.problems ?? []).map((p) => (
@@ -37,7 +38,7 @@ export function AgentDefsSection() {
         <p key={i.dir} className="muted settings-note selectable">{ignoredNote(i)}</p>
       ))}
       <div className="settings-actions">
-        <button onClick={openAgentDefDialog}>New Agent…</button>
+        <Button variant="plain" onClick={openAgentDefDialog}>New Agent…</Button>
       </div>
     </>
   )

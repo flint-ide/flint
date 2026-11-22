@@ -1,3 +1,4 @@
+import { StatusItem } from '@flint-ide/ui'
 import { useEditor } from '../../store/editor'
 import { useMachines } from '../../store/machines'
 import { machinesSummary } from '../../lib/machines'
@@ -8,12 +9,12 @@ export function MachinesStatus() {
   const summary = machinesSummary(statuses)
   if (!summary) return null
   return (
-    <button
-      className={`status-action status-machines ${summary.tone}`}
-      title={`${summary.details.join('\n')}\n\nClick to open Settings ▸ Machines`}
+    <StatusItem
+      className={summary.tone === 'error' ? 'status-error' : undefined}
+      tip={`${summary.details.join('\n')}\n\nClick to open Settings ▸ Machines`}
       onClick={() => useEditor.getState().openSettings('machines')}
     >
       {summary.tone === 'error' ? '⚠' : '⟳'} {summary.label}
-    </button>
+    </StatusItem>
   )
 }

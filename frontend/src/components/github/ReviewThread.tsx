@@ -5,6 +5,9 @@ import { timeAgo } from '../../lib/prReview'
 import { formatKeys } from '../../lib/commands'
 import { canAskAgent } from '../../lib/prAgent'
 import { AskAgentAboutThread } from './ReviewAgent'
+import { Button, IconButton, Textarea } from '@flint-ide/ui'
+import { ExternalLink } from '@flint-ide/ui/icons'
+import { PrBadge } from './PrBadge'
 
 /** Markdown rendered in Go (no raw HTML); links open in the browser. */
 export function HtmlBody({ html, className = '' }: { html: string; className?: string }) {
@@ -65,7 +68,7 @@ export function ReviewThread({ root, number, thread, label }: ThreadProps) {
           </span>
         )}
         <span className="spacer" />
-        {thread.resolved && <span className="pr-badge ok">Resolved{thread.resolvedBy ? ` by ${thread.resolvedBy}` : ''}</span>}
+        {thread.resolved && <PrBadge tone="ok">Resolved{thread.resolvedBy ? ` by ${thread.resolvedBy}` : ''}</PrBadge>}
         {thread.comments.length > 1 && <span className="muted">{thread.comments.length} comments</span>}
       </div>
       {open && (
@@ -75,10 +78,10 @@ export function ReviewThread({ root, number, thread, label }: ThreadProps) {
               <div className="pr-comment-head">
                 <b>{c.author || 'ghost'}</b>
                 <span className="muted">{timeAgo(c.createdAt)}</span>
-                {c.pending && <span className="pr-badge pending">Pending</span>}
+                {c.pending && <PrBadge tone="pending">Pending</PrBadge>}
                 <span className="spacer" />
                 {c.url.startsWith('http') && (
-                  <button className="icon" title="Open on GitHub" onClick={() => openInBrowser(c.url)}>↗</button>
+                  <IconButton size="sm" variant="ghost" aria-label="Open on GitHub" title="Open on GitHub" onClick={() => openInBrowser(c.url)}><ExternalLink /></IconButton>
                 )}
               </div>
               <HtmlBody html={c.bodyHtml} />
@@ -86,7 +89,7 @@ export function ReviewThread({ root, number, thread, label }: ThreadProps) {
           ))}
           <div className="pr-reply">
             {thread.canReply && (
-              <textarea
+              <Textarea
                 rows={reply ? 3 : 1}
                 value={reply}
                 placeholder={`Reply… (${formatKeys('Mod+Enter')} to send)`}
@@ -102,14 +105,14 @@ export function ReviewThread({ root, number, thread, label }: ThreadProps) {
             )}
             <div className="pr-actions">
               {thread.canReply && (
-                <button className="primary" disabled={!reply.trim() || busy} onClick={() => void send()}>Reply</button>
+                <Button size="sm" variant="primary" disabled={!reply.trim() || busy} onClick={() => void send()}>Reply</Button>
               )}
               <span className="spacer" />
               {canAskAgent(thread) && <AskAgentAboutThread root={root} number={number} threadId={thread.id} />}
               {canToggle && (
-                <button disabled={busy} onClick={() => void setThreadResolved(root, number, thread.id, !thread.resolved)}>
+                <Button size="sm" variant="plain" disabled={busy} onClick={() => void setThreadResolved(root, number, thread.id, !thread.resolved)}>
                   {thread.resolved ? 'Unresolve' : 'Resolve'}
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -152,7 +155,7 @@ export function CommentComposer({ root, number, path, line, side, pendingReview,
         New comment on {side === 'LEFT' ? 'base' : 'head'} line {line}
       </div>
       <div className="pr-reply">
-        <textarea
+        <Textarea
           rows={3}
           autoFocus
           value={body}
@@ -168,14 +171,14 @@ export function CommentComposer({ root, number, path, line, side, pendingReview,
           }}
         />
         <div className="pr-actions">
-          <button className="primary" disabled={!body.trim() || busy} onClick={() => void post(true)} title={`Only you see it until the review is submitted (${formatKeys('Mod+Enter')})`}>
+          <Button size="sm" variant="primary" disabled={!body.trim() || busy} onClick={() => void post(true)} title={`Only you see it until the review is submitted (${formatKeys('Mod+Enter')})`}>
             {pendingReview ? 'Add review comment' : 'Start a review'}
-          </button>
-          <button disabled={!body.trim() || busy} onClick={() => void post(false)} title="Posted right away">
+          </Button>
+          <Button size="sm" variant="plain" disabled={!body.trim() || busy} onClick={() => void post(false)} title="Posted right away">
             Add single comment
-          </button>
+          </Button>
           <span className="spacer" />
-          <button className="link" onClick={cancel}>Cancel</button>
+          <Button size="sm" variant="ghost" onClick={cancel}>Cancel</Button>
         </div>
       </div>
     </div>

@@ -1,15 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ClipboardSetText } from '../../wails/runtime'
-import { formatValue, frameAt, percent, searchFrames, type FlameFrame, type TopRow } from '../../lib/flame'
 import { showToast } from '../../store/dialog'
 import { useEditor } from '../../store/editor'
 import { revealProfile, selectProfileFile, selectSampleType, useProfile } from '../../store/profile'
 import { Dropdown } from '../ui/Dropdown'
 import { Select } from '../ui/Select'
-import { FlameGraph } from './FlameGraph'
 import { TopTable } from './TopTable'
-import { fileManagerName } from '../../lib/platform'
-import { Button, Input, Segment, ViewToolbar } from '@flint-ide/ui'
+import { fileManagerName, modKey, modifierName } from '../../lib/platform'
+import { Button, FlameGraph, formatValue, Input, percent, searchFrames, Segment, ViewToolbar, frameAt, type FlameFrame, type TopRow } from '@flint-ide/ui'
 
 interface Props {
   profileId: string
@@ -127,7 +125,16 @@ export function ProfileView({ profileId }: Props) {
         ) : report.total === 0 ? (
           <div className="profile-message muted">The profile has no samples (the program was idle, or ran too briefly).</div>
         ) : view === 'flame' ? (
-          <FlameGraph root={root} unit={unit} focus={focus} onFocus={setFocus} search={search} onOpen={openSource} />
+          <FlameGraph
+            root={root}
+            unit={unit}
+            focus={focus}
+            onZoom={setFocus}
+            search={search}
+            onOpen={openSource}
+            isOpenClick={modKey}
+            openHint={`Click to zoom · ${modifierName('Mod')}-click or double-click opens the source`}
+          />
         ) : (
           <TopTable rows={report.top} total={report.total} unit={unit} query={query} onOpen={openSource} onHighlight={highlight} />
         )}

@@ -265,7 +265,7 @@ Find the class in the view, swap in the component, then delete the CSS rules (an
 | Simple HTML tables (`TopTable.tsx`, `CompareView.tsx`, `ViewChart.tsx`, the table of declarative extension views) | `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell` | IDE density: 12 px text, 24 px header, rows at `--row-py`. Not the virtualised DB results grid. |
 | Card frames: `.account-card`, `.extension-card`, `.permission-card`, `.project-card` | `Card` + `CardHeader`/`CardTitle`/`CardDescription`/`CardContent`/`CardFooter`; small link-like tiles `ItemCard` | `--card-padding` is 12 px under IDE density. |
 | `<hr>`, `.dd-separator`, `.debug-sep` | `Separator` (`orientation="vertical"` in bars) | |
-| Usage and quota bars, determinate progress | `Meter` (a value in a range: budget, quota), `Progress` (a task advancing) | Not the 2 px `.usage-bar` under a row; that stays. |
+| Usage and quota bars, determinate progress | `Meter` (a value in a range: budget, quota), `Progress` (a task advancing) | A thin bar under a row or tile: `<Meter className="fui-meter-thin" …/>`. Usage panel figures: `StatTile`/`StatTiles` (label, value, sub, optional `trend`/`meter`); its breakdown lists are `Table` rows. |
 | Loading placeholders (`.pr-loading`, "Loading…" lines) | `Skeleton` for the shape of what is coming; `Spinner` + text for a short wait | One muted "Loading…" line in a tree can stay a `TreeRow`. |
 | Shortcut hints | `Keys` (Flint's, follows the platform's modifier names); WunderUI's `KbdHint` only for a key list with a label in a webview | |
 | Choice lists with a title and a description (agent pickers, import options) | `OptionRow` in an `OptionRowGroup` | |
@@ -273,7 +273,7 @@ Find the class in the view, swap in the component, then delete the CSS rules (an
 
 WunderUI parts that don't fit an IDE row: `FileTree` (not virtualised, owns a single selection, no inline rename, context menu, drag and drop or Flint's file icons: `FileTree.tsx` keeps its own rows, now `TreeRow`), `Collapsible`/`AccordionRow` for tree groups (the trigger is a button, so the header can't hold a checkbox or buttons, and it is 32 px; use them for disclosure sections in dialogs and settings, the IDE density puts `appearance` triggers at row height), and `Toolbar` bare (a floating rounded card: use `ViewToolbar`).
 
-These stay app CSS, because they draw content rather than lay out controls: the diff and merge views and their gutters, the git graph, the flame graph and profiler table, CodeMirror themes and editor decorations (`lib/editorDecorations.ts`, LSP squiggles, inlay hints), the xterm terminal, the virtualised DB results grid and its column filters, EXPLAIN plans, the chat transcript and composer layout, the Markdown preview, the HTTP response view, the project board columns, the activity bar, drag-and-drop overlays and the shell's split layout.
+These stay app CSS, because they draw content rather than lay out controls: the diff and merge views and their gutters, the git graph, the profiler table (the flame graph is the kit's `FlameGraph`; its layout and colours are tested code in `ui/src/flame.ts`), CodeMirror themes and editor decorations (`lib/editorDecorations.ts`, LSP squiggles, inlay hints), the xterm terminal, the virtualised DB results grid and its column filters, EXPLAIN plans, the chat transcript and composer layout, the Markdown preview, the HTTP response view, the project board columns, the activity bar, drag-and-drop overlays and the shell's split layout.
 
 ## Release process
 

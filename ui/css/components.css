@@ -327,3 +327,36 @@
 [data-density='ide'] [data-slot='settings-row'] p + p { font-size: 11.5px; }
 /* Collapsible with an appearance (row/inline): the trigger at row height. */
 [data-density='ide'] [data-slot='collapsible-trigger'][data-appearance] { padding-block: 3px; font-size: 12px; }
+
+/* StatTile: a small Card with one figure. Card's spacing variables set the padding. */
+.fui-stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; }
+.fui-stat-tile {
+  --card-spacing: 6px;
+  --card-gap: 2px;
+  min-width: 0;
+  padding-inline: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  box-shadow: none;
+  font-size: 11px;
+}
+.fui-stat-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; color: var(--fg-muted); }
+.fui-stat-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fui-stat-value { font-size: 14px; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fui-stat-sub { color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A Meter as a thin bar under a row or tile. */
+.fui-meter-thin { display: block; }
+.fui-meter-thin [data-slot='meter-track'] { height: 3px; }
+
+/* FlameGraph: the scroller, the canvas and the invisible box the tooltip anchors to. */
+.fui-flame { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; outline: none; }
+.fui-flame-stage { position: relative; }
+.fui-flame-canvas { display: block; cursor: pointer; }
+.fui-flame-anchor { position: absolute; pointer-events: none; }
+.fui-flame-tip { display: flex; flex-direction: column; gap: 2px; font-size: 12px; text-align: left; }
+.fui-flame-tip-name { font-family: var(--font-mono); word-break: break-all; }
+.fui-flame-tip-file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.7; }
+.fui-flame-tip-values { display: grid; grid-template-columns: auto auto 1fr; gap: 1px 8px; margin-top: 4px; }
+.fui-flame-tip-values b { font-weight: 600; text-align: right; }
+.fui-flame-tip-hint { margin-top: 4px; font-size: 11px; opacity: 0.7; }

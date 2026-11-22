@@ -6,6 +6,7 @@ import { keyringName } from '../../lib/platform'
 import { openInBrowser } from '../../store/pullRequests'
 import { SignInWithGitHub } from '../accounts/SignInWithGitHub'
 import { NumberField, Row, TextField } from './fields'
+import { Button, Input } from '@flint-ide/ui'
 
 const OAUTH_APPS_DOCS = 'https://docs.github.com/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app'
 
@@ -40,19 +41,19 @@ export function AccountsSection() {
         <NumberField value={github.maxRetryWaitSeconds} min={GITHUB_RETRY_WAIT.min} max={GITHUB_RETRY_WAIT.max} step={1} suffix="s" onCommit={(v) => set({ maxRetryWaitSeconds: Math.round(v) })} />
       </Row>
       <div className="settings-actions">
-        <button
+        <Button variant="plain"
           disabled={github.host === DEFAULT_GITHUB.host && github.clientId === '' && github.scopes.join() === DEFAULT_GITHUB.scopes.join() && github.maxRetryWaitSeconds === DEFAULT_GITHUB.maxRetryWaitSeconds}
           onClick={() => update({ github: { ...DEFAULT_GITHUB, scopes: [...DEFAULT_GITHUB.scopes] } })}
         >
           Reset to Defaults
-        </button>
+        </Button>
       </div>
       <h3>Registering an OAuth App</h3>
       <p className="muted settings-note">
         Sign in with GitHub uses GitHub's device flow, which needs an OAuth App but no secret and no server. On GitHub (or your Enterprise
         server) open Settings ▸ Developer settings ▸ OAuth Apps ▸ New OAuth App, give it any homepage and callback URL (the device flow doesn't use
         them), create it, tick <b>Enable Device Flow</b>, and paste its client ID above. An organization that restricts OAuth Apps must approve it.{' '}
-        <button className="link" onClick={() => openInBrowser(OAUTH_APPS_DOCS)}>GitHub's guide</button>
+        <Button variant="link" className="settings-link" onClick={() => openInBrowser(OAUTH_APPS_DOCS)}>GitHub's guide</Button>
       </p>
     </section>
   )
@@ -88,12 +89,12 @@ function GitHubAccount() {
           </span>
         </div>
         <span className="spacer" />
-        <button onClick={() => void signOut()}>Sign Out</button>
+        <Button variant="plain" onClick={() => void signOut()}>Sign Out</Button>
       </div>
       <span className="muted">Scopes: {account.scopes.length ? account.scopes.join(', ') : 'none reported (a fine-grained or app token)'}</span>
       <span className="muted">
         Sign Out deletes the token from the {keyringName()}. Revoking it at GitHub needs the OAuth App's secret, which Flint doesn't have: do it on{' '}
-        <button className="link" onClick={openAuthorizedApps}>GitHub's authorized apps page</button>.
+        <Button variant="link" className="settings-link" onClick={openAuthorizedApps}>GitHub's authorized apps page</Button>.
       </span>
     </div>
   )
@@ -111,8 +112,9 @@ function ScopesRow({ scopes, onChange }: { scopes: string[]; onChange: (scopes: 
   return (
     <Row label="Scopes" hint="Asked for when signing in: repo (pull requests, reviews, checks, re-runs), read:org (organization repositories), workflow.">
       <div className="settings-control settings-control-stack">
-        <input
-          className={`settings-text${invalid.length ? ' invalid' : ''}`}
+        <Input
+          className="settings-text"
+          aria-invalid={invalid.length > 0 || undefined}
           value={draft}
           spellCheck={false}
           onChange={(e) => setDraft(e.target.value)}

@@ -2,6 +2,7 @@ import { useSettings } from '../../store/settings'
 import { CI_LIMITS, DEFAULT_CI, type CISettings } from '../../lib/ci'
 import { DEFAULT_PR_REVIEW, PR_REVIEW_LIMITS, type PRReviewSettings } from '../../lib/prAgent'
 import { NumberField, Row } from './fields'
+import { Button, Switch } from '@flint-ide/ui'
 
 const NUMBERS: { key: keyof typeof CI_LIMITS; label: string; hint: string; suffix: string }[] = [
   {
@@ -68,7 +69,7 @@ export function CISection() {
         label="Tell me when CI fails or passes"
         hint={`A desktop notification when your pull request's CI fails or turns green while Flint isn't the active app.${notifyInBackground ? '' : ' Needs "Tell me when work finishes in the background" (Settings ▸ Agents), which is off.'}`}
       >
-        <input type="checkbox" checked={ci.notify} onChange={(e) => set({ notify: e.target.checked })} />
+        <Switch checked={ci.notify} onCheckedChange={(checked) => set({ notify: checked })} />
       </Row>
       <h3>Review comments</h3>
       <p className="muted settings-note">
@@ -87,7 +88,7 @@ export function CISection() {
         </Row>
       ))}
       <div className="settings-actions">
-        <button disabled={isDefault} onClick={() => update({ ci: DEFAULT_CI, prReview: DEFAULT_PR_REVIEW })}>Reset to Defaults</button>
+        <Button variant="plain" disabled={isDefault} onClick={() => update({ ci: DEFAULT_CI, prReview: DEFAULT_PR_REVIEW })}>Reset to Defaults</Button>
       </div>
     </section>
   )

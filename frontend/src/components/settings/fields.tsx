@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { Input, Textarea } from '@flint-ide/ui'
 
 /** A labelled settings row with an optional hint under the label. */
 export function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -25,9 +26,9 @@ export function NumberField(props: { value: number; min: number; max: number; st
   const invalid = parse(draft) === null
   return (
     <span className="number-field">
-      <input
+      <Input
         type="number"
-        className={invalid ? 'invalid' : ''}
+        aria-invalid={invalid || undefined}
         value={draft}
         min={min}
         max={max}
@@ -55,8 +56,9 @@ export function TextField(props: { value: string; list?: string; valid: (v: stri
     else setDraft(value)
   }
   return (
-    <input
-      className={`settings-text${valid(draft) ? '' : ' invalid'}`}
+    <Input
+      className="settings-text"
+      aria-invalid={!valid(draft) || undefined}
       value={draft}
       list={list}
       spellCheck={false}
@@ -110,10 +112,11 @@ export function CheckedField(props: {
   return (
     <div className="settings-control settings-control-stack">
       {multiline ? (
-        <textarea className={`settings-textarea${error ? ' invalid' : ''}`} {...shared} />
+        <Textarea className="settings-text settings-multiline" aria-invalid={!!error || undefined} {...shared} />
       ) : (
-        <input
-          className={`settings-text${error ? ' invalid' : ''}`}
+        <Input
+          className="settings-text"
+          aria-invalid={!!error || undefined}
           list={list}
           {...shared}
           onKeyDown={(e) => {

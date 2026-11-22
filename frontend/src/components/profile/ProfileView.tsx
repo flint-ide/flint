@@ -9,10 +9,16 @@ import { Select } from '../ui/Select'
 import { FlameGraph } from './FlameGraph'
 import { TopTable } from './TopTable'
 import { fileManagerName } from '../../lib/platform'
+import { Button, Input, Segment } from '@flint-ide/ui'
 
 interface Props {
   profileId: string
 }
+
+const VIEWS = [
+  { value: 'flame', label: 'Flame Graph' },
+  { value: 'top', label: 'Top' },
+]
 
 /** A profile tab: flame graph or top table of one profile file (store/profile.ts). */
 export function ProfileView({ profileId }: Props) {
@@ -44,14 +50,15 @@ export function ProfileView({ profileId }: Props) {
   return (
     <div className="profile-view">
       <div className="run-toolbar profile-toolbar">
-        <div className="profile-modes" role="tablist">
-          <button role="tab" aria-selected={view === 'flame'} className={view === 'flame' ? 'on' : ''} onClick={() => setView('flame')}>
-            Flame Graph
-          </button>
-          <button role="tab" aria-selected={view === 'top'} className={view === 'top' ? 'on' : ''} onClick={() => setView('top')}>
-            Top
-          </button>
-        </div>
+        <Segment
+          size="sm"
+          shape="rounded"
+          className="profile-modes"
+          aria-label="Profile view"
+          options={VIEWS}
+          value={view}
+          onValueChange={(v) => setView(v as 'flame' | 'top')}
+        />
         {doc.files.length > 1 && (
           <Select
             size="sm"
@@ -70,7 +77,8 @@ export function ProfileView({ profileId }: Props) {
             title="Sample type"
           />
         )}
-        <input
+        <Input
+          size="sm"
           className="profile-search"
           type="search"
           value={query}
@@ -84,9 +92,9 @@ export function ProfileView({ profileId }: Props) {
           </span>
         )}
         {view === 'flame' && (
-          <button className="icon" disabled={focus.length === 0} title="Reset zoom (Esc)" onClick={() => setFocus([])}>
+          <Button variant="ghost" size="sm" disabled={focus.length === 0} title="Reset zoom (Esc)" onClick={() => setFocus([])}>
             Reset Zoom
-          </button>
+          </Button>
         )}
         <span className="spacer" />
         {report && (
@@ -104,9 +112,9 @@ export function ProfileView({ profileId }: Props) {
               { label: `Reveal in ${fileManagerName()}`, onSelect: () => void revealProfile(file.path) },
             ]}
             trigger={(t) => (
-              <button {...t} className="icon" title={`Raw profile: ${file.path} (go tool pprof)`}>
+              <Button {...t} variant="ghost" size="sm" title={`Raw profile: ${file.path} (go tool pprof)`}>
                 Raw .pprof ⌄
-              </button>
+              </Button>
             )}
           />
         )}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { cancelSignIn, importGitHubCLI, loadAccounts, openSignInPage, signIn, useAccounts, useProvider } from '../../store/accounts'
+import { Button } from '@flint-ide/ui'
 
 /**
  * "Sign in with GitHub" where a feature needs an account: the device flow's
@@ -23,12 +24,12 @@ export function SignInWithGitHub({ intro }: { intro?: string }) {
     <div className="signin">
       {intro && <span className="muted">{intro}</span>}
       <div className="signin-actions">
-        <button className="primary" disabled={!!unavailable || state?.phase === 'starting'} title={unavailable || undefined} onClick={() => void signIn()}>
+        <Button variant="primary" disabled={!!unavailable || state?.phase === 'starting'} title={unavailable || undefined} onClick={() => void signIn()}>
           {state?.phase === 'starting' ? 'Asking GitHub…' : 'Sign in with GitHub'}
-        </button>
-        <button disabled={busy} onClick={() => void importGitHubCLI()} title="Runs `gh auth token` once (after you confirm) and keeps the token in the system keyring">
+        </Button>
+        <Button variant="plain" disabled={busy} onClick={() => void importGitHubCLI()} title="Runs `gh auth token` once (after you confirm) and keeps the token in the system keyring">
           Use the GitHub CLI's Token
-        </button>
+        </Button>
       </div>
       {unavailable && <span className="muted signin-note">{unavailable}</span>}
       {error && <span className="error selectable">{error}</span>}
@@ -48,8 +49,8 @@ function EnterCode({ host, code, expiresIn }: { host: string; code: string; expi
       <span className="muted">Enter this code on {host} to let Flint use your account:</span>
       <code className="signin-code selectable">{code}</code>
       <div className="signin-actions">
-        <button className="primary" autoFocus onClick={() => void openSignInPage()}>Copy Code &amp; Open GitHub</button>
-        <button onClick={cancelSignIn}>Cancel</button>
+        <Button variant="primary" autoFocus onClick={() => void openSignInPage()}>Copy Code &amp; Open GitHub</Button>
+        <Button variant="plain" onClick={cancelSignIn}>Cancel</Button>
       </div>
       <span className="muted signin-note">
         Waiting for GitHub… the code expires in {Math.ceil(left / 60)} min. The token goes straight to the system keyring.

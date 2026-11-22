@@ -17,6 +17,7 @@ import { useAgentDefs } from '../../store/agentDefs'
 import { agentOption, DEFAULT_TIERS, MODEL_TIERS, type ModelTier } from '../../lib/agentDefs'
 import { AgentDefsSection } from './AgentDefsSection'
 import { NotificationsSection } from './NotificationsSection'
+import { Button } from '@flint-ide/ui'
 
 // The agent CLIs Flint drives (Go: agent.known).
 const AGENTS = [
@@ -107,7 +108,7 @@ function AgentRows({ id, label, modelHint }: { id: string; label: string; modelH
       </Row>
       {!isDefaultAgent(agent) && (
         <div className="settings-actions">
-          <button onClick={() => commit({ ...EMPTY_AGENT, args: [], tiers: {} })}>Reset {label} to Defaults</button>
+          <Button variant="plain" onClick={() => commit({ ...EMPTY_AGENT, args: [], tiers: {} })}>Reset {label} to Defaults</Button>
         </div>
       )}
     </>

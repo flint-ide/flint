@@ -1,6 +1,7 @@
 import { useSettings } from '../../store/settings'
 import { ORCHESTRATION_LIMITS, type OrchestrationSettings } from '../../lib/orchestration'
 import { NumberField, Row } from './fields'
+import { Switch } from '@flint-ide/ui'
 
 const NUMBERS: { key: keyof typeof ORCHESTRATION_LIMITS; label: string; hint: string; suffix: string }[] = [
   { key: 'maxChildren', label: 'Agents per chat', hint: 'How many agents one chat may have started at a time.', suffix: 'agents' },
@@ -37,7 +38,7 @@ export function OrchestrationSection() {
         label="Let agents start and direct agents"
         hint="Off by default. When on, an agent in a trusted folder can start other agents there, send them messages and read their output through Flint's MCP server (which must be on). The first time a chat does, Flint asks you once; what it sends appears in the other chats, redacted, without a preview."
       >
-        <input type="checkbox" checked={o.enabled} onChange={(e) => set({ enabled: e.target.checked })} />
+        <Switch checked={o.enabled} onCheckedChange={(checked) => set({ enabled: checked })} />
       </Row>
       {NUMBERS.map((n) => (
         <Row key={n.key} label={n.label} hint={n.hint}>
@@ -52,7 +53,7 @@ export function OrchestrationSection() {
         </Row>
       ))}
       <Row label="Tell a chat when its agents need it" hint="When an agent a chat started waits for approval, fails or finishes, Flint sends that chat one short message with the agent's last lines, so it need not poll.">
-        <input type="checkbox" checked={o.notifyParent} onChange={(e) => set({ notifyParent: e.target.checked })} />
+        <Switch checked={o.notifyParent} onCheckedChange={(checked) => set({ notifyParent: checked })} />
       </Row>
     </>
   )

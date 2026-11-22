@@ -4,6 +4,7 @@ import { applyImport, closeVSCodeImport, previewImport, useVSCodeImport } from '
 import { useSettings } from '../../store/settings'
 import { listCommands } from '../../lib/commands'
 import { commandTitle, groupByKind, importedKeymap, keybindingNote, type ImportItem } from '../../lib/vscodeImport'
+import { Button, Segment } from '@flint-ide/ui'
 
 /**
  * Preview of "Import from VS Code…": what would change and what is skipped
@@ -33,20 +34,15 @@ export function ImportVSCodeDialog() {
       </p>
       {sources && sources.length === 0 && <p className="tool-check-empty">No VS Code, Cursor or VSCodium settings were found in your home folder.</p>}
       {sources && sources.length > 1 && (
-        <div className="segmented import-sources" role="radiogroup" aria-label="Import from">
-          {sources.map((s) => (
-            <button
-              key={s.id}
-              role="radio"
-              aria-checked={plan?.source.id === s.id}
-              className={plan?.source.id === s.id ? 'on' : ''}
-              disabled={busy}
-              title={s.userDir}
-              onClick={() => void previewImport(s.id)}
-            >
-              {s.name}
-            </button>
-          ))}
+        <div className="import-sources">
+          <Segment
+            size="sm"
+            shape="rounded"
+            aria-label="Import from"
+            options={sources.map((s) => ({ value: s.id, label: <span title={s.userDir}>{s.name}</span>, disabled: busy }))}
+            value={plan?.source.id ?? ''}
+            onValueChange={(id) => void previewImport(id)}
+          />
         </div>
       )}
       <div className="tool-check-list">
@@ -89,10 +85,10 @@ export function ImportVSCodeDialog() {
       {error && <p className="error tool-check-note">{error}</p>}
       <div className="form-actions">
         <span className="spacer" />
-        <button onClick={closeVSCodeImport}>Cancel</button>
-        <button className="primary" autoFocus disabled={busy || !plan || plan.items.length === 0} onClick={() => void applyImport()}>
+        <Button variant="plain" onClick={closeVSCodeImport}>Cancel</Button>
+        <Button variant="primary" autoFocus disabled={busy || !plan || plan.items.length === 0} onClick={() => void applyImport()}>
           {busy && plan ? 'Importing…' : 'Import'}
-        </button>
+        </Button>
       </div>
     </Modal>
   )

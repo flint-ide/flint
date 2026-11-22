@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSettings } from '../../store/settings'
 import { parseExcludes, validWatchExclude } from '../../lib/settings'
 import { isMac } from '../../lib/platform'
+import { Textarea } from '@flint-ide/ui'
 import { Row } from './fields'
 
 /**
@@ -27,8 +28,9 @@ export function WatchSection() {
         hint="Folder names, one per line (globs like *.egg-info work). Changes inside them don't refresh the file tree on their own. Dependency folders (node_modules, .venv, Cargo's target…) are never watched. Applies to folders opened after the change."
       >
         <div className="settings-control settings-control-stack">
-          <textarea
-            className={`settings-textarea${invalid.length ? ' invalid' : ''}`}
+          <Textarea
+            className="settings-text settings-multiline"
+            aria-invalid={invalid.length > 0 || undefined}
             value={draft}
             spellCheck={false}
             placeholder={'dist\n.cache'}

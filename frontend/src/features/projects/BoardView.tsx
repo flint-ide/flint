@@ -2,7 +2,7 @@ import { useEffect, useState, type DragEvent } from 'react'
 import type { ContributedTab } from '../../lib/features'
 import { useEditor } from '../../store/editor'
 import { ProjectDialogs } from './Dialogs'
-import { ItemActions, ItemDependencies, ItemMeta, ItemTasks, ItemTitle, OldFormatNote, ProjectContext } from './ItemParts'
+import { ItemCard, OldFormatNote, ProjectContext } from './ItemParts'
 import {
   boardProblem,
   boardTitle,
@@ -141,8 +141,11 @@ function Columns({ project }: { project: ProjectData }) {
 function Card({ project, item }: { project: ProjectData; item: ItemInfo }) {
   const [dragging, setDragging] = useState(false)
   return (
-    <div
-      className={`project-card${dragging ? ' dragging' : ''}`}
+    <ItemCard
+      project={project}
+      item={item}
+      frame="card"
+      dragging={dragging}
       draggable={!project.oldFormat}
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG_TYPE, dragPayload(project.path, item))
@@ -150,14 +153,6 @@ function Card({ project, item }: { project: ProjectData; item: ItemInfo }) {
         setDragging(true)
       }}
       onDragEnd={() => setDragging(false)}
-    >
-      <div className="project-card-title">
-        <ItemTitle item={item} items={project.items} />
-      </div>
-      <ItemMeta item={item} project={project} />
-      <ItemDependencies item={item} items={project.items} />
-      <ItemTasks tasks={item.tasks} />
-      <ItemActions project={project} item={item} />
-    </div>
+    />
   )
 }

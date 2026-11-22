@@ -31,6 +31,7 @@ export function ReviewSection({ root }: { root: string }) {
       hint={SEVERITIES.map((s) => counts[s] > 0 && (
         <span key={s} className={`review-count ${s}`} title={`${counts[s]} ${s}`}>{counts[s]}</span>
       ))}
+      actionsVisible="always"
       actions={
         <>
           {shown.length > 1 && (

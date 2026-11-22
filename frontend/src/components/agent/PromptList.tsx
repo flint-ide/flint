@@ -20,7 +20,7 @@ export function PromptList({ listRef, prompts, cursor, onHover, onPick, empty }:
           key={p.name}
           role="option"
           aria-selected={i === cursor}
-          selected={i === cursor}
+          current={i === cursor}
           label={`/${p.name}`}
           file
           hint={p.description}

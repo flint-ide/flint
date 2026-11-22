@@ -122,6 +122,15 @@ export const Sections: Story = {
             />
           ))}
         </TreeSection>
+        <TreeSection
+          title="Review"
+          count="2/3"
+          actionsVisible="always"
+          actions={<IconButton size="sm" variant="ghost" aria-label="Clear the review"><Undo2 /></IconButton>}
+        >
+          <TreeRow depth={1} status={<span className="fui-mono">new</span>} label="Agent finding" hint="status slot" />
+          <TreeRow depth={1} current label="/review" hint="current: bright without focus" />
+        </TreeSection>
         <TreeSection title="Stashes" count={2} defaultOpen={false}>
           <TreeRow depth={1} label="wip (main)" hint="2 hours ago" />
           <TreeRow depth={1} label="spike (ui)" hint="yesterday" />

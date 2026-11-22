@@ -161,7 +161,7 @@
 .fui-tree-row:hover { background: var(--bg-hover); }
 .fui-tree-row:is([data-active], [data-selected]) { background: var(--bg-active); }
 /* The tree container (tabIndex=0) has focus: the selection is the focused one. */
-:focus .fui-tree-row[data-selected] { background: var(--selection); }
+:focus .fui-tree-row[data-selected], .fui-tree-row[data-current] { background: var(--selection); }
 .fui-tree-row[data-emphasis='group'] { font-weight: 600; }
 .fui-tree-row[data-emphasis='root'] {
   font-size: 11px;
@@ -186,8 +186,10 @@
   cursor: pointer;
 }
 .fui-twisty:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; border-radius: 2px; }
-.fui-tree-leading, .fui-tree-icon { display: inline-flex; align-items: center; flex: none; }
+.fui-tree-leading, .fui-tree-status, .fui-tree-icon { display: inline-flex; align-items: center; flex: none; }
 .fui-tree-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The inline editor takes the label's whole width, and its error popover may leave the row. */
+.fui-tree-row[data-editing] .fui-tree-label { display: flex; flex: 1; overflow: visible; }
 .fui-tree-row[data-file] .fui-tree-label { color: var(--fg-name, var(--fg)); }
 .fui-tree-hint {
   flex: 1;
@@ -202,8 +204,10 @@
 .fui-tree-actions { margin-left: auto; display: none; align-items: center; gap: 2px; }
 .fui-tree-badge { margin-left: auto; flex: none; display: inline-flex; }
 /* Hover or keyboard focus inside: the actions take the hint's and the count's place. */
-.fui-tree-row:is(:hover, :focus-within) > .fui-tree-actions { display: flex; }
-.fui-tree-row:is(:hover, :focus-within):has(> .fui-tree-actions) > :is(.fui-tree-hint, .fui-tree-badge) { display: none; }
+.fui-tree-row:is(:hover, :focus-within) > .fui-tree-actions, .fui-tree-row[data-actions='always'] > .fui-tree-actions { display: flex; }
+/* Persistent actions sit beside the badge, which then needs no auto margin of its own. */
+.fui-tree-actions + .fui-tree-badge { margin-left: 4px; }
+.fui-tree-row:not([data-actions='always']):is(:hover, :focus-within):has(> .fui-tree-actions) > :is(.fui-tree-hint, .fui-tree-badge) { display: none; }
 /* The kit Checkbox's hit area reaches 8–12 px past the box; in a 22 px row that
    swallows the twisty and the row above. */
 .fui-tree-row [data-slot='checkbox'] { margin-right: 4px; }

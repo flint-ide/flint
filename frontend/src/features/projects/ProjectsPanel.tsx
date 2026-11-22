@@ -159,21 +159,19 @@ function Repositories({ project, collapsed, clone }: { project: ProjectData; col
   const waiting = repos.filter((r) => repoIssue(r) !== null).length
   return (
     <div className="project-group project-repos">
-      {/* A TreeRow, not a TreeSection: the badge reads "2/3" while checkouts are missing. */}
-      <TreeRow
-        emphasis="group"
-        twisty={open ? 'open' : 'closed'}
-        onTwistyClick={() => toggleGroup('repositories', !open)}
-        onClick={() => toggleGroup('repositories', !open)}
-        label="Repositories"
-        badge={
+      <TreeSection
+        title="Repositories"
+        open={open}
+        onOpenChange={(next) => toggleGroup('repositories', next)}
+        count={
           <CountBadge title={waiting ? `${waiting} can't be used by Delegate yet` : 'Every repository has a checkout here'}>
             {waiting ? `${waiting}/${repos.length}` : repos.length}
           </CountBadge>
         }
-      />
-      {open && clone && <CloneProgress folder={project.path} clone={clone} />}
-      {open && repos.map((r) => <RepoRow key={r.name} folder={project.path} repo={r} cloning={!!clone} />)}
+      >
+        {clone && <CloneProgress folder={project.path} clone={clone} />}
+        {repos.map((r) => <RepoRow key={r.name} folder={project.path} repo={r} cloning={!!clone} />)}
+      </TreeSection>
     </div>
   )
 }

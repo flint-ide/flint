@@ -566,12 +566,6 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
   z-index: 1;
   cursor: default;
 }
-/* The inline editor takes the label's whole width, and its error popover may leave the row. */
-.fui-tree-row[data-editing] .fui-tree-label {
-  display: flex;
-  flex: 1;
-  overflow: visible;
-}
 .tree-edit {
   position: relative;
   flex: 1;

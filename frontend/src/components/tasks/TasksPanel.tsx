@@ -112,7 +112,7 @@ function TaskRow({ t, changes, open, busy, label, heading }: RowProps) {
         title={`${t.prompt}\n\n${t.worktree}`}
         onClick={() => a.diff && toggleChanges(t)}
         twisty={a.diff ? (open ? 'open' : 'closed') : 'none'}
-        icon={
+        status={
           <TaskStateBadge state={t.stale ? 'stale' : s.state} title={t.stale ? 'The worktree folder is gone' : t.error || t.blocked || s.hint}>
             {t.stale ? 'stale' : s.label}
           </TaskStateBadge>

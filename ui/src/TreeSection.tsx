@@ -3,14 +3,16 @@ import { TreeRow } from './TreeRow'
 
 export type TreeSectionProps = {
   title: ReactNode
-  /** Number of items, right-aligned as a small Badge (hidden while the actions show). */
-  count?: number
+  /** Number of items, right-aligned as a small Badge (hidden while the actions show). A string or node ("2/3") is shown as given. */
+  count?: ReactNode
   /** Dimmed text after the title, e.g. the branch of a repository. */
   hint?: ReactNode
   /** A control before the title, e.g. the Checkbox that ticks the whole group. */
   leading?: ReactNode
   /** Buttons on the header, shown on hover or focus. */
   actions?: ReactNode
+  /** 'always' keeps the header actions visible instead of only on hover/focus. */
+  actionsVisible?: 'hover' | 'always'
   /** Controlled open state (e.g. kept in a store by key); omit it to let the section keep its own. */
   open?: boolean
   defaultOpen?: boolean
@@ -28,7 +30,7 @@ export type TreeSectionProps = {
  * is a button, so the header couldn't hold a checkbox or action buttons, and it is not 22 px.
  */
 export function TreeSection({
-  title, count, hint, leading, actions, open, defaultOpen = true, onOpenChange, depth, className, children,
+  title, count, hint, leading, actions, actionsVisible, open, defaultOpen = true, onOpenChange, depth, className, children,
 }: TreeSectionProps) {
   const [ownOpen, setOwnOpen] = useState(defaultOpen)
   const isOpen = open ?? ownOpen
@@ -50,6 +52,7 @@ export function TreeSection({
         hint={hint}
         leading={leading}
         actions={actions}
+        actionsVisible={actionsVisible}
         badge={count}
         onClick={toggle}
       />

@@ -348,6 +348,7 @@ function ChangeGroups({
                 />
               )
             }
+            actionsVisible="always"
             actions={
               <>
                 {g.key !== 'conflicts' && included > 0 && (

@@ -52,7 +52,7 @@ function AgentRowView({ row }: { row: AgentRow }) {
       <TreeRow
         title={`${row.title}\n\n${row.root}${id ? `\n\n${modifierName('Mod')}-click to peek without leaving your tab` : ''}`}
         onClick={(e) => (id && modKey(e) ? peekAgent(id) : focusAgent(row))}
-        icon={<TaskStateBadge state={look} title={stateHint(row.state, row.kind, row.blocked)}>{stateLabel(row.state)}</TaskStateBadge>}
+        status={<TaskStateBadge state={look} title={stateHint(row.state, row.kind, row.blocked)}>{stateLabel(row.state)}</TaskStateBadge>}
         label={row.title}
         file
       />

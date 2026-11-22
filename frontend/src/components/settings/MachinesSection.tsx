@@ -16,6 +16,7 @@ import { checkMachine, checkMachineList, MachinesAPI, refreshMachines, useMachin
 import { errorMessage } from '../../api/backend'
 import { showToast } from '../../store/dialog'
 import { CheckedField, NumberField, Row } from './fields'
+import { Button, Input } from '@flint-ide/ui'
 
 interface Install {
   notice: string
@@ -106,10 +107,10 @@ function MachineRows({ machine, index, list }: { machine: Machine; index: number
         <CheckedField value={machine.command} check={(command) => check({ command })} onCommit={(command) => commit({ command })} />
       </Row>
       <div className="settings-actions">
-        <button onClick={() => void runCheck()} disabled={probe?.busy} title="Runs the command with --version over ssh and reads the answer">
+        <Button variant="plain" onClick={() => void runCheck()} disabled={probe?.busy} title="Runs the command with --version over ssh and reads the answer">
           Check
-        </button>
-        <button onClick={remove}>Remove {machineLabel(machine)}</button>
+        </Button>
+        <Button variant="plain" onClick={remove}>Remove {machineLabel(machine)}</Button>
         {probe?.busy && <span className="muted">Asking the machine…</span>}
         {probe?.error && <span className="error">{probe.error}</span>}
         {probe?.result && <span className={probe.result.status === 'ok' ? 'muted' : 'error'}>{probe.result.message}</span>}
@@ -137,7 +138,7 @@ function InstallSteps() {
             {step.title}
             {step.command && (
               <div>
-                <code className="selectable">{step.command}</code> <button onClick={() => void copy(step.command)}>Copy</button>
+                <code className="selectable">{step.command}</code> <Button variant="plain" onClick={() => void copy(step.command)}>Copy</Button>
               </div>
             )}
             {step.note && <div className="muted">{step.note}</div>}
@@ -170,7 +171,7 @@ function AddMachine({ list }: { list: Machine[] }) {
     setDraft(EMPTY_MACHINE)
   }
   const text = (key: 'id' | 'name' | 'target' | 'command', placeholder: string) => (
-    <input className="settings-text" value={draft[key]} placeholder={placeholder} spellCheck={false} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} />
+    <Input className="settings-text" value={draft[key]} placeholder={placeholder} spellCheck={false} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} />
   )
   return (
     <>
@@ -191,9 +192,9 @@ function AddMachine({ list }: { list: Machine[] }) {
         {text('id', suggestMachineId(draft.name || draft.target, list))}
       </Row>
       <div className="settings-actions">
-        <button onClick={() => void add()} disabled={!draft.target.trim()}>
+        <Button variant="plain" onClick={() => void add()} disabled={!draft.target.trim()}>
           Add Machine
-        </button>
+        </Button>
         {error && <span className="error">{error}</span>}
       </div>
     </>

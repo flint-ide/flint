@@ -8,6 +8,7 @@ import {
 import { formatEnv, joinArgs, parseEnv, splitArgs } from '../../lib/shellArgs'
 import { Modal } from '../layout/Modal'
 import { Select } from '../ui/Select'
+import { Alert, Button, Field, FieldDescription, FieldLabel, Form, FormActions, Input, Textarea } from '@flint-ide/ui'
 
 interface Props {
   editing: { config: RunConfig; replaces: string | null }
@@ -79,111 +80,66 @@ export function RunConfigDialog({ editing }: Props) {
   const title = editing.replaces ? `Edit ${editing.config.name}` : editing.config.name ? `Save ${editing.config.name}` : 'New run configuration'
   return (
     <Modal title={title} onClose={closeRunConfigDialog} className="run-config-dialog">
-      <form
-        className="form"
+      <Form
         onSubmit={(e) => {
           e.preventDefault()
           void save(false)
         }}
       >
         <div className="form-row">
-          <label className="grow">
-            Name
-            <input value={config.name} placeholder="Server" autoFocus required onChange={(e) => update({ name: e.target.value })} />
-          </label>
-          <label className="run-type">
-            Type
+          <Input label="Name" wrapperClassName="grow" value={config.name} placeholder="Server" autoFocus required onChange={(e) => update({ name: e.target.value })} />
+          <Field className="run-type">
+            <FieldLabel>Type</FieldLabel>
             <Select block value={type} options={TYPES} onChange={(t) => update({ type: t as RunConfig['type'] })} />
-          </label>
+          </Field>
         </div>
 
         {type === 'command' && (
           <>
-            <label>
-              Command
-              <input value={config.command ?? ''} placeholder="./bin/server --dev   (shell line, or a program when arguments are set)" required onChange={(e) => update({ command: e.target.value })} />
-            </label>
-            <label>
-              Arguments
-              <input value={args} placeholder="optional; quoted like in a shell" onChange={(e) => setArgs(e.target.value)} />
-            </label>
+            <Input label="Command" value={config.command ?? ''} placeholder="./bin/server --dev (shell line, or a program when arguments are set)" required onChange={(e) => update({ command: e.target.value })} />
+            <Input label="Arguments" value={args} placeholder="optional; quoted like in a shell" onChange={(e) => setArgs(e.target.value)} />
           </>
         )}
         {type === 'go' && (
           <>
-            <label>
-              Package or file
-              <input value={config.package ?? ''} placeholder="./cmd/server, . or main.go" required onChange={(e) => update({ package: e.target.value })} />
-            </label>
+            <Input label="Package or file" value={config.package ?? ''} placeholder="./cmd/server, . or main.go" required onChange={(e) => update({ package: e.target.value })} />
             <div className="form-row">
-              <label className="grow">
-                Build flags
-                <input value={buildFlags} placeholder="-race -tags dev" onChange={(e) => setBuildFlags(e.target.value)} />
-              </label>
-              <label className="grow">
-                Program arguments
-                <input value={args} placeholder="-port 8080" onChange={(e) => setArgs(e.target.value)} />
-              </label>
+              <Input label="Build flags" wrapperClassName="grow" value={buildFlags} placeholder="-race -tags dev" onChange={(e) => setBuildFlags(e.target.value)} />
+              <Input label="Program arguments" wrapperClassName="grow" value={args} placeholder="-port 8080" onChange={(e) => setArgs(e.target.value)} />
             </div>
           </>
         )}
         {type === 'npm' && (
           <div className="form-row">
-            <label className="grow">
-              Script
-              <input value={config.script ?? ''} placeholder="dev" required onChange={(e) => update({ script: e.target.value })} />
-            </label>
-            <label className="grow">
-              Arguments
-              <input value={args} placeholder="--port 3000" onChange={(e) => setArgs(e.target.value)} />
-            </label>
+            <Input label="Script" wrapperClassName="grow" value={config.script ?? ''} placeholder="dev" required onChange={(e) => update({ script: e.target.value })} />
+            <Input label="Arguments" wrapperClassName="grow" value={args} placeholder="--port 3000" onChange={(e) => setArgs(e.target.value)} />
           </div>
         )}
         {type === 'make' && (
-          <label>
-            Target
-            <input value={config.target ?? ''} placeholder="default target" onChange={(e) => update({ target: e.target.value })} />
-          </label>
+          <Input label="Target" value={config.target ?? ''} placeholder="default target" onChange={(e) => update({ target: e.target.value })} />
         )}
 
         <div className="form-row">
-          <label className="grow">
-            Working directory
-            <input value={config.cwd ?? ''} placeholder="workspace folder (relative path)" onChange={(e) => update({ cwd: e.target.value })} />
-          </label>
-          <label className="grow">
-            Before launch
-            <input value={config.before ?? ''} placeholder="e.g. make generate" onChange={(e) => update({ before: e.target.value })} />
-          </label>
+          <Input label="Working directory" wrapperClassName="grow" value={config.cwd ?? ''} placeholder="workspace folder (relative path)" onChange={(e) => update({ cwd: e.target.value })} />
+          <Input label="Before launch" wrapperClassName="grow" value={config.before ?? ''} placeholder="e.g. make generate" onChange={(e) => update({ before: e.target.value })} />
         </div>
-        <label>
-          Environment
-          <textarea className="run-env" rows={3} value={env} placeholder={'KEY=value\nDEBUG=1'} spellCheck={false} onChange={(e) => setEnv(e.target.value)} />
-        </label>
-        <label>
-          Profile URL
-          <input
-            value={config.profileURL ?? ''}
-            placeholder="http://localhost:6060/debug/pprof/profile?seconds=10   (optional, net/http/pprof)"
-            onChange={(e) => update({ profileURL: e.target.value })}
-          />
-        </label>
-        {debuggable && type === 'go' && <div className="muted run-hint">Debugging (dlv dap) will hook into this configuration.</div>}
+        <Textarea label="Environment" className="run-env" rows={3} value={env} placeholder={'KEY=value\nDEBUG=1'} spellCheck={false} onChange={(e) => setEnv(e.target.value)} />
+        <Input label="Profile URL" value={config.profileURL ?? ''} placeholder="http://localhost:6060/debug/pprof/profile?seconds=10 (optional, net/http/pprof)" onChange={(e) => update({ profileURL: e.target.value })} />
+        {debuggable && type === 'go' && <FieldDescription>Debugging (dlv dap) will hook into this configuration.</FieldDescription>}
 
-        {status.kind === 'error' && <div className="form-status error">{status.message}</div>}
-        <div className="form-actions">
+        {status.kind === 'error' && <Alert size="inline" variant="negative">{status.message}</Alert>}
+        <FormActions align="start">
           {editing.replaces && (
-            <button type="button" className="danger" onClick={() => void remove()} disabled={status.kind === 'busy'}>
+            <Button variant="destructive" type="button" onClick={() => void remove()} disabled={status.kind === 'busy'}>
               Delete
-            </button>
+            </Button>
           )}
-          <span className="muted run-hint">.flint/run.json</span>
-          <span className="spacer" />
-          <button type="button" onClick={closeRunConfigDialog}>Cancel</button>
-          <button type="button" onClick={() => void save(true)} disabled={status.kind === 'busy'}>Save &amp; Run</button>
-          <button type="submit" className="primary" disabled={status.kind === 'busy'}>Save</button>
-        </div>
-      </form>
+          <FieldDescription className="fui-grow">.flint/run.json</FieldDescription>
+          <Button variant="plain" type="button" onClick={closeRunConfigDialog}>Cancel</Button>
+          <Button variant="plain" type="button" onClick={() => void save(true)} disabled={status.kind === 'busy'}>Save &amp; Run</Button>
+          <Button variant="primary" type="submit" disabled={status.kind === 'busy'}>Save</Button>
+        </FormActions>
+      </Form>
     </Modal>
   )
 }

@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Button } from '@flint-ide/ui'
+import { PrBadge } from '../github/PrBadge'
 import { severityOf, type PlacedFinding } from '../../lib/agentReview'
 import { dismissFinding, fixAllFindings, fixFinding } from '../../store/agentReview'
 
@@ -26,7 +28,7 @@ export function FindingCard({ finding, agent, total, label }: { finding: PlacedF
         {label && <span className="muted">{label}</span>}
         <b className="truncate">{finding.title}</b>
         <span className="spacer" />
-        {finding.stale && <span className="pr-badge pending" title="The code changed after the review">Stale</span>}
+        {finding.stale && <PrBadge tone="pending" title="The code changed after the review">Stale</PrBadge>}
         <span className="muted">{agent}</span>
       </div>
       {open && (
@@ -44,12 +46,12 @@ export function FindingCard({ finding, agent, total, label }: { finding: PlacedF
           )}
           <div className="pr-reply">
             <div className="pr-actions">
-              <button className="primary" onClick={() => void fixFinding(finding.id)} title="Put this finding in the agent chat's draft">✦ Fix it</button>
+              <Button size="sm" variant="primary" onClick={() => void fixFinding(finding.id)} title="Put this finding in the agent chat's draft">✦ Fix it</Button>
               {total > 1 && (
-                <button onClick={() => void fixAllFindings()} title="Put every finding in one draft">Fix all ({total})</button>
+                <Button size="sm" variant="plain" onClick={() => void fixAllFindings()} title="Put every finding in one draft">Fix all ({total})</Button>
               )}
               <span className="spacer" />
-              <button onClick={() => dismissFinding(finding.id)}>Dismiss</button>
+              <Button size="sm" variant="plain" onClick={() => dismissFinding(finding.id)}>Dismiss</Button>
             </div>
           </div>
         </>

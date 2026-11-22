@@ -18,6 +18,7 @@ import { formatArgs, parseArgs } from '../../lib/toolSettings'
 import * as SettingsAPI from '../../../bindings/flint/settingsapi'
 import { settings as models } from '../../wails/models'
 import { CheckedField, Row } from './fields'
+import { Button, Input, Textarea } from '@flint-ide/ui'
 
 /** Go's verdict on a whole list ('' = it would be saved). */
 const checkList = (list: CustomAgent[]) => SettingsAPI.CheckCustomAgents(list.map((c) => models.CustomAgent.createFrom(c)))
@@ -103,10 +104,10 @@ function CustomAgentRows({ agent, index, list }: { agent: CustomAgent; index: nu
         />
       </Row>
       <div className="settings-actions">
-        <button onClick={() => void runCheck()} disabled={probe?.busy} title="Start the agent, run the ACP handshake and stop it again">
+        <Button variant="plain" onClick={() => void runCheck()} disabled={probe?.busy} title="Start the agent, run the ACP handshake and stop it again">
           Check
-        </button>
-        <button onClick={remove}>Remove {displayName(agent)}</button>
+        </Button>
+        <Button variant="plain" onClick={remove}>Remove {displayName(agent)}</Button>
         {probe && <span className={probe.error ? 'error' : 'muted'}>{probe.text}</span>}
       </div>
     </>
@@ -142,7 +143,7 @@ function AddCustomAgent({ list }: { list: CustomAgent[] }) {
     fill(EMPTY_CUSTOM_AGENT)
   }
   const field = (key: 'id' | 'name' | 'command', placeholder: string) => (
-    <input
+    <Input
       className="settings-text"
       value={draft[key]}
       placeholder={placeholder}
@@ -157,9 +158,9 @@ function AddCustomAgent({ list }: { list: CustomAgent[] }) {
       {presets.length > 0 && (
         <Row label="Presets" hint="Fill in a CLI whose ACP mode is known; install it yourself.">
           {presets.map((p) => (
-            <button key={p.id} onClick={() => fill(p, p.hint)}>
+            <Button variant="plain" key={p.id} onClick={() => fill(p, p.hint)}>
               {p.name}
-            </button>
+            </Button>
           ))}
         </Row>
       )}
@@ -167,7 +168,7 @@ function AddCustomAgent({ list }: { list: CustomAgent[] }) {
         {field('command', 'goose')}
       </Row>
       <Row label="Arguments" hint="Start the CLI in ACP mode. One per line.">
-        <textarea className="settings-textarea" value={argsText} placeholder="acp" spellCheck={false} onChange={(e) => setArgsText(e.target.value)} />
+        <Textarea className="settings-text settings-multiline" value={argsText} placeholder="acp" spellCheck={false} onChange={(e) => setArgsText(e.target.value)} />
       </Row>
       <Row label="Name" hint="Optional.">
         {field('name', 'Goose')}
@@ -176,9 +177,9 @@ function AddCustomAgent({ list }: { list: CustomAgent[] }) {
         {field('id', suggestId(draft.name || draft.command, list))}
       </Row>
       <div className="settings-actions">
-        <button onClick={() => void add()} disabled={!draft.command.trim()}>
+        <Button variant="plain" onClick={() => void add()} disabled={!draft.command.trim()}>
           Add Agent
-        </button>
+        </Button>
         {hint && !error && <span className="muted">{hint}</span>}
         {error && <span className="error">{error}</span>}
       </div>

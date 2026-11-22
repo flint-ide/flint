@@ -1,3 +1,4 @@
+import { Button } from '@flint-ide/ui'
 import { useMemo, useState } from 'react'
 import type { ExplainResult, PlanNode } from '../../../api/backend'
 import {
@@ -41,7 +42,7 @@ export function ExplainView({ result, sql }: Props) {
         <span className={result.warnings ? 'explain-facts has-warnings' : 'explain-facts'}>{facts.join(' · ')}</span>
         <code className="muted truncate" title={sql}>{sql.replace(/\s+/g, ' ')}</code>
         <span className="spacer" />
-        <button className="link" onClick={() => void copy()}>{result.plan ? 'Copy JSON' : 'Copy'}</button>
+        <Button variant="ghost" size="sm" onClick={() => void copy()}>{result.plan ? 'Copy JSON' : 'Copy'}</Button>
       </div>
       {result.plan ? <PlanTree root={result.plan} /> : <TextPlan lines={result.lines ?? []} />}
     </div>
@@ -68,8 +69,8 @@ function PlanTree({ root }: { root: PlanNode }) {
         <span className="plan-node">
           Node
           <span className="plan-tree-actions">
-            <button className="link" onClick={() => setCollapsed(new Set())}>Expand all</button>
-            <button className="link" onClick={() => setCollapsed(new Set(parentPaths(root)))}>Collapse all</button>
+            <Button variant="ghost" size="sm" onClick={() => setCollapsed(new Set())}>Expand all</Button>
+            <Button variant="ghost" size="sm" onClick={() => setCollapsed(new Set(parentPaths(root)))}>Collapse all</Button>
           </span>
         </span>
         <span className="plan-bar" title={metric === 'time' ? 'Share of the total self time' : 'Share of the total self cost'}>

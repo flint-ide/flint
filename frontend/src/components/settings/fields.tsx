@@ -1,14 +1,23 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
+import { Input, Textarea } from '@flint-ide/ui'
 
 /** A labelled settings row with an optional hint under the label. */
 export function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  const id = useId()
   return (
     <div className="settings-row">
       <div className="settings-label">
-        <span>{label}</span>
-        {hint && <span className="muted">{hint}</span>}
+        <span id={`${id}-label`}>{label}</span>
+        {hint && (
+          <span id={`${id}-hint`} className="muted">
+            {hint}
+          </span>
+        )}
       </div>
-      <div className="settings-control">{children}</div>
+      {/* Named by the label, so a switch or field in it is announced with what it sets. */}
+      <div className="settings-control" role="group" aria-labelledby={`${id}-label`} aria-describedby={hint ? `${id}-hint` : undefined}>
+        {children}
+      </div>
     </div>
   )
 }
@@ -25,9 +34,9 @@ export function NumberField(props: { value: number; min: number; max: number; st
   const invalid = parse(draft) === null
   return (
     <span className="number-field">
-      <input
+      <Input
         type="number"
-        className={invalid ? 'invalid' : ''}
+        aria-invalid={invalid || undefined}
         value={draft}
         min={min}
         max={max}
@@ -55,8 +64,9 @@ export function TextField(props: { value: string; list?: string; valid: (v: stri
     else setDraft(value)
   }
   return (
-    <input
-      className={`settings-text${valid(draft) ? '' : ' invalid'}`}
+    <Input
+      className="settings-text"
+      aria-invalid={!valid(draft) || undefined}
       value={draft}
       list={list}
       spellCheck={false}
@@ -110,10 +120,11 @@ export function CheckedField(props: {
   return (
     <div className="settings-control settings-control-stack">
       {multiline ? (
-        <textarea className={`settings-textarea${error ? ' invalid' : ''}`} {...shared} />
+        <Textarea className="settings-text settings-multiline" aria-invalid={!!error || undefined} {...shared} />
       ) : (
-        <input
-          className={`settings-text${error ? ' invalid' : ''}`}
+        <Input
+          className="settings-text"
+          aria-invalid={!!error || undefined}
           list={list}
           {...shared}
           onKeyDown={(e) => {

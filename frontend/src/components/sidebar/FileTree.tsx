@@ -13,6 +13,8 @@ import { openContextMenu } from '../../store/contextMenu'
 import { fileTreeMenu } from './fileTreeMenu'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
+import { IconButton, Input, PanelHeader, TreeRow } from '@flint-ide/ui'
+import { Plus, RefreshCw } from '@flint-ide/ui/icons'
 
 const ROW_HEIGHT = 22
 
@@ -167,69 +169,88 @@ export function FileTree() {
 
   return (
     <div className="panel">
-      <div className="panel-header">
-        <span className="panel-title" title={roots.join('\n')}>{implicitRoot ? basename(implicitRoot) : 'Workspace'}</span>
-        <button className="icon" title={`Add Folder to Workspace… (${formatKeys('Mod+Shift+O')})`} onClick={() => void useWorkspace.getState().pickRoot()}>＋</button>
-        <button className="icon" title="Refresh" onClick={() => void reloadTree()}>↻</button>
-      </div>
+      <PanelHeader
+        title={implicitRoot ? basename(implicitRoot) : 'Workspace'}
+        tooltip={roots.join('\n')}
+        actions={
+          <>
+            <IconButton size="sm" variant="ghost" aria-label="Add Folder to Workspace" title={`Add Folder to Workspace… (${formatKeys('Mod+Shift+O')})`} onClick={() => void useWorkspace.getState().pickRoot()}><Plus /></IconButton>
+            <IconButton size="sm" variant="ghost" aria-label="Refresh" title="Refresh" onClick={() => void reloadTree()}><RefreshCw /></IconButton>
+          </>
+        }
+      />
       <div className="tree" ref={setTreeRef} tabIndex={0} onKeyDown={onKeyDown} onContextMenu={(e) => onContextMenu(e, null)}>
         <div style={{ height: totalSize, position: 'relative' }}>
           {items.map((vi) => {
             const d = display[vi.index]
             const depth = d.kind === 'draft' ? d.depth : d.row.depth
-            const style = { transform: `translateY(${vi.start}px)`, paddingLeft: 8 + depth * 14 }
+            const style = { transform: `translateY(${vi.start}px)` }
             if (d.kind === 'draft') {
               const type: NewKind = d.isDir ? 'folder' : 'file'
               return (
-                <div key="__draft__" className="tree-row editing" style={style}>
-                  <span className="twisty" />
-                  <FileIcon name="" isDir={d.isDir} />
-                  <InlineName
-                    initial=""
-                    isDir={d.isDir}
-                    siblings={siblings(d.dir)}
-                    placeholder={d.isDir ? 'Folder name' : 'File name'}
-                    onCancel={endEdit}
-                    onCommit={async (name) => {
-                      const path = await createEntry(d.dir, name, type)
-                      endEdit()
-                      if (path) select([path])
-                    }}
-                  />
-                </div>
+                <TreeRow
+                  key="__draft__"
+                  virtual
+                  editing
+                  style={style}
+                  depth={depth}
+                  twisty="none"
+                  icon={<FileIcon name="" isDir={d.isDir} />}
+                  label={
+                    <InlineName
+                      initial=""
+                      isDir={d.isDir}
+                      siblings={siblings(d.dir)}
+                      placeholder={d.isDir ? 'Folder name' : 'File name'}
+                      onCancel={endEdit}
+                      onCommit={async (name) => {
+                        const path = await createEntry(d.dir, name, type)
+                        endEdit()
+                        if (path) select([path])
+                      }}
+                    />
+                  }
+                />
               )
             }
             const { entry, expanded: isOpen, isRoot } = d.row
             const renaming = edit?.kind === 'rename' && edit.path === entry.path
             const active = activeId === `file:${entry.path}`
             return (
-              <div
+              <TreeRow
                 key={entry.path}
-                className={`tree-row${isRoot ? ' root-row' : ''}${active ? ' active' : ''}${selected.has(entry.path) ? ' selected' : ''}${renaming ? ' editing' : ''}`}
+                virtual
                 style={style}
+                depth={depth}
+                emphasis={isRoot ? 'root' : undefined}
+                active={active}
+                selected={selected.has(entry.path)}
+                editing={renaming}
+                file={!entry.isDir}
+                twisty={entry.isDir ? (isOpen ? 'open' : 'closed') : 'none'}
+                icon={<FileIcon name={entry.name} isDir={entry.isDir} open={isOpen} />}
                 onClick={(e) => !renaming && onRowClick(e, entry)}
                 onContextMenu={(e) => onContextMenu(e, entry)}
                 title={entry.path}
-              >
-                <span className="twisty">{entry.isDir ? (isOpen ? '▾' : '▸') : ''}</span>
-                <FileIcon name={entry.name} isDir={entry.isDir} open={isOpen} />
-                {renaming ? (
-                  <InlineName
-                    initial={entry.name}
-                    current={entry.name}
-                    isDir={entry.isDir}
-                    siblings={siblings(dirname(entry.path))}
-                    onCancel={endEdit}
-                    onCommit={async (name) => {
-                      const to = await renameEntry(entry.path, name)
-                      endEdit()
-                      if (to) select([to])
-                    }}
-                  />
-                ) : (
-                  <span className={entry.isDir ? 'dir-name' : 'file-name'}>{entry.name}</span>
-                )}
-              </div>
+                label={
+                  renaming ? (
+                    <InlineName
+                      initial={entry.name}
+                      current={entry.name}
+                      isDir={entry.isDir}
+                      siblings={siblings(dirname(entry.path))}
+                      onCancel={endEdit}
+                      onCommit={async (name) => {
+                        const to = await renameEntry(entry.path, name)
+                        endEdit()
+                        if (to) select([to])
+                      }}
+                    />
+                  ) : (
+                    entry.name
+                  )
+                }
+              />
             )
           })}
         </div>
@@ -332,8 +353,9 @@ function InlineName({ initial, current, isDir, siblings, placeholder, onCommit, 
 
   return (
     <span className="tree-edit">
-      <input
+      <Input
         ref={input}
+        size="sm"
         className="inline-input"
         value={value}
         placeholder={placeholder}

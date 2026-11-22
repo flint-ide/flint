@@ -16,8 +16,10 @@ import { AccountsSection } from './AccountsSection'
 import { BackgroundTerminalsSection } from './BackgroundTerminalsSection'
 import { MachinesSection } from './MachinesSection'
 import { NumberField, Row, TextField } from './fields'
+import { Select } from '../ui/Select'
 import { openVSCodeImport } from '../../store/vscodeImport'
 import { isMac } from '../../lib/platform'
+import { Button, Segment, Switch } from '@flint-ide/ui'
 
 type Section = 'appearance' | 'editor' | 'terminal' | 'machines' | 'accounts' | 'agents' | 'agentContext' | 'usage' | 'editorAi' | 'lsp' | 'watch' | 'ci' | 'keymap' | 'import'
 
@@ -58,9 +60,9 @@ export function SettingsView({ active, page: asked }: { active: boolean; page?: 
     <div className="settings-view">
       <nav className="settings-nav" aria-label="Settings sections">
         {pages.map((s) => (
-          <button key={s.id} className={section === s.id ? 'active' : ''} onClick={() => setSection(s.id)}>
+          <Button key={s.id} variant={section === s.id ? 'tint' : 'ghost'} size="sm" className="settings-nav-item" aria-current={section === s.id ? 'page' : undefined} onClick={() => setSection(s.id)}>
             {s.label}
-          </button>
+          </Button>
         ))}
       </nav>
       <div className="settings-body">
@@ -108,13 +110,7 @@ function AppearanceSection() {
     <section>
       <h2>Appearance</h2>
       <Row label="Theme" hint={hint}>
-        <div className="segmented" role="radiogroup" aria-label="Theme">
-          {options.map((o) => (
-            <button key={o.value} role="radio" aria-checked={mode === o.value} className={mode === o.value ? 'on' : ''} onClick={() => update({ theme: o.value })}>
-              {o.label}
-            </button>
-          ))}
-        </div>
+        <Segment size="sm" shape="rounded" aria-label="Theme" options={options} value={mode} onValueChange={(theme) => update({ theme: theme as ThemeMode })} />
       </Row>
       <ContributedThemeRow />
     </section>
@@ -133,18 +129,14 @@ function ContributedThemeRow() {
   }
   return (
     <Row label="Color theme" hint="From your extensions (Settings ▸ Extensions). Chosen, it becomes the Custom theme, terminal colors included.">
-      <select className="settings-select" value={active} onChange={(e) => choose(e.target.value)} aria-label="Color theme">
-        {active === '' && <option value="">Choose a theme…</option>}
-        {groupThemes(themes).map((g) => (
-          <optgroup key={g.group} label={g.group}>
-            {g.themes.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label} ({t.base})
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
+      <Select
+        value={active}
+        placeholder="Choose a theme…"
+        searchable={themes.length > 12}
+        title="Color theme"
+        options={groupThemes(themes).flatMap((g) => g.themes.map((t) => ({ value: t.id, label: t.label, hint: t.base, group: g.group })))}
+        onChange={choose}
+      />
     </Row>
   )
 }
@@ -160,21 +152,17 @@ function EditorSection() {
       <pre className="settings-preview editor-preview">{`func greet(name string) string {\n\treturn "Hello, " + name // 0O 1lI {}[]\n}`}</pre>
       <h3>Saving</h3>
       <Row label="Save files when Flint loses focus" hint="Modified files are written when you switch to another app.">
-        <input type="checkbox" checked={autoSave} onChange={(e) => update({ autoSave: e.target.checked })} />
+        <Switch checked={autoSave} onCheckedChange={(checked) => update({ autoSave: checked })} />
       </Row>
       <Row label="Format on save" hint="The file's language server formats it before each save (gofmt through gopls, rustfmt through rust-analyzer, …). Files without a formatter are saved as they are.">
-        <input type="checkbox" checked={editor.formatOnSave} onChange={(e) => update({ editor: { ...editor, formatOnSave: e.target.checked } })} />
+        <Switch checked={editor.formatOnSave} onCheckedChange={(checked) => update({ editor: { ...editor, formatOnSave: checked } })} />
       </Row>
       <Row label="Organize imports on save" hint="The language server sorts the file's imports, adds missing ones and removes unused ones before each save, where it offers that.">
-        <input
-          type="checkbox"
-          checked={editor.organizeImportsOnSave}
-          onChange={(e) => update({ editor: { ...editor, organizeImportsOnSave: e.target.checked } })}
-        />
+        <Switch checked={editor.organizeImportsOnSave} onCheckedChange={(checked) => update({ editor: { ...editor, organizeImportsOnSave: checked } })} />
       </Row>
       <h3>Keys</h3>
       <Row label="Vim mode" hint={`Vim key bindings in every editor; :w saves, :q closes the tab. ${isMac() ? "A focused Vim editor keeps Vim's ⌃ keys (⌃R redo, not Run)" : 'A focused Vim editor keeps Ctrl+R, Ctrl+D, Ctrl+U, Ctrl+V, Ctrl+A, Ctrl+X and Ctrl+['}; other Flint shortcuts keep working.`}>
-        <input type="checkbox" checked={editor.vimMode} onChange={(e) => update({ editor: { ...editor, vimMode: e.target.checked } })} />
+        <Switch checked={editor.vimMode} onCheckedChange={(checked) => update({ editor: { ...editor, vimMode: checked } })} />
       </Row>
     </section>
   )
@@ -189,7 +177,7 @@ function ImportSection() {
         everything that would change, and what is skipped and why, before anything is saved.
       </p>
       <div className="settings-actions">
-        <button onClick={() => void openVSCodeImport()}>Import from VS Code…</button>
+        <Button variant="plain" onClick={() => void openVSCodeImport()}>Import from VS Code…</Button>
       </div>
     </section>
   )
@@ -231,12 +219,12 @@ function FontRows({ font, defaults, onChange }: { font: FontSettings; defaults: 
         <NumberField value={font.lineHeight} min={LINE_HEIGHT.min} max={LINE_HEIGHT.max} step={0.05} onCommit={(v) => onChange({ ...font, lineHeight: Math.round(v * 100) / 100 })} />
       </Row>
       <div className="settings-actions">
-        <button
+        <Button variant="plain"
           disabled={isDefault}
           onClick={() => onChange({ fontFamily: defaults.fontFamily, fontSize: defaults.fontSize, lineHeight: defaults.lineHeight })}
         >
           Reset to Defaults
-        </button>
+        </Button>
       </div>
     </>
   )

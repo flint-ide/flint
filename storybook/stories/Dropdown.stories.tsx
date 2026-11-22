@@ -4,6 +4,8 @@ import { Button } from '@wunderui/react'
 import { ChevronDown, FolderOpen, GitBranch } from 'lucide-react'
 import { Dropdown, type DropdownItem } from '../../frontend/src/components/ui/Dropdown'
 import { Select } from '../../frontend/src/components/ui/Select'
+import { ContextMenu as AppContextMenu } from '../../frontend/src/components/ui/ContextMenu'
+import { openContextMenu } from '../../frontend/src/store/contextMenu'
 
 const items: DropdownItem[] = [
   { label: 'Open Folder…', icon: <FolderOpen size={14} />, kbd: '⌘O', onSelect: () => undefined },
@@ -70,6 +72,33 @@ export const SelectStory: Story = {
           onChange={setLimit}
           options={[50, 100, 500, 1000].map((n) => ({ value: n, label: String(n) }))}
         />
+      </div>
+    )
+  },
+}
+
+/** Right-click the box: the app's context menu (store/contextMenu + ContextMenu.tsx), at the pointer. */
+export const ContextMenuStory: Story = {
+  name: 'Context menu',
+  render: function Render() {
+    const [picked, setPicked] = useState('—')
+    return (
+      <div style={{ minHeight: 320 }}>
+        <div
+          style={{ width: 280, height: 120, border: '1px dashed var(--border)', borderRadius: 8, display: 'grid', placeItems: 'center', color: 'var(--fg-muted)' }}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            openContextMenu(e.clientX, e.clientY, [
+              { label: 'Copy Path', kbd: '⌥⌘C', onSelect: () => setPicked('Copy Path') },
+              { label: 'Reveal in Finder', onSelect: () => setPicked('Reveal') },
+              { type: 'separator' },
+              { label: 'Delete', danger: true, onSelect: () => setPicked('Delete') },
+            ])
+          }}
+        >
+          Right-click here · picked: {picked}
+        </div>
+        <AppContextMenu />
       </div>
     )
   },

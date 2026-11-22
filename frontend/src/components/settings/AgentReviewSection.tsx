@@ -5,6 +5,7 @@ import { useAgentDefs } from '../../store/agentDefs'
 import { agentOption } from '../../lib/agentDefs'
 import { Select } from '../ui/Select'
 import { NumberField, Row } from './fields'
+import { Button } from '@flint-ide/ui'
 
 const SCOPES: { value: ReviewScope; label: string }[] = [
   { value: 'selected', label: 'Ticked changes' },
@@ -58,7 +59,7 @@ export function AgentReviewSection() {
         Flint's control: Flint declines its permission requests, but an agent configured to skip them runs its tools anyway.
       </p>
       <div className="settings-actions">
-        <button disabled={isDefault} onClick={() => set(DEFAULT_AGENT_REVIEW)}>Reset to Defaults</button>
+        <Button variant="plain" disabled={isDefault} onClick={() => set(DEFAULT_AGENT_REVIEW)}>Reset to Defaults</Button>
       </div>
     </>
   )

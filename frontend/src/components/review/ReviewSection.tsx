@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { Button, IconButton, TreeRow, TreeSection } from '@flint-ide/ui'
+import { Sparkles, X } from '@flint-ide/ui/icons'
 import { SEVERITIES, location, severityCounts, severityOf } from '../../lib/agentReview'
 import {
   cancelReview, clearReview, dismissFinding, fixAllFindings, fixFinding, reviewChanges, revealFinding, runningLabel, useAgentReview,
@@ -16,7 +18,6 @@ export function ReviewSection({ root }: { root: string }) {
   const error = useAgentReview((s) => s.error)
   const files = useAgentReview((s) => s.files)
   const doneAt = useAgentReview((s) => s.doneAt)
-  const [open, setOpen] = useState(true)
 
   const ours = reviewRoot === root
   if (!running && !error && (!ours || doneAt === 0)) return null
@@ -24,58 +25,60 @@ export function ReviewSection({ root }: { root: string }) {
   const shown = ours ? findings : []
 
   return (
-    <div className="review-section">
-      <div className="tree-row static group-row" onClick={() => setOpen(!open)}>
-        <span className="twisty">{open ? '▾' : '▸'}</span>
-        <span className="group-title">Agent Review</span>
-        {SEVERITIES.map((s) => counts[s] > 0 && (
-          <span key={s} className={`review-count ${s}`} title={`${counts[s]} ${s}`}>{counts[s]}</span>
-        ))}
-        <span className="spacer" />
-        {shown.length > 1 && (
-          <button className="link agent-action" onClick={(e) => (e.stopPropagation(), void fixAllFindings())} title="Put every finding in the agent chat's draft">
-            ✦ Fix all
-          </button>
-        )}
-        {!running && (
-          <button className="icon" title="Clear the review" onClick={(e) => (e.stopPropagation(), clearReview())}>×</button>
-        )}
-      </div>
-      {open && (
+    <TreeSection
+      className="review-section"
+      title="Agent Review"
+      hint={SEVERITIES.map((s) => counts[s] > 0 && (
+        <span key={s} className={`review-count ${s}`} title={`${counts[s]} ${s}`}>{counts[s]}</span>
+      ))}
+      actionsVisible="always"
+      actions={
         <>
-          {running && <RunningRow />}
-          {error && !running && (
-            <div className="review-error selectable">
-              {error}
-              <button className="link" onClick={() => void reviewChanges()}>Try again</button>
-            </div>
+          {shown.length > 1 && (
+            <Button size="sm" variant="ghost" className="agent-action" onClick={() => void fixAllFindings()} title="Put every finding in the agent chat's draft">
+              ✦ Fix all
+            </Button>
           )}
-          {ours && !running && !error && shown.length === 0 && doneAt > 0 && (
-            <div className="muted review-note">No problems found in {files.length} file{files.length === 1 ? '' : 's'}.</div>
+          {!running && (
+            <IconButton size="sm" variant="ghost" aria-label="Clear the review" title="Clear the review" onClick={() => clearReview()}><X /></IconButton>
           )}
-          {ours && notes.map((n) => <div key={n} className="muted review-note">{n}</div>)}
-          {shown.map((f) => {
-            const sev = severityOf(f.severity)
-            return (
-              <div
-                key={f.id}
-                className={`tree-row static review-row${f.stale ? ' stale' : ''}`}
-                title={`${location(f)}\n${f.explanation || f.title}`}
-                onClick={() => revealFinding(f.id)}
-              >
-                <span className={`review-dot ${sev}`} aria-label={sev} />
-                <span className="file-name truncate">{f.title}</span>
-                <span className="muted path-hint">{location(f)}{f.stale ? ' · stale' : ''}</span>
-                <span className="row-actions" onClick={(e) => e.stopPropagation()}>
-                  <button className="icon" title="Fix it: put this finding in the agent chat's draft" onClick={() => void fixFinding(f.id)}>✦</button>
-                  <button className="icon" title="Dismiss" onClick={() => dismissFinding(f.id)}>×</button>
-                </span>
-              </div>
-            )
-          })}
         </>
+      }
+    >
+      {running && <RunningRow />}
+      {error && !running && (
+        <div className="review-error selectable">
+          {error}
+          <Button size="sm" variant="ghost" onClick={() => void reviewChanges()}>Try again</Button>
+        </div>
       )}
-    </div>
+      {ours && !running && !error && shown.length === 0 && doneAt > 0 && (
+        <div className="muted review-note">No problems found in {files.length} file{files.length === 1 ? '' : 's'}.</div>
+      )}
+      {ours && notes.map((n) => <div key={n} className="muted review-note">{n}</div>)}
+      {shown.map((f) => {
+        const sev = severityOf(f.severity)
+        return (
+          <TreeRow
+            key={f.id}
+            depth={1}
+            className={f.stale ? 'review-row stale' : undefined}
+            title={`${location(f)}\n${f.explanation || f.title}`}
+            onClick={() => revealFinding(f.id)}
+            icon={<span className={`review-dot ${sev}`} aria-label={sev} />}
+            file
+            label={f.title}
+            hint={`${location(f)}${f.stale ? ' · stale' : ''}`}
+            actions={
+              <>
+                <IconButton size="sm" variant="ghost" aria-label="Fix it" title="Fix it: put this finding in the agent chat's draft" onClick={() => void fixFinding(f.id)}><Sparkles /></IconButton>
+                <IconButton size="sm" variant="ghost" aria-label="Dismiss" title="Dismiss" onClick={() => dismissFinding(f.id)}><X /></IconButton>
+              </>
+            }
+          />
+        )
+      })}
+    </TreeSection>
   )
 }
 
@@ -94,7 +97,7 @@ function RunningRow() {
       <span className="truncate">{runningLabel(running)}</span>
       <span className="muted">{seconds}s</span>
       <span className="spacer" />
-      <button className="link" onClick={cancelReview}>Cancel</button>
+      <Button size="sm" variant="ghost" onClick={cancelReview}>Cancel</Button>
     </div>
   )
 }

@@ -3,16 +3,19 @@ import assert from 'node:assert/strict'
 import { ICONS, isIconName } from './icons'
 
 describe('icons', () => {
-  it('draws every icon with absolute path commands only', () => {
-    for (const [name, paths] of Object.entries(ICONS)) {
-      assert.ok(paths.length > 0, name)
-      for (const d of paths) assert.match(d, /^M[-\d.]/, `${name}: ${d}`)
-      for (const d of paths) assert.ok(!/NaN|undefined/.test(d), `${name}: ${d}`)
+  it('maps every name to a component', () => {
+    assert.equal(Object.keys(ICONS).length, 15)
+    for (const [name, glyph] of Object.entries(ICONS)) {
+      // Lucide icons are forwardRef objects (or functions), never undefined.
+      assert.ok(typeof glyph === 'function' || (typeof glyph === 'object' && glyph !== null), name)
     }
   })
 
   it('knows its names', () => {
+    for (const name of Object.keys(ICONS)) assert.ok(isIconName(name), name)
     assert.ok(isIconName('terminal'))
     assert.ok(!isIconName('⌕'))
+    assert.ok(!isIconName('toString'))
+    assert.ok(!isIconName(''))
   })
 })

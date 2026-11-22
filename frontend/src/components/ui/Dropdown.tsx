@@ -10,13 +10,20 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { Input, Separator } from '@flint-ide/ui'
 import { modKey } from '../../lib/platform'
 import { useListCursor } from '../../lib/useListCursor'
 import { useEventCallback } from '../../lib/useEventCallback'
+import { AppMenu } from './AppMenu'
+import { noteMenuReturn, returnFocusIfLost } from '../../lib/returnFocus'
 
 // The one popover menu used across Flint (title bar, "+" menu, selects, settings,
-// right-click context menus via store/contextMenu). Rendered in a portal with fixed
-// positioning so it never gets clipped by scrolling tab strips or panels.
+// right-click context menus via store/contextMenu). A menu without a filter box is
+// the UI kit's DropdownMenu (AppMenu.tsx); a long or searchable one is Menu below,
+// a list with the kit's Input as its filter box on top, styled like the kit's menu
+// (Base UI menus have no text input, and its Combobox is a single-value picker:
+// no trailing row actions, several checked rows or alt/⌘ on Enter). Both render in a portal
+// with fixed positioning, so they never get clipped by scrolling tab strips or panels.
 
 export type DropdownItem =
   | {
@@ -65,16 +72,28 @@ export interface TriggerProps {
   'data-open': boolean
 }
 
-const AUTO_SEARCH_AT = 9
+/** A list this long gets a filter box unless `searchable` says otherwise. */
+export const AUTO_SEARCH_AT = 9
 
 export function Dropdown({ trigger, items, align = 'start', searchable, placeholder = 'Filter…', minWidth = 200, onOpen, emptyText = 'Nothing here' }: DropdownProps) {
   const [open, setOpen] = useState(false)
   const anchor = useRef<HTMLElement | null>(null)
 
+  const refocus = useRef(false)
+
   const close = useCallback(() => {
+    refocus.current = true
+    noteMenuReturn(anchor.current)
     setOpen(false)
-    anchor.current?.focus()
   }, [])
+  // Back to the trigger once the menu is gone (while it is still mounted, the kit's
+  // menu moves focus to its highlighted row, which then unmounts and drops focus),
+  // unless what the picked item did focused something else.
+  useEffect(() => {
+    if (open || !refocus.current) return
+    refocus.current = false
+    returnFocusIfLost(anchor.current)
+  }, [open])
   const toggle = () => {
     if (!open) onOpen?.()
     setOpen(!open)
@@ -97,7 +116,7 @@ export function Dropdown({ trigger, items, align = 'start', searchable, placehol
         'data-open': open,
       })}
       {open && anchor.current && (
-        <Menu
+        <OpenMenu
           anchor={anchor.current}
           items={typeof items === 'function' ? items() : items}
           align={align}
@@ -110,6 +129,19 @@ export function Dropdown({ trigger, items, align = 'start', searchable, placehol
       )}
     </>
   )
+}
+
+/** The open menu: with a filter box (Menu) when asked for or long, the kit's otherwise (AppMenu). */
+function OpenMenu(props: Omit<MenuProps, 'atPoint'>) {
+  const { anchor, items, align, searchable, minWidth, emptyText, onClose } = props
+  const [at] = useState(() => boxOf(anchor))
+  if (searchable ?? items.filter(isItem).length >= AUTO_SEARCH_AT) return <Menu {...props} />
+  return <AppMenu at={at} items={items} align={align} minWidth={minWidth} emptyText={emptyText} onClose={onClose} trigger={anchor} />
+}
+
+function boxOf(el: HTMLElement) {
+  const r = el.getBoundingClientRect()
+  return { left: r.left, top: r.top, width: r.width, height: r.height }
 }
 
 export interface MenuProps {
@@ -234,19 +266,22 @@ export function Menu({ anchor, atPoint, items, align, searchable, placeholder, m
       onKeyDown={onKeyDown}
     >
       {withSearch && (
-        <input
-          className="dd-search"
-          autoFocus
-          value={query}
-          placeholder={placeholder}
-          spellCheck={false}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        <div className="dd-search">
+          <Input
+            size="sm"
+            autoFocus
+            value={query}
+            placeholder={placeholder}
+            aria-label={placeholder}
+            spellCheck={false}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
       )}
       <div className="dd-items" ref={listRef}>
         {visible.length === 0 && <div className="dd-empty">{query ? 'No matches' : emptyText}</div>}
         {visible.map((it, i) => {
-          if (it.type === 'separator') return <div key={`s${i}`} className="dd-separator" />
+          if (it.type === 'separator') return <Separator key={`s${i}`} className="dd-separator" />
           if (it.type === 'section') return <div key={`h${i}`} className="dd-section">{it.label}</div>
           return <MenuRow key={it.key ?? `${it.label}${i}`} item={it} index={i} current={i === cursor} onHover={hover} onPick={choose} />
         })}

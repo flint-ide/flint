@@ -1,3 +1,4 @@
+import { Button, Input } from '@flint-ide/ui'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { useVirtualList } from '../../../lib/virtualList'
 import type { QueryResult } from '../../../api/backend'
@@ -274,11 +275,12 @@ export function ResultsGrid({ result, summary, actions, editing, driver = 'postg
         {filtered && (
           <span className="filter-status" title="Rows hidden by local filters (the query wasn't re-run)">
             {order.length.toLocaleString()} of {base.toLocaleString()} shown
-            <button className="link" onClick={() => setView({ ...view, filters: {}, search: '' })}>Clear filters</button>
+            <Button variant="ghost" size="sm" onClick={() => setView({ ...view, filters: {}, search: '' })}>Clear filters</Button>
           </span>
         )}
         <span className="spacer" />
-        <input
+        <Input
+          size="sm"
           ref={search}
           className="grid-search"
           placeholder="Filter rows…"
@@ -297,10 +299,10 @@ export function ResultsGrid({ result, summary, actions, editing, driver = 'postg
           }}
         />
         {actions?.(selected?.row ?? null)}
-        <button className="link" onClick={() => copy(toTSV(shownResult()), 'as TSV')}>Copy TSV</button>
-        <button className="link" onClick={() => copy(JSON.stringify(toObjects(shownResult()), null, 2), 'as JSON')}>
+        <Button variant="ghost" size="sm" onClick={() => copy(toTSV(shownResult()), 'as TSV')}>Copy TSV</Button>
+        <Button variant="ghost" size="sm" onClick={() => copy(JSON.stringify(toObjects(shownResult()), null, 2), 'as JSON')}>
           Copy JSON
-        </button>
+        </Button>
       </div>
       <div className="grid-scroller" ref={setScroller} tabIndex={0} onKeyDown={onKeyDown}>
         <div style={{ width: totalWidth, height: totalSize + ROW_HEIGHT, position: 'relative' }}>

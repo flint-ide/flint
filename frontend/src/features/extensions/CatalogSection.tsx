@@ -1,4 +1,6 @@
+import { Button, Card, CardContent } from '@flint-ide/ui'
 import { useEffect } from 'react'
+import { ExtensionStateBadge } from './ExtensionStateBadge'
 import { uninstallExtension, useExtensions } from './store'
 import { installFromCatalog, loadCatalog, useCatalog, type Entry } from './catalogStore'
 import { catalogRows, sentence, type CatalogRow, type CatalogStatus } from './catalogModel'
@@ -32,9 +34,9 @@ export function CatalogSection() {
         Flint asks you to confirm the install.
       </p>
       <div className="settings-actions">
-        <button disabled={loading} onClick={() => void loadCatalog(true)}>
+        <Button variant="plain" disabled={loading} onClick={() => void loadCatalog(true)}>
           {loading ? 'Fetching…' : 'Refresh Repository'}
-        </button>
+        </Button>
       </div>
       {error && <p className="error">{sentence(error)}</p>}
       {loading && !listing && <p className="muted settings-note">Fetching the extensions repository…</p>}
@@ -51,31 +53,31 @@ function CatalogCard({ row }: { row: CatalogRow<Entry> }) {
   const busy = useCatalog((s) => s.busy.includes(entry.folder))
   const kind = entry.program ? 'Program' : entry.themes > 0 ? `${entry.themes} color theme${entry.themes === 1 ? '' : 's'}` : 'Data only'
   return (
-    <div className="extension-card">
+    <Card className="extension-card"><CardContent>
       <div className="extension-head">
         <strong>{entry.name}</strong>
         {entry.version && <span className="muted">{entry.version}</span>}
         {entry.publisher && <span className="muted">by {entry.publisher}</span>}
         <span className="muted">{kind}</span>
-        <span className={`extension-state ${status === 'installed' ? 'running' : status === 'broken' ? 'invalid' : ''}`}>
+        <ExtensionStateBadge tone={status === 'installed' ? 'ok' : status === 'broken' ? 'bad' : 'none'}>
           {status === 'update' || status === 'newer' ? `${STATUS_LABELS[status]} (installed ${installedVersion})` : STATUS_LABELS[status]}
-        </span>
+        </ExtensionStateBadge>
       </div>
       {entry.description && <p className="extension-description">{entry.description}</p>}
       {entry.error && <p className="error">{entry.error}</p>}
       {entry.permissions.length > 0 && <p className="muted extension-warning">Permissions: {entry.permissions.join(', ')}</p>}
       <div className="settings-actions">
         {(status === 'available' || status === 'update') && (
-          <button disabled={busy} onClick={() => void installFromCatalog(entry.folder)}>
+          <Button variant="plain" disabled={busy} onClick={() => void installFromCatalog(entry.folder)}>
             {busy ? (entry.program ? 'Building…' : 'Installing…') : status === 'update' ? 'Update…' : 'Install…'}
-          </button>
+          </Button>
         )}
         {(status === 'installed' || status === 'update' || status === 'newer') && (
-          <button className="danger" disabled={busy} onClick={() => void uninstallExtension(entry.id)}>
+          <Button variant="destructive" disabled={busy} onClick={() => void uninstallExtension(entry.id)}>
             Uninstall…
-          </button>
+          </Button>
         )}
       </div>
-    </div>
+    </CardContent></Card>
   )
 }

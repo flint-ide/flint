@@ -1,4 +1,5 @@
 import { useState, type RefObject } from 'react'
+import { Badge, Button, Input, TreeRow } from '@flint-ide/ui'
 import { sourceLabel } from '../../lib/prompts'
 import type { Prompt } from '../../store/prompts'
 
@@ -15,11 +16,14 @@ export function PromptList({ listRef, prompts, cursor, onHover, onPick, empty }:
   return (
     <div className="quick-list prompt-list" ref={listRef} role="listbox">
       {prompts.map((p, i) => (
-        <div
+        <TreeRow
           key={p.name}
           role="option"
           aria-selected={i === cursor}
-          className={`quick-item${i === cursor ? ' selected' : ''}`}
+          current={i === cursor}
+          label={`/${p.name}`}
+          file
+          hint={p.description}
           onMouseMove={() => onHover(i)}
           // mousedown: keep the focus in the chat input
           onMouseDown={(e) => {
@@ -27,12 +31,10 @@ export function PromptList({ listRef, prompts, cursor, onHover, onPick, empty }:
             onPick(p)
           }}
           title={p.path || undefined}
+          badge={<Badge color={p.untrusted ? 'orange' : 'grey'} badgeStyle="light" size="sm">{sourceLabel(p)}</Badge>}
         >
-          <span className="file-name">/{p.name}</span>
-          <span className="muted path-hint">{p.description}</span>
           {p.agent && <span className="muted">{p.agent} only</span>}
-          <span className={`badge${p.untrusted ? ' untrusted' : ''}`}>{sourceLabel(p)}</span>
-        </div>
+        </TreeRow>
       ))}
       {prompts.length === 0 && <div className="placeholder muted">{empty}</div>}
     </div>
@@ -68,7 +70,7 @@ export function PromptArgsForm({ prompt, onSubmit, onCancel }: {
       {prompt.args.map((a, i) => (
         <label key={a}>
           <span>{a}</span>
-          <input
+          <Input
             autoFocus={i === 0}
             value={values[a] ?? ''}
             spellCheck={false}
@@ -79,8 +81,8 @@ export function PromptArgsForm({ prompt, onSubmit, onCancel }: {
       <div className="prompt-args-actions">
         <span className="muted">Fills the draft; nothing is sent until you press Send.</span>
         <span className="spacer" />
-        <button type="button" onClick={onCancel}>Cancel</button>
-        <button type="submit" className="primary">Fill Draft</button>
+        <Button type="button" variant="plain" size="sm" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" variant="primary" size="sm">Fill Draft</Button>
       </div>
     </form>
   )

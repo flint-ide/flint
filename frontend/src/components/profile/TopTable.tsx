@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { formatValue, percent, shortName, sortTop, type TopRow, type TopSortKey } from '../../lib/flame'
-import { Icon } from '../ui/Icon'
+import { formatValue, IconButton, percent, shortName, sortTop, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, type TopRow, type TopSortKey } from '@flint-ide/ui'
+import { Search } from '@flint-ide/ui/icons'
 
 interface Props {
   rows: TopRow[]
@@ -32,48 +32,51 @@ export function TopTable({ rows, total, unit, query, onOpen, onHighlight }: Prop
 
   return (
     <div className="profile-top">
-      <table>
-        <thead>
-          <tr>
+      <Table>
+        <TableHeader>
+          <TableRow>
             {COLUMNS.map((c) => (
-              <th
+              <TableHead
                 key={c.label}
                 className={`${c.className}${c.key ? ' sortable' : ''}${c.key === sort ? ' sorted' : ''}`}
                 title={c.title}
                 onClick={c.key ? () => setSort(c.key!) : undefined}
               >
                 {c.label}
-              </th>
+              </TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {shown.map((r) => (
-            <tr key={r.name} title={r.name} onClick={() => onOpen(r)} className={r.file ? 'has-source' : undefined}>
-              <td className="num">{formatValue(r.flat, unit)}</td>
-              <td className="num muted">{percent(r.flat, total)}</td>
-              <td className="num">{formatValue(r.cum, unit)}</td>
-              <td className="num muted">{percent(r.cum, total)}</td>
-              <td className="name">
+            <TableRow key={r.name} title={r.name} onClick={() => onOpen(r)} className={r.file ? 'has-source' : undefined}>
+              <TableCell className="num">{formatValue(r.flat, unit)}</TableCell>
+              <TableCell className="num muted">{percent(r.flat, total)}</TableCell>
+              <TableCell className="num">{formatValue(r.cum, unit)}</TableCell>
+              <TableCell className="num muted">{percent(r.cum, total)}</TableCell>
+              <TableCell className="name">
                 <div className="fn">
                   <span className="truncate">{shortName(r.name)}</span>
-                  <button
-                    className="icon"
+                  <IconButton
+                    variant="ghost"
+                    size="sm"
+                    className="fn-action"
+                    aria-label="Highlight in the flame graph"
                     title="Highlight in the flame graph"
                     onClick={(e) => {
                       e.stopPropagation()
                       onHighlight(r)
                     }}
                   >
-                    <Icon name="search" size={14} />
-                  </button>
+                    <Search />
+                  </IconButton>
                 </div>
-              </td>
-              <td className="loc muted truncate">{r.file ? `${r.file.slice(r.file.lastIndexOf('/') + 1)}${r.line ? `:${r.line}` : ''}` : ''}</td>
-            </tr>
+              </TableCell>
+              <TableCell className="loc muted truncate">{r.file ? `${r.file.slice(r.file.lastIndexOf('/') + 1)}${r.line ? `:${r.line}` : ''}` : ''}</TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
       {shown.length === 0 && <div className="muted placeholder">{query ? 'No function matches' : 'No samples'}</div>}
     </div>
   )

@@ -1,10 +1,12 @@
 import { memo, useEffect, useMemo, useState } from 'react'
+import { Kbd } from '@flint-ide/ui'
 import { formatKeys, isAvailable, listCommands, runCommand, shownKeys, type Command } from '../lib/commands'
 import { pushRecent, rankCommands } from '../lib/commandSearch'
 import { useWorkspace } from '../store/workspace'
 import { Modal } from './layout/Modal'
 import { useListCursor } from '../lib/useListCursor'
 import { useEventCallback } from '../lib/useEventCallback'
+import { PaletteSearch } from './ui/PaletteSearch'
 
 const RECENT_KEY = 'flint.recentCommands'
 
@@ -68,12 +70,10 @@ export function CommandPalette() {
 
   return (
     <Modal onClose={close} className="quick-open command-palette">
-      <input
+      <PaletteSearch
         autoFocus
-        className="quick-input"
         placeholder="Find action…"
         value={query}
-        spellCheck={false}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={onKeyDown}
       />
@@ -117,7 +117,7 @@ const CommandRow = memo(function CommandRow({ command, positions, index, selecte
         <Highlighted text={command.title} positions={positions} />
       </span>
       {command.category && <span className="muted path-hint">{command.category}</span>}
-      {keys && <kbd>{formatKeys(keys)}</kbd>}
+      {keys && <Kbd>{formatKeys(keys)}</Kbd>}
     </div>
   )
 })

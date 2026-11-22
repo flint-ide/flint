@@ -12,6 +12,8 @@ import {
 } from '../../store/agentTasks'
 import { Modal } from '../layout/Modal'
 import { Select } from '../ui/Select'
+import { Alert, Button, FormActions, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@flint-ide/ui'
+import { TaskStateBadge } from './badges'
 
 const MARK: Record<string, string> = { add: '+', del: '−', ctx: ' ', hunk: '' }
 
@@ -52,26 +54,26 @@ export function CompareView() {
 
   return (
     <Modal title={`Compare: ${tasks[0]?.task.title ?? 'agent tasks'}`} onClose={closeCompare} className="compare-tasks">
-      {error && <div className="form-status error">{error}</div>}
+      {error && <Alert size="inline" variant="negative">{error}</Alert>}
       {!data && !error && <div className="placeholder muted">Loading…</div>}
       {data && (
         <div className="compare-body">
           <div className="compare-files scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>
                     {data.files.length} {data.files.length === 1 ? 'file' : 'files'}
-                    <button className="link" onClick={() => void refreshCompare()} title="Read the changes again">Refresh</button>
-                  </th>
+                    <Button variant="ghost" size="sm" onClick={() => void refreshCompare()} title="Read the changes again">Refresh</Button>
+                  </TableHead>
                   {tasks.map((c) => {
                     const t = c.task as TaskView
                     const a = taskActions(t)
                     const s = stateInfo(t.state)
                     return (
-                      <th key={t.id} title={`${t.branch}\n${t.worktree}`}>
+                      <TableHead key={t.id} title={`${t.branch}\n${t.worktree}`}>
                         <div className="compare-agent">
-                          {labels[t.id]} <span className={`task-state ${t.stale ? 'stale' : s.state}`}>{t.stale ? 'stale' : s.label}</span>
+                          {labels[t.id]} <TaskStateBadge state={t.stale ? 'stale' : s.state}>{t.stale ? 'stale' : s.label}</TaskStateBadge>
                         </div>
                         <div className="muted">
                           {c.error || `${c.count} ${c.count === 1 ? 'file' : 'files'} +${c.added} −${c.deleted} · ↑${t.ahead}`}
@@ -79,32 +81,32 @@ export function CompareView() {
                         {formatTaskUsage(t) && <div className="muted">{formatTaskUsage(t)}</div>}
                         <div className="compare-keep">
                           {a.merge && (
-                            <button className="link" disabled={!!busy[t.id]} onClick={() => void keepTask(t, 'merge')} title={`Keep this one: merge it into ${t.base}, then choose what happens to the others`}>
+                            <Button variant="ghost" size="sm" disabled={!!busy[t.id]} onClick={() => void keepTask(t, 'merge')} title={`Keep this one: merge it into ${t.base}, then choose what happens to the others`}>
                               Keep: Merge
-                            </button>
+                            </Button>
                           )}
                           {a.pr && (
-                            <button className="link" disabled={!!busy[t.id]} onClick={() => void keepTask(t, 'pr')} title="Keep this one: create its pull request, then choose what happens to the others">
+                            <Button variant="ghost" size="sm" disabled={!!busy[t.id]} onClick={() => void keepTask(t, 'pr')} title="Keep this one: create its pull request, then choose what happens to the others">
                               Keep: PR
-                            </button>
+                            </Button>
                           )}
                         </div>
-                      </th>
+                      </TableHead>
                     )
                   })}
-                </tr>
-              </thead>
-              <tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {data.files.map((f) => (
-                  <tr key={f.path} className={f.path === path ? 'selected' : ''} onClick={() => void selectCompareFile(f.path)}>
-                    <td className="compare-path" title={f.path}>{f.path}</td>
+                  <TableRow key={f.path} className={f.path === path ? 'selected' : ''} onClick={() => void selectCompareFile(f.path)}>
+                    <TableCell className="compare-path" title={f.path}>{f.path}</TableCell>
                     {f.changes.map((c, i) => (
-                      <td key={tasks[i].task.id} className={c ? (c.untracked ? 'change-untracked' : '') : 'muted'}>{changeCell(c)}</td>
+                      <TableCell key={tasks[i].task.id} className={c ? (c.untracked ? 'change-untracked' : '') : 'muted'}>{changeCell(c)}</TableCell>
                     ))}
-                  </tr>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
             {data.files.length === 0 && <div className="placeholder muted">No task changed a file yet.</div>}
             {data.truncated && <div className="muted compare-note">More files were changed than are listed.</div>}
           </div>
@@ -120,9 +122,9 @@ export function CompareView() {
                         <span className="muted">{changeCell(change)}</span>
                         <span className="spacer" />
                         {!c.task.stale && (
-                          <button className="link" onClick={() => openComparedFileDiff(c, path, change?.origPath ?? '')} title="Open the side-by-side diff against the base in a tab">
+                          <Button variant="ghost" size="sm" onClick={() => openComparedFileDiff(c, path, change?.origPath ?? '')} title="Open the side-by-side diff against the base in a tab">
                             Open diff
-                          </button>
+                          </Button>
                         )}
                       </div>
                       <DiffLines d={file?.tasks[i]} />
@@ -146,10 +148,9 @@ export function CompareView() {
           )}
         </div>
       )}
-      <div className="form-actions">
-        <span className="spacer" />
-        <button type="button" onClick={closeCompare}>Close</button>
-      </div>
+      <FormActions align="end">
+        <Button variant="plain" size="sm" type="button" onClick={closeCompare}>Close</Button>
+      </FormActions>
     </Modal>
   )
 }

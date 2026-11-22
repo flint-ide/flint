@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react'
 import { agentLabel } from '../../lib/agentDefs'
 import { useAgentDefs } from '../../store/agentDefs'
 import { activeRoot } from '../../store/activeRoot'
@@ -24,17 +25,20 @@ import {
   type ItemInfo,
   type TaskInfo,
 } from './projects'
+import { dependencyNotes, priorityColor } from './cardParts'
 import { addContext, cancelStart, delegateItem, itemKey, openContext, openItemFile, openItemTask, renameOldConfig, setStatus, useProjects } from './store'
+import { Badge, Button, ListGroup, ListItem, TaskCard } from '@flint-ide/ui'
+import { MarkerBadge, TaskStateBadge } from '../../components/tasks/badges'
 
 /** The note on a project in the Backlog preview's format, with its one action (the panel and the board). */
 export function OldFormatNote({ folder }: { folder: string }) {
   return (
     <div className="project-untrusted project-old-format" role="status">
-      <span className="project-marker warn">Old format</span>
+      <MarkerBadge tone="warn">Old format</MarkerBadge>
       <span className="muted">{OLD_FORMAT_NOTE}</span>
-      <button className="link" onClick={() => void renameOldConfig(folder)} title="Flint asks first; the file's content stays as it is">
+      <Button variant="ghost" size="sm" onClick={() => void renameOldConfig(folder)} title="Flint asks first; the file's content stays as it is">
         {RENAME_ACTION}…
-      </button>
+      </Button>
     </div>
   )
 }
@@ -47,101 +51,98 @@ export function ProjectContext({ project }: { project: ProjectData }) {
       <span className="muted">Context:</span>
       <span className={line.problem ? 'error' : line.action === 'open' ? '' : 'muted'}>{line.text}</span>
       {line.action === 'open' && (
-        <button className="link" onClick={() => openContext(project)} title={`Open ${project.context.path}`}>Open</button>
+        <Button variant="ghost" size="sm" onClick={() => openContext(project)} title={`Open ${project.context.path}`}>Open</Button>
       )}
       {line.action === 'add' && (
-        <button className="link" onClick={() => void addContext(project.path)} title="Write PROJECT.md from a template and open it">Add Project Context…</button>
+        <Button variant="ghost" size="sm" onClick={() => void addContext(project.path)} title="Write PROJECT.md from a template and open it">Add Project Context…</Button>
       )}
     </span>
   )
 }
 
-/** Title, the failed and dependency markers, and the priority. */
-export function ItemTitle({ item, items }: { item: ItemInfo; items: readonly ItemInfo[] }) {
-  const dep = dependencyMarker(item, items)
-  return (
-    <>
-      <span className="file-name" title={item.body ? `${item.title}\n\n${item.body}` : item.title}>{item.title}</span>
-      {item.failed && <span className="task-state failed" title="An agent task of this item failed: the item stays in doing">failed</span>}
-      {dep && <span className={`project-marker ${dep.cls}`} title={dep.hint}>{dep.label}</span>}
-      <span className={`project-prio ${item.priority}`} title={`${item.priority} priority`}>{item.priority}</span>
-    </>
-  )
-}
+type ItemCardProps = Omit<ComponentProps<typeof TaskCard>, 'label'> & { project: ProjectData; item: ItemInfo }
 
-/** The agent (with its engine) and the repositories of an item. */
-export function ItemMeta({ item, project }: { item: ItemInfo; project: ProjectData }) {
+/** One work item, in the Projects panel ('row') and on the board ('card'): title, markers, agent and repositories, dependencies, tasks, actions. */
+export function ItemCard({ project, item, ...rest }: ItemCardProps) {
   const defined = useAgentDefs((s) => s.defined)
   const agent = agentText(item, project.defaultAgent, (n) => agentLabel(n, defined))
   const together = togetherMarker(item)
+  const dep = dependencyMarker(item, project.items)
   return (
-    <div className="project-meta muted">
-      <span title={item.agentProblem || `Runs with ${agent}`} className={item.agentProblem ? 'error' : ''}>✦ {agent}</span>
-      <span title={item.together ? 'The repositories one agent works in together' : 'The repositories Delegate starts an agent task in'}>{reposText(item)}</span>
-      {together && <span className={`project-marker ${together.cls}`} title={together.hint}>{together.label}</span>}
-    </div>
-  )
-}
-
-/** What an item waits for, its dependency problem and its waiting start (with the reason it did not start). */
-export function ItemDependencies({ item, items }: { item: ItemInfo; items: readonly ItemInfo[] }) {
-  const lines = dependencyLines(item, items)
-  if (lines.length === 0) return null
-  return (
-    <div className="project-deps">
-      {lines.map((l) => (
-        <span key={l.kind} className={`project-dep ${l.cls}`} title={l.text}>{l.text}</span>
-      ))}
-    </div>
+    <TaskCard
+      {...rest}
+      label={<span title={item.body ? `${item.title}\n\n${item.body}` : item.title}>{item.title}</span>}
+      badges={
+        (item.failed || dep) && (
+          <>
+            {item.failed && <TaskStateBadge state="failed" title="An agent task of this item failed: the item stays in doing">failed</TaskStateBadge>}
+            {dep && <MarkerBadge tone={dep.cls} title={dep.hint}>{dep.label}</MarkerBadge>}
+          </>
+        )
+      }
+      trailing={
+        <Badge size="sm" color={priorityColor(item.priority)} badgeStyle="light" title={`${item.priority} priority`}>
+          {item.priority}
+        </Badge>
+      }
+      meta={[
+        <span title={item.agentProblem || `Runs with ${agent}`} className={item.agentProblem ? 'fui-danger' : undefined}>✦ {agent}</span>,
+        <span title={item.together ? 'The repositories one agent works in together' : 'The repositories Delegate starts an agent task in'}>{reposText(item)}</span>,
+        together && <MarkerBadge tone={together.cls} title={together.hint}>{together.label}</MarkerBadge>,
+      ]}
+      notes={dependencyNotes(dependencyLines(item, project.items))}
+      actions={<ItemActions project={project} item={item} />}
+    >
+      {item.tasks.length > 0 && <ItemTasks tasks={item.tasks} />}
+    </TaskCard>
   )
 }
 
 /** One line per agent task of an item: its state, repository, Open and the pull request; a joint group stands together. */
-export function ItemTasks({ tasks }: { tasks: TaskInfo[] }) {
-  if (tasks.length === 0) return null
-  return (
-    <div className="project-tasks">
-      {groupTasks(tasks).map((row) =>
-        row.joint ? (
-          <div key={`joint:${row.joint}`} className="project-joint">
-            <div className="project-joint-head muted" title={jointHint(row.tasks)}>one agent · {row.tasks.length} repositories</div>
-            {row.tasks.map((t) => (
-              <TaskLine key={t.id} t={t} all={tasks} />
-            ))}
-          </div>
-        ) : (
-          <TaskLine key={row.tasks[0].id} t={row.tasks[0]} all={tasks} />
-        ),
-      )}
-    </div>
+function ItemTasks({ tasks }: { tasks: TaskInfo[] }) {
+  return groupTasks(tasks).map((row) =>
+    row.joint ? (
+      <ListGroup key={`joint:${row.joint}`} meta={`one agent · ${row.tasks.length} repositories`} tooltip={jointHint(row.tasks)}>
+        {row.tasks.map((t) => (
+          <TaskLine key={t.id} t={t} all={tasks} />
+        ))}
+      </ListGroup>
+    ) : (
+      <TaskLine key={row.tasks[0].id} t={row.tasks[0]} all={tasks} />
+    ),
   )
 }
 
 function TaskLine({ t, all }: { t: TaskInfo; all: TaskInfo[] }) {
   const pill = taskPill(t)
+  const open = canOpenTask(t, all)
   return (
-    <div className="project-task">
-      <span className={`task-state ${pill.cls}`} title={t.gone ? `${pill.hint} (the task was removed)` : pill.hint}>{pill.label}</span>
-      <span className="project-task-repo muted" title={t.branch ? `${t.title}\n${t.branch}` : taskRepo(t)}>{taskRepo(t)}</span>
-      {t.joint && t.lead && <span className="project-marker" title="The lead of the group: the one chat runs in this task's worktree">lead</span>}
-      {canOpenTask(t, all) && (
-        <button className="link" onClick={() => void openItemTask(t)} title={t.joint && !t.lead ? "Open the group's chat (in the lead task's folder)" : 'Open the folder and the agent chat'}>Open</button>
-      )}
-      {t.pullRequest && <button className="link" onClick={() => BrowserOpenURL(t.pullRequest)} title={t.pullRequest}>PR ↗</button>}
-    </div>
+    <ListItem
+      compact
+      leading={<TaskStateBadge state={pill.cls} title={t.gone ? `${pill.hint} (the task was removed)` : pill.hint}>{pill.label}</TaskStateBadge>}
+      label={<span className="fui-muted" title={t.branch ? `${t.title}\n${t.branch}` : taskRepo(t)}>{taskRepo(t)}</span>}
+      badges={t.joint && t.lead && <MarkerBadge title="The lead of the group: the one chat runs in this task's worktree">lead</MarkerBadge>}
+      showActions="always"
+      actions={
+        (open || t.pullRequest) && (
+          <>
+            {open && (
+              <Button variant="ghost" size="sm" onClick={() => void openItemTask(t)} title={t.joint && !t.lead ? "Open the group's chat (in the lead task's folder)" : 'Open the folder and the agent chat'}>Open</Button>
+            )}
+            {t.pullRequest && <Button variant="ghost" size="sm" onClick={() => BrowserOpenURL(t.pullRequest)} title={t.pullRequest}>PR ↗</Button>}
+          </>
+        )
+      }
+    />
   )
 }
 
 /** Delegate, Open and the status menu: the actions of a row and of a card. */
-export function ItemActions({ project, item }: { project: ProjectData; item: ItemInfo }) {
+function ItemActions({ project, item }: { project: ProjectData; item: ItemInfo }) {
   const busy = useProjects((s) => !!s.busy[itemKey(project.path, item.id)])
   const [issue] = delegateIssues(item, project.repositories, activeRoot())
   if (project.oldFormat) {
-    return (
-      <div className="task-actions project-actions">
-        <button className="link" onClick={() => openItemFile(item)} title={item.path}>Open</button>
-      </div>
-    )
+    return <Button variant="ghost" size="sm" onClick={() => openItemFile(item)} title={item.path}>Open</Button>
   }
   const hint = issue
     ? `${issue.message}${issue.fix === 'locate' ? ' Delegate asks for the folder.' : issue.fix === 'attach' ? ' Delegate adds it.' : issue.fix === 'trust' ? ' Delegate asks first.' : ''}`
@@ -151,12 +152,12 @@ export function ItemActions({ project, item }: { project: ProjectData; item: Ite
         ? 'The item waits to start by itself: Delegate it now if its dependencies are done'
         : 'Start one agent task per repository of the item'
   return (
-    <div className="task-actions project-actions">
-      <button className="link" disabled={busy} onClick={() => void delegateItem(project.path, item.id)} title={hint}>Delegate</button>
+    <>
+      <Button variant="ghost" size="sm" disabled={busy} onClick={() => void delegateItem(project.path, item.id)} title={hint}>Delegate</Button>
       {item.waiting && (
-        <button className="link" disabled={busy} onClick={() => void cancelStart(project.path, item.id)} title="Don't start this item by itself when its dependencies are done">Cancel start</button>
+        <Button variant="ghost" size="sm" disabled={busy} onClick={() => void cancelStart(project.path, item.id)} title="Don't start this item by itself when its dependencies are done">Cancel start</Button>
       )}
-      <button className="link" onClick={() => openItemFile(item)} title={item.path}>Open</button>
+      <Button variant="ghost" size="sm" onClick={() => openItemFile(item)} title={item.path}>Open</Button>
       <Dropdown
         minWidth={140}
         items={BOARD_STATUSES.map((s) => ({
@@ -166,9 +167,9 @@ export function ItemActions({ project, item }: { project: ProjectData; item: Ite
           onSelect: () => item.status !== s && void setStatus(project.path, item.id, s),
         }))}
         trigger={(t) => (
-          <button {...t} className="link" title="Set the item's status">Status ⌄</button>
+          <Button variant="ghost" size="sm" {...t} title="Set the item's status">Status ⌄</Button>
         )}
       />
-    </div>
+    </>
   )
 }

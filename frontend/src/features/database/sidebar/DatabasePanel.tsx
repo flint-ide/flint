@@ -1,3 +1,5 @@
+import { Badge, Button, EmptyState, IconButton, PanelHeader, TreeRow } from '@flint-ide/ui'
+import { Pencil, Plus, RefreshCw, SquareTerminal, X } from '@flint-ide/ui/icons'
 import { useState } from 'react'
 import type { Connection } from '../../../api/backend'
 import { defaultDatabase } from '../lib/databases'
@@ -18,16 +20,17 @@ export function DatabasePanel() {
 
   return (
     <div className="panel">
-      <div className="panel-header">
-        <span className="panel-title">Databases</span>
-        <button className="icon" title="New connection" onClick={() => setEditing('new')}>＋</button>
-      </div>
+      <PanelHeader
+        title="Databases"
+        actions={<IconButton variant="ghost" size="sm" aria-label="New connection" title="New connection" onClick={() => setEditing('new')}><Plus /></IconButton>}
+      />
       <div className="tree scroll">
         {connections.length === 0 && (
-          <div className="placeholder muted">
-            No connections yet.
-            <button className="link" onClick={() => setEditing('new')}>Add PostgreSQL or ClickHouse</button>
-          </div>
+          <EmptyState
+            variant="default"
+            title="No connections yet"
+            action={<Button variant="ghost" size="sm" onClick={() => setEditing('new')}>Add PostgreSQL or ClickHouse</Button>}
+          />
         )}
         {connections.map((c) => (
           <ConnectionNode key={c.id} conn={c} onEdit={() => setEditing(c)} />
@@ -60,24 +63,25 @@ function ConnectionNode({ conn, onEdit }: { conn: Connection; onEdit: () => void
   const menu = onMenu(() => connectionMenu(conn, { newConsole, refresh, edit: onEdit, remove: () => void remove(), copy: copyText }))
 
   return (
-    <div className="conn-node">
-      <div className="tree-row static conn-row" onClick={toggle} onContextMenu={menu}>
-        <span className="twisty">{open ? '▾' : '▸'}</span>
-        <span className={`driver-badge ${conn.driver}`}>{conn.driver === 'clickhouse' ? 'CH' : 'PG'}</span>
-        <span className="conn-name" title={`${conn.user}@${conn.host}:${conn.port}/${defaultDatabase(conn)}`}>{conn.name}</span>
-        {conn.readOnly && <span className="badge" title="Read-only">RO</span>}
-        <span className="row-actions" onClick={(e) => e.stopPropagation()}>
-          <button className="icon" title="New SQL console" onClick={newConsole}>⌨</button>
-          <button className="icon" title="Refresh databases" onClick={refresh}>↻</button>
-          <button className="icon" title="Edit" onClick={onEdit}>✎</button>
-          <button className="icon" title="Delete" onClick={() => void remove()}>✕</button>
-        </span>
-      </div>
-      {open && (
-        <div className="conn-children">
-          <DatabasesNode conn={conn} />
-        </div>
-      )}
+    <div>
+      <TreeRow
+        twisty={open ? 'open' : 'closed'}
+        onClick={toggle}
+        onContextMenu={menu}
+        icon={<span className={`driver-badge ${conn.driver}`}>{conn.driver === 'clickhouse' ? 'CH' : 'PG'}</span>}
+        label={<span title={`${conn.user}@${conn.host}:${conn.port}/${defaultDatabase(conn)}`}>{conn.name}</span>}
+        actions={
+          <>
+            <IconButton variant="ghost" size="sm" aria-label="New SQL console" title="New SQL console" onClick={newConsole}><SquareTerminal /></IconButton>
+            <IconButton variant="ghost" size="sm" aria-label="Refresh databases" title="Refresh databases" onClick={refresh}><RefreshCw /></IconButton>
+            <IconButton variant="ghost" size="sm" aria-label="Edit" title="Edit" onClick={onEdit}><Pencil /></IconButton>
+            <IconButton variant="ghost" size="sm" aria-label="Delete" title="Delete" onClick={() => void remove()}><X /></IconButton>
+          </>
+        }
+      >
+        {conn.readOnly && <Badge size="sm" title="Read-only">RO</Badge>}
+      </TreeRow>
+      {open && <DatabasesNode conn={conn} />}
     </div>
   )
 }

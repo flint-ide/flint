@@ -8,6 +8,8 @@ import { useDatabase } from '../../features/database/store/database'
 import { confirmAction } from '../../store/dialog'
 import type { ScratchKind, ScratchPad } from '../../api/backend'
 import { formatKeys } from '../../lib/commands'
+import { IconButton, Input, PanelHeader, TreeRow } from '@flint-ide/ui'
+import { Plus, X } from '@flint-ide/ui/icons'
 
 const KIND_LABEL: Record<ScratchKind, string> = { sql: 'SQL', markdown: 'MD', text: 'TXT' }
 
@@ -49,29 +51,33 @@ export function ScratchPanel() {
 
   return (
     <div className="panel">
-      <div className="panel-header">
-        <span className="panel-title">Scratches</span>
-        <Dropdown
-          align="end"
-          searchable
-          placeholder="Type: http, json, go…"
-          minWidth={240}
-          items={() => newScratchItems((kind) => void create(kind))}
-          trigger={(t) => (
-            <button
-              {...t}
-              ref={(el) => {
-                t.ref(el)
-                picker.current = el
-              }}
-              className="icon"
-              title="New scratch file (any type), SQL console or note"
-            >
-              ＋
-            </button>
-          )}
-        />
-      </div>
+      <PanelHeader
+        title="Scratches"
+        actions={
+          <Dropdown
+            align="end"
+            searchable
+            placeholder="Type: http, json, go…"
+            minWidth={240}
+            items={() => newScratchItems((kind) => void create(kind))}
+            trigger={(t) => (
+              <IconButton
+                {...t}
+                ref={(el) => {
+                  t.ref(el)
+                  picker.current = el
+                }}
+                size="sm"
+                variant="ghost"
+                aria-label="New scratch file"
+                title="New scratch file (any type), SQL console or note"
+              >
+                <Plus />
+              </IconButton>
+            )}
+          />
+        }
+      />
       <div className="tree scroll">
         {items.length === 0 && files.length === 0 && (
           <div className="placeholder muted">No scratches yet. ＋ creates a file of any type (an HTTP request, JSON, Go…); {formatKeys('Mod+N')} an SQL console.</div>
@@ -99,38 +105,42 @@ function ScratchFileRow({ file }: { file: ScratchFile }) {
   }
 
   return (
-    <div
-      className={`tree-row static${active ? ' active' : ''}`}
+    <TreeRow
+      active={active}
+      file
+      editing={renaming}
+      icon={<FileIcon name={file.name} />}
       onClick={() => openFile(file.path)}
       onDoubleClick={() => setRenaming(true)}
       title={`${file.path}\nDouble-click to rename`}
-    >
-      <FileIcon name={file.name} />
-      {renaming ? (
-        <input
-          className="inline-input"
-          defaultValue={file.name}
-          autoFocus
-          onClick={(e) => e.stopPropagation()}
-          onFocus={(e) => {
-            const dot = e.target.value.lastIndexOf('.')
-            e.target.setSelectionRange(0, dot > 0 ? dot : e.target.value.length)
-          }}
-          onBlur={(e) => commit(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commit(e.currentTarget.value)
-            if (e.key === 'Escape') setRenaming(false)
-          }}
-        />
-      ) : (
-        <span className="scratch-name">{file.name}</span>
-      )}
-      <span className="row-actions" onClick={(e) => e.stopPropagation()}>
-        <button className="icon" title="Delete" onClick={() => void deleteScratchFile(file)}>
-          ✕
-        </button>
-      </span>
-    </div>
+      label={
+        renaming ? (
+          <Input
+            size="sm"
+            className="inline-input"
+            defaultValue={file.name}
+            autoFocus
+            onClick={(e) => e.stopPropagation()}
+            onFocus={(e) => {
+              const dot = e.target.value.lastIndexOf('.')
+              e.target.setSelectionRange(0, dot > 0 ? dot : e.target.value.length)
+            }}
+            onBlur={(e) => commit(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commit(e.currentTarget.value)
+              if (e.key === 'Escape') setRenaming(false)
+            }}
+          />
+        ) : (
+          file.name
+        )
+      }
+      actions={
+        <IconButton size="sm" variant="ghost" aria-label="Delete" title="Delete" onClick={() => void deleteScratchFile(file)}>
+          <X />
+        </IconButton>
+      }
+    />
   )
 }
 
@@ -148,38 +158,43 @@ function ScratchRow({ sc }: { sc: ScratchPad }) {
   }
 
   return (
-    <div
-      className={`tree-row static${active ? ' active' : ''}`}
+    <TreeRow
+      active={active}
+      editing={renaming}
+      icon={<span className={`kind-badge ${sc.kind}`}>{KIND_LABEL[sc.kind as ScratchKind] ?? sc.kind}</span>}
       onClick={() => openScratch(sc)}
       onDoubleClick={() => setRenaming(true)}
       title="Double-click to rename"
-    >
-      <span className={`kind-badge ${sc.kind}`}>{KIND_LABEL[sc.kind as ScratchKind] ?? sc.kind}</span>
-      {renaming ? (
-        <input
-          className="inline-input"
-          defaultValue={sc.name}
-          autoFocus
-          onClick={(e) => e.stopPropagation()}
-          onBlur={(e) => commit(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commit(e.currentTarget.value)
-            if (e.key === 'Escape') setRenaming(false)
-          }}
-        />
-      ) : (
-        <span className="scratch-name">{sc.name}</span>
-      )}
-      {connName && <span className="muted path-hint">{sc.database ? `${connName} · ${sc.database}` : connName}</span>}
-      <span className="row-actions" onClick={(e) => e.stopPropagation()}>
-        <button
-          className="icon"
+      label={
+        renaming ? (
+          <Input
+            size="sm"
+            className="inline-input"
+            defaultValue={sc.name}
+            autoFocus
+            onClick={(e) => e.stopPropagation()}
+            onBlur={(e) => commit(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commit(e.currentTarget.value)
+              if (e.key === 'Escape') setRenaming(false)
+            }}
+          />
+        ) : (
+          sc.name
+        )
+      }
+      hint={connName && (sc.database ? `${connName} · ${sc.database}` : connName)}
+      actions={
+        <IconButton
+          size="sm"
+          variant="ghost"
+          aria-label="Delete"
           title="Delete"
           onClick={async () => (await confirmAction(`Delete scratchpad "${sc.name}"?`, 'Delete')) && remove(sc.id)}
         >
-          ✕
-        </button>
-      </span>
-    </div>
+          <X />
+        </IconButton>
+      }
+    />
   )
 }

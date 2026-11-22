@@ -1,7 +1,9 @@
+import { Card, CardContent, Checkbox } from '@flint-ide/ui'
 import { FEATURES } from '..'
 import { useActiveFeatures } from '../../lib/activeFeatures'
 import { coerceToggles, featureOn, pendingRestart, withFeature } from '../../lib/featureToggles'
 import { useSettings } from '../../store/settings'
+import { ExtensionStateBadge } from './ExtensionStateBadge'
 
 /**
  * Settings ▸ Extensions ▸ Built-in: the optional features (Database)
@@ -25,18 +27,18 @@ export function BuiltinExtensions() {
       {optional.map((m) => {
         const on = featureOn(toggles, m)
         return (
-          <div key={m.id} className="extension-card">
+          <Card key={m.id} className="extension-card"><CardContent>
             <div className="extension-head">
               <label className="extension-toggle" title={on ? 'Turn off' : 'Turn on'}>
-                <input type="checkbox" checked={on} onChange={(e) => update((s) => ({ features: withFeature(coerceToggles(s.features), m.id, e.target.checked) }))} />
+                <Checkbox checked={on} onCheckedChange={(checked) => update((s) => ({ features: withFeature(coerceToggles(s.features), m.id, checked) }))} />
                 <strong>{m.name ?? m.id}</strong>
               </label>
               <span className="muted">built-in</span>
-              <span className={`extension-state ${active.has(m.id) ? 'running' : 'disabled'}`}>{active.has(m.id) ? 'On' : 'Off'}</span>
-              {pending.has(m.id) && <span className="extension-state starting">Restart Flint to {on ? 'turn on' : 'turn off'}</span>}
+              <ExtensionStateBadge tone={active.has(m.id) ? 'ok' : 'none'}>{active.has(m.id) ? 'On' : 'Off'}</ExtensionStateBadge>
+              {pending.has(m.id) && <ExtensionStateBadge tone="none">Restart Flint to {on ? 'turn on' : 'turn off'}</ExtensionStateBadge>}
             </div>
             {m.description && <p className="extension-description">{m.description}</p>}
-          </div>
+          </CardContent></Card>
         )
       })}
     </>

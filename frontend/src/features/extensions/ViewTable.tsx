@@ -1,3 +1,4 @@
+import { Button } from '@flint-ide/ui'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import type { Row, Table } from '../../../bindings/flint/internal/extensions/host/models'
 import { useVirtualList } from '../../lib/virtualList'
@@ -199,9 +200,9 @@ export function ViewTable({ table, truncated, onCommand, onAction }: Props) {
           {truncated ? ' (only the first 5,000 are shown)' : ''}
         </span>
         {order.length > 0 && (
-          <button className="link" onClick={() => void copy(tableToTSV(columns, rows, order), 'the table')}>
+          <Button variant="ghost" size="sm" onClick={() => void copy(tableToTSV(columns, rows, order), 'the table')}>
             Copy
-          </button>
+          </Button>
         )}
       </div>
     </div>

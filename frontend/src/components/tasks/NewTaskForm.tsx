@@ -11,6 +11,7 @@ import { MAX_GROUP, planAgents, planNote, planProblem } from '../../lib/agentTas
 import { Modal } from '../layout/Modal'
 import { Select } from '../ui/Select'
 import type { Branch } from '../../store/git'
+import { Alert, Button, Checkbox, Field, FieldDescription, FieldLabel, Form, FormActions, Textarea } from '@flint-ide/ui'
 
 /**
  * New Agent Task: what to do, which agent, from which branch. Start creates the
@@ -68,41 +69,38 @@ export function NewTaskForm() {
 
   return (
     <Modal title="New Agent Task" onClose={closeNewTask} className="new-task">
-      <form
-        className="form"
+      <Form
         onSubmit={(e) => {
           e.preventDefault()
           void submit()
         }}
       >
-        <label>
-          Task
-          <textarea
-            autoFocus
-            rows={6}
-            value={description}
-            placeholder="What should the agent do? The first line names the branch."
-            spellCheck
-            onChange={(e) => setDescription(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault()
-                if (ready) void submit()
-              }
-            }}
-          />
-        </label>
+        <Textarea
+          autoFocus
+          label="Task"
+          rows={6}
+          value={description}
+          placeholder="What should the agent do? The first line names the branch."
+          spellCheck
+          onChange={(e) => setDescription(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault()
+              if (ready) void submit()
+            }
+          }}
+        />
         <div className="form-row">
-          <label className="grow">
-            Agent
+          <Field className="grow">
+            <FieldLabel>Agent</FieldLabel>
             {agents.length === 0 ? (
-              <span className="muted">No agent installed (claude, codex or a custom agent in Settings ▸ Agents)</span>
+              <FieldDescription>No agent installed (claude, codex or a custom agent in Settings ▸ Agents)</FieldDescription>
             ) : (
               <Select block value={chosen} options={agents.map((a) => agentOption(a, defined, a === preferred ? 'default' : undefined))} onChange={setAgent} />
             )}
-          </label>
-          <label className="grow">
-            From branch
+          </Field>
+          <Field className="grow">
+            <FieldLabel>From branch</FieldLabel>
             <Select
               block
               searchable
@@ -110,54 +108,52 @@ export function NewTaskForm() {
               options={branches.map((b) => ({ value: b.name, label: b.name, hint: b.current ? 'current' : undefined }))}
               onChange={setBase}
             />
-          </label>
+          </Field>
         </div>
         {agents.length > 0 && (
-          <label className="check">
-            <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} />
-            Compare agents: give the same task to several agents or attempts
-          </label>
+          <Checkbox
+            label="Compare agents: give the same task to several agents or attempts"
+            checked={compare}
+            onCheckedChange={setCompare}
+          />
         )}
         {compare && (
           <div className="form-row compare-agents">
             <div className="grow compare-agent-list">
               {agents.filter((a) => a !== chosen).map((a) => (
-                <label key={a} className="check">
-                  <input
-                    type="checkbox"
-                    checked={extra.includes(a)}
-                    onChange={(e) => setExtra((cur) => (e.target.checked ? [...cur, a] : cur.filter((x) => x !== a)))}
-                  />
-                  also {agentLabel(a, defined)}
-                </label>
+                <Checkbox
+                  key={a}
+                  label={`also ${agentLabel(a, defined)}`}
+                  checked={extra.includes(a)}
+                  onCheckedChange={(on) => setExtra((cur) => (on ? [...cur, a] : cur.filter((x) => x !== a)))}
+                />
               ))}
               {agents.length < 2 && <span className="muted">Only one agent is installed: use several attempts.</span>}
             </div>
-            <label>
-              Attempts per agent
+            <Field>
+              <FieldLabel>Attempts per agent</FieldLabel>
               <Select
                 block
                 value={attempts}
                 options={Array.from({ length: MAX_GROUP }, (_, i) => ({ value: i + 1, label: String(i + 1) }))}
                 onChange={setAttempts}
               />
-            </label>
+            </Field>
           </div>
         )}
-        <p className="muted form-note">
+        <FieldDescription>
           Flint creates a branch {prefix || ''}… and a worktree for it, opens the folder here and sends the task to the agent in a new chat.{' '}
           {planNote(plan, maxParallel)}
-        </p>
-        {problem && <div className="form-status error">{problem}</div>}
-        {error && <div className="form-status error">{error}</div>}
-        <div className="form-actions">
-          <span className="spacer" />
-          <button type="button" onClick={closeNewTask}>Cancel</button>
-          <button type="submit" className="primary" disabled={!ready}>
+        </FieldDescription>
+        {problem && <Alert size="inline" variant="negative">{problem}</Alert>}
+        {error && <Alert size="inline" variant="negative">{error}</Alert>}
+        <FormActions align="end">
+          <Button variant="plain" type="button" onClick={closeNewTask}>Cancel</Button>
+          <Button variant="primary" type="submit" disabled={!ready}>
             {busy ? 'Starting…' : plan.length > 1 ? `Start ${plan.length} tasks` : 'Start'}
-          </button>
-        </div>
-      </form>
+          </Button>
+        </FormActions>
+      </Form>
     </Modal>
   )
 }

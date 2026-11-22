@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { Button, FormActions } from '@flint-ide/ui'
 import { BrowserOpenURL, ClipboardSetText } from '../../wails/runtime'
 import { closeToolCheck, recheckTools, useToolCheck } from '../../store/toolCheck'
 import { showToast } from '../../store/dialog'
@@ -35,12 +36,13 @@ export function ToolCheck() {
       <p className="muted tool-check-note">
         Flint looks for tools on your login shell&apos;s PATH. If a tool you installed still shows as missing, check that it runs in a new terminal window, then restart Flint.
       </p>
-      <div className="form-actions">
-        {summary && <span className={`tool-check-status ${summary.tone}`}>{summary.text}</span>}
-        <span className="spacer" />
-        <button onClick={() => void recheckTools()} disabled={checking}>{checking ? 'Checking…' : 'Recheck'}</button>
-        <button className="primary" autoFocus onClick={closeToolCheck}>Done</button>
-      </div>
+      <FormActions>
+        <span className="fui-grow">
+          {summary && <span className={`tool-check-status ${summary.tone}`}>{summary.text}</span>}
+        </span>
+        <Button variant="plain" onClick={() => void recheckTools()} disabled={checking}>{checking ? 'Checking…' : 'Recheck'}</Button>
+        <Button variant="primary" autoFocus onClick={closeToolCheck}>Done</Button>
+      </FormActions>
     </Modal>
   )
 }
@@ -65,13 +67,13 @@ function ToolRow({ tool: t }: { tool: ToolStatus }) {
         <div className="tool-feature muted">
           {t.feature}
           {' · '}
-          <button className="link" onClick={() => BrowserOpenURL(t.docsUrl)}>Docs</button>
+          <Button variant="link" size="sm" className="tool-docs" onClick={() => BrowserOpenURL(t.docsUrl)}>Docs</Button>
         </div>
         {t.state === 'error' && t.detail && <div className="tool-detail selectable">{t.detail}</div>}
         {t.state !== 'ok' && (
           <div className="tool-install">
             <code className="selectable">{t.install}</code>
-            <button onClick={() => void copy()}>Copy</button>
+            <Button variant="plain" size="sm" onClick={() => void copy()}>Copy</Button>
           </div>
         )}
       </div>

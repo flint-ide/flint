@@ -1,6 +1,7 @@
 import { useSettings } from '../../store/settings'
 import { DEFAULT_MCP_SERVER, TERMINAL_LINES, TEST_WAIT_SECONDS, type McpActionKey, type McpToolKey } from '../../lib/mcpSettings'
 import { NumberField, Row } from './fields'
+import { Button, Switch } from '@flint-ide/ui'
 
 const TOOLS: { key: McpToolKey; label: string; hint: string }[] = [
   { key: 'diagnostics', label: 'Diagnostics', hint: 'Errors and warnings from the language servers.' },
@@ -26,17 +27,12 @@ export function McpServerSection() {
     <section>
       <h2>Agent Context</h2>
       <Row label="Share Flint's context with agents" hint="Agent chats started in Flint can read what Flint knows through MCP tools. The tools under Tools only read.">
-        <input type="checkbox" checked={mcp.enabled} onChange={(e) => set({ enabled: e.target.checked })} />
+        <Switch checked={mcp.enabled} onCheckedChange={(checked) => set({ enabled: checked })} />
       </Row>
       <h3>Tools</h3>
       {TOOLS.map((t) => (
         <Row key={t.key} label={t.label} hint={t.hint}>
-          <input
-            type="checkbox"
-            disabled={!mcp.enabled}
-            checked={mcp.tools[t.key]}
-            onChange={(e) => set({ tools: { ...mcp.tools, [t.key]: e.target.checked } })}
-          />
+          <Switch disabled={!mcp.enabled} checked={mcp.tools[t.key]} onCheckedChange={(checked) => set({ tools: { ...mcp.tools, [t.key]: checked } })} />
         </Row>
       ))}
       <Row label="Terminal lines" hint="The most lines of one terminal's output an agent gets.">
@@ -49,21 +45,16 @@ export function McpServerSection() {
       </p>
       {ACTIONS.map((t) => (
         <Row key={t.key} label={t.label} hint={t.hint}>
-          <input
-            type="checkbox"
-            disabled={!mcp.enabled}
-            checked={mcp.actions[t.key]}
-            onChange={(e) => set({ actions: { ...mcp.actions, [t.key]: e.target.checked } })}
-          />
+          <Switch disabled={!mcp.enabled} checked={mcp.actions[t.key]} onCheckedChange={(checked) => set({ actions: { ...mcp.actions, [t.key]: checked } })} />
         </Row>
       ))}
       <Row label="Test wait (seconds)" hint="How long run_tests waits for a test run before it answers with the results so far.">
         <NumberField value={mcp.testWaitSeconds} min={TEST_WAIT_SECONDS.min} max={TEST_WAIT_SECONDS.max} step={10} onCommit={(v) => set({ testWaitSeconds: Math.round(v) })} />
       </Row>
       <div className="settings-actions">
-        <button disabled={JSON.stringify(mcp) === JSON.stringify(DEFAULT_MCP_SERVER)} onClick={() => update({ mcpServer: DEFAULT_MCP_SERVER })}>
+        <Button variant="plain" disabled={JSON.stringify(mcp) === JSON.stringify(DEFAULT_MCP_SERVER)} onClick={() => update({ mcpServer: DEFAULT_MCP_SERVER })}>
           Reset to Defaults
-        </button>
+        </Button>
       </div>
       <p className="muted settings-note">
         Flint serves these tools on 127.0.0.1 only, with a separate token per chat that ends with the chat: an agent sees only its own folder.

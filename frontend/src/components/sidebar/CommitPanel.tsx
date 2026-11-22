@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useEventCallback } from '../../lib/useEventCallback'
 import { confirmRollback, tickedOf, updateProject, useGit, type FileChange, type GitStatus } from '../../store/git'
 import { useEditor } from '../../store/editor'
@@ -18,6 +18,8 @@ import { reviewChanges, useAgentReview } from '../../store/agentReview'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
 import { Icon } from '../ui/Icon'
+import { Button, Checkbox, IconButton, PanelHeader, Textarea, TreeRow, TreeSection } from '@flint-ide/ui'
+import { Archive, ArrowDownToLine, Download, ExternalLink, RefreshCw, Sparkles, Undo2, Upload } from '@flint-ide/ui/icons'
 import { openMergeEditor } from '../../store/mergeEditor'
 
 const KIND_LETTER: Record<string, string> = {
@@ -82,12 +84,13 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
   }, [multi, repos, root, folder, status])
   const toggle = (key: string) => setCollapsed((c) => ({ ...c, [key]: !c[key] }))
 
+  // A node as title keeps its own case; plain text gets the panel's small caps.
+  const repoTitle = roots.length > 1 && folder ? <RepoSwitcher /> : 'Commit'
+
   if (!multi && (!root || !isRepo)) {
     return (
       <div className="panel commit-panel">
-        <div className="panel-header">
-          <RepoSwitcher fallback="Commit" />
-        </div>
+        <PanelHeader title={repoTitle} />
         <div className="placeholder muted">Not a git repository.</div>
       </div>
     )
@@ -127,32 +130,38 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
 
   return (
     <div className="panel commit-panel">
-      <div className="panel-header">
-        <RepoSwitcher fallback="Commit" />
-        <button className="icon" title="Refresh" onClick={() => void refreshAll()}>↻</button>
-        <button className="icon" title="Fetch" disabled={!!busy || !isRepo} onClick={() => void remote('fetch')}>⇣</button>
-        <button className="icon" title="Update repository (pull)" disabled={!!busy || !isRepo} onClick={updateProject}>⤓</button>
-        <button className="icon" title={`Push (${formatKeys('Mod+Shift+K')})`} disabled={!!busy || !isRepo} onClick={() => void remote('push')}>⤒</button>
-        <button className="icon" title="Stash changes…" disabled={!!busy || !isRepo} onClick={openStashDialog}>⊟</button>
-      </div>
-      {isRepo && status && (
-        <div className="git-branch-line muted" title={multi ? 'Branch of the repository the toolbar acts on (click a repository below to switch)' : undefined}>
-          {multi && folder && <span className="repo-name">{labelOfFolder(folder)} · </span>}
-          <BranchLine status={status} />
-          {busy && <span className="busy"> · {busy}…</span>}
-        </div>
-      )}
+      <PanelHeader
+        title={repoTitle}
+        actions={
+          <>
+            <IconButton size="sm" variant="ghost" aria-label="Refresh" title="Refresh" onClick={() => void refreshAll()}><RefreshCw /></IconButton>
+            <IconButton size="sm" variant="ghost" aria-label="Fetch" title="Fetch" disabled={!!busy || !isRepo} onClick={() => void remote('fetch')}><ArrowDownToLine /></IconButton>
+            <IconButton size="sm" variant="ghost" aria-label="Update repository (pull)" title="Update repository (pull)" disabled={!!busy || !isRepo} onClick={updateProject}><Download /></IconButton>
+            <IconButton size="sm" variant="ghost" aria-label="Push" title={`Push (${formatKeys('Mod+Shift+K')})`} disabled={!!busy || !isRepo} onClick={() => void remote('push')}><Upload /></IconButton>
+            <IconButton size="sm" variant="ghost" aria-label="Stash changes" title="Stash changes…" disabled={!!busy || !isRepo} onClick={openStashDialog}><Archive /></IconButton>
+          </>
+        }
+      >
+        {isRepo && status && (
+          <span title={multi ? 'Branch of the repository the toolbar acts on (click a repository below to switch)' : undefined}>
+            {multi && folder && <b>{labelOfFolder(folder)} · </b>}
+            <BranchLine status={status} />
+            {busy && <span className="busy"> · {busy}…</span>}
+          </span>
+        )}
+      </PanelHeader>
       {status?.operation && root && (
         <div className="git-banner">
           <span>{capitalize(status.operation)} in progress{conflicted.length ? ` · ${conflicted.length} conflict(s)` : ''}</span>
           {conflicted.length > 0 && agents.conflictAgent && (
-            <button
-              className="link"
+            <Button
+              size="sm"
+              variant="ghost"
               onClick={() => void resolveConflictsWithAgent(root, status.operation, conflicted.map((f) => f.path))}
               title={conflictHint(agents.preferred, agents.conflictAgent, engineOf(agents.preferred, defined))}
             >
               Resolve with {agents.conflictAgent}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -170,7 +179,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
                 toggle={toggle}
               />
             ))
-          : sections.map((sec) => <ChangeGroups key={sec.root} section={sec} collapsed={collapsed} toggle={toggle} />)}
+          : sections.map((sec) => <ChangeGroups key={sec.root} section={sec} collapsed={collapsed} toggle={toggle} depth={0} />)}
         {root && isRepo && <ReviewSection root={root} />}
         {isRepo && <StashSection />}
       </div>
@@ -189,24 +198,26 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
             <span className="muted">{agents.preferred || 'no agent installed'}</span>
           )}
           <span className="spacer" />
-          <button
-            className="link"
+          <Button
+            size="sm"
+            variant="ghost"
             disabled={!agents.preferred || reviewing || (status?.files ?? []).length === 0}
             onClick={() => void reviewChanges()}
             title="Let the agent review the ticked changes (or all of them: Settings ▸ Agents ▸ Review) before you commit"
           >
             {reviewing ? 'Reviewing…' : '✦ Review'}
-          </button>
-          <button
-            className="link"
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
             disabled={!agents.preferred || generating || selected.length === 0}
             onClick={() => void generateMessage()}
             title="Let the agent write a message for the ticked changes"
           >
             {generating ? 'Generating…' : '✦ Generate message'}
-          </button>
+          </Button>
         </div>
-        <textarea
+        <Textarea
           ref={textarea}
           value={message}
           placeholder="Commit message"
@@ -220,19 +231,17 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
           }}
         />
         <div className="commit-actions">
-          <label className="check">
-            <input type="checkbox" checked={amend} onChange={(e) => void setAmend(e.target.checked)} /> Amend
-          </label>
+          <Checkbox label="Amend" checked={amend} onCheckedChange={(checked) => void setAmend(checked)} />
           <span className="spacer" />
           <span className="muted count" title={multi ? 'One commit per repository with ticked files, same message' : undefined}>
             {selected.length} selected{multi ? (amend ? ' (amend: this repo only)' : reposNote(sections, tickedIn)) : ''}
           </span>
-          <button className="primary" disabled={!canCommit} onClick={() => void commit(false)} title={formatKeys('Mod+Enter')}>
+          <Button size="sm" variant="primary" disabled={!canCommit} onClick={() => void commit(false)} title={formatKeys('Mod+Enter')}>
             {busy === 'commit' ? 'Committing…' : 'Commit'}
-          </button>
-          <button disabled={!canCommit} onClick={() => void commit(true)} title={formatKeys('Alt+Mod+Enter')}>
+          </Button>
+          <Button size="sm" variant="plain" disabled={!canCommit} onClick={() => void commit(true)} title={formatKeys('Alt+Mod+Enter')}>
             Commit and Push
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -268,46 +277,44 @@ function RepoSection({
   const open = !collapsed[key]
   return (
     <div className={`repo-section${current ? ' current' : ''}`}>
-      <div
-        className="tree-row static group-row repo-row"
+      <TreeRow
+        emphasis="group"
         title={current ? `${section.root} (the toolbar and branch line act on this repository)` : `${section.root}\nClick to make the toolbar act on this repository`}
+        twisty={open ? 'open' : 'closed'}
+        onTwistyClick={() => toggle(key)}
+        twistyLabel={`${open ? 'Collapse' : 'Expand'} ${label}`}
+        leading={
+          tickable.length > 0 && (
+            <Checkbox
+              aria-label={`Include all files of ${label}`}
+              checked={included === tickable.length}
+              indeterminate={included > 0 && included < tickable.length}
+              onCheckedChange={(checked) => setGroup(tickable, checked, section.root)}
+            />
+          )
+        }
+        label={label}
+        hint={<BranchLine status={section.status} />}
+        badge={files.length > 0 ? files.length : undefined}
         onClick={() => {
           if (!current) void load(section.folder)
           else toggle(key)
         }}
-      >
-        <span className="twisty" onClick={(e) => (e.stopPropagation(), toggle(key))}>{open ? '▾' : '▸'}</span>
-        {tickable.length > 0 && (
-          <input
-            type="checkbox"
-            checked={included === tickable.length}
-            ref={(el) => {
-              if (el) el.indeterminate = included > 0 && included < tickable.length
-            }}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => setGroup(tickable, e.target.checked, section.root)}
-          />
-        )}
-        <span className="group-title repo-title">{label}</span>
-        <span className="muted repo-branch">
-          <BranchLine status={section.status} />
-        </span>
-        {files.length > 0 && <span className="badge">{files.length}</span>}
-      </div>
+      />
       {open &&
         (files.length > 0 ? (
-          <div className="repo-changes">
-            <ChangeGroups section={section} collapsed={collapsed} toggle={toggle} />
-          </div>
+          <ChangeGroups section={section} collapsed={collapsed} toggle={toggle} depth={1} />
         ) : (
-          <div className="repo-changes muted repo-clean">No changes</div>
+          <div className="muted repo-clean">No changes</div>
         ))}
     </div>
   )
 }
 
 /** The conflicts / changes / unversioned groups of one repository. */
-function ChangeGroups({ section, collapsed, toggle }: { section: Section; collapsed: Record<string, boolean>; toggle: (key: string) => void }) {
+function ChangeGroups({
+  section, collapsed, toggle, depth,
+}: { section: Section; collapsed: Record<string, boolean>; toggle: (key: string) => void; depth: number }) {
   const { root, status } = section
   const { isIncluded, setGroup, toggleFile } = useGit.getState()
   const busy = useGit((s) => s.busy)
@@ -324,70 +331,90 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
         const included = g.files.filter((f) => isIncluded(f, root)).length
         const key = `${root}:${g.key}`
         return (
-          <div key={g.key}>
-            <div className="tree-row static group-row" onClick={() => toggle(key)}>
-              <span className="twisty">{collapsed[key] ? '▸' : '▾'}</span>
-              {g.key !== 'conflicts' && (
-                <input
-                  type="checkbox"
+          <TreeSection
+            key={g.key}
+            depth={depth}
+            title={g.title}
+            count={g.files.length}
+            open={!collapsed[key]}
+            onOpenChange={() => toggle(key)}
+            leading={
+              g.key !== 'conflicts' && (
+                <Checkbox
+                  aria-label={`Include all ${g.title.toLowerCase()}`}
                   checked={included === g.files.length}
-                  ref={(el) => {
-                    if (el) el.indeterminate = included > 0 && included < g.files.length
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => setGroup(g.files, e.target.checked, root)}
+                  indeterminate={included > 0 && included < g.files.length}
+                  onCheckedChange={(checked) => setGroup(g.files, checked, root)}
                 />
-              )}
-              <span className="group-title">{g.title}</span>
-              {g.key !== 'conflicts' && included > 0 && (
-                <RollbackTicked files={g.files} root={root} count={included} untracked={g.key === 'untracked'} disabled={!!busy} />
-              )}
-              {g.key === 'conflicts' && agents.conflictAgent && (
-                <button
-                  className="link agent-action"
-                  title={conflictHint(agents.preferred, agents.conflictAgent, engineOf(agents.preferred, defined))}
-                  onClick={(e) => (e.stopPropagation(), resolve(g.files.map((f) => f.path)))}
-                >
-                  ✦ Resolve with {agents.conflictAgent}
-                </button>
-              )}
-              <span className="badge">{g.files.length}</span>
-            </div>
-            {!collapsed[key] &&
-              g.files.map((f) => (
-                <div
-                  key={g.key + f.path}
-                  className="tree-row static change-row"
-                  title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}
-                  onClick={() => (f.kind === 'conflicted' ? openMergeEditor(root, abs(f)) : openDiff(root, abs(f), f.origPath ? `${root}/${f.origPath}` : abs(f)))}
-                  onDoubleClick={() => openFile(abs(f))}
-                >
-                  {g.key !== 'conflicts' && (
-                    <input type="checkbox" checked={isIncluded(f, root)} onClick={(e) => e.stopPropagation()} onChange={() => toggleFile(f, root)} />
-                  )}
-                  <span className={`change-kind ${f.kind}`}>{KIND_LETTER[f.kind] ?? '?'}</span>
-                  <span className={`file-name change-${f.kind}`}>{f.path.split('/').pop()}</span>
-                  <span className="muted path-hint">{dirOf(f.path)}</span>
-                  {!!f.conflicts && <span className="conflict-count" title="Conflicts left in the file">{f.conflicts}</span>}
-                  <span className="row-actions" onClick={(e) => e.stopPropagation()}>
+              )
+            }
+            actionsVisible="always"
+            actions={
+              <>
+                {g.key !== 'conflicts' && included > 0 && (
+                  <RollbackTicked files={g.files} root={root} count={included} untracked={g.key === 'untracked'} disabled={!!busy} />
+                )}
+                {g.key === 'conflicts' && agents.conflictAgent && (
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="agent-action"
+                    title={conflictHint(agents.preferred, agents.conflictAgent, engineOf(agents.preferred, defined))}
+                    onClick={() => resolve(g.files.map((f) => f.path))}
+                  >
+                    <Sparkles /> Resolve with {agents.conflictAgent}
+                  </Button>
+                )}
+              </>
+            }
+          >
+            {g.files.map((f) => (
+              <TreeRow
+                key={g.key + f.path}
+                depth={depth + 1}
+                title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}
+                onClick={() => (f.kind === 'conflicted' ? openMergeEditor(root, abs(f)) : openDiff(root, abs(f), f.origPath ? `${root}/${f.origPath}` : abs(f)))}
+                onDoubleClick={() => openFile(abs(f))}
+                leading={
+                  g.key !== 'conflicts' && (
+                    <Checkbox
+                      aria-label={`Include ${f.path}`}
+                      checked={isIncluded(f, root)}
+                      onCheckedChange={() => toggleFile(f, root)}
+                    />
+                  )
+                }
+                icon={<span className={`change-kind ${f.kind}`}>{KIND_LETTER[f.kind] ?? '?'}</span>}
+                label={<span className={`change-${f.kind}`}>{f.path.split('/').pop()}</span>}
+                file
+                hint={dirOf(f.path)}
+                actions={
+                  <>
                     {f.kind === 'conflicted' && (
                       <>
-                        <button className="link" title="Resolve in the merge editor" onClick={() => openMergeEditor(root, abs(f))}>Resolve…</button>
+                        <Button variant="link" size="sm" title="Resolve in the merge editor" onClick={() => openMergeEditor(root, abs(f))}>Resolve…</Button>
                         {agents.conflictAgent && (
-                          <button className="icon" title={`Resolve with ${agents.conflictAgent} in a terminal`} onClick={() => resolve([f.path])}>
-                            ✦
-                          </button>
+                          <RowAction label={`Resolve with ${agents.conflictAgent} in a terminal`} onClick={() => resolve([f.path])}>
+                            <Sparkles />
+                          </RowAction>
                         )}
                       </>
                     )}
-                    <button className="icon" title="Open file" onClick={() => openFile(abs(f))}>↗</button>
+                    <RowAction label="Open file" onClick={() => openFile(abs(f))}>
+                      <ExternalLink />
+                    </RowAction>
                     {f.kind !== 'conflicted' && (
-                      <button className="icon" title="Rollback" onClick={() => void confirmRollback([f], root)}>↶</button>
+                      <RowAction label="Rollback" onClick={() => void confirmRollback([f], root)}>
+                        <Undo2 />
+                      </RowAction>
                     )}
-                  </span>
-                </div>
-              ))}
-          </div>
+                  </>
+                }
+              >
+                {!!f.conflicts && <span className="conflict-count" title="Conflicts left in the file">{f.conflicts}</span>}
+              </TreeRow>
+            ))}
+          </TreeSection>
         )
       })}
     </>
@@ -398,20 +425,23 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
 function RollbackTicked({
   files, root, count, untracked, disabled,
 }: { files: FileChange[]; root: string; count: number; untracked: boolean; disabled: boolean }) {
-  const onClick = useEventCallback((e: React.MouseEvent) => {
-    e.stopPropagation() // the header itself folds the group
+  const onClick = useEventCallback(() => {
     void confirmRollback(tickedOf(files, root), root)
   })
   const plural = count === 1 ? '' : 's'
   return (
-    <button
-      className="icon group-action"
-      disabled={disabled}
-      title={untracked ? `Delete the ${count} ticked unversioned file${plural}…` : `Rollback the ${count} ticked file${plural}…`}
-      onClick={onClick}
-    >
-      ↶
-    </button>
+    // Disabled kit buttons ignore the pointer, so the hint lives on a wrapper.
+    <span title={untracked ? `Delete the ${count} ticked unversioned file${plural}…` : `Rollback the ${count} ticked file${plural}…`}>
+      <IconButton
+        variant="ghost"
+        size="sm"
+        disabled={disabled}
+        aria-label={untracked ? `Delete the ${count} ticked unversioned file${plural}` : `Rollback the ${count} ticked file${plural}`}
+        onClick={onClick}
+      >
+        <Undo2 />
+      </IconButton>
+    </span>
   )
 }
 
@@ -435,25 +465,32 @@ function capitalize(s: string): string {
  * With several workspace folders: which one's repository the panel shows (it follows
  * the active tab's folder), with the number of changes in each.
  */
-function RepoSwitcher({ fallback }: { fallback: string }) {
+function RepoSwitcher() {
   const roots = useWorkspace((s) => s.roots)
   const folder = useGit((s) => s.folder)
   const counts = useGit((s) => s.counts)
-  if (roots.length < 2 || !folder) return <span className="panel-title">{fallback}</span>
+  if (!folder) return null
   const labels = rootLabels(roots)
   return (
-    <span className="panel-title repo-switcher">
-      <Select
-        size="sm"
-        title="Repository shown in the Commit panel (follows the active file)"
-        value={folder}
-        options={roots.map((r, i) => ({
-          value: r,
-          label: labels[i],
-          hint: r in counts ? `${counts[r]} change${counts[r] === 1 ? '' : 's'}` : 'not a repository',
-        }))}
-        onChange={(r) => void useGit.getState().load(r)}
+    <Select
+      size="sm"
+      title="Repository shown in the Commit panel (follows the active file)"
+      value={folder}
+      options={roots.map((r, i) => ({
+        value: r,
+        label: labels[i],
+        hint: r in counts ? `${counts[r]} change${counts[r] === 1 ? '' : 's'}` : 'not a repository',
+      }))}
+      onChange={(r) => void useGit.getState().load(r)}
       />
-    </span>
+  )
+}
+
+/** A small icon action shown on a hovered change row. */
+function RowAction({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <IconButton variant="ghost" size="sm" aria-label={label} title={label} onClick={onClick}>
+      {children}
+    </IconButton>
   )
 }

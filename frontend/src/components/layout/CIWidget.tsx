@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { StatusItem } from '@flint-ide/ui'
 import { checkName } from '../../lib/ci'
 import { checksSummary } from '../../lib/prReview'
 import { fixCIWithAgent, followCI, useCI, useCurrentCI } from '../../store/ci'
@@ -16,9 +17,9 @@ export function CIWidget() {
   const pr = entry?.data?.pr
   if (entry && !pr && isSignInError(entry.error)) {
     return (
-      <button className="status-ci none" title="Sign in to GitHub to follow this branch's pull request checks" onClick={requestGitHubSignIn}>
+      <StatusItem tip="Sign in to GitHub to follow this branch's pull request checks" onClick={requestGitHubSignIn}>
         CI: Sign in
-      </button>
+      </StatusItem>
     )
   }
   if (!entry || !pr || entry.state === 'none') return null
@@ -26,20 +27,19 @@ export function CIWidget() {
   const failed = data.checks.filter((c) => c.state === 'failure').map(checkName)
   const title = [`#${pr.number} ${pr.title}`, checksSummary(data.counts), ...failed.map((n) => `✗ ${n}`), 'Click to open the pull request'].join('\n')
   return (
-    <span className="status-ci-group">
-      <button className={`status-ci ${entry.state}`} title={title} onClick={() => openPullRequest(entry.root, pr)}>
+    <>
+      <StatusItem className={`status-ci ${entry.state}`} tip={title} onClick={() => openPullRequest(entry.root, pr)}>
         {GLYPH[entry.state]} CI
-      </button>
+      </StatusItem>
       {entry.state === 'failure' && (
-        <button
-          className="status-action"
+        <StatusItem
           disabled={busy}
-          title="Read the failed jobs' logs and put the failure in the agent chat for you to review and send"
+          tip="Read the failed jobs' logs and put the failure in the agent chat for you to review and send"
           onClick={() => void fixCIWithAgent({ root: entry.root, pr, checks: data.checks })}
         >
           {busy ? 'Reading the log…' : 'Fix with agent'}
-        </button>
+        </StatusItem>
       )}
-    </span>
+    </>
   )
 }

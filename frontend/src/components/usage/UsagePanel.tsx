@@ -11,6 +11,8 @@ import { chatTabId, useAgentChat } from '../../store/agentChat'
 import { showToast } from '../../store/dialog'
 import { useEditor } from '../../store/editor'
 import { useUsage } from '../../store/usage'
+import { Badge, IconButton, Meter, PanelHeader, Segment, StatTile, StatTiles, Table, TableBody, TableCell, TableRow } from '@flint-ide/ui'
+import { Download } from '@flint-ide/ui/icons'
 
 interface Group {
   key: string
@@ -54,6 +56,7 @@ interface Filter {
 }
 
 const RANGES = [7, 30] as const
+const RANGE_OPTIONS = RANGES.map((d) => ({ value: String(d), label: `${d}d` }))
 
 /** Agent usage from usage.json: totals, a daily chart, breakdowns and top chats. */
 export function UsagePanel() {
@@ -83,42 +86,55 @@ export function UsagePanel() {
 
   return (
     <div className="panel usage-panel">
-      <div className="panel-header">
-        <span className="panel-title">Usage</span>
-        <span className="spacer" />
-        <div className="usage-range" role="group" aria-label="Range">
-          {RANGES.map((d) => (
-            <button key={d} className={filter.days === d ? 'active' : ''} onClick={() => setFilter({ ...filter, days: d })}>{d}d</button>
-          ))}
-        </div>
-        <button className="icon" title="Export the daily aggregates (with the current filter) as CSV" onClick={() => void exportCSV(filter)}>⇩</button>
-      </div>
+      <PanelHeader
+        title="Usage"
+        actions={
+          <>
+            <Segment
+              size="sm"
+              shape="rounded"
+              className="usage-range"
+              aria-label="Range"
+              options={RANGE_OPTIONS}
+              value={String(filter.days)}
+              onValueChange={(d) => setFilter({ ...filter, days: Number(d) })}
+            />
+            <IconButton
+              variant="ghost"
+              size="sm"
+              aria-label="Export the daily aggregates as CSV"
+              title="Export the daily aggregates (with the current filter) as CSV"
+              onClick={() => void exportCSV(filter)}
+            >
+              <Download />
+            </IconButton>
+          </>
+        }
+      />
       <div className="scroll usage-body">
         {error && <div className="placeholder error">{error}</div>}
         {sum?.problem && <div className="usage-problem error">{sum.problem}</div>}
         {(filter.project || filter.task) && (
           <div className="usage-filters">
             {filter.project && (
-              <span className="chip" title={filter.project}>
+              <Badge title={filter.project} removeLabel="Clear folder filter" onRemove={() => setFilter({ ...filter, project: '' })}>
                 {projectName(filter.project)}
-                <button className="icon" aria-label="Clear folder filter" onClick={() => setFilter({ ...filter, project: '' })}>✕</button>
-              </span>
+              </Badge>
             )}
             {filter.task && (
-              <span className="chip">
+              <Badge removeLabel="Clear task filter" onRemove={() => setFilter({ ...filter, task: '' })}>
                 {taskName(filter.task)}
-                <button className="icon" aria-label="Clear task filter" onClick={() => setFilter({ ...filter, task: '' })}>✕</button>
-              </span>
+              </Badge>
             )}
           </div>
         )}
         {sum && (
           <>
-            <div className="usage-tiles">
+            <StatTiles>
               <Tile label="Today" t={sum.today} />
               <Tile label="7 days" t={sum.week} />
               <Tile label="30 days" t={sum.month} />
-            </div>
+            </StatTiles>
             <Chart days={sum.days} metric={metric} />
             {(sum.estimated || sum.unpriced) && (
               <p className="muted usage-note">
@@ -148,11 +164,12 @@ function Tile({ label, t }: { label: string; t: UsageTotals }) {
   const spent = spentOf(t)
   const estimated = (t.estimatedUsd ?? 0) > 0
   return (
-    <div className="usage-tile" title={totalsTooltip(t)}>
-      <span className="muted">{label}</span>
-      <strong>{spent > 0 ? `${estimated ? '~' : ''}${formatCost(spent)}` : formatTokens(tokensOf(t))}</strong>
-      <span className="muted">{spent > 0 ? `${formatTokens(tokensOf(t))} tokens${estimated ? ' · est.' : ''}` : 'tokens'}</span>
-    </div>
+    <StatTile
+      label={label}
+      title={totalsTooltip(t)}
+      value={spent > 0 ? `${estimated ? '~' : ''}${formatCost(spent)}` : formatTokens(tokensOf(t))}
+      sub={spent > 0 ? `${formatTokens(tokensOf(t))} tokens${estimated ? ' · est.' : ''}` : 'tokens'}
+    />
   )
 }
 
@@ -199,18 +216,24 @@ function Breakdown(props: { title: string; groups: Group[]; name: (k: string) =>
   return (
     <section className="usage-section">
       <h4>{title}</h4>
-      {groups.map((g, i) => (
-        <div
-          key={g.key}
-          className={`usage-row${onPick ? ' pickable' : ''}`}
-          title={`${hint ? hint(g.key) + '\n' : ''}${totalsTooltip(g.totals)}${onPick ? '\nClick to filter' : ''}`}
-          onClick={onPick ? () => onPick(g.key) : undefined}
-        >
-          <span className="usage-name">{name(g.key)}</span>
-          <span className="usage-value">{costLabel(g.totals) || `${formatTokens(tokensOf(g.totals))} tok`}</span>
-          <span className="usage-bar" style={{ width: `${widths[i]}%` }} />
-        </div>
-      ))}
+      <Table>
+        <TableBody>
+          {groups.map((g, i) => (
+            <TableRow
+              key={g.key}
+              className={onPick ? 'usage-pick' : undefined}
+              title={`${hint ? hint(g.key) + '\n' : ''}${totalsTooltip(g.totals)}${onPick ? '\nClick to filter' : ''}`}
+              onClick={onPick ? () => onPick(g.key) : undefined}
+            >
+              <TableCell className="usage-name">
+                <span className="usage-label">{name(g.key)}</span>
+                <Meter className="fui-meter-thin" value={widths[i]} aria-label={`${name(g.key)} share of the ${metric}`} />
+              </TableCell>
+              <TableCell className="usage-value">{costLabel(g.totals) || `${formatTokens(tokensOf(g.totals))} tok`}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </section>
   )
 }
@@ -221,20 +244,26 @@ function TopChats({ chats, taskName }: { chats: ChatRow[]; taskName: (id: string
   return (
     <section className="usage-section">
       <h4>Top chats in this range</h4>
-      {chats.map((c) => {
-        const isOpen = !!open[c.id]
-        return (
-          <div
-            key={c.id}
-            className={`usage-row${isOpen ? ' pickable' : ''}`}
-            title={`${c.label}\n${c.agent}${c.model ? ` · ${c.model}` : ''} · ${projectName(c.project)}${c.task ? ` · ${taskName(c.task)}` : ''}\n${totalsTooltip(c.totals)}${isOpen ? '\nClick to show the chat' : ''}`}
-            onClick={isOpen ? () => useEditor.getState().setActive(chatTabId(c.id)) : undefined}
-          >
-            <span className="usage-name">{c.label || `${c.agent} chat`}</span>
-            <span className="usage-value">{totalsLabel(c.totals)}</span>
-          </div>
-        )
-      })}
+      <Table>
+        <TableBody>
+          {chats.map((c) => {
+            const isOpen = !!open[c.id]
+            return (
+              <TableRow
+                key={c.id}
+                className={isOpen ? 'usage-pick' : undefined}
+                title={`${c.label}\n${c.agent}${c.model ? ` · ${c.model}` : ''} · ${projectName(c.project)}${c.task ? ` · ${taskName(c.task)}` : ''}\n${totalsTooltip(c.totals)}${isOpen ? '\nClick to show the chat' : ''}`}
+                onClick={isOpen ? () => useEditor.getState().setActive(chatTabId(c.id)) : undefined}
+              >
+                <TableCell className="usage-name">
+                  <span className="usage-label">{c.label || `${c.agent} chat`}</span>
+                </TableCell>
+                <TableCell className="usage-value">{totalsLabel(c.totals)}</TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
     </section>
   )
 }

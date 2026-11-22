@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Button, IconButton, ViewToolbar } from '@flint-ide/ui'
+import { ChevronLeft, ChevronRight } from '@flint-ide/ui/icons'
 import { Compartment, EditorState, Prec, type Extension, type StateField } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { Workspace, errorMessage } from '../../api/backend'
@@ -326,33 +328,37 @@ export function MergeView({ tab, active }: { tab: MergeTab; active: boolean }) {
   const canCompare = data.base.exists && !data.base.binary
   return (
     <div className="diff-view merge-view">
-      <div className="diff-header merge-header">
+      <ViewToolbar aria-label="Merge conflicts">
         <span className="truncate" title={tab.path}>{rel}</span>
         <span className="merge-side current" title={sides.current.detail}>Current: {sides.current.label}</span>
         <span className="merge-side incoming" title={sides.incoming.detail}>Incoming: {sides.incoming.label}</span>
-        <span className="spacer" />
+        <span className="fui-grow" />
         {editable && (
           <span className="merge-nav">
-            <button className="icon" title="Previous conflict" disabled={pos.total === 0} onClick={() => go(-1)}>‹</button>
+            <IconButton variant="ghost" size="sm" aria-label="Previous conflict" title="Previous conflict" disabled={pos.total === 0} onClick={() => go(-1)}>
+              <ChevronLeft />
+            </IconButton>
             <span className="muted">{conflictCount(pos)}</span>
-            <button className="icon" title="Next conflict" disabled={pos.total === 0} onClick={() => go(1)}>›</button>
+            <IconButton variant="ghost" size="sm" aria-label="Next conflict" title="Next conflict" disabled={pos.total === 0} onClick={() => go(1)}>
+              <ChevronRight />
+            </IconButton>
           </span>
         )}
         {canCompare && data.current.exists && (
-          <button className="link" title="What the current side changed since the base" onClick={() => compare(':2', sides.current)}>Δ Current</button>
+          <Button variant="ghost" size="sm" title="What the current side changed since the base" onClick={() => compare(':2', sides.current)}>Δ Current</Button>
         )}
         {canCompare && data.incoming.exists && (
-          <button className="link" title="What the incoming side changed since the base" onClick={() => compare(':3', sides.incoming)}>Δ Incoming</button>
+          <Button variant="ghost" size="sm" title="What the incoming side changed since the base" onClick={() => compare(':3', sides.incoming)}>Δ Incoming</Button>
         )}
         {editable && (
           <>
-            <button title={`Save the result without staging it (${formatKeys('Mod+S')})`} onClick={() => void save()}>Save</button>
-            <button className="primary" disabled={busy} title="Save the result and stage it (git add)" onClick={() => void markResolved()}>
+            <Button variant="plain" size="sm" title={`Save the result without staging it (${formatKeys('Mod+S')})`} onClick={() => void save()}>Save</Button>
+            <Button variant="primary" size="sm" disabled={busy} title="Save the result and stage it (git add)" onClick={() => void markResolved()}>
               Mark as Resolved
-            </button>
+            </Button>
           </>
         )}
-      </div>
+      </ViewToolbar>
       <div className="merge-legend muted">
         <span><b>Current</b> = {sides.current.detail}</span>
         <span><b>Incoming</b> = {sides.incoming.detail}</span>

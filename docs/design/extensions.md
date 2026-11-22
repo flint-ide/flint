@@ -310,7 +310,7 @@ Rules, checked at discovery, where a violation disables the extension and is sho
 - Every list is bounded (100 entries per kind, 50 themes) and every string has a maximum length; text may not contain control characters. The manifest is at most 1 MiB.
 - Settings may use only the schema subset below. An unknown keyword is an error rather than ignored, so an extension never relies on a check Flint would skip. Unknown top-level fields are ignored, so a newer manifest with a new optional field still installs (additive changes within a contract).
 - Shortcuts are allowed but never override Flint's defaults or the user's keymap: on a conflict the extension's shortcut is dropped and the conflict listed. Users rebind extension commands in Settings ▸ Keymap like any command.
-- Icons come from Flint's own icon set (`components/ui/icons.ts`); extensions cannot ship SVG.
+- Icons come from Flint's own icon set (`components/ui/icons.ts`, Lucide glyphs by name); extensions cannot ship SVG.
 
 ### Mapping onto level 1
 
@@ -468,7 +468,7 @@ Rules:
 
 - **Text is text.** Labels, cells and card values are plain text. Only `markdown` views and read-only form fields marked `"markdown": true` are Markdown, rendered without raw HTML and with `javascript:` and other schemes dropped.
 - **Colors are Flint's.** Severities (`info`, `ok`, `warning`, `error`) and chart series map to theme variables, so every view follows the theme, a custom one included. An extension cannot set a color in a view; its theme is the place for colors.
-- **Icons are Flint's** (`components/ui/icons.ts`), by name.
+- **Icons are Flint's** (`components/ui/icons.ts`, Lucide glyphs by name), by name.
 - **Buttons and menu entries** send `view/action { view, key?, item, action }`, or run a command when they carry `command`. A form's submit sends `form/submit` with the values, and the field errors in the answer appear under the fields.
 - **Bounds.** A response holds at most 5,000 rows or items in total (tables page with `view/resolve { parent: "<cursor>" }` beyond that), 10 chart series of 2,000 points, 50 cards, 10 children in a stack, 200 KiB of Markdown and 2,000 characters per label. Larger answers are cut, and the view says so.
 - **Unknown kinds or fields** within the contract are ignored by an older Flint, which shows a message for a kind it doesn't know. That is why `initialize` lists the supported kinds and chart types: an extension can fall back to a table.

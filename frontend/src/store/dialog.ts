@@ -15,6 +15,16 @@ interface DialogState {
 
 export const useDialog = createStore<DialogState>(() => ({ confirm: null }))
 
+/** The dialog answers once: a button's click and the close that follows it are one answer. */
+function once(answer: ConfirmRequest['resolve']): ConfirmRequest['resolve'] {
+  let done = false
+  return (ok, alternate) => {
+    if (done) return
+    done = true
+    answer(ok, alternate)
+  }
+}
+
 /** Shows an in-app confirmation (native window.confirm isn't available in the webview). */
 export function confirmAction(message: string, confirmLabel = 'OK'): Promise<boolean> {
   return new Promise((resolve) => {
@@ -22,10 +32,10 @@ export function confirmAction(message: string, confirmLabel = 'OK'): Promise<boo
       confirm: {
         message,
         confirmLabel,
-        resolve: (ok) => {
+        resolve: once((ok) => {
           useDialog.setState({ confirm: null })
           resolve(ok)
-        },
+        }),
       },
     })
   })
@@ -39,10 +49,10 @@ export function chooseAction(message: string, confirmLabel: string, alternateLab
         message,
         confirmLabel,
         alternateLabel,
-        resolve: (ok, alternate) => {
+        resolve: once((ok, alternate) => {
           useDialog.setState({ confirm: null })
           resolve(alternate ? 'alternate' : ok ? 'confirm' : 'cancel')
-        },
+        }),
       },
     })
   })

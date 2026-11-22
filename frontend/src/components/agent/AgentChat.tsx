@@ -1,4 +1,20 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Badge,
+  Button,
+  ChatChangedFiles,
+  ChatComposer,
+  ChatHeader,
+  ChatMarkdown,
+  ChatMessage,
+  ChatNotice,
+  ChatPlan,
+  ChatTranscript,
+  ChatView,
+  ChatWorking,
+  Checkbox,
+} from '@flint-ide/ui'
+import { Plus, Square } from '@flint-ide/ui/icons'
 import { useAgentChat, type ChatSession } from '../../store/agentChat'
 import { editedFiles } from '../../lib/agentReducer'
 import { totalsOf } from '../../lib/usage'
@@ -6,7 +22,7 @@ import { focusSoon } from '../../lib/focusSoon'
 import { useEditor } from '../../store/editor'
 import { useWorkspace } from '../../store/workspace'
 import { rootOf } from '../../lib/workspaceRoots'
-import { FileLink, MessageText, PermissionCard, PlanView, ToolCallRow, UsageLine, ChatUsage } from './ChatItems'
+import { FileLink, PermissionCard, ToolCallRow, UsageLine, ChatUsage } from './ChatItems'
 import { Dropdown, type DropdownItem } from '../ui/Dropdown'
 import { BudgetWarning } from './BudgetWarning'
 import { usePromptPicker } from './PromptPicker'
@@ -25,24 +41,11 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
   // Paths are shown relative to the chat's own workspace folder.
   const root = useWorkspace((s) => rootOf(s.roots, session.cwd)) ?? session.cwd
   const [showThoughts, setShowThoughts] = useState(false)
-  const scroller = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLTextAreaElement>(null)
-  const stick = useRef(true)
-  const frame = useRef(0)
   const picker = usePromptPicker(session, input)
   const { chat } = session
+  const folder = root.split('/').pop()
 
-  // Follow the stream unless the user scrolled up to read. Scrolling (which reads the
-  // layout) happens at most once per frame however often the transcript changes.
-  useEffect(() => {
-    if (!stick.current || frame.current) return
-    frame.current = requestAnimationFrame(() => {
-      frame.current = 0
-      const el = scroller.current
-      if (el && stick.current) el.scrollTop = el.scrollHeight
-    })
-  }, [chat.items])
-  useEffect(() => () => cancelAnimationFrame(frame.current), [])
   useEffect(() => {
     if (active) return focusSoon(() => input.current?.focus())
   }, [active])
@@ -58,55 +61,71 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
   const edited = useMemo(() => (idleChat ? editedFiles(idleChat) : NONE), [idleChat])
 
   return (
-    <div className={`agent-chat${chat.busy ? ' busy' : ''}`}>
-      <div className="chat-header">
-        <span className="agent-name">{session.agent}</span>
-        {session.model && <span className="muted">{session.model}</span>}
-        <ChatUsage totals={totalsOf(chat)} />
-        <span className="spacer" />
-        <label className="check muted" title="Show the agent's reasoning">
-          <input type="checkbox" checked={showThoughts} onChange={(e) => setShowThoughts(e.target.checked)} /> thinking
-        </label>
-        <PolicyToggle />
-      </div>
+    <ChatView>
+      <ChatHeader
+        title={session.agent}
+        subtitle={session.model}
+        meta={<ChatUsage totals={totalsOf(chat)} />}
+        actions={
+          <>
+            <Checkbox
+              wrapperClassName="fui-muted"
+              label="thinking"
+              title="Show the agent's reasoning"
+              checked={showThoughts}
+              onCheckedChange={setShowThoughts}
+            />
+            <PolicyToggle />
+          </>
+        }
+      />
       <BudgetWarning chatId={session.id} />
-      <PlanView plan={chat.plan} />
-      <div
-        className="chat-log"
-        ref={scroller}
-        onScroll={(e) => {
-          const el = e.currentTarget
-          stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40
-        }}
-      >
+      <ChatPlan entries={chat.plan} />
+      <ChatTranscript follow={chat.items} busy={chat.busy} aria-label={`Conversation with ${session.agent}`}>
         {chat.items.length === 0 && session.dormant && (
-          <div className="placeholder muted">
-            An earlier conversation with {session.agent} in {root.split('/').pop()}: its messages are not shown here, but {session.agent} remembers them and picks the conversation up with your next message.
-          </div>
+          <ChatNotice variant="placeholder">
+            An earlier conversation with {session.agent} in {folder}: its messages are not shown here, but {session.agent} remembers them and picks the conversation up with your next message.
+          </ChatNotice>
         )}
         {chat.items.length === 0 && !session.dormant && (
-          <div className="placeholder muted">
-            Ask {session.agent} anything about {root.split('/').pop()}. Edits are applied directly; review them in the Commit panel ({formatKeys('Mod+K')}).
-          </div>
+          <ChatNotice variant="placeholder">
+            Ask {session.agent} anything about {folder}. Edits are applied directly; review them in the Commit panel ({formatKeys('Mod+K')}).
+          </ChatNotice>
         )}
         {chat.items.map((it, i) => {
           switch (it.type) {
             case 'user':
               return (
-                <div key={i} className="msg user">
-                  {it.from && <div className="msg-from muted">from {it.from}</div>}
-                  <MessageText text={it.text} />
-                  {it.attachments.length > 0 && (
-                    <div className="msg-attachments">{it.attachments.map((a, j) => <span key={j} className="chip">{label(a, root)}</span>)}</div>
-                  )}
-                </div>
+                <ChatMessage
+                  key={i}
+                  role="user"
+                  from={it.from}
+                  attachments={
+                    it.attachments.length > 0 &&
+                    it.attachments.map((a, j) => (
+                      <Badge key={j} color="grey" badgeStyle="light_border" size="sm">
+                        {label(a, root)}
+                      </Badge>
+                    ))
+                  }
+                >
+                  <ChatMarkdown text={it.text} />
+                </ChatMessage>
               )
             case 'assistant':
-              return <div key={i} className="msg assistant"><MessageText text={it.text} /></div>
+              return (
+                <ChatMessage key={i} role="assistant">
+                  <ChatMarkdown text={it.text} />
+                </ChatMessage>
+              )
             case 'thought':
-              return showThoughts ? <div key={i} className="msg thought"><MessageText text={it.text} /></div> : null
+              return showThoughts ? (
+                <ChatMessage key={i} role="thought">
+                  <ChatMarkdown text={it.text} />
+                </ChatMessage>
+              ) : null
             case 'tool':
-              return <ToolCallRow key={it.call.id} call={it.call} root={root} />
+              return <ToolCallRow key={it.call.id} call={it.call} root={root} live={chat.busy} />
             case 'permission':
               return (
                 <PermissionCard
@@ -118,66 +137,73 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
                 />
               )
             case 'error':
-              return <div key={i} className="msg error selectable">{it.text}</div>
+              return (
+                <ChatMessage key={i} role="error">
+                  {it.text}
+                </ChatMessage>
+              )
             case 'end':
               return <UsageLine key={i} usage={it.usage} stopReason={it.stopReason} />
           }
           return null
         })}
         {session.dormant && chat.items.length > 0 && (
-          <div className="restored-note muted">Restored after restart — {session.agent} picks the conversation up with your next message.</div>
+          <ChatNotice variant="divider">Restored after restart — {session.agent} picks the conversation up with your next message.</ChatNotice>
         )}
-        {chat.busy && <div className="working muted">● working…</div>}
-      </div>
+        {chat.busy && <ChatWorking />}
+      </ChatTranscript>
       {edited.length > 0 && !chat.busy && (
-        <div className="chat-edited">
-          <span className="muted">Changed:</span>
-          {edited.slice(0, 6).map((p) => <FileLink key={p} path={p} root={root} />)}
-          {edited.length > 6 && <span className="muted">+{edited.length - 6}</span>}
-        </div>
+        <ChatChangedFiles more={edited.length - 6}>
+          {edited.slice(0, 6).map((p) => (
+            <FileLink key={p} path={p} root={root} />
+          ))}
+        </ChatChangedFiles>
       )}
-      <div className="composer">
-        {session.attachments.length > 0 && (
-          <div className="composer-attachments">
-            {session.attachments.map((a, i) => (
-              <span key={i} className="chip">
-                {label(a, root)}
-                <button className="icon" onClick={() => detach(session.id, i)} aria-label="Remove attachment">✕</button>
-              </span>
-            ))}
-          </div>
-        )}
-        {picker.element}
-        <textarea
-          ref={input}
-          value={session.draft}
-          placeholder={chat.busy ? `${session.agent} is working… (Esc to stop)` : `Message ${session.agent} (Enter to send, ${isMac() ? '⇧Enter' : 'Shift+Enter'} newline, / for prompts)`}
-          spellCheck={false}
-          onChange={(e) => setDraft(session.id, e.target.value)}
-          onKeyDown={(e) => {
-            if (picker.onKeyDown(e)) return
-            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault()
-              void send(session.id)
-            } else if (e.key === 'Escape' && chat.busy) {
-              e.preventDefault()
-              cancel(session.id)
-            }
-          }}
-        />
-        <div className="composer-actions">
-          <button className="link" onClick={attachActiveFile} title={`Attach the file open in the editor (${formatKeys('Mod+L')} attaches the selection)`}>
-            ＋ current file
-          </button>
-          <span className="spacer" />
-          {chat.busy ? (
-            <button className="danger" onClick={() => cancel(session.id)}>■ Stop</button>
+      <ChatComposer
+        attachments={
+          session.attachments.length > 0 &&
+          session.attachments.map((a, i) => (
+            <Badge key={i} color="grey" badgeStyle="light_border" size="sm" onRemove={() => detach(session.id, i)} removeLabel="Remove attachment">
+              {label(a, root)}
+            </Badge>
+          ))
+        }
+        above={picker.element}
+        ref={input}
+        value={session.draft}
+        placeholder={chat.busy ? `${session.agent} is working… (Esc to stop)` : `Message ${session.agent} (Enter to send, ${isMac() ? '⇧Enter' : 'Shift+Enter'} newline, / for prompts)`}
+        spellCheck={false}
+        onChange={(e) => setDraft(session.id, e.target.value)}
+        onKeyDown={(e) => {
+          if (picker.onKeyDown(e)) return
+          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+            e.preventDefault()
+            void send(session.id)
+          } else if (e.key === 'Escape' && chat.busy) {
+            e.preventDefault()
+            cancel(session.id)
+          }
+        }}
+        toolbar={
+          <Button variant="ghost" size="sm" onClick={attachActiveFile} title={`Attach the file open in the editor (${formatKeys('Mod+L')} attaches the selection)`}>
+            <Plus data-icon="inline-start" />
+            current file
+          </Button>
+        }
+        actions={
+          chat.busy ? (
+            <Button variant="destructive" size="sm" onClick={() => cancel(session.id)}>
+              <Square data-icon="inline-start" />
+              Stop
+            </Button>
           ) : (
-            <button className="primary" disabled={!session.draft.trim()} onClick={() => void send(session.id)}>Send</button>
-          )}
-        </div>
-      </div>
-    </div>
+            <Button variant="primary" size="sm" disabled={!session.draft.trim()} onClick={() => void send(session.id)}>
+              Send
+            </Button>
+          )
+        }
+      />
+    </ChatView>
   )
 })
 
@@ -220,7 +246,7 @@ function PolicyToggle() {
       minWidth={260}
       items={items}
       trigger={(t) => (
-        <button {...t} className="link" title="What the agent may do without asking">{summary}</button>
+        <Button {...t} variant="ghost" size="sm" title="What the agent may do without asking">{summary}</Button>
       )}
     />
   )

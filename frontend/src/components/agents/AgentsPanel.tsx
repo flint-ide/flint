@@ -1,5 +1,7 @@
 import { useEffect, useMemo } from 'react'
+import { Badge, Button, PanelHeader, TaskCard } from '@flint-ide/ui'
 import { agentRows, attentionCount, stateHint, stateLabel, type AgentRow } from '../../lib/agentList'
+import { TaskStateBadge } from '../tasks/badges'
 import { modKey, modifierName } from '../../lib/platform'
 import { useAgentChat } from '../../store/agentChat'
 import { followTasks, useTasks } from '../../store/agentTasks'
@@ -29,10 +31,10 @@ export function AgentsPanel() {
 
   return (
     <div className="panel tasks-panel">
-      <div className="panel-header">
-        <span className="panel-title">Agents</span>
-        {attention > 0 && <span className="badge" title={`${attention} waiting for you, failed or finished`}>{attention}</span>}
-      </div>
+      <PanelHeader
+        title="Agents"
+        actions={attention > 0 && <Badge color="orange" badgeStyle="light" size="sm" title={`${attention} waiting for you, failed or finished`}>{attention}</Badge>}
+      />
       <div className="tree scroll">
         {rows.map((r) => <AgentRowView key={r.key} row={r} />)}
         {rows.length === 0 && <div className="placeholder muted">No agents yet. Start a chat or an agent task and it is listed here.</div>}
@@ -46,29 +48,27 @@ function AgentRowView({ row }: { row: AgentRow }) {
   const look = row.state === 'finished-unseen' ? 'finished' : row.state
   const id = row.sessionId
   return (
-    <div className="task">
-      <div
-        className="tree-row static task-row"
-        title={`${row.title}\n\n${row.root}${id ? `\n\n${modifierName('Mod')}-click to peek without leaving your tab` : ''}`}
-        onClick={(e) => (id && modKey(e) ? peekAgent(id) : focusAgent(row))}
-      >
-        <span className={`task-state ${look}`} title={stateHint(row.state, row.kind, row.blocked)}>{stateLabel(row.state)}</span>
-        <span className="file-name">{row.title}</span>
-      </div>
-      <div className="task-meta muted">
-        <span>{row.agent}{row.kind === 'task' ? ' · task' : ''}{row.kind === 'terminal' ? ' · terminal' : ''}{row.hidden ? ' · hidden' : ''}</span>
-        <span title={row.root}>{row.project}</span>
-      </div>
-      {id && (
-        <div className="task-actions">
-          <button className="link" onClick={() => peekAgent(id)} title="Show the chat over your current tab: answer a request or send a prompt, then go back">Peek</button>
-          {row.hidden ? (
-            <button className="link" onClick={() => unsettleChat(id)} title="Draw the chat's tab again">Show tab</button>
-          ) : (
-            <button className="link" onClick={() => settleChat(id)} title="Hide the chat's tab until the agent needs you">Hide until needed</button>
-          )}
-        </div>
-      )}
-    </div>
+    <TaskCard
+      tooltip={`${row.title}\n\n${row.root}${id ? `\n\n${modifierName('Mod')}-click to peek without leaving your tab` : ''}`}
+      onOpen={(e) => (id && modKey(e) ? peekAgent(id) : focusAgent(row))}
+      status={<TaskStateBadge state={look} title={stateHint(row.state, row.kind, row.blocked)}>{stateLabel(row.state)}</TaskStateBadge>}
+      label={row.title}
+      meta={[
+        `${row.agent}${row.kind === 'task' ? ' · task' : ''}${row.kind === 'terminal' ? ' · terminal' : ''}${row.hidden ? ' · hidden' : ''}`,
+        <span title={row.root}>{row.project}</span>,
+      ]}
+      actions={
+        id && (
+          <>
+            <Button variant="ghost" size="sm" onClick={() => peekAgent(id)} title="Show the chat over your current tab: answer a request or send a prompt, then go back">Peek</Button>
+            {row.hidden ? (
+              <Button variant="ghost" size="sm" onClick={() => unsettleChat(id)} title="Draw the chat's tab again">Show tab</Button>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => settleChat(id)} title="Hide the chat's tab until the agent needs you">Hide until needed</Button>
+            )}
+          </>
+        )
+      }
+    />
   )
 }

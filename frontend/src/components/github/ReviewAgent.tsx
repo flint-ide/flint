@@ -2,15 +2,17 @@ import { addressReviewComments, busyKey, requestCodeReview, useReviewAgent, type
 import { detailsKey, usePullRequests } from '../../store/pullRequests'
 import { reviewHint } from '../../lib/prAgent'
 import { modifierName } from '../../lib/platform'
+import { Button } from '@flint-ide/ui'
 
 const sendHint = () => `${modifierName('Alt')}-click sends it right away`
 
 /** "✦ Address review comments": all unresolved threads and change requests of a pull request, as an agent chat draft. */
-export function AddressReviewButton({ target, label = '✦ Address review comments', className = 'link' }: { target: ReviewAgentTarget; label?: string; className?: string }) {
+export function AddressReviewButton({ target, label = '✦ Address review comments', variant = 'ghost' }: { target: ReviewAgentTarget; label?: string; variant?: 'ghost' | 'plain' }) {
   const busy = useReviewAgent((s) => !!s.busy[busyKey(target.root, target.number)])
   return (
-    <button
-      className={className}
+    <Button
+      size="sm"
+      variant={variant}
       disabled={busy}
       title={`Put the unresolved review comments in the agent chat for you to review and send (${sendHint()})`}
       onClick={(e) => {
@@ -19,19 +21,21 @@ export function AddressReviewButton({ target, label = '✦ Address review commen
       }}
     >
       {busy ? 'Reading comments…' : label}
-    </button>
+    </Button>
   )
 }
 
 /** "✦ Review with agent": asks the agent for a code review of the pull request, as an agent chat draft. */
 export function RequestCodeReviewButton({ root, number }: { root: string; number: number }) {
   return (
-    <button
+    <Button
+      size="sm"
+      variant="plain"
       title={`Ask the agent for a code review of this pull request: the request goes to the agent chat for you to review and send (${sendHint()}). The agent reads the change and reports findings; it changes no files and posts nothing to GitHub.`}
       onClick={(e) => void requestCodeReview({ root, number }, { send: e.altKey })}
     >
       ✦ Review with agent
-    </button>
+    </Button>
   )
 }
 
@@ -39,14 +43,14 @@ export function RequestCodeReviewButton({ root, number }: { root: string; number
 export function AskAgentAboutThread({ root, number, threadId }: { root: string; number: number; threadId: string }) {
   const busy = useReviewAgent((s) => !!s.busy[busyKey(root, number, threadId)])
   return (
-    <button
-      className="link"
+    <Button
+      size="sm"
+      variant="ghost"
       disabled={busy}
       title={`Put this thread and the code it is about in the agent chat for you to review and send (${sendHint()})`}
-      onClick={(e) => void addressReviewComments({ root, number }, { threadId, send: e.altKey })}
-    >
+      onClick={(e) => void addressReviewComments({ root, number }, { threadId, send: e.altKey })}>
       ✦ Ask agent
-    </button>
+    </Button>
   )
 }
 

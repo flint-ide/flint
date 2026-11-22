@@ -1,3 +1,4 @@
+import { StatusItem } from '@flint-ide/ui'
 import * as API from '../../../bindings/flint/internal/features/extensions/api'
 import { errorMessage } from '../../api/backend'
 import { showToast } from '../../store/dialog'
@@ -12,9 +13,9 @@ export function ExtensionStatusItem({ ext, item }: { ext: string; item: string }
     ? () => API.Execute(ext, status.command, null).catch((err: unknown) => showToast(errorMessage(err), 'error'))
     : undefined
   return run ? (
-    <button className={`status-action status-extension${severity}`} title={status.tooltip || undefined} onClick={() => void run()}>
+    <StatusItem className={`status-extension${severity}`} tip={status.tooltip || status.text} onClick={() => void run()}>
       {status.text}
-    </button>
+    </StatusItem>
   ) : (
     <span className={`status-extension${severity}`} title={status.tooltip || undefined}>
       {status.text}

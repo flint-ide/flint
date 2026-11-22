@@ -1,3 +1,4 @@
+import { Button, Checkbox, Input } from '@flint-ide/ui'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { distinctValues, isKeyShown, isNullKey, setFilter, type GridView } from '../lib/gridView'
@@ -83,7 +84,8 @@ export function ColumnFilter({ anchor, rows, col, columnName, view, onChange, on
         <span className="column-filter-title">Filter {columnName}</span>
         <span className="muted">local</span>
       </div>
-      <input
+      <Input
+        size="sm"
         className="column-filter-search"
         autoFocus
         placeholder="Search values…"
@@ -92,18 +94,18 @@ export function ColumnFilter({ anchor, rows, col, columnName, view, onChange, on
         onKeyDown={(e) => e.key === 'Enter' && selectVisible()}
       />
       <div className="column-filter-actions">
-        <button className="link" onClick={selectVisible} title={needle ? 'Show only the values matching the search (↵)' : 'Show every value'}>
+        <Button variant="ghost" size="sm" onClick={selectVisible} title={needle ? 'Show only the values matching the search (↵)' : 'Show every value'}>
           {needle ? 'Only matching' : 'Select all'}
-        </button>
-        <button className="link" onClick={selectNone}>Select none</button>
+        </Button>
+        <Button variant="ghost" size="sm" onClick={selectNone}>Select none</Button>
         <span className="spacer" />
-        {filter && <button className="link" onClick={() => onChange(setFilter(view, col, null))}>Clear</button>}
+        {filter && <Button variant="ghost" size="sm" onClick={() => onChange(setFilter(view, col, null))}>Clear</Button>}
       </div>
       <div className="column-filter-list">
         {visible.length === 0 && <div className="muted column-filter-empty">No values</div>}
         {visible.map((v) => (
           <label key={v.key} className={`column-filter-item${isNullKey(v.key) || v.key === '' ? ' special' : ''}`} title={v.label}>
-            <input type="checkbox" checked={isKeyShown(filter, v.key)} onChange={() => toggle(v.key)} />
+            <Checkbox checked={isKeyShown(filter, v.key)} onCheckedChange={() => toggle(v.key)} />
             <span className="column-filter-label">{v.label}</span>
             <span className="column-filter-count">{v.count.toLocaleString()}</span>
           </label>

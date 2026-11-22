@@ -1,18 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ClipboardSetText } from '../../wails/runtime'
-import { formatValue, frameAt, percent, searchFrames, type FlameFrame, type TopRow } from '../../lib/flame'
 import { showToast } from '../../store/dialog'
 import { useEditor } from '../../store/editor'
 import { revealProfile, selectProfileFile, selectSampleType, useProfile } from '../../store/profile'
 import { Dropdown } from '../ui/Dropdown'
 import { Select } from '../ui/Select'
-import { FlameGraph } from './FlameGraph'
 import { TopTable } from './TopTable'
-import { fileManagerName } from '../../lib/platform'
+import { fileManagerName, modKey, modifierName } from '../../lib/platform'
+import { Button, FlameGraph, formatValue, Input, percent, searchFrames, Segment, ViewToolbar, frameAt, type FlameFrame, type TopRow } from '@flint-ide/ui'
 
 interface Props {
   profileId: string
 }
+
+const VIEWS = [
+  { value: 'flame', label: 'Flame Graph' },
+  { value: 'top', label: 'Top' },
+]
 
 /** A profile tab: flame graph or top table of one profile file (store/profile.ts). */
 export function ProfileView({ profileId }: Props) {
@@ -43,15 +47,16 @@ export function ProfileView({ profileId }: Props) {
 
   return (
     <div className="profile-view">
-      <div className="run-toolbar profile-toolbar">
-        <div className="profile-modes" role="tablist">
-          <button role="tab" aria-selected={view === 'flame'} className={view === 'flame' ? 'on' : ''} onClick={() => setView('flame')}>
-            Flame Graph
-          </button>
-          <button role="tab" aria-selected={view === 'top'} className={view === 'top' ? 'on' : ''} onClick={() => setView('top')}>
-            Top
-          </button>
-        </div>
+      <ViewToolbar aria-label="Profile" className="profile-toolbar">
+        <Segment
+          size="sm"
+          shape="rounded"
+          className="profile-modes"
+          aria-label="Profile view"
+          options={VIEWS}
+          value={view}
+          onValueChange={(v) => setView(v as 'flame' | 'top')}
+        />
         {doc.files.length > 1 && (
           <Select
             size="sm"
@@ -70,7 +75,8 @@ export function ProfileView({ profileId }: Props) {
             title="Sample type"
           />
         )}
-        <input
+        <Input
+          size="sm"
           className="profile-search"
           type="search"
           value={query}
@@ -84,11 +90,11 @@ export function ProfileView({ profileId }: Props) {
           </span>
         )}
         {view === 'flame' && (
-          <button className="icon" disabled={focus.length === 0} title="Reset zoom (Esc)" onClick={() => setFocus([])}>
+          <Button variant="ghost" size="sm" disabled={focus.length === 0} title="Reset zoom (Esc)" onClick={() => setFocus([])}>
             Reset Zoom
-          </button>
+          </Button>
         )}
-        <span className="spacer" />
+        <span className="fui-grow" />
         {report && (
           <span className="muted profile-summary" title={report.trimmed ? `${report.trimmed} frames under 0.5% are hidden` : undefined}>
             {zoomed && focus.length > 0 ? `${zoomed.name.slice(zoomed.name.lastIndexOf('/') + 1)} · ` : ''}
@@ -104,13 +110,13 @@ export function ProfileView({ profileId }: Props) {
               { label: `Reveal in ${fileManagerName()}`, onSelect: () => void revealProfile(file.path) },
             ]}
             trigger={(t) => (
-              <button {...t} className="icon" title={`Raw profile: ${file.path} (go tool pprof)`}>
+              <Button {...t} variant="ghost" size="sm" title={`Raw profile: ${file.path} (go tool pprof)`}>
                 Raw .pprof ⌄
-              </button>
+              </Button>
             )}
           />
         )}
-      </div>
+      </ViewToolbar>
       <div className="profile-body">
         {doc.error ? (
           <div className="profile-message error">{doc.error}</div>
@@ -119,7 +125,16 @@ export function ProfileView({ profileId }: Props) {
         ) : report.total === 0 ? (
           <div className="profile-message muted">The profile has no samples (the program was idle, or ran too briefly).</div>
         ) : view === 'flame' ? (
-          <FlameGraph root={root} unit={unit} focus={focus} onFocus={setFocus} search={search} onOpen={openSource} />
+          <FlameGraph
+            root={root}
+            unit={unit}
+            focus={focus}
+            onZoom={setFocus}
+            search={search}
+            onOpen={openSource}
+            isOpenClick={modKey}
+            openHint={`Click to zoom · ${modifierName('Mod')}-click or double-click opens the source`}
+          />
         ) : (
           <TopTable rows={report.top} total={report.total} unit={unit} query={query} onOpen={openSource} onHighlight={highlight} />
         )}

@@ -1,3 +1,4 @@
+import { Alert, Button, FormActions } from '@flint-ide/ui'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Database, editBatch, errorMessage, type Driver, type EditTarget, type QueryResult } from '../../../api/backend'
 import { addRow, buildBatch, changeCount, editability, noEdits, toggleDelete, type StagedEdits } from '../lib/rowEdits'
@@ -73,20 +74,21 @@ export function EditableResults({ result, summary, connId, database, driver, rea
         <span className="edit-target" title={`Double-click a cell (or ↵) to edit ${target.schema}.${target.table}; ${formatKeys('Mod+Backspace')} deletes the selected row`}>
           ✎ {target.table}
         </span>
-        <button className="link" onClick={() => setEdits((e) => addRow(e))} title="Add a row">+ Row</button>
-        <button
-          className="link"
+        <Button variant="ghost" size="sm" onClick={() => setEdits((e) => addRow(e))} title="Add a row">+ Row</Button>
+        <Button
+          variant="ghost"
+          size="sm"
           disabled={selectedRow === null}
           onClick={() => selectedRow !== null && setEdits((e) => toggleDelete(result, e, selectedRow))}
           title={`Delete the selected row (${formatKeys('Mod+Backspace')})`}
         >
           {deleted ? 'Restore Row' : '− Row'}
-        </button>
+        </Button>
         {count > 0 && (
           <>
             <span className="edit-count">{count} change{count === 1 ? '' : 's'}</span>
-            <button className="link" onClick={() => void revert()}>Revert</button>
-            <button className="primary small" onClick={() => void openPreview()}>Submit…</button>
+            <Button variant="ghost" size="sm" onClick={() => void revert()}>Revert</Button>
+            <Button variant="primary" size="sm" onClick={() => void openPreview()}>Submit…</Button>
           </>
         )}
       </>
@@ -153,17 +155,17 @@ function SubmitDialog({ sql, table, onClose, onApply }: SubmitProps) {
         Runs in one transaction; values are sent as bind parameters (inlined above only for reading). An UPDATE or DELETE
         that doesn’t hit exactly one row rolls everything back.
       </p>
-      {error && <div className="form-error selectable">{error}</div>}
-      <div className="form-actions">
-        <button className="link" onClick={() => void navigator.clipboard.writeText(sql).then(() => showToast('Copied SQL'))}>
+      {error && <Alert size="inline" variant="negative" className="selectable">{error}</Alert>}
+      <FormActions align="start">
+        <Button variant="ghost" size="sm" onClick={() => void navigator.clipboard.writeText(sql).then(() => showToast('Copied SQL'))}>
           Copy SQL
-        </button>
-        <span className="spacer" />
-        <button onClick={onClose}>Cancel</button>
-        <button className="primary" autoFocus disabled={busy} onClick={() => void apply()}>
+        </Button>
+        <span className="fui-grow" />
+        <Button variant="plain" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" autoFocus disabled={busy} onClick={() => void apply()}>
           {busy ? 'Applying…' : 'Apply'}
-        </button>
-      </div>
+        </Button>
+      </FormActions>
     </Modal>
   )
 }

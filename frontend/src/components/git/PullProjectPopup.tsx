@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { closePullPicker, useGit } from '../../store/git'
 import { useWorkspace } from '../../store/workspace'
 import { pullHint, pullTargets } from '../../lib/pullTargets'
@@ -23,9 +23,13 @@ export function PullProjectPopup() {
   const [index, setIndex] = useState(() => Math.max(0, targets.findIndex((t) => t.current)))
   // Where focus goes back to (an editor, a terminal) when the picker closes.
   const [previousFocus] = useState(() => document.activeElement)
-  const list = useRef<HTMLDivElement>(null)
-
-  useEffect(() => list.current?.focus(), [])
+  const list = useRef<HTMLDivElement | null>(null)
+  // The dialog mounts its content a commit after this component, so the list is
+  // focused and scrolled to the current repository when it appears (a ref callback).
+  const attachList = useCallback((el: HTMLDivElement | null) => {
+    list.current = el
+    el?.focus()
+  }, [])
   useEffect(() => {
     document.getElementById(optionId(index))?.scrollIntoView({ block: 'nearest' })
   }, [index])
@@ -64,7 +68,7 @@ export function PullProjectPopup() {
     <Modal title="Update Repository" onClose={close} className="pull-popup">
       <div className="popup-section" id="pull-popup-hint">Pull from the remote into</div>
       <div
-        ref={list}
+        ref={attachList}
         className="quick-list"
         tabIndex={0}
         role="listbox"

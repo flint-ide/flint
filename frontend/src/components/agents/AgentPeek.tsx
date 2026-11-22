@@ -1,4 +1,6 @@
 import { Suspense, useEffect } from 'react'
+import { Button, IconButton } from '@flint-ide/ui'
+import { X } from '@flint-ide/ui/icons'
 import { lazyPreload } from '../../lib/lazyPreload'
 import { chatTitle } from '../../lib/agentList'
 import { useAgentChat, type ChatSession } from '../../store/agentChat'
@@ -37,9 +39,11 @@ function PeekDialog({ session }: { session: ChatSession }) {
   return (
     <Modal title={`${session.agent} · ${chatTitle(session.chat)}`} onClose={closePeek} className="peek">
       <div className="peek-actions">
-        <button className="link" onClick={keepPeekAsTab} title="Close the peek and switch to the chat's tab">Keep as Tab</button>
+        <Button variant="ghost" size="sm" onClick={keepPeekAsTab} title="Close the peek and switch to the chat's tab">Keep as Tab</Button>
         <span className="spacer" />
-        <button className="icon" onClick={closePeek} aria-label="Close peek" title="Close (Esc)">✕</button>
+        <IconButton variant="ghost" size="sm" onClick={closePeek} aria-label="Close peek" title="Close (Esc)">
+          <X />
+        </IconButton>
       </div>
       <div className="peek-chat">
         <ErrorBoundary label="Peek">

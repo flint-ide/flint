@@ -1,3 +1,4 @@
+import { Button, Card, CardContent, Checkbox } from '@flint-ide/ui'
 import { useEffect, useState } from 'react'
 import * as API from '../../../bindings/flint/internal/features/extensions/api'
 import { errorMessage } from '../../api/backend'
@@ -12,6 +13,7 @@ import { Row } from '../../components/settings/fields'
 import { BuiltinExtensions } from './BuiltinExtensions'
 import { CatalogSection } from './CatalogSection'
 import { IndexSection } from './IndexSection'
+import { ExtensionStateBadge } from './ExtensionStateBadge'
 import { installFromIndex, useIndex } from './indexStore'
 import { availableUpdates } from './indexModel'
 
@@ -45,15 +47,14 @@ export function ExtensionsSection() {
         label="Only run sandboxed extensions"
         hint="Extensions whose program would run unconfined (no sandbox declared, or none on this system) stay installed but are not started."
       >
-        <input
-          type="checkbox"
+        <Checkbox
           checked={sandboxRequired(extensions)}
-          onChange={(e) => update((s) => ({ extensions: withSandboxRequired(s.extensions, e.target.checked) }))}
+          onCheckedChange={(checked) => update((s) => ({ extensions: withSandboxRequired(s.extensions, checked) }))}
         />
       </Row>
       <div className="settings-actions">
-        <button onClick={() => void installFromFolder()}>Install from Folder…</button>
-        <button onClick={() => void loadExtensions(true)}>Reload Installed</button>
+        <Button variant="plain" onClick={() => void installFromFolder()}>Install from Folder…</Button>
+        <Button variant="plain" onClick={() => void loadExtensions(true)}>Reload Installed</Button>
       </div>
       <BuiltinExtensions />
       <IndexSection />
@@ -83,21 +84,20 @@ function ExtensionCard({ info }: { info: Info }) {
   const enabled = extensionEnabled(extensions, info.id)
   const broken = info.state === 'invalid'
   return (
-    <div className="extension-card">
+    <Card className="extension-card"><CardContent>
       <div className="extension-head">
         <label className="extension-toggle" title={enabled ? 'Turn off' : 'Turn on'}>
-          <input
-            type="checkbox"
+          <Checkbox
             checked={enabled}
             disabled={broken}
-            onChange={(e) => update((s) => ({ extensions: withFlag(s.extensions, 'enabled', info.id, e.target.checked) }))}
+            onCheckedChange={(checked) => update((s) => ({ extensions: withFlag(s.extensions, 'enabled', info.id, checked) }))}
           />
           <strong>{info.name}</strong>
         </label>
         {info.version && <span className="muted">{info.version}</span>}
         {info.publisher && <span className="muted">by {info.publisher}</span>}
         <span className="muted">{info.id}</span>
-        <span className={`extension-state ${info.state}`}>{STATE_LABELS[info.state] ?? info.state}</span>
+        <ExtensionStateBadge tone={info.state === 'running' ? 'ok' : ['invalid', 'crashed', 'failed'].includes(info.state) ? 'bad' : 'none'}>{STATE_LABELS[info.state] ?? info.state}</ExtensionStateBadge>
       </div>
       {info.description && <p className="extension-description">{info.description}</p>}
       {info.error && <p className="error">{info.error}</p>}
@@ -183,10 +183,9 @@ function ExtensionCard({ info }: { info: Info }) {
               <dd>
                 {info.decorationSets.map((set) => (
                   <label key={set.id} className="extension-decoration-set">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={decorationSetEnabled(extensions, set.id, set.default)}
-                      onChange={(e) => update((s) => ({ extensions: withDecorationSet(s.extensions, set.id, e.target.checked, set.default) }))}
+                      onCheckedChange={(checked) => update((s) => ({ extensions: withDecorationSet(s.extensions, set.id, checked, set.default) }))}
                     />{' '}
                     {set.title}{' '}
                     <span className="muted">
@@ -216,10 +215,9 @@ function ExtensionCard({ info }: { info: Info }) {
               <dt>Agent tools</dt>
               <dd>
                 <label>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={toolsOffered(extensions, info.id)}
-                    onChange={(e) => update((s) => ({ extensions: withFlag(s.extensions, 'agentTools', info.id, e.target.checked) }))}
+                    onCheckedChange={(checked) => update((s) => ({ extensions: withFlag(s.extensions, 'agentTools', info.id, checked) }))}
                   />{' '}
                   Offer to agents (in trusted folders, when Settings ▸ Agent Context is on)
                 </label>
@@ -236,17 +234,17 @@ function ExtensionCard({ info }: { info: Info }) {
       )}
       <div className="settings-actions">
         {newer && (
-          <button disabled={updating} onClick={() => void installFromIndex(info.id)}>
+          <Button variant="plain" disabled={updating} onClick={() => void installFromIndex(info.id)}>
             {updating ? 'Downloading…' : `Update to ${newer}…`}
-          </button>
+          </Button>
         )}
-        <button onClick={() => (log === null ? void showLog() : setLog(null))}>{log === null ? 'Show Log' : 'Hide Log'}</button>
-        {log !== null && <button onClick={() => void showLog()}>Refresh Log</button>}
-        {(info.state === 'failed' || info.state === 'crashed') && <button onClick={() => void restartExtension(info.id)}>Restart</button>}
-        <button className="danger" onClick={() => void uninstallExtension(info.id)}>Uninstall…</button>
+        <Button variant="plain" onClick={() => (log === null ? void showLog() : setLog(null))}>{log === null ? 'Show Log' : 'Hide Log'}</Button>
+        {log !== null && <Button variant="plain" onClick={() => void showLog()}>Refresh Log</Button>}
+        {(info.state === 'failed' || info.state === 'crashed') && <Button variant="plain" onClick={() => void restartExtension(info.id)}>Restart</Button>}
+        <Button variant="destructive" onClick={() => void uninstallExtension(info.id)}>Uninstall…</Button>
       </div>
       {log !== null && <pre className="extension-log">{log}</pre>}
-    </div>
+    </CardContent></Card>
   )
 }
 
@@ -260,14 +258,14 @@ function ExtensionThemes({ themes }: { themes: readonly ThemeContribution[] }) {
   return (
     <div className="extension-themes">
       {themes.map((t) => (
-        <button key={t.id} className={active === t.id ? 'on' : ''} aria-pressed={active === t.id} onClick={() => update({ theme: 'custom', customTheme: customThemeFrom(t) })}>
+        <Button key={t.id} variant={active === t.id ? 'primary' : 'plain'} aria-pressed={active === t.id} onClick={() => update({ theme: 'custom', customTheme: customThemeFrom(t) })}>
           <span className="theme-swatches" aria-hidden="true">
             {SWATCHES.filter((v) => t.colors[v]).map((v) => (
               <span key={v} className="theme-swatch" style={{ background: t.colors[v] }} />
             ))}
           </span>
           {active === t.id ? `${t.label} (in use)` : `Use ${t.label}`}
-        </button>
+        </Button>
       ))}
     </div>
   )

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Button, Input, RadioGroup, RadioGroupItem } from '@flint-ide/ui'
 import { trustedRoots, validAgentName } from '../../lib/agentDefs'
 import { rootLabels } from '../../lib/workspaceRoots'
 import { activeRoot } from '../../store/activeRoot'
@@ -45,7 +46,7 @@ export function AgentDefDialog() {
       >
         <label>
           Name (used wherever an agent name is)
-          <input
+          <Input
             autoFocus
             value={name}
             spellCheck={false}
@@ -57,22 +58,24 @@ export function AgentDefDialog() {
           />
         </label>
         {name && !valid && <span className="form-status error">Lowercase letters, digits and - only, starting with a letter (at most 32).</span>}
-        <label className="check">
-          <input type="radio" name="scope" checked={!personal} disabled={projects.length === 0} onChange={() => setPersonal(false)} />
-          Repository: .flint/agents, shared with the team through the repository
-        </label>
-        {!personal && projects.length > 1 && (
-          <Select block value={root} options={projects.map((r, i) => ({ value: r, label: labels[i] ?? r }))} onChange={setRoot} />
-        )}
-        {projects.length === 0 && <span className="muted">Open and trust a folder to create a repository agent.</span>}
-        <label className="check">
-          <input type="radio" name="scope" checked={personal} onChange={() => setPersonal(true)} />
-          Personal: only you, in every folder
-        </label>
+        <RadioGroup value={personal ? 'personal' : 'repository'} onValueChange={(v) => setPersonal(v === 'personal')}>
+          <label className="check">
+            <RadioGroupItem value="repository" disabled={projects.length === 0} />
+            Repository: .flint/agents, shared with the team through the repository
+          </label>
+          {!personal && projects.length > 1 && (
+            <Select block value={root} options={projects.map((r, i) => ({ value: r, label: labels[i] ?? r }))} onChange={setRoot} />
+          )}
+          {projects.length === 0 && <span className="muted">Open and trust a folder to create a repository agent.</span>}
+          <label className="check">
+            <RadioGroupItem value="personal" />
+            Personal: only you, in every folder
+          </label>
+        </RadioGroup>
         {error && <span className="form-status error">{error}</span>}
         <div className="form-actions">
-          <button type="button" onClick={closeAgentDefDialog}>Cancel</button>
-          <button type="submit" className="primary" disabled={!valid}>Create and Open</button>
+          <Button type="button" variant="plain" onClick={closeAgentDefDialog}>Cancel</Button>
+          <Button type="submit" variant="primary" disabled={!valid}>Create and Open</Button>
         </div>
       </form>
     </Modal>

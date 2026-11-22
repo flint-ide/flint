@@ -12,6 +12,8 @@ import {
 } from '../../store/agentTasks'
 import { Modal } from '../layout/Modal'
 import { Select } from '../ui/Select'
+import { Button } from '@flint-ide/ui'
+import { TaskStateBadge } from './badges'
 
 const MARK: Record<string, string> = { add: '+', del: '−', ctx: ' ', hunk: '' }
 
@@ -62,7 +64,7 @@ export function CompareView() {
                 <tr>
                   <th>
                     {data.files.length} {data.files.length === 1 ? 'file' : 'files'}
-                    <button className="link" onClick={() => void refreshCompare()} title="Read the changes again">Refresh</button>
+                    <Button variant="ghost" size="sm" onClick={() => void refreshCompare()} title="Read the changes again">Refresh</Button>
                   </th>
                   {tasks.map((c) => {
                     const t = c.task as TaskView
@@ -71,7 +73,7 @@ export function CompareView() {
                     return (
                       <th key={t.id} title={`${t.branch}\n${t.worktree}`}>
                         <div className="compare-agent">
-                          {labels[t.id]} <span className={`task-state ${t.stale ? 'stale' : s.state}`}>{t.stale ? 'stale' : s.label}</span>
+                          {labels[t.id]} <TaskStateBadge state={t.stale ? 'stale' : s.state}>{t.stale ? 'stale' : s.label}</TaskStateBadge>
                         </div>
                         <div className="muted">
                           {c.error || `${c.count} ${c.count === 1 ? 'file' : 'files'} +${c.added} −${c.deleted} · ↑${t.ahead}`}
@@ -79,14 +81,14 @@ export function CompareView() {
                         {formatTaskUsage(t) && <div className="muted">{formatTaskUsage(t)}</div>}
                         <div className="compare-keep">
                           {a.merge && (
-                            <button className="link" disabled={!!busy[t.id]} onClick={() => void keepTask(t, 'merge')} title={`Keep this one: merge it into ${t.base}, then choose what happens to the others`}>
+                            <Button variant="ghost" size="sm" disabled={!!busy[t.id]} onClick={() => void keepTask(t, 'merge')} title={`Keep this one: merge it into ${t.base}, then choose what happens to the others`}>
                               Keep: Merge
-                            </button>
+                            </Button>
                           )}
                           {a.pr && (
-                            <button className="link" disabled={!!busy[t.id]} onClick={() => void keepTask(t, 'pr')} title="Keep this one: create its pull request, then choose what happens to the others">
+                            <Button variant="ghost" size="sm" disabled={!!busy[t.id]} onClick={() => void keepTask(t, 'pr')} title="Keep this one: create its pull request, then choose what happens to the others">
                               Keep: PR
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </th>
@@ -120,9 +122,9 @@ export function CompareView() {
                         <span className="muted">{changeCell(change)}</span>
                         <span className="spacer" />
                         {!c.task.stale && (
-                          <button className="link" onClick={() => openComparedFileDiff(c, path, change?.origPath ?? '')} title="Open the side-by-side diff against the base in a tab">
+                          <Button variant="ghost" size="sm" onClick={() => openComparedFileDiff(c, path, change?.origPath ?? '')} title="Open the side-by-side diff against the base in a tab">
                             Open diff
-                          </button>
+                          </Button>
                         )}
                       </div>
                       <DiffLines d={file?.tasks[i]} />
@@ -148,7 +150,7 @@ export function CompareView() {
       )}
       <div className="form-actions">
         <span className="spacer" />
-        <button type="button" onClick={closeCompare}>Close</button>
+        <Button variant="plain" size="sm" type="button" onClick={closeCompare}>Close</Button>
       </div>
     </Modal>
   )

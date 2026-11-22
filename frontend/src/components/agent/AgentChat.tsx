@@ -1,4 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { Badge, Button, Checkbox } from '@flint-ide/ui'
+import { Plus, Square } from '@flint-ide/ui/icons'
 import { useAgentChat, type ChatSession } from '../../store/agentChat'
 import { editedFiles } from '../../lib/agentReducer'
 import { totalsOf } from '../../lib/usage'
@@ -64,9 +66,13 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
         {session.model && <span className="muted">{session.model}</span>}
         <ChatUsage totals={totalsOf(chat)} />
         <span className="spacer" />
-        <label className="check muted" title="Show the agent's reasoning">
-          <input type="checkbox" checked={showThoughts} onChange={(e) => setShowThoughts(e.target.checked)} /> thinking
-        </label>
+        <Checkbox
+          wrapperClassName="muted"
+          label="thinking"
+          title="Show the agent's reasoning"
+          checked={showThoughts}
+          onCheckedChange={setShowThoughts}
+        />
         <PolicyToggle />
       </div>
       <BudgetWarning chatId={session.id} />
@@ -97,7 +103,7 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
                   {it.from && <div className="msg-from muted">from {it.from}</div>}
                   <MessageText text={it.text} />
                   {it.attachments.length > 0 && (
-                    <div className="msg-attachments">{it.attachments.map((a, j) => <span key={j} className="chip">{label(a, root)}</span>)}</div>
+                    <div className="msg-attachments">{it.attachments.map((a, j) => <Badge key={j} color="grey" badgeStyle="light_border" size="sm">{label(a, root)}</Badge>)}</div>
                   )}
                 </div>
               )
@@ -140,10 +146,9 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
         {session.attachments.length > 0 && (
           <div className="composer-attachments">
             {session.attachments.map((a, i) => (
-              <span key={i} className="chip">
+              <Badge key={i} color="grey" badgeStyle="light_border" size="sm" onRemove={() => detach(session.id, i)} removeLabel="Remove attachment">
                 {label(a, root)}
-                <button className="icon" onClick={() => detach(session.id, i)} aria-label="Remove attachment">✕</button>
-              </span>
+              </Badge>
             ))}
           </div>
         )}
@@ -166,14 +171,18 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
           }}
         />
         <div className="composer-actions">
-          <button className="link" onClick={attachActiveFile} title={`Attach the file open in the editor (${formatKeys('Mod+L')} attaches the selection)`}>
-            ＋ current file
-          </button>
+          <Button variant="ghost" size="sm" onClick={attachActiveFile} title={`Attach the file open in the editor (${formatKeys('Mod+L')} attaches the selection)`}>
+            <Plus data-icon="inline-start" />
+            current file
+          </Button>
           <span className="spacer" />
           {chat.busy ? (
-            <button className="danger" onClick={() => cancel(session.id)}>■ Stop</button>
+            <Button variant="destructive" size="sm" onClick={() => cancel(session.id)}>
+              <Square data-icon="inline-start" />
+              Stop
+            </Button>
           ) : (
-            <button className="primary" disabled={!session.draft.trim()} onClick={() => void send(session.id)}>Send</button>
+            <Button variant="primary" size="sm" disabled={!session.draft.trim()} onClick={() => void send(session.id)}>Send</Button>
           )}
         </div>
       </div>
@@ -220,7 +229,7 @@ function PolicyToggle() {
       minWidth={260}
       items={items}
       trigger={(t) => (
-        <button {...t} className="link" title="What the agent may do without asking">{summary}</button>
+        <Button {...t} variant="ghost" size="sm" title="What the agent may do without asking">{summary}</Button>
       )}
     />
   )

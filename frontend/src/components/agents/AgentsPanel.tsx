@@ -1,5 +1,7 @@
 import { useEffect, useMemo } from 'react'
+import { Badge, Button } from '@flint-ide/ui'
 import { agentRows, attentionCount, stateHint, stateLabel, type AgentRow } from '../../lib/agentList'
+import { TaskStateBadge } from '../tasks/badges'
 import { modKey, modifierName } from '../../lib/platform'
 import { useAgentChat } from '../../store/agentChat'
 import { followTasks, useTasks } from '../../store/agentTasks'
@@ -31,7 +33,7 @@ export function AgentsPanel() {
     <div className="panel tasks-panel">
       <div className="panel-header">
         <span className="panel-title">Agents</span>
-        {attention > 0 && <span className="badge" title={`${attention} waiting for you, failed or finished`}>{attention}</span>}
+        {attention > 0 && <Badge color="orange" badgeStyle="light" size="sm" title={`${attention} waiting for you, failed or finished`}>{attention}</Badge>}
       </div>
       <div className="tree scroll">
         {rows.map((r) => <AgentRowView key={r.key} row={r} />)}
@@ -52,7 +54,7 @@ function AgentRowView({ row }: { row: AgentRow }) {
         title={`${row.title}\n\n${row.root}${id ? `\n\n${modifierName('Mod')}-click to peek without leaving your tab` : ''}`}
         onClick={(e) => (id && modKey(e) ? peekAgent(id) : focusAgent(row))}
       >
-        <span className={`task-state ${look}`} title={stateHint(row.state, row.kind, row.blocked)}>{stateLabel(row.state)}</span>
+        <TaskStateBadge state={look} title={stateHint(row.state, row.kind, row.blocked)}>{stateLabel(row.state)}</TaskStateBadge>
         <span className="file-name">{row.title}</span>
       </div>
       <div className="task-meta muted">
@@ -61,11 +63,11 @@ function AgentRowView({ row }: { row: AgentRow }) {
       </div>
       {id && (
         <div className="task-actions">
-          <button className="link" onClick={() => peekAgent(id)} title="Show the chat over your current tab: answer a request or send a prompt, then go back">Peek</button>
+          <Button variant="ghost" size="sm" onClick={() => peekAgent(id)} title="Show the chat over your current tab: answer a request or send a prompt, then go back">Peek</Button>
           {row.hidden ? (
-            <button className="link" onClick={() => unsettleChat(id)} title="Draw the chat's tab again">Show tab</button>
+            <Button variant="ghost" size="sm" onClick={() => unsettleChat(id)} title="Draw the chat's tab again">Show tab</Button>
           ) : (
-            <button className="link" onClick={() => settleChat(id)} title="Hide the chat's tab until the agent needs you">Hide until needed</button>
+            <Button variant="ghost" size="sm" onClick={() => settleChat(id)} title="Hide the chat's tab until the agent needs you">Hide until needed</Button>
           )}
         </div>
       )}

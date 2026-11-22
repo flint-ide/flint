@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Button, Input, RadioGroup, RadioGroupItem } from '@flint-ide/ui'
 import { matchPrompts, validPromptName } from '../../lib/prompts'
 import { activeRoot } from '../../store/activeRoot'
 import {
@@ -94,20 +95,22 @@ function NewPrompt({ root }: { root: string }) {
       >
         <label>
           Name (typed after /)
-          <input autoFocus value={name} spellCheck={false} placeholder="review-api" onChange={(e) => setName(e.target.value.trim())} />
+          <Input autoFocus value={name} spellCheck={false} placeholder="review-api" onChange={(e) => setName(e.target.value.trim())} />
         </label>
         {name && !valid && <span className="form-status error">Letters, digits, - and _ only, starting with a letter or digit.</span>}
-        <label className="check">
-          <input type="radio" name="scope" checked={!personal} disabled={!root} onChange={() => setPersonal(false)} />
-          Repository: .flint/prompts, shared with the team through the repository
-        </label>
-        <label className="check">
-          <input type="radio" name="scope" checked={personal} onChange={() => setPersonal(true)} />
-          Personal: only you, in every folder
-        </label>
+        <RadioGroup value={personal ? 'personal' : 'repository'} onValueChange={(v) => setPersonal(v === 'personal')}>
+          <label className="check">
+            <RadioGroupItem value="repository" disabled={!root} />
+            Repository: .flint/prompts, shared with the team through the repository
+          </label>
+          <label className="check">
+            <RadioGroupItem value="personal" />
+            Personal: only you, in every folder
+          </label>
+        </RadioGroup>
         <div className="form-actions">
-          <button type="button" onClick={closePromptDialog}>Cancel</button>
-          <button type="submit" className="primary" disabled={!valid}>Create and Open</button>
+          <Button type="button" variant="plain" onClick={closePromptDialog}>Cancel</Button>
+          <Button type="submit" variant="primary" disabled={!valid}>Create and Open</Button>
         </div>
       </form>
     </Modal>

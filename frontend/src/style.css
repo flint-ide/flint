@@ -205,17 +205,13 @@ body.resizing * {
    app's own controls, so inside it only kit components are skipped. :where keeps
    the specificity of a bare element. */
 button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)),
-input:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)),
 select:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)) {
   font: inherit;
   color: inherit;
 }
 
-/* The UI kit's look (WunderUI's Button and Input, measured in the Storybook) at
-   Flint's density: 1px border, 6 px radius, medium weight, a hairline shadow,
-   a solid accent primary, a solid red danger, an accent focus ring. Buttons
-   with a class of their own keep their own surface; only the shadow and weight
-   go to plain, primary and danger buttons. */
+/* The few native buttons left (grid chrome, tree chevrons, menu actions) draw the kit's
+   button surface at Flint's density; most have a class that sets their own. */
 button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)) {
   background: var(--bg-raised);
   border: 1px solid var(--border);
@@ -223,12 +219,6 @@ button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [
   padding: 3px 10px;
   cursor: pointer;
   transition: background-color 120ms ease-out, border-color 120ms ease-out, box-shadow 120ms ease-out;
-}
-button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)):not([class]),
-button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).primary,
-button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).danger {
-  font-weight: 500;
-  box-shadow: 0 1px 1px rgb(16 24 40 / 0.05);
 }
 button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)):hover {
   background: var(--bg-active);
@@ -241,48 +231,7 @@ button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [
   opacity: 0.5;
   cursor: default;
 }
-button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-fg);
-  font-weight: 600;
-}
-button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).primary:hover:not(:disabled) {
-  background: var(--brand-700);
-  border-color: var(--brand-700);
-}
-button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).danger {
-  background: var(--destructive);
-  border-color: var(--destructive);
-  color: var(--destructive-foreground);
-}
-button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--destructive) 85%, #000);
-  border-color: color-mix(in srgb, var(--destructive) 85%, #000);
-}
-button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).link {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--accent);
-}
-button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).link:hover:not(:disabled) {
-  background: none;
-  text-decoration: underline;
-}
-button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).icon {
-  background: none;
-  border: none;
-  padding: 2px 6px;
-  color: var(--fg-muted);
-  font-size: 12px;
-}
-button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).icon:hover {
-  color: var(--fg);
-  background: var(--bg-hover);
-}
 
-input:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)),
 select:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)) {
   background: var(--bg-editor);
   border: 1px solid var(--border-control);
@@ -291,7 +240,6 @@ select:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [
   outline: none;
   transition: border-color 120ms ease-out, box-shadow 120ms ease-out;
 }
-input:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)):focus,
 select:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)):focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-dim);
@@ -2181,9 +2129,6 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 }
 
 /* Merge editor: the result with inline conflict blocks (MergeView). */
-.merge-header {
-  flex-wrap: nowrap;
-}
 .merge-side {
   flex: none;
   padding: 1px 6px;
@@ -3038,9 +2983,7 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   color: var(--fg-faint);
 }
 .dd-separator {
-  height: 1px;
   margin: 4px 6px;
-  background: var(--border);
 }
 .dd-empty {
   padding: 8px 10px;
@@ -4051,10 +3994,6 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   font-size: var(--editor-font-size);
   line-height: var(--editor-line-height);
   tab-size: 4;
-}
-.keymap-toolbar {
-  display: flex;
-  gap: 8px;
 }
 .keymap-list {
   margin-top: 6px;
@@ -5559,14 +5498,7 @@ body.file-drop-target-active::after {
   max-width: 560px;
 }
 .account-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
   margin: 12px 0;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 12px;
 }
 .account-head {
   display: flex;

@@ -1,4 +1,4 @@
-import { Button, IconButton } from '@flint-ide/ui'
+import { Button, FormActions, IconButton } from '@flint-ide/ui'
 import { X } from '@flint-ide/ui/icons'
 import { useGit } from '../../store/git'
 import { PullProjectPopup } from '../git/PullProjectPopup'
@@ -24,10 +24,9 @@ export function Overlays() {
       {signIn && (
         <Modal title="Sign in to GitHub" onClose={closeSignInDialog} className="signin-dialog">
           <SignInWithGitHub intro="This needs a GitHub account. Flint keeps its token in the system keyring and sends it only to GitHub's API." />
-          <div className="form-actions">
-            <span className="spacer" />
+          <FormActions>
             <Button variant="plain" onClick={closeSignInDialog}>Close</Button>
-          </div>
+          </FormActions>
         </Modal>
       )}
       {pullPicker && <PullProjectPopup />}

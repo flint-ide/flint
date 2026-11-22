@@ -14,7 +14,7 @@ import {
 } from '../../lib/commands'
 import { useSettings } from '../../store/settings'
 import { isMac } from '../../lib/platform'
-import { Button, IconButton, Input, Kbd } from '@flint-ide/ui'
+import { Button, IconButton, Input, Kbd, ViewToolbar } from '@flint-ide/ui'
 import { RotateCcw, X } from '@flint-ide/ui/icons'
 
 /** Every command with its shortcut: search, record a new chord, reset or remove it. */
@@ -63,7 +63,7 @@ export function KeymapSection({ active }: { active: boolean }) {
   return (
     <section className="keymap">
       <h2>Keymap</h2>
-      <div className="keymap-toolbar">
+      <ViewToolbar aria-label="Keymap">
         <Input
           className="settings-text"
           placeholder={`Search actions or shortcuts (e.g. push, ${formatKeys('Mod+K')})…`}
@@ -74,7 +74,7 @@ export function KeymapSection({ active }: { active: boolean }) {
         <Button variant="plain" disabled={overrides === 0} onClick={() => update({ keymap: {} })} title="Restore every default shortcut">
           Reset All{overrides ? ` (${overrides})` : ''}
         </Button>
-      </div>
+      </ViewToolbar>
       <p className="muted settings-note">
         Click a shortcut and press the new keys; Esc cancels. {isMac() ? 'Keys of the macOS menu (⌘Q, ⌘C, ⌘V, ⌘O, ⌘,) stay with the menu.' : 'Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z and Ctrl+A stay with text fields, and plain Ctrl+letter keys in a terminal go to the shell.'}
       </p>

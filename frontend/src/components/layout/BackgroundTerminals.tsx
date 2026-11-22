@@ -1,4 +1,4 @@
-import { Button } from '@flint-ide/ui'
+import { Button, FormActions } from '@flint-ide/ui'
 import { useTerminal } from '../../store/terminal'
 import {
   attachBackgroundTerminal, closeBackgroundTerminals, endBackgroundTerminal, useBackgroundTerminals,
@@ -36,10 +36,9 @@ export function BackgroundTerminals() {
           </div>
         ))}
       </div>
-      <div className="form-actions">
-        <span className="spacer" />
+      <FormActions>
         <Button variant="primary" autoFocus onClick={closeBackgroundTerminals}>Done</Button>
-      </div>
+      </FormActions>
     </Modal>
   )
 }

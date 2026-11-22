@@ -25,7 +25,7 @@ import { CIBanner } from './CIStatus'
 import { useCurrentCI } from '../../store/ci'
 import { onAccountsChanged } from '../../store/accounts'
 import { SignInWithGitHub } from '../accounts/SignInWithGitHub'
-import { Button, IconButton, Input } from '@flint-ide/ui'
+import { Button, IconButton, Input, PanelHeader } from '@flint-ide/ui'
 import { ExternalLink, RefreshCw } from '@flint-ide/ui/icons'
 import { PrBadge } from './PrBadge'
 
@@ -66,15 +66,20 @@ export function PullRequestsPanel() {
 
   return (
     <div className="panel pr-panel">
-      <div className="panel-header">
-        <span className="panel-title" title={repo?.url}>
-          Pull Requests{repo && <span className="pr-repo"> · {repo.nameWithOwner}</span>}
-        </span>
-        {repo && (
-          <IconButton size="sm" variant="ghost" aria-label="Open on GitHub" title="Open on GitHub" onClick={() => openInBrowser(`${repo.url}/pulls`)}><ExternalLink /></IconButton>
-        )}
-        <IconButton size="sm" variant="ghost" aria-label="Refresh" title="Refresh" disabled={loading} onClick={() => void loadPullRequests(root, true)}><RefreshCw /></IconButton>
-      </div>
+      <PanelHeader
+        title="Pull Requests"
+        tooltip={repo?.url}
+        actions={
+          <>
+            {repo && (
+              <IconButton size="sm" variant="ghost" aria-label="Open on GitHub" title="Open on GitHub" onClick={() => openInBrowser(`${repo.url}/pulls`)}><ExternalLink /></IconButton>
+            )}
+            <IconButton size="sm" variant="ghost" aria-label="Refresh" title="Refresh" disabled={loading} onClick={() => void loadPullRequests(root, true)}><RefreshCw /></IconButton>
+          </>
+        }
+      >
+        {repo?.nameWithOwner}
+      </PanelHeader>
       {repo && (
         <div className="pr-filters">
           <Select size="sm" value={who} options={WHO} onChange={(v) => setListFilter({ who: v })} title="Whose pull requests" />

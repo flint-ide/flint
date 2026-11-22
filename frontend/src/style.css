@@ -614,14 +614,15 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
   color: var(--fg-muted);
   font-size: 11px;
 }
-.repo-switcher {
-  display: flex;
-  min-width: 0;
-  text-transform: none;
-}
 .tree-row.editing {
   z-index: 1;
   cursor: default;
+}
+/* The inline editor takes the label's whole width, and its error popover may leave the row. */
+.fui-tree-row[data-editing] .fui-tree-label {
+  display: flex;
+  flex: 1;
+  overflow: visible;
 }
 .tree-edit {
   position: relative;
@@ -655,7 +656,6 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
 .dir-name,
 .file-name,
 .conn-name,
-.scratch-name,
 .table-name,
 .schema-name {
   overflow: hidden;
@@ -691,12 +691,6 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
 }
 .indent-3 {
   padding-left: 54px !important;
-}
-.indent-4 {
-  padding-left: 70px !important;
-}
-.indent-5 {
-  padding-left: 86px !important;
 }
 .row-actions {
   margin-left: auto;
@@ -748,11 +742,7 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
   font-size: 11px;
   min-height: 15px;
 }
-.search-file {
-  padding-left: 8px;
-}
 .search-match {
-  padding-left: 22px;
   font-family: var(--font-mono);
   font-size: 12px;
 }
@@ -787,10 +777,6 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
 }
 .search-match.excluded .match-text {
   opacity: 0.45;
-}
-.search-tick {
-  margin: 0 4px 0 0;
-  flex: none;
 }
 .search-replace {
   display: flex;
@@ -1887,13 +1873,6 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 
 /* ---------- git ---------- */
 
-.git-branch-line {
-  padding: 0 12px 6px;
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 .ahead {
   color: var(--ok);
 }
@@ -1916,12 +1895,6 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 .changes-list {
   flex: 1;
 }
-.group-row {
-  font-weight: 600;
-}
-.group-title {
-  flex: none;
-}
 .agent-action {
   font-size: 11px;
   font-weight: 400;
@@ -1931,47 +1904,13 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   padding-left: 22px !important;
 }
 /* Several repositories: a header per repository, its groups indented under it. */
-.repo-row {
-  gap: 4px;
-}
-.repo-section.current > .repo-row {
+.repo-section.current > .fui-tree-row {
   background: var(--bg-raised);
   box-shadow: inset 2px 0 0 var(--accent);
-}
-.repo-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.repo-branch {
-  flex: 1;
-  min-width: 0;
-  font-weight: 400;
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-left: 6px;
-}
-.repo-changes .group-row {
-  padding-left: 18px !important;
-}
-.repo-changes .change-row {
-  padding-left: 38px !important;
 }
 .repo-clean {
   padding: 2px 0 4px 34px;
   font-size: 12px;
-}
-.git-branch-line .repo-name {
-  font-weight: 600;
-}
-/* The kit Checkbox's hit area reaches 8–12px past the box; in a 22px row that
-   swallows the twisty, the line number and the row above. */
-.tree-row [data-slot='checkbox'] {
-  margin-right: 4px;
-}
-.tree-row [data-slot='checkbox']::after {
-  inset: -2px;
 }
 .change-kind {
   width: 14px;
@@ -2034,12 +1973,6 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-}
-.commit-actions .check {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
 }
 .commit-actions .count {
   font-size: 11px;
@@ -2372,11 +2305,6 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 .history-diff {
   flex: 1;
   min-height: 0;
-}
-
-.stash-row .row-actions {
-  gap: 6px;
-  align-items: center;
 }
 
 .status-update .fui-statusitem.on {
@@ -4124,12 +4052,15 @@ button.keymap-chord:hover {
   margin-top: 4px;
 }
 .todo-item {
-  padding-left: 22px;
-  gap: 6px;
   font-size: 12px;
 }
+.todo-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .todo-tag-label {
-  flex: none;
+  margin-right: 6px;
   font: 600 10px var(--font-mono);
   padding: 0 4px;
   border-radius: 3px;
@@ -4726,11 +4657,6 @@ button.keymap-chord:hover {
 
 /* ---------- pull requests (GitHub) ---------- */
 
-.pr-repo {
-  text-transform: none;
-  letter-spacing: 0;
-  color: var(--fg-faint);
-}
 .pr-filters {
   flex: none;
   display: flex;
@@ -4876,7 +4802,6 @@ button.keymap-chord:hover {
   border-radius: 6px;
 }
 .pr-check,
-.pr-file,
 .pr-commit {
   display: flex;
   align-items: center;
@@ -4887,16 +4812,9 @@ button.keymap-chord:hover {
   border-radius: 4px;
   min-width: 0;
 }
-.pr-file {
-  cursor: pointer;
-}
-.pr-file:hover,
 .pr-check:hover,
 .pr-commit:hover {
   background: var(--bg-hover);
-}
-.pr-file .path-hint {
-  flex: 1;
 }
 .pr-comment {
   padding: 8px 12px;
@@ -5401,13 +5319,6 @@ body.file-drop-target-active::after {
 .review-dot.info {
   background: var(--info);
 }
-.review-row {
-  padding-left: 22px !important;
-  cursor: pointer;
-}
-.review-row .file-name {
-  flex: 0 1 auto;
-}
 .review-row.stale,
 .review-finding.stale {
   opacity: 0.65;
@@ -5504,14 +5415,6 @@ body.file-drop-target-active::after {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-}
-.ci-log-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 4px 12px;
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
 }
 .ci-log-text {
   flex: 1;

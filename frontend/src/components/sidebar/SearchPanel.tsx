@@ -9,7 +9,7 @@ import { displayPath, labelOf } from '../../lib/workspaceRoots'
 import { fileKey, matchKey } from '../../lib/replaceTargets'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
-import { Badge, Button, Checkbox, Input, InputGroup, InputGroupAddon } from '@flint-ide/ui'
+import { Badge, Button, Checkbox, Input, InputGroup, InputGroupAddon, PanelHeader, TreeRow } from '@flint-ide/ui'
 
 const basename = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 const dirname = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
@@ -88,9 +88,7 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
 
   return (
     <div className="panel">
-      <div className="panel-header">
-        <span className="panel-title">Search</span>
-      </div>
+      <PanelHeader title="Search" />
       <div className="search-form">
         <InputGroup className="search-input">
           <Input
@@ -174,28 +172,36 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
             const style = { transform: `translateY(${vi.start}px)` }
             if (row.kind === 'file') {
               return (
-                <div key={`f:${row.path}`} className="tree-row search-file" style={style} onClick={() => toggleFile(row.path)} title={row.path}>
-                  <span className="twisty">{collapsed.has(row.path) ? '▸' : '▾'}</span>
-                  {params.replaceOn && <Tick on={!excluded.has(row.path)} onToggle={() => useSearch.getState().toggleExcluded(row.path)} />}
-                  <FileIcon name={basename(row.path)} />
-                  <span className="file-name">{basename(row.path)}</span>
-                  <span className="muted path-hint">{dirname(displayPath(roots, row.path))}</span>
-                  <Badge size="sm" className="count-badge">{row.count}</Badge>
-                </div>
+                <TreeRow
+                  key={`f:${row.path}`}
+                  virtual
+                  style={style}
+                  file
+                  twisty={collapsed.has(row.path) ? 'closed' : 'open'}
+                  leading={params.replaceOn && <Tick on={!excluded.has(row.path)} onToggle={() => useSearch.getState().toggleExcluded(row.path)} />}
+                  icon={<FileIcon name={basename(row.path)} />}
+                  label={basename(row.path)}
+                  hint={dirname(displayPath(roots, row.path))}
+                  badge={row.count}
+                  onClick={() => toggleFile(row.path)}
+                  title={row.path}
+                />
               )
             }
             const m = row.match
+            const skipped = params.replaceOn && (excluded.has(matchKey(m)) || excluded.has(fileKey(m)))
             return (
-              <div
+              <TreeRow
                 key={`m:${m.root}/${m.path}:${m.line}:${vi.index}`}
-                className={`tree-row search-match${params.replaceOn && (excluded.has(matchKey(m)) || excluded.has(fileKey(m))) ? ' excluded' : ''}`}
+                virtual
+                className={`search-match${skipped ? ' excluded' : ''}`}
                 style={style}
+                depth={1}
+                leading={params.replaceOn && <Tick on={!excluded.has(matchKey(m))} onToggle={() => useSearch.getState().toggleExcluded(matchKey(m))} />}
+                icon={<span className="line-no">{m.line}</span>}
+                label={<MatchText match={m} replacing={params.replaceOn} />}
                 onClick={() => open(m)}
-              >
-                {params.replaceOn && <Tick on={!excluded.has(matchKey(m))} onToggle={() => useSearch.getState().toggleExcluded(matchKey(m))} />}
-                <span className="line-no">{m.line}</span>
-                <MatchText match={m} replacing={params.replaceOn} />
-              </div>
+              />
             )
           })}
         </div>
@@ -216,10 +222,8 @@ function Toggle(props: { on: boolean; title: string; onClick: () => void; childr
 function Tick({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
     <Checkbox
-      className="search-tick"
       aria-label="Include in replace"
       checked={on}
-      onClick={(e) => e.stopPropagation()}
       onCheckedChange={onToggle}
     />
   )

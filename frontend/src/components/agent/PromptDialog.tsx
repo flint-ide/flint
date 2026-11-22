@@ -8,6 +8,7 @@ import {
 import { Modal } from '../layout/Modal'
 import { PromptArgsForm, PromptList } from './PromptList'
 import { useListCursor } from '../../lib/useListCursor'
+import { PaletteSearch } from '../ui/PaletteSearch'
 
 /** The Run Prompt… and New Prompt… dialogs (palette commands). */
 export function PromptDialog() {
@@ -47,12 +48,10 @@ function RunPrompt({ root }: { root: string }) {
         <PromptArgsForm prompt={asking} onSubmit={(args) => run(asking, args)} onCancel={() => setAsking(null)} />
       ) : (
         <>
-          <Input
+          <PaletteSearch
             autoFocus
-            className="quick-input"
             placeholder="Run prompt in the agent chat…"
             value={query}
-            spellCheck={false}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'ArrowDown') setCursor((c) => Math.min(c + 1, rows.length - 1))

@@ -4,6 +4,7 @@ import { Modal } from '../../frontend/src/components/layout/Modal'
 import { ConfirmDialog } from '../../frontend/src/components/layout/ConfirmDialog'
 import { ContextMenu as AppContextMenu } from '../../frontend/src/components/ui/ContextMenu'
 import { Dropdown } from '../../frontend/src/components/ui/Dropdown'
+import { PaletteSearch } from '../../frontend/src/components/ui/PaletteSearch'
 import { Select } from '../../frontend/src/components/ui/Select'
 import { openContextMenu } from '../../frontend/src/store/contextMenu'
 import { confirmAction } from '../../frontend/src/store/dialog'
@@ -68,7 +69,7 @@ export const Form: Story = {
   },
 }
 
-/** A palette (Go to File, commands, symbols): `.modal.quick-open`, an input over a list, no title. */
+/** A palette (Go to File, commands, symbols): `.modal.quick-open`, the kit's Input (PaletteSearch) over a list, no title. */
 export const Palette: Story = {
   render: function Render() {
     const [open, setOpen] = useState(true)
@@ -78,7 +79,7 @@ export const Palette: Story = {
         <button onClick={() => setOpen(true)}>Go to File…</button>
         {open && (
           <Modal onClose={() => setOpen(false)} className="quick-open">
-            <input autoFocus className="quick-input" placeholder="Go to file… (1,284 files)" spellCheck={false} />
+            <PaletteSearch autoFocus placeholder="Go to file… (1,284 files)" />
             <div className="quick-list">
               {files.map((f, i) => (
                 <div key={f} className={`quick-item${i === 0 ? ' selected' : ''}`}>

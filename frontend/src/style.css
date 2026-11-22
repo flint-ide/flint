@@ -1381,7 +1381,8 @@ button.small {
   align-items: center;
   border-bottom: 1px solid var(--border);
 }
-.history-search .quick-input {
+.history-search .fui-palette-search {
+  flex: 1;
   border-bottom: none;
 }
 .history-scope {
@@ -1730,20 +1731,6 @@ button.small {
   width: min(640px, 92vw);
   padding: 0;
   overflow: hidden;
-}
-.quick-input {
-  width: 100%;
-  height: auto;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  border-radius: 0;
-  padding: 12px 14px;
-  font-size: 14px;
-  background: transparent;
-}
-.quick-input:focus {
-  border-color: var(--border);
-  box-shadow: none;
 }
 /* Rows in the kit's palette look (CommandPalette): rounded, inset from the edge. */
 .quick-list {
@@ -2961,11 +2948,9 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   overflow: hidden;
   font-size: 13px;
 }
+/* The filter box: the kit's Input (sm). */
 .dd-search {
   margin: 6px 6px 2px;
-  padding: 5px 8px;
-  border-radius: 8px;
-  font-size: 12px;
 }
 .dd-items {
   overflow-y: auto;
@@ -3056,55 +3041,60 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   font-size: 12px;
 }
 
-.select {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+/* Flint's Select on the kit's SelectTrigger: as wide as its value unless block,
+   sm at toolbar height, the menus' 13 px text (12 px when sm). */
+.flint-select {
+  width: auto;
   max-width: 100%;
-  border: 1px solid var(--border-control);
-  background: var(--bg-editor);
-  border-radius: 6px;
-  color: var(--fg);
-  text-align: left;
+  gap: 6px;
+  padding-inline: 8px;
+  font-size: 13px;
 }
-.select.md {
-  height: 28px;
-  padding: 0 8px;
+.flint-select[data-block] {
+  width: 100%;
 }
-.select.sm {
-  height: 24px;
-  padding: 0 6px;
+.flint-select[data-size='sm'] {
+  height: var(--field-sm);
+  padding-inline: 6px;
   font-size: 12px;
 }
-.select.block {
+.flint-select-wrap {
+  display: inline-flex;
+  max-width: 100%;
+}
+.flint-select-wrap[data-block] {
   display: flex;
   width: 100%;
 }
-.select:hover:not(:disabled),
-.select[data-open='true'] {
-  border-color: var(--fg-faint);
-  background: var(--bg-editor);
-}
-.select[data-open='true'] {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-dim);
-}
-.select.empty .select-value {
+.flint-select-label {
+  flex: none;
   color: var(--fg-faint);
 }
-.select-prefix {
-  color: var(--fg-faint);
-}
-.select-value {
+.flint-select-value {
   flex: 1;
+  gap: 6px;
+}
+.flint-select-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.select-chevron {
+.flint-select-icon {
   flex: none;
+  display: flex;
+  align-items: center;
+}
+.flint-select-popup [data-slot='select-item'] {
+  padding-block: 4px;
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.flint-select-hint {
+  padding-left: 8px;
   color: var(--fg-faint);
+  font-size: 11px;
 }
 
 /* ---------- run configurations & tests ---------- */

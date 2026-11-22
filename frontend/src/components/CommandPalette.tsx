@@ -6,6 +6,7 @@ import { useWorkspace } from '../store/workspace'
 import { Modal } from './layout/Modal'
 import { useListCursor } from '../lib/useListCursor'
 import { useEventCallback } from '../lib/useEventCallback'
+import { PaletteSearch } from './ui/PaletteSearch'
 
 const RECENT_KEY = 'flint.recentCommands'
 
@@ -69,12 +70,10 @@ export function CommandPalette() {
 
   return (
     <Modal onClose={close} className="quick-open command-palette">
-      <input
+      <PaletteSearch
         autoFocus
-        className="quick-input"
         placeholder="Find action…"
         value={query}
-        spellCheck={false}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={onKeyDown}
       />

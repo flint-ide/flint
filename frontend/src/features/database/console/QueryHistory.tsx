@@ -1,4 +1,4 @@
-import { Button, Checkbox, Input } from '@flint-ide/ui'
+import { Button, Checkbox } from '@flint-ide/ui'
 import { memo, useEffect, useState } from 'react'
 import { Database, errorMessage, historyFilter, type HistoryEntry } from '../../../api/backend'
 import { formatDuration } from '../../../lib/format'
@@ -8,6 +8,7 @@ import { Modal } from '../../../components/layout/Modal'
 import { formatKeys } from '../../../lib/commands'
 import { useListCursor } from '../../../lib/useListCursor'
 import { useEventCallback } from '../../../lib/useEventCallback'
+import { PaletteSearch } from '../../../components/ui/PaletteSearch'
 
 const FILTER_DEBOUNCE_MS = 80
 const LIST_LIMIT = 300
@@ -89,12 +90,10 @@ export function QueryHistory({ connId, connName, driver, database, onInsert, onR
   return (
     <Modal onClose={onClose} className="quick-open query-history">
       <div className="history-search">
-        <Input
+        <PaletteSearch
           autoFocus
-          className="quick-input"
           placeholder={`Filter history of ${connName}…`}
           value={query}
-          spellCheck={false}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
         />

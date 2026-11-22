@@ -1,6 +1,6 @@
 // Flame graph math without the DOM: frame rectangles of an icicle layout (root on
 // top) zoomed into a frame, hit testing, search, value formatting and colors. The
-// canvas in components/profile draws what this computes; the call tree itself is
+// FlameGraph (flameDraw.ts) draws what this computes; the call tree itself is
 // aggregated and trimmed in Go (internal/profiling).
 
 /** One frame of the call tree (profiling.Frame). total includes the children. */
@@ -203,6 +203,25 @@ function parseHex(s: string): number[] | null {
   if (!m) return null
   const n = parseInt(m[1], 16)
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+export interface FlamePalette {
+  from: string
+  to: string
+  runtimeFrom: string
+  runtimeTo: string
+}
+
+/** A frame's fill: one color per package, between from and to (runtime frames: their own pair). */
+export function frameColor(name: string, palette: FlamePalette): string {
+  const t = hash01(packageOf(name))
+  return isRuntimeFrame(name) ? mixHex(palette.runtimeFrom, palette.runtimeTo, t) : mixHex(palette.from, palette.to, t)
+}
+
+/** Opacity of a frame: non-matches fade while searching, zoomed-out ancestors are dimmed. */
+export function frameAlpha(opts: { searching: boolean; matched: boolean; ancestor: boolean }): number {
+  if (opts.searching && !opts.matched) return 0.3
+  return opts.ancestor ? 0.55 : 1
 }
 
 /** Go runtime and system frames, drawn in their own color. */

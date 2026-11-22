@@ -11,6 +11,14 @@
 .fui-added { color: var(--git-added); }
 .fui-removed { color: var(--git-deleted); }
 
+/* An input inside a group (Input with leading/trailing, InputGroup): the group
+   draws the focus ring. WunderUI's rule that is meant to drop the inner one
+   (.focus-ring-within :is(input, textarea):focus-visible) loses on specificity
+   to .focus-ring:is(input, …, [role=combobox]):focus-visible, so both showed. */
+[data-slot='input-group'] :is(input, textarea):focus-visible {
+  box-shadow: none;
+}
+
 /* CommandPalette */
 .fui-palette {
   width: min(560px, 100%);
@@ -110,6 +118,189 @@
 .fui-agent-time { width: 32px; text-align: right; }
 .fui-agent-action { width: 32px; display: flex; justify-content: flex-end; }
 
+/* ListItem: a two-line list row (title line, muted meta line), 1 px divider. */
+.fui-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 5px 10px 6px;
+}
+.fui-list-item[data-divider] { border-bottom: 1px solid var(--border); }
+.fui-list-item[data-compact] { gap: 0; padding: 1px 10px; }
+.fui-list-item[data-clickable] { cursor: pointer; }
+.fui-list-item[data-clickable]:hover { background: var(--bg-hover); }
+.fui-list-item:is([data-active], [data-selected]) { background: var(--bg-active); }
+.fui-list-item:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.fui-list-main { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 20px; white-space: nowrap; }
+.fui-list-leading, .fui-list-badges, .fui-list-trailing, .fui-list-actions { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.fui-list-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--fg); }
+.fui-list-item[data-mono] .fui-list-label { font-family: var(--font-mono); font-size: 12px; }
+.fui-list-item[data-dimmed] .fui-list-label { color: var(--fg-muted); }
+.fui-list-end { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.fui-list-actions { gap: 2px; }
+/* Hover actions: shown on hover, keyboard focus inside or the list's cursor, in the trailing part's place. */
+.fui-list-item[data-actions='hover'] .fui-list-actions { display: none; }
+.fui-list-item[data-actions='hover']:is(:hover, :focus-within, [data-selected]) .fui-list-actions { display: inline-flex; }
+.fui-list-item[data-actions='hover']:is(:hover, :focus-within, [data-selected]) .fui-list-trailing { display: none; }
+.fui-list-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding-left: var(--list-inset, 0px);
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.fui-list-meta-part { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A part whose component rendered nothing takes no slot and no separator. */
+.fui-list-meta-part:empty { display: none; }
+.fui-list-meta-part:not(:empty) ~ .fui-list-meta-part:not(:empty)::before { content: '·'; margin-right: 6px; color: var(--fg-faint); }
+.fui-list-meta .fui-mono { font-size: inherit; }
+.fui-list-meta svg { width: 12px; height: 12px; vertical-align: -2px; }
+
+/* ListGroup: related items behind an accent line. */
+.fui-list-group { border-left: 2px solid var(--accent-dim); }
+.fui-list-group-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; padding: 5px 10px 2px; font-size: 12px; }
+.fui-list-group-head[data-stacked] { flex-direction: column; align-items: stretch; gap: 0; }
+.fui-list-group-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.fui-list-group-meta { flex: none; font-size: 11px; color: var(--fg-muted); }
+.fui-list-group-head[data-stacked] .fui-list-group-meta { flex: auto; }
+
+/* TaskCard: a ListItem head plus notes, an actions bar and sub-rows. Meta,
+   notes and actions line up past the twisty (--list-inset). */
+.fui-task-card { display: flex; flex-direction: column; min-width: 0; }
+.fui-task-card[data-twisty] { --list-inset: 18px; }
+.fui-task-card[data-frame='row'] { padding: 0 0 5px; border-bottom: 1px solid var(--border); }
+/* Card's own 16 px rhythm and text-sm give way to the list's. */
+.fui-task-card[data-frame='card'] { flex: none; gap: 0; padding: 2px 0 5px; font-size: inherit; }
+.fui-task-card[data-frame='bare'] { padding: 0 0 5px; }
+.fui-task-card[draggable='true'] { cursor: grab; }
+.fui-task-card[data-dragging] { opacity: 0.45; }
+.fui-task-card > .fui-list-item { padding-bottom: 1px; }
+.fui-task-note, .fui-task-actions { padding: 1px 10px 0 calc(10px + var(--list-inset, 0px)); font-size: 11px; }
+.fui-task-note { color: var(--fg-muted); overflow-wrap: anywhere; }
+.fui-task-note[data-tone='faint'] { color: var(--fg-faint); }
+.fui-task-note[data-tone='warn'] { color: var(--warn); }
+.fui-task-note[data-tone='danger'] { color: var(--danger); }
+.fui-task-note[data-truncate] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fui-task-note[data-mono] { font-family: var(--font-mono); }
+/* Ghost buttons carry their own 8 px padding: start 4 px in so their text lines up with the meta. */
+.fui-task-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding-top: 3px; padding-left: calc(4px + var(--list-inset, 0px)); }
+.fui-task-sub { display: flex; flex-direction: column; padding-top: 2px; }
+
+/* PanelHeader: the sidebar panel's 32 px title bar. */
+.fui-panel-header {
+  height: 32px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px 0 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+}
+.fui-panel-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A node in the title's place (a repository switcher) keeps its own case and lays out its parts. */
+.fui-panel-title[data-custom] { display: flex; text-transform: none; letter-spacing: normal; }
+.fui-panel-sub {
+  flex: none;
+  padding: 0 12px 6px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* TreeRow: the 22 px row of sidebar lists and trees. In normal flow by default;
+   data-virtual pins it to the top of a virtualised list's sized box (the caller
+   moves it with transform or top). The left padding comes inline from depth. */
+.fui-tree-row {
+  position: relative;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 8px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.fui-tree-row[data-virtual] { position: absolute; top: 0; left: 0; right: 0; }
+.fui-tree-row:hover { background: var(--bg-hover); }
+.fui-tree-row:is([data-active], [data-selected]) { background: var(--bg-active); }
+/* The tree container (tabIndex=0) has focus: the selection is the focused one. */
+:focus .fui-tree-row[data-selected], .fui-tree-row[data-current] { background: var(--selection); }
+.fui-tree-row[data-emphasis='group'] { font-weight: 600; }
+.fui-tree-row[data-emphasis='root'] {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.fui-tree-row[data-editing] { z-index: 1; cursor: default; }
+.fui-twisty {
+  width: 12px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg-faint);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1;
+  text-align: center;
+  cursor: pointer;
+}
+.fui-twisty:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; border-radius: 2px; }
+.fui-tree-leading, .fui-tree-status, .fui-tree-icon { display: inline-flex; align-items: center; flex: none; }
+.fui-tree-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The inline editor takes the label's whole width, and its error popover may leave the row. */
+.fui-tree-row[data-editing] .fui-tree-label { display: flex; flex: 1; overflow: visible; }
+.fui-tree-row[data-file] .fui-tree-label { color: var(--fg-name, var(--fg)); }
+.fui-tree-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--fg-muted);
+}
+.fui-tree-hint b { color: var(--accent); font-weight: 600; }
+.fui-tree-actions { margin-left: auto; display: none; align-items: center; gap: 2px; }
+.fui-tree-badge { margin-left: auto; flex: none; display: inline-flex; }
+/* Hover or keyboard focus inside: the actions take the hint's and the count's place. */
+.fui-tree-row:is(:hover, :focus-within) > .fui-tree-actions, .fui-tree-row[data-actions='always'] > .fui-tree-actions { display: flex; }
+/* Persistent actions sit beside the badge, which then needs no auto margin of its own. */
+.fui-tree-actions + .fui-tree-badge { margin-left: 4px; }
+.fui-tree-row:not([data-actions='always']):is(:hover, :focus-within):has(> .fui-tree-actions) > :is(.fui-tree-hint, .fui-tree-badge) { display: none; }
+/* The kit Checkbox's hit area reaches 8–12 px past the box; in a 22 px row that
+   swallows the twisty and the row above. */
+.fui-tree-row [data-slot='checkbox'] { margin-right: 4px; }
+.fui-tree-row [data-slot='checkbox']::after { inset: -2px; }
+
+/* ViewToolbar: WunderUI's Toolbar as the flat bar over an editor view. */
+.fui-view-toolbar {
+  height: 32px;
+  flex: none;
+  gap: 4px;
+  padding: 0 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg);
+  font-size: 12px;
+}
+
 /* ContextMenu: the invisible point the shared menu opens at. */
 .fui-menu-anchor {
   position: fixed;
@@ -184,3 +375,163 @@
   width: 14px;
   height: 14px;
 }
+
+/* IDE density for WunderUI's form, empty state, table and settings parts (their
+   Tailwind sizes are layered, so these unlayered rules win). Forms: 12 px muted
+   labels 4 px above the control and 10 px between fields, like the dialogs' .form. */
+[data-density='ide'] [data-slot='form'] { gap: 10px; }
+[data-density='ide'] [data-slot='fieldset'] { gap: 10px; padding: 12px; }
+[data-density='ide'] :is([data-slot='field-label'], [data-slot='input-field'] > div > label, [data-slot='textarea-field'] > label) {
+  margin-bottom: 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--fg-muted);
+}
+[data-density='ide'] :is([data-slot='field'], [data-slot='input-field'], [data-slot='textarea-field']) { gap: 4px; }
+[data-density='ide'] :is([data-slot='field-description'], [data-slot='field-error']) { font-size: 11.5px; }
+/* EmptyState in an editor area or a panel: a tighter frame, smaller icon disc. */
+[data-density='ide'] [data-slot='empty-state'] { gap: 8px; padding: 24px 16px; }
+[data-density='ide'] [data-slot='empty-state'] > div:first-child:has(svg) { width: 36px; height: 36px; }
+[data-density='ide'] [data-slot='empty-state'] > div:first-child svg { width: 18px; height: 18px; }
+[data-density='ide'] [data-slot='empty-state'] p { font-size: 13px; }
+[data-density='ide'] [data-slot='empty-state'] p + p { font-size: 12px; }
+/* Tables: 12 px text, 24 px header (rows already use --row-py). */
+[data-density='ide'] [data-slot='table'] { font-size: 12px; }
+[data-density='ide'] [data-slot='table-head'] { height: var(--control-sm); font-size: 11px; color: var(--fg-muted); }
+/* SettingsRow: 13 px title, 11.5 px description, 16 px gap. */
+[data-density='ide'] [data-slot='settings-row'] { gap: 16px; padding-block: 6px; }
+[data-density='ide'] [data-slot='settings-row'] p:first-child { font-size: 13px; font-weight: 400; }
+[data-density='ide'] [data-slot='settings-row'] p + p { font-size: 11.5px; }
+/* Collapsible with an appearance (row/inline): the trigger at row height. */
+[data-density='ide'] [data-slot='collapsible-trigger'][data-appearance] { padding-block: 3px; font-size: 12px; }
+
+/* StatTile: a small Card with one figure. Card's spacing variables set the padding. */
+.fui-stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; }
+.fui-stat-tile {
+  --card-spacing: 6px;
+  --card-gap: 2px;
+  min-width: 0;
+  padding-inline: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  box-shadow: none;
+  font-size: 11px;
+}
+.fui-stat-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; color: var(--fg-muted); }
+.fui-stat-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fui-stat-value { font-size: 14px; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fui-stat-sub { color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A Meter as a thin bar under a row or tile. */
+.fui-meter-thin { display: block; }
+.fui-meter-thin [data-slot='meter-track'] { height: 3px; }
+
+/* FlameGraph: the scroller, the canvas and the invisible box the tooltip anchors to. */
+.fui-flame { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; outline: none; }
+.fui-flame-stage { position: relative; }
+.fui-flame-canvas { display: block; cursor: pointer; }
+.fui-flame-anchor { position: absolute; pointer-events: none; }
+.fui-flame-tip { display: flex; flex-direction: column; gap: 2px; font-size: 12px; text-align: left; }
+.fui-flame-tip-name { font-family: var(--font-mono); word-break: break-all; }
+.fui-flame-tip-file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.7; }
+.fui-flame-tip-values { display: grid; grid-template-columns: auto auto 1fr; gap: 1px 8px; margin-top: 4px; }
+.fui-flame-tip-values b { font-weight: 600; text-align: right; }
+.fui-flame-tip-hint { margin-top: 4px; font-size: 11px; opacity: 0.7; }
+
+/* Chat (ui/src/chat): the agent transcript and composer. Only layout and the
+   chat's own surfaces; Card, Collapsible, Alert, Meter and Textarea draw the rest. */
+.fui-chat { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg-editor); }
+.fui-chat-header { flex: none; gap: 8px; padding-inline: 10px; }
+.fui-chat-agent { font-weight: 600; color: var(--accent); white-space: nowrap; }
+.fui-chat-usage { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--fg-muted); white-space: nowrap; cursor: default; }
+.fui-chat-context { flex-wrap: nowrap; gap: 0; }
+.fui-chat-context [data-slot='meter-track'] { width: 36px; height: 3px; background: var(--border); }
+.fui-chat-context [data-slot='meter-indicator'] { background: var(--ok); }
+.fui-chat-context[data-level='warn'] [data-slot='meter-indicator'] { background: var(--accent); }
+.fui-chat-context[data-level='full'] [data-slot='meter-indicator'] { background: var(--danger); }
+/* A strip across the chat, not a floating box. */
+.fui-chat-banner { flex: none; border-width: 0 0 1px; border-radius: 0; padding: 4px 10px; font-size: 12px; }
+
+.fui-chat-plan { flex: none; max-height: 30%; overflow-y: auto; border-bottom: 1px solid var(--border); }
+.fui-chat-plan-head { border-radius: 0; padding-inline: 12px; }
+.fui-chat-plan-title { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
+.fui-chat-plan-body > div > div { padding: 0 12px 6px; }
+.fui-chat-plan-list { margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--fg); }
+.fui-chat-plan-list li { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+.fui-chat-plan-list svg { width: 12px; height: 12px; flex: none; }
+.fui-chat-plan-list li[data-status='completed'] { color: var(--fg-muted); text-decoration: line-through; }
+.fui-chat-plan-list li[data-status='in_progress'] { color: var(--accent); }
+
+.fui-chat-log { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.fui-chat-msg { font-size: 13px; line-height: 1.5; }
+.fui-chat-msg[data-role='user'] { align-self: flex-end; max-width: 88%; padding: 6px 10px; border-radius: 10px 10px 2px 10px; background: var(--bg-active); }
+.fui-chat-msg[data-role='thought'] { color: var(--fg-muted); font-style: italic; border-left: 2px solid var(--border); padding-left: 8px; }
+.fui-chat-error { font-family: var(--font-mono); font-size: 12px; user-select: text; -webkit-user-select: text; white-space: pre-wrap; }
+.fui-chat-from { font-size: 11px; margin-bottom: 2px; color: var(--fg-muted); }
+.fui-chat-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.fui-chat-notice { display: flex; flex-direction: column; gap: 6px; font-size: 11px; text-align: center; color: var(--fg-muted); }
+.fui-chat-notice[data-variant='divider'] { padding-bottom: 6px; }
+.fui-chat-notice[data-variant='placeholder'] { padding: 12px; font-size: 12px; text-align: left; }
+.fui-chat-working { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-muted); }
+.fui-chat-working svg { width: 12px; height: 12px; }
+
+/* ChatMarkdown */
+.fui-chat-md { user-select: text; -webkit-user-select: text; overflow-wrap: anywhere; }
+.fui-chat-md code { background: var(--bg-raised); padding: 0 4px; border-radius: 3px; font-family: var(--font-mono); font-size: 0.92em; }
+.fui-chat-code { margin: 4px 0; padding: 8px 10px; overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-raised); font: 12px/1.45 var(--font-mono); }
+.fui-chat-gap { height: 6px; }
+.fui-chat-heading { font-weight: 700; margin-top: 4px; }
+.fui-chat-bullet { display: flex; gap: 6px; padding-left: 4px; }
+.fui-chat-bullet > span:first-child { flex: none; }
+
+/* ToolCall: a 6 px outlined card with a row-height head. */
+.fui-tool { --card-spacing: 0px; --card-gap: 0px; border-radius: 6px; font-size: 12px; overflow: visible; }
+.fui-tool-head { width: 100%; padding-inline: 7px; border-radius: 5px; font-size: 12px; font-weight: 400; }
+.fui-tool-head[data-static] { display: flex; align-items: center; gap: 8px; padding: 4px 8px; }
+.fui-tool-head [data-slot='collapsible-trigger'] svg, .fui-tool-head > svg { width: 14px; height: 14px; }
+.fui-tool-kind { width: 14px; height: 14px; flex: none; color: var(--fg-muted); }
+.fui-tool-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.fui-tool-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
+.fui-tool-status { width: 12px; height: 12px; flex: none; color: var(--accent); }
+.fui-tool-status[data-status='completed'] { color: var(--ok); }
+.fui-tool-status[data-status='failed'] { color: var(--danger); }
+.fui-tool-status[data-status='cancelled'] { color: var(--fg-muted); }
+.fui-tool-paths { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 8px 4px 30px; }
+.fui-tool-details > div > div { display: flex; flex-direction: column; gap: 6px; padding: 0 8px 8px; color: var(--fg); }
+.fui-tool-pre {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--bg-editor);
+  font: 11px/1.45 var(--font-mono);
+  white-space: pre-wrap;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.fui-tool-pre[data-muted] { color: var(--fg-muted); }
+.fui-tool-diff pre { margin: 4px 0 0; max-height: 260px; overflow: auto; padding: 6px 8px; border-radius: 4px; background: var(--bg-editor); font: 11px/1.45 var(--font-mono); user-select: text; -webkit-user-select: text; }
+.fui-tool-diff [data-kind='add'] { color: var(--ok); background: var(--diff-ins-bg); }
+.fui-tool-diff [data-kind='del'] { color: var(--danger); background: var(--diff-del-bg); }
+.fui-tool-diff [data-kind='sep'] { color: var(--fg-faint); }
+.fui-chat-file { height: auto; padding: 0; font: 11px var(--font-mono); text-align: left; }
+
+/* ChatPermission: accent while it waits for an answer, quiet once settled. */
+.fui-chat-permission { --card-spacing: 10px; --card-gap: 6px; padding-block: 8px 0; border-radius: 8px; font-size: 12px; box-shadow: none; outline: 1px solid var(--accent); background: var(--accent-dim); }
+.fui-chat-permission [data-slot='card-header'] { align-items: center; gap: 8px; }
+.fui-chat-permission [data-slot='card-title'] { font-size: 12px; }
+.fui-chat-permission [data-slot='card-leading'] { display: flex; }
+.fui-chat-permission[data-settled] { outline-color: var(--border); background: var(--bg); opacity: 0.8; }
+.fui-chat-permission-footer { justify-content: flex-start; flex-wrap: wrap; gap: 6px; padding-top: 0; padding-bottom: 8px; }
+
+/* ChatComposer and the changed-files strip over it. */
+.fui-chat-changed { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 4px 12px; border-top: 1px solid var(--border); font-size: 11px; }
+.fui-chat-composer { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border); }
+.fui-chat-composer .fui-chat-chips { margin-top: 0; }
+.fui-chat-composer textarea { min-height: 56px; max-height: 200px; user-select: text; -webkit-user-select: text; }
+.fui-chat-composer-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+/* Items keep their height: the log scrolls instead of squeezing cards (Card clips its overflow). */
+.fui-chat-log > * { flex: none; }
+.fui-tool-head[data-static] .fui-tool-row { flex: 1; }
+.fui-chat-header label, .fui-chat-header label * { font-size: 12px; }

@@ -7,8 +7,9 @@ import { confirmAction, showToast } from '../../store/dialog'
 import { Modal } from '../layout/Modal'
 import { NewWorktreeForm } from './NewWorktreeForm'
 import { Icon } from '../ui/Icon'
-import { Button, IconButton, Input } from '@flint-ide/ui'
+import { Button, FormActions, IconButton, Input } from '@flint-ide/ui'
 import { ExternalLink, X } from '@flint-ide/ui/icons'
+import { PaletteSearch } from '../ui/PaletteSearch'
 
 /** IntelliJ-like branches popup: filter, checkout, new branch, worktrees, remote ops. */
 export function BranchesPopup({ onClose, initialMode = 'list' }: { onClose: () => void; initialMode?: BranchesMode }) {
@@ -105,15 +106,14 @@ export function BranchesPopup({ onClose, initialMode = 'list' }: { onClose: () =
         >
           <div className="modal-title">New branch from {status?.branch || 'HEAD'}</div>
           <Input autoFocus value={newBranch} placeholder="feature/name" spellCheck={false} onChange={(e) => setNewBranch(e.target.value)} />
-          <div className="form-actions">
-            <span className="spacer" />
+          <FormActions align="end">
             <Button type="button" variant="plain" onClick={() => setMode('list')}>Back</Button>
             <Button type="submit" variant="primary" disabled={!newBranch.trim()}>Create &amp; checkout</Button>
-          </div>
+          </FormActions>
         </form>
       ) : (
         <>
-          <input autoFocus className="quick-input" placeholder="Search branches and worktrees" value={filter} spellCheck={false} onChange={(e) => setFilter(e.target.value)} />
+          <PaletteSearch autoFocus placeholder="Search branches and worktrees" value={filter} onChange={(e) => setFilter(e.target.value)} />
           <div className="quick-list">
             <PopupAction label="＋ New Branch…" onClick={() => setMode('new-branch')} />
             <PopupAction label="＋ New Worktree…" hint="separate folder + terminal for an agent" onClick={() => setMode('new-worktree')} />

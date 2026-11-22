@@ -7,7 +7,7 @@ import { usePersistentNumber } from '../../lib/usePersistentNumber'
 import { Splitter } from '../layout/Splitter'
 import { RerunIcon, StopIcon } from '../run/RunWidget'
 import { formatKeys } from '../../lib/commands'
-import { IconButton } from '@flint-ide/ui'
+import { IconButton, Input, ViewToolbar, ToolbarSeparator } from '@flint-ide/ui'
 
 /** The debug tab: stepping toolbar, frames, variables and the console. */
 export function DebugView() {
@@ -20,21 +20,21 @@ export function DebugView() {
 
   return (
     <div className="debug-view">
-      <div className="run-toolbar">
+      <ViewToolbar aria-label="Debug">
         <IconButton variant="ghost" size="sm" aria-label="Restart" title="Restart" onClick={() => void restartDebug()}>
           <RerunIcon />
         </IconButton>
         <IconButton variant="ghost" size="sm" aria-label="Stop" title={`Stop (${formatKeys('Mod+F2')})`} disabled={!live && session.status !== 'starting'} onClick={() => void stopDebug()} className="run-stop">
           <StopIcon />
         </IconButton>
-        <span className="debug-sep" />
+        <ToolbarSeparator />
         <StepButton title="Resume (F9)" disabled={!paused} onClick={() => void debugStep('continue')}>▶︎</StepButton>
         <StepButton title="Pause" disabled={session.status !== 'running'} onClick={() => void debugStep('pause')}>❚❚</StepButton>
         <StepButton title="Step Over (F8)" disabled={!paused} onClick={() => void debugStep('next')}>↷</StepButton>
         <StepButton title="Step Into (F7)" disabled={!paused} onClick={() => void debugStep('stepIn')}>↓</StepButton>
         <StepButton title={`Step Out (${formatKeys('Shift+F8')})`} disabled={!paused} onClick={() => void debugStep('stepOut')}>↑</StepButton>
         <span className={`run-status ${statusClass(session)}`}>{statusText(session)}</span>
-      </div>
+      </ViewToolbar>
       <div className="run-body" ref={body}>
         <div className="debug-side" style={{ width }}>
           <Frames session={session} />
@@ -153,7 +153,8 @@ function Console({ session }: { session: DebugSession }) {
   return (
     <div className="debug-console">
       <pre ref={out}>{output}</pre>
-      <input
+      <Input
+        size="sm"
         className="debug-eval"
         placeholder={session.status === 'paused' ? 'Evaluate expression (↵)' : 'Pause the program to evaluate in a frame'}
         spellCheck={false}

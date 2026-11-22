@@ -10,6 +10,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { Input, Separator } from '@flint-ide/ui'
 import { modKey } from '../../lib/platform'
 import { useListCursor } from '../../lib/useListCursor'
 import { useEventCallback } from '../../lib/useEventCallback'
@@ -19,9 +20,10 @@ import { noteMenuReturn, returnFocusIfLost } from '../../lib/returnFocus'
 // The one popover menu used across Flint (title bar, "+" menu, selects, settings,
 // right-click context menus via store/contextMenu). A menu without a filter box is
 // the UI kit's DropdownMenu (AppMenu.tsx); a long or searchable one is Menu below,
-// a list with a filter box on top, styled like the kit's (Base UI menus have no
-// text input). Both render in a portal with fixed positioning, so they never get
-// clipped by scrolling tab strips or panels.
+// a list with the kit's Input as its filter box on top, styled like the kit's menu
+// (Base UI menus have no text input, and its Combobox is a single-value picker:
+// no trailing row actions, several checked rows or alt/⌘ on Enter). Both render in a portal
+// with fixed positioning, so they never get clipped by scrolling tab strips or panels.
 
 export type DropdownItem =
   | {
@@ -70,7 +72,8 @@ export interface TriggerProps {
   'data-open': boolean
 }
 
-const AUTO_SEARCH_AT = 9
+/** A list this long gets a filter box unless `searchable` says otherwise. */
+export const AUTO_SEARCH_AT = 9
 
 export function Dropdown({ trigger, items, align = 'start', searchable, placeholder = 'Filter…', minWidth = 200, onOpen, emptyText = 'Nothing here' }: DropdownProps) {
   const [open, setOpen] = useState(false)
@@ -263,19 +266,22 @@ export function Menu({ anchor, atPoint, items, align, searchable, placeholder, m
       onKeyDown={onKeyDown}
     >
       {withSearch && (
-        <input
-          className="dd-search"
-          autoFocus
-          value={query}
-          placeholder={placeholder}
-          spellCheck={false}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        <div className="dd-search">
+          <Input
+            size="sm"
+            autoFocus
+            value={query}
+            placeholder={placeholder}
+            aria-label={placeholder}
+            spellCheck={false}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
       )}
       <div className="dd-items" ref={listRef}>
         {visible.length === 0 && <div className="dd-empty">{query ? 'No matches' : emptyText}</div>}
         {visible.map((it, i) => {
-          if (it.type === 'separator') return <div key={`s${i}`} className="dd-separator" />
+          if (it.type === 'separator') return <Separator key={`s${i}`} className="dd-separator" />
           if (it.type === 'section') return <div key={`h${i}`} className="dd-section">{it.label}</div>
           return <MenuRow key={it.key ?? `${it.label}${i}`} item={it} index={i} current={i === cursor} onHover={hover} onPick={choose} />
         })}

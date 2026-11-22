@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Checkbox, IconButton, Input } from '@flint-ide/ui'
+import { Button, Checkbox, Form, FormActions, IconButton, Input, TreeRow, TreeSection } from '@flint-ide/ui'
 import { X } from '@flint-ide/ui/icons'
 import { useGit } from '../../store/git'
 import {
@@ -25,7 +25,6 @@ export function StashSection() {
   const root = useGit((s) => s.root)
   const refsVersion = useGit((s) => s.refsVersion)
   const { stashes, files, busy, dialogOpen } = useStash()
-  const [collapsed, setCollapsed] = useState(false)
 
   // Stashing moves refs/stash, which bumps refsVersion (git:changed).
   useEffect(() => void loadStashes(), [root, refsVersion])
@@ -33,24 +32,19 @@ export function StashSection() {
   return (
     <>
       {stashes.length > 0 && (
-        <div>
-          <div className="tree-row static group-row" onClick={() => setCollapsed(!collapsed)}>
-            <span className="twisty">{collapsed ? '▸' : '▾'}</span>
-            <span className="group-title">Stashes</span>
-            <span className="badge">{stashes.length}</span>
-          </div>
-          {!collapsed &&
-            stashes.map((s) => (
-              <div key={s.hash}>
-                <div
-                  className="tree-row static change-row stash-row"
-                  title={`stash@{${s.index}} · ${s.hash.slice(0, 7)} · ${formatDateTime(s.time)}${s.untracked ? '\nincludes untracked files' : ''}`}
-                  onClick={() => void toggleStashFiles(s.hash)}
-                >
-                  <span className="twisty">{files[s.hash] ? '▾' : '▸'}</span>
-                  <span className="file-name">{stashLabel(s.message)}</span>
-                  <span className="muted path-hint">{formatDateTime(s.time)}</span>
-                  <span className="row-actions" onClick={(e) => e.stopPropagation()}>
+        <TreeSection title="Stashes" count={stashes.length}>
+          {stashes.map((s) => (
+            <div key={s.hash}>
+              <TreeRow
+                depth={1}
+                twisty={files[s.hash] ? 'open' : 'closed'}
+                title={`stash@{${s.index}} · ${s.hash.slice(0, 7)} · ${formatDateTime(s.time)}${s.untracked ? '\nincludes untracked files' : ''}`}
+                onClick={() => void toggleStashFiles(s.hash)}
+                file
+                label={stashLabel(s.message)}
+                hint={formatDateTime(s.time)}
+                actions={
+                  <>
                     <Button size="sm" variant="ghost" disabled={busy} title="Apply and keep the stash" onClick={() => void applyStash(s.hash)}>
                       Apply
                     </Button>
@@ -58,23 +52,23 @@ export function StashSection() {
                       Pop
                     </Button>
                     <IconButton size="sm" variant="ghost" aria-label="Drop" disabled={busy} title="Drop" onClick={() => void dropStash(s.hash)}><X /></IconButton>
-                  </span>
-                </div>
-                {files[s.hash]?.map((f) => (
-                  <div
-                    key={f.path}
-                    className="tree-row static change-row indent-2"
-                    title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}
-                    onClick={() => openStashFileDiff(s.hash, f)}
-                  >
-                    <span className={`change-kind ${f.kind}`}>{KIND_LETTER[f.kind] ?? '?'}</span>
-                    <span className={`file-name change-${f.kind}`}>{f.path.split('/').pop()}</span>
-                    <span className="muted path-hint">{f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : ''}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-        </div>
+                  </>
+                }
+              />
+              {files[s.hash]?.map((f) => (
+                <TreeRow
+                  key={f.path}
+                  depth={2}
+                  title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}
+                  onClick={() => openStashFileDiff(s.hash, f)}
+                  icon={<span className={`change-kind ${f.kind}`}>{KIND_LETTER[f.kind] ?? '?'}</span>}
+                  label={<span className={`change-${f.kind}`}>{f.path.split('/').pop()}</span>}
+                  hint={f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : ''}
+                />
+              ))}
+            </div>
+          ))}
+        </TreeSection>
       )}
       {dialogOpen && <StashDialog busy={busy} />}
     </>
@@ -93,29 +87,28 @@ function StashDialog({ busy }: { busy: boolean }) {
   const submit = () => void stashChanges(message, untracked)
   return (
     <Modal title="Stash Changes" onClose={closeStashDialog}>
-      <div className="form">
-        <label>
-          Message
-          <Input
-            autoFocus
-            value={message}
-            placeholder="Optional"
-            spellCheck={false}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !busy && submit()}
-          />
-        </label>
-        <label className="check">
-          <Checkbox checked={untracked} onCheckedChange={setUntracked} /> Include untracked files
-        </label>
-        <div className="form-actions">
-          <span className="spacer" />
-          <Button variant="plain" onClick={closeStashDialog}>Cancel</Button>
-          <Button variant="primary" disabled={busy} onClick={submit}>
+      <Form
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!busy) submit()
+        }}
+      >
+        <Input
+          label="Message"
+          autoFocus
+          value={message}
+          placeholder="Optional"
+          spellCheck={false}
+          onChange={(e) => setMessage(e.target.value)}
+        />
+        <Checkbox label="Include untracked files" checked={untracked} onCheckedChange={setUntracked} />
+        <FormActions align="end">
+          <Button type="button" variant="plain" onClick={closeStashDialog}>Cancel</Button>
+          <Button type="submit" variant="primary" disabled={busy}>
             {busy ? 'Stashing…' : 'Stash'}
           </Button>
-        </div>
-      </div>
+        </FormActions>
+      </Form>
     </Modal>
   )
 }

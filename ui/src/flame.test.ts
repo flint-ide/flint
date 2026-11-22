@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  fitLabel, formatValue, frameAt, hash01, hitTest, isRuntimeFrame, layoutDepth, layoutFlame, mixHex, packageOf, percent,
+  fitLabel, formatValue, frameAlpha, frameAt, frameColor, hash01, hitTest, isRuntimeFrame, layoutDepth, layoutFlame, mixHex, packageOf, percent,
   searchFrames, shortName, sortTop, type FlameFrame,
 } from './flame'
 
@@ -119,5 +119,21 @@ describe('sortTop', () => {
     assert.deepEqual(sortTop(rows, 'cum').map((r) => r.name), ['c', 'a', 'b'])
     assert.deepEqual(sortTop(rows, 'name').map((r) => r.name), ['a', 'b', 'c'])
     assert.equal(rows[0].name, 'b')
+  })
+})
+
+describe('frameColor and frameAlpha', () => {
+  const palette = { from: '#000000', to: '#ffffff', runtimeFrom: '#ff0000', runtimeTo: '#ff0000' }
+
+  it('gives a package one stable color, runtime frames their own pair', () => {
+    assert.equal(frameColor('flint/x.A', palette), frameColor('flint/x.B', palette))
+    assert.equal(frameColor('runtime.gopark', palette), '#ff0000')
+    assert.match(frameColor('flint/x.A', palette), /^#[0-9a-f]{6}$/)
+  })
+
+  it('fades non-matches while searching and dims ancestors', () => {
+    assert.equal(frameAlpha({ searching: true, matched: false, ancestor: false }), 0.3)
+    assert.equal(frameAlpha({ searching: true, matched: true, ancestor: true }), 0.55)
+    assert.equal(frameAlpha({ searching: false, matched: false, ancestor: false }), 1)
   })
 })

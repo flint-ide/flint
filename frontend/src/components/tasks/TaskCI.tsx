@@ -4,23 +4,18 @@ import { checksSummary } from '../../lib/prReview'
 import { ciKey, useCI } from '../../store/ci'
 import { FixWithAgentButton } from '../github/CIStatus'
 import { AddressReviewButton } from '../github/ReviewAgent'
-
-const LABEL = { failure: '✗ CI', pending: '● CI', success: '✓ CI' } as const
+import type { TaskCardCI } from '@flint-ide/ui'
 
 function useTaskCI(t: TaskView) {
   return useCI((s) => (t.pullRequest && !t.merged ? (s.entries[ciKey(t.worktree, t.branch)] ?? null) : null))
 }
 
-/** The CI state of a task's pull request, in its row. */
-export function TaskCI({ t }: { t: TaskView }) {
+/** The CI state of a task's pull request, for its card's processing badge; null without a pull request or checks. */
+export function useTaskCIBadge(t: TaskView): TaskCardCI | null {
   const entry = useTaskCI(t)
   if (!entry?.data?.pr || entry.state === 'none') return null
   const failed = entry.data.checks.filter((c) => c.state === 'failure').map(checkName)
-  return (
-    <span className={`pr-ci ${entry.state}`} title={[checksSummary(entry.data.counts), ...failed.map((n) => `✗ ${n}`)].join('\n')}>
-      {LABEL[entry.state]}
-    </span>
-  )
+  return { state: entry.state, title: [checksSummary(entry.data.counts), ...failed.map((n) => `✗ ${n}`)].join('\n') }
 }
 
 /** Fix with agent for a task whose pull request fails CI: the draft goes to the task's chat. */

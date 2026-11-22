@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Input, RadioGroup, RadioGroupItem } from '@flint-ide/ui'
+import { Alert, Button, Form, FormActions, Input, OptionRow, OptionRowGroup } from '@flint-ide/ui'
 import { trustedRoots, validAgentName } from '../../lib/agentDefs'
 import { rootLabels } from '../../lib/workspaceRoots'
 import { activeRoot } from '../../store/activeRoot'
@@ -37,50 +37,40 @@ export function AgentDefDialog() {
   }
   return (
     <Modal title="New Agent" onClose={closeAgentDefDialog} className="new-prompt">
-      <form
-        className="form"
+      <Form
         onSubmit={(e) => {
           e.preventDefault()
           void create()
         }}
       >
-        <label>
-          Name (used wherever an agent name is)
-          <Input
-            autoFocus
-            value={name}
-            spellCheck={false}
-            placeholder="reviewer"
-            onChange={(e) => {
-              setName(e.target.value.trim())
-              setError('')
-            }}
+        <Input
+          autoFocus
+          label="Name (used wherever an agent name is)"
+          value={name}
+          spellCheck={false}
+          placeholder="reviewer"
+          error={name && !valid ? 'Lowercase letters, digits and - only, starting with a letter (at most 32).' : undefined}
+          onChange={(e) => {
+            setName(e.target.value.trim())
+            setError('')
+          }}
+        />
+        <OptionRowGroup value={personal ? 'personal' : 'repository'} onValueChange={(v) => setPersonal(v === 'personal')} aria-label="Where to create the agent">
+          <OptionRow
+            value="repository"
+            disabled={projects.length === 0}
+            title="Repository"
+            description={projects.length === 0 ? 'Open and trust a folder to create a repository agent.' : '.flint/agents, shared with the team through the repository'}
           />
-        </label>
-        {name && !valid && <span className="form-status error">Lowercase letters, digits and - only, starting with a letter (at most 32).</span>}
-        <RadioGroup value={personal ? 'personal' : 'repository'} onValueChange={(v) => setPersonal(v === 'personal')}>
-          <label className="check">
-            <RadioGroupItem value="repository" disabled={projects.length === 0} />
-            Repository: .flint/agents, shared with the team through the repository
-          </label>
-          {!personal && projects.length > 1 && (
-            // Arrow keys open the select; inside the radio group they would also move to the next radio.
-            <span onKeyDown={(e) => e.stopPropagation()}>
-              <Select block value={root} options={projects.map((r, i) => ({ value: r, label: labels[i] ?? r }))} onChange={setRoot} />
-            </span>
-          )}
-          {projects.length === 0 && <span className="muted">Open and trust a folder to create a repository agent.</span>}
-          <label className="check">
-            <RadioGroupItem value="personal" />
-            Personal: only you, in every folder
-          </label>
-        </RadioGroup>
-        {error && <span className="form-status error">{error}</span>}
-        <div className="form-actions">
+          <OptionRow value="personal" title="Personal" description="Only you, in every folder" />
+        </OptionRowGroup>
+        {!personal && projects.length > 1 && <Select block value={root} options={projects.map((r, i) => ({ value: r, label: labels[i] ?? r }))} onChange={setRoot} />}
+        {error && <Alert size="inline" variant="negative">{error}</Alert>}
+        <FormActions align="start">
           <Button type="button" variant="plain" onClick={closeAgentDefDialog}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={!valid}>Create and Open</Button>
-        </div>
-      </form>
+        </FormActions>
+      </Form>
     </Modal>
   )
 }

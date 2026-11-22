@@ -9,7 +9,7 @@ import { displayPath, labelOf } from '../../lib/workspaceRoots'
 import { fileKey, matchKey } from '../../lib/replaceTargets'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
-import { Button, Input } from '@flint-ide/ui'
+import { Badge, Button, Checkbox, Input, InputGroup, InputGroupAddon, PanelHeader, TreeRow } from '@flint-ide/ui'
 
 const basename = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 const dirname = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
@@ -88,12 +88,10 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
 
   return (
     <div className="panel">
-      <div className="panel-header">
-        <span className="panel-title">Search</span>
-      </div>
+      <PanelHeader title="Search" />
       <div className="search-form">
-        <div className="search-input">
-          <input
+        <InputGroup className="search-input">
+          <Input
             ref={input}
             value={params.query}
             placeholder={roots.length > 1 ? 'Search in workspace' : 'Search in folder'}
@@ -101,31 +99,39 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
             onChange={(e) => setParams({ query: e.target.value })}
             onKeyDown={(e) => e.key === 'Enter' && roots.length > 0 && void run(roots)}
           />
-          <Toggle on={params.caseSensitive} title="Match case" onClick={() => setParams({ caseSensitive: !params.caseSensitive })}>Aa</Toggle>
-          <Toggle on={params.wholeWord} title="Whole word" onClick={() => setParams({ wholeWord: !params.wholeWord })}>W</Toggle>
-          <Toggle on={params.regex} title="Regular expression" onClick={() => setParams({ regex: !params.regex })}>.*</Toggle>
-          <Toggle on={showFilters} title="File filters" onClick={() => setShowFilters(!showFilters)}>⋯</Toggle>
-          <Toggle on={params.replaceOn} title={`Replace (${formatKeys('Mod+Shift+R')})`} onClick={() => setParams({ replaceOn: !params.replaceOn })}>⇄</Toggle>
-        </div>
+          <InputGroupAddon>
+            <Toggle on={params.caseSensitive} title="Match case" onClick={() => setParams({ caseSensitive: !params.caseSensitive })}>Aa</Toggle>
+            <Toggle on={params.wholeWord} title="Whole word" onClick={() => setParams({ wholeWord: !params.wholeWord })}>W</Toggle>
+            <Toggle on={params.regex} title="Regular expression" onClick={() => setParams({ regex: !params.regex })}>.*</Toggle>
+            <Toggle on={showFilters} title="File filters" onClick={() => setShowFilters(!showFilters)}>⋯</Toggle>
+            <Toggle on={params.replaceOn} title={`Replace (${formatKeys('Mod+Shift+R')})`} onClick={() => setParams({ replaceOn: !params.replaceOn })}>⇄</Toggle>
+          </InputGroupAddon>
+        </InputGroup>
         {params.replaceOn && (
-          <div className="search-input search-replace">
-            <input
-              value={params.replace}
-              placeholder={params.regex ? 'Replace ($1, ${name} for groups)' : 'Replace'}
-              spellCheck={false}
-              onChange={(e) => setParams({ replace: e.target.value })}
-              onKeyDown={(e) => e.key === 'Enter' && modKey(e) && void useSearch.getState().replaceAll(roots)}
-            />
-            <Button
-              size="sm"
-              variant="plain"
-              className="replace-all"
-              title={`Replace every ticked match (${formatKeys('Mod+Enter')})`}
-              disabled={replacing || !!runningId || matches.length === 0}
-              onClick={() => void useSearch.getState().replaceAll(roots)}
-            >
-              {replacing ? 'Replacing…' : 'Replace all'}
-            </Button>
+          // The button sits outside the group: the kit dims and disables a whole group
+          // that contains a disabled control (:has(:disabled)), field included.
+          <div className="search-replace">
+            <InputGroup className="search-input">
+              <Input
+                value={params.replace}
+                placeholder={params.regex ? 'Replace ($1, ${name} for groups)' : 'Replace'}
+                spellCheck={false}
+                onChange={(e) => setParams({ replace: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && modKey(e) && void useSearch.getState().replaceAll(roots)}
+              />
+            </InputGroup>
+            {/* Disabled kit buttons ignore the pointer, so the hint lives on a wrapper. */}
+            <span title={`Replace every ticked match (${formatKeys('Mod+Enter')})`}>
+              <Button
+                size="sm"
+                variant="plain"
+                className="replace-all"
+                disabled={replacing || !!runningId || matches.length === 0}
+                onClick={() => void useSearch.getState().replaceAll(roots)}
+              >
+                {replacing ? 'Replacing…' : 'Replace all'}
+              </Button>
+            </span>
           </div>
         )}
         {lastReplace?.undoable && (
@@ -138,10 +144,9 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
         )}
         {scoped && (
           <div className="search-scope">
-            <span className="chip">
+            <Badge size="sm" badgeStyle="light_border" onRemove={() => setParams({ scope: '', include: '' })} removeLabel="Search the whole workspace">
               in {labelOf(roots, params.scope)}
-              <button className="icon" title="Search the whole workspace" onClick={() => setParams({ scope: '', include: '' })}>×</button>
-            </span>
+            </Badge>
           </div>
         )}
         {showFilters && (
@@ -167,28 +172,36 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
             const style = { transform: `translateY(${vi.start}px)` }
             if (row.kind === 'file') {
               return (
-                <div key={`f:${row.path}`} className="tree-row search-file" style={style} onClick={() => toggleFile(row.path)} title={row.path}>
-                  <span className="twisty">{collapsed.has(row.path) ? '▸' : '▾'}</span>
-                  {params.replaceOn && <Tick on={!excluded.has(row.path)} onToggle={() => useSearch.getState().toggleExcluded(row.path)} />}
-                  <FileIcon name={basename(row.path)} />
-                  <span className="file-name">{basename(row.path)}</span>
-                  <span className="muted path-hint">{dirname(displayPath(roots, row.path))}</span>
-                  <span className="badge">{row.count}</span>
-                </div>
+                <TreeRow
+                  key={`f:${row.path}`}
+                  virtual
+                  style={style}
+                  file
+                  twisty={collapsed.has(row.path) ? 'closed' : 'open'}
+                  leading={params.replaceOn && <Tick on={!excluded.has(row.path)} onToggle={() => useSearch.getState().toggleExcluded(row.path)} />}
+                  icon={<FileIcon name={basename(row.path)} />}
+                  label={basename(row.path)}
+                  hint={dirname(displayPath(roots, row.path))}
+                  badge={row.count}
+                  onClick={() => toggleFile(row.path)}
+                  title={row.path}
+                />
               )
             }
             const m = row.match
+            const skipped = params.replaceOn && (excluded.has(matchKey(m)) || excluded.has(fileKey(m)))
             return (
-              <div
+              <TreeRow
                 key={`m:${m.root}/${m.path}:${m.line}:${vi.index}`}
-                className={`tree-row search-match${params.replaceOn && (excluded.has(matchKey(m)) || excluded.has(fileKey(m))) ? ' excluded' : ''}`}
+                virtual
+                className={`search-match${skipped ? ' excluded' : ''}`}
                 style={style}
+                depth={1}
+                leading={params.replaceOn && <Tick on={!excluded.has(matchKey(m))} onToggle={() => useSearch.getState().toggleExcluded(matchKey(m))} />}
+                icon={<span className="line-no">{m.line}</span>}
+                label={<MatchText match={m} replacing={params.replaceOn} />}
                 onClick={() => open(m)}
-              >
-                {params.replaceOn && <Tick on={!excluded.has(matchKey(m))} onToggle={() => useSearch.getState().toggleExcluded(matchKey(m))} />}
-                <span className="line-no">{m.line}</span>
-                <MatchText match={m} replacing={params.replaceOn} />
-              </div>
+              />
             )
           })}
         </div>
@@ -208,12 +221,10 @@ function Toggle(props: { on: boolean; title: string; onClick: () => void; childr
 /** A checkbox that ticks a file or line in or out of a replace (doesn't open the match). */
 function Tick({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
-    <input
-      type="checkbox"
-      className="search-tick"
+    <Checkbox
+      aria-label="Include in replace"
       checked={on}
-      onClick={(e) => e.stopPropagation()}
-      onChange={onToggle}
+      onCheckedChange={onToggle}
     />
   )
 }

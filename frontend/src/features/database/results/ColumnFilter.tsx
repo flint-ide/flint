@@ -1,4 +1,4 @@
-import { Button, Input } from '@flint-ide/ui'
+import { Button, Checkbox, Input } from '@flint-ide/ui'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { distinctValues, isKeyShown, isNullKey, setFilter, type GridView } from '../lib/gridView'
@@ -105,7 +105,7 @@ export function ColumnFilter({ anchor, rows, col, columnName, view, onChange, on
         {visible.length === 0 && <div className="muted column-filter-empty">No values</div>}
         {visible.map((v) => (
           <label key={v.key} className={`column-filter-item${isNullKey(v.key) || v.key === '' ? ' special' : ''}`} title={v.label}>
-            <input type="checkbox" checked={isKeyShown(filter, v.key)} onChange={() => toggle(v.key)} />
+            <Checkbox checked={isKeyShown(filter, v.key)} onCheckedChange={() => toggle(v.key)} />
             <span className="column-filter-label">{v.label}</span>
             <span className="column-filter-count">{v.count.toLocaleString()}</span>
           </label>

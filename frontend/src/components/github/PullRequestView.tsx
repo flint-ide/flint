@@ -18,7 +18,7 @@ import { FailedCheckActions, FixWithAgentButton } from './CIStatus'
 import type { FixTarget } from '../../store/ci'
 import { reviewWork, workSummary } from '../../lib/prAgent'
 import { AddressReviewButton, RequestCodeReviewButton } from './ReviewAgent'
-import { Button, DiffStat, IconButton } from '@flint-ide/ui'
+import { Badge, Button, DiffStat, IconButton, TreeRow } from '@flint-ide/ui'
 import { RefreshCw } from '@flint-ide/ui/icons'
 import { PrBadge } from './PrBadge'
 
@@ -148,7 +148,7 @@ function Files({ root, details }: { root: string; details: PullRequestDetails })
     <section className="pr-section">
       <div className="pr-section-title">
         <span>Files changed</span>
-        <span className="badge">{details.files.length}</span>
+        <Badge size="sm" className="count-badge">{details.files.length}</Badge>
       </div>
       {details.files.map((f) => (
         <FileRow key={f.path} file={f} threads={counts[f.path]} onOpen={() => openPullRequestFile(root, details.number, f.path)} />
@@ -160,14 +160,18 @@ function Files({ root, details }: { root: string; details: PullRequestDetails })
 function FileRow({ file, threads, onOpen }: { file: PullRequestFile; threads?: { open: number; resolved: number }; onOpen: () => void }) {
   const slash = file.path.lastIndexOf('/')
   return (
-    <div className="pr-file" onClick={onOpen} title={file.previousPath ? `${file.previousPath} → ${file.path}` : file.path}>
-      <span className={`change-kind ${STATUS_KIND[file.status] ?? 'modified'}`}>{STATUS_LETTER[file.status] ?? 'M'}</span>
-      <span className="file-name">{file.path.slice(slash + 1)}</span>
-      <span className="muted path-hint">{slash > 0 ? file.path.slice(0, slash) : ''}</span>
+    <TreeRow
+      onClick={onOpen}
+      title={file.previousPath ? `${file.previousPath} → ${file.path}` : file.path}
+      icon={<span className={`change-kind ${STATUS_KIND[file.status] ?? 'modified'}`}>{STATUS_LETTER[file.status] ?? 'M'}</span>}
+      file
+      label={file.path.slice(slash + 1)}
+      hint={slash > 0 ? file.path.slice(0, slash) : ''}
+    >
       {threads && threads.open > 0 && <PrBadge tone="pending" title="Unresolved review threads">{threads.open} open</PrBadge>}
       {threads && threads.open === 0 && threads.resolved > 0 && <PrBadge tone="muted" title="All review threads resolved">{threads.resolved} resolved</PrBadge>}
       <DiffStat added={file.additions} removed={file.deletions} />
-    </div>
+    </TreeRow>
   )
 }
 
@@ -178,7 +182,7 @@ function Commits({ details }: { details: PullRequestDetails }) {
       <div className="pr-section-title clickable" onClick={() => setOpen(!open)}>
         <span className="twisty">{open ? '▾' : '▸'}</span>
         <span>Commits</span>
-        <span className="badge">{details.commits.length}</span>
+        <Badge size="sm" className="count-badge">{details.commits.length}</Badge>
       </div>
       {open &&
         details.commits.map((c) => (
@@ -200,7 +204,7 @@ function Reviews({ details }: { details: PullRequestDetails }) {
     <section className="pr-section">
       <div className="pr-section-title">
         <span>Reviews</span>
-        <span className="badge">{details.reviews.length}</span>
+        <Badge size="sm" className="count-badge">{details.reviews.length}</Badge>
       </div>
       {details.reviews.map((r, i) => (
         <div key={i} className="pr-comment">

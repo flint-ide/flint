@@ -9,6 +9,7 @@ import { Modal } from './layout/Modal'
 import { FileIcon } from './icons/FileIcon'
 import { formatKeys } from '../lib/commands'
 import { useListCursor } from '../lib/useListCursor'
+import { PaletteSearch } from './ui/PaletteSearch'
 
 const tildify = (p: string) => p.replace(/^\/Users\/[^/]+/, '~')
 
@@ -73,12 +74,11 @@ export function RecentProjects() {
 
   return (
     <Modal onClose={close} className="quick-open recent-projects">
-      <input
+      <PaletteSearch
         autoFocus
-        className="quick-input"
+        aria-label="Open recent folder"
         placeholder={`Open recent folder…  (${formatKeys('Mod+Enter')} new window${root ? ` · ${formatKeys('Alt+Enter')} add to workspace` : ''})`}
         value={query}
-        spellCheck={false}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown') setCursor((c) => Math.min(c + 1, rows.length - 1))

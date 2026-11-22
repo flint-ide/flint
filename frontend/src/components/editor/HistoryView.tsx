@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button } from '@flint-ide/ui'
+import { Button, ViewToolbar } from '@flint-ide/ui'
 import { Git, useHeadVersion } from '../../store/git'
 import { revisionDiffTabId, type DiffTab, type HistoryTab } from '../../store/editor'
 import { compareWithCurrent, openCommitDiff, type FileRevision } from '../../store/gitHistory'
@@ -82,10 +82,10 @@ export function HistoryView({ tab, active }: { tab: HistoryTab; active: boolean 
 
   return (
     <div className="history-view">
-      <div className="diff-header">
+      <ViewToolbar aria-label="File history">
         <span className="truncate" title={tab.path}>History of {tab.path.split('/').pop()}</span>
         <span className="muted">{history ? `${commits.length}${commits.length === LIMIT ? '+' : ''} commits` : ''}</span>
-        <span className="spacer" />
+        <span className="fui-grow" />
         <Button
           variant="ghost"
           size="sm"
@@ -104,7 +104,7 @@ export function HistoryView({ tab, active }: { tab: HistoryTab; active: boolean 
         >
           Compare with current
         </Button>
-      </div>
+      </ViewToolbar>
       {error && <div className="placeholder error selectable">{error}</div>}
       {!history && !error && <div className="placeholder">Loading…</div>}
       {history && commits.length === 0 && <div className="placeholder muted">No commits touch this file yet.</div>}

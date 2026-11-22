@@ -1,4 +1,4 @@
-import { Button } from '@flint-ide/ui'
+import { Button, FormActions } from '@flint-ide/ui'
 import { useSettings } from '../../store/settings'
 import { useEditor } from '../../store/editor'
 import { closeMachinePicker, newTerminalOnMachine, useMachines } from '../../store/machines'
@@ -42,7 +42,7 @@ export function MachinePicker() {
           )
         })}
       </div>
-      <div className="form-actions">
+      <FormActions align="between">
         <Button
           variant="plain"
           onClick={() => {
@@ -52,11 +52,10 @@ export function MachinePicker() {
         >
           Machines Settings…
         </Button>
-        <span className="spacer" />
         <Button variant="primary" onClick={closeMachinePicker}>
           Close
         </Button>
-      </div>
+      </FormActions>
     </Modal>
   )
 }

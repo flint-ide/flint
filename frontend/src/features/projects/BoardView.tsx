@@ -2,7 +2,7 @@ import { useEffect, useState, type DragEvent } from 'react'
 import type { ContributedTab } from '../../lib/features'
 import { useEditor } from '../../store/editor'
 import { ProjectDialogs } from './Dialogs'
-import { ItemActions, ItemDependencies, ItemMeta, ItemTasks, ItemTitle, OldFormatNote, ProjectContext } from './ItemParts'
+import { ItemCard, OldFormatNote, ProjectContext } from './ItemParts'
 import {
   boardProblem,
   boardTitle,
@@ -20,7 +20,7 @@ import {
   type Status,
 } from './projects'
 import { followProjects, loadProject, openProject, openNewItem, openPlan, refreshProjects, setStatus, useProjects } from './store'
-import { Button, IconButton } from '@flint-ide/ui'
+import { Button, IconButton, ViewToolbar } from '@flint-ide/ui'
 import { CountBadge, MarkerBadge } from '../../components/tasks/badges'
 import { Plus, RefreshCw } from '@flint-ide/ui/icons'
 
@@ -52,7 +52,7 @@ export function BoardView({ tab, active }: { tab: ContributedTab; active: boolea
   if (!project) return <p className="muted empty">{loaded?.error || 'Loading the project…'}</p>
   return (
     <div className="project-board">
-      <div className="project-board-head">
+      <ViewToolbar aria-label="Project board">
         <span className="project-board-title">{project.name}</span>
         {!project.trusted && (
           <MarkerBadge tone="warn" title="The project's folder is not trusted: agents can't read it with get_project, and Delegate shows you each item before it sends it">
@@ -61,7 +61,7 @@ export function BoardView({ tab, active }: { tab: ContributedTab; active: boolea
         )}
         <span className="muted truncate" title={project.path}>{project.path}</span>
         <ProjectContext project={project} />
-        <span className="spacer" />
+        <span className="fui-grow" />
         {/* The title is on a wrapper: a disabled kit button takes no hover, and the hint says why. */}
         <span title={project.oldFormat ? OLD_FORMAT_HINT : 'New Item…'}>
           <Button variant="ghost" size="sm" disabled={project.oldFormat} onClick={() => openNewItem(folder, 'board')}>
@@ -82,7 +82,7 @@ export function BoardView({ tab, active }: { tab: ContributedTab; active: boolea
         <IconButton variant="ghost" size="sm" aria-label="Refresh" title="Refresh" onClick={() => void loadProject(folder)}>
           <RefreshCw />
         </IconButton>
-      </div>
+      </ViewToolbar>
       {project.oldFormat && <OldFormatNote folder={folder} />}
       {loaded?.error && <div className="project-board-error error">{loaded.error}</div>}
       <Columns project={project} />
@@ -141,8 +141,11 @@ function Columns({ project }: { project: ProjectData }) {
 function Card({ project, item }: { project: ProjectData; item: ItemInfo }) {
   const [dragging, setDragging] = useState(false)
   return (
-    <div
-      className={`project-card${dragging ? ' dragging' : ''}`}
+    <ItemCard
+      project={project}
+      item={item}
+      frame="card"
+      dragging={dragging}
       draggable={!project.oldFormat}
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG_TYPE, dragPayload(project.path, item))
@@ -150,14 +153,6 @@ function Card({ project, item }: { project: ProjectData; item: ItemInfo }) {
         setDragging(true)
       }}
       onDragEnd={() => setDragging(false)}
-    >
-      <div className="project-card-title">
-        <ItemTitle item={item} items={project.items} />
-      </div>
-      <ItemMeta item={item} project={project} />
-      <ItemDependencies item={item} items={project.items} />
-      <ItemTasks tasks={item.tasks} />
-      <ItemActions project={project} item={item} />
-    </div>
+    />
   )
 }

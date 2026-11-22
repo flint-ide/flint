@@ -4,7 +4,7 @@ import { applyImport, closeVSCodeImport, previewImport, useVSCodeImport } from '
 import { useSettings } from '../../store/settings'
 import { listCommands } from '../../lib/commands'
 import { commandTitle, groupByKind, importedKeymap, keybindingNote, type ImportItem } from '../../lib/vscodeImport'
-import { Button, Segment } from '@flint-ide/ui'
+import { Button, FormActions, Segment } from '@flint-ide/ui'
 
 /**
  * Preview of "Import from VS Code…": what would change and what is skipped
@@ -83,13 +83,12 @@ export function ImportVSCodeDialog() {
         )}
       </div>
       {error && <p className="error tool-check-note">{error}</p>}
-      <div className="form-actions">
-        <span className="spacer" />
+      <FormActions>
         <Button variant="plain" onClick={closeVSCodeImport}>Cancel</Button>
         <Button variant="primary" autoFocus disabled={busy || !plan || plan.items.length === 0} onClick={() => void applyImport()}>
           {busy && plan ? 'Importing…' : 'Import'}
         </Button>
-      </div>
+      </FormActions>
     </Modal>
   )
 }

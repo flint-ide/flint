@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Input, RadioGroup, RadioGroupItem } from '@flint-ide/ui'
+import { Button, Form, FormActions, Input, OptionRow, OptionRowGroup } from '@flint-ide/ui'
 import { matchPrompts, validPromptName } from '../../lib/prompts'
 import { activeRoot } from '../../store/activeRoot'
 import {
@@ -8,6 +8,7 @@ import {
 import { Modal } from '../layout/Modal'
 import { PromptArgsForm, PromptList } from './PromptList'
 import { useListCursor } from '../../lib/useListCursor'
+import { PaletteSearch } from '../ui/PaletteSearch'
 
 /** The Run Prompt… and New Prompt… dialogs (palette commands). */
 export function PromptDialog() {
@@ -47,12 +48,10 @@ function RunPrompt({ root }: { root: string }) {
         <PromptArgsForm prompt={asking} onSubmit={(args) => run(asking, args)} onCancel={() => setAsking(null)} />
       ) : (
         <>
-          <input
+          <PaletteSearch
             autoFocus
-            className="quick-input"
             placeholder="Run prompt in the agent chat…"
             value={query}
-            spellCheck={false}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'ArrowDown') setCursor((c) => Math.min(c + 1, rows.length - 1))
@@ -86,33 +85,30 @@ function NewPrompt({ root }: { root: string }) {
   }
   return (
     <Modal title="New Prompt" onClose={closePromptDialog} className="new-prompt">
-      <form
-        className="form"
+      <Form
         onSubmit={(e) => {
           e.preventDefault()
           void create()
         }}
       >
-        <label>
-          Name (typed after /)
-          <Input autoFocus value={name} spellCheck={false} placeholder="review-api" onChange={(e) => setName(e.target.value.trim())} />
-        </label>
-        {name && !valid && <span className="form-status error">Letters, digits, - and _ only, starting with a letter or digit.</span>}
-        <RadioGroup value={personal ? 'personal' : 'repository'} onValueChange={(v) => setPersonal(v === 'personal')}>
-          <label className="check">
-            <RadioGroupItem value="repository" disabled={!root} />
-            Repository: .flint/prompts, shared with the team through the repository
-          </label>
-          <label className="check">
-            <RadioGroupItem value="personal" />
-            Personal: only you, in every folder
-          </label>
-        </RadioGroup>
-        <div className="form-actions">
+        <Input
+          autoFocus
+          label="Name (typed after /)"
+          value={name}
+          spellCheck={false}
+          placeholder="review-api"
+          error={name && !valid ? 'Letters, digits, - and _ only, starting with a letter or digit.' : undefined}
+          onChange={(e) => setName(e.target.value.trim())}
+        />
+        <OptionRowGroup value={personal ? 'personal' : 'repository'} onValueChange={(v) => setPersonal(v === 'personal')} aria-label="Where to create the prompt">
+          <OptionRow value="repository" disabled={!root} title="Repository" description=".flint/prompts, shared with the team through the repository" />
+          <OptionRow value="personal" title="Personal" description="Only you, in every folder" />
+        </OptionRowGroup>
+        <FormActions align="start">
           <Button type="button" variant="plain" onClick={closePromptDialog}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={!valid}>Create and Open</Button>
-        </div>
-      </form>
+        </FormActions>
+      </Form>
     </Modal>
   )
 }

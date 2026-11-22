@@ -1,4 +1,4 @@
-import { Button, IconButton } from '@flint-ide/ui'
+import { Button, IconButton, PanelHeader, TreeRow } from '@flint-ide/ui'
 import { RefreshCw } from '@flint-ide/ui/icons'
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import * as API from '../../../bindings/flint/internal/features/extensions/api'
@@ -91,42 +91,38 @@ export function ExtensionPanel({ ext, view, title, kind }: { ext: string; view: 
       const open = expanded.has(item.id)
       const sub = children[item.id]
       const row = (
-        <div
+        <TreeRow
           key={item.id}
-          className="tree-row static extension-row"
-          style={{ paddingLeft: 8 + depth * 14 }}
+          depth={depth}
+          twisty={kind === 'tree' ? (item.hasChildren ? (open ? 'open' : 'closed') : 'none') : undefined}
+          onTwistyClick={
+            kind === 'tree' && item.hasChildren
+              ? (e) => {
+                  e.stopPropagation()
+                  toggle(item.id)
+                }
+              : undefined
+          }
           title={item.tooltip || item.label}
           onClick={() => activate(item)}
           onContextMenu={(e) => menu(e, item)}
-        >
-          {kind === 'tree' && (
-            <span
-              className="twisty"
-              onClick={(e) => {
-                e.stopPropagation()
-                if (item.hasChildren) toggle(item.id)
-              }}
-            >
-              {item.hasChildren ? (open ? '▾' : '▸') : ''}
-            </span>
-          )}
-          {item.icon && isIconName(item.icon) && <Icon name={item.icon} size={14} />}
-          <span className="extension-label">{item.label}</span>
-          {item.description && <span className="muted path-hint">{item.description}</span>}
-        </div>
+          icon={item.icon && isIconName(item.icon) ? <Icon name={item.icon} size={14} /> : undefined}
+          label={item.label}
+          hint={item.description}
+        />
       )
       if (!open || !item.hasChildren) return [row]
-      if (!sub || 'loading' in sub) return [row, <div key={`${item.id}\n…`} className="tree-row static muted" style={{ paddingLeft: 22 + depth * 14 }}>Loading…</div>]
-      if ('error' in sub) return [row, <div key={`${item.id}\n!`} className="tree-row static error" style={{ paddingLeft: 22 + depth * 14 }}>{sub.error}</div>]
+      if (!sub || 'loading' in sub) return [row, <TreeRow key={`${item.id}\n…`} depth={depth + 1} className="muted" label="Loading…" />]
+      if ('error' in sub) return [row, <TreeRow key={`${item.id}\n!`} depth={depth + 1} className="error" label={sub.error} />]
       return [row, ...rows(sub.items, depth + 1)]
     })
 
   return (
     <div className="panel">
-      <div className="panel-header">
-        <span className="panel-title">{title}</span>
-        <IconButton variant="ghost" size="sm" aria-label="Refresh" title="Refresh" disabled={loading} onClick={load}><RefreshCw /></IconButton>
-      </div>
+      <PanelHeader
+        title={title}
+        actions={<IconButton variant="ghost" size="sm" aria-label="Refresh" title="Refresh" disabled={loading} onClick={load}><RefreshCw /></IconButton>}
+      />
       <div className="tree scroll">
         {error ? (
           <div className="placeholder">

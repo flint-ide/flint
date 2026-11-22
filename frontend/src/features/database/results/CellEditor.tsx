@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react'
 import { validateCell, type CellValue, type TargetColumn } from '../lib/rowEdits'
 import { formatKeys } from '../../../lib/commands'
+import { Button, Input, Textarea } from '@flint-ide/ui'
 
 interface Props {
   column: TargetColumn
@@ -75,7 +76,7 @@ export function CellEditor({ column, initial, style, onCommit, onCancel }: Props
     )
   } else if (kind === 'json') {
     field = (
-      <textarea
+      <Textarea
         autoFocus
         spellCheck={false}
         disabled={isNull}
@@ -86,7 +87,8 @@ export function CellEditor({ column, initial, style, onCommit, onCancel }: Props
     )
   } else {
     field = (
-      <input
+      <Input
+        size="sm"
         autoFocus
         spellCheck={false}
         inputMode={kind === 'number' ? 'decimal' : undefined}
@@ -117,9 +119,9 @@ export function CellEditor({ column, initial, style, onCommit, onCancel }: Props
           </button>
         )}
         {kind === 'json' && (
-          <button className="primary" onMouseDown={(e) => e.preventDefault()} onClick={() => commit()} title={`Apply (${formatKeys('Mod+Enter')})`}>
+          <Button size="sm" onMouseDown={(e) => e.preventDefault()} onClick={() => commit()} title={`Apply (${formatKeys('Mod+Enter')})`}>
             OK
-          </button>
+          </Button>
         )}
       </div>
       {error && <div className="cell-editor-error">{error}</div>}

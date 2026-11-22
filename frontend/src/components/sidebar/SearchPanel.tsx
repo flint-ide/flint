@@ -110,29 +110,31 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
           </InputGroupAddon>
         </InputGroup>
         {params.replaceOn && (
-          <InputGroup className="search-input search-replace">
-            <Input
-              value={params.replace}
-              placeholder={params.regex ? 'Replace ($1, ${name} for groups)' : 'Replace'}
-              spellCheck={false}
-              onChange={(e) => setParams({ replace: e.target.value })}
-              onKeyDown={(e) => e.key === 'Enter' && modKey(e) && void useSearch.getState().replaceAll(roots)}
-            />
-            <InputGroupAddon>
-              {/* Disabled kit buttons ignore the pointer, so the hint lives on a wrapper. */}
-              <span title={`Replace every ticked match (${formatKeys('Mod+Enter')})`}>
-                <Button
-                  size="sm"
-                  variant="plain"
-                  className="replace-all"
-                  disabled={replacing || !!runningId || matches.length === 0}
-                  onClick={() => void useSearch.getState().replaceAll(roots)}
-                >
-                  {replacing ? 'Replacing…' : 'Replace all'}
-                </Button>
-              </span>
-            </InputGroupAddon>
-          </InputGroup>
+          // The button sits outside the group: the kit dims and disables a whole group
+          // that contains a disabled control (:has(:disabled)), field included.
+          <div className="search-replace">
+            <InputGroup className="search-input">
+              <Input
+                value={params.replace}
+                placeholder={params.regex ? 'Replace ($1, ${name} for groups)' : 'Replace'}
+                spellCheck={false}
+                onChange={(e) => setParams({ replace: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && modKey(e) && void useSearch.getState().replaceAll(roots)}
+              />
+            </InputGroup>
+            {/* Disabled kit buttons ignore the pointer, so the hint lives on a wrapper. */}
+            <span title={`Replace every ticked match (${formatKeys('Mod+Enter')})`}>
+              <Button
+                size="sm"
+                variant="plain"
+                className="replace-all"
+                disabled={replacing || !!runningId || matches.length === 0}
+                onClick={() => void useSearch.getState().replaceAll(roots)}
+              >
+                {replacing ? 'Replacing…' : 'Replace all'}
+              </Button>
+            </span>
+          </div>
         )}
         {lastReplace?.undoable && (
           <div className="search-scope">

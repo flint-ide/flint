@@ -76,6 +76,7 @@ export function RecentProjects() {
     <Modal onClose={close} className="quick-open recent-projects">
       <PaletteSearch
         autoFocus
+        aria-label="Open recent folder"
         placeholder={`Open recent folder…  (${formatKeys('Mod+Enter')} new window${root ? ` · ${formatKeys('Alt+Enter')} add to workspace` : ''})`}
         value={query}
         onChange={(e) => setQuery(e.target.value)}

@@ -69,6 +69,7 @@ export function QuickOpen() {
     <Modal onClose={close} className="quick-open">
       <PaletteSearch
         autoFocus
+        aria-label="Go to file"
         placeholder={root ? `Go to file… (${fileCount.toLocaleString()} files)` : 'Open a folder first'}
         value={query}
         onChange={(e) => setQuery(e.target.value)}

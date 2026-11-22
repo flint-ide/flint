@@ -793,9 +793,12 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
   flex: none;
 }
 .search-replace {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   margin-top: 4px;
 }
-.search-replace .replace-all {
+.search-replace > span {
   flex: none;
 }
 
@@ -1216,7 +1219,7 @@ button.small {
   min-height: 150px;
   font: 12px/1.45 var(--font-mono);
 }
-.cell-editor button {
+.cell-editor .null-toggle {
   padding: 0 6px;
   font-size: 11px;
 }
@@ -1962,9 +1965,13 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 .git-branch-line .repo-name {
   font-weight: 600;
 }
-.tree-row input[type='checkbox'] {
-  margin: 0 4px 0 0;
-  accent-color: var(--accent);
+/* The kit Checkbox's hit area reaches 8–12px past the box; in a 22px row that
+   swallows the twisty, the line number and the row above. */
+.tree-row [data-slot='checkbox'] {
+  margin-right: 4px;
+}
+.tree-row [data-slot='checkbox']::after {
+  inset: -2px;
 }
 .change-kind {
   width: 14px;

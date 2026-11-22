@@ -118,6 +118,79 @@
 .fui-agent-time { width: 32px; text-align: right; }
 .fui-agent-action { width: 32px; display: flex; justify-content: flex-end; }
 
+/* ListItem: a two-line list row (title line, muted meta line), 1 px divider. */
+.fui-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 5px 10px 6px;
+}
+.fui-list-item[data-divider] { border-bottom: 1px solid var(--border); }
+.fui-list-item[data-compact] { gap: 0; padding: 1px 10px; }
+.fui-list-item[data-clickable] { cursor: pointer; }
+.fui-list-item[data-clickable]:hover { background: var(--bg-hover); }
+.fui-list-item:is([data-active], [data-selected]) { background: var(--bg-active); }
+.fui-list-item:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.fui-list-main { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 20px; white-space: nowrap; }
+.fui-list-leading, .fui-list-badges, .fui-list-trailing, .fui-list-actions { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.fui-list-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--fg); }
+.fui-list-item[data-mono] .fui-list-label { font-family: var(--font-mono); font-size: 12px; }
+.fui-list-item[data-dimmed] .fui-list-label { color: var(--fg-muted); }
+.fui-list-end { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.fui-list-actions { gap: 2px; }
+/* Hover actions: shown on hover, keyboard focus inside or the list's cursor, in the trailing part's place. */
+.fui-list-item[data-actions='hover'] .fui-list-actions { display: none; }
+.fui-list-item[data-actions='hover']:is(:hover, :focus-within, [data-selected]) .fui-list-actions { display: inline-flex; }
+.fui-list-item[data-actions='hover']:is(:hover, :focus-within, [data-selected]) .fui-list-trailing { display: none; }
+.fui-list-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding-left: var(--list-inset, 0px);
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.fui-list-meta-part { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A part whose component rendered nothing takes no slot and no separator. */
+.fui-list-meta-part:empty { display: none; }
+.fui-list-meta-part:not(:empty) ~ .fui-list-meta-part:not(:empty)::before { content: '·'; margin-right: 6px; color: var(--fg-faint); }
+.fui-list-meta .fui-mono { font-size: inherit; }
+.fui-list-meta svg { width: 12px; height: 12px; vertical-align: -2px; }
+
+/* ListGroup: related items behind an accent line. */
+.fui-list-group { border-left: 2px solid var(--accent-dim); }
+.fui-list-group-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; padding: 5px 10px 2px; font-size: 12px; }
+.fui-list-group-head[data-stacked] { flex-direction: column; align-items: stretch; gap: 0; }
+.fui-list-group-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.fui-list-group-meta { flex: none; font-size: 11px; color: var(--fg-muted); }
+.fui-list-group-head[data-stacked] .fui-list-group-meta { flex: auto; }
+
+/* TaskCard: a ListItem head plus notes, an actions bar and sub-rows. Meta,
+   notes and actions line up past the twisty (--list-inset). */
+.fui-task-card { display: flex; flex-direction: column; min-width: 0; }
+.fui-task-card[data-twisty] { --list-inset: 18px; }
+.fui-task-card[data-frame='row'] { padding: 0 0 5px; border-bottom: 1px solid var(--border); }
+/* Card's own 16 px rhythm and text-sm give way to the list's. */
+.fui-task-card[data-frame='card'] { flex: none; gap: 0; padding: 2px 0 5px; font-size: inherit; }
+.fui-task-card[data-frame='bare'] { padding: 0 0 5px; }
+.fui-task-card[draggable='true'] { cursor: grab; }
+.fui-task-card[data-dragging] { opacity: 0.45; }
+.fui-task-card > .fui-list-item { padding-bottom: 1px; }
+.fui-task-note, .fui-task-actions { padding: 1px 10px 0 calc(10px + var(--list-inset, 0px)); font-size: 11px; }
+.fui-task-note { color: var(--fg-muted); overflow-wrap: anywhere; }
+.fui-task-note[data-tone='faint'] { color: var(--fg-faint); }
+.fui-task-note[data-tone='warn'] { color: var(--warn); }
+.fui-task-note[data-tone='danger'] { color: var(--danger); }
+.fui-task-note[data-truncate] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fui-task-note[data-mono] { font-family: var(--font-mono); }
+/* Ghost buttons carry their own 8 px padding: start 4 px in so their text lines up with the meta. */
+.fui-task-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding-top: 3px; padding-left: calc(4px + var(--list-inset, 0px)); }
+.fui-task-sub { display: flex; flex-direction: column; padding-top: 2px; }
+
 /* PanelHeader: the sidebar panel's 32 px title bar. */
 .fui-panel-header {
   height: 32px;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { Badge, Button, PanelHeader, TreeRow } from '@flint-ide/ui'
+import { Badge, Button, PanelHeader, TaskCard } from '@flint-ide/ui'
 import { agentRows, attentionCount, stateHint, stateLabel, type AgentRow } from '../../lib/agentList'
 import { TaskStateBadge } from '../tasks/badges'
 import { modKey, modifierName } from '../../lib/platform'
@@ -48,28 +48,27 @@ function AgentRowView({ row }: { row: AgentRow }) {
   const look = row.state === 'finished-unseen' ? 'finished' : row.state
   const id = row.sessionId
   return (
-    <div className="task">
-      <TreeRow
-        title={`${row.title}\n\n${row.root}${id ? `\n\n${modifierName('Mod')}-click to peek without leaving your tab` : ''}`}
-        onClick={(e) => (id && modKey(e) ? peekAgent(id) : focusAgent(row))}
-        status={<TaskStateBadge state={look} title={stateHint(row.state, row.kind, row.blocked)}>{stateLabel(row.state)}</TaskStateBadge>}
-        label={row.title}
-        file
-      />
-      <div className="task-meta muted">
-        <span>{row.agent}{row.kind === 'task' ? ' · task' : ''}{row.kind === 'terminal' ? ' · terminal' : ''}{row.hidden ? ' · hidden' : ''}</span>
-        <span title={row.root}>{row.project}</span>
-      </div>
-      {id && (
-        <div className="task-actions">
-          <Button variant="ghost" size="sm" onClick={() => peekAgent(id)} title="Show the chat over your current tab: answer a request or send a prompt, then go back">Peek</Button>
-          {row.hidden ? (
-            <Button variant="ghost" size="sm" onClick={() => unsettleChat(id)} title="Draw the chat's tab again">Show tab</Button>
-          ) : (
-            <Button variant="ghost" size="sm" onClick={() => settleChat(id)} title="Hide the chat's tab until the agent needs you">Hide until needed</Button>
-          )}
-        </div>
-      )}
-    </div>
+    <TaskCard
+      tooltip={`${row.title}\n\n${row.root}${id ? `\n\n${modifierName('Mod')}-click to peek without leaving your tab` : ''}`}
+      onOpen={(e) => (id && modKey(e) ? peekAgent(id) : focusAgent(row))}
+      status={<TaskStateBadge state={look} title={stateHint(row.state, row.kind, row.blocked)}>{stateLabel(row.state)}</TaskStateBadge>}
+      label={row.title}
+      meta={[
+        `${row.agent}${row.kind === 'task' ? ' · task' : ''}${row.kind === 'terminal' ? ' · terminal' : ''}${row.hidden ? ' · hidden' : ''}`,
+        <span title={row.root}>{row.project}</span>,
+      ]}
+      actions={
+        id && (
+          <>
+            <Button variant="ghost" size="sm" onClick={() => peekAgent(id)} title="Show the chat over your current tab: answer a request or send a prompt, then go back">Peek</Button>
+            {row.hidden ? (
+              <Button variant="ghost" size="sm" onClick={() => unsettleChat(id)} title="Draw the chat's tab again">Show tab</Button>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => settleChat(id)} title="Hide the chat's tab until the agent needs you">Hide until needed</Button>
+            )}
+          </>
+        )
+      }
+    />
   )
 }

@@ -30,6 +30,7 @@ Files, terminals, agent chats, SQL consoles and diffs share one tab area, with f
 - `⌘`+click on `path:line` in agent output opens the file at that line.
 - A relative path is looked up in the folder the shell is in now (it may have `cd`-ed away from where the terminal started), then the folder the terminal started in, its workspace folder and the other workspace folders; the first that has the file opens. If none has it, the first is opened and its error shows. Paths in run consoles are tried against the run's folders (`openRunLink`); CI logs map paths in Go.
 - Shift+Enter inserts a newline in claude/codex prompts.
+- On macOS `⌘←` / `⌘→` move to the start / end of the line (sent as Ctrl+A / Ctrl+E) and `⌘↑` / `⌘↓` scroll to the top / bottom of the scrollback.
 - Selected output can be sent to the agent chat as a code block with `⌘L` or right-click → *Send to agent*.
 
 ### Background terminals
@@ -607,6 +608,8 @@ All shortcuts except those owned by CodeMirror can be changed in Settings ▸ Ke
 |---|---|
 | `⌘J` | Toggle terminal / last file |
 | `⇧⌘T` | New terminal |
+| `⌘←` / `⌘→` | Terminal: start / end of the line (macOS) |
+| `⌘↑` / `⌘↓` | Terminal: top / bottom of the scrollback (macOS) |
 | `⌘N` | New SQL console |
 | `⌘↵` | Run query (SQL) / send request (`.http`) |
 

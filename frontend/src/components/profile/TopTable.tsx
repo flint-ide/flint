@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
-import { formatValue, percent, shortName, sortTop, type TopRow, type TopSortKey } from '../../lib/flame'
-import { IconButton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@flint-ide/ui'
+import { formatValue, IconButton, percent, shortName, sortTop, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, type TopRow, type TopSortKey } from '@flint-ide/ui'
 import { Search } from '@flint-ide/ui/icons'
 
 interface Props {

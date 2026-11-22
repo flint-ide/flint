@@ -1,5 +1,5 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@wunderui/react'
-import type { ReactNode } from 'react'
+import { type ReactNode, useId } from 'react'
 
 /** The bar along the bottom of a window or panel. Put StatusItems in it; a StatusSpacer pushes the rest right. */
 export function StatusBar({ children, className }: { children: ReactNode; className?: string }) {
@@ -24,6 +24,9 @@ export type StatusItemProps = {
 
 /** One clickable entry of a StatusBar, with a tooltip above it. */
 export function StatusItem({ children, tip, onClick, disabled, pressed, className }: StatusItemProps) {
+  // The tooltip shows on hover and focus only; screen readers get the tip as the
+  // button's description from a hidden copy.
+  const tipId = useId()
   return (
     <Tooltip>
       <TooltipTrigger
@@ -33,11 +36,15 @@ export function StatusItem({ children, tip, onClick, disabled, pressed, classNam
             className={className ? `fui-statusitem ${className}` : 'fui-statusitem'}
             disabled={disabled}
             aria-pressed={pressed}
+            aria-describedby={tipId}
             onClick={onClick}
           />
         }
       >
         {children}
+        <span id={tipId} hidden>
+          {tip}
+        </span>
       </TooltipTrigger>
       <TooltipContent side="top" className="fui-statustip">
         {tip}

@@ -61,7 +61,7 @@ export function TodoPanel() {
         <Input size="sm" value={query} placeholder="Filter notes" spellCheck={false} onChange={(e) => setTodoQuery(e.target.value)} />
         <div className="todo-tags">
           {TAGS.filter((t) => counts[t]).map((t) => (
-            <Button key={t} variant={tags.has(t) ? 'plain' : 'ghost'} size="sm" aria-pressed={tags.has(t)} onClick={() => toggleTodoTag(t)}>
+            <Button key={t} variant={tags.has(t) ? 'plain' : 'ghost'} size="sm" className={`todo-tag ${t.toLowerCase()}`} aria-pressed={tags.has(t)} onClick={() => toggleTodoTag(t)}>
               {t} {counts[t]}
             </Button>
           ))}
@@ -87,7 +87,7 @@ export function TodoPanel() {
       <div className="tree scroll">
         {files.map((f) => (
           <div key={f.key}>
-            <div className="tree-row search-file" title={f.key} onClick={() => toggleFile(f.key)}>
+            <div className="tree-row static search-file" title={f.key} onClick={() => toggleFile(f.key)}>
               <span className="twisty">{collapsed.has(f.key) ? '▸' : '▾'}</span>
               <FileIcon name={basename(f.path)} />
               <span className="file-name">{basename(f.path)}</span>
@@ -98,7 +98,7 @@ export function TodoPanel() {
               f.items.map((it) => (
                 <div
                   key={`${it.line}:${it.column}`}
-                  className="tree-row todo-item"
+                  className="tree-row static todo-item"
                   title={`${it.tag}${it.owner ? `(${it.owner})` : ''}: ${it.text}`}
                   onClick={() => useEditor.getState().openFile(f.key, { line: it.line, from: it.column - 1, to: it.column - 1 + it.tag.length })}
                 >

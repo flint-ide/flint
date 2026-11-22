@@ -199,7 +199,7 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
 
 function Toggle(props: { on: boolean; title: string; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button className={`toggle${props.on ? ' on' : ''}`} title={props.title} onClick={props.onClick}>
+    <button className={`toggle${props.on ? ' on' : ''}`} title={props.title} aria-pressed={props.on} onClick={props.onClick}>
       {props.children}
     </button>
   )

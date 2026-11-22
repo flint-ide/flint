@@ -7,6 +7,8 @@ export interface SelectOption<T extends string | number> {
   icon?: ReactNode
   hint?: string
   disabled?: boolean
+  /** Heading the option is listed under; options of one group must be next to each other. */
+  group?: string
 }
 
 export interface SelectProps<T extends string | number> {
@@ -36,16 +38,19 @@ export function Select<T extends string | number>(props: SelectProps<T>) {
     ...(allowEmpty !== undefined
       ? [{ label: allowEmpty, checked: value === ('' as T), onSelect: () => onChange('' as T) } as DropdownItem]
       : []),
-    ...options.map(
-      (o): DropdownItem => ({
-        key: String(o.value),
-        label: o.label,
-        icon: o.icon,
-        hint: o.hint,
-        disabled: o.disabled,
-        checked: o.value === value,
-        onSelect: () => onChange(o.value),
-      }),
+    ...withGroupHeadings(
+      options,
+      options.map(
+        (o): DropdownItem => ({
+          key: String(o.value),
+          label: o.label,
+          icon: o.icon,
+          hint: o.hint,
+          disabled: o.disabled,
+          checked: o.value === value,
+          onSelect: () => onChange(o.value),
+        }),
+      ),
     ),
   ]
 
@@ -72,4 +77,12 @@ export function Select<T extends string | number>(props: SelectProps<T>) {
       )}
     />
   )
+}
+
+/** The menu items with a section heading where an option's group starts (items[i] belongs to options[i]). */
+export function withGroupHeadings(options: readonly { group?: string }[], items: readonly DropdownItem[]): DropdownItem[] {
+  return items.flatMap((item, i) => {
+    const group = options[i]?.group
+    return group !== undefined && group !== options[i - 1]?.group ? [{ type: 'section', label: group }, item] : [item]
+  })
 }

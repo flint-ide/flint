@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, IconButton, Input } from '@flint-ide/ui'
+import { Button, Checkbox, IconButton, Input } from '@flint-ide/ui'
 import { X } from '@flint-ide/ui/icons'
 import { useGit } from '../../store/git'
 import {
@@ -106,7 +106,7 @@ function StashDialog({ busy }: { busy: boolean }) {
           />
         </label>
         <label className="check">
-          <input type="checkbox" checked={untracked} onChange={(e) => setUntracked(e.target.checked)} /> Include untracked files
+          <Checkbox checked={untracked} onCheckedChange={setUntracked} /> Include untracked files
         </label>
         <div className="form-actions">
           <span className="spacer" />

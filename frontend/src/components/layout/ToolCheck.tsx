@@ -66,7 +66,7 @@ function ToolRow({ tool: t }: { tool: ToolStatus }) {
         <div className="tool-feature muted">
           {t.feature}
           {' · '}
-          <button className="link" onClick={() => BrowserOpenURL(t.docsUrl)}>Docs</button>
+          <Button variant="link" size="sm" className="tool-docs" onClick={() => BrowserOpenURL(t.docsUrl)}>Docs</Button>
         </div>
         {t.state === 'error' && t.detail && <div className="tool-detail selectable">{t.detail}</div>}
         {t.state !== 'ok' && (

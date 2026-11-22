@@ -555,6 +555,7 @@ All shortcuts except those owned by CodeMirror can be changed in Settings ▸ Ke
 | `⇧⌘P` | Command palette |
 | `⌘,` | Settings (including the keymap) |
 | `⌘[` / `⌘]` | Back / forward |
+| `⌃⇥` / `⌃⇧⇥` | Next / previous tab (files, terminals, chats; wraps around) |
 | `⌘O` | Open folder |
 | `⇧⌘O` | Add folder to workspace |
 | `⌘P` | Go to file |

@@ -139,6 +139,9 @@ function appCommands(): Command[] {
     },
     { id: 'nav.back', title: 'Back', category: 'Navigate', keys: 'Mod+[', keywords: 'previous history', run: () => useEditor.getState().back() },
     { id: 'nav.forward', title: 'Forward', category: 'Navigate', keys: 'Mod+]', keywords: 'next history', run: () => useEditor.getState().forward() },
+    // Literal Ctrl on every platform, as in browsers and editors. Files, terminals and chats share one strip.
+    { id: 'nav.nextTab', title: 'Next Tab', category: 'Navigate', keys: 'Ctrl+Tab', keywords: 'switch cycle window terminal editor', run: () => useEditor.getState().cycleTab(1) },
+    { id: 'nav.previousTab', title: 'Previous Tab', category: 'Navigate', keys: 'Ctrl+Shift+Tab', keywords: 'switch cycle window terminal editor', run: () => useEditor.getState().cycleTab(-1) },
     {
       id: 'nav.goToDeclaration', title: 'Go to Declaration', category: 'Navigate', hintKeys: 'Mod+B', keywords: 'definition lsp',
       when: () => activeTab()?.kind === 'file' && hasEditor(), run: () => pressInEditor('Mod+B'),

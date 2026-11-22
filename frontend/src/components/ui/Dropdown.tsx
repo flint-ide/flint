@@ -14,6 +14,7 @@ import { modKey } from '../../lib/platform'
 import { useListCursor } from '../../lib/useListCursor'
 import { useEventCallback } from '../../lib/useEventCallback'
 import { AppMenu } from './AppMenu'
+import { noteMenuReturn, returnFocusIfLost } from '../../lib/returnFocus'
 
 // The one popover menu used across Flint (title bar, "+" menu, selects, settings,
 // right-click context menus via store/contextMenu). A menu without a filter box is
@@ -75,10 +76,21 @@ export function Dropdown({ trigger, items, align = 'start', searchable, placehol
   const [open, setOpen] = useState(false)
   const anchor = useRef<HTMLElement | null>(null)
 
+  const refocus = useRef(false)
+
   const close = useCallback(() => {
+    refocus.current = true
+    noteMenuReturn(anchor.current)
     setOpen(false)
-    anchor.current?.focus()
   }, [])
+  // Back to the trigger once the menu is gone (while it is still mounted, the kit's
+  // menu moves focus to its highlighted row, which then unmounts and drops focus),
+  // unless what the picked item did focused something else.
+  useEffect(() => {
+    if (open || !refocus.current) return
+    refocus.current = false
+    returnFocusIfLost(anchor.current)
+  }, [open])
   const toggle = () => {
     if (!open) onOpen?.()
     setOpen(!open)

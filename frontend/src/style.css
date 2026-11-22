@@ -201,10 +201,12 @@ body.resizing * {
 
 /* Base controls. WunderUI components (components/ui, marked with data-slot) style
    themselves from wunderui.css; these unlayered rules would beat its layered
-   utilities, so they skip them. :where keeps the specificity of a bare element. */
-button:where(:not([data-slot], [data-slot] *)),
-input:where(:not([data-slot], [data-slot] *)),
-select:where(:not([data-slot], [data-slot] *)) {
+   utilities, so they skip them. The kit's dialog under Modal (.modal) holds the
+   app's own controls, so inside it only kit components are skipped. :where keeps
+   the specificity of a bare element. */
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)),
+input:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)),
+select:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)) {
   font: inherit;
   color: inherit;
 }
@@ -214,7 +216,7 @@ select:where(:not([data-slot], [data-slot] *)) {
    a solid accent primary, a solid red danger, an accent focus ring. Buttons
    with a class of their own keep their own surface; only the shadow and weight
    go to plain, primary and danger buttons. */
-button:where(:not([data-slot], [data-slot] *)) {
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)) {
   background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -222,66 +224,66 @@ button:where(:not([data-slot], [data-slot] *)) {
   cursor: pointer;
   transition: background-color 120ms ease-out, border-color 120ms ease-out, box-shadow 120ms ease-out;
 }
-button:where(:not([data-slot], [data-slot] *)):not([class]),
-button:where(:not([data-slot], [data-slot] *)).primary,
-button:where(:not([data-slot], [data-slot] *)).danger {
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)):not([class]),
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).primary,
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).danger {
   font-weight: 500;
   box-shadow: 0 1px 1px rgb(16 24 40 / 0.05);
 }
-button:where(:not([data-slot], [data-slot] *)):hover {
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)):hover {
   background: var(--bg-active);
 }
-button:where(:not([data-slot], [data-slot] *)):focus-visible {
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
-button:where(:not([data-slot], [data-slot] *)):disabled {
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)):disabled {
   opacity: 0.5;
   cursor: default;
 }
-button:where(:not([data-slot], [data-slot] *)).primary {
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-fg);
   font-weight: 600;
 }
-button:where(:not([data-slot], [data-slot] *)).primary:hover:not(:disabled) {
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).primary:hover:not(:disabled) {
   background: var(--brand-700);
   border-color: var(--brand-700);
 }
-button:where(:not([data-slot], [data-slot] *)).danger {
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).danger {
   background: var(--destructive);
   border-color: var(--destructive);
   color: var(--destructive-foreground);
 }
-button:where(:not([data-slot], [data-slot] *)).danger:hover:not(:disabled) {
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--destructive) 85%, #000);
   border-color: color-mix(in srgb, var(--destructive) 85%, #000);
 }
-button:where(:not([data-slot], [data-slot] *)).link {
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).link {
   background: none;
   border: none;
   padding: 0;
   color: var(--accent);
 }
-button:where(:not([data-slot], [data-slot] *)).link:hover:not(:disabled) {
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).link:hover:not(:disabled) {
   background: none;
   text-decoration: underline;
 }
-button:where(:not([data-slot], [data-slot] *)).icon {
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).icon {
   background: none;
   border: none;
   padding: 2px 6px;
   color: var(--fg-muted);
   font-size: 12px;
 }
-button:where(:not([data-slot], [data-slot] *)).icon:hover {
+button:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)).icon:hover {
   color: var(--fg);
   background: var(--bg-hover);
 }
 
-input:where(:not([data-slot], [data-slot] *)),
-select:where(:not([data-slot], [data-slot] *)) {
+input:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)),
+select:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)) {
   background: var(--bg-editor);
   border: 1px solid var(--border-control);
   border-radius: 6px;
@@ -289,8 +291,8 @@ select:where(:not([data-slot], [data-slot] *)) {
   outline: none;
   transition: border-color 120ms ease-out, box-shadow 120ms ease-out;
 }
-input:where(:not([data-slot], [data-slot] *)):focus,
-select:where(:not([data-slot], [data-slot] *)):focus {
+input:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)):focus,
+select:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)):focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-dim);
 }
@@ -300,7 +302,7 @@ code {
   font-size: 12px;
 }
 
-kbd:where(:not([data-slot], [data-slot] *)) {
+kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [data-slot] *)) {
   font-family: var(--font-mono);
   font-size: 11px;
   background: var(--bg-raised);
@@ -773,11 +775,16 @@ kbd:where(:not([data-slot], [data-slot] *)) {
 }
 .search-input:focus-within {
   border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
 }
 .search-input input {
   flex: 1;
   border: none;
   min-width: 0;
+}
+/* The box around it shows focus; the borderless field itself gets no ring. */
+.search-input input:focus {
+  box-shadow: none;
 }
 .toggle {
   background: none;
@@ -1810,18 +1817,21 @@ button.small {
 
 /* ---------- overlays ---------- */
 
+/* Modal (layout/Modal.tsx) is the UI kit's Dialog: these unlayered rules win over its
+   Tailwind classes, keeping the app's dialogs where they were, near the top like a
+   palette, laid out as a block (not the kit's grid) and as wide as each one asks. */
 .modal-backdrop {
-  position: fixed;
-  inset: 0;
   background: var(--backdrop);
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding-top: 12vh;
-  z-index: 50;
 }
 .modal {
+  display: block;
+  top: 12vh;
+  translate: -50% 0;
   width: min(520px, 92vw);
+  max-width: none;
+  font-size: inherit;
+  line-height: inherit;
+  color: var(--fg);
   background: var(--popover);
   border-radius: 12px;
   /* The kit's dialog edge (DialogContent): a hairline ring and a deep soft shadow. */
@@ -1831,7 +1841,8 @@ button.small {
 .modal-title {
   font-size: 15px;
   font-weight: 600;
-  margin-bottom: 12px;
+  line-height: 1.3;
+  margin: 0 0 12px;
 }
 /* ConfirmDialog: multi-line messages keep their line breaks. */
 .confirm-dialog [data-slot='alert-dialog-description'] {
@@ -1887,6 +1898,7 @@ button.small {
 }
 .quick-input:focus {
   border-color: var(--border);
+  box-shadow: none;
 }
 .quick-list {
   max-height: 50vh;

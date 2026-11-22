@@ -3072,23 +3072,7 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   flex-direction: column;
   background: var(--bg-editor);
 }
-.run-toolbar {
-  height: 30px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 8px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
-  font-size: 12px;
-}
-.run-toolbar button.icon {
-  display: flex;
-  align-items: center;
-  height: 24px;
-}
-.run-toolbar .run-stop:not(:disabled) {
+.fui-view-toolbar .run-stop:not(:disabled) {
   color: var(--danger);
 }
 .run-check {
@@ -3266,11 +3250,8 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   width: 170px;
 }
 /* Environment lines read as code; the kit's Textarea draws the box. */
-.form .run-env {
+.run-env {
   font: 12px/1.4 var(--font-mono);
-}
-.run-hint {
-  font-size: 11px;
 }
 
 /* ⇧⌘P command palette (reuses the quick-open list) */
@@ -3328,19 +3309,13 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   flex-direction: column;
   background: var(--bg-editor);
 }
-.debug-sep {
-  width: 1px;
-  height: 16px;
-  margin: 0 4px;
-  background: var(--border);
-}
-.run-toolbar .debug-step {
+.fui-view-toolbar .debug-step {
   min-width: 24px;
   justify-content: center;
   color: var(--debug);
   font-size: 13px;
 }
-.run-toolbar .debug-step:disabled {
+.fui-view-toolbar .debug-step:disabled {
   color: var(--fg-faint);
 }
 .run-status.paused {
@@ -3471,7 +3446,6 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   background: var(--bg-editor);
 }
 .profile-toolbar {
-  gap: 6px;
   overflow: hidden;
 }
 .profile-toolbar button {
@@ -3553,20 +3527,12 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   overflow: auto;
 }
 .profile-top table {
-  width: 100%;
-  border-collapse: collapse;
   table-layout: fixed;
-  font-size: 12px;
 }
 .profile-top th {
   position: sticky;
   top: 0;
   background: var(--bg);
-  border-bottom: 1px solid var(--border);
-  padding: 4px 8px;
-  font-weight: 500;
-  color: var(--fg-muted);
-  text-align: left;
 }
 .profile-top th.sortable {
   cursor: pointer;
@@ -4532,20 +4498,11 @@ button.keymap-chord:hover {
   border: 1px solid var(--border);
   border-radius: 5px;
 }
-.compare-files table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
 .compare-files th {
   position: sticky;
   top: 0;
   background: var(--bg-raised);
-  text-align: left;
   vertical-align: top;
-  font-weight: 400;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 .compare-files th:first-child button {
@@ -4567,9 +4524,6 @@ button.keymap-chord:hover {
 }
 .compare-files tbody tr {
   cursor: pointer;
-}
-.compare-files tbody tr:hover {
-  background: var(--bg-hover);
 }
 .compare-files tbody tr.selected {
   background: var(--bg-active);

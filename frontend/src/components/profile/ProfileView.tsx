@@ -9,7 +9,7 @@ import { Select } from '../ui/Select'
 import { FlameGraph } from './FlameGraph'
 import { TopTable } from './TopTable'
 import { fileManagerName } from '../../lib/platform'
-import { Button, Input, Segment } from '@flint-ide/ui'
+import { Button, Input, Segment, ViewToolbar } from '@flint-ide/ui'
 
 interface Props {
   profileId: string
@@ -49,7 +49,7 @@ export function ProfileView({ profileId }: Props) {
 
   return (
     <div className="profile-view">
-      <div className="run-toolbar profile-toolbar">
+      <ViewToolbar aria-label="Profile" className="profile-toolbar">
         <Segment
           size="sm"
           shape="rounded"
@@ -96,7 +96,7 @@ export function ProfileView({ profileId }: Props) {
             Reset Zoom
           </Button>
         )}
-        <span className="spacer" />
+        <span className="fui-grow" />
         {report && (
           <span className="muted profile-summary" title={report.trimmed ? `${report.trimmed} frames under 0.5% are hidden` : undefined}>
             {zoomed && focus.length > 0 ? `${zoomed.name.slice(zoomed.name.lastIndexOf('/') + 1)} · ` : ''}
@@ -118,7 +118,7 @@ export function ProfileView({ profileId }: Props) {
             )}
           />
         )}
-      </div>
+      </ViewToolbar>
       <div className="profile-body">
         {doc.error ? (
           <div className="profile-message error">{doc.error}</div>

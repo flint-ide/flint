@@ -22,7 +22,7 @@ import { Icon } from '../ui/Icon'
 import { MarkerBadge, TaskStateBadge } from './badges'
 import { TaskCI, TaskCIFix, TaskReviewComments } from './TaskCI'
 import { CompareView } from './CompareView'
-import { Button, IconButton } from '@flint-ide/ui'
+import { Button, IconButton, PanelHeader, TreeRow } from '@flint-ide/ui'
 import { Plus, X } from '@flint-ide/ui/icons'
 
 const basename = (p: string) => p.slice(p.lastIndexOf('/') + 1)
@@ -34,12 +34,14 @@ export function TasksPanel() {
 
   return (
     <div className="panel tasks-panel">
-      <div className="panel-header">
-        <span className="panel-title">Agent Tasks</span>
-        <IconButton variant="ghost" size="sm" aria-label="New Agent Task" title="New Agent Task…" onClick={openNewTask}>
-          <Plus />
-        </IconButton>
-      </div>
+      <PanelHeader
+        title="Agent Tasks"
+        actions={
+          <IconButton variant="ghost" size="sm" aria-label="New Agent Task" title="New Agent Task…" onClick={openNewTask}>
+            <Plus />
+          </IconButton>
+        }
+      />
       <div className="tree scroll">
         {error && <div className="placeholder error">{error}</div>}
         {groupRows(tasks).map((row) => {
@@ -106,15 +108,21 @@ function TaskRow({ t, changes, open, busy, label, heading }: RowProps) {
   const keep = !!label
   return (
     <div className="task">
-      <div className="tree-row static task-row" title={`${t.prompt}\n\n${t.worktree}`} onClick={() => a.diff && toggleChanges(t)}>
-        <span className="twisty">{a.diff ? (open ? '▾' : '▸') : ' '}</span>
-        <TaskStateBadge state={t.stale ? 'stale' : s.state} title={t.stale ? 'The worktree folder is gone' : t.error || t.blocked || s.hint}>
-          {t.stale ? 'stale' : s.label}
-        </TaskStateBadge>
-        <span className="file-name">{label ?? heading ?? t.title}</span>
+      <TreeRow
+        title={`${t.prompt}\n\n${t.worktree}`}
+        onClick={() => a.diff && toggleChanges(t)}
+        twisty={a.diff ? (open ? 'open' : 'closed') : 'none'}
+        icon={
+          <TaskStateBadge state={t.stale ? 'stale' : s.state} title={t.stale ? 'The worktree folder is gone' : t.error || t.blocked || s.hint}>
+            {t.stale ? 'stale' : s.label}
+          </TaskStateBadge>
+        }
+        label={label ?? heading ?? t.title}
+        file
+      >
         {t.joint && t.lead && <MarkerBadge title="One agent works in the worktrees of this task's group; its chat is in this task's worktree">lead</MarkerBadge>}
         {t.joint && !t.lead && <MarkerBadge title="No chat of its own: the group's one agent works here from the lead's chat. Open shows that chat">lead's chat</MarkerBadge>}
-      </div>
+      </TreeRow>
       <div className="task-meta muted">
         <span title={`${t.branch} from ${t.base} · ${t.agent}`}><Icon name="branch" size={12} /> {t.branch}</span>
         <span>{status}</span>
@@ -141,16 +149,17 @@ function TaskRow({ t, changes, open, busy, label, heading }: RowProps) {
       </div>
       {open &&
         changes?.files?.map((f) => (
-          <div
+          <TreeRow
             key={f.path}
-            className="tree-row static change-row indent-2"
+            depth={2}
             title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}
             onClick={() => openTaskFileDiff(t, f)}
+            label={<span className={f.untracked ? 'change-untracked' : undefined}>{basename(f.path)}</span>}
+            file
+            hint={f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : ''}
           >
-            <span className={`file-name${f.untracked ? ' change-untracked' : ''}`}>{basename(f.path)}</span>
-            <span className="muted path-hint">{f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : ''}</span>
             <span className="task-lines">{f.binary ? 'bin' : `+${f.added} −${f.deleted}`}</span>
-          </div>
+          </TreeRow>
         ))}
       {open && changes?.truncated && <div className="muted indent-2 task-more">…and {changes.count - changes.files.length} more files</div>}
     </div>

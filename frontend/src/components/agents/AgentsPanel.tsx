@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { Badge, Button } from '@flint-ide/ui'
+import { Badge, Button, PanelHeader, TreeRow } from '@flint-ide/ui'
 import { agentRows, attentionCount, stateHint, stateLabel, type AgentRow } from '../../lib/agentList'
 import { TaskStateBadge } from '../tasks/badges'
 import { modKey, modifierName } from '../../lib/platform'
@@ -31,10 +31,10 @@ export function AgentsPanel() {
 
   return (
     <div className="panel tasks-panel">
-      <div className="panel-header">
-        <span className="panel-title">Agents</span>
-        {attention > 0 && <Badge color="orange" badgeStyle="light" size="sm" title={`${attention} waiting for you, failed or finished`}>{attention}</Badge>}
-      </div>
+      <PanelHeader
+        title="Agents"
+        actions={attention > 0 && <Badge color="orange" badgeStyle="light" size="sm" title={`${attention} waiting for you, failed or finished`}>{attention}</Badge>}
+      />
       <div className="tree scroll">
         {rows.map((r) => <AgentRowView key={r.key} row={r} />)}
         {rows.length === 0 && <div className="placeholder muted">No agents yet. Start a chat or an agent task and it is listed here.</div>}
@@ -49,14 +49,13 @@ function AgentRowView({ row }: { row: AgentRow }) {
   const id = row.sessionId
   return (
     <div className="task">
-      <div
-        className="tree-row static task-row"
+      <TreeRow
         title={`${row.title}\n\n${row.root}${id ? `\n\n${modifierName('Mod')}-click to peek without leaving your tab` : ''}`}
         onClick={(e) => (id && modKey(e) ? peekAgent(id) : focusAgent(row))}
-      >
-        <TaskStateBadge state={look} title={stateHint(row.state, row.kind, row.blocked)}>{stateLabel(row.state)}</TaskStateBadge>
-        <span className="file-name">{row.title}</span>
-      </div>
+        icon={<TaskStateBadge state={look} title={stateHint(row.state, row.kind, row.blocked)}>{stateLabel(row.state)}</TaskStateBadge>}
+        label={row.title}
+        file
+      />
       <div className="task-meta muted">
         <span>{row.agent}{row.kind === 'task' ? ' · task' : ''}{row.kind === 'terminal' ? ' · terminal' : ''}{row.hidden ? ' · hidden' : ''}</span>
         <span title={row.root}>{row.project}</span>

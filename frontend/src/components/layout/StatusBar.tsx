@@ -1,3 +1,4 @@
+import { StatusBar as KitStatusBar, StatusItem, StatusSpacer } from '@flint-ide/ui'
 import { useEditor } from '../../store/editor'
 import { useAgentChat } from '../../store/agentChat'
 import { inside } from '../../lib/sessionSnapshot'
@@ -27,9 +28,9 @@ export function StatusBar() {
   const location = active?.kind === 'file' && rootOf(roots, active.path) ? displayPath(roots, active.path) : active?.title
 
   return (
-    <footer className="status-bar">
+    <KitStatusBar className="status-bar">
       <span className="truncate">{location ?? ''}</span>
-      <span className="spacer" />
+      <StatusSpacer />
       {(active?.kind === 'file' || active?.kind === 'scratch') && <VimModeWidget />}
       {active?.kind === 'file' && <GitFileActions path={active.path} />}
       {root && <span>{files.toLocaleString()} files</span>}
@@ -40,7 +41,7 @@ export function StatusBar() {
       <CompletionsWidget />
       <LspWidget path={active?.kind === 'file' ? active.path : null} />
       <ContributedItems />
-    </footer>
+    </KitStatusBar>
   )
 }
 
@@ -71,16 +72,12 @@ function GitFileActions({ path }: { path: string }) {
   if (!isRepo) return null
   return (
     <>
-      <button
-        className={`status-action${annotated ? ' on' : ''}`}
-        title={annotated ? 'Close annotations' : 'Annotate with Git Blame'}
-        onClick={() => toggleBlame(path)}
-      >
+      <StatusItem pressed={annotated} tip={annotated ? 'Close annotations' : 'Annotate with Git Blame'} onClick={() => toggleBlame(path)}>
         Blame
-      </button>
-      <button className="status-action" title="Show History of this file" onClick={() => showFileHistory(path)}>
+      </StatusItem>
+      <StatusItem tip="Show History of this file" onClick={() => showFileHistory(path)}>
         History
-      </button>
+      </StatusItem>
     </>
   )
 }
@@ -121,13 +118,13 @@ function CompletionsWidget() {
   const error = useCompletionStatus((s) => s.error)
   if (!on) return null
   return (
-    <button
-      className={`status-completions${error ? ' error' : ''}`}
-      title={error ? `Completions: ${error}` : `Inline completions from ${model} (Tab accepts, Esc dismisses)`}
+    <StatusItem
+      className={error ? 'status-error' : undefined}
+      tip={error ? `Completions: ${error}` : `Inline completions from ${model} (Tab accepts, Esc dismisses)`}
       onClick={() => error && showToast(`Completions: ${error}`, 'error')}
     >
       {error ? '⚠' : '✦'} Completions
-    </button>
+    </StatusItem>
   )
 }
 
@@ -144,12 +141,12 @@ function LspWidget({ path }: { path: string | null }) {
   if (!st) return null
   const icon = st.state === 'ready' ? '●' : st.state === 'starting' ? '◌' : '⚠'
   return (
-    <button
+    <StatusItem
       className={`status-lsp ${st.state}`}
-      title={st.message || `${st.language} language server: ${st.state}`}
+      tip={st.message || `${st.language} language server: ${st.state}`}
       onClick={() => st.message && showToast(st.message, st.state === 'ready' ? 'info' : 'error')}
     >
       {icon} {st.language}
-    </button>
+    </StatusItem>
   )
 }

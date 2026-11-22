@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { Button } from '@flint-ide/ui'
 import { logFrontendError } from '../../store/diagnostics'
 
 interface Props {
@@ -29,7 +30,7 @@ export class ErrorBoundary extends Component<Props, State> {
       <div className="placeholder error selectable">
         <div>{this.props.label ? `${this.props.label} failed to load.` : 'Something went wrong.'}</div>
         <code>{this.state.error.message}</code>
-        <button onClick={() => this.setState({ error: null })}>Retry</button>
+        <Button variant="plain" size="sm" onClick={() => this.setState({ error: null })}>Retry</Button>
       </div>
     )
   }

@@ -1,3 +1,5 @@
+import { Button, IconButton } from '@flint-ide/ui'
+import { X } from '@flint-ide/ui/icons'
 import { useGit } from '../../store/git'
 import { PullProjectPopup } from '../git/PullProjectPopup'
 import { Modal } from './Modal'
@@ -24,7 +26,7 @@ export function Overlays() {
           <SignInWithGitHub intro="This needs a GitHub account. Flint keeps its token in the system keyring and sends it only to GitHub's API." />
           <div className="form-actions">
             <span className="spacer" />
-            <button onClick={closeSignInDialog}>Close</button>
+            <Button variant="plain" onClick={closeSignInDialog}>Close</Button>
           </div>
         </Modal>
       )}
@@ -54,8 +56,16 @@ function AttentionNotice() {
     <div className="toast attention" role="alert" title="From the keyboard: Show Agent Waiting for You in the command palette">
       <span>{need.inApp}</span>
       <span className="spacer" />
-      <button className="link" aria-label={`Show: ${need.inApp}`} onClick={() => showNeed(need)}>Show</button>
-      <button className="icon" aria-label="Close this notice (the request stays open)" title="Close this notice (the request stays open)" onClick={() => dismissNotice(need.key)}>✕</button>
+      <Button variant="primary" size="sm" aria-label={`Show: ${need.inApp}`} onClick={() => showNeed(need)}>Show</Button>
+      <IconButton
+        variant="ghost"
+        size="sm"
+        aria-label="Close this notice (the request stays open)"
+        title="Close this notice (the request stays open)"
+        onClick={() => dismissNotice(need.key)}
+      >
+        <X />
+      </IconButton>
     </div>
   )
 }

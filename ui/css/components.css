@@ -45,12 +45,13 @@
   cursor: pointer;
   color: var(--fg-muted);
   border-right: 1px solid var(--border);
+  max-width: 220px;
 }
 .fui-tab svg { width: 14px; height: 14px; }
 .fui-tab:hover { color: var(--fg); }
 .fui-tab[aria-selected='true'] { color: var(--fg); background: var(--bg-raised); box-shadow: inset 0 2px 0 var(--accent); }
 .fui-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.fui-tab-title { white-space: nowrap; }
+.fui-tab-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fui-tab-dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; display: none; }
 .fui-tab-close[data-dirty] .fui-tab-dot { display: block; }
 .fui-tab-close[data-dirty] .fui-tab-x { display: none; }
@@ -80,6 +81,9 @@
   cursor: pointer;
 }
 .fui-statusitem:hover { color: var(--fg); background: var(--bg-hover); }
+.fui-statusitem[aria-pressed='true'] { color: var(--accent); }
+.fui-statusitem:disabled { cursor: default; opacity: 0.6; }
+.fui-statustip { white-space: pre-line; }
 .fui-statusitem svg { width: 12px; height: 12px; }
 
 /* DiffStat */

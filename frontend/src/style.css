@@ -374,14 +374,18 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
 .tb-icon:hover {
   background: var(--bg-hover);
 }
-.tb-widget.project .tb-label {
+/* Folder and branch: the kit's ghost buttons; the run widget is still a .tb-widget. */
+.tb-project .tb-label {
   font-weight: 600;
 }
-.tb-widget.branch {
+.tb-branch {
   color: var(--fg-muted);
 }
-.tb-widget.branch .tb-label {
+.tb-branch .tb-label {
   color: var(--fg);
+}
+.tb-caret {
+  color: var(--fg-faint);
 }
 .tb-label {
   max-width: 220px;
@@ -394,44 +398,23 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
   font-size: 11px;
   margin-top: -4px;
 }
-.tb-widget .ahead,
-.tb-widget .behind,
-.tb-widget .warn {
+.tb-count {
   font-size: 11px;
-}
-.tb-path {
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-left: auto;
-  padding-left: 12px;
 }
 .tb-actions {
   display: flex;
   align-items: center;
   gap: 2px;
 }
+/* Go to file: the kit's plain button, as wide as a search field. */
 .tb-search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 26px;
   width: 220px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--fg-faint);
-  font-size: 12px;
+  justify-content: flex-start;
+  color: var(--fg-muted);
   margin-right: 6px;
 }
-.tb-search:hover {
-  border-color: var(--fg-faint);
-  color: var(--fg-muted);
-}
-.tb-search kbd {
+.tb-search [data-slot='kbd'] {
   margin-left: auto;
-  font-size: 10px;
 }
 .tb-icon {
   width: 28px;
@@ -445,8 +428,8 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
   padding: 0;
 }
 @media (max-width: 860px) {
-  .tb-search span,
-  .tb-search kbd {
+  .tb-search-label,
+  .tb-search [data-slot='kbd'] {
     display: none;
   }
   .tb-search {
@@ -477,43 +460,24 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
   flex: none;
   vertical-align: -0.15em;
 }
+/* Panel buttons: the kit's ghost IconButton; the open panel's stays lit. */
 .activity {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
+  position: relative;
   font-size: 16px;
   color: var(--fg-faint);
-  padding: 0;
-  border-radius: 6px;
 }
-.activity.active,
 .activity:hover {
+  color: var(--fg);
+}
+.activity[data-active] {
   color: var(--fg);
   background: var(--bg-hover);
 }
-.activity {
-  position: relative;
-}
-/* A panel's count (PanelSpec.useBadge): the agents that need you. */
+/* A panel's count (PanelSpec.useBadge, the kit's BadgeCounter): the agents that need
+   you, kept inside the bar's edge rather than straddling the corner. */
 .activity-badge {
-  position: absolute;
-  top: 2px;
-  right: 1px;
-  min-width: 15px;
-  height: 15px;
-  padding: 0 4px;
-  box-sizing: border-box;
-  border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-fg);
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 15px;
-  text-align: center;
+  top: 4px;
+  right: 4px;
   pointer-events: none;
 }
 
@@ -555,17 +519,18 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
   background: var(--accent);
 }
 
+/* The kit's StatusBar with StatusItems; plain text and feature modules' own items
+   (spans, .status-action buttons) sit centred between them, as far apart. */
 .status-bar {
-  height: 22px;
   flex: none;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 0 10px;
-  font-size: 11px;
-  color: var(--fg-muted);
-  border-top: 1px solid var(--border);
-  background: var(--bg-sidebar);
+  padding: 0 2px;
+}
+.status-bar > :not(.fui-statusitem, .fui-grow) {
+  align-self: center;
+  margin: 0 8px;
+}
+.status-error {
+  color: var(--danger);
 }
 
 /* ---------- panels & trees ---------- */
@@ -930,42 +895,8 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
   min-height: 0;
   background: var(--bg-editor);
 }
-.tab-bar {
-  height: 34px;
-  flex: none;
-  display: flex;
-  overflow-x: auto;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-}
-.tab-bar::-webkit-scrollbar {
-  height: 0;
-}
-.tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 6px 0 12px;
-  border-right: 1px solid var(--border);
-  white-space: nowrap;
-  cursor: pointer;
-  color: var(--fg-muted);
-  max-width: 220px;
-}
-.tab.active {
-  background: var(--bg-editor);
-  color: var(--fg);
-  box-shadow: inset 0 2px 0 var(--accent);
-}
-.tab.exited {
+.fui-tab.exited {
   opacity: 0.6;
-}
-.tab-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.tab-agent {
-  margin-left: 6px;
 }
 .tab-icon {
   width: 7px;
@@ -982,39 +913,6 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
 }
 .tab-icon.terminal {
   background: var(--ok);
-}
-.tab-close {
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: none;
-  background: none;
-  border-radius: 4px;
-  position: relative;
-  visibility: hidden;
-}
-.tab:hover .tab-close,
-.tab.active .tab-close,
-.tab-close.dirty {
-  visibility: visible;
-}
-.tab-close::before {
-  content: '×';
-  font-size: 15px;
-  line-height: 18px;
-  color: var(--fg-muted);
-}
-.tab-close.dirty::before {
-  content: '●';
-  font-size: 9px;
-  color: var(--accent);
-}
-.tab-close.dirty:hover::before {
-  content: '×';
-  font-size: 15px;
-}
-.new-tab {
-  margin: 0 4px;
 }
 .tab-panels {
   flex: 1;
@@ -1668,9 +1566,6 @@ button.small {
 .shortcuts dd {
   margin: 0;
 }
-.welcome-tools {
-  font-size: 12px;
-}
 
 /* ---------- tool check ---------- */
 
@@ -1887,16 +1782,18 @@ button.small {
   border-color: var(--border);
   box-shadow: none;
 }
+/* Rows in the kit's palette look (CommandPalette): rounded, inset from the edge. */
 .quick-list {
   max-height: 50vh;
   overflow-y: auto;
-  padding: 4px 0;
+  padding: 4px;
 }
 .quick-item {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 4px 14px;
+  padding: 4px 10px;
+  border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -2237,6 +2134,11 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 }
 .quick-item.current .file-name {
   color: var(--accent);
+}
+/* Recent folders' add and remove buttons, kept from making their row taller. */
+.recent-action {
+  align-self: center;
+  margin-block: -4px;
 }
 .quick-item.action {
   color: var(--fg);
@@ -2668,32 +2570,12 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 .cm-diagnostic .cm-diagnosticAction:hover {
   border-color: var(--accent);
 }
-.status-lsp {
-  background: none;
-  border: none;
-  padding: 0 6px;
-  font-size: 11px;
-  color: var(--fg-muted);
-  height: 18px;
-}
 .status-lsp.ready {
   color: var(--ok);
 }
 .status-lsp.failed,
 .status-lsp.unavailable {
   color: var(--accent);
-}
-.status-completions {
-  background: none;
-  border: none;
-  padding: 0 6px;
-  font-size: 11px;
-  color: var(--fg-muted);
-  height: 18px;
-}
-.status-completions.error {
-  color: var(--danger);
-  cursor: pointer;
 }
 .usages-title {
   padding: 10px 14px;
@@ -3055,10 +2937,14 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
-.tab-strip .tab-bar {
+/* The kit's EditorTabs fills the strip, which draws the bottom border under the + too. */
+.tab-strip .fui-tabs {
   flex: 1 1 auto;
   min-width: 0;
   border-bottom: none;
+}
+.tab-strip .fui-tabs::-webkit-scrollbar {
+  height: 0;
 }
 .tab-strip .new-tab-wrap {
   flex: none;
@@ -3073,9 +2959,6 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 }
 .tree-row .file-icon {
   margin-right: 2px;
-}
-.tab .file-icon {
-  margin-left: -2px;
 }
 .quick-item .file-icon {
   align-self: center;
@@ -3549,11 +3432,8 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 .command-palette .path-hint {
   text-align: right;
 }
-.command-palette kbd {
+.command-palette [data-slot='kbd'] {
   margin-left: auto;
-  min-width: 36px;
-  text-align: center;
-  font-size: 10px;
 }
 .command-palette .quick-item.after-recent {
   border-top: 1px solid var(--border);
@@ -3998,28 +3878,12 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   flex-direction: column;
   position: relative;
 }
+/* Editor / Split / Preview (the kit's Segment), floating over the top right corner. */
 .md-modes {
   position: absolute;
   top: 6px;
   right: 14px;
   z-index: 5;
-  display: flex;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--bg);
-}
-.md-mode {
-  height: 22px;
-  padding: 0 9px;
-  font-size: 11px;
-  color: var(--fg-muted);
-  background: transparent;
-  border: 0;
-}
-.md-mode.on {
-  background: var(--bg-active);
-  color: var(--fg);
 }
 .md-body {
   flex: 1;
@@ -5363,19 +5227,12 @@ body.file-drop-target-active::after {
 
 /* ---------- Restricted Mode ---------- */
 
+/* The kit's warning Alert, as a full-width bar under the title bar. */
 .trust-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
-  font-size: 12px;
-  color: var(--fg);
-  background: color-mix(in srgb, var(--warn) 14%, var(--bg));
-  border-bottom: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
-}
-.trust-icon {
-  color: var(--warn);
   flex: none;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  font-size: 12px;
 }
 .trust-text {
   flex: 1;
@@ -5691,20 +5548,6 @@ body.file-drop-target-active::after {
   max-height: 240px;
 }
 /* CI of your pull requests (store/ci.ts) */
-.status-ci-group {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-.status-ci {
-  background: none;
-  border: none;
-  padding: 0 6px;
-  font-size: 11px;
-  height: 18px;
-  border-radius: 4px;
-  color: var(--fg-muted);
-}
 .status-ci.failure {
   color: #fff;
   background: var(--danger);
@@ -6264,31 +6107,11 @@ body.file-drop-target-active::after {
 
 /* ---------- machines (remote terminals) ---------- */
 
-.tab-machine {
-  margin-left: 6px;
-  padding: 0 5px;
-  border-radius: 3px;
-  font-size: 10px;
-  line-height: 15px;
-  color: var(--fg-muted);
-  border: 1px solid var(--border);
-  white-space: nowrap;
-}
+/* A remote terminal's connection state above it: the kit's Alert as a full-width bar. */
 .terminal-banner {
   flex: none;
-  padding: 4px 10px;
+  border-width: 0 0 1px;
+  border-radius: 0;
   font-size: 11px;
-  color: var(--fg-muted);
-  background: var(--bg-elevated, var(--bg-editor));
-  border-bottom: 1px solid var(--border);
   white-space: pre-wrap;
-}
-.terminal-banner.error {
-  color: var(--danger);
-}
-.status-machines {
-  color: var(--fg-muted);
-}
-.status-machines.error {
-  color: var(--danger);
 }

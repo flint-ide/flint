@@ -9,7 +9,7 @@ import { displayPath, labelOf } from '../../lib/workspaceRoots'
 import { fileKey, matchKey } from '../../lib/replaceTargets'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
-import { Button, Input } from '@flint-ide/ui'
+import { Badge, Button, Checkbox, Input, InputGroup, InputGroupAddon } from '@flint-ide/ui'
 
 const basename = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 const dirname = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
@@ -92,8 +92,8 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
         <span className="panel-title">Search</span>
       </div>
       <div className="search-form">
-        <div className="search-input">
-          <input
+        <InputGroup className="search-input">
+          <Input
             ref={input}
             value={params.query}
             placeholder={roots.length > 1 ? 'Search in workspace' : 'Search in folder'}
@@ -101,32 +101,38 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
             onChange={(e) => setParams({ query: e.target.value })}
             onKeyDown={(e) => e.key === 'Enter' && roots.length > 0 && void run(roots)}
           />
-          <Toggle on={params.caseSensitive} title="Match case" onClick={() => setParams({ caseSensitive: !params.caseSensitive })}>Aa</Toggle>
-          <Toggle on={params.wholeWord} title="Whole word" onClick={() => setParams({ wholeWord: !params.wholeWord })}>W</Toggle>
-          <Toggle on={params.regex} title="Regular expression" onClick={() => setParams({ regex: !params.regex })}>.*</Toggle>
-          <Toggle on={showFilters} title="File filters" onClick={() => setShowFilters(!showFilters)}>⋯</Toggle>
-          <Toggle on={params.replaceOn} title={`Replace (${formatKeys('Mod+Shift+R')})`} onClick={() => setParams({ replaceOn: !params.replaceOn })}>⇄</Toggle>
-        </div>
+          <InputGroupAddon>
+            <Toggle on={params.caseSensitive} title="Match case" onClick={() => setParams({ caseSensitive: !params.caseSensitive })}>Aa</Toggle>
+            <Toggle on={params.wholeWord} title="Whole word" onClick={() => setParams({ wholeWord: !params.wholeWord })}>W</Toggle>
+            <Toggle on={params.regex} title="Regular expression" onClick={() => setParams({ regex: !params.regex })}>.*</Toggle>
+            <Toggle on={showFilters} title="File filters" onClick={() => setShowFilters(!showFilters)}>⋯</Toggle>
+            <Toggle on={params.replaceOn} title={`Replace (${formatKeys('Mod+Shift+R')})`} onClick={() => setParams({ replaceOn: !params.replaceOn })}>⇄</Toggle>
+          </InputGroupAddon>
+        </InputGroup>
         {params.replaceOn && (
-          <div className="search-input search-replace">
-            <input
+          <InputGroup className="search-input search-replace">
+            <Input
               value={params.replace}
               placeholder={params.regex ? 'Replace ($1, ${name} for groups)' : 'Replace'}
               spellCheck={false}
               onChange={(e) => setParams({ replace: e.target.value })}
               onKeyDown={(e) => e.key === 'Enter' && modKey(e) && void useSearch.getState().replaceAll(roots)}
             />
-            <Button
-              size="sm"
-              variant="plain"
-              className="replace-all"
-              title={`Replace every ticked match (${formatKeys('Mod+Enter')})`}
-              disabled={replacing || !!runningId || matches.length === 0}
-              onClick={() => void useSearch.getState().replaceAll(roots)}
-            >
-              {replacing ? 'Replacing…' : 'Replace all'}
-            </Button>
-          </div>
+            <InputGroupAddon>
+              {/* Disabled kit buttons ignore the pointer, so the hint lives on a wrapper. */}
+              <span title={`Replace every ticked match (${formatKeys('Mod+Enter')})`}>
+                <Button
+                  size="sm"
+                  variant="plain"
+                  className="replace-all"
+                  disabled={replacing || !!runningId || matches.length === 0}
+                  onClick={() => void useSearch.getState().replaceAll(roots)}
+                >
+                  {replacing ? 'Replacing…' : 'Replace all'}
+                </Button>
+              </span>
+            </InputGroupAddon>
+          </InputGroup>
         )}
         {lastReplace?.undoable && (
           <div className="search-scope">
@@ -138,10 +144,9 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
         )}
         {scoped && (
           <div className="search-scope">
-            <span className="chip">
+            <Badge size="sm" badgeStyle="light_border" onRemove={() => setParams({ scope: '', include: '' })} removeLabel="Search the whole workspace">
               in {labelOf(roots, params.scope)}
-              <button className="icon" title="Search the whole workspace" onClick={() => setParams({ scope: '', include: '' })}>×</button>
-            </span>
+            </Badge>
           </div>
         )}
         {showFilters && (
@@ -173,7 +178,7 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
                   <FileIcon name={basename(row.path)} />
                   <span className="file-name">{basename(row.path)}</span>
                   <span className="muted path-hint">{dirname(displayPath(roots, row.path))}</span>
-                  <span className="badge">{row.count}</span>
+                  <Badge size="sm" className="count-badge">{row.count}</Badge>
                 </div>
               )
             }
@@ -208,12 +213,12 @@ function Toggle(props: { on: boolean; title: string; onClick: () => void; childr
 /** A checkbox that ticks a file or line in or out of a replace (doesn't open the match). */
 function Tick({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
-    <input
-      type="checkbox"
+    <Checkbox
       className="search-tick"
+      aria-label="Include in replace"
       checked={on}
       onClick={(e) => e.stopPropagation()}
-      onChange={onToggle}
+      onCheckedChange={onToggle}
     />
   )
 }

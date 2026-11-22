@@ -47,7 +47,7 @@ function RunPrompt({ root }: { root: string }) {
         <PromptArgsForm prompt={asking} onSubmit={(args) => run(asking, args)} onCancel={() => setAsking(null)} />
       ) : (
         <>
-          <input
+          <Input
             autoFocus
             className="quick-input"
             placeholder="Run prompt in the agent chat…"

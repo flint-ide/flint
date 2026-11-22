@@ -13,7 +13,7 @@ import { openContextMenu } from '../../store/contextMenu'
 import { fileTreeMenu } from './fileTreeMenu'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
-import { IconButton } from '@flint-ide/ui'
+import { IconButton, Input } from '@flint-ide/ui'
 import { Plus, RefreshCw } from '@flint-ide/ui/icons'
 
 const ROW_HEIGHT = 22
@@ -334,8 +334,9 @@ function InlineName({ initial, current, isDir, siblings, placeholder, onCommit, 
 
   return (
     <span className="tree-edit">
-      <input
+      <Input
         ref={input}
+        size="sm"
         className="inline-input"
         value={value}
         placeholder={placeholder}

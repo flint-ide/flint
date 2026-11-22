@@ -678,15 +678,10 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
   color: var(--accent);
   font-weight: 600;
 }
-.badge {
-  font-size: 10px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--bg-active);
-  color: var(--fg-muted);
+/* Right-aligns a kit Badge's count in a tree row. */
+.count-badge {
   margin-left: auto;
+  flex: none;
 }
 .indent-1 {
   padding-left: 22px !important;
@@ -710,7 +705,7 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
 .tree-row:hover .row-actions {
   display: flex;
 }
-.tree-row:hover .row-actions ~ .badge {
+.tree-row:hover .row-actions ~ .count-badge {
   display: none;
 }
 
@@ -730,26 +725,11 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
   gap: 6px;
   padding: 0 10px 8px;
 }
+/* Kit InputGroup at the sidebar's compact field height; the addon holds the toggles. */
 .search-input {
-  display: flex;
-  align-items: center;
-  background: var(--bg-editor);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  padding-right: 3px;
-}
-.search-input:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-dim);
-}
-.search-input input {
-  flex: 1;
-  border: none;
-  min-width: 0;
-}
-/* The box around it shows focus; the borderless field itself gets no ring. */
-.search-input input:focus {
-  box-shadow: none;
+  --ig-h: var(--field-sm);
+  gap: 0;
+  padding: 0 3px 0 8px;
 }
 .toggle {
   background: none;
@@ -880,9 +860,11 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
   font-size: 11px;
   margin-left: 6px;
 }
+/* Kit Input squeezed into a 22px tree row. */
 .inline-input {
   flex: 1;
-  padding: 1px 4px;
+  height: 20px;
+  padding: 0 4px;
   min-width: 0;
 }
 
@@ -1226,20 +1208,12 @@ button.small {
 .cell-editor select {
   flex: 1;
   min-width: 0;
-  padding: 1px 6px;
   font-family: var(--font-mono);
   font-size: 12px;
 }
 .cell-editor textarea {
   flex: 1;
   min-height: 150px;
-  resize: vertical;
-  padding: 4px 6px;
-  background: var(--bg-editor);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  outline: none;
   font: 12px/1.45 var(--font-mono);
 }
 .cell-editor button {
@@ -1759,6 +1733,7 @@ button.small {
 }
 .quick-input {
   width: 100%;
+  height: auto;
   border: none;
   border-bottom: 1px solid var(--border);
   border-radius: 0;
@@ -2672,20 +2647,6 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   gap: 4px;
   margin-top: 4px;
 }
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font: 11px var(--font-mono);
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1px 8px;
-}
-.chip .icon {
-  padding: 0 2px;
-  font-size: 10px;
-}
 .tool-call {
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -2875,19 +2836,8 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 .composer textarea {
   min-height: 56px;
   max-height: 200px;
-  resize: vertical;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 8px;
-  color: var(--fg);
-  font: 13px/1.45 var(--font-ui);
-  outline: none;
   user-select: text;
   -webkit-user-select: text;
-}
-.composer textarea:focus {
-  border-color: var(--accent);
 }
 .composer-actions {
   display: flex;
@@ -3544,6 +3494,7 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   height: 28px;
   border: 0;
   border-top: 1px solid var(--border);
+  border-radius: 0;
   padding: 0 10px;
   background: var(--bg);
   color: var(--fg);
@@ -4916,7 +4867,7 @@ button.keymap-chord:hover {
   font-size: 12px;
   font-weight: 600;
 }
-.pr-section-title .badge {
+.pr-section-title .count-badge {
   margin-left: 0;
 }
 .clickable {

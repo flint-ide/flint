@@ -14,7 +14,7 @@ import {
 } from '../../lib/commands'
 import { useSettings } from '../../store/settings'
 import { isMac } from '../../lib/platform'
-import { Button, IconButton, Input } from '@flint-ide/ui'
+import { Button, IconButton, Input, Kbd } from '@flint-ide/ui'
 import { RotateCcw, X } from '@flint-ide/ui/icons'
 
 /** Every command with its shortcut: search, record a new chord, reset or remove it. */
@@ -96,11 +96,11 @@ export function KeymapSection({ active }: { active: boolean }) {
                     onClick={() => setRecording(recording === cmd.id ? null : cmd.id)}
                     onBlur={() => setRecording((r) => (r === cmd.id ? null : r))}
                   >
-                    {recording === cmd.id ? 'Press keys…' : keys ? <kbd>{safeFormat(keys)}</kbd> : <span className="muted">—</span>}
+                    {recording === cmd.id ? 'Press keys…' : keys ? <Kbd>{safeFormat(keys)}</Kbd> : <span className="muted">—</span>}
                   </button>
                 ) : (
                   <span className="keymap-chord fixed" title="Handled by the editor; it can't be changed here">
-                    {keys && <kbd>{safeFormat(keys)}</kbd>} <span className="muted">editor</span>
+                    {keys && <Kbd>{safeFormat(keys)}</Kbd>} <span className="muted">editor</span>
                   </span>
                 )}
                 <span className="keymap-actions">

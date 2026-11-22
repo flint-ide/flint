@@ -1,3 +1,5 @@
+import { Button, IconButton } from '@flint-ide/ui'
+import { RefreshCw } from '@flint-ide/ui/icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as API from '../../../bindings/flint/internal/features/extensions/api'
 import type { Row, View } from '../../../bindings/flint/internal/extensions/host/models'
@@ -74,7 +76,7 @@ export function DeclarativeView({ ext, view, title, tabKey, data, active }: Prop
   const body = error ? (
     <div className="placeholder">
       <span className="error selectable">{error}</span>
-      <button className="link" onClick={load}>Try again</button>
+      <Button variant="ghost" size="sm" onClick={load}>Try again</Button>
     </div>
   ) : !root ? (
     <div className="placeholder muted">{loading ? 'Loading…' : ''}</div>
@@ -92,9 +94,9 @@ export function DeclarativeView({ ext, view, title, tabKey, data, active }: Prop
     <div className="placeholder">
       <span>{root.text}</span>
       {root.actions?.map((a) => (
-        <button key={a.id} className="link" onClick={() => action('', a.id)}>
+        <Button key={a.id} variant="ghost" size="sm" onClick={() => action('', a.id)}>
           {a.label}
-        </button>
+        </Button>
       ))}
     </div>
   ) : (
@@ -105,7 +107,7 @@ export function DeclarativeView({ ext, view, title, tabKey, data, active }: Prop
     <div className={tabKey ? 'panel ext-view-tab' : 'panel'}>
       <div className="panel-header">
         <span className="panel-title">{title}</span>
-        <button className="icon" title="Refresh" aria-label={`Refresh ${title}`} disabled={loading} onClick={load}>↻</button>
+        <IconButton variant="ghost" size="sm" title="Refresh" aria-label={`Refresh ${title}`} disabled={loading} onClick={load}><RefreshCw /></IconButton>
       </div>
       {body}
     </div>

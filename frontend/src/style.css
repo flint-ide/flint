@@ -1066,7 +1066,6 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
 }
 .query-toolbar button {
   flex: none;
-  padding: 2px 10px;
 }
 .hint {
   font-size: 11px;
@@ -1202,8 +1201,6 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
 .grid-search {
   width: 160px;
   flex: none;
-  padding: 2px 6px;
-  font-size: 12px;
 }
 .filter-status {
   display: inline-flex;
@@ -1243,7 +1240,7 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
 }
 .column-filter-search {
   margin: 4px 10px;
-  padding: 3px 6px;
+  width: calc(100% - 20px);
 }
 .column-filter-actions {
   display: flex;
@@ -2595,9 +2592,6 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   border-bottom: 1px solid var(--border);
   font-size: 15px;
   font-weight: 600;
-}
-.release-notes h2 .badge {
-  margin-left: 0;
 }
 .release-notes ul {
   margin: 0;
@@ -4419,11 +4413,6 @@ button.keymap-chord:hover {
   gap: 4px;
   margin-top: 4px;
 }
-.todo-tag {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
 .todo-item {
   padding-left: 22px;
   gap: 6px;
@@ -6086,16 +6075,11 @@ body.file-drop-target-active::after {
 }
 .extension-state {
   margin-left: auto;
-  font-size: 11px;
-  color: var(--fg-muted);
 }
-.extension-state.running {
-  color: var(--ok);
-}
-.extension-state.crashed,
-.extension-state.failed,
-.extension-state.invalid {
-  color: var(--danger);
+/* A text field of an extension's form or a settings list: the kit's field at a readable width. */
+.wide-field {
+  width: 100%;
+  max-width: 420px;
 }
 .extension-description,
 .extension-warning {

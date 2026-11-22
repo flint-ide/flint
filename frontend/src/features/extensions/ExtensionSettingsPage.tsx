@@ -1,3 +1,4 @@
+import { Checkbox, Textarea } from '@flint-ide/ui'
 import { useEffect, useState } from 'react'
 import { useSettings } from '../../store/settings'
 import { NumberField, Row, TextField } from '../../components/settings/fields'
@@ -35,7 +36,7 @@ export function ExtensionSettingsPage({ id }: { id: string }) {
 function Field({ prop, value, onCommit }: { prop: SchemaProperty; value: unknown; onCommit: (v: unknown) => void }) {
   switch (prop.type) {
     case 'boolean':
-      return <input type="checkbox" checked={value === true} onChange={(e) => onCommit(e.target.checked)} />
+      return <Checkbox checked={value === true} onCheckedChange={onCommit} />
     case 'integer':
     case 'number':
       return (
@@ -65,8 +66,9 @@ function ListField({ prop, value, onCommit }: { prop: SchemaProperty; value: rea
   const why = checkValue(prop, list)
   return (
     <div className="settings-control settings-control-stack">
-      <textarea
-        className={`settings-textarea${why ? ' invalid' : ''}`}
+      <Textarea
+        className="wide-field"
+        aria-invalid={why ? true : undefined}
         value={draft}
         spellCheck={false}
         onChange={(e) => setDraft(e.target.value)}

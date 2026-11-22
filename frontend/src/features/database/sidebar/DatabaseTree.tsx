@@ -1,4 +1,4 @@
-import { IconButton } from '@flint-ide/ui'
+import { Badge, IconButton } from '@flint-ide/ui'
 import { RefreshCw, SquareTerminal } from '@flint-ide/ui/icons'
 import { useEffect, useState, type MouseEvent } from 'react'
 import { errorMessage, type Connection, type DatabaseInfo, type Table } from '../../../api/backend'
@@ -175,7 +175,7 @@ function SchemaTree({ conn, database, tables, onRefresh }: { conn: Connection; d
             >
               <span className="twisty">{sOpen ? '▾' : '▸'}</span>
               <span className="schema-name">{schemaName}</span>
-              <span className="badge">{list.length}</span>
+              <Badge size="sm" className="count-badge">{list.length}</Badge>
             </div>
             {sOpen && tableRows(list, 4)}
           </div>

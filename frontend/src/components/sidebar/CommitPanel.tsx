@@ -18,7 +18,7 @@ import { reviewChanges, useAgentReview } from '../../store/agentReview'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
 import { Icon } from '../ui/Icon'
-import { Button, Checkbox, IconButton, Textarea } from '@flint-ide/ui'
+import { Badge, Button, Checkbox, IconButton, Textarea } from '@flint-ide/ui'
 import { Archive, ArrowDownToLine, Download, ExternalLink, RefreshCw, Sparkles, Undo2, Upload } from '@flint-ide/ui/icons'
 import { openMergeEditor } from '../../store/mergeEditor'
 
@@ -283,21 +283,19 @@ function RepoSection({
       >
         <span className="twisty" onClick={(e) => (e.stopPropagation(), toggle(key))}>{open ? '▾' : '▸'}</span>
         {tickable.length > 0 && (
-          <input
-            type="checkbox"
+          <Checkbox
+            aria-label={`Include all files of ${label}`}
             checked={included === tickable.length}
-            ref={(el) => {
-              if (el) el.indeterminate = included > 0 && included < tickable.length
-            }}
+            indeterminate={included > 0 && included < tickable.length}
             onClick={(e) => e.stopPropagation()}
-            onChange={(e) => setGroup(tickable, e.target.checked, section.root)}
+            onCheckedChange={(checked) => setGroup(tickable, checked, section.root)}
           />
         )}
         <span className="group-title repo-title">{label}</span>
         <span className="muted repo-branch">
           <BranchLine status={section.status} />
         </span>
-        {files.length > 0 && <span className="badge">{files.length}</span>}
+        {files.length > 0 && <Badge size="sm" className="count-badge">{files.length}</Badge>}
       </div>
       {open &&
         (files.length > 0 ? (
@@ -356,7 +354,7 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
                   <Sparkles /> Resolve with {agents.conflictAgent}
                 </Button>
               )}
-              <span className="badge">{g.files.length}</span>
+              <Badge size="sm" className="count-badge">{g.files.length}</Badge>
             </div>
             {!collapsed[key] &&
               g.files.map((f) => (
@@ -418,14 +416,18 @@ function RollbackTicked({
   })
   const plural = count === 1 ? '' : 's'
   return (
-    <button
-      className="icon group-action"
-      disabled={disabled}
-      title={untracked ? `Delete the ${count} ticked unversioned file${plural}…` : `Rollback the ${count} ticked file${plural}…`}
-      onClick={onClick}
-    >
-      ↶
-    </button>
+    // Disabled kit buttons ignore the pointer, so the hint lives on a wrapper.
+    <span title={untracked ? `Delete the ${count} ticked unversioned file${plural}…` : `Rollback the ${count} ticked file${plural}…`}>
+      <IconButton
+        variant="ghost"
+        size="sm"
+        disabled={disabled}
+        aria-label={untracked ? `Delete the ${count} ticked unversioned file${plural}` : `Rollback the ${count} ticked file${plural}`}
+        onClick={onClick}
+      >
+        <Undo2 />
+      </IconButton>
+    </span>
   )
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Checkbox, IconButton, Input } from '@flint-ide/ui'
+import { Badge, Button, Checkbox, IconButton, Input } from '@flint-ide/ui'
 import { X } from '@flint-ide/ui/icons'
 import { useGit } from '../../store/git'
 import {
@@ -37,7 +37,7 @@ export function StashSection() {
           <div className="tree-row static group-row" onClick={() => setCollapsed(!collapsed)}>
             <span className="twisty">{collapsed ? '▸' : '▾'}</span>
             <span className="group-title">Stashes</span>
-            <span className="badge">{stashes.length}</span>
+            <Badge size="sm" className="count-badge">{stashes.length}</Badge>
           </div>
           {!collapsed &&
             stashes.map((s) => (

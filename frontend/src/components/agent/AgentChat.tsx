@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { Badge, Button, Checkbox } from '@flint-ide/ui'
+import { Badge, Button, Checkbox, Textarea } from '@flint-ide/ui'
 import { Plus, Square } from '@flint-ide/ui/icons'
 import { useAgentChat, type ChatSession } from '../../store/agentChat'
 import { editedFiles } from '../../lib/agentReducer'
@@ -153,7 +153,7 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
           </div>
         )}
         {picker.element}
-        <textarea
+        <Textarea
           ref={input}
           value={session.draft}
           placeholder={chat.busy ? `${session.agent} is working… (Esc to stop)` : `Message ${session.agent} (Enter to send, ${isMac() ? '⇧Enter' : 'Shift+Enter'} newline, / for prompts)`}

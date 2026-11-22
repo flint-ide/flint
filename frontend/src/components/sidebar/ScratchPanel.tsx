@@ -8,7 +8,7 @@ import { useDatabase } from '../../features/database/store/database'
 import { confirmAction } from '../../store/dialog'
 import type { ScratchKind, ScratchPad } from '../../api/backend'
 import { formatKeys } from '../../lib/commands'
-import { IconButton } from '@flint-ide/ui'
+import { IconButton, Input } from '@flint-ide/ui'
 import { Plus, X } from '@flint-ide/ui/icons'
 
 const KIND_LABEL: Record<ScratchKind, string> = { sql: 'SQL', markdown: 'MD', text: 'TXT' }
@@ -111,7 +111,8 @@ function ScratchFileRow({ file }: { file: ScratchFile }) {
     >
       <FileIcon name={file.name} />
       {renaming ? (
-        <input
+        <Input
+          size="sm"
           className="inline-input"
           defaultValue={file.name}
           autoFocus
@@ -160,7 +161,8 @@ function ScratchRow({ sc }: { sc: ScratchPad }) {
     >
       <span className={`kind-badge ${sc.kind}`}>{KIND_LABEL[sc.kind as ScratchKind] ?? sc.kind}</span>
       {renaming ? (
-        <input
+        <Input
+          size="sm"
           className="inline-input"
           defaultValue={sc.name}
           autoFocus

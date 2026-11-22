@@ -18,7 +18,7 @@ import { FailedCheckActions, FixWithAgentButton } from './CIStatus'
 import type { FixTarget } from '../../store/ci'
 import { reviewWork, workSummary } from '../../lib/prAgent'
 import { AddressReviewButton, RequestCodeReviewButton } from './ReviewAgent'
-import { Button, DiffStat, IconButton } from '@flint-ide/ui'
+import { Badge, Button, DiffStat, IconButton } from '@flint-ide/ui'
 import { RefreshCw } from '@flint-ide/ui/icons'
 import { PrBadge } from './PrBadge'
 
@@ -148,7 +148,7 @@ function Files({ root, details }: { root: string; details: PullRequestDetails })
     <section className="pr-section">
       <div className="pr-section-title">
         <span>Files changed</span>
-        <span className="badge">{details.files.length}</span>
+        <Badge size="sm" className="count-badge">{details.files.length}</Badge>
       </div>
       {details.files.map((f) => (
         <FileRow key={f.path} file={f} threads={counts[f.path]} onOpen={() => openPullRequestFile(root, details.number, f.path)} />
@@ -178,7 +178,7 @@ function Commits({ details }: { details: PullRequestDetails }) {
       <div className="pr-section-title clickable" onClick={() => setOpen(!open)}>
         <span className="twisty">{open ? '▾' : '▸'}</span>
         <span>Commits</span>
-        <span className="badge">{details.commits.length}</span>
+        <Badge size="sm" className="count-badge">{details.commits.length}</Badge>
       </div>
       {open &&
         details.commits.map((c) => (
@@ -200,7 +200,7 @@ function Reviews({ details }: { details: PullRequestDetails }) {
     <section className="pr-section">
       <div className="pr-section-title">
         <span>Reviews</span>
-        <span className="badge">{details.reviews.length}</span>
+        <Badge size="sm" className="count-badge">{details.reviews.length}</Badge>
       </div>
       {details.reviews.map((r, i) => (
         <div key={i} className="pr-comment">

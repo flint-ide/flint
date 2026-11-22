@@ -7,7 +7,7 @@ import { usePersistentNumber } from '../../lib/usePersistentNumber'
 import { Splitter } from '../layout/Splitter'
 import { RerunIcon, StopIcon } from '../run/RunWidget'
 import { formatKeys } from '../../lib/commands'
-import { IconButton } from '@flint-ide/ui'
+import { IconButton, Input } from '@flint-ide/ui'
 
 /** The debug tab: stepping toolbar, frames, variables and the console. */
 export function DebugView() {
@@ -153,7 +153,8 @@ function Console({ session }: { session: DebugSession }) {
   return (
     <div className="debug-console">
       <pre ref={out}>{output}</pre>
-      <input
+      <Input
+        size="sm"
         className="debug-eval"
         placeholder={session.status === 'paused' ? 'Evaluate expression (↵)' : 'Pause the program to evaluate in a frame'}
         spellCheck={false}

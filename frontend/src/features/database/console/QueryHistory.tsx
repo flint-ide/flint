@@ -1,4 +1,4 @@
-import { Button, Checkbox } from '@flint-ide/ui'
+import { Button, Checkbox, Input } from '@flint-ide/ui'
 import { memo, useEffect, useState } from 'react'
 import { Database, errorMessage, historyFilter, type HistoryEntry } from '../../../api/backend'
 import { formatDuration } from '../../../lib/format'
@@ -89,7 +89,7 @@ export function QueryHistory({ connId, connName, driver, database, onInsert, onR
   return (
     <Modal onClose={onClose} className="quick-open query-history">
       <div className="history-search">
-        <input
+        <Input
           autoFocus
           className="quick-input"
           placeholder={`Filter history of ${connName}…`}

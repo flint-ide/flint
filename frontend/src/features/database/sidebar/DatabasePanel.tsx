@@ -1,3 +1,5 @@
+import { Badge, Button, IconButton } from '@flint-ide/ui'
+import { Pencil, Plus, RefreshCw, SquareTerminal, X } from '@flint-ide/ui/icons'
 import { useState } from 'react'
 import type { Connection } from '../../../api/backend'
 import { defaultDatabase } from '../lib/databases'
@@ -20,13 +22,13 @@ export function DatabasePanel() {
     <div className="panel">
       <div className="panel-header">
         <span className="panel-title">Databases</span>
-        <button className="icon" title="New connection" onClick={() => setEditing('new')}>＋</button>
+        <IconButton variant="ghost" size="sm" aria-label="New connection" title="New connection" onClick={() => setEditing('new')}><Plus /></IconButton>
       </div>
       <div className="tree scroll">
         {connections.length === 0 && (
           <div className="placeholder muted">
             No connections yet.
-            <button className="link" onClick={() => setEditing('new')}>Add PostgreSQL or ClickHouse</button>
+            <Button variant="ghost" size="sm" onClick={() => setEditing('new')}>Add PostgreSQL or ClickHouse</Button>
           </div>
         )}
         {connections.map((c) => (
@@ -65,12 +67,12 @@ function ConnectionNode({ conn, onEdit }: { conn: Connection; onEdit: () => void
         <span className="twisty">{open ? '▾' : '▸'}</span>
         <span className={`driver-badge ${conn.driver}`}>{conn.driver === 'clickhouse' ? 'CH' : 'PG'}</span>
         <span className="conn-name" title={`${conn.user}@${conn.host}:${conn.port}/${defaultDatabase(conn)}`}>{conn.name}</span>
-        {conn.readOnly && <span className="badge" title="Read-only">RO</span>}
+        {conn.readOnly && <Badge size="sm" title="Read-only">RO</Badge>}
         <span className="row-actions" onClick={(e) => e.stopPropagation()}>
-          <button className="icon" title="New SQL console" onClick={newConsole}>⌨</button>
-          <button className="icon" title="Refresh databases" onClick={refresh}>↻</button>
-          <button className="icon" title="Edit" onClick={onEdit}>✎</button>
-          <button className="icon" title="Delete" onClick={() => void remove()}>✕</button>
+          <IconButton variant="ghost" size="sm" aria-label="New SQL console" title="New SQL console" onClick={newConsole}><SquareTerminal /></IconButton>
+          <IconButton variant="ghost" size="sm" aria-label="Refresh databases" title="Refresh databases" onClick={refresh}><RefreshCw /></IconButton>
+          <IconButton variant="ghost" size="sm" aria-label="Edit" title="Edit" onClick={onEdit}><Pencil /></IconButton>
+          <IconButton variant="ghost" size="sm" aria-label="Delete" title="Delete" onClick={() => void remove()}><X /></IconButton>
         </span>
       </div>
       {open && (

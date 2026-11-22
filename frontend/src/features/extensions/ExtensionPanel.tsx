@@ -1,3 +1,5 @@
+import { Button, IconButton } from '@flint-ide/ui'
+import { RefreshCw } from '@flint-ide/ui/icons'
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import * as API from '../../../bindings/flint/internal/features/extensions/api'
 import type { Item, View } from '../../../bindings/flint/internal/extensions/host/models'
@@ -123,13 +125,13 @@ export function ExtensionPanel({ ext, view, title, kind }: { ext: string; view: 
     <div className="panel">
       <div className="panel-header">
         <span className="panel-title">{title}</span>
-        <button className="icon" title="Refresh" disabled={loading} onClick={load}>↻</button>
+        <IconButton variant="ghost" size="sm" aria-label="Refresh" title="Refresh" disabled={loading} onClick={load}><RefreshCw /></IconButton>
       </div>
       <div className="tree scroll">
         {error ? (
           <div className="placeholder">
             <span className="error">{error}</span>
-            <button className="link" onClick={load}>Try again</button>
+            <Button variant="ghost" size="sm" onClick={load}>Try again</Button>
           </div>
         ) : !root ? (
           <div className="placeholder muted">{loading ? 'Loading…' : ''}</div>
@@ -137,9 +139,9 @@ export function ExtensionPanel({ ext, view, title, kind }: { ext: string; view: 
           <div className="placeholder">
             <span>{root.text}</span>
             {root.actions?.map((a) => (
-              <button key={a.id} className="link" onClick={() => void API.Action(ext, view, '', a.id).catch(report)}>
+              <Button key={a.id} variant="ghost" size="sm" onClick={() => void API.Action(ext, view, '', a.id).catch(report)}>
                 {a.label}
-              </button>
+              </Button>
             ))}
           </div>
         ) : root.items.length === 0 ? (

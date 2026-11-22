@@ -1,3 +1,5 @@
+import { Badge, Button, IconButton, Input } from '@flint-ide/ui'
+import { RefreshCw } from '@flint-ide/ui/icons'
 import { useEffect, useMemo, useState } from 'react'
 import { EventsOn } from '../../wails/runtime'
 import { useEditor } from '../../store/editor'
@@ -53,17 +55,15 @@ export function TodoPanel() {
     <div className="panel">
       <div className="panel-header">
         <span className="panel-title">TODO</span>
-        <button className="icon" title="Rescan" disabled={scanning} onClick={() => void scanTodos()}>↻</button>
+        <IconButton variant="ghost" size="sm" aria-label="Rescan" title="Rescan" disabled={scanning} onClick={() => void scanTodos()}><RefreshCw /></IconButton>
       </div>
       <div className="search-form">
-        <div className="search-input">
-          <input value={query} placeholder="Filter notes" spellCheck={false} onChange={(e) => setTodoQuery(e.target.value)} />
-        </div>
+        <Input size="sm" value={query} placeholder="Filter notes" spellCheck={false} onChange={(e) => setTodoQuery(e.target.value)} />
         <div className="todo-tags">
           {TAGS.filter((t) => counts[t]).map((t) => (
-            <button key={t} className={`toggle todo-tag ${t.toLowerCase()}${tags.has(t) ? ' on' : ''}`} onClick={() => toggleTodoTag(t)}>
+            <Button key={t} variant={tags.has(t) ? 'plain' : 'ghost'} size="sm" aria-pressed={tags.has(t)} onClick={() => toggleTodoTag(t)}>
               {t} {counts[t]}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="search-status muted">
@@ -92,7 +92,7 @@ export function TodoPanel() {
               <FileIcon name={basename(f.path)} />
               <span className="file-name">{basename(f.path)}</span>
               <span className="muted path-hint">{displayPath(roots, f.key).replace(/\/?[^/]*$/, '')}</span>
-              <span className="badge">{f.items.length}</span>
+              <Badge size="sm">{f.items.length}</Badge>
             </div>
             {!collapsed.has(f.key) &&
               f.items.map((it) => (

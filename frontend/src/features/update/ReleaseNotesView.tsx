@@ -1,3 +1,4 @@
+import { Badge, Button } from '@flint-ide/ui'
 import type { ContributedTab } from '../../lib/features'
 import { coerceNotes, linkLabel, notesSections, releaseDate } from './notes'
 import { openNotesLink } from './store'
@@ -17,22 +18,22 @@ export function ReleaseNotesView({ tab }: { tab: ContributedTab; active: boolean
         <h1>What&apos;s New in Flint {notes.tag}</h1>
         <p className="muted release-notes-meta">
           {date && <span>Released {date} · </span>}
-          <button className="link" data-url={notes.url} onClick={openLink}>View on GitHub</button>
+          <Button variant="ghost" size="sm" data-url={notes.url} onClick={openLink}>View on GitHub</Button>
         </p>
         {sections.length === 0 && <p className="muted">This release has no notes.</p>}
         {sections.map((s) => (
           <section key={s.id} className={`release-notes-section ${s.id}`}>
             <h2>
-              {s.title} <span className="badge">{s.items.length}</span>
+              {s.title} <Badge size="sm">{s.items.length}</Badge>
             </h2>
             <ul>
               {s.items.map((item, i) => (
                 <li key={i}>
                   <span>{item.text}</span>
                   {item.url && (
-                    <button className="link release-notes-link" title={item.url} data-url={item.url} onClick={openLink}>
+                    <Button variant="ghost" size="sm" className="release-notes-link" title={item.url} data-url={item.url} onClick={openLink}>
                       {linkLabel(item.url)}
-                    </button>
+                    </Button>
                   )}
                 </li>
               ))}

@@ -1,3 +1,4 @@
+import { Textarea } from '@flint-ide/ui'
 import { useEffect, useState } from 'react'
 import { useSettings } from '../../store/settings'
 import { parseExcludes } from '../../lib/settings'
@@ -23,8 +24,9 @@ export function TodoSection() {
       <h2>TODO List</h2>
       <Row label="Excluded folders" hint="One per line, as in .gitignore: docs/legacy, /generated, *.min.js. Saved when you leave the field.">
         <div className="settings-control settings-control-stack">
-          <textarea
-            className={`settings-textarea${invalid.length ? ' invalid' : ''}`}
+          <Textarea
+            className="wide-field"
+            aria-invalid={invalid.length ? true : undefined}
             value={draft}
             spellCheck={false}
             placeholder={'docs/legacy\n*.min.js'}

@@ -1,3 +1,4 @@
+import { Button, Checkbox, Input, Textarea } from '@flint-ide/ui'
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
 import type { Form, FormResult } from '../../../bindings/flint/internal/extensions/host/models'
 import { errorMessage } from '../../api/backend'
@@ -119,9 +120,9 @@ export function ViewForm({ form, onSubmit, onAccepted }: Props) {
       })}
       {problem && <div className="error ext-form-problem" role="alert">{problem}</div>}
       <div className="ext-form-actions">
-        <button type="submit" className="primary" disabled={busy}>
+        <Button type="submit" variant="primary" disabled={busy}>
           {busy ? 'Sending…' : form.submit}
-        </button>
+        </Button>
         {note && <span className="muted" role="status">{note}</span>}
       </div>
     </form>
@@ -150,12 +151,12 @@ function FieldControl({ field, id, value, list, invalid, describedBy, onChange, 
   const cls = invalid ? ' invalid' : ''
   switch (p.type) {
     case 'boolean':
-      return <input type="checkbox" {...shared} checked={value === true} onChange={(e) => onChange(e.target.checked)} />
+      return <Checkbox {...shared} checked={value === true} onCheckedChange={onChange} />
     case 'integer':
     case 'number':
       return (
         <span className="number-field">
-          <input
+          <Input
             type="number"
             {...shared}
             className={cls.trim()}
@@ -169,9 +170,9 @@ function FieldControl({ field, id, value, list, invalid, describedBy, onChange, 
       )
     case 'array':
       return (
-        <textarea
+        <Textarea
           {...shared}
-          className={`settings-textarea${cls}`}
+          className="wide-field"
           value={list ?? (Array.isArray(value) ? value.join('\n') : '')}
           placeholder={field.placeholder || 'One per line'}
           spellCheck={false}
@@ -197,14 +198,14 @@ function FieldControl({ field, id, value, list, invalid, describedBy, onChange, 
   }
   const text = typeof value === 'string' ? value : ''
   if (field.multiline) {
-    return <textarea {...shared} className={`settings-textarea${cls}`} value={text} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value)} />
+    return <Textarea {...shared} className="wide-field" value={text} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value)} />
   }
   return (
-    <input
+    <Input
       {...shared}
       type={field.secret ? 'password' : 'text'}
       autoComplete={field.secret ? 'off' : undefined}
-      className={`settings-text${cls}`}
+      className="wide-field"
       value={text}
       placeholder={field.placeholder}
       spellCheck={false}

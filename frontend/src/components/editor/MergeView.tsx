@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Button, IconButton } from '@flint-ide/ui'
+import { Button, IconButton, ViewToolbar } from '@flint-ide/ui'
 import { ChevronLeft, ChevronRight } from '@flint-ide/ui/icons'
 import { Compartment, EditorState, Prec, type Extension, type StateField } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
@@ -328,11 +328,11 @@ export function MergeView({ tab, active }: { tab: MergeTab; active: boolean }) {
   const canCompare = data.base.exists && !data.base.binary
   return (
     <div className="diff-view merge-view">
-      <div className="diff-header merge-header">
+      <ViewToolbar aria-label="Merge conflicts">
         <span className="truncate" title={tab.path}>{rel}</span>
         <span className="merge-side current" title={sides.current.detail}>Current: {sides.current.label}</span>
         <span className="merge-side incoming" title={sides.incoming.detail}>Incoming: {sides.incoming.label}</span>
-        <span className="spacer" />
+        <span className="fui-grow" />
         {editable && (
           <span className="merge-nav">
             <IconButton variant="ghost" size="sm" aria-label="Previous conflict" title="Previous conflict" disabled={pos.total === 0} onClick={() => go(-1)}>
@@ -358,7 +358,7 @@ export function MergeView({ tab, active }: { tab: MergeTab; active: boolean }) {
             </Button>
           </>
         )}
-      </div>
+      </ViewToolbar>
       <div className="merge-legend muted">
         <span><b>Current</b> = {sides.current.detail}</span>
         <span><b>Incoming</b> = {sides.incoming.detail}</span>

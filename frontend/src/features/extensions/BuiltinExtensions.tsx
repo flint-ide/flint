@@ -1,4 +1,4 @@
-import { Checkbox } from '@flint-ide/ui'
+import { Card, CardContent, Checkbox } from '@flint-ide/ui'
 import { FEATURES } from '..'
 import { useActiveFeatures } from '../../lib/activeFeatures'
 import { coerceToggles, featureOn, pendingRestart, withFeature } from '../../lib/featureToggles'
@@ -27,7 +27,7 @@ export function BuiltinExtensions() {
       {optional.map((m) => {
         const on = featureOn(toggles, m)
         return (
-          <div key={m.id} className="extension-card">
+          <Card key={m.id} className="extension-card"><CardContent>
             <div className="extension-head">
               <label className="extension-toggle" title={on ? 'Turn off' : 'Turn on'}>
                 <Checkbox checked={on} onCheckedChange={(checked) => update((s) => ({ features: withFeature(coerceToggles(s.features), m.id, checked) }))} />
@@ -38,7 +38,7 @@ export function BuiltinExtensions() {
               {pending.has(m.id) && <ExtensionStateBadge tone="none">Restart Flint to {on ? 'turn on' : 'turn off'}</ExtensionStateBadge>}
             </div>
             {m.description && <p className="extension-description">{m.description}</p>}
-          </div>
+          </CardContent></Card>
         )
       })}
     </>

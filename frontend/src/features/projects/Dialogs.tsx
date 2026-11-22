@@ -8,7 +8,7 @@ import { useAgentDefs } from '../../store/agentDefs'
 import { useSettings } from '../../store/settings'
 import { goalLength, goalProblem, isRestrictedError, MAX_GOAL, pickPlanAgent } from './projects'
 import { closeDialog, createProject, createItem, planWithAgent, trustProject, useProjects, type DialogHost } from './store'
-import { Button, Input, Textarea } from '@flint-ide/ui'
+import { Alert, Button, Field, FieldLabel, Form, FormActions, Input, Textarea } from '@flint-ide/ui'
 
 const basename = (p: string) => p.replace(/\/+$/, '').slice(p.replace(/\/+$/, '').lastIndexOf('/') + 1)
 
@@ -53,16 +53,14 @@ function PlanDialog({ folder }: { folder: string }) {
   }
   return (
     <Modal title="Plan with Agent" onClose={closeDialog} className="plan-goal">
-      <form
-        className="form"
+      <Form
         onSubmit={(e) => {
           e.preventDefault()
           void submit()
         }}
       >
-        <label>
-          Goal
-          <Textarea
+        <Textarea
+            label="Goal"
             autoFocus
             rows={6}
             value={goal}
@@ -79,32 +77,31 @@ function PlanDialog({ folder }: { folder: string }) {
               }
             }}
           />
-        </label>
         <span className={`muted${goalLength(goal) > MAX_GOAL ? ' error' : ''}`}>{goalLength(goal)} / {MAX_GOAL}</span>
-        <label>
-          Agent
+        <Field>
+          <FieldLabel>Agent</FieldLabel>
           {agents.length === 0 ? (
             <span className="muted">No agent installed (claude, codex or a custom agent in Settings ▸ Agents)</span>
           ) : (
             <Select block value={chosen} options={agents.map((a) => agentOption(a, defined, a === (defaultAgent || preferred) ? 'default' : undefined))} onChange={setAgent} />
           )}
-        </label>
+        </Field>
         <p className="muted form-note">
           Flint puts a prompt into a chat draft with this agent: the goal, this project and the item format. You read it and send it yourself. The agent adds
           items with add_project_item, which you approve one by one.
         </p>
         {restricted && info && (
-          <div className="form-status error">
+          <Alert size="inline" variant="negative">
             The project's folder is in Restricted Mode: agents could neither read the project nor add to it.{' '}
             <Button variant="link" size="sm" type="button" onClick={() => void trustProject(info).then(() => setError(''))} title={info.path}>Trust Folder…</Button>
-          </div>
+          </Alert>
         )}
-        {error && !isRestrictedError(error) && <div className="form-status error">{error}</div>}
-        <div className="form-actions">
+        {error && !isRestrictedError(error) && <Alert size="inline" variant="negative">{error}</Alert>}
+        <FormActions align="start">
           <Button variant="plain" type="button" onClick={closeDialog}>Cancel</Button>
           <Button variant="primary" type="submit" disabled={!ready}>{busy ? 'Preparing…' : 'Put Prompt in Chat'}</Button>
-        </div>
-      </form>
+        </FormActions>
+      </Form>
     </Modal>
   )
 }
@@ -125,17 +122,15 @@ function NewProjectDialog({ folder }: { folder: string }) {
   }
   return (
     <Modal title="New Project" onClose={closeDialog} className="new-prompt">
-      <form
-        className="form"
+      <Form
         onSubmit={(e) => {
           e.preventDefault()
           void create()
         }}
       >
         <span className="muted selectable" title={folder}>Creates flint-project.json and an items folder in {folder}</span>
-        <label>
-          Name (shown in the panel; optional)
-          <Input
+        <Input
+            label="Name (shown in the panel; optional)"
             autoFocus
             value={name}
             placeholder={basename(folder)}
@@ -144,14 +139,13 @@ function NewProjectDialog({ folder }: { folder: string }) {
               setError('')
             }}
           />
-        </label>
-        {!valid && <span className="form-status error">At most 80 characters.</span>}
-        {error && <span className="form-status error">{error}</span>}
-        <div className="form-actions">
+        {!valid && <Alert size="inline" variant="negative">At most 80 characters.</Alert>}
+        {error && <Alert size="inline" variant="negative">{error}</Alert>}
+        <FormActions align="start">
           <Button variant="plain" type="button" onClick={closeDialog}>Cancel</Button>
           <Button variant="primary" type="submit" disabled={!valid || busy}>Create</Button>
-        </div>
-      </form>
+        </FormActions>
+      </Form>
     </Modal>
   )
 }
@@ -172,16 +166,14 @@ function NewItemDialog({ folder }: { folder: string }) {
   }
   return (
     <Modal title="New Project Item" onClose={closeDialog} className="new-prompt">
-      <form
-        className="form"
+      <Form
         onSubmit={(e) => {
           e.preventDefault()
           void create()
         }}
       >
-        <label>
-          Title
-          <Input
+        <Input
+            label="Title"
             autoFocus
             value={title}
             placeholder="Rate limit the checkout API"
@@ -190,14 +182,13 @@ function NewItemDialog({ folder }: { folder: string }) {
               setError('')
             }}
           />
-        </label>
-        {title.length > 120 && <span className="form-status error">At most 120 characters.</span>}
-        {error && <span className="form-status error">{error}</span>}
-        <div className="form-actions">
+        {title.length > 120 && <Alert size="inline" variant="negative">At most 120 characters.</Alert>}
+        {error && <Alert size="inline" variant="negative">{error}</Alert>}
+        <FormActions align="start">
           <Button variant="plain" type="button" onClick={closeDialog}>Cancel</Button>
           <Button variant="primary" type="submit" disabled={!valid || busy}>Create and Open</Button>
-        </div>
-      </form>
+        </FormActions>
+      </Form>
     </Modal>
   )
 }

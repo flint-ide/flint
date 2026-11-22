@@ -10,7 +10,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { Input } from '@flint-ide/ui'
+import { Input, Separator } from '@flint-ide/ui'
 import { modKey } from '../../lib/platform'
 import { useListCursor } from '../../lib/useListCursor'
 import { useEventCallback } from '../../lib/useEventCallback'
@@ -281,7 +281,7 @@ export function Menu({ anchor, atPoint, items, align, searchable, placeholder, m
       <div className="dd-items" ref={listRef}>
         {visible.length === 0 && <div className="dd-empty">{query ? 'No matches' : emptyText}</div>}
         {visible.map((it, i) => {
-          if (it.type === 'separator') return <div key={`s${i}`} className="dd-separator" />
+          if (it.type === 'separator') return <Separator key={`s${i}`} className="dd-separator" />
           if (it.type === 'section') return <div key={`h${i}`} className="dd-section">{it.label}</div>
           return <MenuRow key={it.key ?? `${it.label}${i}`} item={it} index={i} current={i === cursor} onHover={hover} onPick={choose} />
         })}

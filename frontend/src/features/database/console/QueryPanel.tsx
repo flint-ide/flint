@@ -1,4 +1,4 @@
-import { Button } from '@flint-ide/ui'
+import { Button, ViewToolbar } from '@flint-ide/ui'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import type { EditorView } from '@codemirror/view'
 import { Database, errorMessage, type Connection, type ExplainResult, type HistoryEntry, type QueryResult } from '../../../api/backend'
@@ -217,7 +217,7 @@ export function QueryPanel({ tabId, scratchId, connId, database, runner, editor,
 
   return (
     <div className="query-panel">
-      <div className="query-toolbar">
+      <ViewToolbar aria-label="SQL console">
         <Select
           size="sm"
           value={connId}
@@ -286,11 +286,11 @@ export function QueryPanel({ tabId, scratchId, connId, database, runner, editor,
           onChange={runner.setLimit}
           title="Maximum rows fetched"
         />
-        <span className="spacer" />
+        <span className="fui-grow" />
         <Button variant="plain" size="sm" disabled={!conn} onClick={() => setHistoryOpen(true)} title={`Statements run on this connection (${formatKeys('Mod+Shift+H')})`}>
           History
         </Button>
-      </div>
+      </ViewToolbar>
       <div className="query-split">
         <div style={{ flex: `${split} 1 0` }} className="query-editor">{editor}</div>
         <Splitter direction="vertical" onResize={(ratio) => setSplit(Math.min(0.9, Math.max(0.1, ratio)))} />

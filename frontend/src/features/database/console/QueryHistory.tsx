@@ -1,4 +1,4 @@
-import { Button, Checkbox } from '@flint-ide/ui'
+import { Badge, Button, Checkbox, ListItem } from '@flint-ide/ui'
 import { memo, useEffect, useState } from 'react'
 import { Database, errorMessage, historyFilter, type HistoryEntry } from '../../../api/backend'
 import { formatDuration } from '../../../lib/format'
@@ -33,7 +33,8 @@ export function QueryHistory({ connId, connName, driver, database, onInsert, onR
   const [allDatabases, setAllDatabases] = useState(false)
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null)
   const [error, setError] = useState('')
-  const { listRef, cursor, setCursor, hover } = useListCursor()
+  // The kit's ListItem marks the cursor's row with data-selected.
+  const { listRef, cursor, setCursor, hover } = useListCursor(0, '[data-selected]')
   const [reload, setReload] = useState(0)
   const now = Date.now()
 
@@ -152,30 +153,30 @@ const HistoryRow = memo(function HistoryRow({ entry, index, selected, badge, whe
   onRun: (entry: HistoryEntry) => void
 }) {
   return (
-    <div
-      className={`history-item${selected ? ' selected' : ''}${entry.error ? ' failed' : ''}`}
+    <ListItem
+      selected={selected}
       onMouseMove={() => onHover(index)}
       onDoubleClick={() => onInsert(entry)}
       title={entry.sql.length > 2000 ? `${entry.sql.slice(0, 2000)}…` : entry.sql}
-    >
-      <div className="history-sql">
-        {badge && <span className="history-badge">{badge}</span>}
-        <code>{sqlPreview(entry.sql)}</code>
-      </div>
-      <div className="history-meta">
-        <span>{when}</span>
-        <span>{formatDuration(entry.durationMs)}</span>
-        {!entry.error && entry.kind !== 'explain' && entry.kind !== 'explain-analyze' && <span>{entry.rows.toLocaleString()} rows</span>}
-        {showDatabase && <span>{entry.database || 'default'}</span>}
-        {entry.truncated && <span title="Stored truncated (very long statement)">truncated</span>}
-        {entry.error && <span className="history-error">{entry.error}</span>}
-        <span className="spacer" />
-        <span className="row-actions">
+      leading={badge && <Badge size="sm" color="indigo" badgeStyle="border_color">{badge}</Badge>}
+      label={sqlPreview(entry.sql)}
+      mono
+      dimmed={!!entry.error}
+      meta={[
+        when,
+        formatDuration(entry.durationMs),
+        !entry.error && entry.kind !== 'explain' && entry.kind !== 'explain-analyze' && `${entry.rows.toLocaleString()} rows`,
+        showDatabase && (entry.database || 'default'),
+        entry.truncated && <span title="Stored truncated (very long statement)">truncated</span>,
+        entry.error && <span className="fui-danger">{entry.error}</span>,
+      ]}
+      actions={
+        <>
           <Button variant="ghost" size="sm" onClick={() => onInsert(entry)} title="Insert into the editor (↵)">Insert</Button>
           {canRun(entry) && <Button variant="ghost" size="sm" onClick={() => onRun(entry)} title={`Run again (${formatKeys('Mod+Enter')})`}>Run</Button>}
           <Button variant="ghost" size="sm" onClick={() => void copy(entry)} title={`Copy (${formatKeys('Mod+C')})`}>Copy</Button>
-        </span>
-      </div>
-    </div>
+        </>
+      }
+    />
   )
 })

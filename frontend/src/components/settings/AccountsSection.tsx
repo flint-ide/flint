@@ -6,7 +6,7 @@ import { keyringName } from '../../lib/platform'
 import { openInBrowser } from '../../store/pullRequests'
 import { SignInWithGitHub } from '../accounts/SignInWithGitHub'
 import { NumberField, Row, TextField } from './fields'
-import { Button, Input } from '@flint-ide/ui'
+import { Button, Card, Input } from '@flint-ide/ui'
 
 const OAUTH_APPS_DOCS = 'https://docs.github.com/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app'
 
@@ -65,7 +65,7 @@ function GitHubAccount() {
   const account = provider.account
   if (!account) {
     return (
-      <div className="account-card">
+      <Card className="account-card">
         {provider.envToken ? (
           <span className="muted">
             Using the token in <code>{provider.envToken}</code> from Flint's environment for {provider.host} (read as it is, never stored). Signing in replaces it.
@@ -74,11 +74,11 @@ function GitHubAccount() {
           <span className="muted">Not signed in to {provider.host}.</span>
         )}
         <SignInWithGitHub />
-      </div>
+      </Card>
     )
   }
   return (
-    <div className="account-card">
+    <Card className="account-card">
       <div className="account-head">
         {account.avatarUrl && <img className="account-avatar" src={account.avatarUrl} alt="" referrerPolicy="no-referrer" />}
         <div className="account-who">
@@ -88,7 +88,7 @@ function GitHubAccount() {
             {account.host} · {account.source === 'cli' ? "the GitHub CLI's token" : 'signed in with GitHub'}
           </span>
         </div>
-        <span className="spacer" />
+        <span className="fui-grow" />
         <Button variant="plain" onClick={() => void signOut()}>Sign Out</Button>
       </div>
       <span className="muted">Scopes: {account.scopes.length ? account.scopes.join(', ') : 'none reported (a fine-grained or app token)'}</span>
@@ -96,7 +96,7 @@ function GitHubAccount() {
         Sign Out deletes the token from the {keyringName()}. Revoking it at GitHub needs the OAuth App's secret, which Flint doesn't have: do it on{' '}
         <Button variant="link" className="settings-link" onClick={openAuthorizedApps}>GitHub's authorized apps page</Button>.
       </span>
-    </div>
+    </Card>
   )
 }
 

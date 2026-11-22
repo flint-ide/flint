@@ -14,7 +14,7 @@ import { languageFor } from '../../lib/language'
 import { CodeEditor } from '../editor/CodeEditor'
 import { Select } from '../ui/Select'
 import { formatKeys } from '../../lib/commands'
-import { Button } from '@flint-ide/ui'
+import { Button, ViewToolbar } from '@flint-ide/ui'
 
 const NO_HISTORY: HttpResponse[] = []
 
@@ -29,9 +29,9 @@ export function HttpResponseView({ tab, active }: { tab: HttpTab; active: boolea
 
   return (
     <div className="http-response">
-      <div className="diff-header http-status-bar">
+      <ViewToolbar aria-label="Response" className="http-status-bar">
         {pending ? <Pending label={pending.label} startedAt={pending.startedAt} onCancel={() => cancelRequest(tab.path)} /> : shown && <StatusLine response={shown} />}
-        <span className="spacer" />
+        <span className="fui-grow" />
         {history.length > 1 && shown && (
           <Select
             size="sm"
@@ -56,7 +56,7 @@ export function HttpResponseView({ tab, active }: { tab: HttpTab; active: boolea
             Save to file
           </Button>
         )}
-      </div>
+      </ViewToolbar>
       {error && <div className="placeholder error selectable">{error}</div>}
       {!error && !response && !pending && (
         <div className="placeholder muted">No response yet. Put the cursor in a request and press {formatKeys('Mod+Enter')} (or click ▶ on the margin).</div>

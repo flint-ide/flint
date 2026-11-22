@@ -1,4 +1,4 @@
-import { Badge, Button, IconButton, Input } from '@flint-ide/ui'
+import { Button, IconButton, Input, PanelHeader, TreeRow, TreeSection } from '@flint-ide/ui'
 import { RefreshCw } from '@flint-ide/ui/icons'
 import { useEffect, useMemo, useState } from 'react'
 import { EventsOn } from '../../wails/runtime'
@@ -53,10 +53,10 @@ export function TodoPanel() {
 
   return (
     <div className="panel">
-      <div className="panel-header">
-        <span className="panel-title">TODO</span>
-        <IconButton variant="ghost" size="sm" aria-label="Rescan" title="Rescan" disabled={scanning} onClick={() => void scanTodos()}><RefreshCw /></IconButton>
-      </div>
+      <PanelHeader
+        title="TODO"
+        actions={<IconButton variant="ghost" size="sm" aria-label="Rescan" title="Rescan" disabled={scanning} onClick={() => void scanTodos()}><RefreshCw /></IconButton>}
+      />
       <div className="search-form">
         <Input size="sm" value={query} placeholder="Filter notes" spellCheck={false} onChange={(e) => setTodoQuery(e.target.value)} />
         <div className="todo-tags">
@@ -86,29 +86,32 @@ export function TodoPanel() {
       </div>
       <div className="tree scroll">
         {files.map((f) => (
-          <div key={f.key}>
-            <div className="tree-row static search-file" title={f.key} onClick={() => toggleFile(f.key)}>
-              <span className="twisty">{collapsed.has(f.key) ? '▸' : '▾'}</span>
-              <FileIcon name={basename(f.path)} />
-              <span className="file-name">{basename(f.path)}</span>
-              <span className="muted path-hint">{displayPath(roots, f.key).replace(/\/?[^/]*$/, '')}</span>
-              <Badge size="sm">{f.items.length}</Badge>
-            </div>
-            {!collapsed.has(f.key) &&
-              f.items.map((it) => (
-                <div
-                  key={`${it.line}:${it.column}`}
-                  className="tree-row static todo-item"
-                  title={`${it.tag}${it.owner ? `(${it.owner})` : ''}: ${it.text}`}
-                  onClick={() => useEditor.getState().openFile(f.key, { line: it.line, from: it.column - 1, to: it.column - 1 + it.tag.length })}
-                >
-                  <span className="line-no">{it.line}</span>
-                  <span className={`todo-tag-label ${it.tag.toLowerCase()}`}>{it.tag}</span>
-                  {it.owner && <span className="muted">({it.owner})</span>}
-                  <span className="match-text">{it.text || '—'}</span>
-                </div>
-              ))}
-          </div>
+          <TreeSection
+            key={f.key}
+            title={<span className="todo-file"><FileIcon name={basename(f.path)} />{basename(f.path)}</span>}
+            hint={displayPath(roots, f.key).replace(/\/?[^/]*$/, '')}
+            count={f.items.length}
+            open={!collapsed.has(f.key)}
+            onOpenChange={() => toggleFile(f.key)}
+          >
+            {f.items.map((it) => (
+              <TreeRow
+                key={`${it.line}:${it.column}`}
+                depth={1}
+                className="todo-item"
+                title={`${it.tag}${it.owner ? `(${it.owner})` : ''}: ${it.text}`}
+                onClick={() => useEditor.getState().openFile(f.key, { line: it.line, from: it.column - 1, to: it.column - 1 + it.tag.length })}
+                icon={<span className="line-no">{it.line}</span>}
+                label={
+                  <>
+                    <span className={`todo-tag-label ${it.tag.toLowerCase()}`}>{it.tag}</span>
+                    {it.owner && <span className="muted">({it.owner}) </span>}
+                    <span className="match-text">{it.text || '—'}</span>
+                  </>
+                }
+              />
+            ))}
+          </TreeSection>
         ))}
         {!scanning && !error && items.length === 0 && <div className="placeholder muted">No TODO, FIXME, HACK, XXX or BUG notes.</div>}
       </div>

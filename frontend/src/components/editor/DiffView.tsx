@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { Button } from '@flint-ide/ui'
+import { Button, ViewToolbar } from '@flint-ide/ui'
 import { EditorState, type Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { Diff, Workspace, errorMessage, type Hunk } from '../../api/backend'
@@ -137,16 +137,16 @@ export function DiffView({ tab }: { tab: DiffTab }) {
 
   return (
     <div className="diff-view">
-      <div className="diff-header">
+      <ViewToolbar aria-label="Diff">
         <span className="muted">{tab.baseLabel ?? tab.baseRev ?? 'HEAD'}</span>
         <span className="truncate" title={tab.path}>{rel}</span>
         <span className="muted">{tab.label ?? (tab.rev ? tab.rev.slice(0, 7) : 'Working tree')}</span>
-        <span className="spacer" />
+        <span className="fui-grow" />
         {reviewable && (reviewing
           ? <Button variant="ghost" size="sm" onClick={cancelReview} title="Stop the agent">Reviewing… Cancel</Button>
           : <Button variant="ghost" size="sm" onClick={() => void reviewChanges(tab.path)} title="Let the agent review this file and the other changes in the Commit panel's scope">✦ Review</Button>)}
         <Button variant="ghost" size="sm" onClick={() => openFile(tab.path)}>Open file</Button>
-      </div>
+      </ViewToolbar>
       {error && <div className="placeholder error selectable">{error}</div>}
       {sides?.note && <div className="placeholder muted">{sides.note}</div>}
       {!sides && !error && <div className="placeholder">Loading…</div>}

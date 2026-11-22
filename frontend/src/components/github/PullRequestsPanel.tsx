@@ -25,7 +25,7 @@ import { CIBanner } from './CIStatus'
 import { useCurrentCI } from '../../store/ci'
 import { onAccountsChanged } from '../../store/accounts'
 import { SignInWithGitHub } from '../accounts/SignInWithGitHub'
-import { Button, IconButton, Input } from '@flint-ide/ui'
+import { Button, IconButton, Input, ListItem, PanelHeader } from '@flint-ide/ui'
 import { ExternalLink, RefreshCw } from '@flint-ide/ui/icons'
 import { PrBadge } from './PrBadge'
 
@@ -66,15 +66,20 @@ export function PullRequestsPanel() {
 
   return (
     <div className="panel pr-panel">
-      <div className="panel-header">
-        <span className="panel-title" title={repo?.url}>
-          Pull Requests{repo && <span className="pr-repo"> · {repo.nameWithOwner}</span>}
-        </span>
-        {repo && (
-          <IconButton size="sm" variant="ghost" aria-label="Open on GitHub" title="Open on GitHub" onClick={() => openInBrowser(`${repo.url}/pulls`)}><ExternalLink /></IconButton>
-        )}
-        <IconButton size="sm" variant="ghost" aria-label="Refresh" title="Refresh" disabled={loading} onClick={() => void loadPullRequests(root, true)}><RefreshCw /></IconButton>
-      </div>
+      <PanelHeader
+        title="Pull Requests"
+        tooltip={repo?.url}
+        actions={
+          <>
+            {repo && (
+              <IconButton size="sm" variant="ghost" aria-label="Open on GitHub" title="Open on GitHub" onClick={() => openInBrowser(`${repo.url}/pulls`)}><ExternalLink /></IconButton>
+            )}
+            <IconButton size="sm" variant="ghost" aria-label="Refresh" title="Refresh" disabled={loading} onClick={() => void loadPullRequests(root, true)}><RefreshCw /></IconButton>
+          </>
+        }
+      >
+        {repo?.nameWithOwner}
+      </PanelHeader>
       {repo && (
         <div className="pr-filters">
           <Select size="sm" value={who} options={WHO} onChange={(v) => setListFilter({ who: v })} title="Whose pull requests" />
@@ -171,28 +176,21 @@ function PullRequestRow({ root, pr }: { root: string; pr: PullRequest }) {
     )
   }
   return (
-    <div
-      className={`pr-row${active ? ' active' : ''}`}
+    <ListItem
+      active={active}
       onClick={() => openPullRequest(root, pr)}
       onContextMenu={onContextMenu}
       title={`${pr.title}\n${pr.headRef} → ${pr.baseRef}`}
-    >
-      <div className="pr-row-title">
-        {ci !== 'none' && (
+      leading={
+        ci !== 'none' && (
           <span className={`pr-ci ${ci}`} title={checksSummary(pr.checks)}>
             {ROLLUP_GLYPH[ci]}
           </span>
-        )}
-        <span className="pr-title-text">{pr.title}</span>
-      </div>
-      <div className="pr-row-meta muted">
-        <span>#{pr.number}</span>
-        <span>{pr.author}</span>
-        <span className="pr-branch">{pr.headRef}</span>
-        <span className="spacer" />
-        {badge && <PrBadge tone={badge.tone}>{badge.label}</PrBadge>}
-        <span>{timeAgo(pr.updatedAt)}</span>
-      </div>
-    </div>
+        )
+      }
+      label={pr.title}
+      trailing={badge && <PrBadge tone={badge.tone}>{badge.label}</PrBadge>}
+      meta={[`#${pr.number}`, pr.author, <span className="fui-mono">{pr.headRef}</span>, timeAgo(pr.updatedAt)]}
+    />
   )
 }

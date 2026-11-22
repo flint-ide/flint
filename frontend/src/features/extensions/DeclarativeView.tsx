@@ -1,4 +1,4 @@
-import { Button, IconButton } from '@flint-ide/ui'
+import { Button, IconButton, PanelHeader } from '@flint-ide/ui'
 import { RefreshCw } from '@flint-ide/ui/icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as API from '../../../bindings/flint/internal/features/extensions/api'
@@ -105,10 +105,10 @@ export function DeclarativeView({ ext, view, title, tabKey, data, active }: Prop
 
   return (
     <div className={tabKey ? 'panel ext-view-tab' : 'panel'}>
-      <div className="panel-header">
-        <span className="panel-title">{title}</span>
-        <IconButton variant="ghost" size="sm" title="Refresh" aria-label={`Refresh ${title}`} disabled={loading} onClick={load}><RefreshCw /></IconButton>
-      </div>
+      <PanelHeader
+        title={title}
+        actions={<IconButton variant="ghost" size="sm" title="Refresh" aria-label={`Refresh ${title}`} disabled={loading} onClick={load}><RefreshCw /></IconButton>}
+      />
       {body}
     </div>
   )

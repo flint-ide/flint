@@ -12,7 +12,7 @@ import {
 } from '../../store/agentTasks'
 import { Modal } from '../layout/Modal'
 import { Select } from '../ui/Select'
-import { Button } from '@flint-ide/ui'
+import { Alert, Button, FormActions, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@flint-ide/ui'
 import { TaskStateBadge } from './badges'
 
 const MARK: Record<string, string> = { add: '+', del: '−', ctx: ' ', hunk: '' }
@@ -54,24 +54,24 @@ export function CompareView() {
 
   return (
     <Modal title={`Compare: ${tasks[0]?.task.title ?? 'agent tasks'}`} onClose={closeCompare} className="compare-tasks">
-      {error && <div className="form-status error">{error}</div>}
+      {error && <Alert size="inline" variant="negative">{error}</Alert>}
       {!data && !error && <div className="placeholder muted">Loading…</div>}
       {data && (
         <div className="compare-body">
           <div className="compare-files scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>
                     {data.files.length} {data.files.length === 1 ? 'file' : 'files'}
                     <Button variant="ghost" size="sm" onClick={() => void refreshCompare()} title="Read the changes again">Refresh</Button>
-                  </th>
+                  </TableHead>
                   {tasks.map((c) => {
                     const t = c.task as TaskView
                     const a = taskActions(t)
                     const s = stateInfo(t.state)
                     return (
-                      <th key={t.id} title={`${t.branch}\n${t.worktree}`}>
+                      <TableHead key={t.id} title={`${t.branch}\n${t.worktree}`}>
                         <div className="compare-agent">
                           {labels[t.id]} <TaskStateBadge state={t.stale ? 'stale' : s.state}>{t.stale ? 'stale' : s.label}</TaskStateBadge>
                         </div>
@@ -91,22 +91,22 @@ export function CompareView() {
                             </Button>
                           )}
                         </div>
-                      </th>
+                      </TableHead>
                     )
                   })}
-                </tr>
-              </thead>
-              <tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {data.files.map((f) => (
-                  <tr key={f.path} className={f.path === path ? 'selected' : ''} onClick={() => void selectCompareFile(f.path)}>
-                    <td className="compare-path" title={f.path}>{f.path}</td>
+                  <TableRow key={f.path} className={f.path === path ? 'selected' : ''} onClick={() => void selectCompareFile(f.path)}>
+                    <TableCell className="compare-path" title={f.path}>{f.path}</TableCell>
                     {f.changes.map((c, i) => (
-                      <td key={tasks[i].task.id} className={c ? (c.untracked ? 'change-untracked' : '') : 'muted'}>{changeCell(c)}</td>
+                      <TableCell key={tasks[i].task.id} className={c ? (c.untracked ? 'change-untracked' : '') : 'muted'}>{changeCell(c)}</TableCell>
                     ))}
-                  </tr>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
             {data.files.length === 0 && <div className="placeholder muted">No task changed a file yet.</div>}
             {data.truncated && <div className="muted compare-note">More files were changed than are listed.</div>}
           </div>
@@ -148,10 +148,9 @@ export function CompareView() {
           )}
         </div>
       )}
-      <div className="form-actions">
-        <span className="spacer" />
+      <FormActions align="end">
         <Button variant="plain" size="sm" type="button" onClick={closeCompare}>Close</Button>
-      </div>
+      </FormActions>
     </Modal>
   )
 }

@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useState } from 'react'
+import { Kbd } from '@flint-ide/ui'
 import { formatKeys, isAvailable, listCommands, runCommand, shownKeys, type Command } from '../lib/commands'
 import { pushRecent, rankCommands } from '../lib/commandSearch'
 import { useWorkspace } from '../store/workspace'
@@ -117,7 +118,7 @@ const CommandRow = memo(function CommandRow({ command, positions, index, selecte
         <Highlighted text={command.title} positions={positions} />
       </span>
       {command.category && <span className="muted path-hint">{command.category}</span>}
-      {keys && <kbd>{formatKeys(keys)}</kbd>}
+      {keys && <Kbd>{formatKeys(keys)}</Kbd>}
     </div>
   )
 })

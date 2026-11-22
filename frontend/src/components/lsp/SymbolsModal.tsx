@@ -139,7 +139,7 @@ const SymbolRow = memo(function SymbolRow({ row, index, selected, onHover, onPic
   return (
     <div
       className={`quick-item${selected ? ' selected' : ''}`}
-      style={row.depth ? { paddingLeft: 12 + Math.min(row.depth, 8) * 14 } : undefined}
+      style={row.depth ? { paddingLeft: 10 + Math.min(row.depth, 8) * 14 } : undefined}
       onMouseMove={() => onHover(index)}
       onClick={() => onPick(row)}
     >

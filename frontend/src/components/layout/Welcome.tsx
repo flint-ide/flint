@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Button, Kbd } from '@flint-ide/ui'
 import { Workspace } from '../../api/backend'
 import { useWorkspace } from '../../store/workspace'
 import { openToolCheck } from '../../store/toolCheck'
@@ -35,13 +36,13 @@ export function Welcome() {
       <div className="welcome-logo">flint</div>
       {!root && (
         <div className="welcome-actions">
-          <button className="primary" onClick={() => void pick()}>Open folder…</button>
+          <Button variant="primary" onClick={() => void pick()}>Open folder…</Button>
           {recent.length > 0 && (
             <div className="recent">
               {recent.map((p) => (
-                <button key={p} className="link" onClick={() => void openFolder(p)} title={p}>
+                <Button key={p} variant="ghost" size="sm" onClick={() => void openFolder(p)} title={p}>
                   {p.split('/').pop()} <span className="muted">{p}</span>
-                </button>
+                </Button>
               ))}
             </div>
           )}
@@ -51,11 +52,11 @@ export function Welcome() {
         {SHORTCUTS.map(([k, label]) => (
           <div key={k}>
             <dt>{label}</dt>
-            <dd><kbd>{k}</kbd></dd>
+            <dd><Kbd>{k}</Kbd></dd>
           </div>
         ))}
       </dl>
-      <button className="link welcome-tools" onClick={openToolCheck}>Check installed tools…</button>
+      <Button variant="link" size="sm" onClick={openToolCheck}>Check installed tools…</Button>
     </div>
   )
 }

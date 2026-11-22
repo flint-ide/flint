@@ -1,3 +1,4 @@
+import { BadgeCounter, IconButton } from '@flint-ide/ui'
 import { useWorkspace } from '../../store/workspace'
 import { useEditor } from '../../store/editor'
 import { effectiveKeys, getCommand, formatKeys } from '../../lib/commands'
@@ -14,7 +15,7 @@ function tooltip(spec: PanelSpec): string {
 /** The panel's count on its button (useBadge), e.g. the agents that need you. */
 function PanelBadge({ use }: { use: () => number }) {
   const n = use()
-  return n > 0 ? <span className="activity-badge" aria-label={`${n} need you`}>{n > 99 ? '99+' : n}</span> : null
+  return <BadgeCounter count={n} max={99} tone="brand" overlay className="activity-badge" aria-label={`${n} need you`} />
 }
 
 export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {
@@ -28,9 +29,13 @@ export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {
   return (
     <nav className="activity-bar">
       {panels.filter(isPanelAvailable).map((v) => (
-        <button
+        <IconButton
           key={v.id}
-          className={`activity${visible && sidebar === v.id ? ' active' : ''}`}
+          variant="ghost"
+          size="lg"
+          className="activity"
+          data-active={(visible && sidebar === v.id) || undefined}
+          aria-label={v.title}
           title={tooltip(v)}
           // Refreshed on hover: no re-render follows registering or rebinding a command.
           onPointerEnter={(e) => {
@@ -40,12 +45,20 @@ export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {
         >
           <Icon name={v.icon} />
           {v.useBadge && <PanelBadge use={v.useBadge} />}
-        </button>
+        </IconButton>
       ))}
       <span className="spacer" />
-      <button className={`activity${terminalActive ? ' active' : ''}`} title={`Terminal (${formatKeys('Mod+J')})`} onClick={onTerminal}>
+      <IconButton
+        variant="ghost"
+        size="lg"
+        className="activity"
+        data-active={terminalActive || undefined}
+        aria-label="Terminal"
+        title={`Terminal (${formatKeys('Mod+J')})`}
+        onClick={onTerminal}
+      >
         <Icon name="terminal" />
-      </button>
+      </IconButton>
     </nav>
   )
 }

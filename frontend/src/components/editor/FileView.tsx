@@ -1,4 +1,5 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Segment } from '@flint-ide/ui'
 import { lazyPreload } from '../../lib/lazyPreload'
 import { EditorState, type Extension } from '@codemirror/state'
 import type { EditorView, KeyBinding } from '@codemirror/view'
@@ -40,6 +41,11 @@ import { formatKeys } from '../../lib/commands'
 
 const MarkdownPreview = lazyPreload(() => import('../preview/MarkdownPreview').then((m) => ({ default: m.MarkdownPreview })))
 const PREVIEW_DELAY_MS = 150
+const MD_MODES = [
+  { value: 'editor', label: 'Editor' },
+  { value: 'split', label: 'Split' },
+  { value: 'preview', label: 'Preview' },
+]
 
 interface Props {
   tab: FileTab
@@ -298,12 +304,15 @@ export function FileView({ tab, active }: Props) {
   if (!md) return editor
   return (
     <div className="md-layout">
-      <div className="md-modes" role="tablist">
-        {(['editor', 'split', 'preview'] as const).map((m) => (
-          <button key={m} className={`md-mode${m === mdMode ? ' on' : ''}`} onClick={() => setMarkdownMode(tab.path, m)}>
-            {m === 'editor' ? 'Editor' : m === 'split' ? 'Split' : 'Preview'}
-          </button>
-        ))}
+      <div className="md-modes">
+        <Segment
+          size="xs"
+          shape="rounded"
+          aria-label="Markdown view"
+          options={MD_MODES}
+          value={mdMode}
+          onValueChange={(m) => setMarkdownMode(tab.path, m as MarkdownMode)}
+        />
       </div>
       <div className="md-body">
         {/* The editor stays mounted in Preview mode so undo history and cursor survive. */}

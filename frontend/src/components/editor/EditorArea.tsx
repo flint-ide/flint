@@ -1,4 +1,6 @@
 import { Suspense, memo, useLayoutEffect, type MouseEvent } from 'react'
+import { Alert, Badge, EditorTabs, IconButton, Spinner } from '@flint-ide/ui'
+import { Plus } from '@flint-ide/ui/icons'
 import { lazyPreload } from '../../lib/lazyPreload'
 import { useEditor, type ContributedTab, type FileTab, type Tab } from '../../store/editor'
 import { useContributions } from '../../lib/contributions'
@@ -104,6 +106,12 @@ function openChatTabMenu(e: MouseEvent, sessionId: string): void {
   ])
 }
 
+/** The tab strip's close (button or middle click) for the tab with this id. */
+function closeById(tabs: readonly Tab[], id: string): void {
+  const tab = tabs.find((t) => t.id === id)
+  if (tab) void requestCloseTab(tab)
+}
+
 /** Ids of the terminals whose program exited, one per line. */
 function exitedTerminals(tabs: readonly { id: string; exitCode?: number | null }[]): string {
   return tabs.filter((t) => t.exitCode != null).map((t) => t.id).join('\n')
@@ -136,35 +144,25 @@ export function EditorArea() {
   return (
     <div className="editor-area">
       <div className="tab-strip">
-      <div className="tab-bar" role="tablist">
-        {tabs.filter((t) => !hidden.includes(t.id)).map((tab) => (
-          <div
-            key={tab.id}
-            role="tab"
-            aria-selected={tab.id === activeId}
-            className={`tab${tab.id === activeId ? ' active' : ''}${tab.kind === 'terminal' && exited.split('\n').includes(tab.termId) ? ' exited' : ''}`}
-            title={tab.kind === 'file' ? tab.path : tab.title}
-            onClick={() => setActive(tab.id)}
-            onContextMenu={tab.kind === 'chat' ? (e) => openChatTabMenu(e, tab.sessionId) : undefined}
-            onMouseDown={(e) => e.button === 1 && void requestCloseTab(tab)}
-          >
-            <TabIcon tab={tab} debugActive={debugActive} />
-            <span className="tab-title">{tab.title}</span>
-            {tab.kind === 'terminal' && <TerminalMachineBadge termId={tab.termId} />}
-            {tab.kind === 'terminal' && <TerminalAgentBadge termId={tab.termId} />}
-            {tab.kind === 'chat' && <ChatWaitingBadge sessionId={tab.sessionId} />}
-            <button
-              className={`tab-close${tab.dirty ? ' dirty' : ''}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                void requestCloseTab(tab)
-              }}
-              aria-label="Close tab"
-            />
-          </div>
-        ))}
-      </div>
-      <NewTabMenu />
+        <EditorTabs
+          tabs={tabs.filter((t) => !hidden.includes(t.id)).map((tab) => ({
+            id: tab.id,
+            title: tab.title,
+            icon: <TabIcon tab={tab} debugActive={debugActive} />,
+            dirty: tab.dirty,
+            tip: tab.kind === 'file' ? tab.path : tab.title,
+            extra: <TabBadges tab={tab} />,
+            className: tab.kind === 'terminal' && exited.split('\n').includes(tab.termId) ? 'exited' : undefined,
+          }))}
+          active={activeId ?? ''}
+          onSelect={setActive}
+          onClose={(id) => closeById(tabs, id)}
+          onContextMenu={(id, e) => {
+            const tab = tabs.find((t) => t.id === id)
+            if (tab?.kind === 'chat') openChatTabMenu(e, tab.sessionId)
+          }}
+        />
+        <NewTabMenu />
       </div>
       <div className="tab-panels">
         {/* All tabs stay mounted so shells, agents, undo history and scroll survive tab switches. */}
@@ -217,7 +215,17 @@ function TerminalTabView({ termId, active }: { termId: string; active: boolean }
   const banner = tab.machine ? tabBanner(status) : null
   return (
     <>
-      {banner && <div className={`terminal-banner ${banner.tone}`} role="status">{banner.text}</div>}
+      {banner && (
+        <Alert
+          variant={banner.tone === 'error' ? 'negative' : 'plain'}
+          size="small"
+          icon={banner.tone === 'error' ? undefined : <Spinner />}
+          className="terminal-banner"
+          role="status"
+        >
+          {banner.text}
+        </Alert>
+      )}
       <TerminalView tab={tab} active={active} />
     </>
   )
@@ -267,19 +275,36 @@ function TabIcon({ tab, debugActive }: { tab: Tab; debugActive: boolean }) {
   }
 }
 
+/** After a tab's title: a terminal's machine and agent state, a chat waiting for approval. */
+function TabBadges({ tab }: { tab: Tab }) {
+  if (tab.kind === 'terminal') {
+    return (
+      <>
+        <TerminalMachineBadge termId={tab.termId} />
+        <TerminalAgentBadge termId={tab.termId} />
+      </>
+    )
+  }
+  return tab.kind === 'chat' ? <ChatWaitingBadge sessionId={tab.sessionId} /> : null
+}
+
 /** The machine a terminal runs on, small, before its agent badge; nothing for a local shell. */
 function TerminalMachineBadge({ termId }: { termId: string }) {
   const name = useTerminal((s) => {
     const machine = s.tabs.find((t) => t.id === termId)?.machine
     return machine ? (useSettings.getState().settings.machines.find((m) => m.id === machine)?.name || machine) : ''
   })
-  return name ? <span className="tab-machine" title={`Runs on ${name}`}>{machineBadge(name)}</span> : null
+  return name ? (
+    <Badge size="sm" badgeStyle="border_grey" title={`Runs on ${name}`}>
+      {machineBadge(name)}
+    </Badge>
+  ) : null
 }
 
 /** What an agent CLI in a terminal reported: working, waiting for you, done. */
 function TerminalAgentBadge({ termId }: { termId: string }) {
   const badge = useTerminal((s) => terminalBadge(s.tabs.find((t) => t.id === termId)?.agentState))
-  return badge ? <span className={`task-state tab-agent ${badge.look}`} title={badge.hint}>{badge.label}</span> : null
+  return badge ? <span className={`task-state ${badge.look}`} title={badge.hint}>{badge.label}</span> : null
 }
 
 /** "waiting" on a chat's tab while its agent waits for your approval, like a terminal agent's. */
@@ -288,7 +313,7 @@ function ChatWaitingBadge({ sessionId }: { sessionId: string }) {
     const session = s.sessions[sessionId]
     return !!session && chatState(session.chat, !!session.dormant) === 'waiting'
   })
-  return waiting ? <span className="task-state tab-agent waiting" title="The agent waits for your approval in this chat">waiting</span> : null
+  return waiting ? <span className="task-state waiting" title="The agent waits for your approval in this chat">waiting</span> : null
 }
 
 function ChatTabIcon({ sessionId }: { sessionId: string }) {
@@ -361,7 +386,9 @@ function NewTabMenu() {
         align="end"
         items={items}
         trigger={(t) => (
-          <button {...t} className="icon new-tab" title="New file, scratch or terminal">＋</button>
+          <IconButton {...t} size="sm" variant="ghost" aria-label="New file, scratch or terminal" title="New file, scratch or terminal">
+            <Plus />
+          </IconButton>
         )}
       />
     </span>

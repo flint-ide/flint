@@ -62,19 +62,23 @@ export function BoardView({ tab, active }: { tab: ContributedTab; active: boolea
         <span className="muted truncate" title={project.path}>{project.path}</span>
         <ProjectContext project={project} />
         <span className="spacer" />
-        <Button variant="ghost" size="sm" title={project.oldFormat ? OLD_FORMAT_HINT : 'New Item…'} disabled={project.oldFormat} onClick={() => openNewItem(folder, 'board')}>
-          <Plus data-icon="inline-start" />
-          New Item…
-        </Button>
+        {/* The title is on a wrapper: a disabled kit button takes no hover, and the hint says why. */}
+        <span title={project.oldFormat ? OLD_FORMAT_HINT : 'New Item…'}>
+          <Button variant="ghost" size="sm" disabled={project.oldFormat} onClick={() => openNewItem(folder, 'board')}>
+            <Plus data-icon="inline-start" />
+            New Item…
+          </Button>
+        </span>
+        <span title={project.oldFormat ? OLD_FORMAT_HINT : 'Have an agent split a goal into items (the prompt goes into a chat draft)'}>
         <Button
           variant="ghost"
           size="sm"
-          title={project.oldFormat ? OLD_FORMAT_HINT : 'Have an agent split a goal into items (the prompt goes into a chat draft)'}
           disabled={project.oldFormat}
           onClick={() => openPlan(folder, 'board')}
         >
           ✦ Plan with Agent…
         </Button>
+        </span>
         <IconButton variant="ghost" size="sm" aria-label="Refresh" title="Refresh" onClick={() => void loadProject(folder)}>
           <RefreshCw />
         </IconButton>

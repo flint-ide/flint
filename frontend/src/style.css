@@ -4086,6 +4086,12 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   min-height: 84px;
   resize: vertical;
 }
+/* The kit's Textarea sits in a wrapper div: in the control's flex row it would
+   shrink to the textarea's default width, so the wrapper takes the field width. */
+.settings-control > div:has(> [data-slot='textarea']) {
+  width: 100%;
+  max-width: 420px;
+}
 .settings-control-stack {
   flex-direction: column;
   align-items: stretch;

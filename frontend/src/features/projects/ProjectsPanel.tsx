@@ -54,9 +54,12 @@ export function ProjectsPanel() {
     <div className="panel projects-panel">
       <div className="panel-header">
         <span className="panel-title">Projects</span>
-        <IconButton variant="ghost" size="sm" aria-label="New Item" title={oldFormat ? OLD_FORMAT_HINT : 'New Item…'} disabled={!info || oldFormat} onClick={() => openNewItem(selected)}>
-          <Plus />
-        </IconButton>
+        {/* The title is on a wrapper: a disabled kit button takes no hover, and the hint says why. */}
+        <span title={oldFormat ? OLD_FORMAT_HINT : 'New Item…'}>
+          <IconButton variant="ghost" size="sm" aria-label="New Item" disabled={!info || oldFormat} onClick={() => openNewItem(selected)}>
+            <Plus />
+          </IconButton>
+        </span>
         <IconButton variant="ghost" size="sm" aria-label="Refresh" title="Refresh" disabled={!info} onClick={() => void loadProject(selected)}>
           <RefreshCw />
         </IconButton>
@@ -218,15 +221,11 @@ function RepoRow({ folder, repo, cloning }: { folder: string; repo: RepoView; cl
       <div className="task-actions project-actions">
         <Button variant="ghost" size="sm" onClick={() => repoActions.locate(folder, repo)} title="Choose the folder of your checkout of this repository">Locate…</Button>
         {canClone(repo) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={cloning}
-            onClick={() => repoActions.clone(folder, repo)}
-            title={cloning ? 'A clone of this project is running' : `Clone ${repo.url} into a folder you choose (asks again before it runs)`}
-          >
-            Clone…
-          </Button>
+          <span title={cloning ? 'A clone of this project is running' : `Clone ${repo.url} into a folder you choose (asks again before it runs)`}>
+            <Button variant="ghost" size="sm" disabled={cloning} onClick={() => repoActions.clone(folder, repo)}>
+              Clone…
+            </Button>
+          </span>
         )}
         {issue?.fix === 'attach' && (
           <Button variant="ghost" size="sm" onClick={() => repoActions.attach(folder, repo)} title={`Add ${repo.folder} to the workspace`}>Add to Workspace</Button>

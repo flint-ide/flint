@@ -46,6 +46,8 @@ export function EditorTabs({ tabs, active, onSelect, onClose, onContextMenu, cla
             }}
             onContextMenu={onContextMenu && ((e) => onContextMenu(t.id, e))}
             onKeyDown={(e) => {
+              // Enter on the close button inside closes the tab; it doesn't select it first.
+              if (e.target !== e.currentTarget) return
               if (e.key === 'Enter' || e.key === ' ') onSelect(t.id)
             }}
           >

@@ -1,15 +1,23 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Input, Textarea } from '@flint-ide/ui'
 
 /** A labelled settings row with an optional hint under the label. */
 export function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  const id = useId()
   return (
     <div className="settings-row">
       <div className="settings-label">
-        <span>{label}</span>
-        {hint && <span className="muted">{hint}</span>}
+        <span id={`${id}-label`}>{label}</span>
+        {hint && (
+          <span id={`${id}-hint`} className="muted">
+            {hint}
+          </span>
+        )}
       </div>
-      <div className="settings-control">{children}</div>
+      {/* Named by the label, so a switch or field in it is announced with what it sets. */}
+      <div className="settings-control" role="group" aria-labelledby={`${id}-label`} aria-describedby={hint ? `${id}-hint` : undefined}>
+        {children}
+      </div>
     </div>
   )
 }

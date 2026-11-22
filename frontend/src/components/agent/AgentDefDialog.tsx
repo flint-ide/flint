@@ -64,7 +64,10 @@ export function AgentDefDialog() {
             Repository: .flint/agents, shared with the team through the repository
           </label>
           {!personal && projects.length > 1 && (
-            <Select block value={root} options={projects.map((r, i) => ({ value: r, label: labels[i] ?? r }))} onChange={setRoot} />
+            // Arrow keys open the select; inside the radio group they would also move to the next radio.
+            <span onKeyDown={(e) => e.stopPropagation()}>
+              <Select block value={root} options={projects.map((r, i) => ({ value: r, label: labels[i] ?? r }))} onChange={setRoot} />
+            </span>
           )}
           {projects.length === 0 && <span className="muted">Open and trust a folder to create a repository agent.</span>}
           <label className="check">

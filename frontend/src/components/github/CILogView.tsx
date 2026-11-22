@@ -5,7 +5,7 @@ import { useEditor } from '../../store/editor'
 import { showToast } from '../../store/dialog'
 import { findPathLinks, resolvePath } from '../../lib/pathLinks'
 import { fixCIWithAgent, rerunFailedJobs } from '../../store/ci'
-import { Button } from '@flint-ide/ui'
+import { Button, ViewToolbar } from '@flint-ide/ui'
 
 /** Lines rendered at a time: the end of the log first, earlier pages on request. */
 export const LOG_PAGE = 1000
@@ -49,9 +49,9 @@ export function CILogView({ tab }: { tab: CILogTab }) {
 
   return (
     <div className="ci-log">
-      <div className="ci-log-bar">
+      <ViewToolbar aria-label="CI log">
         <span className="truncate muted">{tab.title.replace(/^Log: /, '')}</span>
-        <span className="spacer" />
+        <span className="fui-grow" />
         <Button
           size="sm"
           variant="ghost"
@@ -63,7 +63,7 @@ export function CILogView({ tab }: { tab: CILogTab }) {
           Rerun failed jobs
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setNonce(nonce + 1)}>Reload</Button>
-      </div>
+      </ViewToolbar>
       {error && <div className="placeholder error selectable">{error}</div>}
       {!log && !error && <div className="placeholder muted">Loading the log…</div>}
       {log && (

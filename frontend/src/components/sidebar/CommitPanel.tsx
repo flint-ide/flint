@@ -18,7 +18,7 @@ import { reviewChanges, useAgentReview } from '../../store/agentReview'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
 import { Icon } from '../ui/Icon'
-import { Badge, Button, Checkbox, IconButton, Textarea } from '@flint-ide/ui'
+import { Button, Checkbox, IconButton, PanelHeader, Textarea, TreeRow, TreeSection } from '@flint-ide/ui'
 import { Archive, ArrowDownToLine, Download, ExternalLink, RefreshCw, Sparkles, Undo2, Upload } from '@flint-ide/ui/icons'
 import { openMergeEditor } from '../../store/mergeEditor'
 
@@ -84,12 +84,13 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
   }, [multi, repos, root, folder, status])
   const toggle = (key: string) => setCollapsed((c) => ({ ...c, [key]: !c[key] }))
 
+  // A node as title keeps its own case; plain text gets the panel's small caps.
+  const repoTitle = roots.length > 1 && folder ? <RepoSwitcher /> : 'Commit'
+
   if (!multi && (!root || !isRepo)) {
     return (
       <div className="panel commit-panel">
-        <div className="panel-header">
-          <RepoSwitcher fallback="Commit" />
-        </div>
+        <PanelHeader title={repoTitle} />
         <div className="placeholder muted">Not a git repository.</div>
       </div>
     )
@@ -129,21 +130,26 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
 
   return (
     <div className="panel commit-panel">
-      <div className="panel-header">
-        <RepoSwitcher fallback="Commit" />
-        <IconButton size="sm" variant="ghost" aria-label="Refresh" title="Refresh" onClick={() => void refreshAll()}><RefreshCw /></IconButton>
-        <IconButton size="sm" variant="ghost" aria-label="Fetch" title="Fetch" disabled={!!busy || !isRepo} onClick={() => void remote('fetch')}><ArrowDownToLine /></IconButton>
-        <IconButton size="sm" variant="ghost" aria-label="Update repository (pull)" title="Update repository (pull)" disabled={!!busy || !isRepo} onClick={updateProject}><Download /></IconButton>
-        <IconButton size="sm" variant="ghost" aria-label="Push" title={`Push (${formatKeys('Mod+Shift+K')})`} disabled={!!busy || !isRepo} onClick={() => void remote('push')}><Upload /></IconButton>
-        <IconButton size="sm" variant="ghost" aria-label="Stash changes" title="Stash changes…" disabled={!!busy || !isRepo} onClick={openStashDialog}><Archive /></IconButton>
-      </div>
-      {isRepo && status && (
-        <div className="git-branch-line muted" title={multi ? 'Branch of the repository the toolbar acts on (click a repository below to switch)' : undefined}>
-          {multi && folder && <span className="repo-name">{labelOfFolder(folder)} · </span>}
-          <BranchLine status={status} />
-          {busy && <span className="busy"> · {busy}…</span>}
-        </div>
-      )}
+      <PanelHeader
+        title={repoTitle}
+        actions={
+          <>
+            <IconButton size="sm" variant="ghost" aria-label="Refresh" title="Refresh" onClick={() => void refreshAll()}><RefreshCw /></IconButton>
+            <IconButton size="sm" variant="ghost" aria-label="Fetch" title="Fetch" disabled={!!busy || !isRepo} onClick={() => void remote('fetch')}><ArrowDownToLine /></IconButton>
+            <IconButton size="sm" variant="ghost" aria-label="Update repository (pull)" title="Update repository (pull)" disabled={!!busy || !isRepo} onClick={updateProject}><Download /></IconButton>
+            <IconButton size="sm" variant="ghost" aria-label="Push" title={`Push (${formatKeys('Mod+Shift+K')})`} disabled={!!busy || !isRepo} onClick={() => void remote('push')}><Upload /></IconButton>
+            <IconButton size="sm" variant="ghost" aria-label="Stash changes" title="Stash changes…" disabled={!!busy || !isRepo} onClick={openStashDialog}><Archive /></IconButton>
+          </>
+        }
+      >
+        {isRepo && status && (
+          <span title={multi ? 'Branch of the repository the toolbar acts on (click a repository below to switch)' : undefined}>
+            {multi && folder && <b>{labelOfFolder(folder)} · </b>}
+            <BranchLine status={status} />
+            {busy && <span className="busy"> · {busy}…</span>}
+          </span>
+        )}
+      </PanelHeader>
       {status?.operation && root && (
         <div className="git-banner">
           <span>{capitalize(status.operation)} in progress{conflicted.length ? ` · ${conflicted.length} conflict(s)` : ''}</span>
@@ -173,7 +179,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
                 toggle={toggle}
               />
             ))
-          : sections.map((sec) => <ChangeGroups key={sec.root} section={sec} collapsed={collapsed} toggle={toggle} />)}
+          : sections.map((sec) => <ChangeGroups key={sec.root} section={sec} collapsed={collapsed} toggle={toggle} depth={0} />)}
         {root && isRepo && <ReviewSection root={root} />}
         {isRepo && <StashSection />}
       </div>
@@ -225,9 +231,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
           }}
         />
         <div className="commit-actions">
-          <label className="check">
-            <Checkbox checked={amend} onCheckedChange={(checked) => void setAmend(checked)} /> Amend
-          </label>
+          <Checkbox label="Amend" checked={amend} onCheckedChange={(checked) => void setAmend(checked)} />
           <span className="spacer" />
           <span className="muted count" title={multi ? 'One commit per repository with ticked files, same message' : undefined}>
             {selected.length} selected{multi ? (amend ? ' (amend: this repo only)' : reposNote(sections, tickedIn)) : ''}
@@ -273,44 +277,44 @@ function RepoSection({
   const open = !collapsed[key]
   return (
     <div className={`repo-section${current ? ' current' : ''}`}>
-      <div
-        className="tree-row static group-row repo-row"
+      <TreeRow
+        emphasis="group"
         title={current ? `${section.root} (the toolbar and branch line act on this repository)` : `${section.root}\nClick to make the toolbar act on this repository`}
+        twisty={open ? 'open' : 'closed'}
+        onTwistyClick={() => toggle(key)}
+        twistyLabel={`${open ? 'Collapse' : 'Expand'} ${label}`}
+        leading={
+          tickable.length > 0 && (
+            <Checkbox
+              aria-label={`Include all files of ${label}`}
+              checked={included === tickable.length}
+              indeterminate={included > 0 && included < tickable.length}
+              onCheckedChange={(checked) => setGroup(tickable, checked, section.root)}
+            />
+          )
+        }
+        label={label}
+        hint={<BranchLine status={section.status} />}
+        badge={files.length > 0 ? files.length : undefined}
         onClick={() => {
           if (!current) void load(section.folder)
           else toggle(key)
         }}
-      >
-        <span className="twisty" onClick={(e) => (e.stopPropagation(), toggle(key))}>{open ? '▾' : '▸'}</span>
-        {tickable.length > 0 && (
-          <Checkbox
-            aria-label={`Include all files of ${label}`}
-            checked={included === tickable.length}
-            indeterminate={included > 0 && included < tickable.length}
-            onClick={(e) => e.stopPropagation()}
-            onCheckedChange={(checked) => setGroup(tickable, checked, section.root)}
-          />
-        )}
-        <span className="group-title repo-title">{label}</span>
-        <span className="muted repo-branch">
-          <BranchLine status={section.status} />
-        </span>
-        {files.length > 0 && <Badge size="sm" className="count-badge">{files.length}</Badge>}
-      </div>
+      />
       {open &&
         (files.length > 0 ? (
-          <div className="repo-changes">
-            <ChangeGroups section={section} collapsed={collapsed} toggle={toggle} />
-          </div>
+          <ChangeGroups section={section} collapsed={collapsed} toggle={toggle} depth={1} />
         ) : (
-          <div className="repo-changes muted repo-clean">No changes</div>
+          <div className="muted repo-clean">No changes</div>
         ))}
     </div>
   )
 }
 
 /** The conflicts / changes / unversioned groups of one repository. */
-function ChangeGroups({ section, collapsed, toggle }: { section: Section; collapsed: Record<string, boolean>; toggle: (key: string) => void }) {
+function ChangeGroups({
+  section, collapsed, toggle, depth,
+}: { section: Section; collapsed: Record<string, boolean>; toggle: (key: string) => void; depth: number }) {
   const { root, status } = section
   const { isIncluded, setGroup, toggleFile } = useGit.getState()
   const busy = useGit((s) => s.busy)
@@ -327,57 +331,64 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
         const included = g.files.filter((f) => isIncluded(f, root)).length
         const key = `${root}:${g.key}`
         return (
-          <div key={g.key}>
-            <div className="tree-row static group-row" onClick={() => toggle(key)}>
-              <span className="twisty">{collapsed[key] ? '▸' : '▾'}</span>
-              {g.key !== 'conflicts' && (
+          <TreeSection
+            key={g.key}
+            depth={depth}
+            title={g.title}
+            count={g.files.length}
+            open={!collapsed[key]}
+            onOpenChange={() => toggle(key)}
+            leading={
+              g.key !== 'conflicts' && (
                 <Checkbox
                   aria-label={`Include all ${g.title.toLowerCase()}`}
                   checked={included === g.files.length}
                   indeterminate={included > 0 && included < g.files.length}
-                  onClick={(e) => e.stopPropagation()}
                   onCheckedChange={(checked) => setGroup(g.files, checked, root)}
                 />
-              )}
-              <span className="group-title">{g.title}</span>
-              {g.key !== 'conflicts' && included > 0 && (
-                <RollbackTicked files={g.files} root={root} count={included} untracked={g.key === 'untracked'} disabled={!!busy} />
-              )}
-              {g.key === 'conflicts' && agents.conflictAgent && (
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="agent-action"
-                  title={conflictHint(agents.preferred, agents.conflictAgent, engineOf(agents.preferred, defined))}
-                  onClick={(e) => (e.stopPropagation(), resolve(g.files.map((f) => f.path)))}
-                >
-                  <Sparkles /> Resolve with {agents.conflictAgent}
-                </Button>
-              )}
-              <Badge size="sm" className="count-badge">{g.files.length}</Badge>
-            </div>
-            {!collapsed[key] &&
-              g.files.map((f) => (
-                <div
-                  key={g.key + f.path}
-                  className="tree-row static change-row"
-                  title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}
-                  onClick={() => (f.kind === 'conflicted' ? openMergeEditor(root, abs(f)) : openDiff(root, abs(f), f.origPath ? `${root}/${f.origPath}` : abs(f)))}
-                  onDoubleClick={() => openFile(abs(f))}
-                >
-                  {g.key !== 'conflicts' && (
+              )
+            }
+            actions={
+              <>
+                {g.key !== 'conflicts' && included > 0 && (
+                  <RollbackTicked files={g.files} root={root} count={included} untracked={g.key === 'untracked'} disabled={!!busy} />
+                )}
+                {g.key === 'conflicts' && agents.conflictAgent && (
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="agent-action"
+                    title={conflictHint(agents.preferred, agents.conflictAgent, engineOf(agents.preferred, defined))}
+                    onClick={() => resolve(g.files.map((f) => f.path))}
+                  >
+                    <Sparkles /> Resolve with {agents.conflictAgent}
+                  </Button>
+                )}
+              </>
+            }
+          >
+            {g.files.map((f) => (
+              <TreeRow
+                key={g.key + f.path}
+                depth={depth + 1}
+                title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}
+                onClick={() => (f.kind === 'conflicted' ? openMergeEditor(root, abs(f)) : openDiff(root, abs(f), f.origPath ? `${root}/${f.origPath}` : abs(f)))}
+                onDoubleClick={() => openFile(abs(f))}
+                leading={
+                  g.key !== 'conflicts' && (
                     <Checkbox
                       aria-label={`Include ${f.path}`}
                       checked={isIncluded(f, root)}
-                      onClick={(e) => e.stopPropagation()}
                       onCheckedChange={() => toggleFile(f, root)}
                     />
-                  )}
-                  <span className={`change-kind ${f.kind}`}>{KIND_LETTER[f.kind] ?? '?'}</span>
-                  <span className={`file-name change-${f.kind}`}>{f.path.split('/').pop()}</span>
-                  <span className="muted path-hint">{dirOf(f.path)}</span>
-                  {!!f.conflicts && <span className="conflict-count" title="Conflicts left in the file">{f.conflicts}</span>}
-                  <span className="row-actions" onClick={(e) => e.stopPropagation()}>
+                  )
+                }
+                icon={<span className={`change-kind ${f.kind}`}>{KIND_LETTER[f.kind] ?? '?'}</span>}
+                label={<span className={`change-${f.kind}`}>{f.path.split('/').pop()}</span>}
+                file
+                hint={dirOf(f.path)}
+                actions={
+                  <>
                     {f.kind === 'conflicted' && (
                       <>
                         <Button variant="link" size="sm" title="Resolve in the merge editor" onClick={() => openMergeEditor(root, abs(f))}>Resolve…</Button>
@@ -396,10 +407,13 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
                         <Undo2 />
                       </RowAction>
                     )}
-                  </span>
-                </div>
-              ))}
-          </div>
+                  </>
+                }
+              >
+                {!!f.conflicts && <span className="conflict-count" title="Conflicts left in the file">{f.conflicts}</span>}
+              </TreeRow>
+            ))}
+          </TreeSection>
         )
       })}
     </>
@@ -410,8 +424,7 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
 function RollbackTicked({
   files, root, count, untracked, disabled,
 }: { files: FileChange[]; root: string; count: number; untracked: boolean; disabled: boolean }) {
-  const onClick = useEventCallback((e: React.MouseEvent) => {
-    e.stopPropagation() // the header itself folds the group
+  const onClick = useEventCallback(() => {
     void confirmRollback(tickedOf(files, root), root)
   })
   const plural = count === 1 ? '' : 's'
@@ -451,26 +464,24 @@ function capitalize(s: string): string {
  * With several workspace folders: which one's repository the panel shows (it follows
  * the active tab's folder), with the number of changes in each.
  */
-function RepoSwitcher({ fallback }: { fallback: string }) {
+function RepoSwitcher() {
   const roots = useWorkspace((s) => s.roots)
   const folder = useGit((s) => s.folder)
   const counts = useGit((s) => s.counts)
-  if (roots.length < 2 || !folder) return <span className="panel-title">{fallback}</span>
+  if (!folder) return null
   const labels = rootLabels(roots)
   return (
-    <span className="panel-title repo-switcher">
-      <Select
-        size="sm"
-        title="Repository shown in the Commit panel (follows the active file)"
-        value={folder}
-        options={roots.map((r, i) => ({
-          value: r,
-          label: labels[i],
-          hint: r in counts ? `${counts[r]} change${counts[r] === 1 ? '' : 's'}` : 'not a repository',
-        }))}
-        onChange={(r) => void useGit.getState().load(r)}
+    <Select
+      size="sm"
+      title="Repository shown in the Commit panel (follows the active file)"
+      value={folder}
+      options={roots.map((r, i) => ({
+        value: r,
+        label: labels[i],
+        hint: r in counts ? `${counts[r]} change${counts[r] === 1 ? '' : 's'}` : 'not a repository',
+      }))}
+      onChange={(r) => void useGit.getState().load(r)}
       />
-    </span>
   )
 }
 

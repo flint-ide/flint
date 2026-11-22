@@ -143,3 +143,40 @@
 .fui-dense [data-slot='collapsible-content'] > div > div {
   padding-top: 4px;
 }
+
+/* IDE density: Flint's own scale, set with data-density="ide" on <html> (the app,
+   frontend/index.html) or any wrapper. Controls sm 24 · md 28 · lg 32, fields the
+   same, rows and cards tighter, and 12 px text in buttons, fields, tabs, segments
+   and badges, so kit components sit in toolbars and sidebars at the app's size.
+   Use size="sm" in toolbars, panel headers and rows, "md" in forms and dialogs. */
+[data-density='ide'] {
+  --control-sm: 24px;
+  --control-md: 28px;
+  --control-lg: 32px;
+  --control-xl: 36px;
+  --control-2xl: 40px;
+  --control-px-sm: 8px;
+  --control-px-md: 10px;
+  --control-px-lg: 12px;
+  --control-px-xl: 14px;
+  --control-px-2xl: 16px;
+  --field-sm: 24px;
+  --field-md: 28px;
+  --field-lg: 32px;
+  --textarea-sm: 56px;
+  --textarea-md: 80px;
+  --textarea-lg: 112px;
+  --row-py: 3px;
+  --list-row-py: 4px;
+  --menu-item-py: 4px;
+  --nav-item-py: 4px;
+  --card-padding: 12px;
+}
+[data-density='ide'] :is([data-slot='button'], [data-slot='icon-button'], [data-slot='input'], [data-slot='textarea'],
+  [data-slot='tabs-trigger'], [data-slot='segment'], [data-slot='toggle'], [data-slot='native-select']) {
+  font-size: 12px;
+}
+[data-density='ide'] [data-slot='button'] svg:not([class*='size-']) {
+  width: 14px;
+  height: 14px;
+}

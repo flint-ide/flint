@@ -118,6 +118,112 @@
 .fui-agent-time { width: 32px; text-align: right; }
 .fui-agent-action { width: 32px; display: flex; justify-content: flex-end; }
 
+/* PanelHeader: the sidebar panel's 32 px title bar. */
+.fui-panel-header {
+  height: 32px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px 0 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+}
+.fui-panel-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A node in the title's place (a repository switcher) keeps its own case and lays out its parts. */
+.fui-panel-title[data-custom] { display: flex; text-transform: none; letter-spacing: normal; }
+.fui-panel-sub {
+  flex: none;
+  padding: 0 12px 6px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* TreeRow: the 22 px row of sidebar lists and trees. In normal flow by default;
+   data-virtual pins it to the top of a virtualised list's sized box (the caller
+   moves it with transform or top). The left padding comes inline from depth. */
+.fui-tree-row {
+  position: relative;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 8px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.fui-tree-row[data-virtual] { position: absolute; top: 0; left: 0; right: 0; }
+.fui-tree-row:hover { background: var(--bg-hover); }
+.fui-tree-row:is([data-active], [data-selected]) { background: var(--bg-active); }
+/* The tree container (tabIndex=0) has focus: the selection is the focused one. */
+:focus .fui-tree-row[data-selected] { background: var(--selection); }
+.fui-tree-row[data-emphasis='group'] { font-weight: 600; }
+.fui-tree-row[data-emphasis='root'] {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.fui-tree-row[data-editing] { z-index: 1; cursor: default; }
+.fui-twisty {
+  width: 12px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg-faint);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1;
+  text-align: center;
+  cursor: pointer;
+}
+.fui-twisty:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; border-radius: 2px; }
+.fui-tree-leading, .fui-tree-icon { display: inline-flex; align-items: center; flex: none; }
+.fui-tree-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fui-tree-row[data-file] .fui-tree-label { color: var(--fg-name, var(--fg)); }
+.fui-tree-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--fg-muted);
+}
+.fui-tree-hint b { color: var(--accent); font-weight: 600; }
+.fui-tree-actions { margin-left: auto; display: none; align-items: center; gap: 2px; }
+.fui-tree-badge { margin-left: auto; flex: none; display: inline-flex; }
+/* Hover or keyboard focus inside: the actions take the hint's and the count's place. */
+.fui-tree-row:is(:hover, :focus-within) > .fui-tree-actions { display: flex; }
+.fui-tree-row:is(:hover, :focus-within):has(> .fui-tree-actions) > :is(.fui-tree-hint, .fui-tree-badge) { display: none; }
+/* The kit Checkbox's hit area reaches 8–12 px past the box; in a 22 px row that
+   swallows the twisty and the row above. */
+.fui-tree-row [data-slot='checkbox'] { margin-right: 4px; }
+.fui-tree-row [data-slot='checkbox']::after { inset: -2px; }
+
+/* ViewToolbar: WunderUI's Toolbar as the flat bar over an editor view. */
+.fui-view-toolbar {
+  height: 32px;
+  flex: none;
+  gap: 4px;
+  padding: 0 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg);
+  font-size: 12px;
+}
+
 /* ContextMenu: the invisible point the shared menu opens at. */
 .fui-menu-anchor {
   position: fixed;
@@ -192,3 +298,32 @@
   width: 14px;
   height: 14px;
 }
+
+/* IDE density for WunderUI's form, empty state, table and settings parts (their
+   Tailwind sizes are layered, so these unlayered rules win). Forms: 12 px muted
+   labels 4 px above the control and 10 px between fields, like the dialogs' .form. */
+[data-density='ide'] [data-slot='form'] { gap: 10px; }
+[data-density='ide'] [data-slot='fieldset'] { gap: 10px; padding: 12px; }
+[data-density='ide'] :is([data-slot='field-label'], [data-slot='input-field'] > div > label, [data-slot='textarea-field'] > label) {
+  margin-bottom: 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--fg-muted);
+}
+[data-density='ide'] :is([data-slot='field'], [data-slot='input-field'], [data-slot='textarea-field']) { gap: 4px; }
+[data-density='ide'] :is([data-slot='field-description'], [data-slot='field-error']) { font-size: 11.5px; }
+/* EmptyState in an editor area or a panel: a tighter frame, smaller icon disc. */
+[data-density='ide'] [data-slot='empty-state'] { gap: 8px; padding: 24px 16px; }
+[data-density='ide'] [data-slot='empty-state'] > div:first-child:has(svg) { width: 36px; height: 36px; }
+[data-density='ide'] [data-slot='empty-state'] > div:first-child svg { width: 18px; height: 18px; }
+[data-density='ide'] [data-slot='empty-state'] p { font-size: 13px; }
+[data-density='ide'] [data-slot='empty-state'] p + p { font-size: 12px; }
+/* Tables: 12 px text, 24 px header (rows already use --row-py). */
+[data-density='ide'] [data-slot='table'] { font-size: 12px; }
+[data-density='ide'] [data-slot='table-head'] { height: var(--control-sm); font-size: 11px; color: var(--fg-muted); }
+/* SettingsRow: 13 px title, 11.5 px description, 16 px gap. */
+[data-density='ide'] [data-slot='settings-row'] { gap: 16px; padding-block: 6px; }
+[data-density='ide'] [data-slot='settings-row'] p:first-child { font-size: 13px; font-weight: 400; }
+[data-density='ide'] [data-slot='settings-row'] p + p { font-size: 11.5px; }
+/* Collapsible with an appearance (row/inline): the trigger at row height. */
+[data-density='ide'] [data-slot='collapsible-trigger'][data-appearance] { padding-block: 3px; font-size: 12px; }

@@ -1,4 +1,4 @@
-import { Badge, Button, IconButton } from '@flint-ide/ui'
+import { Badge, Button, EmptyState, IconButton, PanelHeader, TreeRow } from '@flint-ide/ui'
 import { Pencil, Plus, RefreshCw, SquareTerminal, X } from '@flint-ide/ui/icons'
 import { useState } from 'react'
 import type { Connection } from '../../../api/backend'
@@ -20,16 +20,17 @@ export function DatabasePanel() {
 
   return (
     <div className="panel">
-      <div className="panel-header">
-        <span className="panel-title">Databases</span>
-        <IconButton variant="ghost" size="sm" aria-label="New connection" title="New connection" onClick={() => setEditing('new')}><Plus /></IconButton>
-      </div>
+      <PanelHeader
+        title="Databases"
+        actions={<IconButton variant="ghost" size="sm" aria-label="New connection" title="New connection" onClick={() => setEditing('new')}><Plus /></IconButton>}
+      />
       <div className="tree scroll">
         {connections.length === 0 && (
-          <div className="placeholder muted">
-            No connections yet.
-            <Button variant="ghost" size="sm" onClick={() => setEditing('new')}>Add PostgreSQL or ClickHouse</Button>
-          </div>
+          <EmptyState
+            variant="default"
+            title="No connections yet"
+            action={<Button variant="ghost" size="sm" onClick={() => setEditing('new')}>Add PostgreSQL or ClickHouse</Button>}
+          />
         )}
         {connections.map((c) => (
           <ConnectionNode key={c.id} conn={c} onEdit={() => setEditing(c)} />
@@ -62,24 +63,25 @@ function ConnectionNode({ conn, onEdit }: { conn: Connection; onEdit: () => void
   const menu = onMenu(() => connectionMenu(conn, { newConsole, refresh, edit: onEdit, remove: () => void remove(), copy: copyText }))
 
   return (
-    <div className="conn-node">
-      <div className="tree-row static conn-row" onClick={toggle} onContextMenu={menu}>
-        <span className="twisty">{open ? '▾' : '▸'}</span>
-        <span className={`driver-badge ${conn.driver}`}>{conn.driver === 'clickhouse' ? 'CH' : 'PG'}</span>
-        <span className="conn-name" title={`${conn.user}@${conn.host}:${conn.port}/${defaultDatabase(conn)}`}>{conn.name}</span>
+    <div>
+      <TreeRow
+        twisty={open ? 'open' : 'closed'}
+        onClick={toggle}
+        onContextMenu={menu}
+        icon={<span className={`driver-badge ${conn.driver}`}>{conn.driver === 'clickhouse' ? 'CH' : 'PG'}</span>}
+        label={<span title={`${conn.user}@${conn.host}:${conn.port}/${defaultDatabase(conn)}`}>{conn.name}</span>}
+        actions={
+          <>
+            <IconButton variant="ghost" size="sm" aria-label="New SQL console" title="New SQL console" onClick={newConsole}><SquareTerminal /></IconButton>
+            <IconButton variant="ghost" size="sm" aria-label="Refresh databases" title="Refresh databases" onClick={refresh}><RefreshCw /></IconButton>
+            <IconButton variant="ghost" size="sm" aria-label="Edit" title="Edit" onClick={onEdit}><Pencil /></IconButton>
+            <IconButton variant="ghost" size="sm" aria-label="Delete" title="Delete" onClick={() => void remove()}><X /></IconButton>
+          </>
+        }
+      >
         {conn.readOnly && <Badge size="sm" title="Read-only">RO</Badge>}
-        <span className="row-actions" onClick={(e) => e.stopPropagation()}>
-          <IconButton variant="ghost" size="sm" aria-label="New SQL console" title="New SQL console" onClick={newConsole}><SquareTerminal /></IconButton>
-          <IconButton variant="ghost" size="sm" aria-label="Refresh databases" title="Refresh databases" onClick={refresh}><RefreshCw /></IconButton>
-          <IconButton variant="ghost" size="sm" aria-label="Edit" title="Edit" onClick={onEdit}><Pencil /></IconButton>
-          <IconButton variant="ghost" size="sm" aria-label="Delete" title="Delete" onClick={() => void remove()}><X /></IconButton>
-        </span>
-      </div>
-      {open && (
-        <div className="conn-children">
-          <DatabasesNode conn={conn} />
-        </div>
-      )}
+      </TreeRow>
+      {open && <DatabasesNode conn={conn} />}
     </div>
   )
 }

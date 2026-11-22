@@ -654,10 +654,7 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
 }
 .dir-name,
 .file-name,
-.conn-name,
-.scratch-name,
-.table-name,
-.schema-name {
+.scratch-name {
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -683,20 +680,8 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
   margin-left: auto;
   flex: none;
 }
-.indent-1 {
-  padding-left: 22px !important;
-}
 .indent-2 {
   padding-left: 36px !important;
-}
-.indent-3 {
-  padding-left: 54px !important;
-}
-.indent-4 {
-  padding-left: 70px !important;
-}
-.indent-5 {
-  padding-left: 86px !important;
 }
 .row-actions {
   margin-left: auto;
@@ -832,9 +817,6 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
   background: var(--bg-active);
   color: var(--fg-muted);
 }
-.table-name.view {
-  font-style: italic;
-}
 .db-icon {
   flex: none;
   margin-right: 4px;
@@ -842,16 +824,6 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
 }
 .db-icon.locked {
   color: var(--fg-faint);
-}
-.db-row.locked {
-  color: var(--fg-faint);
-  cursor: default;
-}
-.default-db {
-  font-weight: 600;
-}
-.query-toolbar .db-icon {
-  margin-right: 0;
 }
 .column-row {
   font-size: 12px;
@@ -909,27 +881,6 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
   flex-direction: column;
   flex: 1;
   min-height: 0;
-}
-.query-toolbar {
-  height: 36px;
-  flex: none;
-  overflow: hidden;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
-}
-.query-toolbar label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-}
-.query-toolbar button {
-  flex: none;
 }
 .hint {
   font-size: 11px;
@@ -1227,8 +1178,7 @@ button.small {
   background: var(--accent-dim);
   border-color: var(--accent);
 }
-.cell-editor-error,
-.form-error {
+.cell-editor-error {
   color: var(--danger);
   font-family: var(--font-ui);
   font-size: 12px;
@@ -1247,9 +1197,6 @@ button.small {
   font: 12px/1.5 var(--font-mono);
   white-space: pre-wrap;
   word-break: break-word;
-}
-.form-error {
-  margin-bottom: 8px;
 }
 
 /* ---------- EXPLAIN ---------- */
@@ -4275,13 +4222,6 @@ button.keymap-chord:hover {
 .project-picker {
   padding: 0 10px 6px;
 }
-.project-group .tree-row.root-row {
-  height: 24px;
-}
-.project-group-head:focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
-}
 .project-untrusted {
   display: flex;
   flex-wrap: wrap;
@@ -4442,15 +4382,6 @@ button.keymap-chord:hover {
   height: 100%;
   min-height: 0;
   background: var(--bg-editor);
-}
-.project-board-head {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
 }
 .project-board-title {
   font-weight: 600;
@@ -5604,10 +5535,8 @@ body.file-drop-target-active::after {
 }
 
 /* Extensions (features/extensions): Settings ▸ Extensions, their panels and status items. */
+/* Spacing between the Card of each extension. */
 .extension-card {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 10px 12px 0;
   margin: 10px 0;
 }
 .extension-head {
@@ -5661,14 +5590,6 @@ body.file-drop-target-active::after {
   background: var(--bg-editor);
   border-radius: 4px;
   white-space: pre-wrap;
-}
-.extension-row {
-  gap: 6px;
-}
-.extension-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .status-extension {
   font-size: 11px;
@@ -5791,11 +5712,6 @@ body.file-drop-target-active::after {
   flex-direction: column;
   gap: 2px;
   font-size: 11.5px;
-}
-.ext-form-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
 .ext-chart {

@@ -20,7 +20,7 @@ import {
   type Status,
 } from './projects'
 import { followProjects, loadProject, openProject, openNewItem, openPlan, refreshProjects, setStatus, useProjects } from './store'
-import { Button, IconButton } from '@flint-ide/ui'
+import { Button, IconButton, ViewToolbar } from '@flint-ide/ui'
 import { CountBadge, MarkerBadge } from '../../components/tasks/badges'
 import { Plus, RefreshCw } from '@flint-ide/ui/icons'
 
@@ -52,7 +52,7 @@ export function BoardView({ tab, active }: { tab: ContributedTab; active: boolea
   if (!project) return <p className="muted empty">{loaded?.error || 'Loading the project…'}</p>
   return (
     <div className="project-board">
-      <div className="project-board-head">
+      <ViewToolbar aria-label="Project board">
         <span className="project-board-title">{project.name}</span>
         {!project.trusted && (
           <MarkerBadge tone="warn" title="The project's folder is not trusted: agents can't read it with get_project, and Delegate shows you each item before it sends it">
@@ -61,7 +61,7 @@ export function BoardView({ tab, active }: { tab: ContributedTab; active: boolea
         )}
         <span className="muted truncate" title={project.path}>{project.path}</span>
         <ProjectContext project={project} />
-        <span className="spacer" />
+        <span className="fui-grow" />
         {/* The title is on a wrapper: a disabled kit button takes no hover, and the hint says why. */}
         <span title={project.oldFormat ? OLD_FORMAT_HINT : 'New Item…'}>
           <Button variant="ghost" size="sm" disabled={project.oldFormat} onClick={() => openNewItem(folder, 'board')}>
@@ -82,7 +82,7 @@ export function BoardView({ tab, active }: { tab: ContributedTab; active: boolea
         <IconButton variant="ghost" size="sm" aria-label="Refresh" title="Refresh" onClick={() => void loadProject(folder)}>
           <RefreshCw />
         </IconButton>
-      </div>
+      </ViewToolbar>
       {project.oldFormat && <OldFormatNote folder={folder} />}
       {loaded?.error && <div className="project-board-error error">{loaded.error}</div>}
       <Columns project={project} />

@@ -1,4 +1,4 @@
-import { Button, Checkbox } from '@flint-ide/ui'
+import { Button, Card, CardContent, Checkbox } from '@flint-ide/ui'
 import { useEffect, useState } from 'react'
 import * as API from '../../../bindings/flint/internal/features/extensions/api'
 import { errorMessage } from '../../api/backend'
@@ -84,7 +84,7 @@ function ExtensionCard({ info }: { info: Info }) {
   const enabled = extensionEnabled(extensions, info.id)
   const broken = info.state === 'invalid'
   return (
-    <div className="extension-card">
+    <Card className="extension-card"><CardContent>
       <div className="extension-head">
         <label className="extension-toggle" title={enabled ? 'Turn off' : 'Turn on'}>
           <Checkbox
@@ -244,7 +244,7 @@ function ExtensionCard({ info }: { info: Info }) {
         <Button variant="destructive" onClick={() => void uninstallExtension(info.id)}>Uninstall…</Button>
       </div>
       {log !== null && <pre className="extension-log">{log}</pre>}
-    </div>
+    </CardContent></Card>
   )
 }
 

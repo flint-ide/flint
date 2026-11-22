@@ -1,4 +1,4 @@
-import { Button } from '@flint-ide/ui'
+import { Alert, Button, FormActions } from '@flint-ide/ui'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Database, editBatch, errorMessage, type Driver, type EditTarget, type QueryResult } from '../../../api/backend'
 import { addRow, buildBatch, changeCount, editability, noEdits, toggleDelete, type StagedEdits } from '../lib/rowEdits'
@@ -155,17 +155,17 @@ function SubmitDialog({ sql, table, onClose, onApply }: SubmitProps) {
         Runs in one transaction; values are sent as bind parameters (inlined above only for reading). An UPDATE or DELETE
         that doesn’t hit exactly one row rolls everything back.
       </p>
-      {error && <div className="form-error selectable">{error}</div>}
-      <div className="form-actions">
+      {error && <Alert size="inline" variant="negative" className="selectable">{error}</Alert>}
+      <FormActions align="start">
         <Button variant="ghost" size="sm" onClick={() => void navigator.clipboard.writeText(sql).then(() => showToast('Copied SQL'))}>
           Copy SQL
         </Button>
-        <span className="spacer" />
+        <span className="fui-grow" />
         <Button variant="plain" onClick={onClose}>Cancel</Button>
         <Button variant="primary" autoFocus disabled={busy} onClick={() => void apply()}>
           {busy ? 'Applying…' : 'Apply'}
         </Button>
-      </div>
+      </FormActions>
     </Modal>
   )
 }

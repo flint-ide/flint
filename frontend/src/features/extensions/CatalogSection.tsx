@@ -1,4 +1,4 @@
-import { Button } from '@flint-ide/ui'
+import { Button, Card, CardContent } from '@flint-ide/ui'
 import { useEffect } from 'react'
 import { ExtensionStateBadge } from './ExtensionStateBadge'
 import { uninstallExtension, useExtensions } from './store'
@@ -53,7 +53,7 @@ function CatalogCard({ row }: { row: CatalogRow<Entry> }) {
   const busy = useCatalog((s) => s.busy.includes(entry.folder))
   const kind = entry.program ? 'Program' : entry.themes > 0 ? `${entry.themes} color theme${entry.themes === 1 ? '' : 's'}` : 'Data only'
   return (
-    <div className="extension-card">
+    <Card className="extension-card"><CardContent>
       <div className="extension-head">
         <strong>{entry.name}</strong>
         {entry.version && <span className="muted">{entry.version}</span>}
@@ -78,6 +78,6 @@ function CatalogCard({ row }: { row: CatalogRow<Entry> }) {
           </Button>
         )}
       </div>
-    </div>
+    </CardContent></Card>
   )
 }

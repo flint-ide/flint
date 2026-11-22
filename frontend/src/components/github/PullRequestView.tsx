@@ -18,6 +18,9 @@ import { FailedCheckActions, FixWithAgentButton } from './CIStatus'
 import type { FixTarget } from '../../store/ci'
 import { reviewWork, workSummary } from '../../lib/prAgent'
 import { AddressReviewButton, RequestCodeReviewButton } from './ReviewAgent'
+import { Button, DiffStat, IconButton } from '@flint-ide/ui'
+import { RefreshCw } from '@flint-ide/ui/icons'
+import { PrBadge } from './PrBadge'
 
 const STATUS_LETTER: Record<string, string> = { added: 'A', removed: 'D', modified: 'M', renamed: 'R', copied: 'C', changed: 'T' }
 const STATUS_KIND: Record<string, string> = { added: 'added', removed: 'deleted', modified: 'modified', renamed: 'renamed', copied: 'copied' }
@@ -52,24 +55,23 @@ export function PullRequestView({ tab, active }: { tab: PullRequestTab; active: 
               {d.title} <span className="muted">#{d.number}</span>
             </h2>
             <span className="spacer" />
-            <button className="icon" title="Refresh" disabled={entry.loading} onClick={() => void loadDetails(tab.root, tab.number, true)}>↻</button>
+            <IconButton size="sm" variant="ghost" aria-label="Refresh" title="Refresh" disabled={entry.loading} onClick={() => void loadDetails(tab.root, tab.number, true)}><RefreshCw /></IconButton>
             <RequestCodeReviewButton root={tab.root} number={d.number} />
             {feedback && <AddressReviewButton target={{ root: tab.root, number: d.number }} className="" />}
             {d.state === 'OPEN' && (
-              <button disabled={!!busy} onClick={() => void checkoutPullRequest(tab.root, d.number, d.headRef)} title="git fetch pull/N/head and switch to its branch (refused while files have local changes)">
+              <Button size="sm" variant="plain" disabled={!!busy} onClick={() => void checkoutPullRequest(tab.root, d.number, d.headRef)} title="git fetch pull/N/head and switch to its branch (refused while files have local changes)">
                 {busy === 'checkout' ? 'Checking out…' : 'Check out'}
-              </button>
+              </Button>
             )}
-            <button onClick={() => openInBrowser(d.url)}>Open on GitHub ↗</button>
+            <Button size="sm" variant="plain" onClick={() => openInBrowser(d.url)}>Open on GitHub ↗</Button>
           </div>
           <div className="pr-subtitle muted">
-            {badge && <span className={`pr-badge ${badge.tone}`}>{badge.label}</span>}
+            {badge && <PrBadge tone={badge.tone}>{badge.label}</PrBadge>}
             <span>
               <b>{d.author}</b> wants to merge {d.commits.length} commit{d.commits.length === 1 ? '' : 's'} into <code>{d.baseRef}</code> from{' '}
               <code>{d.crossRepository && d.headOwner ? `${d.headOwner}:${d.headRef}` : d.headRef}</code>
             </span>
-            <span className="pr-stat-add">+{d.additions}</span>
-            <span className="pr-stat-del">−{d.deletions}</span>
+            <DiffStat added={d.additions} removed={d.deletions} />
             <span>updated {timeAgo(d.updatedAt)}</span>
             {feedback && <span title="What ✦ Address review comments hands to the agent">{feedback}</span>}
             {entry.loading && <span>· refreshing…</span>}
@@ -77,7 +79,7 @@ export function PullRequestView({ tab, active }: { tab: PullRequestTab; active: 
           {d.labels.length > 0 && (
             <div className="pr-labels">
               {d.labels.map((l) => (
-                <span key={l} className="pr-badge muted">{l}</span>
+                <PrBadge key={l} tone="muted">{l}</PrBadge>
               ))}
             </div>
           )}
@@ -132,7 +134,7 @@ function Checks({ root, details }: { root: string; details: PullRequestDetails }
             <span className="muted">{(c.conclusion || c.status).toLowerCase().replace(/_/g, ' ')}</span>
             <FailedCheckActions root={root} check={c} target={target} />
             {c.url && (
-              <button className="link" onClick={() => openInBrowser(c.url)}>Details ↗</button>
+              <Button size="sm" variant="ghost" onClick={() => openInBrowser(c.url)}>Details ↗</Button>
             )}
           </div>
         ))}
@@ -162,10 +164,9 @@ function FileRow({ file, threads, onOpen }: { file: PullRequestFile; threads?: {
       <span className={`change-kind ${STATUS_KIND[file.status] ?? 'modified'}`}>{STATUS_LETTER[file.status] ?? 'M'}</span>
       <span className="file-name">{file.path.slice(slash + 1)}</span>
       <span className="muted path-hint">{slash > 0 ? file.path.slice(0, slash) : ''}</span>
-      {threads && threads.open > 0 && <span className="pr-badge pending" title="Unresolved review threads">{threads.open} open</span>}
-      {threads && threads.open === 0 && threads.resolved > 0 && <span className="pr-badge muted" title="All review threads resolved">{threads.resolved} resolved</span>}
-      <span className="pr-stat-add">+{file.additions}</span>
-      <span className="pr-stat-del">−{file.deletions}</span>
+      {threads && threads.open > 0 && <PrBadge tone="pending" title="Unresolved review threads">{threads.open} open</PrBadge>}
+      {threads && threads.open === 0 && threads.resolved > 0 && <PrBadge tone="muted" title="All review threads resolved">{threads.resolved} resolved</PrBadge>}
+      <DiffStat added={file.additions} removed={file.deletions} />
     </div>
   )
 }

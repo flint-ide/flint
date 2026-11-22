@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { Button, IconButton, Input } from '@flint-ide/ui'
+import { X } from '@flint-ide/ui/icons'
 import { useGit } from '../../store/git'
 import {
   applyStash,
@@ -49,13 +51,13 @@ export function StashSection() {
                   <span className="file-name">{stashLabel(s.message)}</span>
                   <span className="muted path-hint">{formatDateTime(s.time)}</span>
                   <span className="row-actions" onClick={(e) => e.stopPropagation()}>
-                    <button className="link" disabled={busy} title="Apply and keep the stash" onClick={() => void applyStash(s.hash)}>
+                    <Button size="sm" variant="ghost" disabled={busy} title="Apply and keep the stash" onClick={() => void applyStash(s.hash)}>
                       Apply
-                    </button>
-                    <button className="link" disabled={busy} title="Apply and drop the stash" onClick={() => void popStash(s.hash)}>
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={busy} title="Apply and drop the stash" onClick={() => void popStash(s.hash)}>
                       Pop
-                    </button>
-                    <button className="icon" disabled={busy} title="Drop" onClick={() => void dropStash(s.hash)}>✕</button>
+                    </Button>
+                    <IconButton size="sm" variant="ghost" aria-label="Drop" disabled={busy} title="Drop" onClick={() => void dropStash(s.hash)}><X /></IconButton>
                   </span>
                 </div>
                 {files[s.hash]?.map((f) => (
@@ -94,7 +96,7 @@ function StashDialog({ busy }: { busy: boolean }) {
       <div className="form">
         <label>
           Message
-          <input
+          <Input
             autoFocus
             value={message}
             placeholder="Optional"
@@ -108,10 +110,10 @@ function StashDialog({ busy }: { busy: boolean }) {
         </label>
         <div className="form-actions">
           <span className="spacer" />
-          <button onClick={closeStashDialog}>Cancel</button>
-          <button className="primary" disabled={busy} onClick={submit}>
+          <Button variant="plain" onClick={closeStashDialog}>Cancel</Button>
+          <Button variant="primary" disabled={busy} onClick={submit}>
             {busy ? 'Stashing…' : 'Stash'}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

@@ -852,9 +852,6 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
 }
 .search-replace .replace-all {
   flex: none;
-  height: 22px;
-  padding: 0 8px;
-  font-size: 11px;
 }
 
 /* ---------- database ---------- */
@@ -1943,6 +1940,11 @@ button.small {
 .form-row.checks {
   gap: 20px;
 }
+/* The radios of a form row sit side by side like the checkboxes did. */
+.radio-row {
+  display: flex;
+  gap: 20px;
+}
 .form label.check {
   flex-direction: row;
   align-items: center;
@@ -2172,21 +2174,13 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   padding: 1px 4px;
   font-size: 12px;
 }
+/* The kit's Textarea draws the field; the box only sets its height and the commit message's monospace. */
 .commit-box textarea {
   min-height: 84px;
   resize: vertical;
-  background: var(--bg-editor);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 6px 8px;
-  color: var(--fg);
-  font: 12px/1.45 var(--font-mono);
-  outline: none;
+  font-family: var(--font-mono);
   user-select: text;
   -webkit-user-select: text;
-}
-.commit-box textarea:focus {
-  border-color: var(--accent);
 }
 .commit-actions {
   display: flex;
@@ -2534,9 +2528,6 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 .stash-row .row-actions {
   gap: 6px;
   align-items: center;
-}
-.stash-row .row-actions .link {
-  font-size: 11px;
 }
 
 .status-action {
@@ -5119,32 +5110,6 @@ button.keymap-chord:hover {
 .pr-ci.neutral {
   color: var(--fg-faint);
 }
-.pr-badge {
-  flex: none;
-  font-size: 10px;
-  line-height: 15px;
-  padding: 0 6px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  color: var(--fg-muted);
-  white-space: nowrap;
-}
-.pr-badge.ok {
-  color: var(--ok);
-  border-color: rgba(134, 239, 172, 0.35);
-}
-.pr-badge.bad {
-  color: var(--danger);
-  border-color: rgba(248, 113, 113, 0.4);
-}
-.pr-badge.pending {
-  color: var(--accent);
-  border-color: var(--accent-dim);
-}
-.pr-badge.merged {
-  color: var(--badge-purple-fg);
-  border-color: var(--badge-purple-bg);
-}
 
 .pr-view {
   display: flex;
@@ -5182,14 +5147,6 @@ button.keymap-chord:hover {
 }
 .pr-subtitle b {
   color: var(--fg);
-}
-.pr-stat-add {
-  color: var(--ok);
-  font: 11px var(--font-mono);
-}
-.pr-stat-del {
-  color: var(--danger);
-  font: 11px var(--font-mono);
 }
 .pr-labels {
   display: flex;
@@ -5361,19 +5318,9 @@ button.keymap-chord:hover {
 .pr-reply textarea,
 .pr-review-bar textarea {
   resize: vertical;
-  background: var(--bg-editor);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 5px 8px;
-  color: var(--fg);
-  font: 12px/1.45 var(--font-mono);
-  outline: none;
+  font-family: var(--font-mono);
   user-select: text;
   -webkit-user-select: text;
-}
-.pr-reply textarea:focus,
-.pr-review-bar textarea:focus {
-  border-color: var(--accent);
 }
 .pr-actions {
   display: flex;
@@ -5720,9 +5667,6 @@ body.file-drop-target-active::after {
   flex-wrap: wrap;
   row-gap: 2px;
 }
-.commit-box-tools .link {
-  white-space: nowrap;
-}
 
 .review-section {
   border-top: 1px solid var(--border);
@@ -5883,11 +5827,6 @@ body.file-drop-target-active::after {
   display: inline-flex;
   gap: 8px;
   flex: none;
-}
-.ci-actions .link,
-.ci-banner .link {
-  font-size: 11px;
-  padding: 0;
 }
 .ci-log {
   display: flex;

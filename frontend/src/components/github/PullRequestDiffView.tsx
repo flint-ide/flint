@@ -14,6 +14,8 @@ import { CommentComposer, ReviewThread } from './ReviewThread'
 import { ReviewBar } from './ReviewBar'
 import { useWindowFocus } from './useWindowFocus'
 import { GitHubError } from '../accounts/GitHubError'
+import { Button, IconButton } from '@flint-ide/ui'
+import { RefreshCw } from '@flint-ide/ui/icons'
 
 const COLLAPSE = { margin: 3, minSize: 6 }
 
@@ -86,8 +88,8 @@ export function PullRequestDiffView({ tab, active }: { tab: PullRequestDiffTab; 
         <span className="muted">{details ? `${details.headRef} @ ${details.headOid.slice(0, 7)}` : 'head'}</span>
         <span className="spacer" />
         {entry?.loading && <span className="muted">refreshing…</span>}
-        <button className="icon" title="Refresh comments" onClick={() => void loadDetails(tab.root, tab.number, true)}>↻</button>
-        {details && <button className="link" onClick={() => openInBrowser(`${details.url}/files`)}>Open on GitHub ↗</button>}
+        <IconButton size="sm" variant="ghost" aria-label="Refresh comments" title="Refresh comments" onClick={() => void loadDetails(tab.root, tab.number, true)}><RefreshCw /></IconButton>
+        {details && <Button size="sm" variant="ghost" onClick={() => openInBrowser(`${details.url}/files`)}>Open on GitHub ↗</Button>}
       </div>
       {(error || entry?.error) && <GitHubError message={(error ?? entry?.error)!} />}
       {note && <div className="placeholder muted">{note}</div>}

@@ -9,6 +9,7 @@ import { displayPath, labelOf } from '../../lib/workspaceRoots'
 import { fileKey, matchKey } from '../../lib/replaceTargets'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
+import { Button, Input } from '@flint-ide/ui'
 
 const basename = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 const dirname = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
@@ -115,14 +116,16 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
               onChange={(e) => setParams({ replace: e.target.value })}
               onKeyDown={(e) => e.key === 'Enter' && modKey(e) && void useSearch.getState().replaceAll(roots)}
             />
-            <button
+            <Button
+              size="sm"
+              variant="plain"
               className="replace-all"
               title={`Replace every ticked match (${formatKeys('Mod+Enter')})`}
               disabled={replacing || !!runningId || matches.length === 0}
               onClick={() => void useSearch.getState().replaceAll(roots)}
             >
               {replacing ? 'Replacing…' : 'Replace all'}
-            </button>
+            </Button>
           </div>
         )}
         {lastReplace?.undoable && (
@@ -130,7 +133,7 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
             <span className="muted">
               Replaced {lastReplace.replacements} in {lastReplace.files} {lastReplace.files === 1 ? 'file' : 'files'}
             </span>
-            <button className="link" onClick={() => void useSearch.getState().undoReplace(roots)}>Undo</button>
+            <Button size="sm" variant="ghost" onClick={() => void useSearch.getState().undoReplace(roots)}>Undo</Button>
           </div>
         )}
         {scoped && (
@@ -143,8 +146,8 @@ export function SearchPanel({ focusToken }: { focusToken: number }) {
         )}
         {showFilters && (
           <>
-            <input value={params.include} placeholder="include: *.go, src/**" spellCheck={false} onChange={(e) => setParams({ include: e.target.value })} />
-            <input value={params.exclude} placeholder="exclude: *_test.go, vendor/**" spellCheck={false} onChange={(e) => setParams({ exclude: e.target.value })} />
+            <Input size="sm" value={params.include} placeholder="include: *.go, src/**" spellCheck={false} onChange={(e) => setParams({ include: e.target.value })} />
+            <Input size="sm" value={params.exclude} placeholder="exclude: *_test.go, vendor/**" spellCheck={false} onChange={(e) => setParams({ exclude: e.target.value })} />
           </>
         )}
         <div className="search-status muted">

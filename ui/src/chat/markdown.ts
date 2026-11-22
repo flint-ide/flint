@@ -23,10 +23,12 @@ export type MarkdownLine =
  */
 export function parseLine(line: string, edge: boolean): MarkdownLine | null {
   if (!line.trim()) return edge ? null : { kind: 'gap' }
-  const heading = /^(#{1,4})\s+(.*)$/.exec(line)
-  if (heading) return { kind: 'heading', text: heading[2] }
-  const bullet = /^\s*([-*]|\d+\.)\s+(.*)$/.exec(line)
-  if (bullet) return { kind: 'bullet', marker: /\d/.test(bullet[1]) ? bullet[1] : '•', text: bullet[2] }
+  // Only the prefix is matched and the rest sliced off: a pattern ending in \s+(.*)$
+  // backtracks polynomially on long runs of spaces (agent output is untrusted input).
+  const heading = /^#{1,4}[ \t]+/.exec(line)
+  if (heading) return { kind: 'heading', text: line.slice(heading[0].length) }
+  const bullet = /^[ \t]*([-*]|\d+\.)[ \t]+/.exec(line)
+  if (bullet) return { kind: 'bullet', marker: /\d/.test(bullet[1]) ? bullet[1] : '•', text: line.slice(bullet[0].length) }
   return { kind: 'text', text: line }
 }
 

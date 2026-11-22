@@ -40,6 +40,14 @@ describe('parseLine', () => {
   it('keeps anything else as text', () => {
     assert.deepEqual(parseLine('hello', true), { kind: 'text', text: 'hello' })
   })
+  it('stays linear on long runs of spaces (no ReDoS)', () => {
+    const spaces = ' '.repeat(50_000)
+    const started = Date.now()
+    assert.equal(parseLine(`* ${spaces}x`, false)?.kind, 'bullet')
+    assert.equal(parseLine(`# ${spaces}`, false)?.kind, 'heading')
+    assert.deepEqual(parseLine(`*${spaces}`, false), { kind: 'bullet', marker: '•', text: '' })
+    assert.ok(Date.now() - started < 200)
+  })
 })
 
 describe('inlineTokens', () => {

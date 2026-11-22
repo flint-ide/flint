@@ -1,5 +1,4 @@
-import { Button, IconButton } from '@flint-ide/ui'
-import { X } from '@flint-ide/ui/icons'
+import { Button, ChatBanner } from '@flint-ide/ui'
 import { alertText, isPaused } from '../../lib/usageView'
 import { alertsKey, continueOverBudget, dismissBudget, useUsage } from '../../store/usage'
 import { useWorkspace } from '../../store/workspace'
@@ -15,23 +14,25 @@ export function BudgetWarning({ chatId }: { chatId: string }) {
   const paused = isPaused(budget.alerts, budget.pause)
   if (!paused && dismissed === alertsKey(budget.alerts)) return null
   return (
-    <div className={`budget-warning${paused ? ' paused' : ''}`} role="status">
-      <span className="budget-icon" aria-hidden>⚠</span>
-      <span className="budget-text">
-        {budget.alerts.map((a) => alertText(a)).join(' · ')}
-        {paused && ' — new turns are paused.'}
-      </span>
-      {paused && (
-        <Button variant="plain" size="sm" onClick={() => void continueOverBudget(chatId)} title="Let turns run today (and in this task) although the budget is spent">
-          Continue anyway
-        </Button>
-      )}
-      <Button variant="ghost" size="sm" onClick={() => useWorkspace.getState().setSidebar('usage')}>Usage</Button>
-      {!paused && (
-        <IconButton variant="ghost" size="sm" aria-label="Dismiss" onClick={() => dismissBudget(chatId)}>
-          <X />
-        </IconButton>
-      )}
-    </div>
+    <ChatBanner
+      tone={paused ? 'negative' : 'warning'}
+      // A paused chat can't be dismissed: the pause has to be lifted or waited out.
+      onDismiss={paused ? undefined : () => dismissBudget(chatId)}
+      actions={
+        <>
+          {paused && (
+            <Button variant="plain" size="sm" onClick={() => void continueOverBudget(chatId)} title="Let turns run today (and in this task) although the budget is spent">
+              Continue anyway
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => useWorkspace.getState().setSidebar('usage')}>
+            Usage
+          </Button>
+        </>
+      }
+    >
+      {budget.alerts.map((a) => alertText(a)).join(' · ')}
+      {paused && ' — new turns are paused.'}
+    </ChatBanner>
   )
 }

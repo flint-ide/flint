@@ -11,6 +11,14 @@
 .fui-added { color: var(--git-added); }
 .fui-removed { color: var(--git-deleted); }
 
+/* An input inside a group (Input with leading/trailing, InputGroup): the group
+   draws the focus ring. WunderUI's rule that is meant to drop the inner one
+   (.focus-ring-within :is(input, textarea):focus-visible) loses on specificity
+   to .focus-ring:is(input, …, [role=combobox]):focus-visible, so both showed. */
+[data-slot='input-group'] :is(input, textarea):focus-visible {
+  box-shadow: none;
+}
+
 /* CommandPalette */
 .fui-palette {
   width: min(560px, 100%);

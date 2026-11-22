@@ -20,6 +20,9 @@ import {
   type Status,
 } from './projects'
 import { followProjects, loadProject, openProject, openNewItem, openPlan, refreshProjects, setStatus, useProjects } from './store'
+import { Button, IconButton } from '@flint-ide/ui'
+import { CountBadge, MarkerBadge } from '../../components/tasks/badges'
+import { Plus, RefreshCw } from '@flint-ide/ui/icons'
 
 /** The Board tab: one column per status; a card can be dragged to another column or moved with its Status menu. */
 export function BoardView({ tab, active }: { tab: ContributedTab; active: boolean }) {
@@ -40,7 +43,7 @@ export function BoardView({ tab, active }: { tab: ContributedTab; active: boolea
       <div className="project-board-message">
         <p className="error">{problem}</p>
         <p>
-          <button className="link" onClick={() => void openProject().then(refreshProjects)}>Open Project…</button>
+          <Button variant="ghost" size="sm" onClick={() => void openProject().then(refreshProjects)}>Open Project…</Button>
         </p>
       </div>
     )
@@ -52,23 +55,29 @@ export function BoardView({ tab, active }: { tab: ContributedTab; active: boolea
       <div className="project-board-head">
         <span className="project-board-title">{project.name}</span>
         {!project.trusted && (
-          <span className="project-marker warn" title="The project's folder is not trusted: agents can't read it with get_project, and Delegate shows you each item before it sends it">
+          <MarkerBadge tone="warn" title="The project's folder is not trusted: agents can't read it with get_project, and Delegate shows you each item before it sends it">
             Restricted Mode
-          </span>
+          </MarkerBadge>
         )}
         <span className="muted truncate" title={project.path}>{project.path}</span>
         <ProjectContext project={project} />
         <span className="spacer" />
-        <button className="icon" title={project.oldFormat ? OLD_FORMAT_HINT : 'New Item…'} disabled={project.oldFormat} onClick={() => openNewItem(folder, 'board')}>＋ New Item…</button>
-        <button
-          className="icon"
+        <Button variant="ghost" size="sm" title={project.oldFormat ? OLD_FORMAT_HINT : 'New Item…'} disabled={project.oldFormat} onClick={() => openNewItem(folder, 'board')}>
+          <Plus data-icon="inline-start" />
+          New Item…
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           title={project.oldFormat ? OLD_FORMAT_HINT : 'Have an agent split a goal into items (the prompt goes into a chat draft)'}
           disabled={project.oldFormat}
           onClick={() => openPlan(folder, 'board')}
         >
           ✦ Plan with Agent…
-        </button>
-        <button className="icon" title="Refresh" onClick={() => void loadProject(folder)}>↻</button>
+        </Button>
+        <IconButton variant="ghost" size="sm" aria-label="Refresh" title="Refresh" onClick={() => void loadProject(folder)}>
+          <RefreshCw />
+        </IconButton>
       </div>
       {project.oldFormat && <OldFormatNote folder={folder} />}
       {loaded?.error && <div className="project-board-error error">{loaded.error}</div>}
@@ -111,7 +120,7 @@ function Columns({ project }: { project: ProjectData }) {
         >
           <header className="project-column-head">
             <span>{statusLabel(status)}</span>
-            <span className="badge">{groups[status].length}</span>
+            <CountBadge>{groups[status].length}</CountBadge>
           </header>
           <div className="project-column-body scroll">
             {groups[status].map((item) => (

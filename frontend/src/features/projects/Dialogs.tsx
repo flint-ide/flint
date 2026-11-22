@@ -8,6 +8,7 @@ import { useAgentDefs } from '../../store/agentDefs'
 import { useSettings } from '../../store/settings'
 import { goalLength, goalProblem, isRestrictedError, MAX_GOAL, pickPlanAgent } from './projects'
 import { closeDialog, createProject, createItem, planWithAgent, trustProject, useProjects, type DialogHost } from './store'
+import { Button, Input, Textarea } from '@flint-ide/ui'
 
 const basename = (p: string) => p.replace(/\/+$/, '').slice(p.replace(/\/+$/, '').lastIndexOf('/') + 1)
 
@@ -61,7 +62,7 @@ function PlanDialog({ folder }: { folder: string }) {
       >
         <label>
           Goal
-          <textarea
+          <Textarea
             autoFocus
             rows={6}
             value={goal}
@@ -95,13 +96,13 @@ function PlanDialog({ folder }: { folder: string }) {
         {restricted && info && (
           <div className="form-status error">
             The project's folder is in Restricted Mode: agents could neither read the project nor add to it.{' '}
-            <button type="button" className="link" onClick={() => void trustProject(info).then(() => setError(''))} title={info.path}>Trust Folder…</button>
+            <Button variant="link" size="sm" type="button" onClick={() => void trustProject(info).then(() => setError(''))} title={info.path}>Trust Folder…</Button>
           </div>
         )}
         {error && !isRestrictedError(error) && <div className="form-status error">{error}</div>}
         <div className="form-actions">
-          <button type="button" onClick={closeDialog}>Cancel</button>
-          <button type="submit" className="primary" disabled={!ready}>{busy ? 'Preparing…' : 'Put Prompt in Chat'}</button>
+          <Button variant="plain" type="button" onClick={closeDialog}>Cancel</Button>
+          <Button variant="primary" type="submit" disabled={!ready}>{busy ? 'Preparing…' : 'Put Prompt in Chat'}</Button>
         </div>
       </form>
     </Modal>
@@ -134,7 +135,7 @@ function NewProjectDialog({ folder }: { folder: string }) {
         <span className="muted selectable" title={folder}>Creates flint-project.json and an items folder in {folder}</span>
         <label>
           Name (shown in the panel; optional)
-          <input
+          <Input
             autoFocus
             value={name}
             placeholder={basename(folder)}
@@ -147,8 +148,8 @@ function NewProjectDialog({ folder }: { folder: string }) {
         {!valid && <span className="form-status error">At most 80 characters.</span>}
         {error && <span className="form-status error">{error}</span>}
         <div className="form-actions">
-          <button type="button" onClick={closeDialog}>Cancel</button>
-          <button type="submit" className="primary" disabled={!valid || busy}>Create</button>
+          <Button variant="plain" type="button" onClick={closeDialog}>Cancel</Button>
+          <Button variant="primary" type="submit" disabled={!valid || busy}>Create</Button>
         </div>
       </form>
     </Modal>
@@ -180,7 +181,7 @@ function NewItemDialog({ folder }: { folder: string }) {
       >
         <label>
           Title
-          <input
+          <Input
             autoFocus
             value={title}
             placeholder="Rate limit the checkout API"
@@ -193,8 +194,8 @@ function NewItemDialog({ folder }: { folder: string }) {
         {title.length > 120 && <span className="form-status error">At most 120 characters.</span>}
         {error && <span className="form-status error">{error}</span>}
         <div className="form-actions">
-          <button type="button" onClick={closeDialog}>Cancel</button>
-          <button type="submit" className="primary" disabled={!valid || busy}>Create and Open</button>
+          <Button variant="plain" type="button" onClick={closeDialog}>Cancel</Button>
+          <Button variant="primary" type="submit" disabled={!valid || busy}>Create and Open</Button>
         </div>
       </form>
     </Modal>

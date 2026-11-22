@@ -1864,13 +1864,6 @@ button.small {
   gap: 8px;
   padding: 0 12px 8px 16px;
 }
-.peek-actions .link {
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--accent);
-  cursor: pointer;
-}
 .peek-chat {
   flex: 1;
   min-height: 0;
@@ -2757,11 +2750,6 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   font-size: 12px;
   border-bottom: 1px solid var(--border);
 }
-.chat-header .check {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
 .agent-name {
   font-weight: 600;
   color: var(--accent);
@@ -3361,11 +3349,6 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 }
 .run-toolbar .run-stop:not(:disabled) {
   color: var(--danger);
-}
-.run-toolbar .run-fix {
-  height: 22px;
-  padding: 0 8px;
-  font-size: 11px;
 }
 .run-check {
   display: flex;
@@ -4404,10 +4387,6 @@ button.keymap-chord:hover {
   background: var(--bg-hover);
   white-space: nowrap;
 }
-.task-state.queued {
-  color: var(--warn);
-  background: color-mix(in srgb, var(--warn) 14%, transparent);
-}
 .task-group {
   border-left: 2px solid var(--accent-dim);
 }
@@ -4429,15 +4408,6 @@ button.keymap-chord:hover {
 .task-group-head .muted {
   flex: none;
   font-size: 11px;
-}
-.task-group-head .link,
-.modal.compare-tasks .link {
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--accent);
-  font-size: 11px;
-  cursor: pointer;
 }
 .task-joint .task-group-head {
   flex-direction: column;
@@ -4461,15 +4431,6 @@ button.keymap-chord:hover {
 .task-state.finished {
   color: var(--ok);
   background: color-mix(in srgb, var(--ok) 14%, transparent);
-}
-.task-state.interrupted {
-  color: var(--warn);
-  background: color-mix(in srgb, var(--warn) 14%, transparent);
-}
-.task-state.failed,
-.task-state.stale {
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 14%, transparent);
 }
 .task-meta {
   display: flex;
@@ -4532,23 +4493,6 @@ button.keymap-chord:hover {
   outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
-.project-marker {
-  flex: none;
-  font-size: 10px;
-  line-height: 15px;
-  padding: 0 6px;
-  border-radius: 8px;
-  color: var(--fg-faint);
-  background: color-mix(in srgb, var(--fg-faint) 12%, transparent);
-}
-.project-marker.warn {
-  color: var(--warn);
-  background: color-mix(in srgb, var(--warn) 14%, transparent);
-}
-.project-marker.error {
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 14%, transparent);
-}
 .project-untrusted {
   display: flex;
   flex-wrap: wrap;
@@ -4560,14 +4504,6 @@ button.keymap-chord:hover {
   border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
   border-radius: 4px;
 }
-.project-untrusted .link {
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--accent);
-  font-size: 11px;
-  cursor: pointer;
-}
 .project-context-row {
   padding: 0 10px 6px;
 }
@@ -4578,14 +4514,6 @@ button.keymap-chord:hover {
   gap: 6px;
   font-size: 11px;
   min-width: 0;
-}
-.project-context .link {
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--accent);
-  font-size: 11px;
-  cursor: pointer;
 }
 .project-repos {
   border-bottom: 1px solid var(--border);
@@ -4640,14 +4568,6 @@ button.keymap-chord:hover {
   align-items: center;
   gap: 8px;
   font-size: 11px;
-}
-.project-task .link {
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--accent);
-  font-size: 11px;
-  cursor: pointer;
 }
 .project-deps {
   display: flex;
@@ -4791,7 +4711,11 @@ button.keymap-chord:hover {
   text-transform: uppercase;
   color: var(--fg-muted);
 }
-.project-column-head .badge {
+.count-badge {
+  flex: none;
+  margin-left: auto;
+}
+.project-column-head .count-badge {
   margin-left: 0;
 }
 .project-column-body {
@@ -4909,7 +4833,7 @@ button.keymap-chord:hover {
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
-.compare-files th:first-child .link {
+.compare-files th:first-child button {
   margin-left: 10px;
 }
 .compare-agent {
@@ -5470,13 +5394,6 @@ body.file-drop-target-active::after {
   color: var(--fg-muted);
   border-bottom: 1px solid var(--border);
 }
-.preview-remote-bar .link {
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--accent);
-  cursor: pointer;
-}
 
 /* Usage panel (components/usage/UsagePanel.tsx) and the chat's budget warning. */
 .usage-range {
@@ -5623,7 +5540,6 @@ body.file-drop-target-active::after {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.prompt-list .badge.untrusted,
 .prompt-picker-note .untrusted {
   color: var(--warn);
 }

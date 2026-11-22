@@ -5,6 +5,8 @@ import { toggleSvgSource } from '../../store/preview'
 import { onFileChanged } from '../../store/fsEvents'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
+import { Button, IconButton } from '@flint-ide/ui'
+import { Minus, Plus } from '@flint-ide/ui/icons'
 
 const ZOOMS = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8]
 
@@ -65,12 +67,16 @@ export function ImageView({ path, active }: { path: string; active: boolean }) {
   return (
     <div className="image-view">
       <div className="run-toolbar">
-        <button className="icon" title={`Zoom out (${formatKeys('Mod+-')})`} onClick={() => step(-1)}>−</button>
-        <button className="icon" title={`Fit (${formatKeys('Mod+0')})`} onClick={() => setZoom(null)}>{zoom === null ? 'Fit' : `${Math.round(scale * 100)}%`}</button>
-        <button className="icon" title={`Zoom in (${formatKeys('Mod++')})`} onClick={() => step(1)}>+</button>
-        <button className="icon" title="Actual size" onClick={() => setZoom(1)}>1:1</button>
+        <IconButton variant="ghost" size="sm" aria-label="Zoom out" title={`Zoom out (${formatKeys('Mod+-')})`} onClick={() => step(-1)}>
+          <Minus />
+        </IconButton>
+        <Button variant="ghost" size="sm" title={`Fit (${formatKeys('Mod+0')})`} onClick={() => setZoom(null)}>{zoom === null ? 'Fit' : `${Math.round(scale * 100)}%`}</Button>
+        <IconButton variant="ghost" size="sm" aria-label="Zoom in" title={`Zoom in (${formatKeys('Mod++')})`} onClick={() => step(1)}>
+          <Plus />
+        </IconButton>
+        <Button variant="ghost" size="sm" title="Actual size" onClick={() => setZoom(1)}>1:1</Button>
         {svg && (
-          <button className="icon" title="Edit the SVG source" onClick={() => toggleSvgSource(path)}>Source</button>
+          <Button variant="ghost" size="sm" title="Edit the SVG source" onClick={() => toggleSvgSource(path)}>Source</Button>
         )}
         <span className="run-status">
           {natural ? `${natural.w} × ${natural.h} · ` : ''}

@@ -11,6 +11,7 @@ import { MAX_GROUP, planAgents, planNote, planProblem } from '../../lib/agentTas
 import { Modal } from '../layout/Modal'
 import { Select } from '../ui/Select'
 import type { Branch } from '../../store/git'
+import { Button, Checkbox, Textarea } from '@flint-ide/ui'
 
 /**
  * New Agent Task: what to do, which agent, from which branch. Start creates the
@@ -77,7 +78,7 @@ export function NewTaskForm() {
       >
         <label>
           Task
-          <textarea
+          <Textarea
             autoFocus
             rows={6}
             value={description}
@@ -113,23 +114,24 @@ export function NewTaskForm() {
           </label>
         </div>
         {agents.length > 0 && (
-          <label className="check">
-            <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} />
-            Compare agents: give the same task to several agents or attempts
-          </label>
+          <Checkbox
+            wrapperClassName="check"
+            label="Compare agents: give the same task to several agents or attempts"
+            checked={compare}
+            onCheckedChange={setCompare}
+          />
         )}
         {compare && (
           <div className="form-row compare-agents">
             <div className="grow compare-agent-list">
               {agents.filter((a) => a !== chosen).map((a) => (
-                <label key={a} className="check">
-                  <input
-                    type="checkbox"
-                    checked={extra.includes(a)}
-                    onChange={(e) => setExtra((cur) => (e.target.checked ? [...cur, a] : cur.filter((x) => x !== a)))}
-                  />
-                  also {agentLabel(a, defined)}
-                </label>
+                <Checkbox
+                  key={a}
+                  wrapperClassName="check"
+                  label={`also ${agentLabel(a, defined)}`}
+                  checked={extra.includes(a)}
+                  onCheckedChange={(on) => setExtra((cur) => (on ? [...cur, a] : cur.filter((x) => x !== a)))}
+                />
               ))}
               {agents.length < 2 && <span className="muted">Only one agent is installed: use several attempts.</span>}
             </div>
@@ -152,10 +154,10 @@ export function NewTaskForm() {
         {error && <div className="form-status error">{error}</div>}
         <div className="form-actions">
           <span className="spacer" />
-          <button type="button" onClick={closeNewTask}>Cancel</button>
-          <button type="submit" className="primary" disabled={!ready}>
+          <Button variant="plain" type="button" onClick={closeNewTask}>Cancel</Button>
+          <Button variant="primary" type="submit" disabled={!ready}>
             {busy ? 'Starting…' : plan.length > 1 ? `Start ${plan.length} tasks` : 'Start'}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

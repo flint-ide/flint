@@ -14,6 +14,7 @@ import { languageFor } from '../../lib/language'
 import { CodeEditor } from '../editor/CodeEditor'
 import { Select } from '../ui/Select'
 import { formatKeys } from '../../lib/commands'
+import { Button } from '@flint-ide/ui'
 
 const NO_HISTORY: HttpResponse[] = []
 
@@ -46,14 +47,14 @@ export function HttpResponseView({ tab, active }: { tab: HttpTab; active: boolea
           />
         )}
         {shown && (
-          <button className="link" title="Copy the request that produced this response as a curl command" onClick={() => void copyResponseAsCurl(shown.id)}>
+          <Button variant="ghost" size="sm" title="Copy the request that produced this response as a curl command" onClick={() => void copyResponseAsCurl(shown.id)}>
             Copy as curl
-          </button>
+          </Button>
         )}
         {shown && shown.size > 0 && (
-          <button className="link" title="Save the whole body to a file" onClick={() => void saveResponseBody(shown)}>
+          <Button variant="ghost" size="sm" title="Save the whole body to a file" onClick={() => void saveResponseBody(shown)}>
             Save to file
-          </button>
+          </Button>
         )}
       </div>
       {error && <div className="placeholder error selectable">{error}</div>}
@@ -76,7 +77,7 @@ function Pending({ label, startedAt, onCancel }: { label: string; startedAt: num
       <span className="http-status pending">Sending</span>
       <span className="truncate" title={label}>{label}</span>
       <span className="muted">{formatTime(now - startedAt)}</span>
-      <button className="link" onClick={onCancel}>Cancel</button>
+      <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
     </>
   )
 }
@@ -120,9 +121,9 @@ function ResponseDetails({ response: r, active }: { response: HttpResponse; acti
 
 function BodyNotice({ response: r }: { response: HttpResponse }) {
   const save = (
-    <button className="link" onClick={() => void saveResponseBody(r)}>
+    <Button variant="ghost" size="sm" onClick={() => void saveResponseBody(r)}>
       Save to file
-    </button>
+    </Button>
   )
   if (r.kind === 'empty') return <div className="http-notice muted">No body</div>
   if (!r.body) {

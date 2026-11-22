@@ -7,6 +7,7 @@ import { usePersistentNumber } from '../../lib/usePersistentNumber'
 import { Splitter } from '../layout/Splitter'
 import { RerunIcon, StopIcon } from '../run/RunWidget'
 import { formatKeys } from '../../lib/commands'
+import { IconButton } from '@flint-ide/ui'
 
 /** The debug tab: stepping toolbar, frames, variables and the console. */
 export function DebugView() {
@@ -20,12 +21,12 @@ export function DebugView() {
   return (
     <div className="debug-view">
       <div className="run-toolbar">
-        <button className="icon" title="Restart" onClick={() => void restartDebug()}>
+        <IconButton variant="ghost" size="sm" aria-label="Restart" title="Restart" onClick={() => void restartDebug()}>
           <RerunIcon />
-        </button>
-        <button className="icon run-stop" title={`Stop (${formatKeys('Mod+F2')})`} disabled={!live && session.status !== 'starting'} onClick={() => void stopDebug()}>
+        </IconButton>
+        <IconButton variant="ghost" size="sm" aria-label="Stop" title={`Stop (${formatKeys('Mod+F2')})`} disabled={!live && session.status !== 'starting'} onClick={() => void stopDebug()} className="run-stop">
           <StopIcon />
-        </button>
+        </IconButton>
         <span className="debug-sep" />
         <StepButton title="Resume (F9)" disabled={!paused} onClick={() => void debugStep('continue')}>▶︎</StepButton>
         <StepButton title="Pause" disabled={session.status !== 'running'} onClick={() => void debugStep('pause')}>❚❚</StepButton>
@@ -54,9 +55,9 @@ export function DebugView() {
 
 function StepButton({ title, disabled, onClick, children }: { title: string; disabled: boolean; onClick: () => void; children: ReactNode }) {
   return (
-    <button className="icon debug-step" title={title} disabled={disabled} onClick={onClick}>
+    <IconButton variant="ghost" size="sm" aria-label={title} title={title} disabled={disabled} onClick={onClick} className="debug-step">
       {children}
-    </button>
+    </IconButton>
   )
 }
 

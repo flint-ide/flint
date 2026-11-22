@@ -1,4 +1,4 @@
-import { Button, Checkbox, Input } from '@flint-ide/ui'
+import { Alert, Button, Checkbox, Field, FieldLabel, Form, FormActions, Input } from '@flint-ide/ui'
 import { useState } from 'react'
 import { Database, errorMessage, newConnection, type Connection, type Driver } from '../../../api/backend'
 import { db } from '../../../wails/models'
@@ -51,15 +51,14 @@ export function ConnectionForm({ initial, onClose }: Props) {
 
   return (
     <Modal title={initial ? `Edit ${initial.name}` : 'New connection'} onClose={onClose}>
-      <form
-        className="form"
+      <Form
         onSubmit={(e) => {
           e.preventDefault()
           void save()
         }}
       >
-        <label>
-          Driver
+        <Field>
+          <FieldLabel>Driver</FieldLabel>
           <Select
             block
             value={conn.driver as Driver}
@@ -69,38 +68,36 @@ export function ConnectionForm({ initial, onClose }: Props) {
             ]}
             onChange={(driver) => update({ driver: driver as Connection['driver'], port: 0 })}
           />
-        </label>
-        <label>
-          Name
-          <Input value={conn.name} placeholder="prod-analytics" onChange={(e) => update({ name: e.target.value })} />
-        </label>
+        </Field>
+        <Input label="Name" value={conn.name} placeholder="prod-analytics" onChange={(e) => update({ name: e.target.value })} />
         <div className="form-row">
-          <label className="grow">
-            Host
-            <Input value={conn.host} onChange={(e) => update({ host: e.target.value })} required />
-          </label>
-          <label className="port">
-            Port
+          <div className="grow">
+            <Input label="Host" value={conn.host} onChange={(e) => update({ host: e.target.value })} required />
+          </div>
+          <div className="port">
             <Input
+              label="Port"
               type="number"
               value={conn.port || ''}
               placeholder={String(defaultPort)}
               onChange={(e) => update({ port: Number(e.target.value) || 0 })}
             />
-          </label>
+          </div>
         </div>
-        <label>
-          Default database <span className="muted">(optional — every database on the server is listed)</span>
-          <Input value={conn.database} placeholder={isClickHouse ? 'default' : 'postgres'} onChange={(e) => update({ database: e.target.value })} />
-        </label>
+        <Input
+          label="Default database"
+          helper="Optional: every database on the server is listed"
+          value={conn.database}
+          placeholder={isClickHouse ? 'default' : 'postgres'}
+          onChange={(e) => update({ database: e.target.value })}
+        />
         <div className="form-row">
-          <label className="grow">
-            User
-            <Input value={conn.user} onChange={(e) => update({ user: e.target.value })} required autoComplete="off" />
-          </label>
-          <label className="grow">
-            Password
+          <div className="grow">
+            <Input label="User" value={conn.user} onChange={(e) => update({ user: e.target.value })} required autoComplete="off" />
+          </div>
+          <div className="grow">
             <Input
+              label="Password"
               type="password"
               value={password}
               placeholder={passwordTouched ? '' : `•••••• (stored in ${keyringName()})`}
@@ -110,34 +107,30 @@ export function ConnectionForm({ initial, onClose }: Props) {
                 setPasswordTouched(true)
               }}
             />
-          </label>
+          </div>
         </div>
         <div className="form-row checks">
-          <label className="check">
-            <Checkbox checked={conn.tls} onCheckedChange={(checked) => update({ tls: checked, tlsInsecure: false, port: 0 })} />
-            TLS
-          </label>
+          <Checkbox label="TLS" checked={conn.tls} onCheckedChange={(checked) => update({ tls: checked, tlsInsecure: false, port: 0 })} />
           {conn.tls && (
-            <label className="check" title="Encrypts without checking the server's certificate: anyone in between can read the traffic. Only for self-signed or private CAs.">
-              <Checkbox checked={conn.tlsInsecure} onCheckedChange={(checked) => update({ tlsInsecure: checked })} />
-              Don't verify certificate (insecure)
-            </label>
+            <span title="Encrypts without checking the server's certificate: anyone in between can read the traffic. Only for self-signed or private CAs.">
+              <Checkbox label="Don't verify certificate (insecure)" checked={conn.tlsInsecure} onCheckedChange={(checked) => update({ tlsInsecure: checked })} />
+            </span>
           )}
-          <label className="check">
-            <Checkbox checked={conn.readOnly} onCheckedChange={(checked) => update({ readOnly: checked })} />
-            Read-only
-          </label>
+          <Checkbox label="Read-only" checked={conn.readOnly} onCheckedChange={(checked) => update({ readOnly: checked })} />
         </div>
         {status.kind !== 'idle' && (
-          <div className={`form-status ${status.kind}`}>{status.kind === 'busy' ? status.label : status.message}</div>
+          <Alert size="inline" variant={status.kind === 'error' ? 'negative' : status.kind === 'ok' ? 'positive' : 'plain'}>
+            {status.kind === 'busy' ? status.label : status.message}
+          </Alert>
         )}
-        <div className="form-actions">
+        <FormActions align="between">
           <Button type="button" variant="plain" onClick={() => void test()} disabled={busy}>Test</Button>
-          <span className="spacer" />
-          <Button type="button" variant="plain" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={busy}>Save</Button>
-        </div>
-      </form>
+          <span>
+            <Button type="button" variant="plain" onClick={onClose}>Cancel</Button>
+            <Button type="submit" variant="primary" disabled={busy}>Save</Button>
+          </span>
+        </FormActions>
+      </Form>
     </Modal>
   )
 }

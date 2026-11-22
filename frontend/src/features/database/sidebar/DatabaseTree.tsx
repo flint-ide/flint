@@ -1,4 +1,4 @@
-import { Badge, IconButton } from '@flint-ide/ui'
+import { IconButton, TreeRow } from '@flint-ide/ui'
 import { RefreshCw, SquareTerminal } from '@flint-ide/ui/icons'
 import { useEffect, useState, type MouseEvent } from 'react'
 import { errorMessage, type Connection, type DatabaseInfo, type Table } from '../../../api/backend'
@@ -37,14 +37,11 @@ export function DatabasesNode({ conn }: { conn: Connection }) {
 
   return (
     <>
-      <div className="tree-row static indent-1" onClick={() => setOpen(!open)}>
-        <span className="twisty">{open ? '▾' : '▸'}</span>
-        <span className="schema-name">Databases{count}</span>
-      </div>
-      {open && entry?.loading && <div className="tree-row static muted indent-2">Loading databases…</div>}
+      <TreeRow depth={1} twisty={open ? 'open' : 'closed'} label={`Databases${count}`} onClick={() => setOpen(!open)} />
+      {open && entry?.loading && <TreeRow depth={2} className="muted" label="Loading databases…" />}
       {open && entry?.error && (
         <>
-          <div className="tree-row static error indent-2 selectable" title={entry.error}>{entry.error}</div>
+          <TreeRow depth={2} className="error selectable" title={entry.error} label={entry.error} />
           {/* The list is a convenience: the default database still works without it. */}
           <DatabaseNode conn={conn} info={{ name: fallback, canConnect: true, default: true }} />
         </>
@@ -75,34 +72,40 @@ function DatabaseNode({ conn, info }: { conn: Connection; info: DatabaseInfo }) 
 
   if (!info.canConnect) {
     return (
-      <div className="tree-row static indent-2 db-row locked" title="No CONNECT privilege on this database" onContextMenu={menu}>
-        <span className="twisty" />
-        <DatabaseIcon locked />
-        <span className="schema-name">{info.name}</span>
-      </div>
+      <TreeRow
+        depth={2}
+        twisty="none"
+        // Not clickable: dimmed with a plain cursor.
+        style={{ color: 'var(--fg-faint)', cursor: 'default' }}
+        title="No CONNECT privilege on this database"
+        onContextMenu={menu}
+        icon={<DatabaseIcon locked />}
+        label={info.name}
+      />
     )
   }
 
   return (
     <div>
-      <div
-        className="tree-row static indent-2 db-row"
+      <TreeRow
+        depth={2}
+        twisty={open ? 'open' : 'closed'}
         onClick={() => setOpen(!open)}
         onContextMenu={menu}
         title={isDefault ? 'Default database of this connection' : undefined}
-      >
-        <span className="twisty">{open ? '▾' : '▸'}</span>
-        <DatabaseIcon />
-        <span className={`schema-name${isDefault ? ' default-db' : ''}`}>{info.name}</span>
-        <span className="row-actions" onClick={(e) => e.stopPropagation()}>
-          <IconButton variant="ghost" size="sm" aria-label="New SQL console in this database" title="New SQL console in this database" onClick={newConsole}><SquareTerminal /></IconButton>
-          <IconButton variant="ghost" size="sm" aria-label="Refresh schema" title="Refresh schema" onClick={refresh}><RefreshCw /></IconButton>
-        </span>
-      </div>
+        icon={<DatabaseIcon />}
+        label={isDefault ? <strong>{info.name}</strong> : info.name}
+        actions={
+          <>
+            <IconButton variant="ghost" size="sm" aria-label="New SQL console in this database" title="New SQL console in this database" onClick={newConsole}><SquareTerminal /></IconButton>
+            <IconButton variant="ghost" size="sm" aria-label="Refresh schema" title="Refresh schema" onClick={refresh}><RefreshCw /></IconButton>
+          </>
+        }
+      />
       {open && (
         <>
-          {schema?.loading && <div className="tree-row static muted indent-3">Loading schema…</div>}
-          {schema?.error && <div className="tree-row static error indent-3 selectable" title={schema.error}>{schema.error}</div>}
+          {schema?.loading && <TreeRow depth={3} className="muted" label="Loading schema…" />}
+          {schema?.error && <TreeRow depth={3} className="error selectable" title={schema.error} label={schema.error} />}
           {schema && !schema.loading && !schema.error && (
             <SchemaTree conn={conn} database={scratchDatabase} tables={schema.tables} onRefresh={refresh} />
           )}
@@ -124,7 +127,7 @@ function SchemaTree({ conn, database, tables, onRefresh }: { conn: Connection; d
 
   const bySchema = new Map<string, Table[]>()
   for (const t of tables) bySchema.set(t.schema, [...(bySchema.get(t.schema) ?? []), t])
-  if (bySchema.size === 0) return <div className="tree-row static muted indent-3">No tables.</div>
+  if (bySchema.size === 0) return <TreeRow depth={3} className="muted" label="No tables." />
 
   const query = (sql: string) => void createScratch('sql', conn.id, sql, database)
   const preview = (t: Table) => query(previewQuery(conn.driver, t))
@@ -135,26 +138,26 @@ function SchemaTree({ conn, database, tables, onRefresh }: { conn: Connection; d
       const tOpen = !!openTables[key]
       return (
         <div key={key}>
-          <div
-            className={`tree-row static indent-${depth}`}
+          <TreeRow
+            depth={depth}
+            twisty={tOpen ? 'open' : 'closed'}
             title={`${t.kind} · double-click to preview`}
             onClick={() => setOpenTables({ ...openTables, [key]: !tOpen })}
             onDoubleClick={() => preview(t)}
             onContextMenu={onMenu(() => tableMenu(conn.driver, t, { query, copy: copyText, refresh: onRefresh }))}
-          >
-            <span className="twisty">{tOpen ? '▾' : '▸'}</span>
-            <span className={`table-name ${t.kind.includes('view') ? 'view' : ''}`}>{t.name}</span>
-          </div>
+            label={t.kind.includes('view') ? <em>{t.name}</em> : t.name}
+          />
           {tOpen &&
             t.columns.map((c) => (
-              <div
+              <TreeRow
                 key={c.name}
-                className={`tree-row static indent-${depth + 1} column-row`}
+                depth={depth + 1}
+                className="column-row"
                 onContextMenu={onMenu(() => columnMenu(conn.driver, t, c, { query, copy: copyText }))}
+                label={<span className="col-name">{c.name}</span>}
               >
-                <span className="col-name">{c.name}</span>
                 <span className="col-type">{c.type}</span>
-              </div>
+              </TreeRow>
             ))}
         </div>
       )
@@ -168,15 +171,14 @@ function SchemaTree({ conn, database, tables, onRefresh }: { conn: Connection; d
         const sOpen = openSchemas[schemaName] ?? bySchema.size === 1
         return (
           <div key={schemaName}>
-            <div
-              className="tree-row static indent-3"
+            <TreeRow
+              depth={3}
+              twisty={sOpen ? 'open' : 'closed'}
               onClick={() => setOpenSchemas({ ...openSchemas, [schemaName]: !sOpen })}
               onContextMenu={onMenu(() => schemaMenu(conn.driver, schemaName, { query, copy: copyText }))}
-            >
-              <span className="twisty">{sOpen ? '▾' : '▸'}</span>
-              <span className="schema-name">{schemaName}</span>
-              <Badge size="sm" className="count-badge">{list.length}</Badge>
-            </div>
+              label={schemaName}
+              badge={list.length}
+            />
             {sOpen && tableRows(list, 4)}
           </div>
         )

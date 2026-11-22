@@ -1,4 +1,4 @@
-import { Button } from '@flint-ide/ui'
+import { Button, Card, CardContent } from '@flint-ide/ui'
 import { useEffect } from 'react'
 import { useSettings } from '../../store/settings'
 import { Row, TextField } from '../../components/settings/fields'
@@ -91,7 +91,7 @@ function IndexCard({ row }: { row: CatalogRow<IndexEntry> }) {
   const busy = useIndex((s) => s.busy.includes(entry.id))
   const size = formatSize(entry.size)
   return (
-    <div className="extension-card">
+    <Card className="extension-card"><CardContent>
       <div className="extension-head">
         <strong>{entry.name}</strong>
         <span className="muted">{entry.version}</span>
@@ -123,6 +123,6 @@ function IndexCard({ row }: { row: CatalogRow<IndexEntry> }) {
           </Button>
         )}
       </div>
-    </div>
+    </CardContent></Card>
   )
 }

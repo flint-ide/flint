@@ -5,7 +5,7 @@ import { toggleSvgSource } from '../../store/preview'
 import { onFileChanged } from '../../store/fsEvents'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
-import { Button, IconButton } from '@flint-ide/ui'
+import { Button, IconButton, ViewToolbar } from '@flint-ide/ui'
 import { Minus, Plus } from '@flint-ide/ui/icons'
 
 const ZOOMS = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8]
@@ -66,7 +66,7 @@ export function ImageView({ path, active }: { path: string; active: boolean }) {
   const svg = /\.svg$/i.test(path)
   return (
     <div className="image-view">
-      <div className="run-toolbar">
+      <ViewToolbar aria-label="Image">
         <IconButton variant="ghost" size="sm" aria-label="Zoom out" title={`Zoom out (${formatKeys('Mod+-')})`} onClick={() => step(-1)}>
           <Minus />
         </IconButton>
@@ -82,7 +82,7 @@ export function ImageView({ path, active }: { path: string; active: boolean }) {
           {natural ? `${natural.w} × ${natural.h} · ` : ''}
           {formatSize(img.size)}
         </span>
-      </div>
+      </ViewToolbar>
       <div
         ref={box}
         className="image-stage"

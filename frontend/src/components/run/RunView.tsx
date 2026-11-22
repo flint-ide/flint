@@ -17,7 +17,7 @@ import { currentTerminalOptions, useTerminalSettings } from '../terminal/useTerm
 import { PlayIcon, RerunIcon, StopIcon } from './RunWidget'
 import { formatKeys, keyHint } from '../../lib/commands'
 import { modifierName } from '../../lib/platform'
-import { Button, Checkbox, IconButton } from '@flint-ide/ui'
+import { Button, Checkbox, IconButton, ViewToolbar } from '@flint-ide/ui'
 
 interface Props {
   runKey: string
@@ -35,7 +35,7 @@ export function RunView({ runKey, active }: Props) {
 
   return (
     <div className="run-view">
-      <div className="run-toolbar">
+      <ViewToolbar aria-label="Run">
         <IconButton variant="ghost" size="sm" aria-label="Rerun" title={`Rerun (${keyHint('run.selected')})`} onClick={() => void rerun(runKey)}>
           {session.running ? <RerunIcon /> : <PlayIcon />}
         </IconButton>
@@ -59,10 +59,10 @@ export function RunView({ runKey, active }: Props) {
             <Checkbox wrapperClassName="run-check" label="Hide passed" title="Hide passed tests" checked={hidePassed} onCheckedChange={setHidePassed} />
           </>
         )}
-        <span className="spacer" />
+        <span className="fui-grow" />
         {isTests && <TestCountsView tree={session.tests} />}
         <RunStatus session={session} />
-      </div>
+      </ViewToolbar>
       <div className="run-body">
         {isTests && <TestPanel session={session} hidePassed={hidePassed} />}
         <RunConsole runKey={runKey} active={active} interactive={session.kind === 'config'} />

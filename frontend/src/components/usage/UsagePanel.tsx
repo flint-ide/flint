@@ -11,7 +11,7 @@ import { chatTabId, useAgentChat } from '../../store/agentChat'
 import { showToast } from '../../store/dialog'
 import { useEditor } from '../../store/editor'
 import { useUsage } from '../../store/usage'
-import { Badge, IconButton, Segment } from '@flint-ide/ui'
+import { Badge, IconButton, Segment, PanelHeader } from '@flint-ide/ui'
 import { Download } from '@flint-ide/ui/icons'
 
 interface Group {
@@ -86,28 +86,31 @@ export function UsagePanel() {
 
   return (
     <div className="panel usage-panel">
-      <div className="panel-header">
-        <span className="panel-title">Usage</span>
-        <span className="spacer" />
-        <Segment
-          size="sm"
-          shape="rounded"
-          className="usage-range"
-          aria-label="Range"
-          options={RANGE_OPTIONS}
-          value={String(filter.days)}
-          onValueChange={(d) => setFilter({ ...filter, days: Number(d) })}
-        />
-        <IconButton
-          variant="ghost"
-          size="sm"
-          aria-label="Export the daily aggregates as CSV"
-          title="Export the daily aggregates (with the current filter) as CSV"
-          onClick={() => void exportCSV(filter)}
-        >
-          <Download />
-        </IconButton>
-      </div>
+      <PanelHeader
+        title="Usage"
+        actions={
+          <>
+            <Segment
+              size="sm"
+              shape="rounded"
+              className="usage-range"
+              aria-label="Range"
+              options={RANGE_OPTIONS}
+              value={String(filter.days)}
+              onValueChange={(d) => setFilter({ ...filter, days: Number(d) })}
+            />
+            <IconButton
+              variant="ghost"
+              size="sm"
+              aria-label="Export the daily aggregates as CSV"
+              title="Export the daily aggregates (with the current filter) as CSV"
+              onClick={() => void exportCSV(filter)}
+            >
+              <Download />
+            </IconButton>
+          </>
+        }
+      />
       <div className="scroll usage-body">
         {error && <div className="placeholder error">{error}</div>}
         {sum?.problem && <div className="usage-problem error">{sum.problem}</div>}

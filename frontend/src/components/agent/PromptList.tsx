@@ -1,5 +1,5 @@
 import { useState, type RefObject } from 'react'
-import { Badge, Button, Input } from '@flint-ide/ui'
+import { Badge, Button, Input, TreeRow } from '@flint-ide/ui'
 import { sourceLabel } from '../../lib/prompts'
 import type { Prompt } from '../../store/prompts'
 
@@ -16,11 +16,14 @@ export function PromptList({ listRef, prompts, cursor, onHover, onPick, empty }:
   return (
     <div className="quick-list prompt-list" ref={listRef} role="listbox">
       {prompts.map((p, i) => (
-        <div
+        <TreeRow
           key={p.name}
           role="option"
           aria-selected={i === cursor}
-          className={`quick-item${i === cursor ? ' selected' : ''}`}
+          selected={i === cursor}
+          label={`/${p.name}`}
+          file
+          hint={p.description}
           onMouseMove={() => onHover(i)}
           // mousedown: keep the focus in the chat input
           onMouseDown={(e) => {
@@ -28,12 +31,10 @@ export function PromptList({ listRef, prompts, cursor, onHover, onPick, empty }:
             onPick(p)
           }}
           title={p.path || undefined}
+          badge={<Badge color={p.untrusted ? 'orange' : 'grey'} badgeStyle="light" size="sm">{sourceLabel(p)}</Badge>}
         >
-          <span className="file-name">/{p.name}</span>
-          <span className="muted path-hint">{p.description}</span>
           {p.agent && <span className="muted">{p.agent} only</span>}
-          <Badge color={p.untrusted ? 'orange' : 'grey'} badgeStyle="light" size="sm">{sourceLabel(p)}</Badge>
-        </div>
+        </TreeRow>
       ))}
       {prompts.length === 0 && <div className="placeholder muted">{empty}</div>}
     </div>

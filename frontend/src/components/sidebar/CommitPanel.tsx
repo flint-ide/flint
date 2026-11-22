@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useEventCallback } from '../../lib/useEventCallback'
 import { confirmRollback, tickedOf, updateProject, useGit, type FileChange, type GitStatus } from '../../store/git'
 import { useEditor } from '../../store/editor'
@@ -18,8 +18,8 @@ import { reviewChanges, useAgentReview } from '../../store/agentReview'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
 import { Icon } from '../ui/Icon'
-import { Button, IconButton, Textarea } from '@flint-ide/ui'
-import { Archive, ArrowDownToLine, Download, RefreshCw, Upload } from '@flint-ide/ui/icons'
+import { Button, Checkbox, IconButton, Textarea } from '@flint-ide/ui'
+import { Archive, ArrowDownToLine, Download, ExternalLink, RefreshCw, Sparkles, Undo2, Upload } from '@flint-ide/ui/icons'
 import { openMergeEditor } from '../../store/mergeEditor'
 
 const KIND_LETTER: Record<string, string> = {
@@ -226,7 +226,7 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
         />
         <div className="commit-actions">
           <label className="check">
-            <input type="checkbox" checked={amend} onChange={(e) => void setAmend(e.target.checked)} /> Amend
+            <Checkbox checked={amend} onCheckedChange={(checked) => void setAmend(checked)} /> Amend
           </label>
           <span className="spacer" />
           <span className="muted count" title={multi ? 'One commit per repository with ticked files, same message' : undefined}>
@@ -333,14 +333,12 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
             <div className="tree-row static group-row" onClick={() => toggle(key)}>
               <span className="twisty">{collapsed[key] ? '▸' : '▾'}</span>
               {g.key !== 'conflicts' && (
-                <input
-                  type="checkbox"
+                <Checkbox
+                  aria-label={`Include all ${g.title.toLowerCase()}`}
                   checked={included === g.files.length}
-                  ref={(el) => {
-                    if (el) el.indeterminate = included > 0 && included < g.files.length
-                  }}
+                  indeterminate={included > 0 && included < g.files.length}
                   onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => setGroup(g.files, e.target.checked, root)}
+                  onCheckedChange={(checked) => setGroup(g.files, checked, root)}
                 />
               )}
               <span className="group-title">{g.title}</span>
@@ -348,13 +346,15 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
                 <RollbackTicked files={g.files} root={root} count={included} untracked={g.key === 'untracked'} disabled={!!busy} />
               )}
               {g.key === 'conflicts' && agents.conflictAgent && (
-                <button
-                  className="link agent-action"
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="agent-action"
                   title={conflictHint(agents.preferred, agents.conflictAgent, engineOf(agents.preferred, defined))}
                   onClick={(e) => (e.stopPropagation(), resolve(g.files.map((f) => f.path)))}
                 >
-                  ✦ Resolve with {agents.conflictAgent}
-                </button>
+                  <Sparkles /> Resolve with {agents.conflictAgent}
+                </Button>
               )}
               <span className="badge">{g.files.length}</span>
             </div>
@@ -368,7 +368,12 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
                   onDoubleClick={() => openFile(abs(f))}
                 >
                   {g.key !== 'conflicts' && (
-                    <input type="checkbox" checked={isIncluded(f, root)} onClick={(e) => e.stopPropagation()} onChange={() => toggleFile(f, root)} />
+                    <Checkbox
+                      aria-label={`Include ${f.path}`}
+                      checked={isIncluded(f, root)}
+                      onClick={(e) => e.stopPropagation()}
+                      onCheckedChange={() => toggleFile(f, root)}
+                    />
                   )}
                   <span className={`change-kind ${f.kind}`}>{KIND_LETTER[f.kind] ?? '?'}</span>
                   <span className={`file-name change-${f.kind}`}>{f.path.split('/').pop()}</span>
@@ -377,17 +382,21 @@ function ChangeGroups({ section, collapsed, toggle }: { section: Section; collap
                   <span className="row-actions" onClick={(e) => e.stopPropagation()}>
                     {f.kind === 'conflicted' && (
                       <>
-                        <button className="link" title="Resolve in the merge editor" onClick={() => openMergeEditor(root, abs(f))}>Resolve…</button>
+                        <Button variant="link" size="sm" title="Resolve in the merge editor" onClick={() => openMergeEditor(root, abs(f))}>Resolve…</Button>
                         {agents.conflictAgent && (
-                          <button className="icon" title={`Resolve with ${agents.conflictAgent} in a terminal`} onClick={() => resolve([f.path])}>
-                            ✦
-                          </button>
+                          <RowAction label={`Resolve with ${agents.conflictAgent} in a terminal`} onClick={() => resolve([f.path])}>
+                            <Sparkles />
+                          </RowAction>
                         )}
                       </>
                     )}
-                    <button className="icon" title="Open file" onClick={() => openFile(abs(f))}>↗</button>
+                    <RowAction label="Open file" onClick={() => openFile(abs(f))}>
+                      <ExternalLink />
+                    </RowAction>
                     {f.kind !== 'conflicted' && (
-                      <button className="icon" title="Rollback" onClick={() => void confirmRollback([f], root)}>↶</button>
+                      <RowAction label="Rollback" onClick={() => void confirmRollback([f], root)}>
+                        <Undo2 />
+                      </RowAction>
                     )}
                   </span>
                 </div>
@@ -460,5 +469,14 @@ function RepoSwitcher({ fallback }: { fallback: string }) {
         onChange={(r) => void useGit.getState().load(r)}
       />
     </span>
+  )
+}
+
+/** A small icon action shown on a hovered change row. */
+function RowAction({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <IconButton variant="ghost" size="sm" aria-label={label} title={label} onClick={onClick}>
+      {children}
+    </IconButton>
   )
 }

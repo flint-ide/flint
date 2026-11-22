@@ -12,12 +12,6 @@ function tooltip(spec: PanelSpec): string {
   return panelTooltip(spec, cmd && effectiveKeys(cmd))
 }
 
-/** The panel's count on its button (useBadge), e.g. the agents that need you. */
-function PanelBadge({ use }: { use: () => number }) {
-  const n = use()
-  return <BadgeCounter count={n} max={99} tone="brand" overlay className="activity-badge" aria-label={`${n} need you`} />
-}
-
 export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {
   const terminalActive = useEditor((s) => s.activeId?.startsWith('term:') ?? false)
   const sidebar = useWorkspace((s) => s.sidebar)
@@ -28,25 +22,15 @@ export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {
 
   return (
     <nav className="activity-bar">
-      {panels.filter(isPanelAvailable).map((v) => (
-        <IconButton
-          key={v.id}
-          variant="ghost"
-          size="lg"
-          className="activity"
-          data-active={(visible && sidebar === v.id) || undefined}
-          aria-label={v.title}
-          title={tooltip(v)}
-          // Refreshed on hover: no re-render follows registering or rebinding a command.
-          onPointerEnter={(e) => {
-            e.currentTarget.title = tooltip(v)
-          }}
-          onClick={() => (visible && sidebar === v.id ? toggleSidebar() : setSidebar(v.id))}
-        >
-          <Icon name={v.icon} />
-          {v.useBadge && <PanelBadge use={v.useBadge} />}
-        </IconButton>
-      ))}
+      {panels.filter(isPanelAvailable).map((v) => {
+        const active = visible && sidebar === v.id
+        const onClick = () => (active ? toggleSidebar() : setSidebar(v.id))
+        return v.useBadge ? (
+          <BadgedPanelButton key={v.id} spec={v} use={v.useBadge} active={active} onClick={onClick} />
+        ) : (
+          <PanelButton key={v.id} spec={v} active={active} onClick={onClick} />
+        )
+      })}
       <span className="spacer" />
       <IconButton
         variant="ghost"
@@ -60,5 +44,37 @@ export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {
         <Icon name="terminal" />
       </IconButton>
     </nav>
+  )
+}
+
+interface PanelButtonProps {
+  spec: PanelSpec
+  active: boolean
+  onClick: () => void
+}
+
+/** A panel's button with its count (useBadge), e.g. the agents that need you; the count is part of the button's name. */
+function BadgedPanelButton({ use, ...props }: PanelButtonProps & { use: () => number }) {
+  return <PanelButton {...props} count={use()} />
+}
+
+function PanelButton({ spec, active, onClick, count = 0 }: PanelButtonProps & { count?: number }) {
+  return (
+    <IconButton
+      variant="ghost"
+      size="lg"
+      className="activity"
+      data-active={active || undefined}
+      aria-label={count > 0 ? `${spec.title}, ${count} need you` : spec.title}
+      title={tooltip(spec)}
+      // Refreshed on hover: no re-render follows registering or rebinding a command.
+      onPointerEnter={(e) => {
+        e.currentTarget.title = tooltip(spec)
+      }}
+      onClick={onClick}
+    >
+      <Icon name={spec.icon} />
+      {count > 0 && <BadgeCounter count={count} max={99} tone="brand" overlay className="activity-badge" aria-hidden />}
+    </IconButton>
   )
 }

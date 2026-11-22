@@ -16,6 +16,7 @@ import { AccountsSection } from './AccountsSection'
 import { BackgroundTerminalsSection } from './BackgroundTerminalsSection'
 import { MachinesSection } from './MachinesSection'
 import { NumberField, Row, TextField } from './fields'
+import { Select } from '../ui/Select'
 import { openVSCodeImport } from '../../store/vscodeImport'
 import { isMac } from '../../lib/platform'
 import { Button, Segment, Switch } from '@flint-ide/ui'
@@ -128,18 +129,14 @@ function ContributedThemeRow() {
   }
   return (
     <Row label="Color theme" hint="From your extensions (Settings ▸ Extensions). Chosen, it becomes the Custom theme, terminal colors included.">
-      <select className="settings-select" value={active} onChange={(e) => choose(e.target.value)} aria-label="Color theme">
-        {active === '' && <option value="">Choose a theme…</option>}
-        {groupThemes(themes).map((g) => (
-          <optgroup key={g.group} label={g.group}>
-            {g.themes.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label} ({t.base})
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
+      <Select
+        value={active}
+        placeholder="Choose a theme…"
+        searchable={themes.length > 12}
+        title="Color theme"
+        options={groupThemes(themes).flatMap((g) => g.themes.map((t) => ({ value: t.id, label: t.label, hint: t.base, group: g.group })))}
+        onChange={choose}
+      />
     </Row>
   )
 }

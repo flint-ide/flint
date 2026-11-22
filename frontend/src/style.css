@@ -520,7 +520,7 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
 }
 
 /* The kit's StatusBar with StatusItems; plain text and feature modules' own items
-   (spans, .status-action buttons) sit centred between them, as far apart. */
+   (spans, an update notice) sit centred between them, as far apart. */
 .status-bar {
   flex: none;
   padding: 0 2px;
@@ -897,22 +897,6 @@ kbd:where(:not([data-slot], [data-slot] *), .modal :not([data-slot], .modal [dat
 }
 .fui-tab.exited {
   opacity: 0.6;
-}
-.tab-icon {
-  width: 7px;
-  height: 7px;
-  border-radius: 2px;
-  flex: none;
-  background: var(--fg-faint);
-}
-.tab-icon.scratch-sql {
-  background: var(--icon-blue);
-}
-.tab-icon.scratch-markdown {
-  background: var(--icon-purple);
-}
-.tab-icon.terminal {
-  background: var(--ok);
 }
 .tab-panels {
   flex: 1;
@@ -1638,6 +1622,10 @@ button.small {
 .tool-feature {
   font-size: 12px;
 }
+.tool-docs {
+  height: auto;
+  padding: 0;
+}
 .tool-detail {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -2328,9 +2316,6 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 .cm-git-deleted {
   background: linear-gradient(to bottom, var(--git-deleted) 0 3px, transparent 3px);
 }
-.tab-icon.diff {
-  background: var(--info);
-}
 
 /* Annotate (git blame): IntelliJ-style column left of the line numbers. */
 /* Spacing sits on the entries, so the column takes no room while blame is off. */
@@ -2425,20 +2410,7 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
   align-items: center;
 }
 
-.status-action {
-  background: none;
-  border: none;
-  padding: 0 6px;
-  font-size: 11px;
-  color: var(--fg-muted);
-  border-radius: 4px;
-  height: 18px;
-}
-.status-action:hover {
-  background: var(--bg-hover);
-  color: var(--fg);
-}
-.status-action.on {
+.status-update .fui-statusitem.on {
   color: var(--accent);
 }
 .status-update {
@@ -2592,10 +2564,6 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 
 /* ---------- agent chat ---------- */
 
-.tab-icon.agent {
-  background: var(--accent);
-  border-radius: 50%;
-}
 .tab-icon.agent.busy {
   animation: pulse 1s ease-in-out infinite;
 }
@@ -3407,15 +3375,9 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 .form-row .run-type {
   width: 170px;
 }
+/* Environment lines read as code; the kit's Textarea draws the box. */
 .form .run-env {
   font: 12px/1.4 var(--font-mono);
-  background: var(--bg-editor);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 4px 8px;
-  resize: vertical;
-  outline: none;
 }
 .run-hint {
   font-size: 11px;
@@ -4226,12 +4188,21 @@ button.keymap-chord:hover {
   color: var(--accent);
   background: var(--bg-hover);
 }
+/* The tag's colour on its filter button and on each note: TODO accent, FIXME/BUG danger, HACK/XXX warn. */
+.todo-tag {
+  color: var(--accent);
+  font: 600 10px var(--font-mono);
+}
 .todo-tag-label.fixme,
-.todo-tag-label.bug {
+.todo-tag-label.bug,
+.todo-tag.fixme,
+.todo-tag.bug {
   color: var(--danger);
 }
 .todo-tag-label.hack,
-.todo-tag-label.xxx {
+.todo-tag-label.xxx,
+.todo-tag.hack,
+.todo-tag.xxx {
   color: var(--warn);
 }
 
@@ -4646,19 +4617,6 @@ button.keymap-chord:hover {
   border-radius: 4px;
   padding: 6px 8px;
   resize: vertical;
-}
-.modal.new-task textarea {
-  font: 13px/1.45 var(--font-ui);
-  background: var(--bg-editor);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 6px 8px;
-  resize: vertical;
-  outline: none;
-}
-.modal.new-task textarea:focus {
-  border-color: var(--accent);
 }
 .compare-agent-list {
   display: flex;
@@ -5666,9 +5624,6 @@ body.file-drop-target-active::after {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-.settings-select {
-  max-width: 420px;
 }
 .extension-themes {
   display: flex;

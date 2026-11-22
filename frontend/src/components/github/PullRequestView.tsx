@@ -57,7 +57,7 @@ export function PullRequestView({ tab, active }: { tab: PullRequestTab; active: 
             <span className="spacer" />
             <IconButton size="sm" variant="ghost" aria-label="Refresh" title="Refresh" disabled={entry.loading} onClick={() => void loadDetails(tab.root, tab.number, true)}><RefreshCw /></IconButton>
             <RequestCodeReviewButton root={tab.root} number={d.number} />
-            {feedback && <AddressReviewButton target={{ root: tab.root, number: d.number }} className="" />}
+            {feedback && <AddressReviewButton target={{ root: tab.root, number: d.number }} variant="plain" />}
             {d.state === 'OPEN' && (
               <Button size="sm" variant="plain" disabled={!!busy} onClick={() => void checkoutPullRequest(tab.root, d.number, d.headRef)} title="git fetch pull/N/head and switch to its branch (refused while files have local changes)">
                 {busy === 'checkout' ? 'Checking out…' : 'Check out'}

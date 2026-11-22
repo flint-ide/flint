@@ -7,12 +7,12 @@ import { Button } from '@flint-ide/ui'
 const sendHint = () => `${modifierName('Alt')}-click sends it right away`
 
 /** "✦ Address review comments": all unresolved threads and change requests of a pull request, as an agent chat draft. */
-export function AddressReviewButton({ target, label = '✦ Address review comments', className = 'link' }: { target: ReviewAgentTarget; label?: string; className?: 'link' | '' }) {
+export function AddressReviewButton({ target, label = '✦ Address review comments', variant = 'ghost' }: { target: ReviewAgentTarget; label?: string; variant?: 'ghost' | 'plain' }) {
   const busy = useReviewAgent((s) => !!s.busy[busyKey(target.root, target.number)])
   return (
     <Button
       size="sm"
-      variant={className === 'link' ? 'ghost' : 'plain'}
+      variant={variant}
       disabled={busy}
       title={`Put the unresolved review comments in the agent chat for you to review and send (${sendHint()})`}
       onClick={(e) => {

@@ -8,6 +8,8 @@ import { useDatabase } from '../../features/database/store/database'
 import { confirmAction } from '../../store/dialog'
 import type { ScratchKind, ScratchPad } from '../../api/backend'
 import { formatKeys } from '../../lib/commands'
+import { IconButton } from '@flint-ide/ui'
+import { Plus, X } from '@flint-ide/ui/icons'
 
 const KIND_LABEL: Record<ScratchKind, string> = { sql: 'SQL', markdown: 'MD', text: 'TXT' }
 
@@ -58,17 +60,19 @@ export function ScratchPanel() {
           minWidth={240}
           items={() => newScratchItems((kind) => void create(kind))}
           trigger={(t) => (
-            <button
+            <IconButton
               {...t}
               ref={(el) => {
                 t.ref(el)
                 picker.current = el
               }}
-              className="icon"
+              size="sm"
+              variant="ghost"
+              aria-label="New scratch file"
               title="New scratch file (any type), SQL console or note"
             >
-              ＋
-            </button>
+              <Plus />
+            </IconButton>
           )}
         />
       </div>
@@ -126,9 +130,9 @@ function ScratchFileRow({ file }: { file: ScratchFile }) {
         <span className="scratch-name">{file.name}</span>
       )}
       <span className="row-actions" onClick={(e) => e.stopPropagation()}>
-        <button className="icon" title="Delete" onClick={() => void deleteScratchFile(file)}>
-          ✕
-        </button>
+        <IconButton size="sm" variant="ghost" aria-label="Delete" title="Delete" onClick={() => void deleteScratchFile(file)}>
+          <X />
+        </IconButton>
       </span>
     </div>
   )
@@ -172,13 +176,15 @@ function ScratchRow({ sc }: { sc: ScratchPad }) {
       )}
       {connName && <span className="muted path-hint">{sc.database ? `${connName} · ${sc.database}` : connName}</span>}
       <span className="row-actions" onClick={(e) => e.stopPropagation()}>
-        <button
-          className="icon"
+        <IconButton
+          size="sm"
+          variant="ghost"
+          aria-label="Delete"
           title="Delete"
           onClick={async () => (await confirmAction(`Delete scratchpad "${sc.name}"?`, 'Delete')) && remove(sc.id)}
         >
-          ✕
-        </button>
+          <X />
+        </IconButton>
       </span>
     </div>
   )

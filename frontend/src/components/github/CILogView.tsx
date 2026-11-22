@@ -5,6 +5,7 @@ import { useEditor } from '../../store/editor'
 import { showToast } from '../../store/dialog'
 import { findPathLinks, resolvePath } from '../../lib/pathLinks'
 import { fixCIWithAgent, rerunFailedJobs } from '../../store/ci'
+import { Button } from '@flint-ide/ui'
 
 /** Lines rendered at a time: the end of the log first, earlier pages on request. */
 export const LOG_PAGE = 1000
@@ -51,26 +52,26 @@ export function CILogView({ tab }: { tab: CILogTab }) {
       <div className="ci-log-bar">
         <span className="truncate muted">{tab.title.replace(/^Log: /, '')}</span>
         <span className="spacer" />
-        <button
-          className="link"
+        <Button
+          size="sm"
+          variant="ghost"
           title="Put the failure in the agent chat for you to review and send"
-          onClick={() => void fixCIWithAgent({ root: tab.root, pr: null, checks: [] }, { runId: tab.runId, jobId: tab.jobId })}
-        >
+          onClick={() => void fixCIWithAgent({ root: tab.root, pr: null, checks: [] }, { runId: tab.runId, jobId: tab.jobId })}>
           ✦ Fix with agent
-        </button>
-        <button className="link" title="Re-run the failed jobs on GitHub (asks first)" onClick={() => void rerunFailedJobs(tab.root, tab.runId, `run ${tab.runId}`)}>
+        </Button>
+        <Button size="sm" variant="ghost" title="Re-run the failed jobs on GitHub (asks first)" onClick={() => void rerunFailedJobs(tab.root, tab.runId, `run ${tab.runId}`)}>
           Rerun failed jobs
-        </button>
-        <button className="link" onClick={() => setNonce(nonce + 1)}>Reload</button>
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setNonce(nonce + 1)}>Reload</Button>
       </div>
       {error && <div className="placeholder error selectable">{error}</div>}
       {!log && !error && <div className="placeholder muted">Loading the log…</div>}
       {log && (
         <pre className="ci-log-text selectable">
           {first > 0 ? (
-            <button className="link" onClick={() => setShown(shown + LOG_PAGE)}>
+            <Button size="sm" variant="ghost" onClick={() => setShown(shown + LOG_PAGE)}>
               Show {Math.min(LOG_PAGE, first)} earlier lines ({first} hidden)
-            </button>
+            </Button>
           ) : (
             log.truncated && <div className="muted">… the start of the log is left out (it was longer than Flint keeps)</div>
           )}

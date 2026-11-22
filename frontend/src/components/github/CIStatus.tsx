@@ -4,22 +4,23 @@ import { fixCIWithAgent, openCILog, rerunFailedJobs, useCI, type CIEntry, type F
 import { openPullRequest } from '../../store/pullRequests'
 import { checksSummary, ROLLUP_GLYPH } from '../../lib/prReview'
 import { AddressReviewButton, useReviewHint } from './ReviewAgent'
+import { Button } from '@flint-ide/ui'
 
 /** "✦ Fix with agent" for a target (all its failed runs, or one run / job). */
 export function FixWithAgentButton({ target, only, label = '✦ Fix with agent' }: { target: FixTarget; only?: { runId: number; jobId: number }; label?: string }) {
   const busy = useCI((s) => !!s.busy[`${target.root}#fix`])
   return (
-    <button
-      className="link"
+    <Button
+      size="sm"
+      variant="ghost"
       disabled={busy}
       title="Read the failed jobs' logs and put the failure in the agent chat for you to review and send"
       onClick={(e) => {
         e.stopPropagation()
         void fixCIWithAgent(target, only)
-      }}
-    >
+      }}>
       {busy ? 'Reading the log…' : label}
-    </button>
+    </Button>
   )
 }
 
@@ -30,10 +31,10 @@ export function FailedCheckActions({ root, check, target }: { root: string; chec
   return (
     <span className="ci-actions" onClick={(e) => e.stopPropagation()}>
       <FixWithAgentButton target={target} only={{ runId: check.runId, jobId: check.jobId }} label="✦ Fix" />
-      <button className="link" title="Read the failed steps' log in a tab" onClick={() => openCILog(root, check.runId, check.jobId, label)}>Log</button>
-      <button className="link" title="Re-run the failed jobs of this run on GitHub (asks first)" onClick={() => void rerunFailedJobs(root, check.runId, check.workflow || label)}>
+      <Button size="sm" variant="ghost" title="Read the failed steps' log in a tab" onClick={() => openCILog(root, check.runId, check.jobId, label)}>Log</Button>
+      <Button size="sm" variant="ghost" title="Re-run the failed jobs of this run on GitHub (asks first)" onClick={() => void rerunFailedJobs(root, check.runId, check.workflow || label)}>
         Rerun
-      </button>
+      </Button>
     </span>
   )
 }

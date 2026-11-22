@@ -13,6 +13,8 @@ import { openContextMenu } from '../../store/contextMenu'
 import { fileTreeMenu } from './fileTreeMenu'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
+import { IconButton } from '@flint-ide/ui'
+import { Plus, RefreshCw } from '@flint-ide/ui/icons'
 
 const ROW_HEIGHT = 22
 
@@ -169,8 +171,8 @@ export function FileTree() {
     <div className="panel">
       <div className="panel-header">
         <span className="panel-title" title={roots.join('\n')}>{implicitRoot ? basename(implicitRoot) : 'Workspace'}</span>
-        <button className="icon" title={`Add Folder to Workspace… (${formatKeys('Mod+Shift+O')})`} onClick={() => void useWorkspace.getState().pickRoot()}>＋</button>
-        <button className="icon" title="Refresh" onClick={() => void reloadTree()}>↻</button>
+        <IconButton size="sm" variant="ghost" aria-label="Add Folder to Workspace" title={`Add Folder to Workspace… (${formatKeys('Mod+Shift+O')})`} onClick={() => void useWorkspace.getState().pickRoot()}><Plus /></IconButton>
+        <IconButton size="sm" variant="ghost" aria-label="Refresh" title="Refresh" onClick={() => void reloadTree()}><RefreshCw /></IconButton>
       </div>
       <div className="tree" ref={setTreeRef} tabIndex={0} onKeyDown={onKeyDown} onContextMenu={(e) => onContextMenu(e, null)}>
         <div style={{ height: totalSize, position: 'relative' }}>

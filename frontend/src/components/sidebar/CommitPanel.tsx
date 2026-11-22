@@ -18,6 +18,8 @@ import { reviewChanges, useAgentReview } from '../../store/agentReview'
 import { formatKeys } from '../../lib/commands'
 import { modKey } from '../../lib/platform'
 import { Icon } from '../ui/Icon'
+import { Button, IconButton, Textarea } from '@flint-ide/ui'
+import { Archive, ArrowDownToLine, Download, RefreshCw, Upload } from '@flint-ide/ui/icons'
 import { openMergeEditor } from '../../store/mergeEditor'
 
 const KIND_LETTER: Record<string, string> = {
@@ -129,11 +131,11 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
     <div className="panel commit-panel">
       <div className="panel-header">
         <RepoSwitcher fallback="Commit" />
-        <button className="icon" title="Refresh" onClick={() => void refreshAll()}>↻</button>
-        <button className="icon" title="Fetch" disabled={!!busy || !isRepo} onClick={() => void remote('fetch')}>⇣</button>
-        <button className="icon" title="Update repository (pull)" disabled={!!busy || !isRepo} onClick={updateProject}>⤓</button>
-        <button className="icon" title={`Push (${formatKeys('Mod+Shift+K')})`} disabled={!!busy || !isRepo} onClick={() => void remote('push')}>⤒</button>
-        <button className="icon" title="Stash changes…" disabled={!!busy || !isRepo} onClick={openStashDialog}>⊟</button>
+        <IconButton size="sm" variant="ghost" aria-label="Refresh" title="Refresh" onClick={() => void refreshAll()}><RefreshCw /></IconButton>
+        <IconButton size="sm" variant="ghost" aria-label="Fetch" title="Fetch" disabled={!!busy || !isRepo} onClick={() => void remote('fetch')}><ArrowDownToLine /></IconButton>
+        <IconButton size="sm" variant="ghost" aria-label="Update repository (pull)" title="Update repository (pull)" disabled={!!busy || !isRepo} onClick={updateProject}><Download /></IconButton>
+        <IconButton size="sm" variant="ghost" aria-label="Push" title={`Push (${formatKeys('Mod+Shift+K')})`} disabled={!!busy || !isRepo} onClick={() => void remote('push')}><Upload /></IconButton>
+        <IconButton size="sm" variant="ghost" aria-label="Stash changes" title="Stash changes…" disabled={!!busy || !isRepo} onClick={openStashDialog}><Archive /></IconButton>
       </div>
       {isRepo && status && (
         <div className="git-branch-line muted" title={multi ? 'Branch of the repository the toolbar acts on (click a repository below to switch)' : undefined}>
@@ -146,13 +148,14 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
         <div className="git-banner">
           <span>{capitalize(status.operation)} in progress{conflicted.length ? ` · ${conflicted.length} conflict(s)` : ''}</span>
           {conflicted.length > 0 && agents.conflictAgent && (
-            <button
-              className="link"
+            <Button
+              size="sm"
+              variant="ghost"
               onClick={() => void resolveConflictsWithAgent(root, status.operation, conflicted.map((f) => f.path))}
               title={conflictHint(agents.preferred, agents.conflictAgent, engineOf(agents.preferred, defined))}
             >
               Resolve with {agents.conflictAgent}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -189,24 +192,26 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
             <span className="muted">{agents.preferred || 'no agent installed'}</span>
           )}
           <span className="spacer" />
-          <button
-            className="link"
+          <Button
+            size="sm"
+            variant="ghost"
             disabled={!agents.preferred || reviewing || (status?.files ?? []).length === 0}
             onClick={() => void reviewChanges()}
             title="Let the agent review the ticked changes (or all of them: Settings ▸ Agents ▸ Review) before you commit"
           >
             {reviewing ? 'Reviewing…' : '✦ Review'}
-          </button>
-          <button
-            className="link"
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
             disabled={!agents.preferred || generating || selected.length === 0}
             onClick={() => void generateMessage()}
             title="Let the agent write a message for the ticked changes"
           >
             {generating ? 'Generating…' : '✦ Generate message'}
-          </button>
+          </Button>
         </div>
-        <textarea
+        <Textarea
           ref={textarea}
           value={message}
           placeholder="Commit message"
@@ -227,12 +232,12 @@ export function CommitPanel({ focusToken }: { focusToken: number }) {
           <span className="muted count" title={multi ? 'One commit per repository with ticked files, same message' : undefined}>
             {selected.length} selected{multi ? (amend ? ' (amend: this repo only)' : reposNote(sections, tickedIn)) : ''}
           </span>
-          <button className="primary" disabled={!canCommit} onClick={() => void commit(false)} title={formatKeys('Mod+Enter')}>
+          <Button size="sm" variant="primary" disabled={!canCommit} onClick={() => void commit(false)} title={formatKeys('Mod+Enter')}>
             {busy === 'commit' ? 'Committing…' : 'Commit'}
-          </button>
-          <button disabled={!canCommit} onClick={() => void commit(true)} title={formatKeys('Alt+Mod+Enter')}>
+          </Button>
+          <Button size="sm" variant="plain" disabled={!canCommit} onClick={() => void commit(true)} title={formatKeys('Alt+Mod+Enter')}>
             Commit and Push
-          </button>
+          </Button>
         </div>
       </div>
     </div>

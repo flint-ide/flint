@@ -25,6 +25,9 @@ import { CIBanner } from './CIStatus'
 import { useCurrentCI } from '../../store/ci'
 import { onAccountsChanged } from '../../store/accounts'
 import { SignInWithGitHub } from '../accounts/SignInWithGitHub'
+import { Button, IconButton, Input } from '@flint-ide/ui'
+import { ExternalLink, RefreshCw } from '@flint-ide/ui/icons'
+import { PrBadge } from './PrBadge'
 
 const WHO: { value: Who; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -68,9 +71,9 @@ export function PullRequestsPanel() {
           Pull Requests{repo && <span className="pr-repo"> · {repo.nameWithOwner}</span>}
         </span>
         {repo && (
-          <button className="icon" title="Open on GitHub" onClick={() => openInBrowser(`${repo.url}/pulls`)}>↗</button>
+          <IconButton size="sm" variant="ghost" aria-label="Open on GitHub" title="Open on GitHub" onClick={() => openInBrowser(`${repo.url}/pulls`)}><ExternalLink /></IconButton>
         )}
-        <button className="icon" title="Refresh" disabled={loading} onClick={() => void loadPullRequests(root, true)}>↻</button>
+        <IconButton size="sm" variant="ghost" aria-label="Refresh" title="Refresh" disabled={loading} onClick={() => void loadPullRequests(root, true)}><RefreshCw /></IconButton>
       </div>
       {repo && (
         <div className="pr-filters">
@@ -81,7 +84,7 @@ export function PullRequestsPanel() {
       )}
       {repo && (
         <div className="pr-search">
-          <input
+          <Input
             type="search"
             className="pr-search-input"
             placeholder="Search by title or #number"
@@ -125,14 +128,14 @@ function StatusMessage({ state, message, onRetry }: { state: string; message: st
     return (
       <div className="placeholder">
         <SignInWithGitHub intro="Sign in to GitHub to see and review this repository's pull requests. Flint keeps the token in the system keyring." />
-        <button className="link" onClick={onRetry}>Retry</button>
+        <Button size="sm" variant="ghost" onClick={onRetry}>Retry</Button>
       </div>
     )
   }
   return (
     <div className="placeholder">
       <span className={state === 'error' ? 'error selectable' : 'selectable'}>{message}</span>
-      <button className="link" onClick={onRetry}>Retry</button>
+      <Button size="sm" variant="ghost" onClick={onRetry}>Retry</Button>
     </div>
   )
 }
@@ -187,7 +190,7 @@ function PullRequestRow({ root, pr }: { root: string; pr: PullRequest }) {
         <span>{pr.author}</span>
         <span className="pr-branch">{pr.headRef}</span>
         <span className="spacer" />
-        {badge && <span className={`pr-badge ${badge.tone}`}>{badge.label}</span>}
+        {badge && <PrBadge tone={badge.tone}>{badge.label}</PrBadge>}
         <span>{timeAgo(pr.updatedAt)}</span>
       </div>
     </div>

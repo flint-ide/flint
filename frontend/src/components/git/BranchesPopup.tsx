@@ -7,6 +7,8 @@ import { confirmAction, showToast } from '../../store/dialog'
 import { Modal } from '../layout/Modal'
 import { NewWorktreeForm } from './NewWorktreeForm'
 import { Icon } from '../ui/Icon'
+import { Button, IconButton, Input } from '@flint-ide/ui'
+import { ExternalLink, X } from '@flint-ide/ui/icons'
 
 /** IntelliJ-like branches popup: filter, checkout, new branch, worktrees, remote ops. */
 export function BranchesPopup({ onClose, initialMode = 'list' }: { onClose: () => void; initialMode?: BranchesMode }) {
@@ -102,11 +104,11 @@ export function BranchesPopup({ onClose, initialMode = 'list' }: { onClose: () =
           }}
         >
           <div className="modal-title">New branch from {status?.branch || 'HEAD'}</div>
-          <input autoFocus value={newBranch} placeholder="feature/name" spellCheck={false} onChange={(e) => setNewBranch(e.target.value)} />
+          <Input autoFocus value={newBranch} placeholder="feature/name" spellCheck={false} onChange={(e) => setNewBranch(e.target.value)} />
           <div className="form-actions">
             <span className="spacer" />
-            <button type="button" onClick={() => setMode('list')}>Back</button>
-            <button type="submit" className="primary" disabled={!newBranch.trim()}>Create &amp; checkout</button>
+            <Button type="button" variant="plain" onClick={() => setMode('list')}>Back</Button>
+            <Button type="submit" variant="primary" disabled={!newBranch.trim()}>Create &amp; checkout</Button>
           </div>
         </form>
       ) : (
@@ -128,10 +130,10 @@ export function BranchesPopup({ onClose, initialMode = 'list' }: { onClose: () =
                     <span className="file-name">{w.current ? '● ' : ''}{w.branch || `detached ${w.head.slice(0, 7)}`}</span>
                     <span className="muted path-hint">{w.path}</span>
                     <span className="row-actions inline">
-                      <button className="icon" title="Open in new window" onClick={(e) => (e.stopPropagation(), void run(() => Git.OpenWindow(w.path)))}>⧉</button>
-                      <button className="icon" title="Open terminal here" onClick={(e) => (e.stopPropagation(), useTerminal.getState().create(w.path), onClose())}><Icon name="terminal" size={14} /></button>
+                      <IconButton size="sm" variant="ghost" aria-label="Open in new window" title="Open in new window" onClick={(e) => (e.stopPropagation(), void run(() => Git.OpenWindow(w.path)))}><ExternalLink /></IconButton>
+                      <IconButton size="sm" variant="ghost" aria-label="Open terminal here" title="Open terminal here" onClick={(e) => (e.stopPropagation(), useTerminal.getState().create(w.path), onClose())}><Icon name="terminal" size={14} /></IconButton>
                       {!w.main && !w.current && (
-                        <button className="icon" title="Remove worktree" onClick={(e) => (e.stopPropagation(), void removeWorktree(w))}>✕</button>
+                        <IconButton size="sm" variant="ghost" aria-label="Remove worktree" title="Remove worktree" onClick={(e) => (e.stopPropagation(), void removeWorktree(w))}><X /></IconButton>
                       )}
                     </span>
                   </div>
@@ -146,7 +148,7 @@ export function BranchesPopup({ onClose, initialMode = 'list' }: { onClose: () =
                 </span>
                 {!b.current && !b.worktree && (
                   <span className="row-actions inline">
-                    <button className="icon" title="Delete branch" onClick={(e) => (e.stopPropagation(), void deleteBranch(b))}>✕</button>
+                    <IconButton size="sm" variant="ghost" aria-label="Delete branch" title="Delete branch" onClick={(e) => (e.stopPropagation(), void deleteBranch(b))}><X /></IconButton>
                   </span>
                 )}
               </div>

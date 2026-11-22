@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { Button, IconButton } from '@flint-ide/ui'
+import { Sparkles, X } from '@flint-ide/ui/icons'
 import { SEVERITIES, location, severityCounts, severityOf } from '../../lib/agentReview'
 import {
   cancelReview, clearReview, dismissFinding, fixAllFindings, fixFinding, reviewChanges, revealFinding, runningLabel, useAgentReview,
@@ -33,12 +35,12 @@ export function ReviewSection({ root }: { root: string }) {
         ))}
         <span className="spacer" />
         {shown.length > 1 && (
-          <button className="link agent-action" onClick={(e) => (e.stopPropagation(), void fixAllFindings())} title="Put every finding in the agent chat's draft">
+          <Button size="sm" variant="ghost" className="agent-action" onClick={(e) => (e.stopPropagation(), void fixAllFindings())} title="Put every finding in the agent chat's draft">
             ✦ Fix all
-          </button>
+          </Button>
         )}
         {!running && (
-          <button className="icon" title="Clear the review" onClick={(e) => (e.stopPropagation(), clearReview())}>×</button>
+          <IconButton size="sm" variant="ghost" aria-label="Clear the review" title="Clear the review" onClick={(e) => (e.stopPropagation(), clearReview())}><X /></IconButton>
         )}
       </div>
       {open && (
@@ -47,7 +49,7 @@ export function ReviewSection({ root }: { root: string }) {
           {error && !running && (
             <div className="review-error selectable">
               {error}
-              <button className="link" onClick={() => void reviewChanges()}>Try again</button>
+              <Button size="sm" variant="ghost" onClick={() => void reviewChanges()}>Try again</Button>
             </div>
           )}
           {ours && !running && !error && shown.length === 0 && doneAt > 0 && (
@@ -67,8 +69,8 @@ export function ReviewSection({ root }: { root: string }) {
                 <span className="file-name truncate">{f.title}</span>
                 <span className="muted path-hint">{location(f)}{f.stale ? ' · stale' : ''}</span>
                 <span className="row-actions" onClick={(e) => e.stopPropagation()}>
-                  <button className="icon" title="Fix it: put this finding in the agent chat's draft" onClick={() => void fixFinding(f.id)}>✦</button>
-                  <button className="icon" title="Dismiss" onClick={() => dismissFinding(f.id)}>×</button>
+                  <IconButton size="sm" variant="ghost" aria-label="Fix it" title="Fix it: put this finding in the agent chat's draft" onClick={() => void fixFinding(f.id)}><Sparkles /></IconButton>
+                  <IconButton size="sm" variant="ghost" aria-label="Dismiss" title="Dismiss" onClick={() => dismissFinding(f.id)}><X /></IconButton>
                 </span>
               </div>
             )
@@ -94,7 +96,7 @@ function RunningRow() {
       <span className="truncate">{runningLabel(running)}</span>
       <span className="muted">{seconds}s</span>
       <span className="spacer" />
-      <button className="link" onClick={cancelReview}>Cancel</button>
+      <Button size="sm" variant="ghost" onClick={cancelReview}>Cancel</Button>
     </div>
   )
 }

@@ -31,5 +31,16 @@ export function Markdown(src: string): $CancellablePromise<string> {
     return $Call.ByID(496859621, src);
 }
 
+/**
+ * OpenedImage reads an image the user opened in a tab as a data URL, wherever
+ * it is (a screenshot an agent left in a temp folder), as the editor reads any
+ * file the user opens. Images named by a document go through Image.
+ */
+export function OpenedImage(path: string): $CancellablePromise<preview$0.Image> {
+    return $Call.ByID(305161362, path).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
 // Private type creation functions
 const $$createType0 = preview$0.Image.createFrom;

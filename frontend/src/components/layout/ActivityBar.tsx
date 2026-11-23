@@ -1,7 +1,6 @@
 import { BadgeCounter, IconButton } from '@flint-ide/ui'
 import { useWorkspace } from '../../store/workspace'
-import { useEditor } from '../../store/editor'
-import { effectiveKeys, getCommand, formatKeys } from '../../lib/commands'
+import { effectiveKeys, getCommand } from '../../lib/commands'
 import { usePanels } from '../../panels'
 import { isPanelAvailable, panelTooltip, type PanelSpec } from '../../panels/registry'
 import { Icon } from '../ui/Icon'
@@ -12,8 +11,7 @@ function tooltip(spec: PanelSpec): string {
   return panelTooltip(spec, cmd && effectiveKeys(cmd))
 }
 
-export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {
-  const terminalActive = useEditor((s) => s.activeId?.startsWith('term:') ?? false)
+export function ActivityBar() {
   const sidebar = useWorkspace((s) => s.sidebar)
   const visible = useWorkspace((s) => s.sidebarVisible)
   const setSidebar = useWorkspace((s) => s.setSidebar)
@@ -31,18 +29,6 @@ export function ActivityBar({ onTerminal }: { onTerminal: () => void }) {
           <PanelButton key={v.id} spec={v} active={active} onClick={onClick} />
         )
       })}
-      <span className="spacer" />
-      <IconButton
-        variant="ghost"
-        size="lg"
-        className="activity"
-        data-active={terminalActive || undefined}
-        aria-label="Terminal"
-        title={`Terminal (${formatKeys('Mod+J')})`}
-        onClick={onTerminal}
-      >
-        <Icon name="terminal" />
-      </IconButton>
     </nav>
   )
 }
@@ -62,7 +48,7 @@ function PanelButton({ spec, active, onClick, count = 0 }: PanelButtonProps & { 
   return (
     <IconButton
       variant="ghost"
-      size="lg"
+      size="sm"
       className="activity"
       data-active={active || undefined}
       aria-label={count > 0 ? `${spec.title}, ${count} need you` : spec.title}

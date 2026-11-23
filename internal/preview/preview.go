@@ -79,19 +79,54 @@ func IsImage(path string) bool {
 }
 
 // ReadImage reads an image inside one of roots (symlinks resolved, so a link
-// can't point the preview outside the open folders).
+// can't point the preview outside the open folders). It serves content that
+// names its own images, like a Markdown preview.
 func ReadImage(path string, roots []string) (Image, error) {
-	mime, ok := imageTypes[strings.ToLower(filepath.Ext(path))]
-	if !ok {
-		return Image{}, fmt.Errorf("not an image: %s", filepath.Base(path))
+	mime, err := imageMime(path)
+	if err != nil {
+		return Image{}, err
 	}
 	real, err := inside(path, roots)
 	if err != nil {
 		return Image{}, err
 	}
+	return readImage(real, mime)
+}
+
+// ReadOpenedImage reads an image the user opened in a tab, wherever it is: the
+// editor reads any file the user opens the same way. Only a regular file with
+// an image extension is read.
+func ReadOpenedImage(path string) (Image, error) {
+	mime, err := imageMime(path)
+	if err != nil {
+		return Image{}, err
+	}
+	if !filepath.IsAbs(path) {
+		return Image{}, fmt.Errorf("path %q is not absolute", path)
+	}
+	real, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return Image{}, err
+	}
+	return readImage(real, mime)
+}
+
+func imageMime(path string) (string, error) {
+	mime, ok := imageTypes[strings.ToLower(filepath.Ext(path))]
+	if !ok {
+		return "", fmt.Errorf("not an image: %s", filepath.Base(path))
+	}
+	return mime, nil
+}
+
+// readImage loads the resolved file real as a data URL, capped in size.
+func readImage(real, mime string) (Image, error) {
 	info, err := os.Stat(real)
 	if err != nil {
 		return Image{}, err
+	}
+	if !info.Mode().IsRegular() {
+		return Image{}, fmt.Errorf("not a file: %s", filepath.Base(real))
 	}
 	img := Image{Mime: mime, Size: info.Size()}
 	if info.Size() > MaxImageBytes {

@@ -25,7 +25,7 @@ export function ImageView({ path, active }: { path: string; active: boolean }) {
   useEffect(() => onFileChanged(path, () => setVersion((v) => v + 1)), [path])
   useEffect(() => {
     let cancelled = false
-    PreviewAPI.Image(path)
+    PreviewAPI.OpenedImage(path)
       .then((res) => !cancelled && (setImg({ url: res.dataUrl, size: res.size, tooLarge: res.tooLarge }), setError(null)))
       .catch((err) => !cancelled && setError(errorMessage(err)))
     return () => {

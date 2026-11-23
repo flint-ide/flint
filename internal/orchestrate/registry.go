@@ -64,8 +64,8 @@ type entry struct {
 
 // waiter is one blocked Wait; res is buffered so a wake-up never blocks.
 type waiter struct {
-	until []string
-	res   chan waitResult
+	done func(agenttask.Live) bool
+	res  chan waitResult
 }
 
 type waitResult struct {
@@ -243,7 +243,7 @@ func (r *Registry) update(id string, f func(agenttask.Live) agenttask.Live, even
 	}
 	e.node.Live = f(e.node.Live)
 	for w := range e.waiters {
-		if contains(w.until, e.node.Live.State) {
+		if w.done(e.node.Live) {
 			w.res <- waitResult{live: e.node.Live}
 			delete(e.waiters, w)
 		}
@@ -264,7 +264,7 @@ func (e *entry) record(ev as.Event) {
 		if title == "" {
 			title = ev.ToolCall.Kind
 		}
-		if title != "" {
+		if title = oneLine(title); title != "" {
 			e.out.addLine("[tool] " + title)
 		}
 	}

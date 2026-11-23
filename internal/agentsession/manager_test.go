@@ -737,3 +737,34 @@ func TestEveryTurnStartGetsOneTurnEnd(t *testing.T) {
 		})
 	}
 }
+
+// TestProtectedDirsAsk: an edit in a folder that holds what Flint or an
+// agent CLI runs (.flint's workflows and run configurations, agent
+// settings, git) asks, even inside the project; an ordinary file does not.
+func TestProtectedDirsAsk(t *testing.T) {
+	cwd := t.TempDir()
+	tests := []struct {
+		path string
+		want string
+	}{
+		{".flint/workflows/feature.md", ".flint"},
+		{".flint/run.json", ".flint"},
+		{"sub/.FLINT/agents/x.md", ".flint"},
+		{".claude/settings.json", ".claude"},
+		{".git/hooks/pre-commit", ".git"},
+		{"src/flint.go", ""},
+		{".flintrc", ""},
+	}
+	p := DefaultPolicy()
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			if got := ProtectedDir(tt.path, cwd); got != tt.want {
+				t.Errorf("ProtectedDir(%q) = %q, want %q", tt.path, got, tt.want)
+			}
+			auto := p.autoApproves(ToolCall{Kind: ToolEdit, Paths: []string{cwd + "/" + tt.path}}, cwd)
+			if auto != (tt.want == "") {
+				t.Errorf("autoApproves(edit %q) = %v", tt.path, auto)
+			}
+		})
+	}
+}

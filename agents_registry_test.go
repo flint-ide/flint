@@ -14,6 +14,7 @@ import (
 	"flint/internal/agenthost/hostmode"
 	as "flint/internal/agentsession"
 	"flint/internal/agentsession/acpdriver"
+	"flint/internal/extensions/sandbox"
 	"flint/internal/settings"
 )
 
@@ -21,6 +22,7 @@ import (
 // in these tests run os.Executable()) and as the background host
 // (background_e2e_test.go spawns os.Executable() --agent-host).
 func TestMain(m *testing.M) {
+	sandbox.Main() // the launcher of sandboxed script steps (features_steps_sandbox_test.go)
 	acptest.RunIfAgent()
 	if os.Getenv("FLINT_TEST_AGENT_HOST") == "1" {
 		hostmode.Main(hostmode.Options{Version: "e2e", AllowShell: true}) // returns unless started with --agent-host

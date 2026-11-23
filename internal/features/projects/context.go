@@ -17,6 +17,7 @@ import (
 	"flint/internal/agenttask"
 	"flint/internal/feature"
 	"flint/internal/prompts"
+	"flint/internal/textsafe"
 )
 
 // Project context (docs/design/projects.md, "Project context"): PROJECT.md at
@@ -59,7 +60,7 @@ type ProjectContext struct {
 // ReadContext reads folder's ContextFile (folder resolved): resolved inside the
 // folder (a symbolic link that leaves it is refused), at most MaxFileSize
 // bytes, UTF-8, at most MaxContextChars characters, and no character that
-// hides text from the person reading it (the rule of items, hiddenRune). Line
+// hides text from the person reading it (the rule of items, textsafe.HiddenRune). Line
 // endings become \n, a leading byte order mark is dropped and the text is
 // trimmed. A file that breaks a rule is a problem and its text is not used.
 func ReadContext(folder string) ProjectContext {
@@ -91,8 +92,8 @@ func checkContext(data []byte) (string, error) {
 	if n := utf8.RuneCountInString(text); n > MaxContextChars {
 		return "", fmt.Errorf("longer than %d characters (%d): Flint sends at most %d to agents", MaxContextChars, n, MaxContextChars)
 	}
-	if r, ok := hiddenRune(text); ok {
-		return "", fmt.Errorf("contains %s", runeKind(r))
+	if r, ok := textsafe.HiddenRune(text); ok {
+		return "", fmt.Errorf("contains %s", textsafe.RuneKind(r))
 	}
 	return text, nil
 }
@@ -203,6 +204,10 @@ type origin struct {
 	// task takes them from here, never from the folder as it is later.
 	Title string   `json:"title,omitempty"`
 	Repos []string `json:"repos,omitempty"`
+	// By says who delegated the item when it was not the user's click: an
+	// agent's delegate_project_item call the user approved ("an agent in
+	// <folder> (chat <id>)").
+	By string `json:"by,omitempty"`
 }
 
 func (o origin) String() string {
@@ -480,7 +485,7 @@ func agentName(agent string) string {
 }
 
 // writeContext writes the block between its delimiters. Free text in it (the
-// context file above all) can't close or reopen it: fenceSafe quotes every
+// context file above all) can't close or reopen it: textsafe.FenceSafe quotes every
 // line that looks like a delimiter.
 func writeContext(in contextInput, c cuts) string {
 	limit := fmt.Sprintf("Flint sends at most %d KB of project context", maxContextBlock>>10)
@@ -620,25 +625,7 @@ func writeContext(in contextInput, c cuts) string {
 	if st.MCP && !in.Restricted {
 		fmt.Fprintf(&b, "\n## Reading more\n\nFlint's %s tool returns this project's whole backlog, your item first.\n", ToolName)
 	}
-	return contextStart + "\n" + fenceSafe(b.String()) + "\n" + contextEnd
-}
-
-// fenceSafe keeps text inside the block from closing or reopening it: a line
-// that starts (after spaces) with "=====", as both delimiters do, gets "> " in
-// front of it, so no line of the text equals contextStart or contextEnd and
-// none looks like them. Applied to the whole inside of the block, so it
-// covers the context file and every title, name and reason in it.
-func fenceSafe(s string) string {
-	if !strings.Contains(s, "=====") {
-		return s
-	}
-	lines := strings.Split(s, "\n")
-	for i, l := range lines {
-		if strings.HasPrefix(strings.TrimLeft(l, " \t"), "=====") {
-			lines[i] = "> " + l
-		}
-	}
-	return strings.Join(lines, "\n")
+	return contextStart + "\n" + textsafe.FenceSafe(b.String()) + "\n" + contextEnd
 }
 
 // confirmContext is what the confirmation of a Delegate from an untrusted

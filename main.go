@@ -10,6 +10,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"flint/internal/agenthost/hostmode"
+	"flint/internal/cli/clisock"
 	"flint/internal/diag"
 	"flint/internal/extensions/sandbox"
 	"flint/internal/shellenv"
@@ -23,6 +24,10 @@ const linuxAppID = "io.github.flint_ide.flint"
 
 func main() {
 	sandbox.Main() // first: started as an extension's sandbox launcher, this never returns
+	// `flint workflow …`, `flint task …` and the rest: the command line talks to
+	// the running Flint and exits, before anything of Wails exists (no window,
+	// no Dock icon). Anything else (a folder, no argument) goes on.
+	clisock.Main()
 	// Started with --agent-host this runs the background session host and never
 	// returns, before anything of Wails or the App exists.
 	hostmode.Main(hostmode.Options{Version: diag.Version(version), Drivers: registerHostDrivers})

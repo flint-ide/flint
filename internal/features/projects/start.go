@@ -214,7 +214,7 @@ func (a *API) autoStart(ctx context.Context, folder string, it Item, entry Waiti
 		cur, ok := a.waiting()[folder][it.ID]
 		return ok && cur.Since.Equal(entry.Since)
 	}
-	res, err := a.delegate(folder, it.ID, entry.Root, &autoStart{waitedFor: it.After, still: still, hash: entry.Hash})
+	res, err := a.delegate(folder, it.ID, entry.Root, &autoStart{waitedFor: it.After, still: still, hash: entry.Hash}, "")
 	switch {
 	case errors.Is(err, errStarting):
 		return // a click is starting it, or the start was cancelled

@@ -58,6 +58,55 @@ type Host struct {
 	// origins are the tasks' origins by task id; chats the task of each chat.
 	origins map[string]string
 	chats   map[string]string
+	// taskWorkflow plans the runs of requests that name a workflow
+	// (SetTaskWorkflow); taskRun answers AgentTask.Run (SetTaskRuns);
+	// tasksChanged counts TasksChanged calls.
+	taskWorkflow func(context.Context, feature.NewAgentTask) (feature.PlannedWorkflow, error)
+	taskRun      func(string) (feature.TaskRun, bool)
+	tasksChanged int
+	// workflowCheck answers CheckTaskWorkflow (SetTaskWorkflowCheck);
+	// folderProjects answers FolderProjects (SetFolderProjects).
+	workflowCheck  func(context.Context, feature.NewAgentTask) error
+	folderProjects func(context.Context, string) feature.FolderProjects
+
+	// The workflow steps part: the StartStepChat calls, the scripted chat
+	// results and outputs, the tasks' latest chats, the stopped chats, and
+	// the scripted and recorded RunConfiguration calls.
+	stepChats  []StepChat
+	stepErr    error
+	results    map[string]feature.ChatResult
+	finished   map[string]chan struct{} // closed by FinishChat
+	outputs    map[string]string
+	taskChats  map[string]string
+	stopped    []string
+	runResults map[string]runScript
+	runs       []RunCall
+	// launches answer RunLaunch, by checkout and name; sandbox answers
+	// ScriptSandbox.
+	launches map[string]feature.RunLaunch
+	sandbox  feature.SandboxSupport
+	// budget is BudgetPause's answer.
+	budget error
+}
+
+// StepChat is one StartStepChat call and the chat it opened ("" when it
+// failed).
+type StepChat struct {
+	Task, Agent, Prompt string
+	Chat                string
+	// Reviewer is the call's StepChatOptions.Reviewer.
+	Reviewer bool
+}
+
+// RunCall is one RunConfiguration call; Sandbox is its options' (a copy).
+type RunCall struct {
+	Task, Name string
+	Sandbox    *feature.Sandbox
+}
+
+type runScript struct {
+	res feature.RunResult
+	err error
 }
 
 // Event is one Emit call.
@@ -73,6 +122,9 @@ func New(ctx context.Context) *Host {
 		state: map[string]json.RawMessage{}, streams: map[string]terminal.Stream{},
 		tasks: map[string]feature.AgentTask{}, repos: map[string]feature.Repository{},
 		origins: map[string]string{}, chats: map[string]string{},
+		results: map[string]feature.ChatResult{}, finished: map[string]chan struct{}{},
+		outputs: map[string]string{}, taskChats: map[string]string{}, runResults: map[string]runScript{},
+		launches: map[string]feature.RunLaunch{}, sandbox: feature.SandboxSupport{Available: true, Mechanism: "fake"},
 	}
 }
 
@@ -196,6 +248,102 @@ func (h *Host) Opened() []string {
 
 func (h *Host) Version() string { return h.VersionString }
 
+// TasksChanged counts the calls (TasksChangedCount).
+func (h *Host) TasksChanged() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.tasksChanged++
+}
+
+// TasksChangedCount is how many times TasksChanged was called.
+func (h *Host) TasksChangedCount() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.tasksChanged
+}
+
+// SetTaskWorkflow makes CreateAgentTasks plan a request that names a
+// workflow with fn, as the app asks the Workflows feature
+// (feature.Set.TaskWorkflow); nil: such a request fails with
+// feature.ErrWorkflowsOff.
+func (h *Host) SetTaskWorkflow(fn func(context.Context, feature.NewAgentTask) (feature.PlannedWorkflow, error)) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.taskWorkflow = fn
+}
+
+// SetTaskRuns makes AgentTasks and CreateAgentTasks fill AgentTask.Run from
+// fn, as the app asks the Workflows feature (feature.Set.TaskRun).
+func (h *Host) SetTaskRuns(fn func(taskID string) (feature.TaskRun, bool)) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.taskRun = fn
+}
+
+// SetTaskWorkflowCheck makes CheckTaskWorkflow answer with fn, as the app
+// asks the Workflows feature (feature.Set.TaskWorkflowCheck). Without it,
+// CheckTaskWorkflow plans the request with SetTaskWorkflow's function and
+// drops the plan at once (feature.ErrWorkflowsOff without either).
+func (h *Host) SetTaskWorkflowCheck(fn func(context.Context, feature.NewAgentTask) error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.workflowCheck = fn
+}
+
+// CheckTaskWorkflow answers as SetTaskWorkflowCheck says.
+func (h *Host) CheckTaskWorkflow(ctx context.Context, req feature.NewAgentTask) error {
+	h.mu.Lock()
+	check, plan := h.workflowCheck, h.taskWorkflow
+	h.mu.Unlock()
+	switch {
+	case check != nil:
+		return check(ctx, req)
+	case plan == nil:
+		return feature.ErrWorkflowsOff
+	}
+	p, err := plan(ctx, req)
+	if err == nil && p.Drop != nil {
+		p.Drop()
+	}
+	return err
+}
+
+// SetFolderProjects makes FolderProjects answer with fn, as the app asks
+// the Projects feature (feature.Set.FolderProjects); nil: no projects.
+func (h *Host) SetFolderProjects(fn func(context.Context, string) feature.FolderProjects) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.folderProjects = fn
+}
+
+// FolderProjects answers as SetFolderProjects says (outside the lock: fn
+// may call the host).
+func (h *Host) FolderProjects(ctx context.Context, dir string) feature.FolderProjects {
+	h.mu.Lock()
+	fn := h.folderProjects
+	h.mu.Unlock()
+	if fn == nil {
+		return feature.FolderProjects{}
+	}
+	return fn(ctx, dir)
+}
+
+// withRuns fills in the tasks' runs (outside the lock: fn may call the host).
+func (h *Host) withRuns(tasks map[string]feature.AgentTask) {
+	h.mu.Lock()
+	fn := h.taskRun
+	h.mu.Unlock()
+	if fn == nil {
+		return
+	}
+	for id, t := range tasks {
+		if r, ok := fn(id); ok {
+			t.Run = r
+			tasks[id] = t
+		}
+	}
+}
+
 func (h *Host) LoadState(key string, v any) error {
 	h.mu.Lock()
 	raw, ok := h.state[key]
@@ -236,11 +384,72 @@ func (h *Host) StartStream(termID, _ string, st terminal.Stream) error {
 
 // CreateAgentTasks records the requests and makes a task for each, working
 // in a folder named after the request's; with SetCreateError it creates none.
-// Dir must be inside a root, as the app requires.
+// Dir must be inside a root, as the app requires. As the app does, a request
+// that names a workflow is planned first (SetTaskWorkflow; every request
+// before any task is made), takes the planned agent, and its run is bound
+// once every task exists or dropped when the call fails.
 func (h *Host) CreateAgentTasks(ctx context.Context, reqs []feature.NewAgentTask) ([]feature.AgentTask, error) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	h.requested = append(h.requested, slices.Clone(reqs))
+	plan := h.taskWorkflow
+	h.mu.Unlock()
+	reqs = slices.Clone(reqs)
+	planned := make([]feature.PlannedWorkflow, len(reqs))
+	drop := func() {
+		for _, p := range planned {
+			if p.Drop != nil {
+				p.Drop()
+			}
+		}
+	}
+	for i, r := range reqs {
+		if r.Workflow == "" {
+			continue
+		}
+		if plan == nil {
+			drop()
+			return nil, feature.ErrWorkflowsOff
+		}
+		p, err := plan(ctx, r)
+		if err != nil {
+			drop()
+			return nil, err
+		}
+		planned[i], reqs[i].Agent = p, p.Agent
+	}
+	out, err := h.createTasks(ctx, reqs)
+	if err != nil {
+		drop()
+		return nil, err
+	}
+	for i, p := range planned {
+		if p.Bind == nil {
+			continue
+		}
+		if err := p.Bind(out[i].ID); err != nil {
+			h.mu.Lock()
+			for _, t := range out {
+				delete(h.tasks, t.ID)
+			}
+			h.mu.Unlock()
+			drop()
+			return nil, err
+		}
+	}
+	byID := map[string]feature.AgentTask{}
+	for _, t := range out {
+		byID[t.ID] = t
+	}
+	h.withRuns(byID)
+	for i, t := range out {
+		out[i] = byID[t.ID]
+	}
+	return out, nil
+}
+
+func (h *Host) createTasks(ctx context.Context, reqs []feature.NewAgentTask) ([]feature.AgentTask, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	if h.createErr != nil {
 		return nil, h.createErr
 	}
@@ -288,6 +497,9 @@ func (h *Host) CreateJointAgentTasks(ctx context.Context, reqs []feature.NewAgen
 	h.joint = append(h.joint, JointRequest{slices.Clone(reqs), agent})
 	if h.createErr != nil {
 		return nil, h.createErr
+	}
+	if slices.ContainsFunc(reqs, func(r feature.NewAgentTask) bool { return r.Workflow != "" }) {
+		return nil, feature.ErrJointWorkflow
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -360,13 +572,14 @@ func (h *Host) Requested() [][]feature.NewAgentTask {
 
 func (h *Host) AgentTasks(_ context.Context, ids []string) map[string]feature.AgentTask {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	out := map[string]feature.AgentTask{}
 	for _, id := range ids {
 		if t, ok := h.tasks[id]; ok {
 			out[id] = t
 		}
 	}
+	h.mu.Unlock()
+	h.withRuns(out)
 	return out
 }
 
@@ -474,4 +687,247 @@ func (h *Host) SetAgents(def string, available ...string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.agents = feature.Agents{Available: available, Default: def}
+}
+
+// StartStepChat records the call and opens "chat-1", "chat-2"… bound to the
+// task (TaskChat then returns it); with SetStepChatError it opens none. The
+// task must exist (SetAgentTask or CreateAgentTasks), as the app requires.
+func (h *Host) StartStepChat(ctx context.Context, taskID, agent, prompt string, opts feature.StepChatOptions) (string, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	call := StepChat{Task: taskID, Agent: agent, Prompt: prompt, Reviewer: opts.Reviewer}
+	err := h.stepErr
+	switch {
+	case err != nil:
+	case ctx.Err() != nil:
+		err = ctx.Err()
+	case strings.TrimSpace(prompt) == "":
+		err = errors.New("a step's chat needs a first message")
+	default:
+		if _, ok := h.tasks[taskID]; !ok {
+			err = fmt.Errorf("no agent task %s (it was removed)", taskID)
+		}
+	}
+	if err != nil {
+		h.stepChats = append(h.stepChats, call)
+		return "", err
+	}
+	call.Chat = fmt.Sprintf("chat-%d", len(h.stepChats)+1)
+	h.stepChats = append(h.stepChats, call)
+	h.chats[call.Chat] = taskID
+	h.taskChats[taskID] = call.Chat
+	h.finished[call.Chat] = make(chan struct{})
+	return call.Chat, nil
+}
+
+// SetStepChatError makes StartStepChat fail with err (nil: succeed).
+func (h *Host) SetStepChatError(err error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.stepErr = err
+}
+
+// StepChats returns the StartStepChat calls, in order.
+func (h *Host) StepChats() []StepChat {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.stepChats)
+}
+
+// TaskChat is the chat SetTaskChat or the last StartStepChat bound to the
+// task, "" when none.
+func (h *Host) TaskChat(taskID string) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.taskChats[taskID]
+}
+
+// SetTaskChat makes chat the task's latest chat (as the task's own first
+// chat would be) and lets WaitChat wait for it.
+func (h *Host) SetTaskChat(taskID, chat string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.taskChats[taskID] = chat
+	h.chats[chat] = taskID
+	if h.finished[chat] == nil {
+		h.finished[chat] = make(chan struct{})
+	}
+}
+
+// WaitChat blocks until FinishChat ends the chat's turn or ctx ends; a chat
+// that StartStepChat or SetTaskChat did not open, or that StopChat
+// stopped, is "closed".
+func (h *Host) WaitChat(ctx context.Context, chat string) (feature.ChatResult, error) {
+	h.mu.Lock()
+	done := h.finished[chat]
+	h.mu.Unlock()
+	if done == nil {
+		return feature.ChatResult{}, fmt.Errorf("the chat %s was closed", chat)
+	}
+	select {
+	case <-done:
+	case <-ctx.Done():
+		return feature.ChatResult{}, ctx.Err()
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	res, ok := h.results[chat]
+	if !ok {
+		return feature.ChatResult{}, fmt.Errorf("the chat %s was closed", chat)
+	}
+	return res, nil
+}
+
+// FinishChat ends the chat's turn with res: its WaitChat calls, those
+// waiting and later ones, return res. A chat finishes once; it may be
+// unknown yet (it is then made known).
+func (h *Host) FinishChat(chat string, res feature.ChatResult) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	done := h.finished[chat]
+	if done == nil {
+		done = make(chan struct{})
+		h.finished[chat] = done
+	}
+	select {
+	case <-done:
+		return
+	default:
+	}
+	h.results[chat] = res
+	close(done)
+}
+
+// ChatOutput is what SetChatOutput set, its last lines (1 to 200).
+func (h *Host) ChatOutput(chat string, lines int) string {
+	h.mu.Lock()
+	out := h.outputs[chat]
+	h.mu.Unlock()
+	all := strings.Split(out, "\n")
+	n := min(max(lines, 1), 200)
+	if len(all) > n {
+		all = all[len(all)-n:]
+	}
+	return strings.Join(all, "\n")
+}
+
+// SetChatOutput sets what ChatOutput returns for the chat.
+func (h *Host) SetChatOutput(chat, output string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.outputs[chat] = output
+}
+
+// StopChat records the chat and ends its waits with "closed" (an unknown
+// or empty id is a no-op, as in the app).
+func (h *Host) StopChat(chat string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	done := h.finished[chat]
+	if chat == "" || done == nil {
+		return nil
+	}
+	h.stopped = append(h.stopped, chat)
+	select {
+	case <-done:
+	default:
+		close(done) // no result: WaitChat says the chat was closed
+	}
+	return nil
+}
+
+// Stopped returns the chats StopChat stopped, in order.
+func (h *Host) Stopped() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.stopped)
+}
+
+// RunConfiguration records the call and returns what SetRunResult scripted
+// for name; an unscripted name fails as the app's lookup does. The task
+// must exist. ctx's end is returned as its error.
+func (h *Host) RunConfiguration(ctx context.Context, taskID, name string, opts feature.RunOptions) (feature.RunResult, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	call := RunCall{Task: taskID, Name: name}
+	if opts.Sandbox != nil {
+		sb := *opts.Sandbox
+		sb.Writable = slices.Clone(sb.Writable)
+		call.Sandbox = &sb
+	}
+	h.runs = append(h.runs, call)
+	if err := ctx.Err(); err != nil {
+		return feature.RunResult{}, err
+	}
+	if _, ok := h.tasks[taskID]; !ok {
+		return feature.RunResult{}, fmt.Errorf("no agent task %s (it was removed)", taskID)
+	}
+	sc, ok := h.runResults[name]
+	if !ok {
+		return feature.RunResult{}, fmt.Errorf("no run configuration named %q: add it to .flint/run.json", name)
+	}
+	return sc.res, sc.err
+}
+
+// BudgetPause returns what SetBudgetPause set (nil by default).
+func (h *Host) BudgetPause() error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.budget
+}
+
+// SetBudgetPause makes BudgetPause return err.
+func (h *Host) SetBudgetPause(err error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.budget = err
+}
+
+// SetRunResult makes RunConfiguration of name return res and err.
+func (h *Host) SetRunResult(name string, res feature.RunResult, err error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.runResults[name] = runScript{res, err}
+}
+
+// Runs returns the RunConfiguration calls, in order.
+func (h *Host) Runs() []RunCall {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.runs)
+}
+
+// RunLaunch returns what SetRunLaunch set for the checkout and name; an
+// unset one fails as the app's lookup does.
+func (h *Host) RunLaunch(checkout, name string) (feature.RunLaunch, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	l, ok := h.launches[checkout+"\x00"+name]
+	if !ok {
+		return feature.RunLaunch{}, fmt.Errorf("no run configuration named %q in %s: add it to .flint/run.json", name, checkout)
+	}
+	l.Commands = slices.Clone(l.Commands)
+	l.Env = slices.Clone(l.Env)
+	return l, nil
+}
+
+// SetRunLaunch makes RunLaunch of checkout and name return l.
+func (h *Host) SetRunLaunch(checkout, name string, l feature.RunLaunch) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.launches[checkout+"\x00"+name] = l
+}
+
+// ScriptSandbox returns what SetScriptSandbox set (available by default).
+func (h *Host) ScriptSandbox() feature.SandboxSupport {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.sandbox
+}
+
+// SetScriptSandbox makes ScriptSandbox return s.
+func (h *Host) SetScriptSandbox(s feature.SandboxSupport) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.sandbox = s
 }

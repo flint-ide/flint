@@ -32,6 +32,16 @@ type MCPActions struct {
 	SQL bool `json:"sql"`
 	// Projects: add_project_item (writes a new item into a project whose folder is trusted).
 	Projects bool `json:"projects"`
+	// Workflows: list_workflows, get_workflow_runs, wait_for_workflow_run,
+	// start_workflow and steer_workflow_run (the Workflows feature: an
+	// agent starts and steers runs of its folder; it can never approve a
+	// gate or continue past a failed step).
+	Workflows bool `json:"workflows"`
+	// Delegate: delegate_project_item (the Projects feature: an agent hands
+	// a ready item of a project its folder is in to the item's agents or
+	// workflow, as Delegate does; never an item that waits, never from an
+	// untrusted project, never from inside handed-out work).
+	Delegate bool `json:"delegate"`
 }
 
 // MCPTools switches the server's tools on and off. Diagnostics, the editor

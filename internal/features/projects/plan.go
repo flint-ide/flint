@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"flint/internal/agenttask"
+	"flint/internal/textsafe"
 )
 
 // Bounds of Plan with Agent….
@@ -47,8 +48,8 @@ func (a *API) PlanPrompt(folder, goal string) (PlanPrompt, error) {
 	case utf8.RuneCountInString(goal) > MaxGoal:
 		return PlanPrompt{}, fmt.Errorf("the goal is longer than %d characters", MaxGoal)
 	}
-	if r, ok := hiddenRune(goal); ok {
-		return PlanPrompt{}, fmt.Errorf("the goal contains %s", runeKind(r))
+	if r, ok := textsafe.HiddenRune(goal); ok {
+		return PlanPrompt{}, fmt.Errorf("the goal contains %s", textsafe.RuneKind(r))
 	}
 	if !a.host.Trusted(real) {
 		return PlanPrompt{}, errors.New("the project's folder is in Restricted Mode: trust it first, so agents can read the project and add items to it")
@@ -112,7 +113,9 @@ func planText(c Config, folder, goal string, agents []string, def string, pc Pro
 	} else {
 		b.WriteString("- repos: leave it out (this project lists no repositories; its items run in the folder active in Flint's window)\n")
 	}
-	fmt.Fprintf(&b, "- after (optional): ids of items of this project that must be done first, at most %d, no cycles\n\n", MaxAfter)
+	fmt.Fprintf(&b, "- after (optional): ids of items of this project that must be done first, at most %d, no cycles\n", MaxAfter)
+	b.WriteString("- workflow (optional): the name of a Flint workflow (its file name without .md; list_workflows shows them when it is offered) that takes the item step by step " +
+		"(plan, implement, test, review, my approval) instead of one agent; not with together; leave it out when unsure\n\n")
 	b.WriteString("Title and text must not contain control characters other than tab and newline, or invisible characters. " +
 		"New items start as todo. You can't change, delete, start or set the status of items. " +
 		"If a call is refused, correct the item as the message says and try again. " +

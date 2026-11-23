@@ -203,3 +203,77 @@ func TestConcurrentUse(t *testing.T) {
 	}
 	<-done
 }
+
+// waitTurnAsync starts WaitFor(TurnOver) and returns once it is registered
+// as a waiter (or returned at once).
+func waitTurnAsync(t *testing.T, r *Registry, id string) <-chan waitOut {
+	t.Helper()
+	ch := make(chan waitOut, 1)
+	go func() {
+		l, err := r.WaitFor(context.Background(), id, TurnOver)
+		ch <- waitOut{l, err}
+	}()
+	deadline := time.Now().Add(3 * time.Second)
+	for r.waiterCount(id) == 0 {
+		select {
+		case o := <-ch:
+			ch <- o
+			return ch
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("WaitFor never registered")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	return ch
+}
+
+// A non-fatal error in the middle of a turn makes the state failed, which
+// wakes a Wait for "failed"; the turn is not over, so WaitFor(TurnOver)
+// sleeps on until the turn really ends.
+func TestWaitForTurnOverSeesThroughAnErrorMidTurn(t *testing.T) {
+	for _, tc := range []struct {
+		name, stop, want string
+	}{
+		{"finished", as.StopEndTurn, agenttask.Finished},
+		{"cancelled", as.StopCancelled, agenttask.Idle},
+		{"failed", "refusal", agenttask.Failed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newWith(t, Node{ID: "a"})
+			r.Prompted("a")
+			ch := waitTurnAsync(t, r, "a")
+			r.Observe(as.Event{SessionID: "a", Kind: as.KindError, Text: "auto-approve failed"})
+			select {
+			case o := <-ch:
+				t.Fatalf("returned mid-turn: %+v", o)
+			case <-time.After(20 * time.Millisecond):
+			}
+			r.Observe(chunk("a", "going on"))
+			r.Observe(turnEnd("a", tc.stop))
+			if o := result(t, ch); o.err != nil || o.live.State != tc.want || o.live.Turn {
+				t.Fatalf("got %+v", o)
+			}
+		})
+	}
+}
+
+func TestWaitForTurnOverImmediateAndErrors(t *testing.T) {
+	r := newWith(t, Node{ID: "a"})
+	if l, err := r.WaitFor(context.Background(), "a", TurnOver); err != nil || l.State != agenttask.Idle {
+		t.Fatalf("an idle chat: %+v, %v", l, err)
+	}
+	if _, err := r.WaitFor(context.Background(), "nope", TurnOver); !errors.Is(err, ErrUnknown) {
+		t.Fatalf("unknown: %v", err)
+	}
+	if _, err := r.WaitFor(context.Background(), "a", nil); err == nil {
+		t.Fatal("a nil condition was accepted")
+	}
+	r.Prompted("a")
+	ch := waitTurnAsync(t, r, "a")
+	r.Remove("a")
+	if o := result(t, ch); !errors.Is(o.err, ErrRemoved) {
+		t.Fatalf("removed: %+v", o)
+	}
+}

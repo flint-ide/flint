@@ -86,7 +86,9 @@ func (l loadedAgents) route(name, engine string) (drv as.Driver, k string, err e
 // starts on the in-process manager too: the folders travel in ctx, which only
 // it hands to a driver, never across a connection to another process.
 func (a *App) startChat(ctx context.Context, drv as.Driver, name, cwd string) (as.SessionInfo, error) {
-	if drv != nil || len(as.Folders(ctx)) > 0 {
+	// The in-process manager reads what the context carries (additional
+	// folders, a reviewer's mark), which another process would not get.
+	if drv != nil || len(as.Folders(ctx)) > 0 || as.Reviewer(ctx) {
 		if a.agentMgr == nil {
 			return as.SessionInfo{}, errors.New("agent sessions are not available")
 		}

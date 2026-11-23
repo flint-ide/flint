@@ -143,6 +143,8 @@ tasks:
       - cp build/darwin/icons.icns "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources"
       - cp "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS"
       - cp build/darwin/Info.plist "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents"
+      # The `flint` command (folders and the command line), linked by the Homebrew cask.
+      - install -m 755 scripts/flint "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources/flint"
       - |
         if [ "{{.VERSION}}" != dev ]; then
           plutil -replace CFBundleShortVersionString -string "{{trimPrefix "v" .VERSION}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Info.plist"

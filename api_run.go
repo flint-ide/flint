@@ -61,6 +61,8 @@ type runEvents struct {
 	seq   map[string]uint64
 	tests map[string]*testSink
 	done  map[string]chan struct{} // closed when the run ended (watch, api_mcp_actions.go)
+	// results get how the run ended (await, features_steps.go).
+	results map[string]chan runner.Result
 }
 
 func newRunEvents(app *App) *runEvents {
@@ -99,11 +101,34 @@ func (e *runEvents) Exited(id string, res runner.Result) {
 	e.mu.Lock()
 	delete(e.seq, id)
 	delete(e.tests, id)
+	e.endLocked(id, res)
+	e.mu.Unlock()
+}
+
+// endLocked tells the run's watchers that it ended and how; called with
+// e.mu held.
+func (e *runEvents) endLocked(id string, res runner.Result) {
 	if done := e.done[id]; done != nil {
 		close(done)
 		delete(e.done, id)
 	}
-	e.mu.Unlock()
+	if ch := e.results[id]; ch != nil {
+		ch <- res // buffered, sent once: never blocks
+		delete(e.results, id)
+	}
+}
+
+// await returns a channel that gets the run's result once it ended (call it
+// before the run starts). Like watch, at most one awaiter per run.
+func (e *runEvents) await(id string) <-chan runner.Result {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	ch := make(chan runner.Result, 1)
+	if e.results == nil {
+		e.results = map[string]chan runner.Result{}
+	}
+	e.results[id] = ch
+	return ch
 }
 
 func (e *runEvents) emit(ev RunEvent) {
@@ -206,6 +231,14 @@ func (r *RunAPI) Start(id, root string, cfg runconfig.Config, cols, rows int) er
 // startConfig runs a configuration under id (also for an agent's
 // run_configuration, api_mcp_actions.go).
 func (a *App) startConfig(id, root string, cfg runconfig.Config, cols, rows int) error {
+	return a.startConfigWith(id, root, cfg, cols, rows, nil)
+}
+
+// startConfigWith is startConfig whose resolved launch confine, when set,
+// rewrites (a workflow's sandboxed script step, features_steps_sandbox.go)
+// and whose run tab shows confine's banner first. A confine error starts
+// nothing.
+func (a *App) startConfigWith(id, root string, cfg runconfig.Config, cols, rows int, confine func(runconfig.Launch) (runconfig.Launch, string, error)) error {
 	if err := checkRoot(root); err != nil {
 		return err
 	}
@@ -213,9 +246,15 @@ func (a *App) startConfig(id, root string, cfg runconfig.Config, cols, rows int)
 	if err != nil {
 		return err
 	}
+	banner := ""
+	if confine != nil {
+		if launch, banner, err = confine(launch); err != nil {
+			return err
+		}
+	}
 	opened := a.mcpSources.Terminals.OpenNew(id, mcptools.KindRun, cfg.Name, launch.Cwd)
 	err = a.runs.Start(id, runner.Spec{
-		Steps: launch.Steps, Cwd: launch.Cwd, Env: launch.Env, PTY: true, Cols: cols, Rows: rows,
+		Steps: launch.Steps, Cwd: launch.Cwd, Env: launch.Env, PTY: true, Cols: cols, Rows: rows, Banner: banner,
 	})
 	if err != nil {
 		if opened {

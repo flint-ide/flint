@@ -27,6 +27,8 @@ const (
 	maxAddCounters = 1000
 	// maxSummaryText is how much of the text the confirmation shows.
 	maxSummaryText = 600
+	// maxWorkflowName bounds a workflow's name in a call (prompts' names).
+	maxWorkflowName = 64
 )
 
 // addTool is add_project_item, offered while the user has switched it on
@@ -48,8 +50,9 @@ func (a *API) addTool() mcpserver.Tool {
 			`"agent":{"type":"string","description":"The agent that works on it (default: the user's default agent)."},`+
 			`"repos":{"type":"array","items":{"type":"string"},"maxItems":%d,"description":"Names of the project's repositories it changes (default: the folder active in Flint's window)."},`+
 			`"after":{"type":"array","items":{"type":"string"},"maxItems":%d,"description":"Ids of existing items of this project that must be done first."},`+
-			`"together":{"type":"boolean","description":"Only with 2 to %d repos: true makes one agent work in all of them at once, in one chat, instead of one agent per repository (only agents that can work in several folders, such as Claude Code). Default: false."}`+
-			`},"required":["project","title","text"],"additionalProperties":false}`, MaxTitle, MaxDescription, MaxRepositories, MaxAfter, agenttask.MaxJoint)),
+			`"together":{"type":"boolean","description":"Only with 2 to %d repos: true makes one agent work in all of them at once, in one chat, instead of one agent per repository (only agents that can work in several folders, such as Claude Code). Default: false."},`+
+			`"workflow":{"type":"string","maxLength":%d,"description":"The name of a Flint workflow that takes the item's work step by step (plan, implement, test, review, the user's approval) instead of one agent. Not with together. Default: none."}`+
+			`},"required":["project","title","text"],"additionalProperties":false}`, MaxTitle, MaxDescription, MaxRepositories, MaxAfter, agenttask.MaxJoint, maxWorkflowName)),
 		Acts: true,
 		Plan: a.planAdd,
 	}
@@ -64,6 +67,7 @@ type addArgs struct {
 	Repos    []string `json:"repos"`
 	After    []string `json:"after"`
 	Together bool     `json:"together"`
+	Workflow string   `json:"workflow"`
 }
 
 // planAdd checks a call of add_project_item and says what it will write; the
@@ -81,14 +85,14 @@ func (a *API) planAdd(ctx context.Context, root string, raw json.RawMessage) (mc
 	if in.Text == nil {
 		return mcpserver.Planned{}, errors.New("text is required (it may be empty)")
 	}
-	if len(in.Repos) > MaxRepositories || len(in.After) > MaxAfter || len(*in.Text) > MaxDescription || len(in.Title) > 4*MaxTitle {
+	if len(in.Repos) > MaxRepositories || len(in.After) > MaxAfter || len(*in.Text) > MaxDescription || len(in.Title) > 4*MaxTitle || len(in.Workflow) > maxWorkflowName {
 		return mcpserver.Planned{}, fmt.Errorf("too long: at most %d repositories, %d items in after, %d bytes of text", MaxRepositories, MaxAfter, MaxDescription)
 	}
 	real, c, err := a.toolProject(in.Project)
 	if err != nil {
 		return mcpserver.Planned{}, err
 	}
-	spec := ItemSpec{Title: in.Title, Text: *in.Text, Priority: in.Priority, Agent: in.Agent, Repos: in.Repos, After: in.After, Together: in.Together}
+	spec := ItemSpec{Title: in.Title, Text: *in.Text, Priority: in.Priority, Agent: in.Agent, Repos: in.Repos, After: in.After, Together: in.Together, Workflow: in.Workflow}
 	caller := mcpserver.CallerFrom(ctx)
 	if caller == "" {
 		caller = "folder:" + root
@@ -249,6 +253,9 @@ func addSummary(name, folder, base string, spec ItemSpec) string {
 	}
 	if len(spec.After) > 0 {
 		fmt.Fprintf(&b, " · After: %s", strings.Join(spec.After, ", "))
+	}
+	if spec.Workflow != "" {
+		fmt.Fprintf(&b, " · Workflow: %s", spec.Workflow)
 	}
 	fmt.Fprintf(&b, "\nFile: %s (or the next free name)\n", itemPath(base))
 	if text := strings.TrimSpace(spec.Text); text != "" {

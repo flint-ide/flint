@@ -33,11 +33,23 @@ const (
 	ToolSQL = "run_sql_query"
 	// ToolProjectAdd is offered by the Projects feature (internal/features/projects).
 	ToolProjectAdd = "add_project_item"
+	// ToolProjectDelegate is offered by the Projects feature while
+	// actions.delegate is on.
+	ToolProjectDelegate = "delegate_project_item"
+	// The workflow tools are offered by the Workflows feature
+	// (internal/features/workflows) while actions.workflows is on: three
+	// read, two act.
+	ToolWorkflowList  = "list_workflows"
+	ToolWorkflowRuns  = "get_workflow_runs"
+	ToolWorkflowWait  = "wait_for_workflow_run"
+	ToolWorkflowStart = "start_workflow"
+	ToolWorkflowSteer = "steer_workflow_run"
 )
 
 // ActionNames lists the tools Flint offers on top of Names when the user
 // switched their group on.
-var ActionNames = []string{ToolRunTests, ToolRunConfig, ToolRunOutput, ToolHTTP, ToolSQL, ToolProjectAdd}
+var ActionNames = []string{ToolRunTests, ToolRunConfig, ToolRunOutput, ToolHTTP, ToolSQL, ToolProjectAdd, ToolProjectDelegate,
+	ToolWorkflowList, ToolWorkflowRuns, ToolWorkflowWait, ToolWorkflowStart, ToolWorkflowSteer}
 
 // Bounds of the acting tools' arguments and answers.
 const (

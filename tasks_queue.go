@@ -235,6 +235,14 @@ func (a *App) startTaskChat(task agenttask.Task) {
 	if a.chatIn(task.Worktree) {
 		return
 	}
+	start := a.taskStart(task)
+	if err := a.features.TaskStartCheck(start); err != nil {
+		// The task stays off the queue, without a chat: a stopped workflow
+		// run never starts an agent later.
+		a.logf("start the chat of task %s: not started: %v", task.ID, err)
+		a.tasksChanged()
+		return
+	}
 	if text := a.taskContext(task); text != "" {
 		prompt = text + "\n\n" + prompt
 	}
@@ -244,6 +252,7 @@ func (a *App) startTaskChat(task agenttask.Task) {
 	a.watchFirstTurn(task)
 	info, err := a.openChat(ctx, ChatRequest{
 		Agent: task.Agent, Cwd: task.Worktree, Prompt: prompt, TaskID: task.ID, Origin: &origin,
+		opened: func(id string) { a.features.TaskChatStarted(start, id) },
 	})
 	if err != nil {
 		a.unwatchFirstTurn(task.ID)
@@ -473,10 +482,16 @@ func (a *App) taskContext(task agenttask.Task) string {
 	}
 	ctx, cancel := context.WithTimeout(a.ctx, gitTimeout)
 	defer cancel()
-	return a.features.TaskContext(ctx, feature.TaskStart{
-		Origin: task.Origin, Worktree: task.Worktree, Branch: task.Branch, Base: task.Base,
+	return a.features.TaskContext(ctx, a.taskStart(task))
+}
+
+// taskStart describes the start of task's chat (a joint group's lead) to
+// the features.
+func (a *App) taskStart(task agenttask.Task) feature.TaskStart {
+	return feature.TaskStart{
+		Origin: task.Origin, TaskID: task.ID, Worktree: task.Worktree, Branch: task.Branch, Base: task.Base,
 		Joint: task.Joint != "", MCP: a.allowMCP(task.Worktree),
-	})
+	}
 }
 
 // flintStarts: Flint starts the task's chat itself, also on Start now (a

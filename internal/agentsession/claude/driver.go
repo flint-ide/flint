@@ -180,7 +180,10 @@ func (d *Driver) start(ctx context.Context, cwd, id string, resume bool, sink ag
 	if srv, ok := opts.MCP.Offer(ctx, cwd); ok {
 		mcp = &srv
 	}
-	args, err := buildArgs(id, resume, opts, opts.Untrusted != nil && opts.Untrusted(cwd), mcp, folders)
+	// A reviewer chat (agentsession.WithReviewer) loads no more of its
+	// folder than an untrusted one: the code under review wrote it.
+	isolated := opts.Untrusted != nil && opts.Untrusted(cwd) || agentsession.Reviewer(ctx)
+	args, err := buildArgs(id, resume, opts, isolated, mcp, folders)
 	if err != nil {
 		mcp.Revoke()
 		return agentsession.SessionInfo{}, fmt.Errorf("claude: %w", err)
@@ -367,8 +370,10 @@ func (s *session) shutdownAsFailure() {
 // buildArgs assembles the CLI command line. resume continues the saved
 // conversation sessionID instead of starting a new one under that id. The
 // user's extra arguments come first, so Flint's flags (the stream protocol,
-// the permission prompt and, in untrusted folders, --setting-sources user)
-// are parsed last and win. mcp, when set, is Flint's MCP server: Claude Code
+// the permission prompt and, in untrusted folders and for a reviewer chat
+// (untrusted is then true), --setting-sources user, which leaves out the
+// folder's .claude settings, their hooks and its CLAUDE.md) are parsed last
+// and win. mcp, when set, is Flint's MCP server: Claude Code
 // merges every --mcp-config, so the user's own servers stay. folders are
 // Flint's additional folders (agentsession.CheckFolders validated them): each
 // is its own "--add-dir <folder>" pair among Flint's flags, after the user's

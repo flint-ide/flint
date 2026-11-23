@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -76,6 +77,9 @@ type Spec struct {
 	// nothing but still produces an Output call, so the caller can flush state it
 	// collected (parsed test results) promptly.
 	Filter func(line []byte) []byte
+	// Banner, when set, is shown before the first step (dimmed; lines
+	// separated by "\n"): what the user should know about how it runs.
+	Banner string
 }
 
 type run struct {
@@ -217,6 +221,9 @@ func (m *Manager) execute(id string, r *run) {
 	}()
 	out := func(s string) { chunks <- []byte(s) }
 
+	if r.spec.Banner != "" {
+		out(dim + strings.ReplaceAll(r.spec.Banner, "\n", "\r\n") + reset + "\r\n")
+	}
 	res := Result{}
 	for i, step := range r.spec.Steps {
 		if r.isStopped() {
@@ -270,7 +277,7 @@ func footer(res Result) string {
 func (r *run) runStep(step runconfig.Command, chunks chan<- []byte, last bool) Result {
 	cmd := exec.Command(step.Program, step.Args...)
 	cmd.Dir = r.spec.Cwd
-	cmd.Env = append(terminal.Environ(), r.spec.Env...)
+	cmd.Env = append(append(terminal.Environ(), r.spec.Env...), step.Env...)
 
 	var (
 		ptmx     *os.File

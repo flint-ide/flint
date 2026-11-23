@@ -35,6 +35,10 @@ type ChatRequest struct {
 	// caller, which may hold a lock around it: start_agent turns its reserved
 	// slot into the registered child atomically.
 	wrapRegister func(do func() error) error
+	// opened, when set, learns the chat's id once it is registered and
+	// before its first message is sent, so its turn can never end before
+	// the caller knows the chat (a task's start tells the features).
+	opened func(id string)
 }
 
 // ChatOpened is the payload of "chat:opened". Background asks the UI not to
@@ -93,6 +97,9 @@ func (a *App) openChatWith(ctx context.Context, r ChatRequest, loaded loadedAgen
 		return as.SessionInfo{}, err
 	}
 	a.orchGrants.inherit(r.Parent, info.ID) // the parent's grant, one level deeper
+	if r.opened != nil {
+		r.opened(info.ID)
+	}
 	a.emit(eventChatOpened, ChatOpened{
 		Info: info, Parent: r.Parent, TaskID: r.TaskID, Role: r.Role,
 		Background: r.Origin != nil || r.Parent != "",

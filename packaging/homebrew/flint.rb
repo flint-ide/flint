@@ -18,6 +18,8 @@ cask "flint" do
   depends_on macos: :monterey
 
   app "flint.app"
+  # `flint [folder]` and the command line (`flint task list`, `flint run wait …`).
+  binary "#{appdir}/flint.app/Contents/Resources/flint"
 
   zap trash: [
     "~/Library/Application Support/flint",

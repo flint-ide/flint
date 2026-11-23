@@ -19,6 +19,7 @@ import (
 	"flint/internal/features/projects"
 	"flint/internal/features/todo"
 	"flint/internal/features/update"
+	"flint/internal/features/workflows"
 	"flint/internal/mcptools"
 	"flint/internal/settings"
 	"flint/internal/terminal"
@@ -33,6 +34,7 @@ var features = []feature.Module{
 	update.Module,
 	extensions.Module,
 	projects.Module,
+	workflows.Module,
 }
 
 // registerFeatures registers the modules' settings sections and tools, once
@@ -66,6 +68,10 @@ func (h featureHost) OpenURL(link string) error         { return h.a.openURL(lin
 func (h featureHost) Version() string                   { return diag.Version(version) }
 func (h featureHost) LoadState(key string, v any) error { return h.a.loadFeatureState(key, v) }
 func (h featureHost) SaveState(key string, v any) error { return h.a.saveFeatureState(key, v) }
+
+// TasksChanged is what every change of an agent task does: the UI hears
+// tasks:changed and the features' TasksChanged hooks run.
+func (h featureHost) TasksChanged() { h.a.tasksChanged() }
 
 // StartStream registers the console for agents (terminal tools) and starts
 // the terminal session.

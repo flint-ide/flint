@@ -12,6 +12,7 @@ import (
 
 	"flint/internal/agenttask"
 	"flint/internal/prompts"
+	"flint/internal/textsafe"
 )
 
 // The project folder's format (docs/design/projects.md). Its limits are fixed:
@@ -103,8 +104,8 @@ func ParseConfig(data []byte, folderName string) (Config, error) {
 	case strings.ContainsFunc(c.Name, unicode.IsControl):
 		return Config{}, errors.New("name contains control characters")
 	}
-	if r, ok := hiddenRune(c.Name); ok {
-		return Config{}, fmt.Errorf("name contains %s", runeKind(r))
+	if r, ok := textsafe.HiddenRune(c.Name); ok {
+		return Config{}, fmt.Errorf("name contains %s", textsafe.RuneKind(r))
 	}
 	if len(c.Repositories) > MaxRepositories {
 		return Config{}, fmt.Errorf("more than %d repositories", MaxRepositories)
@@ -135,8 +136,8 @@ func NewConfig(name string) ([]byte, error) {
 	if utf8.RuneCountInString(name) > maxProjectName || strings.ContainsFunc(name, oneLineBreaker) {
 		return nil, fmt.Errorf("the name must be one line of at most %d characters", maxProjectName)
 	}
-	if r, ok := hiddenRune(name); ok {
-		return nil, fmt.Errorf("the name contains %s", runeKind(r))
+	if r, ok := textsafe.HiddenRune(name); ok {
+		return nil, fmt.Errorf("the name contains %s", textsafe.RuneKind(r))
 	}
 	data, err := json.MarshalIndent(Config{Name: name, Repositories: []RepositoryDecl{}}, "", "  ")
 	if err != nil {
@@ -158,7 +159,12 @@ type Item struct {
 	// Together: one agent works in all of Repos at once (a joint group of
 	// agent tasks) instead of one agent per repository. Only with two to
 	// agenttask.MaxJoint repositories.
-	Together bool   `json:"together"`
+	Together bool `json:"together"`
+	// Workflow names the workflow that takes each of the item's agent tasks
+	// ("" = one agent): the Workflows feature's (a built-in one, the user's
+	// own, or the trusted checkout's .flint/workflows; never read from the
+	// project's folder). Not with Together.
+	Workflow string `json:"workflow"`
 	Body     string `json:"body"`
 }
 
@@ -202,6 +208,11 @@ func ParseItem(id string, data []byte, c Config) (Item, error) {
 			if it.After, err = parseAfter(f.Value); err != nil {
 				return Item{}, err
 			}
+		case "workflow":
+			if f.Value != "" && !textsafe.ValidSlugName(f.Value) {
+				return Item{}, fmt.Errorf("workflow %q: use the name of a workflow (lowercase letters, digits and dashes: its file name without .md)", f.Value)
+			}
+			it.Workflow = f.Value
 		case "together":
 			switch f.Value {
 			case "true":
@@ -218,6 +229,8 @@ func ParseItem(id string, data []byte, c Config) (Item, error) {
 		return Item{}, errors.New("together: true needs two or more repositories in repos (one agent works in all of them)")
 	case it.Together && len(it.Repos) > agenttask.MaxJoint:
 		return Item{}, fmt.Errorf("together: true works with at most %d repositories", agenttask.MaxJoint)
+	case it.Together && it.Workflow != "":
+		return Item{}, errors.New("a workflow runs in one repository: remove together or workflow")
 	}
 	switch {
 	case it.Title == "":
@@ -227,56 +240,14 @@ func ParseItem(id string, data []byte, c Config) (Item, error) {
 	}
 	it.Body = strings.TrimSpace(strings.ReplaceAll(body, "\r\n", "\n"))
 	for _, part := range []struct{ name, text string }{{"title", it.Title}, {"the text", it.Body}} {
-		if r, ok := hiddenRune(part.text); ok {
-			return Item{}, fmt.Errorf("%s contains %s", part.name, runeKind(r))
+		if r, ok := textsafe.HiddenRune(part.text); ok {
+			return Item{}, fmt.Errorf("%s contains %s", part.name, textsafe.RuneKind(r))
 		}
 	}
 	if len(it.Description()) > MaxDescription {
 		return Item{}, fmt.Errorf("title and text are longer than %d bytes", MaxDescription)
 	}
 	return it, nil
-}
-
-// hiddenRune finds a character an item must not contain because the user
-// reading it does not see it, while the agent it is sent to does: a control
-// character other than tab and newline, a Unicode tag (U+E0000–U+E007F), a
-// bidirectional control (U+202A–U+202E, U+2066–U+2069), a zero-width space
-// (U+200B), a word joiner (U+2060) or a zero-width no-break space (U+FEFF; a
-// file that starts with one has no front matter, so no title). Zero-width
-// joiner and non-joiner (U+200D, U+200C) are allowed: emoji and several
-// scripts need them.
-//
-// The line and paragraph separators (U+2028, U+2029) are refused too: many
-// readers (an agent, a dialog) break the line there while the panel shows one
-// line, so a title could imitate a line of its own, such as the delimiters of
-// the project context block. NEL (U+0085) is a control character.
-func hiddenRune(s string) (rune, bool) {
-	for _, r := range s {
-		switch {
-		case r == '\t' || r == '\n':
-		case unicode.IsControl(r),
-			r == 0x2028, r == 0x2029,
-			r >= 0xE0000 && r <= 0xE007F,
-			r >= 0x202A && r <= 0x202E,
-			r >= 0x2066 && r <= 0x2069,
-			r == 0x200B, r == 0x2060, r == 0xFEFF:
-			return r, true
-		}
-	}
-	return 0, false
-}
-
-// runeKind names a character hiddenRune found, for a problem's reason:
-// "a control character (U+0007)", "a line or paragraph separator (U+2028)" or
-// "invisible characters (U+200B)".
-func runeKind(r rune) string {
-	switch {
-	case unicode.IsControl(r):
-		return fmt.Sprintf("a control character (U+%04X)", r)
-	case r == 0x2028 || r == 0x2029:
-		return fmt.Sprintf("a line or paragraph separator (U+%04X)", r)
-	}
-	return fmt.Sprintf("invisible characters (U+%04X)", r)
 }
 
 // oneLineBreaker reports a character that breaks a line: a control
@@ -405,8 +376,8 @@ func checkTitle(title string) (string, error) {
 	case strings.ContainsFunc(title, oneLineBreaker):
 		return "", errors.New("the title must be one line")
 	}
-	if r, ok := hiddenRune(title); ok {
-		return "", fmt.Errorf("the title contains %s", runeKind(r))
+	if r, ok := textsafe.HiddenRune(title); ok {
+		return "", fmt.Errorf("the title contains %s", textsafe.RuneKind(r))
 	}
 	return title, nil
 }
@@ -421,10 +392,22 @@ func titleValue(title string) string {
 }
 
 // NewItemFile is the file New Item writes for title.
-func NewItemFile(title string) ([]byte, error) {
+func NewItemFile(title string) ([]byte, error) { return NewItemFileWith(title, "") }
+
+// NewItemFileWith is NewItemFile with a workflow that takes the item's tasks
+// ("" leaves the commented example); the name has the rule of an item's
+// workflow key (textsafe.ValidSlugName).
+func NewItemFileWith(title, workflow string) ([]byte, error) {
 	title, err := checkTitle(title)
 	if err != nil {
 		return nil, err
+	}
+	line := "# workflow: bug-fix  a workflow takes each task, step by step (default: one agent)\n"
+	if workflow != "" {
+		if !textsafe.ValidSlugName(workflow) {
+			return nil, fmt.Errorf("workflow %q: use the name of a workflow (lowercase letters, digits and dashes: its file name without .md)", workflow)
+		}
+		line = "workflow: " + workflow + "\n"
 	}
 	return []byte("---\n" +
 		"title: " + titleValue(title) + "\n" +
@@ -433,6 +416,7 @@ func NewItemFile(title string) ([]byte, error) {
 		"# agent: backend     the agent that works on it (default: the default agent)\n" +
 		"# repos: api, web    repositories from " + ConfigFile + " (default: the active folder)\n" +
 		"# together: true     with several repos: one agent works in all of them (default: one per repository)\n" +
+		line +
 		"---\n" +
 		"What to do.\n\n" +
 		"Done when:\n" +
@@ -450,6 +434,8 @@ type ItemSpec struct {
 	After    []string
 	// Together: one agent across Repos (written only when true).
 	Together bool
+	// Workflow: the workflow that takes the item's tasks ("" = none).
+	Workflow string
 }
 
 // BuildItemFile writes spec as an item file of project c and checks it with the
@@ -477,8 +463,11 @@ func BuildItemFile(spec ItemSpec, id string, c Config) ([]byte, error) {
 			}
 		}
 	}
-	if strings.ContainsAny(spec.Agent+spec.Priority, "\n\r") {
-		return nil, errors.New("agent and priority are one word each")
+	if strings.ContainsAny(spec.Agent+spec.Priority+spec.Workflow, "\n\r") {
+		return nil, errors.New("agent, priority and workflow are one word each")
+	}
+	if spec.Workflow != "" && !textsafe.ValidSlugName(spec.Workflow) {
+		return nil, fmt.Errorf("workflow %q: use the name of a workflow (lowercase letters, digits and dashes: its file name without .md)", spec.Workflow)
 	}
 	text := strings.TrimSpace(strings.ReplaceAll(spec.Text, "\r\n", "\n"))
 	var b strings.Builder
@@ -491,6 +480,9 @@ func BuildItemFile(spec ItemSpec, id string, c Config) ([]byte, error) {
 	if spec.Together {
 		b.WriteString("together: true\n")
 	}
+	if spec.Workflow != "" {
+		b.WriteString("workflow: " + spec.Workflow + "\n")
+	}
 	b.WriteString("---\n")
 	if text != "" {
 		b.WriteString(text + "\n")
@@ -501,7 +493,7 @@ func BuildItemFile(spec ItemSpec, id string, c Config) ([]byte, error) {
 		return nil, err
 	}
 	// What was meant is what is written.
-	if it.Title != title || it.Body != text || it.Status != StatusTodo || it.Priority != spec.Priority || it.Agent != spec.Agent || it.Together != spec.Together ||
+	if it.Title != title || it.Body != text || it.Status != StatusTodo || it.Priority != spec.Priority || it.Agent != spec.Agent || it.Together != spec.Together || it.Workflow != spec.Workflow ||
 		!slices.Equal(it.Repos, nonNil(spec.Repos)) || !slices.Equal(it.After, nonNil(spec.After)) {
 		return nil, errors.New("the item can't be written as given: check the title and the names")
 	}

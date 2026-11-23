@@ -20,12 +20,17 @@ const (
 	maxToolBody   = 2000 // bytes of one item's text
 )
 
-// agentTools are get_project and, while the user has switched it on
-// (mcpServer.actions.projects), add_project_item.
+// agentTools are get_project and, while the user has switched them on,
+// add_project_item (mcpServer.actions.projects) and delegate_project_item
+// (mcpServer.actions.delegate, with the server on).
 func (a *API) agentTools() []mcpserver.Tool {
 	tools := a.readTools()
-	if a.host.Settings().MCPServer.Actions.Projects {
+	mcp := a.host.Settings().MCPServer
+	if mcp.Actions.Projects {
 		tools = append(tools, a.addTool())
+	}
+	if mcp.Enabled && mcp.Actions.Delegate {
+		tools = append(tools, a.delegateTool())
 	}
 	return tools
 }
@@ -35,7 +40,7 @@ func (a *API) readTools() []mcpserver.Tool {
 		Name:  ToolName,
 		Title: "Read the Flint projects",
 		Description: "Returns the Flint projects the user has open (a Flint project is a folder of planned work items, its backlog, for one or more repositories; not the folder this chat works in) with their items: " +
-			"id, title, status (doing, review, todo, done), priority, agent, repositories (and whether one agent works in all of them together), the items it waits for (after) and whether it is ready, and text. " +
+			"id, title, status (doing, review, todo, done), priority, agent, repositories (and whether one agent works in all of them together), the workflow that takes it and the state of its runs, the items it waits for (after) and whether it is ready, and text. " +
 			"Use it to answer what is planned or what to work on next. " +
 			"Called from an agent working on a project's item, it returns that project first and in full, marks that item, and names the other projects (ask for one by name). " +
 			"Read-only: statuses change in Flint. " +
@@ -192,8 +197,9 @@ func (a *API) describeFor(who caller, status, name string) string {
 			continue
 		}
 		deps := Dependencies(l.Items)
+		runs := a.itemRuns(folder)
 		for _, it := range items {
-			entry := itemText(it, deps[it.ID])
+			entry := itemText(it, deps[it.ID], runs[it.ID])
 			if it.ID == mine {
 				entry = strings.Replace(entry, "\n", " (you are working on this item)\n", 1)
 			}
@@ -259,7 +265,9 @@ func projectHeader(c Config, folder string) string {
 	return b.String()
 }
 
-func itemText(it Item, d Deps) string {
+// itemText is one item for get_project; runs are the lines of its tasks'
+// workflow runs (itemRuns).
+func itemText(it Item, d Deps, runs []string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## %s: %s\n", it.ID, it.Title)
 	fmt.Fprintf(&b, "status: %s; priority: %s", it.Status, it.Priority)
@@ -271,6 +279,9 @@ func itemText(it Item, d Deps) string {
 		if it.Together {
 			b.WriteString(" (together: one agent works in all of them)")
 		}
+	}
+	if it.Workflow != "" {
+		fmt.Fprintf(&b, "; workflow: %s (a workflow run takes each of its tasks)", it.Workflow)
 	}
 	if len(it.After) > 0 {
 		fmt.Fprintf(&b, "; after: %s", strings.Join(it.After, ", "))
@@ -284,6 +295,9 @@ func itemText(it Item, d Deps) string {
 		}
 	}
 	b.WriteString("\n")
+	if len(runs) > 0 {
+		b.WriteString("runs: " + strings.Join(runs, "; ") + "\n")
+	}
 	if it.Body != "" {
 		body := it.Body
 		if len(body) > maxToolBody {
@@ -297,4 +311,73 @@ func itemText(it Item, d Deps) string {
 	}
 	b.WriteString("\n")
 	return b.String()
+}
+
+// maxRunsPerItem bounds the runs get_project shows per item: the newest.
+const maxRunsPerItem = 5
+
+// itemRuns are, per item of folder, the workflow runs that take its agent
+// tasks, as "bug-fix · waiting for the user's approval (run <id>, api)":
+// the state as it is now while the task exists, else as last seen. A
+// coordinator sees where each item's runs stand without another call.
+func (a *API) itemRuns(folder string) map[string][]string {
+	a.mu.Lock()
+	items := a.links()[folder]
+	a.mu.Unlock()
+	var ids []string
+	for _, ls := range items {
+		for _, l := range ls {
+			if l.Workflow != "" && !l.Gone {
+				ids = append(ids, l.Task)
+			}
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	ctx, cancel := a.ctx(gitTimeout)
+	tasks := a.host.AgentTasks(ctx, ids)
+	cancel()
+	out := map[string][]string{}
+	for id, ls := range items {
+		var lines []string
+		for _, l := range ls {
+			if l.Workflow == "" {
+				continue
+			}
+			wf, run, state := l.Workflow, l.RunID, l.Run
+			if t, ok := tasks[l.Task]; ok && !l.Gone && t.Run.Workflow != "" {
+				wf, run, state = t.Run.Workflow, t.Run.ID, t.Run.State
+			}
+			where := l.Repo
+			if where == "" {
+				where = "the active folder"
+			}
+			if l.Gone {
+				where += ", task removed"
+			}
+			lines = append(lines, fmt.Sprintf("%s · %s (run %s, %s)", wf, runStateText(state), run, where))
+		}
+		if n := len(lines); n > maxRunsPerItem {
+			lines = append([]string{fmt.Sprintf("%d older run(s) not shown", n-maxRunsPerItem)}, lines[n-maxRunsPerItem:]...)
+		}
+		if len(lines) > 0 {
+			out[id] = lines
+		}
+	}
+	return out
+}
+
+// runStateText says a run's state for an agent; a run that waits for the
+// user is said plainly, so the agent tells the user instead of acting.
+func runStateText(state string) string {
+	switch state {
+	case runWaiting:
+		return "waiting for the user's approval"
+	case runFailed:
+		return "failed, waits for the user"
+	case "":
+		return "state unknown"
+	}
+	return state
 }

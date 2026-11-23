@@ -35,11 +35,16 @@ var Module = feature.Module{
 	New: func(h feature.Host) feature.Instance {
 		api := newAPI(h)
 		return feature.Instance{
-			Services:     []application.Service{application.NewService(api)},
-			AgentTools:   api.agentTools,
+			Services:   []application.Service{application.NewService(api)},
+			AgentTools: api.agentTools,
+			// flint project … (cli.go).
+			CLI:          api.cliCommands(),
 			TasksChanged: api.tasksChanged,
 			// The project context every item's agent gets, when its chat starts.
 			TaskContext: api.taskContext,
+			// The projects a coordinator's folder is in, and their items'
+			// agent tasks, whose workflow runs it may then reach.
+			FolderProjects: api.folderProjects,
 			// A waiting start that failed for a checkout's trust or a
 			// missing workspace folder may go now.
 			RootsChanged: api.kickStarter,

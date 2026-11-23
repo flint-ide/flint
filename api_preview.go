@@ -17,3 +17,10 @@ func (p *PreviewAPI) Markdown(src string) (string, error) {
 func (p *PreviewAPI) Image(path string) (preview.Image, error) {
 	return preview.ReadImage(path, p.app.projectRoots())
 }
+
+// OpenedImage reads an image the user opened in a tab as a data URL, wherever
+// it is (a screenshot an agent left in a temp folder), as the editor reads any
+// file the user opens. Images named by a document go through Image.
+func (p *PreviewAPI) OpenedImage(path string) (preview.Image, error) {
+	return preview.ReadOpenedImage(path)
+}

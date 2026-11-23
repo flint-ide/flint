@@ -93,7 +93,7 @@ FSEvents with one recursive subscription per folder. The file tree refreshes and
 ### Markdown and image preview
 
 - **Markdown**: an Editor / Split / Preview switch on `.md` files (`⇧⌘V`). Rendering happens in Go (goldmark, GFM: tables, task lists, strikethrough, autolinks), live while you type. In Split mode the preview follows the heading visible in the editor. Raw HTML and `javascript:` links are dropped. Relative links open files in the editor, external links open in the browser, and relative images load only from open folders.
-- **Images** (`png jpg gif webp svg ico bmp`) open in a preview tab: fit to window, zoom with `⌘+` / `⌘-` / `⌘0` and `⌘`+scroll wheel, a checkerboard behind transparency, dimensions and file size. SVG can be switched to its source. Limit: 25 MB per image.
+- **Images** (`png jpg gif webp svg ico bmp`) open in a preview tab: fit to window, zoom with `⌘+` / `⌘-` / `⌘0` and `⌘`+scroll wheel, a checkerboard behind transparency, dimensions and file size. SVG can be switched to its source. An image you open yourself previews from anywhere, like a file in the editor (a screenshot an agent left in a temp folder). Limit: 25 MB per image.
 
 ### Search and replace
 

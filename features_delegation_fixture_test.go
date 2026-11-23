@@ -336,6 +336,12 @@ func (f *dlgFixture) firstChat(t *testing.T, taskID string) string {
 
 // finish ends the turn of chat saying result (the agent's last line).
 func (f *dlgFixture) finish(chat, result string) {
+	// A turn can end only after its prompt reached the agent: a step's chat
+	// is announced (chat:opened) before Flint sends the prompt, and a turn
+	// end that arrives in between would be dropped, leaving the chat working.
+	for i := 0; i < 500 && len(f.driver.got(chat)) == 0; i++ {
+		time.Sleep(10 * time.Millisecond)
+	}
 	f.app.orch.Observe(as.Event{SessionID: chat, Kind: as.KindMessageChunk, Text: result})
 	f.app.orch.Observe(as.Event{SessionID: chat, Kind: as.KindTurnEnd, StopReason: as.StopEndTurn})
 	f.app.tasks.Observe(as.Event{SessionID: chat, Kind: as.KindTurnEnd, StopReason: as.StopEndTurn})

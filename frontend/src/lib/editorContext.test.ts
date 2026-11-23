@@ -84,10 +84,10 @@ describe('MCP server settings', () => {
     assert.equal(sharesEditor({ ...DEFAULT_MCP_SERVER, tools: { ...DEFAULT_MCP_SERVER.tools, editor: false } }), false)
   })
   it('keeps the tools that act off unless a group is switched on', () => {
-    assert.deepEqual(DEFAULT_MCP_SERVER.actions, { tests: false, run: false, http: false, sql: false, projects: false })
+    assert.deepEqual(DEFAULT_MCP_SERVER.actions, { tests: false, run: false, http: false, sql: false, projects: false, workflows: false, delegate: false })
     assert.equal(DEFAULT_MCP_SERVER.testWaitSeconds, 120)
     const m = coerceMcpServer({ actions: { tests: true, run: 'true', http: 1, shell: true }, testWaitSeconds: 5 })
-    assert.deepEqual(m.actions, { tests: true, run: false, http: false, sql: false, projects: false })
+    assert.deepEqual(m.actions, { tests: true, run: false, http: false, sql: false, projects: false, workflows: false, delegate: false })
     assert.equal(m.testWaitSeconds, 10)
     assert.equal(coerceMcpServer({ actions: 'all', testWaitSeconds: 'long' }).testWaitSeconds, 120)
     assert.deepEqual(coerceMcpServer({ actions: 'all' }).actions, DEFAULT_MCP_SERVER.actions)
@@ -99,5 +99,20 @@ describe('MCP server settings', () => {
     // What the Settings tab writes (JSON) reads back the same.
     assert.deepEqual(coerceMcpServer(JSON.parse(JSON.stringify(on))), on)
     assert.equal(coerceMcpServer({ actions: { projects: 'yes' } }).actions.projects, false)
+  })
+  it('keeps delegating items (actions.delegate) off unless a literal true', () => {
+    assert.equal(DEFAULT_MCP_SERVER.actions.delegate, false)
+    assert.equal(coerceMcpServer({ actions: { delegate: true } }).actions.delegate, true)
+    assert.equal(coerceMcpServer({ actions: { delegate: 'yes' } }).actions.delegate, false)
+  })
+
+  it('keeps the workflow tools (actions.workflows) off unless a literal true', () => {
+    assert.equal(DEFAULT_MCP_SERVER.actions.workflows, false)
+    const on = coerceMcpServer({ actions: { workflows: true } })
+    assert.equal(on.actions.workflows, true)
+    assert.equal(on.actions.projects, false)
+    assert.deepEqual(coerceMcpServer(JSON.parse(JSON.stringify(on))), on)
+    assert.equal(coerceMcpServer({ actions: { workflows: 'yes' } }).actions.workflows, false)
+    assert.equal(coerceMcpServer({ actions: { workflows: 1 } }).actions.workflows, false)
   })
 })

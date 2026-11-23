@@ -1,5 +1,6 @@
 import { useSettings } from '../../store/settings'
 import { DEFAULT_MCP_SERVER, TERMINAL_LINES, TEST_WAIT_SECONDS, type McpActionKey, type McpToolKey } from '../../lib/mcpSettings'
+import { isFeatureActive } from '../../lib/activeFeatures'
 import { NumberField, Row } from './fields'
 import { Button, Switch } from '@flint-ide/ui'
 
@@ -10,12 +11,24 @@ const TOOLS: { key: McpToolKey; label: string; hint: string }[] = [
   { key: 'tests', label: 'Test results', hint: 'The last test run: totals and failed tests with their output.' },
 ]
 
-const ACTIONS: { key: McpActionKey; label: string; hint: string }[] = [
+const ACTIONS: { key: McpActionKey; label: string; hint: string; feature?: string }[] = [
   { key: 'tests', label: 'Run tests', hint: 'run_tests: a Go package, a test file or single tests, in the Tests tab, like the ▶ in the gutter.' },
   { key: 'run', label: 'Run configurations', hint: 'run_configuration starts one of the folder\'s run configurations in its run tab; get_run_output reads its output.' },
   { key: 'http', label: 'Send HTTP requests', hint: 'send_http_request: a named request of a .http file in the chat\'s folder; the response is kept in the file\'s history.' },
   { key: 'sql', label: 'Run SQL queries', hint: 'run_sql_query: one reading statement on a saved connection, only when that connection is read-only.' },
   { key: 'projects', label: 'Add project items', hint: 'add_project_item: writes a new item into the backlog of a project whose folder is trusted, after you approve each one' },
+  {
+    key: 'workflows',
+    label: 'Run and steer workflows',
+    hint: "Agents may start runs of this folder's workflows and pause, resume, retry, send back or stop them. You are asked before each. They can never approve a step.",
+    feature: 'workflows',
+  },
+  {
+    key: 'delegate',
+    label: 'Delegate project items',
+    hint: 'An agent in a project hands a ready item to its agents or workflow, as your Delegate click does. You are asked before each. Never an item that waits for others, never from an untrusted project.',
+    feature: 'projects',
+  },
 ]
 
 /** Settings ▸ Agent Context: Flint's own MCP server for the agents it starts. */
@@ -43,7 +56,7 @@ export function McpServerSection() {
         Tools that do something in Flint for an agent. They are off until you turn them on, and Flint asks you before every call: in the chat when
         the agent asks there, otherwise in a dialog. "Always allow" and "Do everything" don't apply to them.
       </p>
-      {ACTIONS.map((t) => (
+      {ACTIONS.filter((t) => !t.feature || isFeatureActive(t.feature)).map((t) => (
         <Row key={t.key} label={t.label} hint={t.hint}>
           <Switch disabled={!mcp.enabled} checked={mcp.actions[t.key]} onCheckedChange={(checked) => set({ actions: { ...mcp.actions, [t.key]: checked } })} />
         </Row>

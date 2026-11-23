@@ -27,6 +27,10 @@ export interface McpActions {
   sql: boolean
   /** add_project_item (writes a new item into a project whose folder is trusted) */
   projects: boolean
+  /** The workflow tools: start runs of the folder's workflows and pause, resume, retry, send back or stop them (never approve a step). */
+  workflows: boolean
+  /** delegate_project_item: hands a ready item of a trusted project to its agents or workflow, after the user's yes to each call. */
+  delegate: boolean
 }
 
 export type McpActionKey = keyof McpActions
@@ -51,7 +55,7 @@ export const TEST_WAIT_SECONDS = { min: 10, max: 540 }
 export const DEFAULT_MCP_SERVER: McpServerSettings = Object.freeze({
   enabled: true,
   tools: Object.freeze({ diagnostics: true, editor: true, terminals: false, tests: true }),
-  actions: Object.freeze({ tests: false, run: false, http: false, sql: false, projects: false }),
+  actions: Object.freeze({ tests: false, run: false, http: false, sql: false, projects: false, workflows: false, delegate: false }),
   terminalLines: 200,
   testWaitSeconds: 120,
 }) as McpServerSettings
@@ -80,7 +84,7 @@ export function coerceMcpServer(v: unknown): McpServerSettings {
       tests: bool(t.tests, d.tools.tests),
     },
     // Only a literal true switches an acting tool on.
-    actions: { tests: a.tests === true, run: a.run === true, http: a.http === true, sql: a.sql === true, projects: a.projects === true },
+    actions: { tests: a.tests === true, run: a.run === true, http: a.http === true, sql: a.sql === true, projects: a.projects === true, workflows: a.workflows === true, delegate: a.delegate === true },
     terminalLines: lines,
     testWaitSeconds: wait,
   }

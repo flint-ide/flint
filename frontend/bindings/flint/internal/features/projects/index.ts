@@ -11,6 +11,7 @@ export {
     ContextView,
     DelegateResult,
     ItemView,
+    NewItemRequest,
     PlanPrompt,
     Problem,
     Project,

@@ -2,6 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   agentText,
+  workflowOptions,
   allReposResolve,
   applyCloneEvent,
   autoStartNotice,
@@ -60,13 +61,13 @@ import {
 } from './projects'
 
 const item = (over: Partial<ItemInfo> = {}): ItemInfo => ({
-  id: 'a', title: 'A', status: 'todo', priority: 'normal', agent: '', repos: [], body: '', path: '/b/items/a.md', agentProblem: '', failed: false, tasks: [], together: false, after: [], waitingFor: [], ready: true, dependencyProblem: '', waiting: null, ...over,
+  id: 'a', title: 'A', status: 'todo', priority: 'normal', agent: '', repos: [], body: '', path: '/b/items/a.md', agentProblem: '', failed: false, tasks: [], together: false, after: [], waitingFor: [], ready: true, dependencyProblem: '', waiting: null, workflow: '', ...over,
 })
 const repo = (over: Partial<RepoView> = {}): RepoView => ({
   name: 'api', url: 'git@h:a/api.git', folder: '/w/api', located: false, inWorkspace: true, trusted: true, problem: '', ...over,
 })
 const task = (over: Partial<TaskInfo> = {}): TaskInfo => ({
-  id: 't', repo: 'api', title: '', agent: '', branch: '', worktree: '/w/t', state: 'working', error: '', pullRequest: '', merged: false, stale: false, gone: false, joint: '', lead: false, ...over,
+  id: 't', repo: 'api', title: '', agent: '', branch: '', worktree: '/w/t', state: 'working', error: '', pullRequest: '', merged: false, stale: false, gone: false, joint: '', lead: false, workflow: '', run: '', runState: '', ...over,
 })
 
 describe('grouping', () => {
@@ -475,5 +476,25 @@ describe('project notifications', () => {
     assert.deepEqual(cloneNotice({ ...ev, error: 'exit status 128' }), { title: "Couldn't clone api", body: 'exit status 128' })
     assert.equal(cloneNotice({ ...ev, cancelled: true }), null)
     assert.equal(cloneNotice({ ...ev, done: false }), null)
+  })
+})
+
+describe('workflowOptions', () => {
+  it('offers a workflow with its description and disables the ones that cannot run', () => {
+    assert.deepEqual(
+      workflowOptions([
+        { name: 'ship', description: 'Plan, build, review', problem: '', steps: [{}] },
+        { name: 'broken', description: 'x', problem: 'step 2 has no title', steps: [{}] },
+        { name: 'empty', description: '', problem: '', steps: [] },
+      ]),
+      [
+        { value: 'ship', label: 'ship', disabled: false, hint: 'Plan, build, review' },
+        { value: 'broken', label: 'broken', disabled: true, hint: 'step 2 has no title' },
+        { value: 'empty', label: 'empty', disabled: true, hint: '' },
+      ],
+    )
+  })
+  it('has no options for no workflows', () => {
+    assert.deepEqual(workflowOptions([]), [])
   })
 })

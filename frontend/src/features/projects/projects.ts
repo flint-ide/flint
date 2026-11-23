@@ -31,6 +31,10 @@ export interface TaskInfo {
   joint: string
   /** The lead of its joint group: the chat runs in this task's worktree. */
   lead: boolean
+  /** The workflow run that takes the task: its workflow, its id and its state (running, waiting, failed, paused, done, stopped); '' when none. */
+  workflow: string
+  run: string
+  runState: string
 }
 
 /** A waiting start: the user asked to start the item when it is ready (Go: WaitingView). */
@@ -61,6 +65,8 @@ export interface ItemInfo {
   /** What is wrong with after (an unknown id, the item itself, a cycle); '' when nothing. */
   dependencyProblem: string
   waiting: WaitingInfo | null
+  /** The workflow that takes each of the item's agent tasks (the item's `workflow:` key); '' when none. */
+  workflow: string
 }
 
 export interface ProblemInfo {
@@ -737,3 +743,28 @@ export const PLAN_TOOL_OFF =
 export function pickPlanAgent(agents: readonly string[], defaultAgent: string, preferred: string): string {
   return [defaultAgent, preferred].find((a) => a && agents.includes(a)) ?? agents[0] ?? ''
 }
+
+// ---- New Item with a workflow
+
+/** The value of "None (one agent)" in New Item's Workflow select. */
+export const NO_WORKFLOW = ''
+
+export interface WorkflowOption {
+  value: string
+  label: string
+  disabled: boolean
+  hint: string
+}
+
+/** The workflows a folder offers (the Workflows binding's List) as select options: one with a problem or no step is shown but cannot be chosen. */
+export function workflowOptions(list: readonly { name: string; description: string; problem: string; steps: readonly unknown[] }[]): WorkflowOption[] {
+  return list.map((w) => ({
+    value: w.name,
+    label: w.name,
+    disabled: !!w.problem || w.steps.length === 0,
+    hint: w.problem || w.description,
+  }))
+}
+
+/** The help line under the Workflow select of New Item. */
+export const WORKFLOW_HELP = 'The item runs this workflow when you delegate it.'

@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Button, Kbd } from '@flint-ide/ui'
+import { Button, Kbd, ListGroup, ListItem } from '@flint-ide/ui'
+import { GitFork, LayoutDashboard, Workflow } from '@flint-ide/ui/icons'
 import { Workspace } from '../../api/backend'
 import { useWorkspace } from '../../store/workspace'
 import { openToolCheck } from '../../store/toolCheck'
-import { formatKeys } from '../../lib/commands'
+import { formatKeys, runCommandById } from '../../lib/commands'
+import { useActiveFeatures } from '../../lib/activeFeatures'
+import { openNewTask } from '../../store/agentTasks'
 
 const SHORTCUTS: [string, string][] = [
   [formatKeys('Mod+P'), 'Go to file'],
@@ -16,6 +19,37 @@ const SHORTCUTS: [string, string][] = [
   [formatKeys('Mod+Enter'), 'Run statement'],
   [formatKeys('Mod+B'), 'Toggle sidebar'],
 ]
+
+/** The AI-native starting points; the ones of a feature show only while the feature runs. */
+function WorkWithAgents() {
+  const active = useActiveFeatures((s) => s.ids)
+  return (
+    <ListGroup label="Work with agents" className="welcome-agents">
+      {active.has('workflows') && (
+        <ListItem
+          leading={<Workflow aria-hidden />}
+          label="Run a workflow…"
+          meta={['Plan, build, test, review and approve a change, the same way every time']}
+          onClick={() => runCommandById('workflows.run')}
+        />
+      )}
+      {active.has('projects') && (
+        <ListItem
+          leading={<LayoutDashboard aria-hidden />}
+          label="Open the project board"
+          meta={['Plan work as items, then hand them to agents']}
+          onClick={() => runCommandById('projects.board')}
+        />
+      )}
+      <ListItem
+        leading={<GitFork aria-hidden />}
+        label="New agent task…"
+        meta={['Give an agent its own branch and worktree to work in']}
+        onClick={openNewTask}
+      />
+    </ListGroup>
+  )
+}
 
 export function Welcome() {
   const root = useWorkspace((s) => s.root)
@@ -48,6 +82,7 @@ export function Welcome() {
           )}
         </div>
       )}
+      {root && <WorkWithAgents />}
       <dl className="shortcuts">
         {SHORTCUTS.map(([k, label]) => (
           <div key={k}>

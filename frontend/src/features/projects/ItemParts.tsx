@@ -26,14 +26,15 @@ import {
   type TaskInfo,
 } from './projects'
 import { dependencyNotes, priorityColor } from './cardParts'
-import { addContext, cancelStart, delegateItem, itemKey, openContext, openItemFile, openItemTask, renameOldConfig, setStatus, useProjects } from './store'
+import { addContext, cancelStart, delegateItem, itemKey, openContext, openItemFile, openItemTask, openWorkflowRun, renameOldConfig, setStatus, useProjects } from './store'
 import { Badge, Button, ListGroup, ListItem, TaskCard } from '@flint-ide/ui'
 import { MarkerBadge, TaskStateBadge } from '../../components/tasks/badges'
+import { runStateText, runStateTone } from '../../lib/workflowRuns'
 
 /** The note on a project in the Backlog preview's format, with its one action (the panel and the board). */
 export function OldFormatNote({ folder }: { folder: string }) {
   return (
-    <div className="project-untrusted project-old-format" role="status">
+    <div className="restricted-note project-old-format" role="status">
       <MarkerBadge tone="warn">Old format</MarkerBadge>
       <span className="muted">{OLD_FORMAT_NOTE}</span>
       <Button variant="ghost" size="sm" onClick={() => void renameOldConfig(folder)} title="Flint asks first; the file's content stays as it is">
@@ -89,6 +90,7 @@ export function ItemCard({ project, item, ...rest }: ItemCardProps) {
         <span title={item.agentProblem || `Runs with ${agent}`} className={item.agentProblem ? 'fui-danger' : undefined}>✦ {agent}</span>,
         <span title={item.together ? 'The repositories one agent works in together' : 'The repositories Delegate starts an agent task in'}>{reposText(item)}</span>,
         together && <MarkerBadge tone={together.cls} title={together.hint}>{together.label}</MarkerBadge>,
+        item.workflow && <MarkerBadge title={`Each agent task of this item is taken through the workflow ${item.workflow}`}>{`Workflow: ${item.workflow}`}</MarkerBadge>,
       ]}
       notes={dependencyNotes(dependencyLines(item, project.items))}
       actions={<ItemActions project={project} item={item} />}
@@ -121,11 +123,23 @@ function TaskLine({ t, all }: { t: TaskInfo; all: TaskInfo[] }) {
       compact
       leading={<TaskStateBadge state={pill.cls} title={t.gone ? `${pill.hint} (the task was removed)` : pill.hint}>{pill.label}</TaskStateBadge>}
       label={<span className="fui-muted" title={t.branch ? `${t.title}\n${t.branch}` : taskRepo(t)}>{taskRepo(t)}</span>}
-      badges={t.joint && t.lead && <MarkerBadge title="The lead of the group: the one chat runs in this task's worktree">lead</MarkerBadge>}
+      badges={
+        (t.joint && t.lead) || t.run ? (
+          <>
+            {t.joint && t.lead && <MarkerBadge title="The lead of the group: the one chat runs in this task's worktree">lead</MarkerBadge>}
+            {t.run && (
+              <Badge size="sm" color={runStateTone(t.runState)} badgeStyle="light" title={`The workflow run${t.workflow ? ` of ${t.workflow}` : ''}`}>
+                {`Run: ${runStateText(t.runState)}`}
+              </Badge>
+            )}
+          </>
+        ) : undefined
+      }
       showActions="always"
       actions={
-        (open || t.pullRequest) && (
+        (open || t.pullRequest || t.run) && (
           <>
+            {t.run && <Button variant="ghost" size="sm" onClick={() => openWorkflowRun(t.run)} title="Open the workflow run in its tab">Open run</Button>}
             {open && (
               <Button variant="ghost" size="sm" onClick={() => void openItemTask(t)} title={t.joint && !t.lead ? "Open the group's chat (in the lead task's folder)" : 'Open the folder and the agent chat'}>Open</Button>
             )}

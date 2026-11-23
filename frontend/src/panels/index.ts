@@ -18,6 +18,8 @@ const TasksPanel = lazyPreload(() => import('../components/tasks/TasksPanel').th
 const AgentsPanel = lazyPreload(() => import('../components/agents/AgentsPanel').then((m) => ({ default: m.AgentsPanel })))
 const UsagePanel = lazyPreload(() => import('../components/usage/UsagePanel').then((m) => ({ default: m.UsagePanel })))
 
+// The AI-native panels sit together right after Files, in the order a task moves: Agents (who is working),
+// Agent Tasks, Workflows (16) and Projects (18, a feature) come from their modules. The classic IDE panels follow.
 // Command ids and titles predating the registry are kept: keymap overrides are stored by id.
 export const PANELS = definePanels([
   { id: 'files', title: 'Files', icon: 'files', order: 10, component: FileTree, command: { keywords: 'folder tree explorer' } },
@@ -30,11 +32,11 @@ export const PANELS = definePanels([
     command: { keywords: 'git changes' },
   },
   {
-    id: 'tasks', title: 'Agent Tasks', icon: 'fork', order: 35, component: TasksPanel,
+    id: 'tasks', title: 'Agent Tasks', icon: 'fork', order: 14, component: TasksPanel,
     command: { id: 'view.agentTasks', category: 'Agent', keywords: 'worktree parallel agents branch claude codex' },
   },
   {
-    id: 'agents', title: 'Agents', icon: 'agents', order: 36, component: AgentsPanel, useBadge: () => useNeedingYouCount(),
+    id: 'agents', title: 'Agents', icon: 'agents', order: 12, component: AgentsPanel, useBadge: () => useNeedingYouCount(),
     command: { id: 'view.agents', title: 'Show Agents', category: 'Agent', keywords: 'chats status waiting working running overview approval claude codex' },
   },
   {

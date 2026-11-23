@@ -4,10 +4,13 @@
 // what a project shows too. Nothing polls: views follow events while mounted.
 import { createStore } from '../../lib/store'
 import * as API from '../../../bindings/flint/internal/features/projects/api'
+import * as WorkflowsAPI from '../../../bindings/flint/internal/features/workflows/api'
 import * as Workspace from '../../../bindings/flint/workspaceapi'
 import { EventsOn } from '../../wails/runtime'
 import { errorMessage } from '../../api/backend'
 import { askAgent } from '../../lib/askAgent'
+import { isFeatureActive } from '../../lib/activeFeatures'
+import { RUN_VIEW, runTabData } from '../../lib/workflowRuns'
 import { chooseAction, confirmAction, showToast } from '../../store/dialog'
 import { alertDone } from '../../store/alerts'
 import { useEditor } from '../../store/editor'
@@ -46,6 +49,8 @@ import {
   trustProjectQuestion,
   trustQuestion,
   waitingToast,
+  workflowOptions,
+  type WorkflowOption,
   type ProjectData,
   type ProjectInfo,
   type CloneState,
@@ -374,14 +379,27 @@ export function openNewItem(folder: string, host: DialogHost = 'panel'): void {
 }
 
 /** Writes the item's file from a template and opens it. Returns the error to show, '' on success. */
-export async function createItem(folder: string, title: string): Promise<string> {
+export async function createItem(folder: string, title: string, workflow = ''): Promise<string> {
   try {
-    const item = await API.NewItem(folder, title.trim())
+    const item = workflow ? await API.NewItemWith(folder, { title: title.trim(), workflow }) : await API.NewItem(folder, title.trim())
     useEditor.getState().openFile(item.path)
     void loadProject(folder)
     return ''
   } catch (err) {
     return errorMessage(err)
+  }
+}
+
+/**
+ * The workflows of a folder for New Item's select (the Workflows binding's List: a binding, not the feature's code).
+ * Empty while the Workflows feature is off. Returns the error to show too, '' when it worked.
+ */
+export async function listWorkflows(folder: string): Promise<{ options: WorkflowOption[]; error: string }> {
+  if (!isFeatureActive('workflows')) return { options: [], error: '' }
+  try {
+    return { options: workflowOptions((await WorkflowsAPI.List(folder)).workflows ?? []), error: '' }
+  } catch (err) {
+    return { options: [], error: errorMessage(err) }
   }
 }
 
@@ -412,6 +430,12 @@ export async function planWithAgent(folder: string, goal: string, agent: string)
   if (!id) return `No chat with ${agent} could be opened.`
   closeDialog()
   return ''
+}
+
+/** Opens the tab of a workflow run (the Workflows feature draws it; Projects only names it by id, through the tab store). */
+export function openWorkflowRun(id: string): void {
+  if (!isFeatureActive('workflows')) return showToast('The Workflows feature is off: switch it on to open this run', 'info')
+  useEditor.getState().openContributed(RUN_VIEW, id, 'Workflow run', runTabData(id))
 }
 
 export const openItemFile = (item: ItemInfo): void => useEditor.getState().openFile(item.path)

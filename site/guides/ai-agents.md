@@ -32,7 +32,7 @@ What a custom agent can and can't do:
 
 - It starts only in a [trusted folder](restricted-mode.md); in Restricted Mode Flint shows an error asking you to trust the folder.
 - Its questions use the same approval policy as Claude Code and Codex (see below).
-- Flint lets it read and write files only inside the chat's folder and never inside a `.git` folder (at any depth). Writes into agent or editor configuration (`.claude`, `.codex`, `.vscode`, `.idea`) ask you first in the chat. Flint offers it no terminal of its own. The agent still runs its own tools with your user's rights, as it does in a terminal.
+- Flint lets it read and write files only inside the chat's folder and never inside a `.git` folder (at any depth). Writes into agent or editor configuration (`.claude`, `.codex`, `.vscode`, `.idea`, and `.flint`, which holds the workflows, run configurations, agents, roles and prompts Flint itself runs) ask you first in the chat. Flint offers it no terminal of its own. The agent still runs its own tools with your user's rights, as it does in a terminal.
 - **Generate message** runs it once in the repository: Flint lets it read files there, declines every permission request and refuses writes sent through Flint. Its own tools and configuration are outside Flint's control: if the agent's settings let it edit files or run commands without asking, it can still do so, as in a terminal.
 - Conflict resolution runs an agent interactively in a terminal, which ACP agents don't have, so Claude Code or Codex does it (the button names which one). Without either installed, the button is hidden.
 - A chat with a custom agent can't continue the old conversation after a restart; Flint starts a new one and tells you.
@@ -270,6 +270,7 @@ You can also let an agent do a few things the way you do them in Flint, so the r
 | `send_http_request` | Sends one named request (`### name`) of a `.http` or `.rest` file in the folder, as saved on disk, optionally with an environment. Returns the status, the headers and the start of the body. | The file's response tab and history |
 | `run_sql_query` | Runs one reading statement (`SELECT`, `WITH`, `SHOW`, …) on a saved database connection, **only if that connection is read-only**, and returns up to 500 rows. | The connection's query history |
 | `add_project_item` | Adds one `todo` item to the backlog of a [Flint project](projects.md) whose folder is trusted: title, text, and optionally priority, agent, repositories, the items it waits for and whether one agent works in all its repositories. It can't change, delete, re-status or delegate items. Switch: **Add project items**. | The Projects panel and the item's file |
+| `delegate_project_item` | Delegates one ready item of a [Flint project](projects.md#what-agents-can-delegate) the chat's folder is in, exactly as your Delegate click does: agent tasks in every repository it names, run by its agent or workflow. Never an item that waits for others, never from a project whose folder is untrusted, never from an agent task's chat or worktree. Switch: **Delegate project items**. | The Projects panel, Agent Tasks and Workflows |
 
 **You are asked before every call.** Nothing an agent starts this way runs without your yes to that one call:
 

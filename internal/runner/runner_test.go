@@ -175,3 +175,24 @@ func TestToCRLF(t *testing.T) {
 		t.Errorf("toCRLF = %q", got)
 	}
 }
+
+func TestBannerAndStepEnv(t *testing.T) {
+	rec := newRecorder()
+	m := NewManager(rec)
+	only := sh("echo step $FLINT_STEP")
+	only.Env = []string{"FLINT_STEP=first"}
+	err := m.Start("b", Spec{Cwd: t.TempDir(), Banner: "Sandboxed\nno network", Steps: []runconfig.Command{only, sh("echo next $FLINT_STEP.")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res := rec.wait(t); res.Code != 0 {
+		t.Fatalf("result = %+v", res)
+	}
+	out := rec.output()
+	if !strings.HasPrefix(out, dim+"Sandboxed\r\nno network"+reset+"\r\n"+dim+"$ echo step") {
+		t.Errorf("the banner is not the first line: %q", out)
+	}
+	if !strings.Contains(out, "step first\r\n") || !strings.Contains(out, "next .\r\n") {
+		t.Errorf("a step's env is not its own: %q", out)
+	}
+}

@@ -16,7 +16,9 @@ import {
   Sigma,
   Sparkles,
   SquareCheck,
+  SquareKanban,
   SquareTerminal,
+  Workflow,
   type LucideIcon,
 } from '@flint-ide/ui/icons'
 
@@ -34,6 +36,8 @@ export const ICONS = {
   helm: ShipWheel, // ☸
   terminal: SquareTerminal, // ❯_
   sum: Sigma, // ∑
+  board: SquareKanban, // the Projects panel and board tab
+  workflow: Workflow, // the Workflows panel and run tab
   agents: Sparkles, // ✦ the Agents panel
   puzzle: Puzzle, // extensions, and panels whose icon Flint doesn't know
 } as const satisfies Record<string, LucideIcon>

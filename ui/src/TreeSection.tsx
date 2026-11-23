@@ -3,7 +3,7 @@ import { TreeRow } from './TreeRow'
 
 export type TreeSectionProps = {
   title: ReactNode
-  /** Number of items, right-aligned as a small Badge (hidden while the actions show). A string or node ("2/3") is shown as given. */
+  /** Number of items, right-aligned as a small muted count (hidden while the actions show). A string or node ("2/3") is shown as given. */
   count?: ReactNode
   /** Dimmed text after the title, e.g. the branch of a repository. */
   hint?: ReactNode

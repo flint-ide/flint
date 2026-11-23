@@ -68,6 +68,11 @@ type Policy struct {
 	// Protected are the places the macOS profile closes before it opens the
 	// paths above (Linux denies everything not listed anyway).
 	Protected []string
+	// DenyWrite are paths inside Write that may still not be written,
+	// created, renamed or removed (a script step's WorktreeProtected), in
+	// any letter case. Only the macOS profile can enforce it: Landlock has
+	// no "except" (the fingerprint of TakeFingerprint covers both).
+	DenyWrite []string
 	// Notes say what was asked for but not granted, and why.
 	Notes []string
 }

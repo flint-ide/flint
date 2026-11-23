@@ -1,9 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
-import { Badge, Button, IconButton, ListGroup, ListItem, TaskCard, TreeRow } from '@flint-ide/ui'
-import { X } from '@flint-ide/ui/icons'
+import { Badge, Button, ListGroup, ListItem, TaskCard, TreeRow } from '@flint-ide/ui'
 
-/** TaskCard: an agent task or a work item: state, title, meta, CI, notes, actions and sub-rows (ui/src/TaskCard.tsx). */
+/**
+ * TaskCard: an agent task or a work item: state, title, meta, CI, notes, actions and sub-rows (ui/src/TaskCard.tsx).
+ * The actions bar (the card's last line, always shown) is the one place an agent panel puts an item's actions: quiet
+ * words; `data-primary` on the one that waits for a person (Approve, Check again) gives it the accent's text colour.
+ * A card that opens on click or carries actions hovers and shows its selection as one unit, bar and sub-rows included.
+ */
 const meta = { title: 'Flint/Task Card', component: TaskCard } satisfies Meta<typeof TaskCard>
 
 export default meta
@@ -26,6 +30,7 @@ export const Playground: Story = {
     ci: { state: 'pending', title: '3 checks running' },
     actions: (
       <>
+        <Button variant="ghost" size="sm" data-primary>Approve</Button>
         <Button variant="ghost" size="sm">Open</Button>
         <Button variant="ghost" size="sm">Show diff</Button>
       </>
@@ -54,7 +59,7 @@ export const AgentTasks: Story = {
         <Button variant="ghost" size="sm">Open</Button>
         {extra && <Button variant="ghost" size="sm">{extra}</Button>}
         <span className="fui-grow" />
-        <IconButton variant="ghost" size="sm" aria-label="Remove the task"><X /></IconButton>
+        <Button variant="ghost" size="sm" title="Remove the task">Remove</Button>
       </>
     )
     return (

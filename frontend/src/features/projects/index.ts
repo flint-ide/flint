@@ -19,7 +19,7 @@ export default defineFeature({
   description: 'Plan work as items above your repositories, then Delegate them to agents. A panel and a board show the items and the agent tasks behind them.',
   panels: [
     {
-      id: 'projects', title: 'Projects', icon: 'checkbox', order: 34, component: ProjectsPanel,
+      id: 'projects', title: 'Projects', icon: 'board', order: 18, component: ProjectsPanel,
       command: { keywords: 'backlog items board plan work todo delegate agents tasks' },
     },
   ],
@@ -37,5 +37,5 @@ export default defineFeature({
     { id: 'projects.board', title: 'Show Project Board', category: 'Projects', keywords: 'kanban columns status drag', run: () => void showBoard() },
   ],
   activate: subscribeAutoStart,
-  tabKinds: [{ id: BOARD_VIEW, component: BoardView, icon: 'checkbox', restore: true }],
+  tabKinds: [{ id: BOARD_VIEW, component: BoardView, icon: 'board', restore: true }],
 })

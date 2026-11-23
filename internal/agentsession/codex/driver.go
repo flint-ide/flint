@@ -149,6 +149,9 @@ func (d *Driver) start(ctx context.Context, cwd, resumeID string, sink agentsess
 	}
 	env := buildEnv(opts.Env, mcp)
 	args, err := buildArgs(opts, opts.Untrusted != nil && opts.Untrusted(cwd), mcp)
+	if err == nil && agentsession.Reviewer(ctx) {
+		args, err = reviewerArgs(opts, mcp)
+	}
 	if err != nil {
 		mcp.Revoke()
 		return agentsession.SessionInfo{}, fmt.Errorf("codex: %w", err)
@@ -197,6 +200,21 @@ func buildArgs(opts Options, untrusted bool, mcp *agentsession.MCPServer) ([]str
 			"-c", prefix+"bearer_token_env_var="+strconv.Quote(agentsession.MCPTokenEnv))
 	}
 	return agent.ComposeArgs(agent.Codex, opts.ExtraArgs, args, untrusted)
+}
+
+// reviewerArgs is buildArgs for a reviewer chat (agentsession.WithReviewer):
+// the user's extra arguments are left out as in Restricted Mode (a relative
+// path in them resolves in the worktree under review) and the folder's
+// AGENTS.md files are not read (project_doc_max_bytes=0). Codex has no
+// switch for a project's .codex/config.toml: it reads it only in a project
+// the user trusted in Codex itself, and Flint keeps a script step from
+// changing it (sandbox.WorktreeProtected) and asks before an agent edits it.
+func reviewerArgs(opts Options, mcp *agentsession.MCPServer) ([]string, error) {
+	args, err := buildArgs(opts, true, mcp)
+	if err != nil {
+		return nil, err
+	}
+	return append(args, "-c", "project_doc_max_bytes=0"), nil
 }
 
 func (d *Driver) register(id string, s *session) error {

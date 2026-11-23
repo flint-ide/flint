@@ -23,7 +23,7 @@ import { MarkerBadge, TaskStateBadge } from './badges'
 import { TaskCIFix, TaskReviewComments, useTaskCIBadge } from './TaskCI'
 import { CompareView } from './CompareView'
 import { Button, IconButton, ListGroup, PanelHeader, TaskCard, TreeRow } from '@flint-ide/ui'
-import { Plus, X } from '@flint-ide/ui/icons'
+import { Plus } from '@flint-ide/ui/icons'
 
 const basename = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 
@@ -176,9 +176,9 @@ function TaskActions({ t, open, busy, keep }: { t: TaskView; open: boolean; busy
       <TaskCIFix t={t} />
       <TaskReviewComments t={t} />
       <span className="fui-grow" />
-      <IconButton variant="ghost" size="sm" aria-label="Remove the task" disabled={busy} title="Remove the task" onClick={() => void removeTask(t)}>
-        <X />
-      </IconButton>
+      <Button variant="ghost" size="sm" disabled={busy} title="Remove the task" onClick={() => void removeTask(t)}>
+        Remove
+      </Button>
     </>
   )
 }

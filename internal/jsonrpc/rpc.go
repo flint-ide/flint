@@ -216,23 +216,43 @@ func (c *Conn) Call(ctx context.Context, method string, params, result any) erro
 	if err := c.send(ctx, request{JSONRPC: "2.0", ID: &id, Method: method, Params: params}); err != nil {
 		return err
 	}
+	msg, err := c.await(ctx, id, ch)
+	if err != nil {
+		return err
+	}
+	if msg.Error != nil {
+		return msg.Error
+	}
+	if result == nil {
+		return nil
+	}
+	if err := json.Unmarshal(msg.Result, result); err != nil {
+		return fmt.Errorf("%s: invalid result: %w", method, err)
+	}
+	return nil
+}
+
+// await waits for the response on ch. A response that arrived wins over the
+// connection's end: the other side commonly answers and closes at once (one
+// request per connection), and Serve delivers the answer to ch before it
+// reads the end and closes done, so both can be ready by the time we look.
+// select picks among ready cases at random, so done is only taken as the
+// answer when ch is still empty after it. When ctx ends first, the request
+// is cancelled with $/cancelRequest.
+func (c *Conn) await(ctx context.Context, id int64, ch <-chan *message) (*message, error) {
 	select {
 	case msg := <-ch:
-		if msg.Error != nil {
-			return msg.Error
-		}
-		if result == nil {
-			return nil
-		}
-		if err := json.Unmarshal(msg.Result, result); err != nil {
-			return fmt.Errorf("%s: invalid result: %w", method, err)
-		}
-		return nil
+		return msg, nil
 	case <-ctx.Done():
 		_ = c.Notify("$/cancelRequest", map[string]int64{"id": id})
-		return ctx.Err()
+		return nil, ctx.Err()
 	case <-c.done:
-		return c.err
+		select {
+		case msg := <-ch:
+			return msg, nil
+		default:
+			return nil, c.err
+		}
 	}
 }
 

@@ -18,6 +18,7 @@ import (
 	"flint/internal/accounts"
 	"flint/internal/agentsession"
 	"flint/internal/agenttask"
+	"flint/internal/cli/clisock"
 	"flint/internal/config"
 	"flint/internal/dap"
 	"flint/internal/feature"
@@ -162,6 +163,9 @@ type App struct {
 	// noticeProblems is the last problem told about each chat whose notice
 	// from Flint did not arrive (chat id → text), so it is told once.
 	noticeProblems sync.Map
+	// cliServer serves the flint command line (cli_server.go); nil until
+	// launched, and in the server build.
+	cliServer atomic.Pointer[clisock.Server]
 }
 
 // notifier sends a desktop notification; clicking it shows tab ("" for none).
@@ -252,6 +256,7 @@ func (a *App) startup(ctx context.Context) {
 		go a.background.connect() // terminal calls wait for it, startup does not
 	}
 	a.features.Start(ctx)
+	a.startCLI() // after the features: their commands are ready
 }
 
 func (a *App) shutdown() {
@@ -271,6 +276,7 @@ func (a *App) shutdown() {
 		a.profiles.closeAll,
 		a.closeProject,
 		a.closeUsage,
+		a.closeCLI,
 	}, a.features.Closers()...) {
 		wg.Add(1)
 		go func(stop func()) {

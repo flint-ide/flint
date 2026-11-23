@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"flint/internal/agenttask"
 	"flint/internal/feature"
@@ -30,6 +31,13 @@ const (
 // (taskQueue.held): the queue starts none of them, so a rollback never
 // removes a task whose chat is running, and the slots they hold do not run
 // out while the other requests are created.
+//
+// A request that names a workflow is planned by the feature that owns
+// workflows (feature.Set.TaskWorkflow) before any task is made, every one of
+// them, so a refusal creates nothing; its task's agent is the planned one.
+// The planned runs get their tasks (Bind) once all tasks exist and before
+// any chat starts, so the first chat's context (TaskContext) knows its run;
+// when the call fails, they are dropped.
 func (h featureHost) CreateAgentTasks(ctx context.Context, reqs []feature.NewAgentTask) ([]feature.AgentTask, error) {
 	a := h.a
 	if len(reqs) == 0 {
@@ -38,6 +46,51 @@ func (h featureHost) CreateAgentTasks(ctx context.Context, reqs []feature.NewAge
 	if len(reqs) > maxFeatureTasks {
 		return nil, fmt.Errorf("at most %d agent tasks at once", maxFeatureTasks)
 	}
+	reqs, planned, err := a.planWorkflows(ctx, reqs)
+	if err != nil {
+		return nil, err
+	}
+	made, err := h.createFeatureTasks(ctx, reqs, planned)
+	if err != nil {
+		dropWorkflows(planned)
+		return nil, err
+	}
+	return made, nil
+}
+
+// planWorkflows plans the run of every request that names a workflow and
+// gives its task the run's first agent; when one is refused, the runs
+// planned so far are dropped.
+func (a *App) planWorkflows(ctx context.Context, reqs []feature.NewAgentTask) ([]feature.NewAgentTask, []feature.PlannedWorkflow, error) {
+	planned := make([]feature.PlannedWorkflow, len(reqs))
+	out := slices.Clone(reqs)
+	for i, req := range reqs {
+		if req.Workflow == "" {
+			continue
+		}
+		p, err := a.features.TaskWorkflow(ctx, req)
+		if err != nil {
+			dropWorkflows(planned)
+			return nil, nil, fmt.Errorf("%s: %w", req.Dir, err)
+		}
+		planned[i], out[i].Agent = p, p.Agent
+	}
+	return out, planned, nil
+}
+
+// dropWorkflows forgets planned runs whose tasks were not made.
+func dropWorkflows(planned []feature.PlannedWorkflow) {
+	for _, p := range planned {
+		if p.Drop != nil {
+			p.Drop()
+		}
+	}
+}
+
+// createFeatureTasks is CreateAgentTasks once the workflows are planned
+// (planned[i] belongs to reqs[i]; zero for a request without one).
+func (h featureHost) createFeatureTasks(ctx context.Context, reqs []feature.NewAgentTask, planned []feature.PlannedWorkflow) ([]feature.AgentTask, error) {
+	a := h.a
 	type group struct {
 		r     *git.Repo
 		tasks []agenttask.Task
@@ -70,6 +123,22 @@ func (h featureHost) CreateAgentTasks(ctx context.Context, reqs []feature.NewAge
 			a.queue.afterRequest(i + 1)
 		}
 	}
+	for i, p := range planned {
+		if p.Bind == nil {
+			continue
+		}
+		// Still held: no chat of these tasks has started.
+		if err := p.Bind(groups[i].tasks[0].ID); err != nil {
+			uctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), gitTimeout)
+			for _, g := range groups {
+				a.discardTasks(uctx, g.r, g.tasks)
+			}
+			cancel()
+			a.unhold(all)
+			a.tasksChanged()
+			return nil, fmt.Errorf("%s: %w", reqs[i].Dir, err)
+		}
+	}
 	for _, task := range all {
 		if !task.Queued {
 			a.reserveStart(task.ID) // their starts begin now: startGrace counts from here
@@ -82,7 +151,7 @@ func (h featureHost) CreateAgentTasks(ctx context.Context, reqs []feature.NewAge
 	var out []feature.AgentTask
 	for _, g := range groups {
 		for _, task := range g.tasks {
-			out = append(out, featureTask(api.view(vctx, g.r, task)))
+			out = append(out, a.withRun(featureTask(api.view(vctx, g.r, task))))
 			if task.Queued {
 				continue
 			}
@@ -108,6 +177,9 @@ func (h featureHost) CreateJointAgentTasks(ctx context.Context, reqs []feature.N
 	a := h.a
 	jreqs := make([]jointRequest, len(reqs))
 	for i, req := range reqs {
+		if req.Workflow != "" {
+			return nil, fmt.Errorf("%s: %w", req.Dir, feature.ErrJointWorkflow)
+		}
 		if req.Agent != "" && req.Agent != agentName {
 			return nil, fmt.Errorf("%s: a joint agent task has one agent, %s, not %s", req.Dir, agentName, req.Agent)
 		}
@@ -187,10 +259,10 @@ func (h featureHost) AgentTasks(ctx context.Context, ids []string) map[string]fe
 			repos[task.Checkout] = r
 		}
 		if r == nil { // the checkout is gone: no git facts, the rest as known
-			out[id] = storedFeatureTask(a, task)
+			out[id] = a.withRun(storedFeatureTask(a, task))
 			continue
 		}
-		out[id] = featureTask(api.view(ctx, r, task))
+		out[id] = a.withRun(featureTask(api.view(ctx, r, task)))
 	}
 	return out
 }
@@ -201,6 +273,12 @@ func featureTask(v TaskView) feature.AgentTask {
 		State: v.State, Error: v.Error, PullRequest: v.PullRequest, Merged: v.Merged, Stale: v.Stale,
 		Joint: v.Joint, Lead: v.Lead,
 	}
+}
+
+// withRun fills in the workflow run that takes the task, if one does.
+func (a *App) withRun(t feature.AgentTask) feature.AgentTask {
+	t.Run = a.features.TaskRun(t.ID)
+	return t
 }
 
 // storedFeatureTask is a task whose checkout can't be opened: no git facts,
@@ -232,6 +310,20 @@ func (h featureHost) Repository(ctx context.Context, dir string) (feature.Reposi
 		out.Remotes = append(out.Remotes, rm.URL)
 	}
 	return out, nil
+}
+
+// CheckTaskWorkflow is every check of req's workflow that CreateAgentTasks
+// makes (planWorkflows), planning nothing (feature.Set.TaskWorkflowCheck).
+func (h featureHost) CheckTaskWorkflow(ctx context.Context, req feature.NewAgentTask) error {
+	if err := h.a.features.TaskWorkflowCheck(ctx, req); err != nil {
+		return fmt.Errorf("%s: %w", req.Dir, err)
+	}
+	return nil
+}
+
+// FolderProjects are the projects dir is in (feature.Set.FolderProjects).
+func (h featureHost) FolderProjects(ctx context.Context, dir string) feature.FolderProjects {
+	return h.a.features.FolderProjects(ctx, dir)
 }
 
 // TaskOrigin is the origin of the task the chat works for: the tasks the

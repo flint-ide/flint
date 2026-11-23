@@ -151,6 +151,16 @@ export function NewItem(folder: string, title: string): $CancellablePromise<$mod
 }
 
 /**
+ * NewItemWith is NewItem with the workflow named in the item's front matter
+ * (a `workflow:` line, checked like the parser checks it).
+ */
+export function NewItemWith(folder: string, req: $models.NewItemRequest): $CancellablePromise<$models.ItemView> {
+    return $Call.ByID(3441138136, folder, req).then(($result: any) => {
+        return $$createType5($result);
+    });
+}
+
+/**
  * Open remembers a folder that holds flint-project.json (Open Project…; the
  * UI asks for the folder with WorkspaceAPI.PickFolder).
  */

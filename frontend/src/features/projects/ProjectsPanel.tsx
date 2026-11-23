@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Dropdown } from '../../components/ui/Dropdown'
+import { getCommand, runCommandById } from '../../lib/commands'
 import { Select } from '../../components/ui/Select'
 import { ProjectDialogs } from './Dialogs'
 import { ItemCard, OldFormatNote, ProjectContext } from './ItemParts'
@@ -74,6 +75,7 @@ export function ProjectsPanel() {
                 { label: 'New Project…', onSelect: () => void newProject() },
                 { label: 'Plan with Agent…', disabled: !info || oldFormat, hint: oldFormat ? 'old format' : undefined, onSelect: () => openPlan(selected) },
                 { label: 'Show Board', disabled: !info, onSelect: () => info && openBoard(info) },
+                ...(getCommand('workflows.run') ? [{ label: 'Run Workflow…', onSelect: () => runCommandById('workflows.run') }] : []),
                 { type: 'separator' },
                 { label: 'Close Project', disabled: !canClose(info), hint: info?.workspace ? 'workspace folder' : undefined, onSelect: () => info && void closeProject(info) },
               ]}
@@ -142,7 +144,7 @@ export function ProjectsPanel() {
 /** The note on a project whose folder is not trusted: agents don't read it, and Delegate asks first. */
 function Untrusted({ info }: { info: ProjectInfo }) {
   return (
-    <div className="project-untrusted" role="status">
+    <div className="restricted-note" role="status">
       <MarkerBadge tone="warn">Restricted Mode</MarkerBadge>
       <span className="muted">
         This project&apos;s folder is not trusted: agents can&apos;t read it with get_project, and Delegate shows you each item before it sends it.
@@ -253,7 +255,7 @@ function Groups({ project, collapsed }: { project: ProjectData; collapsed: Recor
 /** Files Flint could not use, each with the hand-off to the agent. */
 function Problems({ project }: { project: ProjectData }) {
   return (
-    <div className="project-problems">
+    <div className="panel-section-divided">
       <TreeRow emphasis="group" label="Problems" badge={project.problems.length} />
       {project.problems.map((p: ProblemInfo, i) => (
         <TaskCard

@@ -127,6 +127,17 @@ export function runCommand(cmd: Command): void {
   }
 }
 
+/**
+ * Runs a command by id, the way a feature starts one of another feature without importing its code.
+ * False when no such command is registered or it is not available (that feature is off).
+ */
+export function runCommandById(id: string): boolean {
+  const cmd = getCommand(id)
+  if (!cmd || !isAvailable(cmd)) return false
+  runCommand(cmd)
+  return true
+}
+
 const MODIFIERS: Record<string, keyof Omit<Chord, 'key'>> = {
   cmd: 'meta', meta: 'meta', super: 'meta', ctrl: 'ctrl', control: 'ctrl', alt: 'alt', option: 'alt', shift: 'shift',
 }

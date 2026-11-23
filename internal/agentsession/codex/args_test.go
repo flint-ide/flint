@@ -156,3 +156,17 @@ func TestSettingsAreReadOnStart(t *testing.T) {
 		t.Errorf("Start with reserved extra argument: %v", err)
 	}
 }
+
+// A reviewer chat's app-server reads no AGENTS.md and gets none of the
+// user's extra arguments; Flint's own overrides stay.
+func TestReviewerArgs(t *testing.T) {
+	opts := Options{Config: []string{"model_verbosity=low"}, ExtraArgs: []string{"-c", "model_reasoning_effort=high"}}
+	got, err := reviewerArgs(opts, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"app-server", "-c", "model_verbosity=low", "-c", "project_doc_max_bytes=0"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("reviewerArgs() = %q, want %q", got, want)
+	}
+}

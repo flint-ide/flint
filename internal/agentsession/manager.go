@@ -47,8 +47,9 @@ func (p Policy) autoApproves(tc ToolCall, cwd string, folders ...string) bool {
 // protectedDirs are never touched without asking, even inside the project.
 // Each matches a path component at any depth (vendor/x/.git/config, a new
 // x/.git that makes a repository) in any letter case: macOS file systems
-// ignore case, so .GIT is the same directory.
-var protectedDirs = []string{".git", ".claude", ".codex", ".vscode", ".idea"}
+// ignore case, so .GIT is the same directory. .flint holds what Flint itself
+// runs or injects (workflows, run configurations, agents, roles, prompts).
+var protectedDirs = []string{".git", ".claude", ".codex", ".vscode", ".idea", ".flint"}
 
 // allInside reports whether paths is non-empty and every path stays inside cwd
 // or one of folders (after cleaning; relative paths resolve against cwd) and
@@ -163,6 +164,9 @@ type managed struct {
 	cancel  context.CancelFunc // non-nil while a turn runs
 	// turn: a turn_start was emitted and its turn_end not yet (Prompt).
 	turn bool
+	// reviewer: the chat reviews another agent's code (WithReviewer); no
+	// permission request of it is answered without the user.
+	reviewer bool
 }
 
 // NewManager creates a manager that forwards events to emit.
@@ -314,7 +318,7 @@ func (m *Manager) open(ctx context.Context, agent string, d Driver, cwd string, 
 	if d == nil {
 		return SessionInfo{}, fmt.Errorf("unknown agent %q", agent)
 	}
-	s := &managed{agent: agent, cwd: cwd, folders: Folders(ctx), driver: d}
+	s := &managed{agent: agent, cwd: cwd, folders: Folders(ctx), driver: d, reviewer: Reviewer(ctx)}
 	var sessionID string
 	var idMu sync.Mutex
 	slot := &CallerSlot{}
@@ -390,6 +394,14 @@ func (m *Manager) route(s *managed, e Event) {
 		if !open {
 			return
 		}
+	}
+	if e.Kind == KindPermission && e.Permission != nil && s.reviewer {
+		// A reviewer chat: the user answers every request (WithReviewer).
+		if req, acts := m.gateAction(e.SessionID, s.cwd, *e.Permission); acts {
+			e.Permission = &req
+		}
+		m.emit(e)
+		return
 	}
 	if e.Kind == KindPermission && e.Permission != nil {
 		if opt, ok := m.grantedOption(e.SessionID, *e.Permission); ok {

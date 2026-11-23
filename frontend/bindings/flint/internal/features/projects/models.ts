@@ -167,6 +167,12 @@ export class ItemView {
      * joint group of agent tasks, one chat) instead of one per repository.
      */
     "together": boolean;
+
+    /**
+     * Workflow is the workflow that takes each of the item's agent tasks
+     * ("" = one agent per task).
+     */
+    "workflow": string;
     "body": string;
 
     /**
@@ -233,6 +239,9 @@ export class ItemView {
         if (!("together" in $$source)) {
             this["together"] = false;
         }
+        if (!("workflow" in $$source)) {
+            this["workflow"] = "";
+        }
         if (!("body" in $$source)) {
             this["body"] = "";
         }
@@ -272,27 +281,61 @@ export class ItemView {
      */
     static createFrom($$source: any = {}): ItemView {
         const $$createField5_0 = $$createType3;
-        const $$createField11_0 = $$createType2;
-        const $$createField12_0 = $$createType3;
+        const $$createField12_0 = $$createType2;
         const $$createField13_0 = $$createType3;
-        const $$createField16_0 = $$createType5;
+        const $$createField14_0 = $$createType3;
+        const $$createField17_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("repos" in $$parsedSource) {
             $$parsedSource["repos"] = $$createField5_0($$parsedSource["repos"]);
         }
         if ("tasks" in $$parsedSource) {
-            $$parsedSource["tasks"] = $$createField11_0($$parsedSource["tasks"]);
+            $$parsedSource["tasks"] = $$createField12_0($$parsedSource["tasks"]);
         }
         if ("after" in $$parsedSource) {
-            $$parsedSource["after"] = $$createField12_0($$parsedSource["after"]);
+            $$parsedSource["after"] = $$createField13_0($$parsedSource["after"]);
         }
         if ("waitingFor" in $$parsedSource) {
-            $$parsedSource["waitingFor"] = $$createField13_0($$parsedSource["waitingFor"]);
+            $$parsedSource["waitingFor"] = $$createField14_0($$parsedSource["waitingFor"]);
         }
         if ("waiting" in $$parsedSource) {
-            $$parsedSource["waiting"] = $$createField16_0($$parsedSource["waiting"]);
+            $$parsedSource["waiting"] = $$createField17_0($$parsedSource["waiting"]);
         }
         return new ItemView($$parsedSource as Partial<ItemView>);
+    }
+}
+
+/**
+ * NewItemRequest is what New Item asks for: the title and, optionally, the
+ * workflow that takes the item's agent tasks.
+ */
+export class NewItemRequest {
+    "title": string;
+
+    /**
+     * Workflow is a workflow's name ("" = none): lowercase letters, digits and
+     * dashes.
+     */
+    "workflow": string;
+
+    /** Creates a new NewItemRequest instance. */
+    constructor($$source: Partial<NewItemRequest> = {}) {
+        if (!("title" in $$source)) {
+            this["title"] = "";
+        }
+        if (!("workflow" in $$source)) {
+            this["workflow"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new NewItemRequest instance from a string or object.
+     */
+    static createFrom($$source: any = {}): NewItemRequest {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new NewItemRequest($$parsedSource as Partial<NewItemRequest>);
     }
 }
 
@@ -658,6 +701,17 @@ export class TaskView {
     "joint": string;
     "lead": boolean;
 
+    /**
+     * Workflow, Run and RunState are the workflow run that takes the task
+     * ("" when none): its workflow, its id (open it in the Workflows panel)
+     * and its state, which the item's status follows: running or paused
+     * (working), waiting (a gate waits for the user), done, failed or
+     * stopped. For a removed task, or a removed run, as last seen.
+     */
+    "workflow": string;
+    "run": string;
+    "runState": string;
+
     /** Creates a new TaskView instance. */
     constructor($$source: Partial<TaskView> = {}) {
         if (!("id" in $$source)) {
@@ -701,6 +755,15 @@ export class TaskView {
         }
         if (!("lead" in $$source)) {
             this["lead"] = false;
+        }
+        if (!("workflow" in $$source)) {
+            this["workflow"] = "";
+        }
+        if (!("run" in $$source)) {
+            this["run"] = "";
+        }
+        if (!("runState" in $$source)) {
+            this["runState"] = "";
         }
 
         Object.assign(this, $$source);

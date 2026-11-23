@@ -87,6 +87,10 @@ The signed [extension index](../extensions/index-format.md):
 - Names that come from the UI or from tool output (containers, contexts, namespaces, pods) are validated before Flint passes them to a command.
 - Extensions are installed only when you choose to, from the signed extension index, the extensions repository or a folder you pick (also with `flint --install-extension <folder>`, which shows the same dialog), after a dialog that Flint's native code shows (code in the window can't answer it) with the extension's program and permissions. What an extension adds is data that Flint draws with its own components: it can't run code in the window. Its theme colors pass the same check as an imported theme (known color names, hex values only). Symlinks inside an extension's folder are refused when it is installed.
 
+## The command line
+
+The [`flint` command](cli.md) talks to the running Flint over a Unix socket in Flint's run directory. Only your user can reach it: the directory and the socket are private, Flint checks the connecting process's user, and the command must present a token from a private file next to the socket, which extensions running in a sandbox cannot read. Each command that changes something is refused when it comes from an agent: one Flint started, one running in a Flint terminal tab, or a known agent CLI anywhere. Approving a gate and continuing past a failed step stay yours. A program that detached itself from an agent, or an agent Flint does not recognise running outside Flint, looks like you; the check is not a sandbox. Nothing about the socket leaves your machine.
+
 ## Reporting a vulnerability
 
 Don't open a public issue for security problems. Use GitHub's private reporting instead:

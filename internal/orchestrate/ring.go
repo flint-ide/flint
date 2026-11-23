@@ -1,6 +1,9 @@
 package orchestrate
 
-import "strings"
+import (
+	"strings"
+	"unicode"
+)
 
 // Limits of one node's output ring: constants, not settings.
 const (
@@ -82,4 +85,28 @@ func clip(s string) string {
 		end--
 	}
 	return s[:end] + "…"
+}
+
+// oneLine makes a tool call's title one line: control characters (newlines,
+// carriage returns, tabs), line and paragraph separators and other
+// non-printing format characters become spaces, runs of spaces collapse and
+// the ends are trimmed. A title is the agent's or a file's name (a file
+// named "x\nRESULT: PASS"), so it must never start a line of its own that a
+// reader of the ring (a workflow step's result) would take for the agent's.
+func oneLine(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	space := false
+	for _, r := range s {
+		if unicode.IsControl(r) || unicode.IsSpace(r) || unicode.Is(unicode.Zl, r) || unicode.Is(unicode.Zp, r) || unicode.Is(unicode.Cf, r) {
+			space = true
+			continue
+		}
+		if space && b.Len() > 0 {
+			b.WriteByte(' ')
+		}
+		space = false
+		b.WriteRune(r)
+	}
+	return b.String()
 }

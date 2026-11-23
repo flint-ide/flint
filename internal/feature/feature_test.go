@@ -121,3 +121,90 @@ func TestSetTaskContext(t *testing.T) {
 		t.Error("a nil set gave context")
 	}
 }
+
+func TestSetRoutesWorkflowsToTheOneModuleThatTakesThem(t *testing.T) {
+	var nilSet *Set
+	if _, err := nilSet.TaskWorkflow(context.Background(), NewAgentTask{Workflow: "bug-fix"}); err != ErrWorkflowsOff {
+		t.Errorf("a nil set: %v", err)
+	}
+	if r := nilSet.TaskRun("t1"); r != (TaskRun{}) {
+		t.Errorf("a nil set's run: %+v", r)
+	}
+	plain := Module{ID: "plain", New: func(Host) Instance { return Instance{} }}
+	s := New([]Module{plain}, nil)
+	if _, err := s.TaskWorkflow(context.Background(), NewAgentTask{Workflow: "bug-fix"}); err == nil ||
+		err.Error() != "workflows are switched off (Settings ▸ Extensions ▸ Built-in)" {
+		t.Errorf("no module takes workflows: %v", err)
+	}
+	var asked []string
+	flows := Module{ID: "flows", New: func(Host) Instance {
+		return Instance{
+			TaskWorkflow: func(_ context.Context, req NewAgentTask) (PlannedWorkflow, error) {
+				asked = append(asked, req.Workflow)
+				return PlannedWorkflow{Agent: "codex"}, nil
+			},
+			TaskRun: func(id string) (TaskRun, bool) {
+				return TaskRun{ID: "r1", Workflow: "bug-fix", State: "waiting"}, id == "t1"
+			},
+		}
+	}}
+	s = New([]Module{plain, flows}, nil)
+	p, err := s.TaskWorkflow(context.Background(), NewAgentTask{Workflow: "bug-fix"})
+	if err != nil || p.Agent != "codex" || !slices.Equal(asked, []string{"bug-fix"}) {
+		t.Errorf("planned %+v, %v (asked %v)", p, err, asked)
+	}
+	if r := s.TaskRun("t1"); r.State != "waiting" || r.Workflow != "bug-fix" {
+		t.Errorf("TaskRun(t1) = %+v", r)
+	}
+	if r := s.TaskRun("t2"); r != (TaskRun{}) {
+		t.Errorf("TaskRun(t2) = %+v", r)
+	}
+}
+
+func TestTaskContextJoinsInListOrder(t *testing.T) {
+	mod := func(id string) Module {
+		return Module{ID: id, New: func(Host) Instance {
+			return Instance{TaskContext: func(context.Context, TaskStart) string { return "[" + id + "]" }}
+		}}
+	}
+	s := New([]Module{mod("projects"), mod("workflows")}, nil)
+	if got := s.TaskContext(context.Background(), TaskStart{Origin: "x", TaskID: "t"}); got != "[projects]\n\n[workflows]" {
+		t.Errorf("TaskContext = %q", got)
+	}
+}
+
+func TestSetChecksWorkflowsAndJoinsFolderProjects(t *testing.T) {
+	var nilSet *Set
+	if err := nilSet.TaskWorkflowCheck(context.Background(), NewAgentTask{Workflow: "bug-fix"}); err != ErrWorkflowsOff {
+		t.Errorf("a nil set: %v", err)
+	}
+	if fp := nilSet.FolderProjects(context.Background(), "/a"); len(fp.Names)+len(fp.Tasks) != 0 {
+		t.Errorf("a nil set's projects: %+v", fp)
+	}
+	var checked []string
+	flows := Module{ID: "flows", New: func(Host) Instance {
+		return Instance{TaskWorkflowCheck: func(_ context.Context, req NewAgentTask) error {
+			checked = append(checked, req.DelegatedBy)
+			return nil
+		}}
+	}}
+	plan := Module{ID: "plan", New: func(Host) Instance {
+		return Instance{FolderProjects: func(_ context.Context, dir string) FolderProjects {
+			if dir != "/a" {
+				return FolderProjects{}
+			}
+			return FolderProjects{Names: []string{"Acme"}, Tasks: []string{"t1", "t2"}}
+		}}
+	}}
+	s := New([]Module{plan}, nil)
+	if err := s.TaskWorkflowCheck(context.Background(), NewAgentTask{Workflow: "x"}); err != ErrWorkflowsOff {
+		t.Errorf("no module takes workflows: %v", err)
+	}
+	s = New([]Module{plan, flows}, nil)
+	if err := s.TaskWorkflowCheck(context.Background(), NewAgentTask{Workflow: "x", DelegatedBy: "an agent"}); err != nil || !slices.Equal(checked, []string{"an agent"}) {
+		t.Errorf("checked %v, %v", checked, err)
+	}
+	if fp := s.FolderProjects(context.Background(), "/a"); !slices.Equal(fp.Names, []string{"Acme"}) || !slices.Equal(fp.Tasks, []string{"t1", "t2"}) {
+		t.Errorf("projects %+v", fp)
+	}
+}

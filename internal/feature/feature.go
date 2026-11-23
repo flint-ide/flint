@@ -30,6 +30,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"flint/internal/cli"
 	"flint/internal/mcpserver"
 	"flint/internal/settings"
 	"flint/internal/terminal"
@@ -89,13 +90,115 @@ type Instance struct {
 	// is called once per chat, from the goroutine that starts it, so it may
 	// read files and the Host's agent tasks; it must not ask the user.
 	TaskContext func(ctx context.Context, start TaskStart) string
+	// TaskWorkflow is offered by the feature that owns workflows. It is
+	// asked by CreateAgentTasks, for every request that names a workflow
+	// and before any task is created, to take the task: it checks the
+	// request (the workflow exists for Dir, can run, its agents are
+	// available, Dir is trusted) and plans the run, which nobody sees until
+	// it is bound. Its answer says who takes the task's first chat, what to
+	// do once the task exists (Bind, before the chat starts, so TaskContext
+	// knows the run) and when the creation failed (Drop). It must not ask
+	// the user.
+	TaskWorkflow func(ctx context.Context, req NewAgentTask) (PlannedWorkflow, error)
+	// TaskWorkflowCheck is offered by the feature that owns workflows with
+	// TaskWorkflow: every check TaskWorkflow makes for req, planning nothing
+	// and asking nothing (an agent's delegation is checked before the user
+	// is asked to approve it). It must not ask the user.
+	TaskWorkflowCheck func(ctx context.Context, req NewAgentTask) error
+	// FolderProjects is offered by the feature that owns projects: the
+	// projects whose folder is trusted that the workspace folder dir is
+	// "in" (the project's folder is dir or inside it, or dir's checkout has
+	// a remote that is one of the project's repositories) and the agent
+	// tasks linked to their items. Nothing for an agent task's worktree. It
+	// lets the feature that owns workflows scope a coordinating agent to
+	// its projects' runs. It must return quickly and must not ask the user.
+	FolderProjects func(ctx context.Context, dir string) FolderProjects
+	// TaskRun is the workflow run that takes the agent task with this id
+	// (the feature that owns workflows answers), ok false when none does.
+	// It must return quickly: it is asked for every task Host.AgentTasks
+	// reads.
+	TaskRun func(taskID string) (run TaskRun, ok bool)
+	// TaskStartCheck is asked before Flint starts the chat of an agent task
+	// by itself (the queue, Start now, a feature's create, a restart): an
+	// error refuses the start, and the task stays off the queue without a
+	// chat (the error is logged). The feature that owns workflows refuses
+	// the task of a run that is over or that it does not know, so a stopped
+	// run never starts an agent later. It must return quickly and must not
+	// ask the user.
+	TaskStartCheck func(start TaskStart) error
+	// TaskChatStarted tells the feature which chat Flint opened for an
+	// agent task's start (start as TaskContext got it), right after the
+	// chat registered and before its first message is sent, so the chat's
+	// end can never come before the feature knows the chat. It must return
+	// quickly.
+	TaskChatStarted func(start TaskStart, chat string)
+	// CLI are the feature's commands of the flint command line (package
+	// cli): each calls the functions the feature's bound API calls, and says
+	// whether it reads or acts.
+	CLI []cli.Command
 }
+
+// CLI are every module's commands, in list order.
+func (s *Set) CLI() []cli.Command {
+	if s == nil {
+		return nil
+	}
+	var out []cli.Command
+	for _, p := range s.parts {
+		out = append(out, p.CLI...)
+	}
+	return out
+}
+
+// PlannedWorkflow is a workflow run planned for an agent task that does not
+// exist yet (Instance.TaskWorkflow).
+type PlannedWorkflow struct {
+	// Agent takes the task's first chat: the first step's agent, else the
+	// run's (the request's Agent, else the default one).
+	Agent string
+	// Bind gives the run its task, once every task of the call exists and
+	// before any of their chats start. An error rolls the call back.
+	Bind func(taskID string) error
+	// Drop forgets the run: its task was not created, or the call was
+	// rolled back after Bind. Never called once the call succeeded.
+	Drop func()
+}
+
+// FolderProjects are the projects a workspace folder is in
+// (Instance.FolderProjects).
+type FolderProjects struct {
+	// Names are the projects' names, Tasks the ids of the agent tasks
+	// linked to their items (removed ones left out).
+	Names, Tasks []string
+}
+
+// TaskRun is the workflow run that takes an agent task (AgentTask.Run).
+type TaskRun struct {
+	// ID is the run's id, Workflow the workflow's name.
+	ID, Workflow string
+	// State is the run's: running, waiting (a gate waits for the user),
+	// failed, paused, done or stopped.
+	State string
+	// AtLastStep: the run's current step is its last one, so a run that
+	// waits at a gate here has nothing left for agents to do.
+	AtLastStep bool
+}
+
+// ErrWorkflowsOff is CreateAgentTasks' refusal of a request that names a
+// workflow while no feature takes workflows.
+var ErrWorkflowsOff = errors.New("workflows are switched off (Settings ▸ Extensions ▸ Built-in)")
+
+// ErrJointWorkflow is CreateJointAgentTasks' refusal of a request that names
+// a workflow: a run takes one task in one repository.
+var ErrJointWorkflow = errors.New("a workflow runs in one repository: a joint agent task cannot take one")
 
 // TaskStart is the chat of an agent task Flint is starting, for
 // Instance.TaskContext.
 type TaskStart struct {
 	// Origin is the NewAgentTask.Origin the task was made with (never "").
 	Origin string
+	// TaskID is the agent task whose chat starts (a joint group's lead).
+	TaskID string
 	// Worktree is where the chat runs (the lead's for a joint group), Branch
 	// its branch and Base the branch it started from.
 	Worktree, Branch, Base string
@@ -135,6 +238,11 @@ type Host interface {
 	OpenURL(link string) error
 	// Version is Flint's version ("v1.2.0", or "dev…" for builds from source).
 	Version() string
+	// TasksChanged tells Flint that something the agent tasks show changed
+	// (a workflow run that takes a task moved on): the UI hears
+	// "tasks:changed" and every feature's TasksChanged hook runs. It must
+	// not be called with a lock the hooks take.
+	TasksChanged()
 	// LoadState decodes the feature's state.json key into v (left as is when
 	// the key is absent); SaveState replaces it. Keys must be in Module.State.
 	LoadState(key string, v any) error
@@ -175,11 +283,178 @@ type Host interface {
 	Repository(ctx context.Context, dir string) (Repository, error)
 	// Agents are the agents that can start now and the default one.
 	Agents() Agents
+	// CheckTaskWorkflow makes every check CreateAgentTasks would make for
+	// req's workflow (Instance.TaskWorkflowCheck of the feature that owns
+	// workflows), creating, planning and asking nothing; ErrWorkflowsOff
+	// when no feature takes workflows.
+	CheckTaskWorkflow(ctx context.Context, req NewAgentTask) error
+	// FolderProjects are the projects the workspace folder dir is in and
+	// their items' agent tasks (Instance.FolderProjects of the feature that
+	// owns projects; nothing when none runs).
+	FolderProjects(ctx context.Context, dir string) FolderProjects
 	// TaskOrigin is the Origin of the agent task the chat with this session
 	// id works for (a chat of a joint group: its lead's), "" when the chat is
 	// no task's or its task has none. The id comes from Flint (an agent
 	// tool's caller, mcpserver.CallerFrom), not from the UI.
 	TaskOrigin(chat string) string
+
+	// The workflow steps part (the Workflows feature): the steps of a run
+	// are taken inside one agent task's worktree, agent steps as chats and
+	// script steps as run configurations, through the paths the user's own
+	// chats and runs take. Every argument comes from the feature's Go code,
+	// never from the UI.
+
+	// StartStepChat opens a new chat of agent ("" = the task's agent) in the
+	// worktree of the agent task taskID (the lead's for a joint group) and
+	// sends prompt as its first message, shown as coming from Flint; it
+	// takes the path of every prompt (usage budget, redaction). It refuses
+	// an invalid or unknown task, a worktree that is gone or not trusted
+	// (Restricted Mode), and an empty prompt or one over 64 KiB. Returns
+	// the chat's id. When the chat opened but the prompt was refused (the
+	// usage budget, say), the id is returned next to the error. opts.Reviewer
+	// starts a chat that reviews the worktree's code (StepChatOptions).
+	StartStepChat(ctx context.Context, taskID, agent, prompt string, opts StepChatOptions) (chat string, err error)
+	// WaitChat blocks until the chat's running turn is over (at once when
+	// none runs) and returns how it ended; an error the agent reports in
+	// the middle of a turn does not end the wait. No polling. A chat that is
+	// closed, before or while it waits, is an error; so is ctx ending.
+	WaitChat(ctx context.Context, chat string) (ChatResult, error)
+	// ChatOutput is the last lines (1 to 200) of the chat's text and
+	// tool-call titles, redacted; "" for an unknown chat.
+	ChatOutput(chat string, lines int) string
+	// StopChat ends the chat and the agents it started; an unknown or empty
+	// id is a no-op.
+	StopChat(chat string) error
+	// RunConfiguration runs the run configuration called name (exactly) in
+	// the worktree of the agent task taskID, shows it in a run tab, waits
+	// for it and returns how it ended. The configuration is read from the
+	// task's checkout (its .flint/run.json, then the detected ones), never
+	// from the worktree, so an agent working there cannot change what runs.
+	// It refuses an unknown task, a checkout or worktree that is gone or not
+	// trusted, and a name the checkout has no configuration for. When ctx
+	// ends, the run is stopped and ctx's error returned. opts.Sandbox
+	// confines every process of the run (RunOptions); when this system has
+	// no sandbox the run fails and nothing starts.
+	//
+	// Before the run Flint takes a fingerprint of what the worktree holds
+	// for later steps to run or read (sandbox.WorktreeProtected: .git,
+	// .claude, .codex, .flint, CLAUDE.md, AGENTS.md …) and after it compares
+	// it again: what changed is RunResult.Changed. A worktree whose
+	// fingerprint cannot be taken fails the run before it starts.
+	RunConfiguration(ctx context.Context, taskID, name string, opts RunOptions) (RunResult, error)
+	// RunLaunch is what the run configuration called name of the checkout
+	// (a folder inside an open, trusted workspace folder: the repository's
+	// top folder a run's task branches from) would run, resolved as
+	// RunConfiguration resolves it, without running anything. It refuses a
+	// checkout that is gone, outside the workspace or not trusted and a name
+	// the checkout has no configuration for.
+	RunLaunch(checkout, name string) (RunLaunch, error)
+	// ScriptSandbox says whether this system can run a script step in the
+	// sandbox (RunOptions.Sandbox), and why not.
+	ScriptSandbox() SandboxSupport
+	// BudgetPause says why a new agent turn may not start now: a usage
+	// budget is spent and usage.pauseOverBudget is on (nil otherwise). A
+	// feature that starts work by itself (a schedule) asks before it does.
+	BudgetPause() error
+}
+
+// StepChatOptions are how Host.StartStepChat opens a step's chat.
+type StepChatOptions struct {
+	// Reviewer: the chat reviews code another agent wrote in the worktree.
+	// It is started without the worktree's project settings and instruction
+	// files where the agent's engine has a switch for it (Claude Code:
+	// --setting-sources user, which leaves out .claude/settings*.json, its
+	// hooks and the project's CLAUDE.md; Codex: AGENTS.md off), without the
+	// user's extra arguments (a relative path in them would resolve in the
+	// worktree), and no tool call of it is approved by the approval policy:
+	// every edit, read and command asks.
+	Reviewer bool
+}
+
+// RunLaunch is a run configuration's resolved launch (Host.RunLaunch).
+type RunLaunch struct {
+	// Name is the configuration's name.
+	Name string
+	// Commands are its processes in order.
+	Commands []RunCommand
+	// Cwd is the working folder relative to the checkout ("." for its top).
+	Cwd string
+	// Env are the KEY=VALUE pairs it adds to the environment.
+	Env []string
+}
+
+// RunCommand is one process of a RunLaunch.
+type RunCommand struct {
+	// Line is the command line as the run tab shows it.
+	Line    string
+	Program string
+	Args    []string
+}
+
+// CommandLine is the launch's command lines joined with " && " (how the
+// processes run: a failing one stops the rest).
+func (l RunLaunch) CommandLine() string {
+	lines := make([]string, len(l.Commands))
+	for i, c := range l.Commands {
+		lines[i] = c.Line
+	}
+	return strings.Join(lines, " && ")
+}
+
+// SandboxSupport is whether this system has the sandbox a script step runs
+// in (Host.ScriptSandbox).
+type SandboxSupport struct {
+	Available bool
+	// Mechanism names it ("sandbox-exec", "Landlock"); Reason says why there
+	// is none.
+	Mechanism, Reason string
+}
+
+// RunOptions are how Host.RunConfiguration runs a configuration.
+type RunOptions struct {
+	// Sandbox, when set, runs every process of the configuration inside the
+	// operating system's sandbox (the one extensions run in).
+	Sandbox *Sandbox
+}
+
+// Sandbox is what a sandboxed run may do besides reading what the user can
+// read (except credentials, keys, history and Flint's own folder) and
+// writing the task's worktree and the temporary folders.
+type Sandbox struct {
+	// Network: it may use the network (Internet and local sockets).
+	Network bool
+	// Writable are more absolute folders it may write.
+	Writable []string
+}
+
+// ChatResult is how a chat's turn ended (Host.WaitChat).
+type ChatResult struct {
+	// State is agenttask.Finished, agenttask.Failed, or agenttask.Idle for
+	// a turn that was cancelled (or a chat that never started one).
+	State string
+	// Error is what the agent reported when it failed (redacted, short).
+	Error string
+}
+
+// RunResult is how a run configuration ended (Host.RunConfiguration).
+type RunResult struct {
+	// ID is the run's id (its run tab).
+	ID string
+	// Code is the exit code of the last step that ran; -1 when the process
+	// was killed by a signal or did not start.
+	Code int
+	// Stopped: the run was stopped (by the user, in its tab).
+	Stopped bool
+	// Error is set when a step could not be started.
+	Error string
+	// Output is the end of what the run printed: plain text, redacted, at
+	// most 8 KiB.
+	Output string
+	// Changed lists what the run changed in the worktree that later steps
+	// run or read (paths relative to the worktree: ".claude/settings.json",
+	// "CLAUDE.md"), or why that could not be checked after it; empty when
+	// nothing changed.
+	Changed []string
 }
 
 // NewAgentTask asks for one agent task: Agent works on Description in a
@@ -187,9 +462,24 @@ type Host interface {
 // note of what the task is for (at most agenttask.MaxOrigin bytes, kept with
 // the task): Flint passes it back to Instance.TaskContext when the task's
 // chat starts, and Host.TaskOrigin gives it for the task's chat.
+//
+// Workflow, when set, names the workflow that takes the task ("" = one
+// agent): the feature that owns workflows checks and plans the run
+// (Instance.TaskWorkflow) before anything is created, the task's agent is
+// the run's first step's, and the first chat starts with the step's prompt
+// after the other features' context. The request's Agent is then the run's
+// agent (for the steps that name none; "" = the default one).
+//
+// DelegatedBy, when set, says that an agent's call the user approved asked
+// for the task (delegate_project_item): "an agent in <folder> (chat <id>)".
+// A workflow run that takes such a task is the agent's (its origin and log
+// say so), and script steps without a sandbox are refused until the user
+// allowed them in that checkout, never asked.
 type NewAgentTask struct {
 	Dir, Description, Agent string
 	Origin                  string
+	Workflow                string
+	DelegatedBy             string
 }
 
 // DetachedHeadError is CreateAgentTasks' error for a request whose Dir is a
@@ -232,6 +522,8 @@ type AgentTask struct {
 	// runs in.
 	Joint string
 	Lead  bool
+	// Run is the workflow run that takes the task (zero when none).
+	Run TaskRun
 }
 
 // Repository is the git repository a folder is in.
@@ -405,8 +697,11 @@ func (s *Set) TasksChanged() {
 }
 
 // TaskContext is the context the features give for a task's chat that
-// starts (Instance.TaskContext), the non-empty answers joined; "" when the
-// task has no origin or no feature knows it.
+// starts (Instance.TaskContext), the non-empty answers joined in the
+// modules' list order; "" when the task has no origin or no feature knows
+// it. package main lists Projects before Workflows, so an item's task that
+// a workflow takes starts with the project's block, then the step's block,
+// then the task's description (which ends the step's block).
 func (s *Set) TaskContext(ctx context.Context, start TaskStart) string {
 	if s == nil || start.Origin == "" {
 		return ""
@@ -421,6 +716,97 @@ func (s *Set) TaskContext(ctx context.Context, start TaskStart) string {
 		}
 	}
 	return strings.Join(out, "\n\n")
+}
+
+// TaskStartCheck asks every module whether Flint may start the chat of
+// the agent task start describes (Instance.TaskStartCheck); the first
+// refusal wins.
+func (s *Set) TaskStartCheck(start TaskStart) error {
+	if s == nil {
+		return nil
+	}
+	for _, p := range s.parts {
+		if p.TaskStartCheck == nil {
+			continue
+		}
+		if err := p.TaskStartCheck(start); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// TaskChatStarted tells every module which chat Flint opened for an agent
+// task's start (Instance.TaskChatStarted).
+func (s *Set) TaskChatStarted(start TaskStart, chat string) {
+	if s == nil || chat == "" {
+		return
+	}
+	for _, p := range s.parts {
+		if p.TaskChatStarted != nil {
+			p.TaskChatStarted(start, chat)
+		}
+	}
+}
+
+// TaskWorkflow asks the one module that takes workflows to plan the run of
+// req (Instance.TaskWorkflow); ErrWorkflowsOff when none runs.
+func (s *Set) TaskWorkflow(ctx context.Context, req NewAgentTask) (PlannedWorkflow, error) {
+	if s != nil {
+		for _, p := range s.parts {
+			if p.TaskWorkflow != nil {
+				return p.TaskWorkflow(ctx, req)
+			}
+		}
+	}
+	return PlannedWorkflow{}, ErrWorkflowsOff
+}
+
+// TaskWorkflowCheck asks the one module that takes workflows to check req
+// (Instance.TaskWorkflowCheck); ErrWorkflowsOff when none runs.
+func (s *Set) TaskWorkflowCheck(ctx context.Context, req NewAgentTask) error {
+	if s != nil {
+		for _, p := range s.parts {
+			if p.TaskWorkflowCheck != nil {
+				return p.TaskWorkflowCheck(ctx, req)
+			}
+		}
+	}
+	return ErrWorkflowsOff
+}
+
+// FolderProjects joins the modules' answers (Instance.FolderProjects).
+func (s *Set) FolderProjects(ctx context.Context, dir string) FolderProjects {
+	var out FolderProjects
+	if s == nil {
+		return out
+	}
+	for _, p := range s.parts {
+		if p.FolderProjects == nil {
+			continue
+		}
+		fp := p.FolderProjects(ctx, dir)
+		out.Names = append(out.Names, fp.Names...)
+		out.Tasks = append(out.Tasks, fp.Tasks...)
+	}
+	return out
+}
+
+// TaskRun is the workflow run that takes the task (Instance.TaskRun), the
+// zero TaskRun when none does.
+func (s *Set) TaskRun(taskID string) TaskRun {
+	if s == nil {
+		return TaskRun{}
+	}
+	for _, p := range s.parts {
+		if p.TaskRun == nil {
+			continue
+		}
+		if r, ok := p.TaskRun(taskID); ok {
+			return r
+		}
+	}
+	return TaskRun{}
 }
 
 // Closers are the Close hooks, for the app's parallel shutdown.

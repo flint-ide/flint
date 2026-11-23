@@ -3,6 +3,7 @@ package projects
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -39,7 +40,7 @@ func (a *API) Delegate(folder, id, root string) (DelegateResult, error) {
 	if !prompts.ValidName(id) {
 		return DelegateResult{}, errors.New("invalid item id")
 	}
-	return a.delegate(real, id, root, nil)
+	return a.delegate(real, id, root, nil, "")
 }
 
 // errStarting: the item is being delegated already.
@@ -63,9 +64,11 @@ type autoStart struct {
 var errItemChanged = errors.New("the item changed since you asked: Delegate it again or cancel the start")
 
 // delegate is Delegate for a known project folder and a valid id, by a click
-// (auto nil) or by the starter for a waiting start (auto). Only one delegate
-// of an item runs at a time; another one meanwhile fails with errStarting.
-func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, error) {
+// (auto nil, by ""), by the starter for a waiting start (auto), or by an
+// agent's delegate_project_item call the user approved (by: "an agent in
+// <folder> (chat <id>)"; delegatetool.go). Only one delegate of an item runs
+// at a time; another one meanwhile fails with errStarting.
+func (a *API) delegate(real, id, root string, auto *autoStart, by string) (DelegateResult, error) {
 	key := real + "\x00" + id
 	a.mu.Lock()
 	if a.starting[key] || auto != nil && !auto.still() {
@@ -79,123 +82,15 @@ func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, 
 		delete(a.starting, key)
 		a.mu.Unlock()
 	}()
-	c, err := LoadConfig(real)
+	d, notReady, err := a.prepare(real, id, root, auto, by)
 	if err != nil {
 		return DelegateResult{}, err
 	}
-	if err := writable(c); err != nil {
-		return DelegateResult{}, err
+	if notReady != nil {
+		return *notReady, nil
 	}
-	data, _, err := ReadItemFile(real, id)
-	if auto != nil && (err != nil || itemHash(data) != auto.hash) {
-		// Only what the user asked for starts by itself; this data is what
-		// is sent below.
-		return DelegateResult{}, errItemChanged
-	}
-	if err != nil {
-		return DelegateResult{}, fmt.Errorf("%s: %w", itemPath(id), err)
-	}
-	it, err := ParseItem(id, data, c)
-	if err != nil {
-		return DelegateResult{}, fmt.Errorf("%s: %w", itemPath(id), err)
-	}
-	var deps Deps
-	if len(it.After) > 0 {
-		l, err := Load(real)
-		if err != nil {
-			return DelegateResult{}, err
-		}
-		deps = Dependencies(append(slices.DeleteFunc(l.Items, func(x Item) bool { return x.ID == id }), it))[id]
-		if deps.Problem != "" {
-			return DelegateResult{}, fmt.Errorf("%s can't start: %s: fix the item's after line", itemPath(id), deps.Problem)
-		}
-		if len(deps.WaitingFor) > 0 {
-			v := itemView(real, it, a.linksOf(real, id), nil)
-			a.mu.Lock()
-			setDeps(&v, deps, a.waiting()[real])
-			a.mu.Unlock()
-			return DelegateResult{Item: v, Tasks: []TaskView{}, NotReady: true, WaitingFor: deps.WaitingFor}, nil
-		}
-	}
-	agents := a.host.Agents()
-	if p := agentProblem(it.Agent, agents); p != "" {
-		return DelegateResult{}, errors.New(p)
-	}
-	agent := it.Agent
-	if agent == "" {
-		agent = agents.Default
-	}
-	// The checks get their own context: the one that bounds creating the
-	// tasks starts after the confirmation below, which may stay open for a
-	// long while (a waiting start that asks while the user is away).
-	cctx, ccancel := a.ctx(delegateTimeout)
-	defer ccancel()
-	type target struct{ repo, dir string }
-	var targets []target
-	if len(it.Repos) == 0 {
-		dir, err := a.activeFolder(root)
-		if err != nil {
-			return DelegateResult{}, err
-		}
-		targets = append(targets, target{"", dir})
-	} else {
-		roots := a.roots(cctx)
-		checkouts := a.checkouts()
-		var missing, outside, untrusted, broken []string
-		for _, name := range it.Repos {
-			decl, _ := c.Repository(name) // ParseItem checked the names
-			v := a.resolveRepo(cctx, decl, roots, checkouts)
-			switch {
-			case v.Problem != "":
-				broken = append(broken, name+": "+v.Problem)
-			case v.Folder == "":
-				missing = append(missing, name)
-			case !v.InWorkspace:
-				outside = append(outside, name+" ("+v.Folder+")")
-			case !v.Trusted:
-				untrusted = append(untrusted, name+" ("+v.Folder+")")
-			default:
-				targets = append(targets, target{name, v.Folder})
-			}
-		}
-		var why []string
-		if len(missing) > 0 {
-			why = append(why, "no checkout of "+strings.Join(missing, ", ")+" was found: open it in the workspace or Locate… it")
-		}
-		why = append(why, broken...)
-		if len(outside) > 0 {
-			why = append(why, "add "+strings.Join(outside, ", ")+" to the workspace first")
-		}
-		if len(untrusted) > 0 {
-			why = append(why, strings.Join(untrusted, ", ")+" is in Restricted Mode: trust the folder first")
-		}
-		if len(why) > 0 {
-			return DelegateResult{}, errors.New("Delegate needs every repository of the item: " + strings.Join(why, "; "))
-		}
-	}
-	// The context file as the user may be shown it now: an untrusted
-	// project's is sent only while it is still this text (origin.Confirmed).
-	pc := ReadContext(real)
-	trusted := a.host.Trusted(real)
-	reqs := make([]feature.NewAgentTask, len(targets))
-	for i, t := range targets {
-		o := origin{Project: real, Item: id, Repo: t.repo}
-		if !trusted {
-			// What the confirmation below shows is all its chat may get
-			// (restrictedContext).
-			shown, _ := shownContext(pc.Text)
-			o.Confirmed, o.Title, o.Repos = contextHash(shown), it.Title, it.Repos
-		}
-		reqs[i] = feature.NewAgentTask{Dir: t.dir, Description: it.TaskDescription(t.repo), Agent: agent, Origin: o.String()}
-		if len(reqs[i].Description) > MaxDescription {
-			if d := reqs[i].Description; d == it.Description() {
-				return DelegateResult{}, fmt.Errorf("the item's title and text are longer than %d bytes: shorten the text", MaxDescription)
-			}
-			return DelegateResult{}, fmt.Errorf("the item's title and text with the note about its repositories are longer than %d bytes: shorten the text", MaxDescription)
-		}
-	}
-	joint := it.Together && len(reqs) > 1 // ParseItem: together only with repos
-	if !trusted {
+	c, it, deps, agents, agent, targets, reqs, joint, pc := d.c, d.it, d.deps, d.agents, d.agent, d.targets, d.reqs, d.joint, d.pc
+	if !d.trusted {
 		if auto == nil && !a.host.Confirm("Delegate from an untrusted project?", untrustedMessage(c.Name, real, agent, reqs, joint, pc), "Delegate") {
 			return DelegateResult{}, errors.New("Delegate was cancelled: the project's folder is in Restricted Mode")
 		}
@@ -214,10 +109,7 @@ func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, 
 			return DelegateResult{}, errStarting // cancelled while the question was open
 		}
 	}
-	a.mu.Lock()
-	_, room := addLinks(a.links()[real][id], make([]Link, len(reqs)))
-	a.mu.Unlock()
-	if !room {
+	if !a.hasRoom(real, id, len(reqs)) {
 		return DelegateResult{}, fmt.Errorf("the item has %d agent tasks: remove some in the Agent Tasks panel first", MaxTasksPerItem)
 	}
 	// Not under mu: creating worktrees can take a while (checkout hooks), and
@@ -243,10 +135,17 @@ func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, 
 	if len(made) != len(targets) {
 		return DelegateResult{}, fmt.Errorf("internal error: %d agent tasks for %d repositories", len(made), len(targets))
 	}
+	if by != "" {
+		// Agent tasks keep no log of their own: Flint's log and the tasks'
+		// origin (origin.By) say who handed the item out; a run's log says
+		// it too (feature.NewAgentTask.DelegatedBy).
+		slog.Info("projects: item delegated by "+by+", approved by the user", "project", real, "item", id, "tasks", len(made))
+	}
 	added := make([]Link, len(made))
 	tasks := map[string]feature.AgentTask{}
 	for i, t := range made {
-		added[i] = Link{Task: t.ID, Repo: targets[i].repo, State: t.State, PullRequest: t.PullRequest, Merged: t.Merged}
+		added[i] = Link{Task: t.ID, Repo: targets[i].repo, State: t.State, PullRequest: t.PullRequest, Merged: t.Merged,
+			Workflow: t.Run.Workflow, RunID: t.Run.ID, Run: t.Run.State}
 		tasks[t.ID] = t
 	}
 	a.mu.Lock()
@@ -304,6 +203,170 @@ func (a *API) delegate(real, id, root string, auto *autoStart) (DelegateResult, 
 	return res, nil
 }
 
+// target is where one of an item's agent tasks is made: the repository's
+// name ("" for the active folder) and its checkout.
+type target struct{ repo, dir string }
+
+// delegation is an item that passed every check of Delegate that changes
+// nothing and asks nothing (prepare), with the requests it would make.
+type delegation struct {
+	c       Config
+	it      Item
+	deps    Deps
+	agents  feature.Agents
+	agent   string
+	targets []target
+	reqs    []feature.NewAgentTask
+	joint   bool
+	pc      ProjectContext
+	trusted bool
+}
+
+// errAgentUntrusted refuses an agent's delegation from a project whose
+// folder is not trusted: only the user's Delegate, after its confirmation,
+// sends such an item.
+var errAgentUntrusted = errors.New("the project's folder is in Restricted Mode in Flint: an agent cannot delegate its items; the user can Delegate them in the Projects panel, or trust the folder")
+
+// prepare makes Delegate's checks that change nothing and ask nothing: the
+// project can be written, the item's file is what a waiting start asked for
+// (auto), it is ready (else notReady says what it waits for), its agent is
+// available, every repository resolves to a trusted checkout in the
+// workspace (root for an item without repositories), and the descriptions
+// fit. For an agent's call (by) a project whose folder is not trusted is
+// refused outright, and the requests say who delegated them.
+func (a *API) prepare(real, id, root string, auto *autoStart, by string) (delegation, *DelegateResult, error) {
+	c, err := LoadConfig(real)
+	if err != nil {
+		return delegation{}, nil, err
+	}
+	if err := writable(c); err != nil {
+		return delegation{}, nil, err
+	}
+	trusted := a.host.Trusted(real)
+	if by != "" && !trusted {
+		return delegation{}, nil, errAgentUntrusted
+	}
+	data, _, err := ReadItemFile(real, id)
+	if auto != nil && (err != nil || itemHash(data) != auto.hash) {
+		// Only what the user asked for starts by itself; this data is what
+		// is sent below.
+		return delegation{}, nil, errItemChanged
+	}
+	if err != nil {
+		return delegation{}, nil, fmt.Errorf("%s: %w", itemPath(id), err)
+	}
+	it, err := ParseItem(id, data, c)
+	if err != nil {
+		return delegation{}, nil, fmt.Errorf("%s: %w", itemPath(id), err)
+	}
+	var deps Deps
+	if len(it.After) > 0 {
+		l, err := Load(real)
+		if err != nil {
+			return delegation{}, nil, err
+		}
+		deps = Dependencies(append(slices.DeleteFunc(l.Items, func(x Item) bool { return x.ID == id }), it))[id]
+		if deps.Problem != "" {
+			return delegation{}, nil, fmt.Errorf("%s can't start: %s: fix the item's after line", itemPath(id), deps.Problem)
+		}
+		if len(deps.WaitingFor) > 0 {
+			v := itemView(real, it, a.linksOf(real, id), nil)
+			a.mu.Lock()
+			setDeps(&v, deps, a.waiting()[real])
+			a.mu.Unlock()
+			return delegation{}, &DelegateResult{Item: v, Tasks: []TaskView{}, NotReady: true, WaitingFor: deps.WaitingFor}, nil
+		}
+	}
+	agents := a.host.Agents()
+	if p := agentProblem(it.Agent, agents); p != "" {
+		return delegation{}, nil, errors.New(p)
+	}
+	agent := it.Agent
+	if agent == "" {
+		agent = agents.Default
+	}
+	targets, err := a.targets(c, it, root)
+	if err != nil {
+		return delegation{}, nil, err
+	}
+	// The context file as the user may be shown it now: an untrusted
+	// project's is sent only while it is still this text (origin.Confirmed).
+	pc := ReadContext(real)
+	reqs := make([]feature.NewAgentTask, len(targets))
+	for i, t := range targets {
+		o := origin{Project: real, Item: id, Repo: t.repo, By: by}
+		if !trusted {
+			// What the confirmation shows is all its chat may get
+			// (restrictedContext).
+			shown, _ := shownContext(pc.Text)
+			o.Confirmed, o.Title, o.Repos = contextHash(shown), it.Title, it.Repos
+		}
+		reqs[i] = feature.NewAgentTask{Dir: t.dir, Description: it.TaskDescription(t.repo), Agent: agent, Origin: o.String(), Workflow: it.Workflow, DelegatedBy: by}
+		if len(reqs[i].Description) > MaxDescription {
+			if d := reqs[i].Description; d == it.Description() {
+				return delegation{}, nil, fmt.Errorf("the item's title and text are longer than %d bytes: shorten the text", MaxDescription)
+			}
+			return delegation{}, nil, fmt.Errorf("the item's title and text with the note about its repositories are longer than %d bytes: shorten the text", MaxDescription)
+		}
+	}
+	joint := it.Together && len(reqs) > 1 // ParseItem: together only with repos, never with workflow
+	return delegation{c: c, it: it, deps: deps, agents: agents, agent: agent, targets: targets, reqs: reqs, joint: joint, pc: pc, trusted: trusted}, nil, nil
+}
+
+// targets resolves where an item's agent tasks are made: each repository
+// it names to a checkout that is in the workspace and trusted (saying in
+// one message everything that is missing), or root, an open, trusted
+// workspace folder, for an item that names none.
+func (a *API) targets(c Config, it Item, root string) ([]target, error) {
+	if len(it.Repos) == 0 {
+		dir, err := a.activeFolder(root)
+		if err != nil {
+			return nil, err
+		}
+		return []target{{"", dir}}, nil
+	}
+	// The checks get their own context: the one that bounds creating the
+	// tasks starts after the confirmation, which may stay open for a long
+	// while (a waiting start that asks while the user is away).
+	cctx, ccancel := a.ctx(delegateTimeout)
+	defer ccancel()
+	roots := a.roots(cctx)
+	checkouts := a.checkouts()
+	var targets []target
+	var missing, outside, untrusted, broken []string
+	for _, name := range it.Repos {
+		decl, _ := c.Repository(name) // ParseItem checked the names
+		v := a.resolveRepo(cctx, decl, roots, checkouts)
+		switch {
+		case v.Problem != "":
+			broken = append(broken, name+": "+v.Problem)
+		case v.Folder == "":
+			missing = append(missing, name)
+		case !v.InWorkspace:
+			outside = append(outside, name+" ("+v.Folder+")")
+		case !v.Trusted:
+			untrusted = append(untrusted, name+" ("+v.Folder+")")
+		default:
+			targets = append(targets, target{name, v.Folder})
+		}
+	}
+	var why []string
+	if len(missing) > 0 {
+		why = append(why, "no checkout of "+strings.Join(missing, ", ")+" was found: open it in the workspace or Locate… it")
+	}
+	why = append(why, broken...)
+	if len(outside) > 0 {
+		why = append(why, "add "+strings.Join(outside, ", ")+" to the workspace first")
+	}
+	if len(untrusted) > 0 {
+		why = append(why, strings.Join(untrusted, ", ")+" is in Restricted Mode: trust the folder first")
+	}
+	if len(why) > 0 {
+		return nil, errors.New("Delegate needs every repository of the item: " + strings.Join(why, "; "))
+	}
+	return targets, nil
+}
+
 // maxConfirmText bounds the description shown in the confirmation of a
 // Delegate from an untrusted project (characters).
 const maxConfirmText = 1000
@@ -332,6 +395,11 @@ func untrustedMessage(name, folder, agent string, reqs []feature.NewAgentTask, j
 	case len(reqs) > 1:
 		note = "\nEach task also gets a note naming the item's repositories."
 	}
+	if w := reqs[0].Workflow; w != "" {
+		note += fmt.Sprintf("\nThe item runs the workflow %q: its steps' agents take each task step by step. "+
+			"The workflow is read from Flint's built-in workflows, your own, or the trusted repository's .flint/workflows, never from the project's folder; "+
+			"its first step's agent starts the task.", w)
+	}
 	read := "Its item becomes the instructions of an agent. Read it before you go on."
 	if pc.Text != "" {
 		read = "Its item and its context file become the instructions of an agent. Read them before you go on."
@@ -349,6 +417,9 @@ func autoStartMessage(it Item, waitedFor []string) string {
 	together := ""
 	if it.Together {
 		together = fmt.Sprintf(" It runs as one agent across the repositories %s.", strings.Join(it.Repos, ", "))
+	}
+	if it.Workflow != "" {
+		together = fmt.Sprintf(" It runs the workflow %q.", it.Workflow)
 	}
 	return fmt.Sprintf("Flint is starting the item %q (%s) by itself: you asked to start it when it is ready, "+
 		"and the items it waited for (%s) are done now.%s\n\n", it.Title, it.ID, strings.Join(waitedFor, ", "), together)

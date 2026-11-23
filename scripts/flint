@@ -3,17 +3,55 @@
 # Flint takes it over (single instance) and comes to the front.
 # flint --install-extension <folder> — asks Flint to install the extension in
 # that folder; Flint shows its usual confirmation first.
+# flint <workflow|run|project|task|help> … — the command line: runs the app's
+# own binary, which talks to the running Flint and exits (no window).
 set -eu
+
+app=
+for dir in /Applications/flint.app "$HOME/Applications/flint.app"; do
+	if [ -d "$dir" ]; then
+		app=$dir
+		break
+	fi
+done
 
 case "${1:-}" in
 -h | --help)
-	echo "usage: flint [folder]"
-	echo "       flint --install-extension <folder>"
+	echo "usage: flint [folder]                      open a folder in Flint"
+	echo "       flint --install-extension <folder>  install the extension in that folder"
+	echo "       flint <command> [arguments] [--json]"
+	echo
+	echo "Commands (Flint must be running; flint help lists them all):"
+	echo "  flint workflow list|show|new|run|coordinate     workflows of the current folder"
+	echo "  flint run list|show|wait|approve|send-back|…    workflow runs"
+	echo "  flint project list|show|items|add|status|…      projects and their boards"
+	echo "  flint task list|show|new|start|diff|merge|pr|…  agent tasks"
+	echo
+	echo "A folder named like a command opens with a path: flint ./task"
 	exit 0
+	;;
+workflow[[:space:]]* | run[[:space:]]* | project[[:space:]]* | task[[:space:]]* | help[[:space:]]*)
+	# `flint "workflow list"`: one quoted argument, not a folder (unless one
+	# of that name exists, which opens below).
+	if [ ! -d "$1" ]; then
+		set -f
+		# shellcheck disable=SC2086 # split the argument into its words
+		words=$(printf '%s ' $1)
+		set +f
+		echo "flint: \"$1\" is one argument: write flint ${words% }" >&2
+		exit 2
+	fi
+	;;
+workflow | run | project | task | help)
+	if [ -z "$app" ]; then
+		echo "flint: Flint.app is not installed (run \`make install\` in the flint repo)" >&2
+		exit 1
+	fi
+	exec "$app/Contents/MacOS/flint" "$@"
 	;;
 esac
 
-if [ ! -d /Applications/flint.app ] && [ ! -d "$HOME/Applications/flint.app" ]; then
+if [ -z "$app" ]; then
 	echo "flint: Flint.app is not installed (run \`make install\` in the flint repo)" >&2
 	exit 1
 fi

@@ -53,7 +53,7 @@ export function BoardView({ tab, active }: { tab: ContributedTab; active: boolea
   return (
     <div className="project-board">
       <ViewToolbar aria-label="Project board">
-        <span className="project-board-title">{project.name}</span>
+        <span className="view-title">{project.name}</span>
         {!project.trusted && (
           <MarkerBadge tone="warn" title="The project's folder is not trusted: agents can't read it with get_project, and Delegate shows you each item before it sends it">
             Restricted Mode

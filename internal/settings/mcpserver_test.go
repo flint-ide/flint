@@ -62,3 +62,36 @@ func TestMCPServerValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// "Run and steer workflows" is off by default and only a boolean switches it on.
+func TestMCPServerWorkflowsAction(t *testing.T) {
+	if Default().MCPServer.Actions.Workflows {
+		t.Fatal("actions.workflows is on by default")
+	}
+	got, _ := Load(write(t, `{"mcpServer":{"actions":{"workflows":"yes"}}}`))
+	if got.MCPServer.Actions.Workflows {
+		t.Fatal("a non-boolean switched it on")
+	}
+	got, err := Load(write(t, `{"mcpServer":{"actions":{"workflows":true}}}`))
+	if err != nil || got.MCPServer.Actions != (MCPActions{Workflows: true}) {
+		t.Fatalf("loaded %+v, %v", got.MCPServer.Actions, err)
+	}
+}
+
+// "Delegate project items" is its own switch, off by default; it does not
+// follow "Add project items", and only a boolean switches it on.
+func TestMCPServerDelegateAction(t *testing.T) {
+	if Default().MCPServer.Actions.Delegate {
+		t.Fatal("actions.delegate is on by default")
+	}
+	for _, text := range []string{`{"mcpServer":{"actions":{"delegate":"yes"}}}`, `{"mcpServer":{"actions":{"projects":true,"workflows":true}}}`} {
+		got, _ := Load(write(t, text))
+		if got.MCPServer.Actions.Delegate {
+			t.Errorf("%s switched it on", text)
+		}
+	}
+	got, err := Load(write(t, `{"mcpServer":{"actions":{"delegate":true}}}`))
+	if err != nil || got.MCPServer.Actions != (MCPActions{Delegate: true}) {
+		t.Fatalf("loaded %+v, %v", got.MCPServer.Actions, err)
+	}
+}

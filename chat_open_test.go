@@ -31,6 +31,9 @@ type chatDriver struct {
 	// fail, when set, makes Prompt fail at once, before any event (an agent
 	// whose process died before the turn began).
 	fail error
+	// reviewers records, per Start, whether its context marked a reviewer
+	// chat (as.WithReviewer).
+	reviewers []bool
 }
 
 // holdNextStart makes the next Start block until gate is closed.
@@ -49,8 +52,9 @@ func (d *chatDriver) isStartHeld() bool {
 
 func newChatDriver() *chatDriver { return &chatDriver{prompts: map[string][]string{}} }
 
-func (d *chatDriver) Start(_ context.Context, cwd string, _ as.Sink) (as.SessionInfo, error) {
+func (d *chatDriver) Start(ctx context.Context, cwd string, _ as.Sink) (as.SessionInfo, error) {
 	d.mu.Lock()
+	d.reviewers = append(d.reviewers, as.Reviewer(ctx))
 	if gate := d.startGate; gate != nil {
 		d.startGate, d.startHeld = nil, true
 		d.mu.Unlock()

@@ -100,6 +100,7 @@ Done when:
 | `repos` | Optional, comma-separated names from `flint-project.json`, each at most once. Empty means the folder that is active in the window. |
 | `after` | Optional, comma-separated ids of items of the same project that must be `done` first: at most 20, each at most once. See [Dependencies](#dependencies). A value that isn't an id, more than 20 ids, or an id twice makes the file a problem. |
 | `together` | Optional, `true` or `false` (default `false`). `true` starts one agent that works in all the item's repositories instead of one agent per repository. It needs 2 to 10 names in `repos`. See [One agent across repositories](#one-agent-across-repositories). Any other value, and `true` with fewer than two or more than 10 repositories, makes the file a problem. |
+| `workflow` | Optional, the name of a [workflow](workflows.md#run-a-workflow-from-a-project-item). Delegate then starts a workflow run for each of the item's agent tasks instead of a plain chat. It can't be combined with `together: true`. The item's status follows the run. |
 | Text after the front matter | What to do and how to tell it is done. |
 
 The title and the text together become the agent task's description, the first message the agent gets. They may be at most 8,000 bytes, as for New Agent Task (a letter outside ASCII takes two to four bytes). With several repositories, Delegate adds a note naming them, and the note counts too. With `together: true` there is no note: the agent is told which folder is which repository in its first message, and that text doesn't count.
@@ -556,7 +557,7 @@ Say no to an item and it isn't written; the agent can go on with the next. After
 
 ### What agents can't do
 
-Flint gives agents no tool to change an item, delete one, set a status or delegate: the one they have adds items, always as `todo`. An agent can never ask Flint to start an item. Nothing starts until you click **Delegate**, or until the items an item waits for are done when you asked it to [start when ready](#start-when-ready). An agent whose chat works in the project's folder can still edit its files like any other file there, and that can change a status: so it can make an item that you asked to start when ready start (by marking what it waits for done), but it can't change what starts (the changed item is refused, see [Start when ready](#start-when-ready)). Read what an agent planned before you delegate it: it chose the `agent`, the `repos`, `after` and `together` too.
+Flint gives agents no tool to change an item, delete one or set a status: `add_project_item` adds items, always as `todo`, and [`delegate_project_item`](#what-agents-can-delegate) hands out a ready item only with your yes to that call. An agent can never ask Flint to start an item when it is ready. Nothing else starts until you click **Delegate**, or until the items an item waits for are done when you asked it to [start when ready](#start-when-ready). An agent whose chat works in the project's folder can still edit its files like any other file there, and that can change a status: so it can make an item that you asked to start when ready start (by marking what it waits for done), but it can't change what starts (the changed item is refused, see [Start when ready](#start-when-ready)). Read what an agent planned before you delegate it: it chose the `agent`, the `repos`, `after` and `together` too.
 
 An agent whose chat runs in the project's own folder can still edit its files like any other file in the folder it works in. Flint reads them with the same rules as any item, and a file that breaks one is a problem.
 
@@ -608,7 +609,7 @@ An agent chat can read the project through Flint's [MCP server](ai-agents.md#wha
 | `status` | Optional. Only items with this status (`todo`, `doing`, `review` or `done`). |
 | `project` | Optional. Only the project with this name. |
 
-The answer lists each project Flint knows whose folder is trusted, with its repositories and its items: id, title, status, priority, agent, repositories (marked when one agent works in all of them), the items it waits for with whether it is ready, and text. It does not include agent tasks. Projects whose folder is in Restricted Mode are left out, and the answer says how many and why. The text of one item is cut at 2,000 bytes, and the whole answer, headings and repository lists included, at 60 KB, with a line saying how many items were left out; ask for one status or one project to see them.
+The answer lists each project Flint knows whose folder is trusted, with its repositories and its items: id, title, status, priority, agent, repositories (marked when one agent works in all of them), the workflow and how its runs stand ("bug-fix · waiting for the user's approval", the newest 5 per item), the items it waits for with whether it is ready, and text. It does not list plain agent tasks. Projects whose folder is in Restricted Mode are left out, and the answer says how many and why. The text of one item is cut at 2,000 bytes, and the whole answer, headings and repository lists included, at 60 KB, with a line saying how many items were left out; ask for one status or one project to see them.
 
 It knows who is asking. Called by the agent of a project's item, without arguments it returns that project first and in full, says "You are working on the item …" and marks that item, and lists the other projects by name only; ask for one with `project` to read it. Called from any other chat, the projects with a repository whose URL is a remote of the chat's folder come first.
 
@@ -637,7 +638,11 @@ Unknown arguments are refused. The item goes through the same code as **New Item
 - A project whose folder is in Restricted Mode is refused: "agents can't add items to it until the user trusts the folder".
 - One chat adds at most 50 items. The project's limit of 500 items holds, as for **New Item…**.
 
-Agents get no tool to change or delete an item, set a status, or delegate.
+Agents get no tool to change or delete an item or set a status.
+
+### What agents can delegate
+
+With **Delegate project items** switched on in Settings ▸ Agent Context ▸ Actions (`mcpServer.actions.delegate`, off by default and separate from **Add project items**), an agent that coordinates a project can hand a ready item to its agents or workflow with `delegate_project_item` (`item`, and optionally `project`), exactly as your **Delegate** click does: the same checks, the same agent tasks in every repository the item names, the item moves to doing. An agent can delegate a ready item only when "Delegate project items" is on, only with your yes to that one call, never an item that waits for others, never from a project whose folder is untrusted, and never from inside handed-out work (an agent task's chat or worktree, or a workflow step). It works only from a chat in a trusted folder that is in the project (the project's folder or one of its repositories' checkouts), at most 10 times per chat. Before each call Flint shows you the project, the item, its agent or workflow, each repository with the folder its task is made from, whether one agent works in all of them, and the beginning of the item's text. A workflow's script steps without a sandbox are refused until you have run such a workflow in that repository yourself. The tasks and runs say an agent delegated them; [Let an agent coordinate](workflows.md#let-an-agent-coordinate) shows how to get one going.
 
 ## Projects and Restricted Mode
 
@@ -647,7 +652,7 @@ A project is read in any folder: reading files runs nothing. What Restricted Mod
 - **Joint groups.** A `together: true` item needs every repository's checkout and every worktree of the group to be trusted, because one agent writes in all of them. A chat in a group doesn't open while one of them is untrusted.
 - **The project's own folder.** An item's text becomes an agent's instructions, and a project may come from someone else's repository. A project whose folder isn't trusted is marked **Restricted Mode** in the panel (with **Trust Folder…**) and on its board, and:
   - `get_project` leaves it out, so no chat reads its items;
-  - `add_project_item` refuses it, and **Plan with Agent…** and **Add Project Context…** are refused for it, because agents could neither read it nor add to it;
+  - `add_project_item` and `delegate_project_item` refuse it, and **Plan with Agent…** and **Add Project Context…** are refused for it, because agents could neither read it nor add to it;
   - Delegate on one of its items asks first, in a dialog of Flint's own that the page can't skip. It says the project's folder isn't trusted and shows the agent, the folders the tasks will work in and the description that will be sent (the first 1,000 characters, saying when it is cut). When the project has a `PROJECT.md`, it says that the file is sent too and shows its beginning (the first 1,000 characters; when the file is longer it says so, and that only this beginning is sent). For an item with `together: true` it also says that one agent works in all of these folders together, in one chat. Cancel stops Delegate before anything is created;
   - the agents of such a project get only what you confirmed. Of `PROJECT.md` they get exactly the beginning the question showed, and only while the file still starts with it (the rest of a longer file is left out, and so is a file whose beginning changed after your answer; the agent is told which). Of their item they get the id, and the title and repositories as they were when you answered, never read again from the folder. The project's name, its other items, the items it waits for, the repositories' URLs and `get_project` are left out of the [context](#project-context-what-every-agent-knows). This holds for a task that waits in the queue, for a chat that starts later, and also when you trust the project's folder after answering;
   - an item you asked to [start when ready](#start-when-ready) asks the same question when it starts, naming the item and saying that it starts now because the items it waited for are done. If you decline, nothing starts and the item keeps waiting;
@@ -688,7 +693,6 @@ A symbolic link that leaves the project folder is refused.
 
 ## Not supported yet
 
-- A coordinating agent above the per-repository agents.
 - Milestones, budgets per item, and assignees who are people.
 - Watching a project folder outside the window, and live updates from a teammate's push.
 - Import from or synchronization with trackers.

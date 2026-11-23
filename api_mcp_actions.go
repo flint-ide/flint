@@ -320,12 +320,10 @@ func (e *runEvents) watch(id string) <-chan struct{} {
 
 // failed ends a run that could not start, for the tab that already shows it.
 func (e *runEvents) failed(id string, err error) {
-	e.emit(RunEvent{ID: id, Exit: &runner.Result{Code: -1, Error: err.Error()}})
+	res := runner.Result{Code: -1, Error: err.Error()}
+	e.emit(RunEvent{ID: id, Exit: &res})
 	e.mu.Lock()
 	delete(e.seq, id)
-	if done := e.done[id]; done != nil {
-		close(done)
-		delete(e.done, id)
-	}
+	e.endLocked(id, res)
 	e.mu.Unlock()
 }

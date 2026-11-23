@@ -54,8 +54,9 @@ type API struct {
 	// starting are the items being delegated now (folder NUL id), under
 	// mu: one start per item at a time, whoever asks (a click, the starter).
 	starting map[string]bool
-	// added counts the items each chat added with add_project_item, under mu.
-	added map[string]int
+	// added counts the items each chat added with add_project_item, and
+	// delegated those it delegated with delegate_project_item, under mu.
+	added, delegated map[string]int
 	// beforeCompare runs in writeStatus once the new file is written, just
 	// before the old one is compared (tests: an editor saving meanwhile).
 	beforeCompare func()
@@ -64,7 +65,7 @@ type API struct {
 }
 
 func newAPI(h feature.Host) *API {
-	return &API{host: h, kick: make(chan struct{}, 1), startKick: make(chan struct{}, 1), starting: map[string]bool{}, added: map[string]int{}}
+	return &API{host: h, kick: make(chan struct{}, 1), startKick: make(chan struct{}, 1), starting: map[string]bool{}, added: map[string]int{}, delegated: map[string]int{}}
 }
 
 // ProjectInfo is a project in the picker.
@@ -139,7 +140,10 @@ type ItemView struct {
 	Repos    []string `json:"repos"`
 	// Together: Delegate starts one agent that works in all of Repos (one
 	// joint group of agent tasks, one chat) instead of one per repository.
-	Together bool   `json:"together"`
+	Together bool `json:"together"`
+	// Workflow is the workflow that takes each of the item's agent tasks
+	// ("" = one agent per task).
+	Workflow string `json:"workflow"`
 	Body     string `json:"body"`
 	// Path is the item's file, to open in the editor.
 	Path string `json:"path"`
@@ -197,6 +201,14 @@ type TaskView struct {
 	// worktree its one chat runs in (open that one for the chat).
 	Joint string `json:"joint"`
 	Lead  bool   `json:"lead"`
+	// Workflow, Run and RunState are the workflow run that takes the task
+	// ("" when none): its workflow, its id (open it in the Workflows panel)
+	// and its state, which the item's status follows: running or paused
+	// (working), waiting (a gate waits for the user), done, failed or
+	// stopped. For a removed task, or a removed run, as last seen.
+	Workflow string `json:"workflow"`
+	Run      string `json:"run"`
+	RunState string `json:"runState"`
 }
 
 // DelegateResult is what Delegate started.
@@ -528,17 +540,21 @@ func agentProblem(agent string, agents feature.Agents) string {
 func itemView(folder string, it Item, ls []Link, tasks map[string]feature.AgentTask) ItemView {
 	v := ItemView{
 		ID: it.ID, Title: it.Title, Status: it.Status, Priority: it.Priority, Agent: it.Agent,
-		Repos: nonNil(it.Repos), Together: it.Together, Body: it.Body, Path: ItemFile(folder, it.ID), Tasks: []TaskView{},
+		Repos: nonNil(it.Repos), Together: it.Together, Workflow: it.Workflow, Body: it.Body, Path: ItemFile(folder, it.ID), Tasks: []TaskView{},
 		Failed: Failed(ls), After: nonNil(it.After), WaitingFor: []string{}, Ready: true,
 	}
 	for _, l := range ls {
-		tv := TaskView{ID: l.Task, Repo: l.Repo, State: l.State, PullRequest: l.PullRequest, Merged: l.Merged, Gone: l.Gone}
+		tv := TaskView{ID: l.Task, Repo: l.Repo, State: l.State, PullRequest: l.PullRequest, Merged: l.Merged, Gone: l.Gone,
+			Workflow: l.Workflow, Run: l.RunID, RunState: l.Run}
 		if t, ok := tasks[l.Task]; ok && !l.Gone {
 			tv.Title, tv.Agent, tv.Branch, tv.Worktree = t.Title, t.Agent, t.Branch, t.Worktree
 			tv.State, tv.Error, tv.Merged, tv.Stale = t.State, t.Error, t.Merged, t.Stale
 			tv.Joint, tv.Lead = t.Joint, t.Lead
 			if t.PullRequest != "" {
 				tv.PullRequest = t.PullRequest
+			}
+			if t.Run.Workflow != "" {
+				tv.Workflow, tv.Run, tv.RunState = t.Run.Workflow, t.Run.ID, t.Run.State
 			}
 		}
 		v.Tasks = append(v.Tasks, tv)
@@ -704,9 +720,24 @@ func (a *API) Locate(folder, repo, dir string) (RepositoryView, error) {
 
 // ---- writing items
 
+// NewItemRequest is what New Item asks for: the title and, optionally, the
+// workflow that takes the item's agent tasks.
+type NewItemRequest struct {
+	Title string `json:"title"`
+	// Workflow is a workflow's name ("" = none): lowercase letters, digits and
+	// dashes.
+	Workflow string `json:"workflow"`
+}
+
 // NewItem writes items/<id>.md from a template with title (the id is derived
 // from it, made unique) and returns the item; the UI opens its file.
 func (a *API) NewItem(folder, title string) (ItemView, error) {
+	return a.NewItemWith(folder, NewItemRequest{Title: title})
+}
+
+// NewItemWith is NewItem with the workflow named in the item's front matter
+// (a `workflow:` line, checked like the parser checks it).
+func (a *API) NewItemWith(folder string, req NewItemRequest) (ItemView, error) {
 	real, _, err := a.known(folder)
 	if err != nil {
 		return ItemView{}, err
@@ -718,13 +749,13 @@ func (a *API) NewItem(folder, title string) (ItemView, error) {
 	if err := writable(c); err != nil {
 		return ItemView{}, err
 	}
-	data, err := NewItemFile(title)
+	data, err := NewItemFileWith(req.Title, req.Workflow)
 	if err != nil {
 		return ItemView{}, err
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	it, err := a.writeNewItem(real, c, ItemID(title), func(string) ([]byte, error) { return data, nil })
+	it, err := a.writeNewItem(real, c, ItemID(req.Title), func(string) ([]byte, error) { return data, nil })
 	if err != nil {
 		return ItemView{}, err
 	}
@@ -938,7 +969,7 @@ func (a *API) reconcile(ctx context.Context, folder string, c Config) (moved boo
 		if err != nil {
 			continue
 		}
-		if status := NextStatus(it.Status, next); status != it.Status {
+		if status := NextStatusAfter(it.Status, list, next); status != it.Status {
 			if _, err := a.writeStatus(folder, id, c, status); err != nil {
 				continue
 			}

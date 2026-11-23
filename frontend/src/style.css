@@ -1341,6 +1341,10 @@ button.small {
   font-size: 11px;
   margin-left: 6px;
 }
+/* The "Work with agents" group of the welcome view. */
+.welcome-agents {
+  width: min(420px, 90%);
+}
 .shortcuts {
   display: grid;
   grid-template-columns: auto auto;
@@ -3555,7 +3559,7 @@ button.keymap-chord:hover {
 .project-picker {
   padding: 0 10px 6px;
 }
-.project-untrusted {
+.restricted-note {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -3589,9 +3593,750 @@ button.keymap-chord:hover {
   border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
   border-radius: 4px;
 }
-.project-problems {
+.panel-section-divided {
   margin-top: 6px;
   border-top: 1px solid var(--border);
+}
+
+/* ---------- Workflows ---------- */
+
+/* The state colours of steps and runs (stepLook.ts): one variable, --wf-tone, read by the block's top edge, its
+   mark, its state word, the connector dots of the panel and the run rows. Theme variables only. */
+:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-detail) {
+  --wf-tone: var(--fg-faint);
+}
+:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-detail)[data-status='done'] { --wf-tone: var(--ok); }
+:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-detail)[data-status='running'] { --wf-tone: var(--info); }
+:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-detail)[data-status='waiting'] { --wf-tone: var(--accent); }
+:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-detail)[data-status='failed'] { --wf-tone: var(--danger); }
+:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-detail):is([data-status='paused'], [data-status='queued'], [data-status='skipped']) {
+  --wf-tone: var(--warn);
+}
+
+/* The steps (StepFlow, flowLayout.ts): ONE line of blocks joined by connectors, never wrapped. Blocks grow up to
+   --wf-node-max and shrink down to --wf-node-min; past that the line scrolls sideways (snapping per block), with a
+   fade and a previous/next button at each end that hides blocks. data-layout=vertical: a stepper, one per line. */
+.wf-flow {
+  position: relative;
+  min-width: 0;
+  flex: none;
+}
+.wf-flow-line {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  margin: 0;
+  padding: 3px 3px 10px;
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 44px;
+  scrollbar-width: thin;
+}
+.wf-flow-line:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+.wf-flow[data-before] .wf-flow-line {
+  mask-image: linear-gradient(to right, transparent, #000 56px);
+}
+.wf-flow[data-after] .wf-flow-line {
+  mask-image: linear-gradient(to left, transparent, #000 56px);
+}
+.wf-flow[data-before][data-after] .wf-flow-line {
+  mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+}
+.wf-flow-nav {
+  position: absolute;
+  top: calc(50% - 4px);
+  z-index: 1;
+  transform: translateY(-50%);
+}
+.wf-flow-nav[data-side='before'] {
+  left: 2px;
+}
+.wf-flow-nav[data-side='after'] {
+  right: 2px;
+}
+.wf-flow-item {
+  display: flex;
+  align-items: stretch;
+  flex: 1 1 calc(var(--wf-node-min) + var(--wf-link));
+  min-width: calc(var(--wf-node-min) + var(--wf-link));
+  max-width: calc(var(--wf-node-max) + 112px);
+  scroll-snap-align: start;
+}
+.wf-flow-item:last-child {
+  flex-basis: var(--wf-node-min);
+  min-width: var(--wf-node-min);
+  max-width: var(--wf-node-max);
+}
+
+/* A connector: a line, solid in the success colour once the run went past the step, dashed while still ahead,
+   plain in a preview; a small head points on. */
+.wf-link {
+  position: relative;
+  flex: 1 1 var(--wf-link);
+  min-width: var(--wf-link);
+  align-self: center;
+  height: 2px;
+  margin: 0 6px 0 4px;
+  border-radius: 1px;
+  color: var(--fg-faint);
+  background: currentColor;
+}
+.wf-link[data-state='done'] {
+  color: var(--ok);
+}
+.wf-link[data-state='todo'] {
+  background: repeating-linear-gradient(to right, currentColor 0 5px, transparent 5px 9px);
+}
+.wf-link::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  transform: translate(1px, -50%) rotate(45deg);
+}
+
+/* A step block: a card with the kind's tile, the title, the kind and who takes it, the state mark; its top edge
+   and mark carry the state, the kind lives in the tile and its word. */
+.wf-node {
+  position: relative;
+  box-sizing: border-box;
+  flex: 4 1 var(--wf-node-min);
+  min-width: var(--wf-node-min);
+  max-width: var(--wf-node-max);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  padding: 14px 12px 11px;
+  overflow: hidden;
+  font: inherit;
+  text-align: left;
+  color: var(--fg);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+.wf-node::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--wf-tone);
+}
+.wf-node[data-status='none']::before {
+  display: none;
+}
+.wf-node[data-status='pending']::before,
+.wf-node[data-status='stopped']::before {
+  background: var(--border);
+}
+.wf-node[data-status='running'] {
+  border-color: color-mix(in srgb, var(--info) 45%, var(--border));
+}
+.wf-node[data-status='waiting'] {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-raised));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.wf-node[data-status='failed'] {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+  background: color-mix(in srgb, var(--danger) 6%, var(--bg-raised));
+}
+button.wf-node {
+  cursor: pointer;
+}
+button.wf-node:hover {
+  border-color: var(--fg-faint);
+}
+button.wf-node[data-status='none']:hover,
+button.wf-node[data-status='pending']:hover,
+button.wf-node[data-status='done']:hover,
+button.wf-node[data-status='stopped']:hover {
+  background: var(--bg-hover);
+}
+.wf-node[data-selected] {
+  border-color: var(--wf-ring);
+  box-shadow: inset 0 0 0 1px var(--wf-ring);
+}
+/* The ring of the picked block: neutral, or the block's own state colour where the block already wears one. */
+.wf-node {
+  --wf-ring: var(--fg-muted);
+}
+.wf-node:is([data-status='waiting'], [data-status='failed'], [data-status='running']) {
+  --wf-ring: var(--wf-tone);
+}
+.wf-node[data-status='waiting'][data-selected] {
+  box-shadow: inset 0 0 0 1px var(--wf-ring), 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+button.wf-node:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.wf-node-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.wf-node-names {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.wf-node-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.wf-node-no {
+  flex: none;
+  min-width: 1ch;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.wf-node-sub {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.wf-node-kind {
+  flex: none;
+  font-weight: 600;
+}
+.wf-node-who.fui-mono {
+  font-size: 11.5px;
+}
+.wf-node-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-width: 0;
+  padding-left: 42px;
+  font-size: 11.5px;
+  color: var(--fg-muted);
+}
+.wf-node-state {
+  font-weight: 600;
+  color: var(--wf-tone);
+}
+.wf-node-state:is([data-status='pending'], [data-status='stopped']) {
+  color: var(--fg-muted);
+}
+.wf-node-attempt {
+  padding: 0 6px;
+  border-radius: 999px;
+  color: var(--fg);
+  background: var(--bg-active);
+}
+
+/* The kind's colour on its word (block, detail): the text tint of the kind's kit IconTile tone (stepLook.kindTone). */
+.wf-node-kind,
+.wf-kind {
+  color: var(--tint-text-purple);
+}
+:is(.wf-node-kind[data-kind='review'], .wf-kind[data-tone='pink']) {
+  color: var(--tint-text-pink);
+}
+:is(.wf-node-kind:is([data-kind='script'], [data-kind='workflow']), .wf-kind[data-tone='neutral']) {
+  color: var(--tint-text-alternative);
+}
+:is(.wf-node-kind[data-kind='gate'], .wf-kind[data-tone='indigo']) {
+  color: var(--tint-text-indigo);
+}
+.wf-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+.wf-kind svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* The round state mark: filled for an outcome (done, failed, waiting for you), tinted while under way. */
+.wf-mark {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--wf-tone);
+  background: color-mix(in srgb, var(--wf-tone) 18%, transparent);
+}
+.wf-mark svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.5;
+}
+.wf-mark:is([data-status='done'], [data-status='failed']) {
+  color: var(--bg);
+  background: var(--wf-tone);
+}
+.wf-mark[data-status='waiting'] {
+  color: var(--accent-fg);
+  background: var(--accent);
+}
+.wf-mark[data-status='pending'] {
+  background: transparent;
+}
+.wf-mark[data-status='pending'] svg {
+  stroke-width: 2;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .wf-mark[data-status='running'] svg {
+    animation: wf-spin 1.4s linear infinite;
+  }
+}
+@keyframes wf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* The kind tile keeps a hairline rim in its own colour: the kit's light tints alone are close to white. */
+.wf-kind-tile {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent);
+}
+.wf-rework {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--fg-muted);
+}
+.wf-rework svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+.wf-badge-icon {
+  width: 12px;
+  height: 12px;
+  margin-right: 3px;
+}
+
+/* The vertical stepper (no room for two blocks in a row): blocks full width, the connector runs down past the tiles. */
+.wf-flow[data-layout='vertical'] .wf-flow-line {
+  flex-direction: column;
+  overflow: visible;
+  padding: 3px;
+}
+.wf-flow[data-layout='vertical'] .wf-flow-item {
+  flex-direction: column;
+  flex: none;
+  min-width: 0;
+  max-width: none;
+}
+.wf-flow[data-layout='vertical'] .wf-node {
+  flex: none;
+  min-width: 0;
+  max-width: none;
+}
+.wf-flow[data-layout='vertical'] .wf-link {
+  flex: none;
+  align-self: flex-start;
+  width: 2px;
+  min-width: 2px;
+  height: 16px;
+  margin: 3px 0 3px 28px;
+}
+.wf-flow[data-layout='vertical'] .wf-link[data-state='todo'] {
+  background: repeating-linear-gradient(to bottom, currentColor 0 4px, transparent 4px 7px);
+}
+.wf-flow[data-layout='vertical'] .wf-link::after {
+  display: none;
+}
+
+/* The preview has no scroll of its own up and down: the dialog body scrolls (a box in a box is hard to use). */
+.wf-preview {
+  min-width: 0;
+}
+/* Run Workflow…: wide enough for three blocks of the preview side by side. */
+.modal.new-task.wf-dialog {
+  width: min(760px, 94vw);
+}
+/* A workflow dialog never grows past the window: the body scrolls, the buttons stay in view. */
+.modal.wf-dialog {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  max-height: calc(100vh - 12vh - 16px);
+}
+.wf-dialog > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+}
+.wf-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px 4px 2px 2px;
+  margin: -2px -4px -2px -2px;
+}
+
+/* The run tab and the diagram view: a head (title, facts, actions, progress), then the body. */
+.wf-run {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-editor);
+}
+.wf-head {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.wf-head-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 16px;
+}
+.wf-head-names {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wf-head-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.wf-head-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.wf-head-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.wf-head-fact svg {
+  width: 13px;
+  height: 13px;
+}
+.wf-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.wf-head-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 2px;
+  background: var(--border);
+}
+.wf-head-description {
+  margin: 0;
+  max-width: 90ch;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+.wf-danger {
+  color: var(--danger);
+}
+.wf-progress {
+  gap: 6px;
+}
+.wf-progress-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--fg);
+}
+.wf-progress-value {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.wf-progress[data-tone='green'] [data-slot='progress-indicator'] { background-color: var(--ok); }
+.wf-progress[data-tone='red'] [data-slot='progress-indicator'] { background-color: var(--danger); }
+.wf-progress[data-tone='blue'] [data-slot='progress-indicator'] { background-color: var(--info); }
+.wf-progress:is([data-tone='yellow'], [data-tone='grey']) [data-slot='progress-indicator'] { background-color: var(--fg-muted); }
+.wf-run-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px 20px;
+  overflow: auto;
+}
+.wf-hint {
+  margin: 0;
+  font-size: 12.5px;
+}
+.wf-reason {
+  display: block;
+  margin: 2px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.wf-command {
+  padding: 0 4px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.wf-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* The picked step: a panel with what it is told next to what it said. */
+.wf-detail,
+.wf-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.wf-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.wf-detail-names {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.wf-detail-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.wf-detail-no {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.wf-detail-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 12px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.wf-detail-actions {
+  display: flex;
+  gap: 6px;
+}
+.wf-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px 20px;
+}
+.wf-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.wf-pane-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.wf-pane-head svg {
+  width: 13px;
+  height: 13px;
+}
+.wf-prose {
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.wf-output {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 260px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg-editor);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.wf-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  align-items: start;
+  gap: 14px;
+}
+
+/* The log: a compact timeline, one mark per kind of event joined by a thin line. */
+.wf-log {
+  display: flex;
+  flex-direction: column;
+  max-height: 340px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  font-size: 12px;
+}
+.wf-log li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 3px 0;
+}
+.wf-log li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 9.5px;
+  top: 23px;
+  bottom: -3px;
+  width: 1px;
+  background: var(--border);
+}
+.wf-log-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--fg-muted);
+  background: var(--bg-hover);
+}
+.wf-log-mark svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.25;
+}
+.wf-log-mark:is([data-kind='pass'], [data-kind='done']) { color: var(--ok); }
+.wf-log-mark[data-kind='fail'] { color: var(--danger); }
+.wf-log-mark[data-kind='wait'] { color: var(--accent); }
+.wf-log-mark:is([data-kind='pause'], [data-kind='limit'], [data-kind='skip'], [data-kind='back']) { color: var(--warn); }
+.wf-log-mark:is([data-kind='start'], [data-kind='resume'], [data-kind='check']) { color: var(--info); }
+.wf-log-text {
+  padding-top: 2px;
+  overflow-wrap: anywhere;
+}
+.wf-log-time {
+  padding-top: 3px;
+  font-size: 11px;
+  color: var(--fg-faint);
+}
+
+/* The panel: a run's row carries its state on the left edge and a segment per step; a workflow's row its kind tiles. */
+.wf-dots {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+.wf-dots-line {
+  display: flex;
+  gap: 2px;
+  width: 96px;
+}
+.wf-dot {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--wf-tone);
+}
+.wf-dot:is([data-status='pending'], [data-status='stopped']) {
+  background: var(--bg-active);
+}
+.wf-dots-text {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-muted);
+}
+.wf-kinds {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  vertical-align: middle;
+}
+.wf-kinds-more {
+  margin-left: 2px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.workflows-panel .wf-kinds [data-slot='icon-tile'] {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+.workflows-panel .wf-kinds [data-slot='icon-tile'] svg {
+  width: 12px;
+  height: 12px;
 }
 
 /* Board tab */
@@ -3603,7 +4348,7 @@ button.keymap-chord:hover {
   min-height: 0;
   background: var(--bg-editor);
 }
-.project-board-title {
+.view-title {
   font-weight: 600;
   font-size: 13px;
   flex: none;
@@ -4304,7 +5049,7 @@ body.file-drop-target-active::after {
   overflow: hidden;
 }
 .prompt-picker .quick-list {
-  max-height: 220px;
+  max-height: 280px;
 }
 .prompt-list .quick-item {
   overflow: hidden;

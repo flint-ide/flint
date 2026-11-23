@@ -18,6 +18,9 @@ type Command struct {
 	Label   string   `json:"label"`
 	Program string   `json:"program"`
 	Args    []string `json:"args"`
+	// Env holds KEY=VALUE pairs added to this process's environment only
+	// (after the launch's): how a sandboxed process gets its launch spec.
+	Env []string `json:"-"`
 }
 
 // Launch is a resolved configuration: the processes to run in order (a failing

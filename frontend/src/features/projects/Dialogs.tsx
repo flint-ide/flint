@@ -6,9 +6,10 @@ import { useAgent } from '../../store/agent'
 import { useAgentChat } from '../../store/agentChat'
 import { useAgentDefs } from '../../store/agentDefs'
 import { useSettings } from '../../store/settings'
-import { goalLength, goalProblem, isRestrictedError, MAX_GOAL, pickPlanAgent } from './projects'
-import { closeDialog, createProject, createItem, planWithAgent, trustProject, useProjects, type DialogHost } from './store'
-import { Alert, Button, Field, FieldLabel, Form, FormActions, Input, Textarea } from '@flint-ide/ui'
+import { useActiveFeatures } from '../../lib/activeFeatures'
+import { goalLength, goalProblem, isRestrictedError, MAX_GOAL, NO_WORKFLOW, pickPlanAgent, WORKFLOW_HELP, type WorkflowOption } from './projects'
+import { closeDialog, createProject, createItem, listWorkflows, planWithAgent, trustProject, useProjects, type DialogHost } from './store'
+import { Alert, Button, Field, FieldDescription, FieldLabel, Form, FormActions, Input, Textarea } from '@flint-ide/ui'
 
 const basename = (p: string) => p.replace(/\/+$/, '').slice(p.replace(/\/+$/, '').lastIndexOf('/') + 1)
 
@@ -155,11 +156,27 @@ function NewItemDialog({ folder }: { folder: string }) {
   const [title, setTitle] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [workflow, setWorkflow] = useState(NO_WORKFLOW)
+  const [options, setOptions] = useState<WorkflowOption[]>([])
+  const [listError, setListError] = useState('')
+  const workflowsOn = useActiveFeatures((s) => s.ids.has('workflows'))
+  useEffect(() => {
+    if (!workflowsOn) return
+    let live = true
+    void listWorkflows(folder).then((r) => {
+      if (!live) return
+      setOptions(r.options)
+      setListError(r.error)
+    })
+    return () => {
+      live = false
+    }
+  }, [folder, workflowsOn])
   const valid = title.trim() !== '' && title.length <= 120
   const create = async () => {
     if (!valid || busy) return
     setBusy(true)
-    const err = await createItem(folder, title)
+    const err = await createItem(folder, title, workflowsOn ? workflow : NO_WORKFLOW)
     setBusy(false)
     if (err) return setError(err)
     closeDialog()
@@ -183,6 +200,13 @@ function NewItemDialog({ folder }: { folder: string }) {
             }}
           />
         {title.length > 120 && <Alert size="inline" variant="negative">At most 120 characters.</Alert>}
+        {workflowsOn && (
+          <Field>
+            <FieldLabel>Workflow (optional)</FieldLabel>
+            <Select block value={workflow} allowEmpty="None (one agent)" options={options} onChange={setWorkflow} />
+            <FieldDescription>{listError || WORKFLOW_HELP}</FieldDescription>
+          </Field>
+        )}
         {error && <Alert size="inline" variant="negative">{error}</Alert>}
         <FormActions align="start">
           <Button variant="plain" type="button" onClick={closeDialog}>Cancel</Button>

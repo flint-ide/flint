@@ -7,5 +7,6 @@ import database from './database'
 import extensions from './extensions'
 import todo from './todo'
 import update from './update'
+import workflows from './workflows'
 
-export const FEATURES: readonly FeatureModule[] = [database, todo, update, extensions, projects]
+export const FEATURES: readonly FeatureModule[] = [database, todo, update, extensions, projects, workflows]

@@ -260,12 +260,14 @@ Flint's own MCP server for agent chats: read-only tools, and tools that act when
 | `actions.http` | boolean | | `false` | `send_http_request`: send a named request of a `.http` file in the chat's folder. |
 | `actions.sql` | boolean | | `false` | `run_sql_query`: one reading statement on a saved connection that is read-only. Needs the Database feature. |
 | `actions.projects` | boolean | | `false` | `add_project_item`: add one `todo` item to a [project](../guides/projects.md#what-agents-can-add) whose folder is trusted. Shown in Settings as **Add project items**. Needs the Projects feature. |
+| `actions.workflows` | boolean | | `false` | `list_workflows`, `get_workflow_runs`, `wait_for_workflow_run` (read) and `start_workflow`, `steer_workflow_run` (act): an agent starts runs of the [workflows](#workflows) of its folder and pauses, resumes, retries, sends back or stops them; you are asked before each start or change. An agent can never approve a gate or continue past a failed step, and a workflow's own steps get none of these tools. Shown in Settings as **Run and steer workflows**. Needs the Workflows feature. |
+| `actions.delegate` | boolean | | `false` | `delegate_project_item`: an agent in a trusted folder that is in a [project](../guides/projects.md#what-agents-can-delegate) hands one of its ready items to the item's agents or workflow, as your Delegate click does; you are asked before each call. Never an item that waits, never from a project whose folder is untrusted, never from an agent task's chat or worktree or a workflow step; at most 10 per chat. Shown in Settings as **Delegate project items**. Needs the Projects feature. |
 | `terminalLines` | integer | 10–2000 | `200` | The most lines of one terminal's or run's output an agent gets (clamped into the range). |
 | `testWaitSeconds` | integer | 10–540 | `120` | How long `run_tests` waits for a test run before it answers with the results so far (clamped into the range). |
 
 Tool switches apply right away, also to running chats.
 
-`get_project` (the [project](../guides/projects.md#what-agents-can-see)) has no key here: it is offered while the Projects feature is on (see [features](#features)). `add_project_item`, which adds items, is switched on with `actions.projects`.
+`get_project` (the [project](../guides/projects.md#what-agents-can-see)) has no key here: it is offered while the Projects feature is on (see [features](#features)). `add_project_item`, which adds items, is switched on with `actions.projects`; `delegate_project_item`, which delegates ready items, with `actions.delegate`.
 ### completions
 
 Ghost-text suggestions in file editors from a fill-in-the-middle code model. See [AI in the editor](../guides/editor-and-navigation.md#ai-in-the-editor).

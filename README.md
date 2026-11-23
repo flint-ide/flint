@@ -5,7 +5,7 @@
 [![CI](https://github.com/flint-ide/flint/actions/workflows/ci.yml/badge.svg)](https://github.com/flint-ide/flint/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Flint is a fast, minimal, AI-first IDE for macOS and Linux. Coding agents (Claude Code, Codex) write the code in a built-in chat or terminal, and Flint is where you navigate, search the code, review what the agent changed, run and debug, and work with your databases, APIs and clusters. It is a single Go process with the system web view (WKWebView on macOS, WebKitGTK on Linux; Wails v3), not Electron, so it starts quickly and stays light on CPU and memory.
+Flint is a fast, minimal workspace for AI-native work on macOS and Linux. Coding agents (Claude Code, Codex) do the work: in a built-in chat, in parallel agent tasks, and in workflows whose steps (plan, implement, test, review) are written down and end in a gate that only you can pass. A project board holds the work you plan to hand to them. A full editor, Git, run and debug, databases and an HTTP client sit around it, so you can understand, review and correct what the agents did without leaving the window. It is a single Go process with the system web view (WKWebView on macOS, WebKitGTK on Linux; Wails v3), not Electron, so it starts quickly and stays light on CPU and memory.
 
 **Stack:** Go + [Wails v3](https://v3.wails.io) (system WebView, no Electron) · React 19 + TypeScript · CodeMirror 6 · xterm.js (WebGL)
 
@@ -25,19 +25,32 @@ Memory is the physical footprint of all of the editor's processes, including the
 
 ## Why another IDE?
 
-Coding agents now write much of the code; the work around them is giving them context, reviewing what they changed, running and debugging it, and handing back what broke. Today's editors were built for the person typing, with AI added on the side, so that work is spread over a terminal, an editor, a git client, a database client and a browser tab. Flint is built the other way round:
+Coding agents now write much of the code. The work that is left is deciding what they should do, keeping them on a process, reviewing what they changed, running and debugging it, and handing back what broke. Today's editors were built for the person typing, with AI added on the side, so that work is spread over a terminal, an editor, a git client, a database client and a browser tab. Flint is built the other way round: agents doing the work under your control comes first, and the editor is how you check and correct it.
 
+- **Workflows with gates:** a workflow is one Markdown file of steps that agents, scripts and you take in order: plan, implement, test, review, approve. A failed check sends the work back to the step that can fix it. An agent can start and steer a run, but it can never approve a gate, in the app or from the command line.
+- **A board for the work:** a project holds work items as plain files next to your code. **Delegate** starts an agent task, or a workflow run, in each repository an item names, and the item's status follows the work.
+- **Parallel agents you can review:** each agent task has its own branch and worktree, with IntelliJ-style Git and pull request review for the result.
 - **Bring your own agent:** Claude Code, Codex or any ACP agent, with your own subscriptions; Flint has no model or AI plan of its own.
-- **Agents see what the IDE sees:** language server problems, the selection, test results, through Flint's own read-only MCP server.
-- **Every failure is one step from the agent:** a test, a build, a crashing pod, a query, a merge conflict, with the context gathered and redacted for you to review.
-- **Built for reviewing:** IntelliJ-style Git and pull request review, parallel agent tasks in their own worktrees.
-- **Everything in one window, and light:** databases, HTTP, debugging, in about 120 MB, with Docker, Kubernetes and AWS as extensions.
+- **Agents see what the IDE sees:** language server problems, the selection, test results, through Flint's own read-only MCP server. Every failure (a test, a build, a crashing pod, a query, a merge conflict) is one step from the agent, with the context gathered and redacted for you to review.
+- **Everything to check it in one window, and light:** editor, search, databases, HTTP and debugging, in about 120 MB, with Docker, Kubernetes and AWS as extensions.
 
 The full comparison with VS Code, Cursor, Zed, JetBrains and terminal agents, and when Flint is *not* the right choice yet, is in [Why Flint](site/why-flint.md).
 
 ## Features
 
 The full reference, with every detail and all keyboard shortcuts, is in [docs/FEATURES.md](docs/FEATURES.md).
+
+**AI agents**
+- Workflows: a Markdown file of steps (agent, script, independent review, your approval) that a run takes in order, with failures sent back to the step that fixes them, usage-limit holds with a fallback agent, schedules, an optional sandbox for script steps, and a run view that shows every step; see the [guide](site/guides/workflows.md)
+- Project board: work items as files in a project folder, for one or more repositories; Delegate starts agent tasks or workflow runs, an item's status follows the work, and agents can propose items for you to review
+- Agents can coordinate: with your yes to each call, an agent starts and steers workflow runs. It can never approve a gate or continue past a failed step
+- The `flint` command does what the panels do (`flint workflow run`, `flint run wait`, `flint task new`, `flint project add`), for scripts, with exit statuses
+- Native Claude Code and Codex chat drivers, no npm: streamed responses, tool calls with mini diffs, plan, changed files, token usage and cost
+- Any other agent with an Agent Client Protocol mode (Gemini CLI, OpenCode, …), added in Settings with no code
+- *Fix with agent* on any LSP problem, `⌘L` to send a selection or terminal output to the chat
+- Generated commit messages and agent-assisted merge conflict resolution
+- Agents see what Flint sees through its own MCP server: language server problems, open files and the selection, the last test results
+- Agent tasks: one click gives an agent its own branch and worktree, so several work in parallel; a panel shows their state and diff, with Merge and Create PR
 
 **Editor and navigation**
 - One tab area for files, terminals, agent chats, SQL consoles and diffs, with IntelliJ-style back/forward history
@@ -46,14 +59,6 @@ The full reference, with every detail and all keyboard shortcuts, is in [docs/FE
 - Language servers (gopls, rust-analyzer, vtsls / typescript-language-server, basedpyright / pyright): completion, hover and parameter info, go to definition, implementations and symbols, find usages, rename, quick fixes and refactorings, formatting (also on save), live diagnostics
 - Files edited by agents reload in place as they change
 - `⌘I` *Edit with Agent* on the selection, optional ghost-text completions from a local model (Ollama or any OpenAI-compatible server), and a Vim mode
-
-**AI agents**
-- Native Claude Code and Codex chat drivers, no npm: streamed responses, tool calls with mini diffs, plan, changed files, token usage and cost
-- Any other agent with an Agent Client Protocol mode (Gemini CLI, OpenCode, …), added in Settings with no code
-- *Fix with agent* on any LSP problem, `⌘L` to send a selection or terminal output to the chat
-- Generated commit messages and agent-assisted merge conflict resolution
-- Agents see what Flint sees through its own MCP server: language server problems, open files and the selection, the last test results
-- Agent tasks: one click gives an agent its own branch and worktree, so several work in parallel; a panel shows their state and diff, with Merge and Create PR
 
 **Git and GitHub**
 - IntelliJ-style Commit panel, side-by-side diffs, gutter markers, blame, file history, stash, branches and worktrees

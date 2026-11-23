@@ -28,6 +28,7 @@
 - [Editor and navigation](guides/editor-and-navigation.md)
 - [AI agents](guides/ai-agents.md)
 - [Projects](guides/projects.md)
+- [Workflows](guides/workflows.md)
 - [Git and GitHub](guides/git-and-github.md)
 - [Run, debug and test](guides/run-debug-test.md)
 - [Databases](guides/databases.md)
@@ -49,6 +50,7 @@
 ## Reference
 - [Keyboard shortcuts](reference/keyboard-shortcuts.md)
 - [Settings file](reference/settings.md)
+- [Command line](reference/cli.md)
 - [Files and data](reference/files-and-data.md)
 - [Troubleshooting](reference/troubleshooting.md)
 - [FAQ](reference/faq.md)

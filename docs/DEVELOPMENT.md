@@ -179,6 +179,8 @@ FLINT_CONFIG_DIR=/tmp/flint dbus-run-session -- build/bin/flint /src &
 sleep 20; xwd -root -silent | convert xwd:- png:/src/build/bin/screen.png
 ```
 
+For Go tests alone the plain `golang` image is enough with `apt install git pkg-config libgtk-4-dev libwebkitgtk-6.0-dev libsoup-3.0-dev`, run as a user who is not root. Copy the whole tree: the root package embeds `frontend/dist` and, on Linux, `build/linux/icon-512.png` (`window_other.go`), so a copy without `build/` fails with `FAIL flint [setup failed]` (`pattern build/linux/icon-512.png: no matching files found`). The sandbox's launch tests run where the kernel has Landlock (Docker's default seccomp profile allows it) and skip with the reason elsewhere.
+
 Server mode (`go run -tags server .`) needs no display at all. Remove the image and volumes when you are done (`docker rmi flint-linux`, `docker volume rm flint-linux-node-modules`).
 
 ### Platform code

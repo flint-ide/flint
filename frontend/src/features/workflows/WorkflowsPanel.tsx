@@ -9,17 +9,17 @@ import { useWorkspace } from '../../store/workspace'
 import { WorkflowDialogs } from './Dialogs'
 import { Schedules } from './Schedules'
 import { KindSummary } from './KindSummary'
-import { SectionCount, StatusMark } from './StepParts'
+import { StateBadge } from './StepParts'
 import { runProgress, stepLook, type StepStatus } from './stepLook'
 import {
-  groupRuns, originText, restrictedNote, runStateLabel, runStatus, runTooltip, sourceLabel, stepCount, usable, primaryAction, actionHint,
+  groupRuns, originText, restrictedNote, runStateLabel, runStatus, runTone, runTooltip, sourceLabel, stepCount, usable, primaryAction, actionHint,
   type RunInfo, type WorkflowInfo,
 } from './workflows'
 import {
   loadList, loadRuns, openCoordinateDialog, openNewDialog, openRun, openRunDialog, openWorkflowFile, openWorkflowView, perform, trustWorkflowFolder, useWorkflows, type Listed,
 } from './store'
 import { Button, IconButton, ListItem, PanelHeader, TaskCard, TreeRow, TreeSection } from '@flint-ide/ui'
-import { Check, Ellipsis, FileText, Play, Plus, RefreshCw, RotateCcw, Workflow, type LucideIcon } from '@flint-ide/ui/icons'
+import { Ellipsis, Plus, RefreshCw } from '@flint-ide/ui/icons'
 
 const basename = (p: string) => p.replace(/\/+$/, '').slice(p.replace(/\/+$/, '').lastIndexOf('/') + 1)
 
@@ -102,7 +102,7 @@ function Runs({ runs }: { runs: RunInfo[] | null }) {
         <TreeSection
           key={g.id}
           title={g.title}
-          count={<SectionCount n={g.runs.length} />}
+          count={g.runs.length}
           open={!collapsed[g.id]}
           onOpenChange={(open) => setCollapsed((c) => ({ ...c, [g.id]: !open }))}
         >
@@ -122,43 +122,37 @@ function runStatusOf(run: RunInfo): StepStatus {
   }
 }
 
-/** The icon of a run's primary action in its row (the words are its aria-label and tooltip). */
-const ACTION_ICONS: Record<string, LucideIcon> = { approve: Check, resume: Play, recheck: RefreshCw, retry: RotateCcw }
-
 /**
- * A run in the panel: the whole row opens its tab, where the actions are. The primary action is also a small icon
- * button at the end of the title line, shown on hover or keyboard focus in place of the state word (the kit's row
- * actions), so the row keeps its height and the state word does the talking otherwise.
+ * A run in the panel: the whole row opens its tab, where the actions are. The primary action is also a small quiet
+ * text button at the end of the title line, shown on hover or keyboard focus in place of the state word (the kit's
+ * row actions), so the row keeps its height and the state word does the talking otherwise.
  */
 function RunRow({ run }: { run: RunInfo }) {
   const busy = useWorkflows((s) => !!s.busy[run.id])
   const primary = primaryAction(run.actions)
   const status = runStatusOf(run)
-  const Icon = primary ? ACTION_ICONS[primary.name] : undefined
   return (
     <ListItem
       className="wf-run-row"
       data-status={status}
       title={runTooltip(run)}
-      leading={<StatusMark status={status} />}
+      leading={<StateBadge tone={runTone(run)}>{runStateLabel(run)}</StateBadge>}
       label={run.title || run.workflow}
-      trailing={<span className="wf-run-state" data-status={status}>{runStateLabel(run)}</span>}
       meta={[runStatus(run)]}
       onClick={() => openRun(run.id)}
       actions={
-        primary &&
-        Icon && (
-          <IconButton
+        primary && (
+          <Button
             variant="ghost"
             size="sm"
             className="wf-row-action"
-            aria-label={primary.label}
-            title={`${primary.label}: ${actionHint(primary, run)}`}
+            data-primary
+            title={actionHint(primary, run)}
             disabled={busy}
             onClick={() => void perform(run, primary.name)}
           >
-            <Icon />
-          </IconButton>
+            {primary.label}
+          </Button>
         )
       }
     >
@@ -190,7 +184,7 @@ function Available({ dir, listed }: { dir: string; listed: Listed | undefined })
   const listing = listed?.listing
   return (
     <div className="panel-section-divided">
-      <TreeRow emphasis="group" label={`Workflows in ${basename(dir)}`} badge={<SectionCount n={listing?.workflows.length} />} />
+      <TreeRow emphasis="group" label={`Workflows in ${basename(dir)}`} badge={listing?.workflows.length} />
       {listed?.error && <div className="placeholder error">{listed.error}</div>}
       {listing?.restricted && <Restricted dir={dir} hidden={listing.hidden} />}
       {listing?.workflows.map((w) => <WorkflowRow key={w.name} dir={dir} workflow={w} />)}
@@ -204,7 +198,7 @@ function Available({ dir, listed }: { dir: string; listed: Listed | undefined })
       )}
       {listing && listing.problems.length > 0 && (
         <>
-          <TreeRow emphasis="group" label="Problems" badge={<SectionCount n={listing.problems.length} />} />
+          <TreeRow emphasis="group" label="Problems" badge={listing.problems.length} />
           {listing.problems.map((p, i) => <ProblemRow key={`${p}:${i}`} text={p} />)}
         </>
       )}
@@ -236,17 +230,17 @@ function WorkflowRow({ dir, workflow }: { dir: string; workflow: WorkflowInfo })
       actions={
         <>
           <span title={ok ? `Run ${workflow.name}: you say what to do, then pick the agent` : `Can't run: ${workflow.problem || 'it has no steps'}`}>
-            <IconButton variant="ghost" size="sm" className="wf-row-action" aria-label={`Run ${workflow.name}…`} disabled={!ok} onClick={() => openRunDialog(workflow.name, dir)}>
-              <Play />
-            </IconButton>
+            <Button variant="ghost" size="sm" className="wf-row-action" aria-label={`Run ${workflow.name}…`} disabled={!ok} onClick={() => openRunDialog(workflow.name, dir)}>
+              Run…
+            </Button>
           </span>
-          <IconButton variant="ghost" size="sm" className="wf-row-action" aria-label={`Show ${workflow.name} as a diagram`} title={`Show ${workflow.name} as a diagram`} onClick={() => openWorkflowView(dir, workflow.name)}>
-            <Workflow />
-          </IconButton>
+          <Button variant="ghost" size="sm" className="wf-row-action" aria-label={`View ${workflow.name}`} title={`Show ${workflow.name} as a diagram`} onClick={() => openWorkflowView(dir, workflow.name)}>
+            View
+          </Button>
           {workflow.path && (
-            <IconButton variant="ghost" size="sm" className="wf-row-action" aria-label={`Open ${workflow.path}`} title={`Open ${workflow.path}`} onClick={() => openWorkflowFile(workflow.path)}>
-              <FileText />
-            </IconButton>
+            <Button variant="ghost" size="sm" className="wf-row-action" aria-label={`Open ${workflow.name}`} title={`Open ${workflow.path}`} onClick={() => openWorkflowFile(workflow.path)}>
+              Open
+            </Button>
           )}
         </>
       }

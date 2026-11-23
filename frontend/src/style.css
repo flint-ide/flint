@@ -3602,14 +3602,14 @@ button.keymap-chord:hover {
 
 /* The state colours of steps and runs (stepLook.ts): one variable, --wf-tone, read by the block's top edge, its
    mark, its state word, the connector dots of the panel and the run rows. Theme variables only. */
-:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-run-row, .wf-run-state, .wf-detail) {
+:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-detail) {
   --wf-tone: var(--fg-faint);
 }
-:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-run-row, .wf-run-state, .wf-detail)[data-status='done'] { --wf-tone: var(--ok); }
-:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-run-row, .wf-run-state, .wf-detail)[data-status='running'] { --wf-tone: var(--info); }
-:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-run-row, .wf-run-state, .wf-detail)[data-status='waiting'] { --wf-tone: var(--accent); }
-:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-run-row, .wf-run-state, .wf-detail)[data-status='failed'] { --wf-tone: var(--danger); }
-:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-run-row, .wf-run-state, .wf-detail):is([data-status='paused'], [data-status='queued'], [data-status='skipped']) {
+:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-detail)[data-status='done'] { --wf-tone: var(--ok); }
+:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-detail)[data-status='running'] { --wf-tone: var(--info); }
+:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-detail)[data-status='waiting'] { --wf-tone: var(--accent); }
+:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-detail)[data-status='failed'] { --wf-tone: var(--danger); }
+:is(.wf-node, .wf-mark, .wf-dot, .wf-node-state, .wf-detail):is([data-status='paused'], [data-status='queued'], [data-status='skipped']) {
   --wf-tone: var(--warn);
 }
 
@@ -4206,16 +4206,6 @@ button.wf-node:focus-visible {
   width: 13px;
   height: 13px;
 }
-/* The count of a section head (SectionCount): a small muted number, not a pill. */
-.wf-count {
-  padding: 0 2px;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-  font-variant-numeric: tabular-nums;
-  color: var(--fg-muted);
-}
 .wf-prose {
   margin: 0;
   max-height: 260px;
@@ -4303,19 +4293,8 @@ button.wf-node:focus-visible {
 }
 
 /* The panel: a run's row carries its state on the left edge and a segment per step; a workflow's row its kind tiles. */
-.wf-run-row:is([data-status='waiting'], [data-status='failed']) {
-  box-shadow: inset 3px 0 0 var(--wf-tone);
-}
-.wf-run-row .fui-list-leading .wf-mark {
-  width: 18px;
-  height: 18px;
-}
-.wf-run-row .fui-list-leading .wf-mark svg {
-  width: 11px;
-  height: 11px;
-}
 /* A row of the panel is one unit (the kit ListItem): its hover, focus and selection cover every line, and its
-   small icon actions sit inside it, at the end of the title line, 20px so the line never changes height. */
+   small text actions (the kit's title-line actions) sit inside it, so the line never changes height. */
 .wf-run-foot {
   display: flex;
   align-items: center;
@@ -4327,30 +4306,15 @@ button.wf-node:focus-visible {
 .wf-workflow-row .fui-task-note {
   padding: 1px 0 0;
 }
-.wf-row-action {
-  width: 20px;
-  height: 20px;
-  min-width: 20px;
-  min-height: 20px;
-  padding: 0;
-}
-.wf-row-action svg {
-  width: 14px;
-  height: 14px;
+/* A run's primary action (Approve, Check again…) in the accent's text colour, never a filled button; the kit sizes it. */
+.fui-list-actions .wf-row-action[data-primary] {
+  color: var(--accent);
+  font-weight: 600;
 }
 .wf-run-workflow {
   flex: 1;
   min-width: 0;
   font-size: 11px;
-  color: var(--fg-muted);
-}
-.wf-run-state {
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  color: var(--wf-tone);
-}
-.wf-run-state:is([data-status='stopped'], [data-status='pending']) {
   color: var(--fg-muted);
 }
 .wf-dots {

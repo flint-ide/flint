@@ -2,7 +2,6 @@ import { useWorkflows, openRun, openWorkflowSettings } from './store'
 import type { ScheduleView } from '../../../bindings/flint/internal/features/workflows/models'
 import { SCHEDULE_CHANGED_NOTE, scheduleLines, scheduleWhen } from './workflows'
 import { ReviewButton } from './ScheduleReview'
-import { SectionCount } from './StepParts'
 import { Button, TaskCard, TreeRow } from '@flint-ide/ui'
 
 const basename = (p: string) => p.replace(/\/+$/, '').slice(p.replace(/\/+$/, '').lastIndexOf('/') + 1)
@@ -13,7 +12,7 @@ export function Schedules() {
   if (!schedules || schedules.length === 0) return null
   return (
     <div className="panel-section-divided">
-      <TreeRow emphasis="group" label="Schedules" badge={<SectionCount n={schedules.length} />} />
+      <TreeRow emphasis="group" label="Schedules" badge={schedules.length} />
       {schedules.map((s) => <ScheduleRow key={s.name} schedule={s} />)}
       <div className="placeholder muted">
         <span>

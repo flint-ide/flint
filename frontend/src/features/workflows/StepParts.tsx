@@ -114,11 +114,3 @@ export function LogMark({ kind }: { kind: LogKind }) {
   )
 }
 
-/**
- * The count of a section head (Needs you, Workflows in …, Schedules, the log): a small muted number, quieter than the
- * kit's pill, so a sidebar's heads do not shout. undefined while the number is not known.
- */
-export function SectionCount({ n }: { n: number | undefined }) {
-  if (n === undefined) return null
-  return <span className="wf-count">{n}</span>
-}

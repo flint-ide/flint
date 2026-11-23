@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
-import { Badge, Button, IconButton, ListGroup, ListItem, TaskCard, TreeRow } from '@flint-ide/ui'
-import { X } from '@flint-ide/ui/icons'
+import { Badge, Button, ListGroup, ListItem, TaskCard, TreeRow } from '@flint-ide/ui'
 
-/** TaskCard: an agent task or a work item: state, title, meta, CI, notes, actions and sub-rows (ui/src/TaskCard.tsx). */
+/**
+ * TaskCard: an agent task or a work item: state, title, meta, CI, notes, actions and sub-rows (ui/src/TaskCard.tsx).
+ * A clickable card hovers and shows its selection as one unit, actions bar and sub-rows included; its actions are words.
+ */
 const meta = { title: 'Flint/Task Card', component: TaskCard } satisfies Meta<typeof TaskCard>
 
 export default meta
@@ -54,7 +56,7 @@ export const AgentTasks: Story = {
         <Button variant="ghost" size="sm">Open</Button>
         {extra && <Button variant="ghost" size="sm">{extra}</Button>}
         <span className="fui-grow" />
-        <IconButton variant="ghost" size="sm" aria-label="Remove the task"><X /></IconButton>
+        <Button variant="ghost" size="sm" title="Remove the task">Remove</Button>
       </>
     )
     return (

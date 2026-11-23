@@ -47,7 +47,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 4px 0 12px;
+  padding: 0 6px 0 12px;
   height: 34px;
   flex: none;
   cursor: pointer;
@@ -59,6 +59,7 @@
 .fui-tab:hover { color: var(--fg); }
 .fui-tab[aria-selected='true'] { color: var(--fg); background: var(--bg-raised); box-shadow: inset 0 2px 0 var(--accent); }
 .fui-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.fui-tab .fui-tab-close { flex: none; width: 20px; height: 20px; min-width: 0; padding: 0; }
 .fui-tab-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fui-tab-dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; display: none; }
 .fui-tab-close[data-dirty] .fui-tab-dot { display: block; }

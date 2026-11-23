@@ -1882,12 +1882,17 @@ body:has(.toast.attention) [data-slot='toast-viewport'][data-position='bottom-ri
 .quick-item:hover {
   background: var(--bg-hover);
 }
+/* Always laid out, so a row keeps its height and its text when the actions appear. */
 .row-actions.inline {
-  display: none;
-  margin-left: auto;
-}
-.quick-item:hover .row-actions.inline {
   display: flex;
+  align-self: center;
+  margin-left: auto;
+  margin-block: -8px;
+  visibility: hidden;
+}
+.quick-item:hover .row-actions.inline,
+.quick-item:focus-within .row-actions.inline {
+  visibility: visible;
 }
 
 .diff-view {

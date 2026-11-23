@@ -152,7 +152,7 @@ subscribeUsageEvents()
     <div className="app">
       <TitleBar />
       <div className="workbench" ref={workbench}>
-        <ActivityBar onTerminal={() => toggleTerminal(activeRoot())} />
+        <ActivityBar />
         {sidebarVisible && (
           <ResizableSidebar workbench={workbench}>
             <ErrorBoundary label="Sidebar">

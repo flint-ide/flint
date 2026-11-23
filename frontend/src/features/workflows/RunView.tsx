@@ -11,7 +11,7 @@ import {
   primaryAction, runIdOf, runStateLabel, runStatus, runTabTitle, runTone, type ActionInfo, type RunInfo,
 } from './workflows'
 import { loadRuns, openRunChat, openStepRun, openTask, perform, showTaskChanges, useWorkflows } from './store'
-import { Alert, AlertDescription, Button, Progress, ProgressLabel, ProgressValue } from '@flint-ide/ui'
+import { Alert, AlertDescription, Button, Count, Progress, ProgressLabel, ProgressValue } from '@flint-ide/ui'
 import { Check, Hand, LoaderCircle, Pause, Square, Workflow, X, type LucideIcon } from '@flint-ide/ui/icons'
 
 /** The run tab: the one place a run is steered from. Its steps are a line of blocks; a click shows one below. */
@@ -222,7 +222,7 @@ function LogCard({ run }: { run: RunInfo }) {
     <section className="wf-card" aria-label="Log">
       <div className="wf-pane-head">
         Log
-        <span className="fui-tree-count">{run.log.length}</span>
+        <Count>{run.log.length}</Count>
       </div>
       <ol className="wf-log">
         {run.log.length === 0 && <li className="muted">Nothing yet.</li>}

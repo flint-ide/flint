@@ -4,7 +4,9 @@ import { Badge, Button, ListGroup, ListItem, TaskCard, TreeRow } from '@flint-id
 
 /**
  * TaskCard: an agent task or a work item: state, title, meta, CI, notes, actions and sub-rows (ui/src/TaskCard.tsx).
- * A clickable card hovers and shows its selection as one unit, actions bar and sub-rows included; its actions are words.
+ * The actions bar (the card's last line, always shown) is the one place an agent panel puts an item's actions: quiet
+ * words; `data-primary` on the one that waits for a person (Approve, Check again) gives it the accent's text colour.
+ * A card that opens on click or carries actions hovers and shows its selection as one unit, bar and sub-rows included.
  */
 const meta = { title: 'Flint/Task Card', component: TaskCard } satisfies Meta<typeof TaskCard>
 
@@ -28,6 +30,7 @@ export const Playground: Story = {
     ci: { state: 'pending', title: '3 checks running' },
     actions: (
       <>
+        <Button variant="ghost" size="sm" data-primary>Approve</Button>
         <Button variant="ghost" size="sm">Open</Button>
         <Button variant="ghost" size="sm">Show diff</Button>
       </>

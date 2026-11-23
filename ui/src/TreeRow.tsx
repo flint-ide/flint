@@ -1,4 +1,5 @@
 import type { ComponentProps, MouseEvent, ReactNode } from 'react'
+import { Count } from './Count'
 import { classNames, treeIndent, type TwistyState, twistyGlyph } from './treeIndent'
 
 export type TreeRowProps = Omit<ComponentProps<'div'>, 'children'> & {
@@ -87,7 +88,7 @@ export function TreeRow({
         </span>
       )}
       {badge !== undefined && badge !== null && badge !== false && (
-        <span className="fui-tree-badge">{typeof badge === 'number' ? <span className="fui-tree-count">{badge}</span> : badge}</span>
+        <span className="fui-tree-badge">{typeof badge === 'number' ? <Count>{badge}</Count> : badge}</span>
       )}
     </div>
   )

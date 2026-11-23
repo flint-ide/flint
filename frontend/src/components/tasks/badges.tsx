@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Badge } from '@flint-ide/ui'
+import { Badge, Count } from '@flint-ide/ui'
 
 type BadgeColor = NonNullable<Parameters<typeof Badge>[0]['color']>
 
@@ -39,11 +39,11 @@ export function MarkerBadge({ tone, title, children }: BadgeProps & { tone?: str
   )
 }
 
-/** A count at the end of a row or header. */
+/** A count at the end of a row or header (a board column, a section): the kit's quiet count, not a pill. */
 export function CountBadge({ title, children }: BadgeProps) {
   return (
-    <Badge color="grey" badgeStyle="light" size="sm" className="count-badge" title={title}>
+    <Count className="count-badge" title={title}>
       {children}
-    </Badge>
+    </Count>
   )
 }

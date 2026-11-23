@@ -10,7 +10,7 @@ import { WorkflowDialogs } from './Dialogs'
 import { Schedules } from './Schedules'
 import { KindSummary } from './KindSummary'
 import { StateBadge } from './StepParts'
-import { runProgress, stepLook, type StepStatus } from './stepLook'
+import { runProgress, stepLook } from './stepLook'
 import {
   groupRuns, originText, restrictedNote, runStateLabel, runStatus, runTone, runTooltip, sourceLabel, stepCount, usable, primaryAction, actionHint,
   type RunInfo, type WorkflowInfo,
@@ -18,7 +18,7 @@ import {
 import {
   loadList, loadRuns, openCoordinateDialog, openNewDialog, openRun, openRunDialog, openWorkflowFile, openWorkflowView, perform, trustWorkflowFolder, useWorkflows, type Listed,
 } from './store'
-import { Button, IconButton, ListItem, PanelHeader, TaskCard, TreeRow, TreeSection } from '@flint-ide/ui'
+import { Button, IconButton, PanelHeader, TaskCard, TreeRow, TreeSection } from '@flint-ide/ui'
 import { Ellipsis, Plus, RefreshCw } from '@flint-ide/ui/icons'
 
 const basename = (p: string) => p.replace(/\/+$/, '').slice(p.replace(/\/+$/, '').lastIndexOf('/') + 1)
@@ -113,54 +113,30 @@ function Runs({ runs }: { runs: RunInfo[] | null }) {
   )
 }
 
-/** The look of a run as a whole, for the mark at the start of its row. */
-function runStatusOf(run: RunInfo): StepStatus {
-  if (run.queued && run.state === 'running') return 'queued'
-  switch (run.state) {
-    case 'running': case 'waiting': case 'failed': case 'paused': case 'done': case 'stopped': return run.state
-    default: return 'pending'
-  }
-}
-
 /**
- * A run in the panel: the whole row opens its tab, where the actions are. The primary action is also a small quiet
- * text button at the end of the title line, shown on hover or keyboard focus in place of the state word (the kit's
- * row actions), so the row keeps its height and the state word does the talking otherwise.
+ * A run in the panel, as a kit TaskCard like every agent panel's item: the state badge, the title, the step segments
+ * and the workflow, the status sentence; the whole card opens the run's tab. Its one action that waits for a person
+ * (Approve, Check again, Resume, Retry) sits in the card's actions bar, always shown, in the accent's text colour.
  */
 function RunRow({ run }: { run: RunInfo }) {
   const busy = useWorkflows((s) => !!s.busy[run.id])
   const primary = primaryAction(run.actions)
-  const status = runStatusOf(run)
   return (
-    <ListItem
-      className="wf-run-row"
-      data-status={status}
-      title={runTooltip(run)}
-      leading={<StateBadge tone={runTone(run)}>{runStateLabel(run)}</StateBadge>}
+    <TaskCard
+      tooltip={runTooltip(run)}
+      status={<StateBadge tone={runTone(run)}>{runStateLabel(run)}</StateBadge>}
       label={run.title || run.workflow}
-      meta={[runStatus(run)]}
-      onClick={() => openRun(run.id)}
+      meta={[<StepDots key="d" run={run} />, run.workflow, originText(run.origin) || false]}
+      notes={[{ text: runStatus(run), truncate: true, title: runStatus(run) }]}
+      onOpen={() => openRun(run.id)}
       actions={
         primary && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="wf-row-action"
-            data-primary
-            title={actionHint(primary, run)}
-            disabled={busy}
-            onClick={() => void perform(run, primary.name)}
-          >
+          <Button variant="ghost" size="sm" data-primary title={actionHint(primary, run)} disabled={busy} onClick={() => void perform(run, primary.name)}>
             {primary.label}
           </Button>
         )
       }
-    >
-      <div className="wf-run-foot">
-        <StepDots run={run} />
-        <span className="wf-run-workflow truncate">{[run.workflow, originText(run.origin)].filter(Boolean).join(' · ')}</span>
-      </div>
-    </ListItem>
+    />
   )
 }
 
@@ -216,38 +192,38 @@ function Restricted({ dir, hidden }: { dir: string; hidden: number }) {
   )
 }
 
+/** A workflow in the panel, as a kit TaskCard: name, kind tiles, steps and source, description; Run…, View and Open in its actions bar. */
 function WorkflowRow({ dir, workflow }: { dir: string; workflow: WorkflowInfo }) {
   const ok = usable(workflow)
   return (
-    <ListItem
-      className="wf-workflow-row"
-      title={workflow.path || 'Built in'}
+    <TaskCard
+      tooltip={workflow.path || 'Built in'}
       label={workflow.name}
-      onClick={() => openWorkflowView(dir, workflow.name)}
+      onOpen={() => openWorkflowView(dir, workflow.name)}
       badges={workflow.problem ? <MarkerBadge tone="error">{sourceLabel(workflow.source)}</MarkerBadge> : undefined}
       meta={ok ? [<KindSummary key="k" steps={workflow.steps} />, stepCount(workflow.steps.length), sourceLabel(workflow.source)] : [sourceLabel(workflow.source)]}
-      showActions="always"
+      notes={[
+        !!workflow.description && { text: workflow.description, truncate: true, title: workflow.description },
+        !!workflow.problem && { text: workflow.problem, tone: 'danger' },
+      ]}
       actions={
         <>
           <span title={ok ? `Run ${workflow.name}: you say what to do, then pick the agent` : `Can't run: ${workflow.problem || 'it has no steps'}`}>
-            <Button variant="ghost" size="sm" className="wf-row-action" aria-label={`Run ${workflow.name}…`} disabled={!ok} onClick={() => openRunDialog(workflow.name, dir)}>
+            <Button variant="ghost" size="sm" aria-label={`Run ${workflow.name}…`} disabled={!ok} onClick={() => openRunDialog(workflow.name, dir)}>
               Run…
             </Button>
           </span>
-          <Button variant="ghost" size="sm" className="wf-row-action" aria-label={`View ${workflow.name}`} title={`Show ${workflow.name} as a diagram`} onClick={() => openWorkflowView(dir, workflow.name)}>
+          <Button variant="ghost" size="sm" aria-label={`View ${workflow.name}`} title={`Show ${workflow.name} as a diagram`} onClick={() => openWorkflowView(dir, workflow.name)}>
             View
           </Button>
           {workflow.path && (
-            <Button variant="ghost" size="sm" className="wf-row-action" aria-label={`Open ${workflow.name}`} title={`Open ${workflow.path}`} onClick={() => openWorkflowFile(workflow.path)}>
+            <Button variant="ghost" size="sm" aria-label={`Open ${workflow.name}`} title={`Open ${workflow.path}`} onClick={() => openWorkflowFile(workflow.path)}>
               Open
             </Button>
           )}
         </>
       }
-    >
-      {workflow.description && <div className="fui-task-note" data-truncate title={workflow.description}>{workflow.description}</div>}
-      {workflow.problem && <div className="fui-task-note" data-tone="danger">{workflow.problem}</div>}
-    </ListItem>
+    />
   )
 }
 

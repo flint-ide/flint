@@ -4293,30 +4293,6 @@ button.wf-node:focus-visible {
 }
 
 /* The panel: a run's row carries its state on the left edge and a segment per step; a workflow's row its kind tiles. */
-/* A row of the panel is one unit (the kit ListItem): its hover, focus and selection cover every line, and its
-   small text actions (the kit's title-line actions) sit inside it, so the line never changes height. */
-.wf-run-foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 16px;
-  padding-top: 2px;
-}
-/* Notes inside a workflow row line up with its meta line (the row's own padding already applies). */
-.wf-workflow-row .fui-task-note {
-  padding: 1px 0 0;
-}
-/* A run's primary action (Approve, Check again…) in the accent's text colour, never a filled button; the kit sizes it. */
-.fui-list-actions .wf-row-action[data-primary] {
-  color: var(--accent);
-  font-weight: 600;
-}
-.wf-run-workflow {
-  flex: 1;
-  min-width: 0;
-  font-size: 11px;
-  color: var(--fg-muted);
-}
 .wf-dots {
   display: flex;
   flex: none;
@@ -4353,12 +4329,12 @@ button.wf-node:focus-visible {
   font-size: 11px;
   color: var(--fg-muted);
 }
-.wf-workflow-row .wf-kinds [data-slot='icon-tile'] {
+.workflows-panel .wf-kinds [data-slot='icon-tile'] {
   width: 18px;
   height: 18px;
   border-radius: 4px;
 }
-.wf-workflow-row .wf-kinds [data-slot='icon-tile'] svg {
+.workflows-panel .wf-kinds [data-slot='icon-tile'] svg {
   width: 12px;
   height: 12px;
 }

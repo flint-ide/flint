@@ -3,7 +3,10 @@ import { useState } from 'react'
 import { Checkbox, IconButton, TreeRow, TreeSection } from '@flint-ide/ui'
 import { ExternalLink, File, Folder, FolderOpen, Undo2 } from '@flint-ide/ui/icons'
 
-/** TreeRow and TreeSection: the 22 px rows of every sidebar list and tree (ui/src/TreeRow.tsx). */
+/**
+ * TreeRow and TreeSection: the 22 px rows of every sidebar list and tree (ui/src/TreeRow.tsx). A numeric `badge` or
+ * `count` is the kit's quiet Count (a small muted number, ui/src/Count.tsx), not a pill.
+ */
 const meta = { title: 'Flint/Tree Row', component: TreeRow } satisfies Meta<typeof TreeRow>
 
 export default meta

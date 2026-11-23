@@ -139,10 +139,12 @@
 .fui-list-item[data-dimmed] .fui-list-label { color: var(--fg-muted); }
 .fui-list-end { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; flex: none; }
 .fui-list-actions { gap: 2px; }
-/* Text buttons on the title line are quiet and compact (20 px, the line's own height), so a row keeps its height
-   when its hover actions appear in place of the trailing part. */
-.fui-list-actions [data-slot='button'] { height: 20px; min-height: 20px; padding: 0 6px; font-size: 12px; font-weight: 500; color: var(--fg-muted); }
-.fui-list-actions [data-slot='button']:hover:not(:disabled) { color: var(--fg); }
+/* Row actions are words in ONE form wherever they sit (a card's actions bar, a list row's title line): quiet,
+   compact text buttons 20 px tall (a title line's own height, so hover actions never change a row's height).
+   data-primary marks the action that waits for a person's decision (Approve, Check again): accent text, not a fill. */
+:is(.fui-list-actions, .fui-task-actions) [data-slot='button'] { height: 20px; min-height: 20px; padding: 0 6px; font-size: 12px; font-weight: 500; color: var(--fg-muted); }
+:is(.fui-list-actions, .fui-task-actions) [data-slot='button']:hover:not(:disabled) { color: var(--fg); }
+:is(.fui-list-actions, .fui-task-actions) [data-slot='button'][data-primary] { font-weight: 600; color: var(--accent); }
 /* Hover actions: shown on hover, keyboard focus inside or the list's cursor, in the trailing part's place. */
 .fui-list-item[data-actions='hover'] .fui-list-actions { display: none; }
 .fui-list-item[data-actions='hover']:is(:hover, :focus-within, [data-selected]) .fui-list-actions { display: inline-flex; }
@@ -184,10 +186,11 @@
 .fui-task-card[draggable='true'] { cursor: grab; }
 .fui-task-card[data-dragging] { opacity: 0.45; }
 .fui-task-card > .fui-list-item { padding-bottom: 1px; }
-/* A clickable card hovers, takes focus and shows its selection as ONE unit: head, meta, notes, the actions bar and
-   the sub-rows (a task's changed files) share the background, so the actions read as the card's own. The head
-   draws no background of its own then; buttons and sub-rows keep their own hover on top. */
-.fui-task-card:has(> .fui-list-item[data-clickable]):is(:hover, :focus-within) { background: var(--bg-hover); }
+/* A card that opens on click or carries actions hovers, takes focus and shows its selection as ONE unit: head,
+   meta, notes, the actions bar and the sub-rows (a task's changed files) share the background, so the actions read
+   as the card's own (a card without a click target keeps its default cursor). The head draws no background of its
+   own then; buttons and sub-rows keep their own hover on top. */
+.fui-task-card:is(:has(> .fui-list-item[data-clickable]), :has(> .fui-task-actions)):is(:hover, :focus-within) { background: var(--bg-hover); }
 .fui-task-card:has(> .fui-list-item:is([data-active], [data-selected])) { background: var(--bg-active); }
 .fui-task-card > .fui-list-item[data-clickable]:hover,
 .fui-task-card > .fui-list-item:is([data-active], [data-selected]) { background: transparent; }
@@ -198,7 +201,8 @@
 .fui-task-note[data-tone='danger'] { color: var(--danger); }
 .fui-task-note[data-truncate] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fui-task-note[data-mono] { font-family: var(--font-mono); }
-/* Ghost buttons carry their own 8 px padding: start 4 px in so their text lines up with the meta. */
+/* The actions bar: the card's last line, the one place a card's actions sit (always shown). Its buttons carry 6 px
+   of padding: start 4 px in so their text lines up with the meta. */
 .fui-task-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding-top: 3px; padding-left: calc(4px + var(--list-inset, 0px)); }
 .fui-task-sub { display: flex; flex-direction: column; padding-top: 2px; }
 
@@ -287,8 +291,8 @@
 .fui-tree-hint b { color: var(--accent); font-weight: 600; }
 .fui-tree-actions { margin-left: auto; display: none; align-items: center; gap: 2px; }
 .fui-tree-badge { margin-left: auto; flex: none; display: inline-flex; }
-/* A row's or a section's count: a small muted number, not a pill, so the heads of a sidebar stay quiet. */
-.fui-tree-count { padding: 0 2px; font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--fg-muted); }
+/* Count: a section's, a column's or a row's number, small and muted, not a pill, so the heads stay quiet. */
+.fui-count { padding: 0 2px; font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--fg-muted); }
 /* Hover or keyboard focus inside: the actions take the hint's and the count's place. */
 .fui-tree-row:is(:hover, :focus-within) > .fui-tree-actions, .fui-tree-row[data-actions='always'] > .fui-tree-actions { display: flex; }
 /* Persistent actions sit beside the badge, which then needs no auto margin of its own. */

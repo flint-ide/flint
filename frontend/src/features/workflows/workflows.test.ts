@@ -6,7 +6,7 @@ import {
   onFailHint, orderedActions, pickWorkflow, primaryAction, runIdOf, restrictedNote, runStateLabel, runStatus, runTone, sendBackChoices, sourceLabel,
   MAX_TASK_BYTES, stepBadge, stoppedStep, outputLabel, capitalize, stepCount, stepKind, stepWho, taskProblem, usable, workflowMeta,
   daysText, goalProblem, isRestrictedError, lastRunText, nextText, SCHEDULE_CHANGED_NOTE, scheduleLines, scheduleWhen, scriptNotice, sandboxText, skippedText, consentText, UNSANDBOXED_ASKS, UNSANDBOXED_ALLOWED,
-  workflowViewTitle, workflowViewData, workflowViewKey, workflowHeader, workflowViewState, WORKFLOW_GONE, clampStep, noTextNote, isWorkflowFile, workflowForPath, workflowFileRoot,
+  runTooltip, workflowViewTitle, workflowViewData, workflowViewKey, workflowHeader, workflowViewState, WORKFLOW_GONE, clampStep, noTextNote, isWorkflowFile, workflowForPath, workflowFileRoot,
   type RunInfo, type StepInfo, type WorkflowInfo,
 } from './workflows'
 
@@ -492,5 +492,15 @@ describe('a step without text', () => {
     assert.match(noTextNote('script'), /runs the command/)
     assert.match(noTextNote('gate'), /until you approve/)
     assert.match(noTextNote('agent'), /task is what the agent gets/)
+  })
+})
+
+describe('runTooltip', () => {
+  it('shows the title once when the task is the same text', () => {
+    assert.equal(runTooltip({ title: 'Create hello.txt as the step says.', workflow: 'w', description: 'Create hello.txt as the step says. ' }), 'Create hello.txt as the step says.')
+  })
+  it('adds the task when it says more, and falls back to the workflow without a title', () => {
+    assert.equal(runTooltip({ title: 'Add login', workflow: 'ship', description: 'Add a login form\nwith tests' }), 'Add login\n\nAdd a login form\nwith tests')
+    assert.equal(runTooltip({ title: '', workflow: 'ship', description: '' }), 'ship')
   })
 })

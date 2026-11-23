@@ -203,6 +203,16 @@ export const needsYouText = (n: number): string => `Workflows: ${n} ${n === 1 ? 
 
 export const runTabTitle = (run: Pick<RunInfo, 'title' | 'workflow'>): string => run.title || run.workflow
 
+/**
+ * The tooltip of a run's row: its title, then the task when the task says more. A run started from the dialog takes
+ * its title from the task, so the two are often the same text: it is shown once.
+ */
+export function runTooltip(run: Pick<RunInfo, 'title' | 'workflow' | 'description'>): string {
+  const title = runTabTitle(run).trim()
+  const task = run.description.trim()
+  return task && task !== title ? `${title}\n\n${task}` : title
+}
+
 // ---- steps
 
 export interface KindInfo {

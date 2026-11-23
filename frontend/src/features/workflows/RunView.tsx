@@ -4,7 +4,7 @@ import { useEditor } from '../../store/editor'
 import { WorkflowDialogs } from './Dialogs'
 import { StepDetail } from './StepDetail'
 import { StepFlow } from './StepFlow'
-import { LogMark, StateBadge } from './StepParts'
+import { LogMark, SectionCount, StateBadge } from './StepParts'
 import { logKind, runProgress, stepLook, waitingNote } from './stepLook'
 import {
   actionHint, AGENT_ANSWER_NOTE, capitalize, canRecheck, chatButton, DONE_NOTE, holdDetail, initialStep, logLines, orderedActions, originText,
@@ -222,7 +222,7 @@ function LogCard({ run }: { run: RunInfo }) {
     <section className="wf-card" aria-label="Log">
       <div className="wf-pane-head">
         Log
-        <span className="wf-pane-count">{run.log.length}</span>
+        <SectionCount n={run.log.length} />
       </div>
       <ol className="wf-log">
         {run.log.length === 0 && <li className="muted">Nothing yet.</li>}

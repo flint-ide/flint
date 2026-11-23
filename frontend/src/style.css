@@ -4206,9 +4206,15 @@ button.wf-node:focus-visible {
   width: 13px;
   height: 13px;
 }
-.wf-pane-count {
+/* The count of a section head (SectionCount): a small muted number, not a pill. */
+.wf-count {
+  padding: 0 2px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
   font-variant-numeric: tabular-nums;
-  color: var(--fg-faint);
+  color: var(--fg-muted);
 }
 .wf-prose {
   margin: 0;
@@ -4308,12 +4314,29 @@ button.wf-node:focus-visible {
   width: 11px;
   height: 11px;
 }
+/* A row of the panel is one unit (the kit ListItem): its hover, focus and selection cover every line, and its
+   small icon actions sit inside it, at the end of the title line, 20px so the line never changes height. */
 .wf-run-foot {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 24px;
-  padding: 3px 10px 0 calc(10px + var(--list-inset, 0px));
+  min-height: 16px;
+  padding-top: 2px;
+}
+/* Notes inside a workflow row line up with its meta line (the row's own padding already applies). */
+.wf-workflow-row .fui-task-note {
+  padding: 1px 0 0;
+}
+.wf-row-action {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  padding: 0;
+}
+.wf-row-action svg {
+  width: 14px;
+  height: 14px;
 }
 .wf-run-workflow {
   flex: 1;

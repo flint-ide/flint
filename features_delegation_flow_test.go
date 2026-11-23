@@ -64,12 +64,18 @@ func TestDelegatedItemStatusFollowsItsRunsThroughTheRealHooks(t *testing.T) {
 	f.ev.until(t, "the item back in doing", func() bool { return f.status(t, "rl") == projects.StatusDoing })
 
 	// The sent-back step runs in a new chat of the web task.
-	var webChats []string
-	for _, c := range f.ev.chats() {
-		if c.TaskID == p.webTask {
-			webChats = append(webChats, c.Info.ID)
+	// The run is running again before its step's chat is open, so wait for the chat.
+	webChatsNow := func() []string {
+		var ids []string
+		for _, c := range f.ev.chats() {
+			if c.TaskID == p.webTask {
+				ids = append(ids, c.Info.ID)
+			}
 		}
+		return ids
 	}
+	f.ev.until(t, "the sent-back step's chat", func() bool { return len(webChatsNow()) >= 2 })
+	webChats := webChatsNow()
 	if len(webChats) != 2 || webChats[0] != p.webChat {
 		t.Errorf("chats of the web task: %v", webChats)
 	}

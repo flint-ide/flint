@@ -58,6 +58,22 @@ func TestReadImageStaysInsideRoots(t *testing.T) {
 	if _, err := ReadImage(filepath.Join(root, "a.txt"), []string{root}); err == nil {
 		t.Error("non-image accepted")
 	}
+	// A tab the user opened reads the image wherever it is, but still only images and files.
+	if img, err := ReadOpenedImage(filepath.Join(outside, "secret.png")); err != nil || !strings.HasPrefix(img.DataURL, "data:image/png;base64,") {
+		t.Errorf("opened image outside: img %+v err %v", img, err)
+	}
+	if _, err := ReadOpenedImage(filepath.Join(root, "a.txt")); err == nil {
+		t.Error("opened non-image accepted")
+	}
+	if _, err := ReadOpenedImage("a.png"); err == nil {
+		t.Error("opened relative path accepted")
+	}
+	if err := os.Mkdir(filepath.Join(root, "dir.png"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadOpenedImage(filepath.Join(root, "dir.png")); err == nil {
+		t.Error("opened directory accepted")
+	}
 }
 
 func TestReadImageCapsSize(t *testing.T) {

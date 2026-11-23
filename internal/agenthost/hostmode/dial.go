@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -23,6 +24,14 @@ const (
 	// without saying ready to finish exiting.
 	exitWait = 5 * time.Second
 )
+
+// spawned is the pid of the host this process started last (Spawned).
+var spawned atomic.Int64
+
+// Spawned is the pid of the background host this process started (0 when
+// it started none): the command line recognises the host by it, never by
+// a command line a process can make up (clisock.Facts.HostPID).
+func Spawned() int { return int(spawned.Load()) }
 
 // Dial connects to the running host of configDir and performs hello. cfg
 // carries the version and the handlers; Dial fills in the token. A host that
@@ -123,6 +132,7 @@ func spawnThen[T any](ctx context.Context, configDir string, connect func(contex
 	if err != nil {
 		return zero, fmt.Errorf("start the host: %w", err)
 	}
+	spawned.Store(int64(cmd.Process.Pid))
 	exited := make(chan error, 1)
 	go func() { exited <- cmd.Wait() }() // reaps it, whenever it ends
 

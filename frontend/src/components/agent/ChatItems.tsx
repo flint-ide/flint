@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react'
 import { ChatContextUsage, ChatFileLink, ChatNotice, ChatPermission, DiffStat, ToolCall, ToolCallOutput, ToolDiff, toolStatus } from '@flint-ide/ui'
 import type { Diff, PermissionRequest, ToolCall as ToolCallData, Usage, UsageTotals } from '../../lib/agentReducer'
-import { contextPercent, formatCost, formatTokens, hasUsage, usageTooltip } from '../../lib/usage'
+import { formatCost, formatTokens, hasUsage, usageTooltip } from '../../lib/usage'
 import { countLines, previewLines, useHunks } from '../../lib/editDiff'
 import { useEditor } from '../../store/editor'
 
@@ -80,11 +80,11 @@ export const PermissionCard = memo(function PermissionCard(props: {
   )
 })
 
-/** Compact running usage of a chat: context fill gauge, tokens and cost; details in the tooltip. */
+/** Compact running usage of a chat: tokens and cost, details in the tooltip. The context fill is the ring in the prompt box. */
 export const ChatUsage = memo(function ChatUsage({ totals }: { totals: UsageTotals }) {
   if (!hasUsage(totals)) return null
   return (
-    <ChatContextUsage percent={contextPercent(totals)} title={usageTooltip(totals)}>
+    <ChatContextUsage percent={null} title={usageTooltip(totals)}>
       <span>
         {formatTokens(totals.inputTokens)} in / {formatTokens(totals.outputTokens)} out
       </span>

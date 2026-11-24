@@ -195,6 +195,33 @@ export function groupRuns(runs: readonly RunInfo[]): RunGroup[] {
   return groups.filter((g) => g.runs.length > 0)
 }
 
+/** One run in a workflow's history strip (a kit StatusTracker item). */
+export interface HistoryItem {
+  id: string
+  state: 'ok' | 'failed' | 'warn' | 'running' | 'skipped'
+  title: string
+}
+
+function historyState(run: Pick<RunInfo, 'state' | 'needsUser'>): HistoryItem['state'] {
+  if (run.state === 'done') return 'ok'
+  if (run.state === 'failed') return 'failed'
+  if (run.state === 'stopped') return 'skipped'
+  return run.needsUser || run.state === 'waiting' || run.state === 'paused' ? 'warn' : 'running'
+}
+
+/** How many runs a workflow's history strip shows. */
+export const HISTORY_RUNS = 10
+
+/** The newest `max` runs of one workflow in one folder, oldest first: what its row shows as a strip. */
+export function workflowHistory(runs: readonly RunInfo[], dir: string, workflow: string, max: number = HISTORY_RUNS): HistoryItem[] {
+  if (max <= 0) return []
+  return runs
+    .filter((r) => r.dir === dir && r.workflow === workflow)
+    .sort((a, b) => a.created - b.created)
+    .slice(-max)
+    .map((r) => ({ id: r.id, state: historyState(r), title: `${r.title || r.workflow}: ${runStateLabel(r)}` }))
+}
+
 /** How many runs wait for the user: the badge of the activity bar and the status bar item. */
 export const needsYouCount = (runs: readonly Pick<RunInfo, 'needsUser'>[]): number => runs.filter((r) => r.needsUser).length
 

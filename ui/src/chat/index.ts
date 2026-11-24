@@ -15,6 +15,23 @@ export {
   ChatView,
   ChatWorking,
 } from './ChatTranscript'
+export { ContextMeter, type ContextMeterProps } from './ContextMeter'
+export { type ContextPart, contextPercent, formatShare, formatTokens, hasLimit, type PartShare, partShares, ringGeometry, type UsageBreakdown, usageBreakdown, usageText } from './contextMeterMath'
+export { MentionPicker, type MentionPickerProps } from './MentionPicker'
+export { applyMention, flatMentions, groupMentions, highlightRange, isImeKey, mentionAt, type MentionGroup, type MentionItem, type MentionKey, type MentionKeyAction, mentionKeyAction, type MentionMatch, mentionQueryAt, type MentionRange, type MentionToken, wrapIndex } from './mention'
+export { type MentionPickerState, type MentionSearch, type MentionSelectResult, type MentionTextareaProps, useMentionPicker, type UseMentionPickerOptions, type UseMentionPickerResult } from './useMentionPicker'
+export { ModelPicker, type ModelPickerProps } from './ModelPicker'
+export {
+  filterModels,
+  flattenGroups,
+  formatContextWindow,
+  groupModels,
+  type ModelGroup,
+  type ModelOption,
+  nextEnabledIndex,
+  triggerAccessibleName,
+  triggerText,
+} from './modelPickerLogic'
 export { codeText, fenceParts, type InlineToken, inlineTokens, type MarkdownLine, parseLine } from './markdown'
 export { type ContextLevel, contextLevel, isNearBottom, isRunning, type ScrollBox, type ToolCallStatus, toolStatus } from './status'
 export {

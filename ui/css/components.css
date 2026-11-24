@@ -553,3 +553,244 @@
 .fui-chat-log > * { flex: none; }
 .fui-tool-head[data-static] .fui-tool-row { flex: 1; }
 .fui-chat-header label, .fui-chat-header label * { font-size: 12px; }
+
+/* TextShimmer */
+/* Plain muted text by default; the active class sweeps a highlight across it.
+   The text keeps its glyphs (fill is transparent, the gradient is clipped to the
+   text), so selection and screen readers are unaffected. */
+.fui-shimmer {
+  color: var(--fg-muted);
+}
+.fui-shimmer-active {
+  background-image: linear-gradient(
+    90deg,
+    var(--fg-muted) 0%,
+    var(--fg-muted) 40%,
+    var(--fg) 50%,
+    var(--fg-muted) 60%,
+    var(--fg-muted) 100%
+  );
+  background-size: 200% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: fui-shimmer-sweep 2.4s linear infinite;
+}
+@keyframes fui-shimmer-sweep {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fui-shimmer-active {
+    animation: none;
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+    color: var(--fg-muted);
+  }
+}
+
+/* DurationBar */
+/* A thin track; the fill is --accent, or --danger once the step is over its estimate.
+   The tick marks the estimate on the track. Widths are set inline by the component. */
+.fui-duration {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-hover);
+}
+.fui-duration-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  max-width: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 160ms ease-out;
+}
+.fui-duration-fill[data-over] {
+  background: var(--danger);
+}
+.fui-duration-tick {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--fg-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fui-duration-fill {
+    transition: none;
+  }
+}
+
+/* Sparkline: an inline SVG trend line. The tone sets currentColor; everything inside draws with it. */
+.fui-sparkline { display: inline-block; flex: none; vertical-align: middle; overflow: visible; color: var(--accent); }
+.fui-sparkline[data-tone='ok'] { color: var(--ok); }
+.fui-sparkline[data-tone='warn'] { color: var(--warn); }
+.fui-sparkline[data-tone='danger'] { color: var(--danger); }
+.fui-sparkline[data-tone='muted'] { color: var(--fg-muted); }
+.fui-sparkline-line { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.fui-sparkline-area { fill: currentColor; fill-opacity: 0.15; stroke: none; }
+.fui-sparkline-dot { fill: currentColor; stroke: none; }
+.fui-sparkline-base { stroke: currentColor; stroke-width: 1; stroke-opacity: 0.4; stroke-linecap: round; stroke-dasharray: 2 3; }
+
+/* StatusTracker: a strip of equal blocks, one per run, oldest left. */
+.fui-status-tracker { --block-w: 4px; --block-h: 12px; display: inline-flex; align-items: center; gap: 2px; vertical-align: middle; max-width: 100%; }
+.fui-status-tracker[data-size='md'] { --block-w: 6px; --block-h: 18px; gap: 3px; }
+.fui-status-block {
+  box-sizing: border-box;
+  flex: none;
+  width: var(--block-w);
+  height: var(--block-h);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 1.5px;
+  background: var(--fg-muted);
+  opacity: 0.25;
+}
+.fui-status-block[data-state='ok'] { background: var(--ok); opacity: 1; }
+.fui-status-block[data-state='failed'] { background: var(--danger); opacity: 1; }
+.fui-status-block[data-state='warn'] { background: var(--warn); opacity: 1; }
+.fui-status-block[data-state='running'] { background: var(--info); opacity: 1; animation: fui-status-pulse 1.4s ease-in-out infinite; }
+.fui-status-block[data-state='skipped'] { opacity: 0.45; }
+button.fui-status-block { cursor: pointer; }
+button.fui-status-block:hover { filter: brightness(1.25); }
+button.fui-status-block:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+@keyframes fui-status-pulse { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) {
+  .fui-status-block[data-state='running'] { animation: none; }
+}
+
+/* ContextMeter (ui/src/chat/ContextMeter.tsx): a ring for the prompt toolbar, or a stacked bar with a legend. */
+.fui-ctx-ring { display: inline-flex; flex: none; align-items: center; justify-content: center; padding: 2px; border: 0; border-radius: 50%; background: none; color: var(--ok); cursor: default; line-height: 0; }
+button.fui-ctx-ring { cursor: pointer; }
+button.fui-ctx-ring:hover { background: var(--bg-hover); }
+.fui-ctx-ring:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.fui-ctx-ring[data-level='warn'] { color: var(--accent); }
+.fui-ctx-ring[data-level='full'] { color: var(--danger); }
+.fui-ctx-ring svg { transform: rotate(-90deg); }
+.fui-ctx-track { stroke: var(--border); }
+.fui-ctx-arc { stroke: currentColor; }
+
+.fui-ctx-bar { display: flex; flex-direction: column; gap: 8px; min-width: 0; width: 100%; font-size: 12px; color: var(--fg); }
+.fui-ctx-bar-track { display: flex; height: 6px; overflow: hidden; border-radius: 3px; background: var(--border); }
+.fui-ctx-seg { flex: none; height: 100%; }
+.fui-ctx-seg-total { background: var(--ok); }
+.fui-ctx-seg-other, .fui-ctx-dot-other { background: var(--fg-muted); opacity: 0.45; }
+.fui-ctx-bar[data-level='warn'] .fui-ctx-seg-total { background: var(--accent); }
+.fui-ctx-bar[data-level='full'] .fui-ctx-seg-total { background: var(--danger); }
+/* A small fixed cycle of Flint's colours; the bar's segments and the legend's dots share it. */
+.fui-ctx-seg[data-part-index='0'], .fui-ctx-dot[data-part-index='0'] { background: var(--info); }
+.fui-ctx-seg[data-part-index='1'], .fui-ctx-dot[data-part-index='1'] { background: var(--accent); }
+.fui-ctx-seg[data-part-index='2'], .fui-ctx-dot[data-part-index='2'] { background: var(--ok); }
+.fui-ctx-seg[data-part-index='3'], .fui-ctx-dot[data-part-index='3'] { background: var(--warn); }
+.fui-ctx-seg[data-part-index='4'], .fui-ctx-dot[data-part-index='4'] { background: var(--fg-muted); }
+.fui-ctx-seg[data-part-index='5'], .fui-ctx-dot[data-part-index='5'] { background: var(--danger); }
+.fui-ctx-seg + .fui-ctx-seg { border-left: 1px solid var(--bg-raised); }
+
+.fui-ctx-legend { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.fui-ctx-legend li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.fui-ctx-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+.fui-ctx-dot-free { background: none; border: 1px solid var(--border); }
+.fui-ctx-name { flex: 1; min-width: 0; }
+.fui-ctx-count, .fui-ctx-share { flex: none; color: var(--fg-muted); font-variant-numeric: tabular-nums; text-align: right; }
+.fui-ctx-share { min-width: 32px; }
+.fui-ctx-popover { width: 240px; padding: 10px 12px; background: var(--bg-raised); }
+
+/* ModelPicker (ui/src/chat/ModelPicker.tsx) */
+.fui-model-trigger { max-width: 220px; gap: 4px; font-size: 12px; color: var(--fg-muted); }
+.fui-model-trigger:hover { color: var(--fg); }
+.fui-model-trigger-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fui-model-popup { padding: 0; width: 420px; max-width: calc(100vw - 16px); font-size: 12px; }
+.fui-model-panel { display: flex; flex-direction: column; min-width: 0; }
+.fui-model-search { padding: 6px; border-bottom: 1px solid var(--border); }
+.fui-model-list { padding: 4px; max-height: 320px; overflow: auto; outline: none; }
+.fui-model-group-title { padding: 6px 8px 2px; font-size: 11px; font-weight: 600; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.fui-model-row { display: flex; align-items: center; gap: 8px; min-height: 28px; padding: 0 8px; border-radius: 4px; cursor: pointer; color: var(--fg); font-size: 13px; }
+.fui-model-row[data-active] { background: var(--bg-hover); }
+.fui-model-row[aria-selected='true'] .fui-model-name { font-weight: 600; }
+.fui-model-row[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
+.fui-model-list:focus-visible .fui-model-row[data-active] { background: var(--bg-active); }
+.fui-model-check { flex: none; width: 14px; height: 14px; color: var(--accent); }
+.fui-model-check svg { width: 14px; height: 14px; }
+.fui-model-name { flex: none; white-space: nowrap; }
+.fui-model-desc { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--fg-muted); }
+.fui-model-meta { flex: none; margin-left: auto; display: flex; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--fg-muted); white-space: nowrap; }
+.fui-model-desc + .fui-model-meta { margin-left: 0; }
+.fui-model-name:not(:has(+ .fui-model-desc)) { flex: 1; }
+.fui-model-empty { padding: 12px 8px; text-align: center; color: var(--fg-muted); }
+.fui-model-effort { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-top: 1px solid var(--border); }
+.fui-model-effort-label { color: var(--fg-muted); }
+
+/* MentionPicker (ui/src/chat/MentionPicker.tsx): the @-mention popup over the chat composer.
+   Positioned (fixed) by the component; the rows are offsetParent-relative to .fui-mention-popup. */
+.fui-mention-popup {
+  position: fixed;
+  z-index: 60;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  color: var(--fg);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.3);
+  font-size: 12px;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.fui-mention-group + .fui-mention-group { margin-top: 2px; }
+.fui-mention-header {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.fui-mention-row {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.fui-mention-row[aria-selected='true'] { background: var(--bg-active); }
+.fui-mention-icon { flex: none; display: inline-flex; width: 16px; justify-content: center; color: var(--fg-muted); }
+.fui-mention-icon svg { width: 14px; height: 14px; }
+.fui-mention-label { flex: 0 1 auto; min-width: 0; max-width: 75%; overflow: hidden; text-overflow: ellipsis; }
+.fui-mention-hit { background: none; color: var(--accent); font-weight: 600; }
+.fui-mention-detail {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.fui-mention-status {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg-muted);
+}
+.fui-mention-status[data-tone='error'] { color: var(--danger); }
+.fui-mention-status svg { flex: none; width: 12px; height: 12px; }
+/* An older query's rows while the search for the current one runs: shown, but dimmed and not pickable. */
+.fui-mention-popup [data-stale] { opacity: 0.5; }

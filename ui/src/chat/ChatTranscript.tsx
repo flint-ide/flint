@@ -1,5 +1,6 @@
 import { Alert, Separator, Spinner } from '@wunderui/react'
 import { useEffect, useRef, type ReactNode } from 'react'
+import { TextShimmer } from '../TextShimmer'
 import { classNames } from '../treeIndent'
 import { isNearBottom } from './status'
 
@@ -107,7 +108,7 @@ export function ChatWorking({ children = 'working…' }: { children?: ReactNode 
   return (
     <div className="fui-chat-working" role="status">
       <Spinner aria-hidden />
-      <span>{children}</span>
+      <TextShimmer>{children}</TextShimmer>
     </div>
   )
 }

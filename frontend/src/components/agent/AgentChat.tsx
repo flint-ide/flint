@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Badge,
   Button,
@@ -13,11 +13,19 @@ import {
   ChatView,
   ChatWorking,
   Checkbox,
+  ContextMeter,
+  isImeKey,
+  MentionPicker,
+  type MentionItem,
+  useMentionPicker,
 } from '@flint-ide/ui'
 import { Plus, Square } from '@flint-ide/ui/icons'
+import { Workspace } from '../../api/backend'
 import { useAgentChat, type ChatSession } from '../../store/agentChat'
 import { editedFiles } from '../../lib/agentReducer'
 import { totalsOf } from '../../lib/usage'
+import { FILE_MENTION_LIMIT, fileMentionItems } from '../../lib/fileMentions'
+import { FileIcon } from '../icons/FileIcon'
 import { focusSoon } from '../../lib/focusSoon'
 import { useEditor } from '../../store/editor'
 import { useWorkspace } from '../../store/workspace'
@@ -43,7 +51,27 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
   const [showThoughts, setShowThoughts] = useState(false)
   const input = useRef<HTMLTextAreaElement>(null)
   const picker = usePromptPicker(session, input)
+  // "@" lists the folder's files; picking one attaches it and takes the typed "@query" out of the message.
+  const findFiles = useCallback(
+    async (query: string, signal: AbortSignal): Promise<readonly MentionItem[]> => {
+      const found = await Workspace.FindFiles([root], query, FILE_MENTION_LIMIT)
+      if (signal.aborted) return []
+      return fileMentionItems(found.matches ?? [], root).map((item) => ({ ...item, icon: <FileIcon name={item.label} /> }))
+    },
+    [root],
+  )
+  const mention = useMentionPicker({
+    value: session.draft,
+    onChange: (text) => setDraft(session.id, text),
+    search: findFiles,
+    onSelect: (item) => {
+      attach(session.id, { path: item.id })
+      return ''
+    },
+    ref: input,
+  })
   const { chat } = session
+  const totals = totalsOf(chat)
   const folder = root.split('/').pop()
 
   useEffect(() => {
@@ -65,7 +93,7 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
       <ChatHeader
         title={session.agent}
         subtitle={session.model}
-        meta={<ChatUsage totals={totalsOf(chat)} />}
+        meta={<ChatUsage totals={totals} />}
         actions={
           <>
             <Checkbox
@@ -168,15 +196,20 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
             </Badge>
           ))
         }
-        above={picker.element}
-        ref={input}
-        value={session.draft}
-        placeholder={chat.busy ? `${session.agent} is working… (Esc to stop)` : `Message ${session.agent} (Enter to send, ${isMac() ? '⇧Enter' : 'Shift+Enter'} newline, / for prompts)`}
+        {...mention.textareaProps}
+        above={
+          <>
+            {picker.element}
+            <MentionPicker picker={mention} anchor={input} emptyText="No matching files" />
+          </>
+        }
+        placeholder={chat.busy ? `${session.agent} is working… (Esc to stop)` : `Message ${session.agent} (Enter to send, ${isMac() ? '⇧Enter' : 'Shift+Enter'} newline, / for prompts, @ for files)`}
         spellCheck={false}
-        onChange={(e) => setDraft(session.id, e.target.value)}
         onKeyDown={(e) => {
+          if (mention.onKeyDown(e)) return
           if (picker.onKeyDown(e)) return
-          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+          const ime = isImeKey({ key: e.key, keyCode: e.keyCode, isComposing: e.nativeEvent.isComposing })
+          if (e.key === 'Enter' && !e.shiftKey && !ime) {
             e.preventDefault()
             void send(session.id)
           } else if (e.key === 'Escape' && chat.busy) {
@@ -185,10 +218,13 @@ export const AgentChat = memo(function AgentChat({ session, active }: { session:
           }
         }}
         toolbar={
-          <Button variant="ghost" size="sm" onClick={attachActiveFile} title={`Attach the file open in the editor (${formatKeys('Mod+L')} attaches the selection)`}>
-            <Plus data-icon="inline-start" />
-            current file
-          </Button>
+          <>
+            <Button variant="ghost" size="sm" onClick={attachActiveFile} title={`Attach the file open in the editor (${formatKeys('Mod+L')} attaches the selection)`}>
+              <Plus data-icon="inline-start" />
+              current file
+            </Button>
+            <ContextMeter used={totals.contextTokens} limit={totals.contextWindow} />
+          </>
         }
         actions={
           chat.busy ? (

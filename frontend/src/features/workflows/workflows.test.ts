@@ -7,6 +7,7 @@ import {
   MAX_TASK_BYTES, stepBadge, stoppedStep, outputLabel, capitalize, stepCount, stepKind, stepWho, taskProblem, usable, workflowMeta,
   daysText, goalProblem, isRestrictedError, lastRunText, nextText, SCHEDULE_CHANGED_NOTE, scheduleLines, scheduleWhen, scriptNotice, sandboxText, skippedText, consentText, UNSANDBOXED_ASKS, UNSANDBOXED_ALLOWED,
   runTooltip, workflowViewTitle, workflowViewData, workflowViewKey, workflowHeader, workflowViewState, WORKFLOW_GONE, clampStep, noTextNote, isWorkflowFile, workflowForPath, workflowFileRoot,
+  workflowHistory,
   type RunInfo, type StepInfo, type WorkflowInfo,
 } from './workflows'
 
@@ -502,5 +503,32 @@ describe('runTooltip', () => {
   it('adds the task when it says more, and falls back to the workflow without a title', () => {
     assert.equal(runTooltip({ title: 'Add login', workflow: 'ship', description: 'Add a login form\nwith tests' }), 'Add login\n\nAdd a login form\nwith tests')
     assert.equal(runTooltip({ title: '', workflow: 'ship', description: '' }), 'ship')
+  })
+})
+
+describe('workflowHistory', () => {
+  const runs = [
+    run({ id: 'new', state: 'running', created: 30 }),
+    run({ id: 'old', state: 'done', created: 10 }),
+    run({ id: 'mid', state: 'failed', created: 20 }),
+    run({ id: 'other', workflow: 'review', state: 'done', created: 5 }),
+    run({ id: 'elsewhere', dir: '/x', state: 'done', created: 6 }),
+  ]
+  it('keeps the runs of one workflow in one folder, oldest first', () => {
+    assert.deepEqual(workflowHistory(runs, '/w', 'ship').map((h) => [h.id, h.state]), [['old', 'ok'], ['mid', 'failed'], ['new', 'running']])
+  })
+  it('shows a run that waits for the user as a warning and a stopped one as skipped', () => {
+    const waiting = [run({ id: 'a', state: 'waiting', needsUser: true }), run({ id: 'b', state: 'stopped', created: 1 }), run({ id: 'c', state: 'paused', created: 2 })]
+    assert.deepEqual(workflowHistory(waiting, '/w', 'ship').map((h) => h.state), ['warn', 'skipped', 'warn'])
+  })
+  it('names each run by its title and state', () => {
+    assert.equal(workflowHistory(runs, '/w', 'ship')[0]?.title, 'Add login: Done')
+  })
+  it('keeps only the newest runs', () => {
+    assert.deepEqual(workflowHistory(runs, '/w', 'ship', 2).map((h) => h.id), ['mid', 'new'])
+    assert.deepEqual(workflowHistory(runs, '/w', 'ship', 0), [])
+  })
+  it('is empty for a workflow that never ran', () => {
+    assert.deepEqual(workflowHistory(runs, '/w', 'never'), [])
   })
 })

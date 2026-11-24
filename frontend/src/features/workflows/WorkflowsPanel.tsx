@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Dropdown } from '../../components/ui/Dropdown'
 import { MarkerBadge } from '../../components/tasks/badges'
 import { runCommandById } from '../../lib/commands'
@@ -12,13 +12,13 @@ import { KindSummary } from './KindSummary'
 import { StateBadge } from './StepParts'
 import { runProgress, stepLook } from './stepLook'
 import {
-  groupRuns, originText, restrictedNote, runStateLabel, runStatus, runTone, runTooltip, sourceLabel, stepCount, usable, primaryAction, actionHint,
+  groupRuns, HISTORY_RUNS, originText, restrictedNote, runStateLabel, runStatus, runTone, runTooltip, sourceLabel, stepCount, usable, primaryAction, actionHint, workflowHistory,
   type RunInfo, type WorkflowInfo,
 } from './workflows'
 import {
   loadList, loadRuns, openCoordinateDialog, openNewDialog, openRun, openRunDialog, openWorkflowFile, openWorkflowView, perform, trustWorkflowFolder, useWorkflows, type Listed,
 } from './store'
-import { Button, IconButton, PanelHeader, TaskCard, TreeRow, TreeSection } from '@flint-ide/ui'
+import { Button, IconButton, PanelHeader, StatusTracker, TaskCard, TreeRow, TreeSection } from '@flint-ide/ui'
 import { Ellipsis, Plus, RefreshCw } from '@flint-ide/ui/icons'
 
 const basename = (p: string) => p.replace(/\/+$/, '').slice(p.replace(/\/+$/, '').lastIndexOf('/') + 1)
@@ -195,13 +195,17 @@ function Restricted({ dir, hidden }: { dir: string; hidden: number }) {
 /** A workflow in the panel, as a kit TaskCard: name, kind tiles, steps and source, description; Run…, View and Open in its actions bar. */
 function WorkflowRow({ dir, workflow }: { dir: string; workflow: WorkflowInfo }) {
   const ok = usable(workflow)
+  const runs = useWorkflows((s) => s.runs)
+  // The workflow's last runs in this folder, oldest left; nothing until it has run once.
+  const history = useMemo(() => workflowHistory(runs ?? [], dir, workflow.name), [runs, dir, workflow.name])
+  const strip = history.length > 0 && <StatusTracker key="h" items={history} max={HISTORY_RUNS} label={`Runs of ${workflow.name}`} />
   return (
     <TaskCard
       tooltip={workflow.path || 'Built in'}
       label={workflow.name}
       onOpen={() => openWorkflowView(dir, workflow.name)}
       badges={workflow.problem ? <MarkerBadge tone="error">{sourceLabel(workflow.source)}</MarkerBadge> : undefined}
-      meta={ok ? [<KindSummary key="k" steps={workflow.steps} />, stepCount(workflow.steps.length), sourceLabel(workflow.source)] : [sourceLabel(workflow.source)]}
+      meta={ok ? [<KindSummary key="k" steps={workflow.steps} />, stepCount(workflow.steps.length), sourceLabel(workflow.source), strip] : [sourceLabel(workflow.source), strip]}
       notes={[
         !!workflow.description && { text: workflow.description, truncate: true, title: workflow.description },
         !!workflow.problem && { text: workflow.problem, tone: 'danger' },

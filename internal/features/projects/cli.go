@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"flint/internal/cli"
+	"flint/internal/settings"
 )
 
 // cliCommands are the feature's commands of the flint command line
@@ -22,7 +23,7 @@ func (a *API) cliCommands() []cli.Command {
 		{Path: "project list", Summary: "List the projects Flint knows", Kind: cli.Reads, Run: a.cliList},
 		{
 			Path: "project open", Summary: "Open a folder that holds flint-project.json as a project", Kind: cli.Acts,
-			Args: []cli.Arg{{Name: "dir", Max: 4096}},
+			Args: []cli.Arg{{Name: "dir", Max: 4096}}, Agents: cli.AgentAsks,
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
 				p, err := a.Open(c.Path(c.Arg(0)))
 				return infoResult("Opened", p, err)
@@ -30,8 +31,9 @@ func (a *API) cliCommands() []cli.Command {
 		},
 		{
 			Path: "project new", Summary: "Make a folder a project (writes flint-project.json and items/)", Kind: cli.Acts,
-			Args:  []cli.Arg{{Name: "dir", Max: 4096}},
-			Flags: []cli.Flag{{Name: "name", Value: "<name>", Usage: "the project's name (default: the folder's)", Max: 4 * MaxTitle}},
+			Args:   []cli.Arg{{Name: "dir", Max: 4096}},
+			Flags:  []cli.Flag{{Name: "name", Value: "<name>", Usage: "the project's name (default: the folder's)", Max: 4 * MaxTitle}},
+			Agents: cli.AgentAsks,
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
 				p, err := a.Create(c.Path(c.Arg(0)), c.String("name"))
 				return infoResult("Created", p, err)
@@ -39,7 +41,7 @@ func (a *API) cliCommands() []cli.Command {
 		},
 		{
 			Path: "project close", Summary: "Forget a project and its items' links to agent tasks (the tasks stay)", Kind: cli.Acts,
-			Args: []cli.Arg{{Name: "project", Max: 4096}},
+			Args: []cli.Arg{{Name: "project", Max: 4096}}, Agents: cli.AgentAsks, AgentCheck: a.agentProject(argRef),
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
 				real, err := a.cliProject(c, c.Arg(0))
 				if err != nil {
@@ -70,12 +72,15 @@ func (a *API) cliCommands() []cli.Command {
 				{Name: "together", Usage: "one agent in all of its repositories at once"},
 				projectFlag,
 			},
-			Help: "The id comes from the title; a file is never overwritten. Checked like New Item… and add_project_item.",
-			Run:  a.cliAdd,
+			Help:       "The id comes from the title; a file is never overwritten. Checked like New Item… and add_project_item.",
+			Agents:     cli.AgentAsks,
+			AgentCheck: a.agentProjectWith(flagRef, func(mcp settings.MCPServer) bool { return mcp.Actions.Projects }, errAgentAddOff),
+			Run:        a.cliAdd,
 		},
 		{
 			Path: "project status", Summary: "Set an item's status", Kind: cli.Acts,
 			Args: []cli.Arg{itemArg, {Name: "todo|doing|review|done", Max: 16}}, Flags: []cli.Flag{projectFlag},
+			Agents: cli.AgentAsks, AgentCheck: a.agentProject(flagRef),
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
 				real, err := a.cliProject(c, c.String("project"))
 				if err != nil {
@@ -93,12 +98,17 @@ func (a *API) cliCommands() []cli.Command {
 			Args: []cli.Arg{itemArg}, Flags: []cli.Flag{projectFlag},
 			Help: "As Delegate on the board. An item of a project whose folder is not trusted is sent only after you\n" +
 				"confirm it in Flint's own dialog; the command waits for your answer. An item without repositories\n" +
-				"works in the workspace folder of --folder (default: the current directory).",
-			Run: a.cliDelegate,
+				"works in the workspace folder of --folder (default: the current directory).\n" +
+				"An agent outside Flint can delegate only while Settings ▸ Agent Context ▸ Actions ▸ \"Delegate project items\"\n" +
+				"is on, never an item of a project whose folder is not trusted, and only after your yes in Flint.",
+			Agents:     cli.AgentAsks,
+			AgentCheck: a.agentProjectWith(flagRef, func(mcp settings.MCPServer) bool { return mcp.Actions.Delegate }, errAgentDelegateOff),
+			Run:        a.cliDelegate,
 		},
 		{
 			Path: "project start-when-ready", Summary: "Start an item by itself once the items it waits for are done", Kind: cli.Acts, Folder: true,
 			Args: []cli.Arg{itemArg}, Flags: []cli.Flag{projectFlag},
+			Help: "Agents cannot run it: an agent never delegates an item that waits for others, nor asks to start it when ready.",
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
 				real, err := a.cliProject(c, c.String("project"))
 				if err != nil {
@@ -114,6 +124,7 @@ func (a *API) cliCommands() []cli.Command {
 		{
 			Path: "project cancel-start", Summary: "Forget an item's waiting start", Kind: cli.Acts,
 			Args: []cli.Arg{itemArg}, Flags: []cli.Flag{projectFlag},
+			Agents: cli.AgentAsks, AgentCheck: a.agentProject(flagRef),
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
 				real, err := a.cliProject(c, c.String("project"))
 				if err != nil {
@@ -147,7 +158,8 @@ func (a *API) cliCommands() []cli.Command {
 		},
 		{
 			Path: "project context", Summary: "Add PROJECT.md, the context every item's agent gets", Kind: cli.Acts, Args: projectArg,
-			Help: "Never overwrites the file; refused for a project whose folder is not trusted.",
+			Help:   "Never overwrites the file; refused for a project whose folder is not trusted.",
+			Agents: cli.AgentAsks, AgentCheck: a.agentProject(argRef),
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
 				real, err := a.cliProject(c, c.Arg(0))
 				if err != nil {
@@ -163,6 +175,7 @@ func (a *API) cliCommands() []cli.Command {
 		{
 			Path: "project locate", Summary: "Use a checkout for one of the project's repositories", Kind: cli.Acts,
 			Args: []cli.Arg{{Name: "repo", Max: 256}, {Name: "dir", Max: 4096}}, Flags: []cli.Flag{projectFlag},
+			Agents: cli.AgentAsks, AgentCheck: a.agentProject(flagRef),
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
 				real, err := a.cliProject(c, c.String("project"))
 				if err != nil {
@@ -176,7 +189,8 @@ func (a *API) cliCommands() []cli.Command {
 			Path: "project clone", Summary: "Clone one of the project's repositories into a new folder inside <parent>", Kind: cli.Acts,
 			Args: []cli.Arg{{Name: "repo", Max: 256}, {Name: "parent", Max: 4096}}, Flags: []cli.Flag{projectFlag},
 			Help: "Flint shows the URL and the folder in its own dialog first; the command waits for your answer and\n" +
-				"for the clone (stop it with flint project cancel-clone).",
+				"for the clone (stop it with flint project cancel-clone). Agents cannot run it: a clone into a trusted\n" +
+				"folder is trusted at once.",
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
 				real, err := a.cliProject(c, c.String("project"))
 				if err != nil {
@@ -188,6 +202,7 @@ func (a *API) cliCommands() []cli.Command {
 		},
 		{
 			Path: "project cancel-clone", Summary: "Stop the project's running clone", Kind: cli.Acts, Flags: []cli.Flag{projectFlag},
+			Agents: cli.AgentAsks, AgentCheck: a.agentProject(flagRef),
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
 				real, err := a.cliProject(c, c.String("project"))
 				if err != nil {
@@ -201,6 +216,7 @@ func (a *API) cliCommands() []cli.Command {
 		},
 		{
 			Path: "project rename-config", Summary: "Rename an old project's flint-backlog.json to flint-project.json", Kind: cli.Acts, Args: projectArg,
+			Agents: cli.AgentAsks, AgentCheck: a.agentProject(argRef),
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
 				real, err := a.cliProject(c, c.Arg(0))
 				if err != nil {
@@ -451,12 +467,20 @@ func (a *API) cliAdd(_ context.Context, c *cli.Call) (cli.Result, error) {
 	return cli.Result{Text: fmt.Sprintf("Added %s (%s) to %q", it.ID, v.Path, cfg.Name), JSON: v}, nil
 }
 
-func (a *API) cliDelegate(_ context.Context, c *cli.Call) (cli.Result, error) {
+func (a *API) cliDelegate(ctx context.Context, c *cli.Call) (cli.Result, error) {
 	real, err := a.cliProject(c, c.String("project"))
 	if err != nil {
 		return cli.Result{}, err
 	}
-	r, err := a.Delegate(real, c.Arg(0), a.cliRoot(c.Folder))
+	var r DelegateResult
+	if who, ok := cli.CallerFrom(ctx); ok && who.Agent {
+		// An agent's delegation the user approved: as delegate_project_item,
+		// never from an untrusted project, and its workflow runs are the
+		// agent's (script steps without a sandbox refused, never asked).
+		r, err = a.delegateAgent(real, c.Arg(0), a.cliRoot(c.Folder), cli.AgentBy(who))
+	} else {
+		r, err = a.Delegate(real, c.Arg(0), a.cliRoot(c.Folder))
+	}
 	if err != nil {
 		return cli.Result{}, err
 	}

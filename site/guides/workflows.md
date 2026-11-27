@@ -227,12 +227,12 @@ flint run wait 3f2a9c0d1e4b5a6f; [ $? -eq 3 ] && flint run show 3f2a9c0d1e4b5a6f
 flint run approve 3f2a9c0d1e4b5a6f
 ```
 
-Add `--json` for scripts. `flint run send-back <run> --step <step> --note <text>`, `check`, `retry`, `continue`, `pause`, `resume`, `stop` and `remove` match the buttons. A command that changes something is refused when a coding agent sends it, so `flint run approve` stays yours.
+Add `--json` for scripts. `flint run send-back <run> --step <step> --note <text>`, `check`, `retry`, `continue`, `pause`, `resume`, `stop` and `remove` match the buttons. A coding agent you run outside Flint (Claude Code in your terminal, say) can start and steer runs with these commands only after you allow each call in Flint's dialog, and only while **Run and steer workflows** is on; `flint run approve`, `continue` and `check` are refused to every agent, so those decisions stay yours. Agents Flint started are refused every command that changes something. See [Agents ask you first](../reference/cli.md#agents-ask-you-first).
 
 ## How this stays safe
 
 - An agent can never approve a gate or continue past a failed step. Not through Flint's tools, and not through the command line.
-- Agents can start and steer runs only if you turn it on, only in trusted folders, and only with your yes to each call. A step of a run gets no such tools.
+- Agents can start and steer runs only if you turn it on, only in trusted folders, and only with your yes to each call, through Flint's tools or, for an agent you run outside Flint, through the command line. A step of a run gets no such tools, and the command line refuses it and anything sent from an agent task's worktree.
 - A run starts only on your click, on a schedule you wrote in your own settings, or on an agent call you approved. Opening a folder starts nothing.
 - A project item names a workflow, it never defines one. Steps are read from the built-ins, your folder or the trusted checkout.
 - A run uses a copy of its workflow. An agent that edits `.flint/workflows` in its worktree changes nothing about the run it is part of.

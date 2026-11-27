@@ -19,7 +19,8 @@ import (
 
 // Kind says whether a command changes anything. It is a required field of
 // every Command (the zero value is invalid), so a new command cannot forget
-// it: agents running inside Flint may use the read-only ones only.
+// it: agents running inside Flint may use the read-only ones only, and an
+// agent outside Flint a command that acts only as Command.Agents says.
 type Kind int
 
 const (
@@ -27,6 +28,22 @@ const (
 	Reads Kind = iota + 1
 	// Acts changes something (starts, approves, writes, removes).
 	Acts
+)
+
+// AgentUse says whether an agent may run a command that acts.
+type AgentUse int
+
+const (
+	// AgentRefused, the zero value, refuses every agent's call, with no
+	// dialog: a new command is refused to agents until it says otherwise.
+	AgentRefused AgentUse = iota
+	// AgentAsks lets an agent outside Flint (one the user runs in their own
+	// terminal: Caller.InFlint is false) run the command after the user's
+	// yes to that one call in Flint's native dialog (Env.ConfirmAgent), as
+	// Flint's acting MCP tools ask before each call. Agents Flint started
+	// (chats, workflow steps, agent tasks) are still refused: they act
+	// through Flint's tools.
+	AgentAsks
 )
 
 func (k Kind) String() string {
@@ -158,8 +175,17 @@ type Command struct {
 	// which the web view cannot answer (Env.Confirm, with Ask's question),
 	// and runs it only after a yes ("not approved in Flint", exit 1,
 	// otherwise). An agent's, a detached or an unknown caller is refused
-	// before any dialog.
+	// before any dialog, even one that may run AgentAsks commands.
 	Human bool
+	// Agents says whether an agent outside Flint may run a command that
+	// acts after the user's yes in Flint (AgentAsks), or never
+	// (AgentRefused, the zero value). A human decision is always refused.
+	Agents AgentUse
+	// AgentCheck refuses an agent's call to an AgentAsks command before
+	// Flint asks (a switch in Settings that is off, a folder or project in
+	// Restricted Mode, a run of an untrusted folder); nil checks nothing
+	// more. It must change nothing.
+	AgentCheck func(ctx context.Context, c *Call) error
 	// Ask describes a Human decision for the dialog; it must change
 	// nothing. It is asked again after the yes, and the decision runs only
 	// when its Key is the same (what the user saw is what is decided).

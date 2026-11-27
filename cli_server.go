@@ -26,6 +26,7 @@ func (a *App) startCLI() {
 	}
 	srv, err := clisock.Start(clisock.Options{
 		Paths: clisock.PathsFor(a.configDir), Registry: reg, Classify: a.classifyCaller, Confirm: a.confirmDecision,
+		ConfirmAgent: a.confirmAgentCLI,
 	})
 	if err != nil {
 		a.logf("command line: %v", err)

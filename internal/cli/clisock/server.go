@@ -71,6 +71,10 @@ type Options struct {
 	// Confirm asks the user in Flint's native dialog (a human decision,
 	// cli.Command.Human); nil answers no.
 	Confirm func(ctx context.Context, q cli.Question) bool
+	// ConfirmAgent asks the user in Flint's native dialog whether an agent
+	// outside Flint may run one command (cli.Env.ConfirmAgent); nil
+	// refuses every agent.
+	ConfirmAgent func(ctx context.Context, a cli.AgentRequest) error
 }
 
 // Server serves the command line until Close.
@@ -228,7 +232,7 @@ func (s *Server) serve(c *net.UnixConn) {
 				}
 				return s.o.Classify(pid)
 			}
-			return cli.DispatchWith(ctx, s.o.Registry, req, cli.Env{Who: who, Confirm: s.o.Confirm}), nil
+			return cli.DispatchWith(ctx, s.o.Registry, req, cli.Env{Who: who, Confirm: s.o.Confirm, ConfirmAgent: s.o.ConfirmAgent}), nil
 		},
 		AfterReply: func(string) {
 			rpc.Close(nil)

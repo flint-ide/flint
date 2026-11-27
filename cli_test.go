@@ -57,9 +57,25 @@ func TestCLICommandKinds(t *testing.T) {
 		"project list", "project show", "project items", "project plan",
 		"task list", "task show", "task diff", "task compare",
 	}
+	// The commands that act which an agent outside Flint may run after the
+	// user's yes in Flint; every other one is refused to every agent. Not
+	// here, on purpose: the user's decisions (run approve, run continue,
+	// run check), starting an item when ready (an agent never delegates a
+	// waiting item), a clone (trusted at once inside a trusted folder) and
+	// run remove (no agent tool removes runs).
+	agentAsks := []string{
+		"workflow new", "workflow run",
+		"run send-back", "run retry", "run pause", "run resume", "run stop",
+		"project open", "project new", "project close", "project add", "project status", "project delegate",
+		"project cancel-start", "project context", "project locate", "project cancel-clone", "project rename-config",
+		"task new", "task start", "task update", "task merge", "task pr", "task remove",
+	}
 	var got []string
 	for _, c := range reg.Commands() {
 		got = append(got, c.Path)
+		if asks := c.Agents == cli.AgentAsks; asks != slices.Contains(agentAsks, c.Path) {
+			t.Errorf("%q lets agents ask: %v", c.Path, asks)
+		}
 		want := cli.Reads
 		if slices.Contains(acts, c.Path) {
 			want = cli.Acts
@@ -131,6 +147,65 @@ func TestCLIRefusesAgentsEveryCommandThatActs(t *testing.T) {
 		res = cli.Dispatch(t.Context(), guarded, cli.Request{Args: append(strings.Fields(path), "0123456789abcdef")}, person)
 		if res.Exit != cli.ExitFailed || res.Stdout != "" {
 			t.Errorf("%s for a person without a dialog: %+v", path, res)
+		}
+	}
+}
+
+// An agent outside Flint is asked about only for the commands that let
+// agents ask; the others, the user's decisions above all, are refused with
+// no dialog, and an agent Flint started is refused every one. Nothing runs
+// when the user says no.
+func TestCLIAgentsOutsideFlintAreAskedOrRefused(t *testing.T) {
+	_, reg := cliApp(t)
+	cmds := reg.Commands()
+	for i, c := range cmds {
+		path := c.Path
+		cmds[i].Run = func(context.Context, *cli.Call) (cli.Result, error) {
+			t.Errorf("%s ran though the user said no", path)
+			return cli.Result{}, nil
+		}
+	}
+	guarded, err := cli.NewRegistry(cmds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, inFlint := range []bool{false, true} {
+		for _, c := range cmds {
+			if c.Kind != cli.Acts {
+				continue
+			}
+			args := c.Words()
+			for range c.Args {
+				args = append(args, "0123456789abcdef")
+			}
+			for _, fl := range c.Flags {
+				if fl.Required {
+					args = append(args, "--"+fl.Name, "x")
+				}
+			}
+			asked := 0
+			env := cli.Env{
+				Who: func() cli.Caller { return cli.Caller{Agent: true, What: "claude", InFlint: inFlint} },
+				Confirm: func(context.Context, cli.Question) bool {
+					t.Errorf("%s: a human decision was asked for an agent", c.Path)
+					return true
+				},
+				ConfirmAgent: func(context.Context, cli.AgentRequest) error {
+					asked++
+					return errors.New(cli.NotApproved)
+				},
+			}
+			res := cli.DispatchWith(t.Context(), guarded, cli.Request{Args: args, Cwd: "/"}, env)
+			switch {
+			case res.Exit != cli.ExitFailed:
+				t.Errorf("%q (in Flint %v) = %+v", args, inFlint, res)
+			case inFlint && (asked != 0 || !strings.Contains(res.Stderr, "this command was run by an agent (claude)")):
+				t.Errorf("%q by an agent Flint started: asked %d, %q", args, asked, res.Stderr)
+			case !inFlint && c.Agents != cli.AgentAsks && (asked != 0 || !strings.Contains(res.Stderr, "not even with your yes")):
+				t.Errorf("%q, refused to agents: asked %d, %q", args, asked, res.Stderr)
+			case asked > 1:
+				t.Errorf("%q asked %d times", args, asked)
+			}
 		}
 	}
 }

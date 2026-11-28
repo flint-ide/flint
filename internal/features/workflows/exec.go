@@ -161,15 +161,29 @@ func (e *engine) takeChat(ctx context.Context, r Run) {
 		e.dropChat(id, exec, chat)
 		return
 	}
-	res, err := e.host.WaitChat(ctx, chat)
-	if err != nil {
-		if ctx.Err() == nil {
-			_ = e.complete(id, exec, failed(reasonClosed, "", false).apply)
+	e.awaitChat(ctx, id, exec, chat, kind)
+}
+
+// awaitChat waits for the end of the step's chat turn and applies its
+// outcome; a turn that ended without a result line is first asked to finish
+// (nudge), and the next turn is waited for.
+func (e *engine) awaitChat(ctx context.Context, id string, exec int, chat string, kind Kind) {
+	complete := func(fn func(Run, policy, int64) Run) error { return e.complete(id, exec, fn) }
+	for {
+		res, err := e.host.WaitChat(ctx, chat)
+		if err != nil {
+			if ctx.Err() == nil {
+				_ = e.complete(id, exec, failed(reasonClosed, "", false).apply)
+			}
+			return // Flint quits: the step is interrupted at the next start
 		}
-		return // Flint quits: the step is interrupted at the next start
+		o := chatOutcome(kind, res, e.host.ChatOutput(chat, outputLines))
+		if r, ok := e.get(id); ok && r.Exec == exec && e.nudge(ctx, r, chat, o, complete) {
+			continue
+		}
+		_ = e.complete(id, exec, o.apply)
+		return
 	}
-	out := e.host.ChatOutput(chat, outputLines)
-	_ = e.complete(id, exec, chatOutcome(kind, res, out).apply)
 }
 
 // dropChat stops a chat that was opened for a step start the run no longer

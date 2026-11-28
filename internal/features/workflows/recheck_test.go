@@ -227,6 +227,7 @@ func TestRecheckInTheEngine(t *testing.T) {
 
 func TestRecheckAReviewInTheEngine(t *testing.T) {
 	f := newFixture(t)
+	f.settings(base(func(s *Settings) { s.Nudges = 0 })) // the run waits for the user at once
 	v := f.start("feature")
 	f.finishFirst(v.ID, "RESULT: DONE")
 	f.finishChat(v.ID, 1, "RESULT: DONE")

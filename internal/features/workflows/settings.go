@@ -15,7 +15,7 @@ import (
 
 // Settings is the "workflows" key of settings.json:
 //
-//	"workflows": { "maxAttempts": 3, "fallbackAgent": "codex", "resumeAfterMinutes": 60,
+//	"workflows": { "maxAttempts": 3, "nudges": 2, "fallbackAgent": "codex", "resumeAfterMinutes": 60,
 //	  "sandbox": "on", "sandboxNetwork": false, "sandboxWritable": ["~/Library/Caches/go-build"],
 //	  "schedules": [{ "name": "nightly-deps", "workflow": "feature", "folder": "/abs/repo",
 //	    "task": "Update the dependencies.", "agent": "", "at": "02:30", "days": ["mon", "fri"] }] }
@@ -24,6 +24,10 @@ type Settings struct {
 	// check stops sending the work back by itself and the run waits for the
 	// user (Run.Failed's maxAttempts).
 	MaxAttempts int `json:"maxAttempts"`
+	// Nudges bounds how many times Flint asks an agent or review step's
+	// chat again to finish when its turn ended without a result line,
+	// before the run waits for the user (0 = never ask).
+	Nudges int `json:"nudges"`
 	// FallbackAgent takes a step again at once when the step's agent
 	// reached its own usage limit ("" = the run is held instead).
 	FallbackAgent string `json:"fallbackAgent"`
@@ -52,6 +56,10 @@ const (
 // Bounds of the section.
 const (
 	defaultMaxAttempts = 3
+	defaultNudges      = 2
+	// maxNudges keeps an agent that never ends with a result line from
+	// running turns for long.
+	maxNudges = 5
 	// maxMaxAttempts keeps a review that never passes from running agents
 	// (and the usage budget) for long.
 	maxMaxAttempts = 10
@@ -71,7 +79,7 @@ var Section = &settings.Section[Settings]{
 }
 
 func defaultSettings() Settings {
-	return Settings{MaxAttempts: defaultMaxAttempts, Sandbox: SandboxOn, SandboxWritable: []string{}, Schedules: []Schedule{}}
+	return Settings{MaxAttempts: defaultMaxAttempts, Nudges: defaultNudges, Sandbox: SandboxOn, SandboxWritable: []string{}, Schedules: []Schedule{}}
 }
 
 func cloneSettings(s Settings) Settings {
@@ -92,6 +100,9 @@ func normalizeSettings(s Settings) Settings {
 	s = cloneSettings(s)
 	if checkMaxAttempts(s.MaxAttempts) != nil {
 		s.MaxAttempts = defaultMaxAttempts
+	}
+	if checkNudges(s.Nudges) != nil {
+		s.Nudges = defaultNudges
 	}
 	if checkFallback(s.FallbackAgent) != nil {
 		s.FallbackAgent = ""
@@ -117,6 +128,9 @@ func checkSettings(s Settings) error {
 	if err := checkMaxAttempts(s.MaxAttempts); err != nil {
 		return err
 	}
+	if err := checkNudges(s.Nudges); err != nil {
+		return err
+	}
 	if err := checkFallback(s.FallbackAgent); err != nil {
 		return err
 	}
@@ -130,6 +144,13 @@ func checkSettings(s Settings) error {
 		return err
 	}
 	return checkSchedules(s.Schedules)
+}
+
+func checkNudges(n int) error {
+	if n < 0 || n > maxNudges {
+		return fmt.Errorf("workflows.nudges must be between 0 and %d", maxNudges)
+	}
+	return nil
 }
 
 func checkMaxAttempts(n int) error {

@@ -314,6 +314,13 @@ type Host interface {
 	// usage budget, say), the id is returned next to the error. opts.Reviewer
 	// starts a chat that reviews the worktree's code (StepChatOptions).
 	StartStepChat(ctx context.Context, taskID, agent, prompt string, opts StepChatOptions) (chat string, err error)
+	// PromptStepChat sends text into a step's chat (one StartStepChat opened,
+	// or a task's chat that takes a run's first step) as Flint's next
+	// message, through the path of every prompt (usage budget, redaction).
+	// A chat whose turn is still running gets nothing and no error: waiting
+	// for that turn is what the step does next. It refuses an unknown or
+	// closed chat and an empty or oversized text.
+	PromptStepChat(ctx context.Context, chat, text string) error
 	// WaitChat blocks until the chat's running turn is over (at once when
 	// none runs) and returns how it ended; an error the agent reports in
 	// the middle of a turn does not end the wait. No polling. A chat that is

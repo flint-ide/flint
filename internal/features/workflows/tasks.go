@@ -106,6 +106,11 @@ func (e *engine) firstStep(r Run, t feature.AgentTask) {
 		}
 		out := e.host.ChatOutput(chat, outputLines)
 		o := chatOutcome(r.Steps[0].Kind, feature.ChatResult{State: agenttask.Finished}, out)
+		ctx, cancel := context.WithTimeout(e.baseCtx(), tasksTimeout)
+		defer cancel()
+		if e.nudge(ctx, r, chat, o, func(fn func(Run, policy, int64) Run) error { return e.completeByTask(r, fn) }) {
+			return // the task works again; its next finish is read the same way
+		}
 		_ = e.completeByTask(r, o.apply)
 	case agenttask.Failed, agenttask.Interrupted:
 		reason := t.Error

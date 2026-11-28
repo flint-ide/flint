@@ -72,21 +72,28 @@ type Host struct {
 	// The workflow steps part: the StartStepChat calls, the scripted chat
 	// results and outputs, the tasks' latest chats, the stopped chats, and
 	// the scripted and recorded RunConfiguration calls.
-	stepChats  []StepChat
-	stepErr    error
-	results    map[string]feature.ChatResult
-	finished   map[string]chan struct{} // closed by FinishChat
-	outputs    map[string]string
-	taskChats  map[string]string
-	stopped    []string
-	runResults map[string]runScript
-	runs       []RunCall
+	stepChats   []StepChat
+	stepPrompts []StepPrompt
+	promptErr   error
+	stepErr     error
+	results     map[string]feature.ChatResult
+	finished    map[string]chan struct{} // closed by FinishChat
+	outputs     map[string]string
+	taskChats   map[string]string
+	stopped     []string
+	runResults  map[string]runScript
+	runs        []RunCall
 	// launches answer RunLaunch, by checkout and name; sandbox answers
 	// ScriptSandbox.
 	launches map[string]feature.RunLaunch
 	sandbox  feature.SandboxSupport
 	// budget is BudgetPause's answer.
 	budget error
+}
+
+// StepPrompt is one PromptStepChat call that sent a message.
+type StepPrompt struct {
+	Chat, Text string
 }
 
 // StepChat is one StartStepChat call and the chat it opened ("" when it
@@ -718,6 +725,53 @@ func (h *Host) StartStepChat(ctx context.Context, taskID, agent, prompt string, 
 	h.taskChats[taskID] = call.Chat
 	h.finished[call.Chat] = make(chan struct{})
 	return call.Chat, nil
+}
+
+// PromptStepChat records the call and starts a new turn of the chat: its
+// next WaitChat waits for the next FinishChat. A task bound to the chat that
+// had finished is working again, as the app's prompt makes it. With
+// SetStepPromptError it fails and sends nothing.
+func (h *Host) PromptStepChat(ctx context.Context, chat, text string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	switch {
+	case h.promptErr != nil:
+		return h.promptErr
+	case ctx.Err() != nil:
+		return ctx.Err()
+	case strings.TrimSpace(text) == "":
+		return errors.New("a step's chat needs a message")
+	case h.finished[chat] == nil:
+		return fmt.Errorf("the chat %s was closed", chat)
+	}
+	h.stepPrompts = append(h.stepPrompts, StepPrompt{Chat: chat, Text: text})
+	select {
+	case <-h.finished[chat]:
+		h.finished[chat] = make(chan struct{})
+		delete(h.results, chat)
+	default:
+	}
+	if id, ok := h.chats[chat]; ok {
+		if t, ok := h.tasks[id]; ok && t.State == agenttask.Finished {
+			t.State = agenttask.Working
+			h.tasks[id] = t
+		}
+	}
+	return nil
+}
+
+// SetStepPromptError makes PromptStepChat fail with err (nil: succeed).
+func (h *Host) SetStepPromptError(err error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.promptErr = err
+}
+
+// StepPrompts returns the PromptStepChat calls that sent a message, in order.
+func (h *Host) StepPrompts() []StepPrompt {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.stepPrompts)
 }
 
 // SetStepChatError makes StartStepChat fail with err (nil: succeed).

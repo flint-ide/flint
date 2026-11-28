@@ -50,6 +50,8 @@ Two cases need more explanation.
 
 **A step fails.** A `script` or `review` step with an `on-fail` line sends the work back by itself, up to `workflows.maxAttempts` times per step (3 by default, Settings ▸ Workflows ▸ Tries per step). After that the run is Failed and waits for you. Read the error under the toolbar and the step's output, then choose Send back…, Check again (an agent or review step, after you answered it in its chat), Retry or Continue anyway.
 
+**An agent ends without a result line.** Agents sometimes stop early, often saying they wait for tests or a watcher they left running in the background, which cannot wake a turn that is over. Before such a step waits for you, Flint asks the same chat to finish: to run what is left in the foreground and end with its result line. It does this up to `workflows.nudges` times per attempt (2 by default, Settings ▸ Workflows ▸ Ask again without a result; 0 turns it off), and each ask is a line in the run's log. A reviewer that gives no verdict is asked the same way.
+
 **An agent step asks a question.** An agent step passes when the agent ends with `RESULT: DONE`. If it ends with `RESULT: BLOCKED`, or with no result line (it may simply have asked you something), the run waits with the agent's last lines. Answer in that step's chat, then click **Check again**: Flint reads the end of the chat once more and, when it now ends with `RESULT: DONE`, the step passes and the run goes on. **Retry** starts a new chat that has not seen your answer; **Continue anyway** counts the step as passed without checking.
 
 When the run is Done, click **Show changes**. The result is a normal agent task: review the diff, then Merge or Create PR from the Agent Tasks panel.

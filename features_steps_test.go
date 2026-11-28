@@ -504,3 +504,73 @@ func TestKeepEnd(t *testing.T) {
 		}
 	}
 }
+
+// PromptStepChat asks a step's chat again after its turn ended: the message
+// comes from Flint (redacted), reaches the agent, and the next WaitChat waits
+// for the turn it starts. A chat whose turn still runs gets nothing.
+func TestPromptStepChatStartsTheNextTurn(t *testing.T) {
+	f := newStepFixture(t)
+	ctx := context.Background()
+	f.driver.mu.Lock()
+	orig := f.driver.hold // the fixture closes it when the test ends
+	f.driver.mu.Unlock()
+	t.Cleanup(func() { f.driver.mu.Lock(); f.driver.hold = orig; f.driver.mu.Unlock() })
+	hold := func() chan struct{} {
+		ch := make(chan struct{})
+		f.driver.mu.Lock()
+		f.driver.hold = ch
+		f.driver.mu.Unlock()
+		return ch
+	}
+	first := hold()
+	chat := f.start("implement")
+	f.driver.waitPrompts(t, chat, 1)
+	if err := f.h.PromptStepChat(ctx, chat, "finish please"); err != nil {
+		t.Fatalf("PromptStepChat on a busy chat = %v, want nil", err)
+	}
+	if got := f.driver.got(chat); len(got) != 1 {
+		t.Fatalf("a busy chat got another prompt: %q", got)
+	}
+	endTurn := func(release chan struct{}) {
+		close(release)
+		for i := 0; i < 500 && f.app.agents.Busy(chat); i++ {
+			time.Sleep(10 * time.Millisecond)
+		}
+		f.app.orch.Observe(as.Event{SessionID: chat, Kind: as.KindTurnEnd, StopReason: as.StopEndTurn})
+	}
+	endTurn(first)
+	if w := waited(t, f.waitAsync(ctx, chat)); w.err != nil || w.res.State != agenttask.Finished {
+		t.Fatalf("first turn = %+v, %v", w.res, w.err)
+	}
+
+	second := hold()
+	if err := f.h.PromptStepChat(ctx, chat, "Your turn ended without a result line, token ghp_0123456789abcdefghijklmnopqrstuvwxyzAB"); err != nil {
+		t.Fatal(err)
+	}
+	ch := f.waitAsync(ctx, chat)
+	notYet(t, ch)
+	msgs := f.rec.announced(chat)
+	last := msgs[len(msgs)-1]
+	if len(msgs) != 2 || last.Origin == nil || *last.Origin != stepOrigin || strings.Contains(last.Text, "ghp_0123") {
+		t.Fatalf("messages = %+v", msgs)
+	}
+	if prompts := f.driver.waitPrompts(t, chat, 2); prompts[1] != last.Text {
+		t.Errorf("the agent got %q", prompts[1])
+	}
+	endTurn(second)
+	if w := waited(t, ch); w.err != nil || w.res.State != agenttask.Finished {
+		t.Fatalf("second turn = %+v, %v", w.res, w.err)
+	}
+}
+
+func TestPromptStepChatRefusals(t *testing.T) {
+	f := newStepFixture(t)
+	ctx := context.Background()
+	if err := f.h.PromptStepChat(ctx, "no-such-chat", "finish"); err == nil || !strings.Contains(err.Error(), "was closed") {
+		t.Errorf("unknown chat: %v", err)
+	}
+	chat := f.start("work")
+	if err := f.h.PromptStepChat(ctx, chat, "  \n"); err == nil {
+		t.Error("an empty message was sent")
+	}
+}

@@ -28,6 +28,8 @@ export interface Schedule {
 export interface WorkflowSettings {
   /** How many times one step is taken before a failing check stops sending the work back (1 to 10). */
   maxAttempts: number
+  /** How many times Flint asks a step's chat to finish when its turn ended without a result line (0 to 5; 0 = never). */
+  nudges: number
   /** The agent that takes a step again when the step's agent reached its usage limit ("" = pause the run). */
   fallbackAgent: string
   /** Resume a run paused by a limit after this many minutes (0 to 720; 0 = wait for the user). */
@@ -51,6 +53,7 @@ declare module '../../lib/settingsSections' {
 
 export const DEFAULT_WORKFLOW_SETTINGS: WorkflowSettings = Object.freeze({
   maxAttempts: 3,
+  nudges: 2,
   fallbackAgent: '',
   resumeAfterMinutes: 0,
   sandbox: 'on',
@@ -160,6 +163,7 @@ export function coerceWorkflowSettings(v: unknown): WorkflowSettings {
   const o = v
   return {
     maxAttempts: intIn(o.maxAttempts, 1, 10, DEFAULT_WORKFLOW_SETTINGS.maxAttempts),
+    nudges: intIn(o.nudges, 0, 5, DEFAULT_WORKFLOW_SETTINGS.nudges),
     fallbackAgent: typeof o.fallbackAgent === 'string' && AGENT_NAME.test(o.fallbackAgent) ? o.fallbackAgent : '',
     resumeAfterMinutes: intIn(o.resumeAfterMinutes, 0, 720, 0),
     // The sandbox is on unless the file says a literal "off"; the network only for a literal true.

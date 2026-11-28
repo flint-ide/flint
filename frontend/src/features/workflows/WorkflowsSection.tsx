@@ -21,6 +21,9 @@ export function WorkflowsSection() {
       <Row label="Attempts per step" hint="How many times Flint takes a step again after a check fails. After that the run stops and waits for you.">
         <NumberField value={settings.maxAttempts} min={1} max={10} step={1} onCommit={(maxAttempts) => set({ maxAttempts })} />
       </Row>
+      <Row label="Ask again without a result" hint="When an agent's turn ends without its result line (often while it says it waits for something in the background), Flint asks it to finish this many times before the run waits for you. 0 means it waits at once.">
+        <NumberField value={settings.nudges} min={0} max={5} step={1} onCommit={(nudges) => set({ nudges })} />
+      </Row>
       <Row label="Agent for a usage limit" hint="When an agent reaches its usage limit, this agent takes the step instead. With none, the run is “Paused by a limit”.">
         <div className="settings-control">
           <AgentPicker value={settings.fallbackAgent} none="none" onChange={(fallbackAgent) => set({ fallbackAgent })} />

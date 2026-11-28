@@ -42,6 +42,10 @@ func TestSettings(t *testing.T) {
 		{base(func(s *Settings) { s.Sandbox = "docker" }), base(nil), true},
 		{base(func(s *Settings) { s.Sandbox = "OFF" }), base(nil), true},
 		{base(func(s *Settings) { s.Sandbox = "" }), base(nil), true},
+		{base(func(s *Settings) { s.Nudges = 0 }), base(func(s *Settings) { s.Nudges = 0 }), false},
+		{base(func(s *Settings) { s.Nudges = 5 }), base(func(s *Settings) { s.Nudges = 5 }), false},
+		{base(func(s *Settings) { s.Nudges = 6 }), base(nil), true},
+		{base(func(s *Settings) { s.Nudges = -1 }), base(nil), true},
 		// Nil lists (an old file, JSON null) become empty ones.
 		{base(func(s *Settings) { s.SandboxWritable, s.Schedules = nil, nil }), base(nil), false},
 	}
@@ -53,7 +57,7 @@ func TestSettings(t *testing.T) {
 			t.Errorf("check(%+v) = %v", c.in, err)
 		}
 	}
-	if d := Section.Default(); !reflect.DeepEqual(d, Settings{MaxAttempts: 3, Sandbox: "on", SandboxWritable: []string{}, Schedules: []Schedule{}}) {
+	if d := Section.Default(); !reflect.DeepEqual(d, Settings{MaxAttempts: 3, Nudges: 2, Sandbox: "on", SandboxWritable: []string{}, Schedules: []Schedule{}}) {
 		t.Errorf("default %+v", d)
 	}
 }

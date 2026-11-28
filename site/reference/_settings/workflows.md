@@ -5,6 +5,7 @@
 | Key | Type | Range | Default | Meaning |
 |---|---|---|---|---|
 | `maxAttempts` | integer | 1–10 | `3` | How many times one step is taken. A `script` or `review` step with `on-fail` that fails sends the work back to that step by itself only while the failing step was taken fewer times than this; after that the run stops and waits for you. |
+| `nudges` | integer | 0–5 | `2` | How many times Flint asks an agent or review step's chat to finish when its turn ended without a result line (`RESULT: DONE`/`BLOCKED`, or a reviewer's `PASS`/`FAIL`), before the run waits for you. An agent often stops like that while it says it waits for something it left in the background, which cannot wake a finished turn. Each ask is a line in the run's log; a new attempt of the step starts again from 0. `0`: the run waits at once. |
 | `fallbackAgent` | string | an agent's name | `""` | When a step's agent reaches its own usage limit (its subscription's limit, a rate limit, no credits), this agent takes the step again at once, if it can start and is not the agent that hit the limit. The run view shows which agent took the step. Empty: the run is paused instead. Flint's own budget (`usage.pauseOverBudget`) always pauses. |
 | `resumeAfterMinutes` | integer | 0–720 | `0` | A run paused by a limit resumes by itself after this many minutes, at most 12 times per step. `0`: it waits for you to click **Resume**. Flint does not read when the provider's limit resets, so pick a wait that fits your plan. |
 

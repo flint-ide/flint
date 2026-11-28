@@ -344,6 +344,7 @@ func TestReviewFailSendsBackUntilMaxAttempts(t *testing.T) {
 
 func TestBlockedAndNoResultWaitForTheUser(t *testing.T) {
 	f := newFixture(t)
+	f.settings(base(func(s *Settings) { s.Nudges = 0 })) // the run waits for the user at once
 	v := f.start("feature")
 	f.finishFirst(v.ID, "RESULT: DONE")
 	r := f.finishChat(v.ID, 1, "Which flag library?\nRESULT: BLOCKED")

@@ -49,8 +49,10 @@ describe('workflow settings', () => {
     assert.equal(coerceWorkflowSettings({ sandboxNetwork: 'yes' }).sandboxNetwork, false)
   })
   it('keeps the older keys', () => {
-    const s = coerceWorkflowSettings({ maxAttempts: 5, fallbackAgent: 'codex', resumeAfterMinutes: 30 })
-    assert.deepEqual([s.maxAttempts, s.fallbackAgent, s.resumeAfterMinutes], [5, 'codex', 30])
+    const s = coerceWorkflowSettings({ maxAttempts: 5, nudges: 0, fallbackAgent: 'codex', resumeAfterMinutes: 30 })
+    assert.deepEqual([s.maxAttempts, s.nudges, s.fallbackAgent, s.resumeAfterMinutes], [5, 0, 'codex', 30])
+    assert.equal(coerceWorkflowSettings({ nudges: 9 }).nudges, 2)
+    assert.equal(coerceWorkflowSettings({}).nudges, 2)
   })
   it('survives a save and a load', () => {
     const s = coerceWorkflowSettings({ sandbox: 'on', sandboxWritable: ['/a'], schedules: [schedule({ days: ['mon', 'fri'] })] })

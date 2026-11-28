@@ -135,6 +135,26 @@ func (a *App) checkStepFolder(what, dir string) error {
 	return nil
 }
 
+// PromptStepChat sends text as Flint's next message in a step's chat
+// (promptChat, as StartStepChat's first). A busy chat (its agent started a
+// turn of its own) gets nothing: the step waits for that turn instead.
+func (h featureHost) PromptStepChat(ctx context.Context, chat, text string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := checkStepPrompt(text); err != nil {
+		return err
+	}
+	if _, ok := h.a.orch.Get(chat); !ok {
+		return fmt.Errorf("the chat %s was closed", shortText(chat, 80))
+	}
+	origin := stepOrigin
+	if err := h.a.promptChat(chat, text, nil, false, &origin); err != nil && !errors.Is(err, as.ErrBusy) {
+		return fmt.Errorf("ask chat %s again: %w", shortText(chat, 80), err)
+	}
+	return nil
+}
+
 // WaitChat waits in the registry until the chat's turn is over
 // (orchestrate.TurnOver): not merely until its state is failed, which a
 // non-fatal error in the middle of a turn makes it while the turn goes on.

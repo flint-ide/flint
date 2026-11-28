@@ -71,6 +71,9 @@ type Record struct {
 	Agent string `json:"agent,omitempty"`
 	// Holds counts the holds of the step (Held) since it last passed.
 	Holds int `json:"holds,omitempty"`
+	// Nudges counts how many times Flint asked this attempt's chat to
+	// finish after a turn without a result line (Nudged).
+	Nudges int `json:"nudges,omitempty"`
 }
 
 // Hold says why a run is paused by a limit rather than by the user: Flint's
@@ -296,6 +299,18 @@ func (r Run) WithRunTab(id string) Run {
 	r = r.clone()
 	r.Records[r.Current].RunTab = id
 	return r
+}
+
+// Nudged records that Flint asked the current step's chat, whose turn ended
+// without a result line, to finish: the nth of at most max times.
+func (r Run) Nudged(max int, now int64) Run {
+	if !r.valid() {
+		return r
+	}
+	r = r.clone()
+	r.Records[r.Current].Nudges++
+	return r.logged(now, r.Current, fmt.Sprintf("%s ended its turn without a result line: Flint asked it to finish (%d of %d)",
+		r.title(r.Current), r.Records[r.Current].Nudges, max))
 }
 
 // WithSeen records that the first step's task was seen working.

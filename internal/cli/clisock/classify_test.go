@@ -99,6 +99,23 @@ func TestClassify(t *testing.T) {
 		{"no peer pid", fakeTree{}, 0, false, "does not say", true, false},
 		{"a loop", fakeTree{500: user(501, "a"), 501: user(500, "b")}, 500, false, "more than", true, false},
 		{"Flint itself", fakeTree{}, 100, true, "Flint itself", false, false},
+		{"claude in a background host's tab", fakeTree{500: term(600, 420, "flint"), 420: term(600, 600, "claude"), 600: term(600, 700, "-zsh")}, 500, true, "claude", false, false},
+		{"claude whose ancestry cannot be followed", fakeTree{500: term(499, 420, "flint"), 420: term(499, 450, "claude")}, 500, true, "claude", false, false},
+	}
+	// Whether each agent runs under a process Flint started for an agent
+	// (refused, never asked about) or under a terminal (Flint may ask).
+	inFlint := map[string]bool{
+		"claude in a terminal tab":                    false,
+		"a tab whose agent reports working":           false,
+		"an agent chat":                               true,
+		"a custom ACP agent by its command":           true,
+		"a workflow's script step":                    true,
+		"a child of Flint that calls itself the host": true,
+		"a host the agent started":                    true,
+		"claude outside Flint":                        false,
+		"Flint itself":                                true,
+		"claude in a background host's tab":           false,
+		"claude whose ancestry cannot be followed":    true,
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -113,6 +130,12 @@ func TestClassify(t *testing.T) {
 			if got.Agent != tc.agent || got.Unknown != tc.unk || got.Detached != tc.detached ||
 				(tc.what == "") != (got.What == "") || !strings.Contains(got.What, tc.what) {
 				t.Errorf("Classify = %+v, want agent %v unknown %v detached %v what %q", got, tc.agent, tc.unk, tc.detached, tc.what)
+			}
+			if want, ok := inFlint[tc.name]; got.Agent && (!ok || got.InFlint != want) {
+				t.Errorf("InFlint = %v, want %v (listed %v)", got.InFlint, want, ok)
+			}
+			if !got.Agent && got.InFlint {
+				t.Errorf("InFlint for a caller that is no agent's: %+v", got)
 			}
 			if tc.peer == 500 && got.PID != 500 {
 				t.Errorf("PID %d", got.PID)

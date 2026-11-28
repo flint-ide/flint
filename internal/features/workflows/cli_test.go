@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,11 +28,21 @@ type cliFixture struct {
 	caller  atomic.Pointer[cli.Caller]
 	decline atomic.Bool
 	asked   atomic.Int32
+	// agentAsks gives the server a way to ask about an agent's command
+	// (cli.Env.ConfirmAgent): agentAsked counts those dialogs, agentDecline
+	// answers them no. Without it every agent is refused, as before.
+	agentAsks    bool
+	agentAsked   atomic.Int32
+	agentDecline atomic.Bool
 }
 
 func newCLIFixture(t *testing.T) *cliFixture {
 	t.Helper()
-	f := &cliFixture{fixture: newFixture(t)}
+	return startCLIFixture(t, &cliFixture{fixture: newFixture(t)})
+}
+
+func startCLIFixture(t *testing.T, f *cliFixture) *cliFixture {
+	t.Helper()
 	reg, err := cli.NewRegistry(f.api.cliCommands())
 	if err != nil {
 		t.Fatal(err)
@@ -42,7 +53,17 @@ func newCLIFixture(t *testing.T) *cliFixture {
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(d) })
 	f.paths = clisock.PathsIn(filepath.Join(d, "run"))
-	srv, err := clisock.Start(clisock.Options{Paths: f.paths, Registry: reg, Classify: func(pid int) cli.Caller {
+	var confirmAgent func(context.Context, cli.AgentRequest) error
+	if f.agentAsks {
+		confirmAgent = func(context.Context, cli.AgentRequest) error {
+			f.agentAsked.Add(1)
+			if f.agentDecline.Load() {
+				return errors.New(cli.NotApproved)
+			}
+			return nil
+		}
+	}
+	srv, err := clisock.Start(clisock.Options{Paths: f.paths, Registry: reg, ConfirmAgent: confirmAgent, Classify: func(pid int) cli.Caller {
 		if f.agent.Load() {
 			return cli.Caller{Agent: true, What: "claude", PID: pid}
 		}
@@ -301,5 +322,66 @@ func TestCLINoteBound(t *testing.T) {
 	// 4,000 characters of two bytes each are accepted.
 	if _, errs, code := f.flint("", "run", "send-back", v.ID, "--step", "plan", "--note", strings.Repeat("ż", MaxNote)); code != 0 {
 		t.Fatalf("a note of %d characters = %d %q", MaxNote, code, errs)
+	}
+}
+
+// An agent outside Flint starts and steers runs after the user's yes in
+// Flint, only while "Run and steer workflows" is on and only for runs of a
+// trusted folder; approving, checking again and continuing stay the user's,
+// refused with no dialog.
+func TestCLIAgentOutsideFlintIsAsked(t *testing.T) {
+	f := startCLIFixture(t, &cliFixture{fixture: newFixture(t), agentAsks: true})
+	f.agent.Store(true)
+	start := []string{"workflow", "run", "feature", "--task", "Add a --verbose flag"}
+
+	if _, errs, code := f.flint("", start...); code != 1 || !strings.Contains(errs, `"Run and steer workflows" is on`) || f.agentAsked.Load() != 0 {
+		t.Fatalf("switched off = %d %q, asked %d", code, errs, f.agentAsked.Load())
+	}
+	s := f.h.Settings()
+	s.MCPServer.Actions.Workflows = true
+	f.h.SetSettings(s)
+
+	f.agentDecline.Store(true)
+	if _, errs, code := f.flint("", start...); code != 1 || errs != "flint: not approved in Flint\n" || f.agentAsked.Load() != 1 {
+		t.Fatalf("declined = %d %q, asked %d", code, errs, f.agentAsked.Load())
+	}
+	if n := len(f.api.Runs()); n != 0 {
+		t.Fatalf("a declined start made %d runs", n)
+	}
+	f.agentDecline.Store(false)
+	out, errs, code := f.flint("", append(start, "--json")...)
+	var v RunView
+	if code != 0 || json.Unmarshal([]byte(out), &v) != nil || v.ID == "" || f.agentAsked.Load() != 2 {
+		t.Fatalf("allowed = %d %q %s, asked %d", code, errs, out, f.agentAsked.Load())
+	}
+	// The run is the agent's, as one start_workflow started.
+	if r, _ := f.e.get(v.ID); r.Origin != OriginAgent || !strings.HasPrefix(r.Log[0].Text, "Run started by an agent (claude, pid ") ||
+		!strings.HasSuffix(r.Log[0].Text, ") outside Flint, from the command line, approved by you") {
+		t.Fatalf("an agent's run: origin %q, log %+v", r.Origin, r.Log[0])
+	}
+
+	for _, cmd := range []string{"approve", "continue", "check"} {
+		_, errs, code := f.flint("", "run", cmd, v.ID)
+		if code != 1 || !strings.Contains(errs, "an agent (claude) cannot run flint run "+cmd+", not even with your yes") {
+			t.Errorf("run %s by an agent = %d %q", cmd, code, errs)
+		}
+	}
+	if f.asked.Load() != 0 || f.agentAsked.Load() != 2 {
+		t.Fatalf("the user's decisions were asked about: %d, %d", f.asked.Load(), f.agentAsked.Load())
+	}
+
+	if _, errs, code := f.flint("", "run", "pause", v.ID); code != 0 || f.agentAsked.Load() != 3 {
+		t.Fatalf("pause = %d %q, asked %d", code, errs, f.agentAsked.Load())
+	}
+	f.h.SetUntrusted(f.root)
+	if _, errs, code := f.flint("", "run", "stop", v.ID); code != 1 || !strings.Contains(errs, "Restricted Mode") || f.agentAsked.Load() != 3 {
+		t.Fatalf("stop in an untrusted folder = %d %q, asked %d", code, errs, f.agentAsked.Load())
+	}
+
+	// A person is not asked about any of it.
+	f.agent.Store(false)
+	f.h.SetTrusted(f.root)
+	if _, errs, code := f.flint("", "run", "stop", v.ID); code != 0 || f.agentAsked.Load() != 3 {
+		t.Fatalf("a person's stop = %d %q, asked %d", code, errs, f.agentAsked.Load())
 	}
 }

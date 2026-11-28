@@ -121,8 +121,12 @@ const maxDepth = 128
 //     or command line cannot be read, a tree deeper than maxDepth) is
 //     unknown.
 //
-// Dispatch refuses every command that acts to an agent's, a detached and
-// an unknown caller.
+// An agent's caller is InFlint when the agent runs under a process Flint
+// started for an agent rather than under a terminal (underFlint).
+//
+// Dispatch refuses every command that acts to a detached and an unknown
+// caller, and to an agent's unless the agent is not InFlint, the command
+// lets agents ask (cli.AgentAsks) and the user says yes in Flint.
 func Classify(pid int, t Tree, f Facts) cli.Caller {
 	if pid <= 0 {
 		return cli.Caller{Unknown: true, What: "this system does not say which process connected"}
@@ -150,6 +154,7 @@ func Classify(pid int, t Tree, f Facts) cli.Caller {
 				if id := customAgent(args, f.Custom); id != "" {
 					me.AgentName = id
 				}
+				me.InFlint = underFlint(cur, t, f)
 				return agent(me, name)
 			}
 		}
@@ -165,6 +170,35 @@ func Classify(pid int, t Tree, f Facts) cli.Caller {
 	return unknown(me, fmt.Sprintf("more than %d processes above it", maxDepth))
 }
 
+// underFlint reports whether the agent CLI at pid runs under a process
+// Flint started for an agent (a chat, a workflow step, an agent task's
+// chat): its walk up reaches Flint through a child of Flint that is not one
+// of its terminal tabs' shells, or it is Flint or the background host
+// itself. Reaching a tab's shell, the background host (which runs terminal
+// tabs only) or the top of the tree is not. A walk that cannot be finished
+// counts as under Flint: such an agent is refused, not asked about.
+func underFlint(pid int, t Tree, f Facts) bool {
+	prev, cur := 0, pid
+	for range maxDepth {
+		switch {
+		case cur == f.Self:
+			_, tab := f.Shells[prev]
+			return prev == 0 || !tab
+		case f.HostPID > 0 && cur == f.HostPID:
+			return prev == 0
+		}
+		p, err := t.Parent(cur)
+		if err != nil {
+			return true
+		}
+		if p.PPID <= 1 {
+			return false
+		}
+		prev, cur = cur, p.PPID
+	}
+	return true
+}
+
 func unknown(c cli.Caller, what string) cli.Caller {
 	c.Unknown, c.What = true, what
 	return c
@@ -178,11 +212,13 @@ func agent(c cli.Caller, what string) cli.Caller {
 // viaFlint decides for a process that descends from Flint: chain is its
 // ancestry below Flint, the child of Flint last.
 func viaFlint(chain []proctree.Proc, f Facts, me cli.Caller) cli.Caller {
+	me.InFlint = true
 	if len(chain) == 0 {
 		return agent(me, "Flint itself")
 	}
 	child := chain[len(chain)-1].PID
 	if sh, ok := f.Shells[child]; ok {
+		me.InFlint = false
 		if sh.Agent {
 			return agent(me, "an agent CLI in a terminal tab")
 		}
@@ -198,6 +234,7 @@ func viaFlint(chain []proctree.Proc, f Facts, me cli.Caller) cli.Caller {
 // a child of the host: a tab's shell).
 func fromTerminal(chain []proctree.Proc, me cli.Caller, host int) cli.Caller {
 	if len(chain) == 0 {
+		me.InFlint = true
 		return agent(me, "the background host itself")
 	}
 	caller := chain[0]

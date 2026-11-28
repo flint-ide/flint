@@ -48,27 +48,47 @@ flint: not approved in Flint
 
 The dialog is drawn by Flint, not by the web page, so neither a page nor an agent can answer it. When the run moved on while the dialog was open (another step, another attempt), nothing is done and the command says so. At most 8 commands that wait (dialogs and `flint run wait`) run at once; another one is refused until one ends.
 
-## Agents cannot act through it
+## Agents ask you first
 
-The command line is for you and your scripts. A coding agent could type `flint run approve …` into its shell, so for every command that changes something Flint also checks which program sent it, and refuses it, before any dialog, when it comes:
+The command line is for you and your scripts, and for an agent you run yourself. A coding agent could type `flint run approve …` into its shell, so for every command that changes something Flint also checks which program sent it.
 
-- from an agent Flint started (a chat, a workflow step, or anything else Flint runs that is not one of its terminal tabs), from an agent CLI running in one of Flint's terminal tabs, or from a known agent CLI anywhere (`claude`, `codex`, `gemini` and others, plus the agents you configured):
+**An agent you run outside Flint** (Claude Code, Codex and others in Terminal, iTerm, `tmux` or one of Flint's own terminal tabs) can run the commands that change something only after you allow each call. Flint shows the same dialog as for its agents' tools, in its own window: "Allow this agent action?", with the agent and its process, the folder, what the command does and the whole command line (the text of `--<option>-file` options included, secrets redacted, at most 600 characters). **Allow** runs that one call; **Cancel** is the default. The command waits for your answer, at most 5 minutes, like an agent's tool call. Declined, it changes nothing and exits with status 1:
+
+```text
+flint: not approved in Flint
+```
+
+Unanswered in time, it says `flint: the user did not answer Flint's question in time, so nothing was run` (exit 1). There is no "Always allow": every call is asked. The rules of the agents' own tools still hold, and Flint checks them before it asks:
+
+- **Your decisions stay yours.** `flint run approve`, `flint run continue` and `flint run check` are refused to every agent, with no dialog: an agent can never approve a gate, check a failed step again or continue past it. Nor can an agent run `flint project start-when-ready` (an agent never delegates an item that waits for others), `flint project clone` (a clone into a trusted folder is trusted at once) or `flint run remove`:
 
   ```text
-  flint: this command was run by an agent (claude). Agents change things through Flint's tools, which ask you first.
+  flint: only you can take this decision: an agent (claude) cannot run flint run approve, not even with your yes. Run it yourself in a terminal.
   ```
 
-  A custom agent you configured is named by its id when its command line matches the settings' ("run by the agent fake-cli"), not by its program (`node`).
+- **Not from inside handed-out work.** A command sent from an agent task's worktree (the work of an agent task or of a workflow step) is refused: work Flint handed out never hands out or steers work.
+- **Trusted folders only.** The folder of a command marked *folder*, the project of a `project` command, the folder a run started from and an agent task's repository must be trusted: nothing an agent sends acts in [Restricted Mode](../guides/restricted-mode.md).
+- **The same switches as the tools.** In Settings ▸ Agent Context ▸ Actions: `flint workflow run` and the `flint run` commands need **Run and steer workflows** (`mcpServer.actions.workflows`), `flint project delegate` needs **Delegate project items** (`mcpServer.actions.delegate`) and `flint project add` needs **Add project items** (`mcpServer.actions.projects`). All are off by default.
 
-- from a process that is not in a terminal: one without a terminal (started in the background by a program without one, by `launchd`, `cron` or a service), or one that left the terminal session it was started in (a background job whose shell ended, `nohup`, `setsid`). The command must come from a terminal whose shell is one of its ancestors:
+`flint <command> --help` says whether an agent can run the command.
 
-  ```text
-  flint: this command did not come from a terminal (it has no terminal: it runs in the background or under a service), so Flint changes nothing for it. Run it in a terminal.
-  ```
+**Agents Flint started** (a chat, an agent task, a workflow step, or anything else Flint runs that is not one of its terminal tabs) are refused every command that changes something, with no dialog. They act through Flint's own tools, which ask you before each call:
 
-Commands you type in Terminal, iTerm, an `ssh` session, `tmux` or Flint's own terminal tabs pass. Scripts that change things must run in a terminal too; read-only commands (marked *reads* below) work from anywhere, agents included. Agents start and steer work through Flint's own tools, which ask you before each call and can never approve a step or continue past a failed one (see [AI agents](../guides/ai-agents.md)).
+```text
+flint: this command was run by an agent (claude). Agents change things through Flint's tools, which ask you first.
+```
 
-What this check does not cover, and why the dialog above is what protects your decisions: a process can hide where it came from. A program that gives itself a new terminal (`script`, a pseudo-terminal of its own), a command handed to an already running `tmux` or `screen` server, another terminal app driven by AppleScript, or an agent under a name Flint does not know running outside Flint all look like your own terminal. Such a program can still run the commands that act but are not your decisions (start, send back, retry, pause, resume, stop, remove, and the other groups' commands), and can ask the dialog the question; only you can answer it.
+Flint recognises an agent by its program among the command's ancestors: a known agent CLI (`claude`, `codex`, `gemini` and others, plus the agents you configured), or an agent CLI that reports its state in one of Flint's terminal tabs. It is one Flint started when the walk up reaches Flint through anything but a terminal tab's shell, or when Flint cannot follow it to the end. A custom agent you configured is named by its id when its command line matches the settings' ("run by the agent fake-cli"), not by its program (`node`).
+
+**A process that is not in a terminal** is refused every command that changes something: one without a terminal (started in the background by a program without one, by `launchd`, `cron` or a service), or one that left the terminal session it was started in (a background job whose shell ended, `nohup`, `setsid`). The command must come from a terminal whose shell is one of its ancestors:
+
+```text
+flint: this command did not come from a terminal (it has no terminal: it runs in the background or under a service), so Flint changes nothing for it. Run it in a terminal.
+```
+
+Commands you type in Terminal, iTerm, an `ssh` session, `tmux` or Flint's own terminal tabs pass without a question. Scripts that change things must run in a terminal too; read-only commands (marked *reads* below) work from anywhere, agents included.
+
+What this check does not cover, and why the dialogs are what protect you: a process can hide where it came from. A program that gives itself a new terminal (`script`, a pseudo-terminal of its own), a command handed to an already running `tmux` or `screen` server, another terminal app driven by AppleScript, or an agent under a name Flint does not know running outside Flint all look like your own terminal. Such a program can still run the commands that change something but are not your decisions (start, send back, retry, pause, resume, stop, remove, and the other groups' commands) without the agent dialog, and can ask the dialog of a decision; only you can answer it. An agent Flint started that detaches itself from Flint gets the agent dialog instead of the refusal.
 
 ## Workflows
 

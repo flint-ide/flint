@@ -55,6 +55,12 @@ func check(c Command) error {
 	if c.Kind != Reads && c.Kind != Acts {
 		return fmt.Errorf("Kind must be Reads or Acts")
 	}
+	if c.Agents != AgentRefused && (c.Kind != Acts || c.Human || c.Agents != AgentAsks) {
+		return fmt.Errorf("only a command that acts and is no human decision may let agents ask")
+	}
+	if c.AgentCheck != nil && c.Agents != AgentAsks {
+		return fmt.Errorf("an AgentCheck needs Agents: AgentAsks")
+	}
 	if c.Run == nil || c.Summary == "" {
 		return fmt.Errorf("Run and Summary are required")
 	}
@@ -118,7 +124,7 @@ func (r *Registry) Help() string {
 		fmt.Fprintf(&b, "\n%s:\n", groupTitles[g])
 		writeSummaries(&b, cmds)
 	}
-	b.WriteString("\n* changes something: refused when an agent runs it.\n")
+	b.WriteString(actsFooter)
 	b.WriteString("flint <group> --help and flint <command> --help say more.\n")
 	b.WriteString("Exit status: 0 ok, 1 failed, 2 wrong usage, 3 the run needs you, 4 timed out (run wait).\n")
 	return b.String()
@@ -134,7 +140,7 @@ func (r *Registry) GroupHelp(group string) string {
 		return b.String()
 	}
 	writeSummaries(&b, cmds)
-	b.WriteString("\n* changes something: refused when an agent runs it.\n")
+	b.WriteString(actsFooter)
 	return b.String()
 }
 
@@ -207,8 +213,15 @@ func CommandHelp(c Command) string {
 		b.WriteString("\nOnly you decide this: Flint asks you first in a dialog in its window (Cancel is the default),\n" +
 			"and the command waits for your answer. Declined, it changes nothing and exits 1 (\"" + NotApproved + "\").\n" +
 			"Agents cannot run it, nor can a process that is not in a terminal.\n")
+	} else if c.Kind == Acts && c.Agents == AgentAsks {
+		b.WriteString("\nThis command changes something. An agent you run outside Flint can run it only after you allow\n" +
+			"that one call in Flint's own dialog (Cancel is the default); agents Flint started cannot run it,\n" +
+			"nor can a process that is not in a terminal.\n")
 	} else if c.Kind == Acts {
 		b.WriteString("\nThis command changes something: agents cannot run it, nor can a process that is not in a terminal.\n")
 	}
 	return b.String()
 }
+
+// actsFooter explains the mark of a command that acts in the lists.
+const actsFooter = "\n* changes something: an agent outside Flint runs it only after you allow it in Flint (some never).\n"

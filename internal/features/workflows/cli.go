@@ -34,6 +34,12 @@ func (a *API) cliCommands() []cli.Command {
 			},
 		}
 	}
+	// steer lets an agent outside Flint take an action of
+	// steer_workflow_run, after the user's yes (agentSteerCheck).
+	steer := func(c cli.Command) cli.Command {
+		c.Agents, c.AgentCheck = cli.AgentAsks, a.agentSteerCheck
+		return c
+	}
 	return []cli.Command{
 		{
 			Path: "workflow list", Summary: "List the workflows offered in the folder", Kind: cli.Reads, Folder: true,
@@ -45,8 +51,9 @@ func (a *API) cliCommands() []cli.Command {
 		},
 		{
 			Path: "workflow new", Summary: "Write a starter workflow to .flint/workflows/<name>.md", Kind: cli.Acts, Folder: true,
-			Args: []cli.Arg{{Name: "name", Max: 64}},
-			Help: "The folder must be trusted. An existing file is never overwritten.",
+			Args:   []cli.Arg{{Name: "name", Max: 64}},
+			Help:   "The folder must be trusted. An existing file is never overwritten.",
+			Agents: cli.AgentAsks,
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
 				path, err := a.NewWorkflow(c.Folder, c.Arg(0))
 				if err != nil {
@@ -65,8 +72,17 @@ func (a *API) cliCommands() []cli.Command {
 			Help: "Like Run Workflow…: one agent task (a branch and a worktree) takes the steps in order.\n" +
 				"The folder must be trusted and in a git repository. Follow it with flint run wait <run>.\n" +
 				"The first time script steps would run without a sandbox in a checkout, Flint asks you in its own dialog.",
-			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
-				v, err := a.Start(StartRequest{Dir: c.Folder, Workflow: c.Arg(0), Description: c.String("task"), Agent: c.String("agent")})
+			Agents:     cli.AgentAsks,
+			AgentCheck: func(context.Context, *cli.Call) error { return a.agentWorkflowsOn() },
+			Run: func(ctx context.Context, c *cli.Call) (cli.Result, error) {
+				req := runRequest{dir: c.Folder, workflow: c.Arg(0), description: c.String("task"), agent: c.String("agent")}
+				if who, ok := cli.CallerFrom(ctx); ok && who.Agent {
+					// An agent's start the user approved: like start_workflow, its
+					// script steps without a sandbox are refused, never asked.
+					req.origin, req.consent = OriginAgent, consentAgent
+					req.by = "Run started by " + cli.AgentBy(who) + ", approved by you"
+				}
+				v, err := a.startRun(req)
 				if err != nil {
 					return cli.Result{}, err
 				}
@@ -99,7 +115,7 @@ func (a *API) cliCommands() []cli.Command {
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) { return a.runResult(c.Arg(0)) },
 		},
 		a.humanCommand("run approve", "Approve: pass the approval step the run waits at", "Only you can approve: agents cannot run this command.", approveDecision, a.Approve),
-		{
+		steer(cli.Command{
 			Path: "run send-back", Summary: "Take the steps from one step on again, with a note", Kind: cli.Acts, Args: runArg,
 			Flags: []cli.Flag{
 				{Name: "step", Value: "<step>", Usage: "the step's id or title", Required: true, Max: maxArg},
@@ -112,13 +128,13 @@ func (a *API) cliCommands() []cli.Command {
 				}
 				return a.runResult(id)
 			},
-		},
+		}),
 		act("run check", "Check again: read the failed step's chat for its result", "Use it after you answered the agent in the step's chat. A result line of RESULT: DONE or PASS passes the step and the run goes on; otherwise the run stays failed.", a.Recheck),
-		act("run retry", "Take the failed step again", "", a.Retry),
+		steer(act("run retry", "Take the failed step again", "", a.Retry)),
 		a.humanCommand("run continue", "Continue anyway: pass the failed step and go on", "Only you can continue past a failed step: agents cannot run this command.", continueDecision, a.Skip),
-		act("run pause", "Pause the run before its next step", "", a.Pause),
-		act("run resume", "Let a paused run go on", "", a.Resume),
-		act("run stop", "Stop the run and its running step; the agent task stays", "", a.Stop),
+		steer(act("run pause", "Pause the run before its next step", "", a.Pause)),
+		steer(act("run resume", "Let a paused run go on", "", a.Resume)),
+		steer(act("run stop", "Stop the run and its running step; the agent task stays", "", a.Stop)),
 		{
 			Path: "run remove", Summary: "Forget a run that is over; its agent task stays", Kind: cli.Acts, Args: runArg,
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
@@ -414,4 +430,36 @@ func (a *API) cliWait(ctx context.Context, c *cli.Call) (cli.Result, error) {
 		res.Exit = cli.ExitNeedsUser
 	}
 	return res, nil
+}
+
+// errAgentWorkflowsOff refuses an agent's workflow command while the user
+// has not switched agents' workflow actions on.
+var errAgentWorkflowsOff = errors.New("agents can start and steer workflow runs only while Settings ▸ Agent Context ▸ Actions ▸ \"Run and steer workflows\" is on")
+
+// agentWorkflowsOn is the check of an agent's workflow run: the switch that
+// lets agents start and steer runs (mcpServer.actions.workflows) is on.
+func (a *API) agentWorkflowsOn() error {
+	if !a.host.Settings().MCPServer.Actions.Workflows {
+		return errAgentWorkflowsOff
+	}
+	return nil
+}
+
+// agentSteerCheck is the check of an agent's run send-back, retry, pause,
+// resume and stop, the actions of steer_workflow_run: the switch is on and
+// the run was started from a trusted folder. Approving a step, checking a
+// failed one again and continuing past it are the user's alone: those
+// commands are refused to every agent.
+func (a *API) agentSteerCheck(_ context.Context, c *cli.Call) error {
+	if err := a.agentWorkflowsOn(); err != nil {
+		return err
+	}
+	r, err := a.run(c.Arg(0))
+	if err != nil {
+		return err
+	}
+	if !a.host.Trusted(r.Dir) {
+		return fmt.Errorf("the run's folder %s is in Restricted Mode in Flint: agents cannot steer its runs", r.Dir)
+	}
+	return nil
 }

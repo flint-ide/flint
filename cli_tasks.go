@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -43,10 +44,12 @@ func (t *TaskAPI) cliCommands() []cli.Command {
 			},
 			Help: "Like New Agent Task…: the folder must be open in Flint. Flint starts the chat, or queues the task\n" +
 				"when agentTasks.maxParallel tasks work already.",
-			Run: t.cliNew,
+			Agents: cli.AgentAsks,
+			Run:    t.cliNew,
 		},
 		{
 			Path: "task start", Summary: "Start a queued task now", Kind: cli.Acts, Args: idArg,
+			Agents: cli.AgentAsks, AgentCheck: t.agentTaskCheck,
 			Run: t.cliStart,
 		},
 		{
@@ -60,6 +63,7 @@ func (t *TaskAPI) cliCommands() []cli.Command {
 		},
 		{
 			Path: "task update", Summary: "Merge the task's base into its branch (Update from base)", Kind: cli.Acts, Args: idArg,
+			Agents: cli.AgentAsks, AgentCheck: t.agentTaskCheck,
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
 				files, err := t.UpdateFromBase(c.Arg(0))
 				if err != nil {
@@ -78,6 +82,7 @@ func (t *TaskAPI) cliCommands() []cli.Command {
 		},
 		{
 			Path: "task merge", Summary: "Merge the task's branch into its base", Kind: cli.Acts, Args: idArg,
+			Agents: cli.AgentAsks, AgentCheck: t.agentTaskCheck,
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
 				r, err := t.Merge(c.Arg(0))
 				if err != nil {
@@ -96,6 +101,7 @@ func (t *TaskAPI) cliCommands() []cli.Command {
 		},
 		{
 			Path: "task pr", Summary: "Push the branch and open a pull request", Kind: cli.Acts, Args: idArg,
+			Agents: cli.AgentAsks, AgentCheck: t.agentTaskCheck,
 			Help: "Flint shows what it will push in its own dialog first; the command waits for your answer.",
 			Run: func(_ context.Context, c *cli.Call) (cli.Result, error) {
 				url, err := t.CreatePullRequest(c.Arg(0))
@@ -107,11 +113,31 @@ func (t *TaskAPI) cliCommands() []cli.Command {
 		},
 		{
 			Path: "task remove", Summary: "Stop the task's chats, delete its worktree and forget it", Kind: cli.Acts, Args: idArg,
+			Agents: cli.AgentAsks, AgentCheck: t.agentTaskCheck,
 			Help: "When the worktree has uncommitted or ignored files, or the branch has commits its base lacks,\n" +
 				"Flint asks in its own dialog first; the command waits for your answer.",
 			Run: t.cliRemove,
 		},
 	}
+}
+
+// agentTaskCheck refuses an agent's command on a task of a repository in
+// Restricted Mode (cli.Command.AgentCheck).
+func (t *TaskAPI) agentTaskCheck(_ context.Context, c *cli.Call) error {
+	if !agenttask.ValidID(c.Arg(0)) {
+		return errors.New("invalid task id")
+	}
+	repo, _, ok := t.app.taskStore().Find(c.Arg(0))
+	if !ok {
+		return errors.New("no such task (it was removed)")
+	}
+	if filepath.Base(repo) == ".git" {
+		repo = filepath.Dir(repo) // tasks are kept by the repository's git directory
+	}
+	if !t.app.isTrusted(repo) {
+		return fmt.Errorf("the task's repository %s is in Restricted Mode in Flint: agents cannot act on its tasks", repo)
+	}
+	return nil
 }
 
 // cliFolder checks a folder from the command line like the panel's: inside a

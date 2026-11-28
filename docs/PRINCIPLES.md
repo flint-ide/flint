@@ -44,7 +44,7 @@ Flint is built around coding agents (Claude Code, Codex). Agent work is the prim
 - One path builds agent context: gather the facts, redact secrets (`internal/redact`), and put the request in the chat draft for the user to review. Nothing goes to an AI provider without the user seeing it.
 - Agents investigate read-only first; changes to live systems (clusters, databases) need an explicit request. Project-level agent settings are ignored in Restricted Mode.
 - Everything the user can do, an agent can do through the same CLIs and files; Flint doesn't keep state an agent can't see.
-- **A human decision is never taken by an agent.** An agent may start and steer work, each acting call with the user's yes, but approving a gate and continuing past a failed step belong to the user, on every path: the panels, the agent tools and the command line (which refuses commands sent by an agent).
+- **A human decision is never taken by an agent.** An agent may start and steer work, each acting call with the user's yes, but approving a gate and continuing past a failed step belong to the user, on every path: the panels, the agent tools and the command line (which refuses those commands to every agent, and asks the user before any other command an agent sends).
 - **Anything a panel can do, the command line can do.** A feature that adds an action to a panel adds the same action to the `flint` command, through the same function, with `--json` output and exit statuses for scripts ([reference](../site/reference/cli.md)).
 
 **In practice:** a new failure view without "Ask the agent" is incomplete.
